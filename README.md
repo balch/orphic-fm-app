@@ -1,40 +1,65 @@
-This is a Kotlin Multiplatform project targeting Android, Desktop (JVM).
+# Songe-8
 
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./composeApp/src/jvmMain/kotlin)
-    folder is the appropriate location.
+An 8-oscillator organismic synthesizer inspired by the [SOMA Lyra-8](https://somasynths.com/lyra-organismic-synthesizer/), built with Kotlin Multiplatform targeting Desktop and Android.
 
-### Build and Run Android Application
+## Overview
 
-To build and run the development version of the Android app, use the run configuration from the run widget
-in your IDE’s toolbar or build it directly from the terminal:
-- on macOS/Linux
-  ```shell
-  ./gradlew :composeApp:assembleDebug
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :composeApp:assembleDebug
-  ```
+Songe-8 features non-linear voice generators (similar to old electric organ tone generators) with a hierarchical modulation structure:
 
-### Build and Run Desktop (JVM) Application
+- **8 Voices**: Individual tone generators with tune, pulse, and hold controls
+- **4 Duo Groups**: Paired voices with cross-modulation and LFO
+- **2 Quad Groups**: Groups of 4 with pitch shift and sustain
+- **Global Controls**: Vibrato, distortion, volume, pan, and master drive
 
-To build and run the development version of the desktop app, use the run configuration from the run widget
-in your IDE’s toolbar or run it directly from the terminal:
-- on macOS/Linux
-  ```shell
-  ./gradlew :composeApp:run
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :composeApp:run
-  ```
+## Tech Stack
+
+- **Kotlin 2.3.0** with Kotlin Multiplatform
+- **Compose Multiplatform** (Desktop & Android)
+- **Metro** for compile-time dependency injection
+- **Navigation3** with adaptive layouts
+- **Material3** with dark synth theme
+- **Haze** for glassmorphism effects
+- **JSyn** for audio synthesis (Desktop/JVM)
+- **KmLogging** for structured logging
+
+## Project Structure
+
+```
+composeApp/
+├── src/
+│   ├── commonMain/kotlin/org/balch/songe/
+│   │   ├── navigation/     # Nav3 routing
+│   │   ├── synth/          # Audio engine & state
+│   │   └── ui/
+│   │       ├── components/ # Reusable controls
+│   │       ├── panels/     # Voice & group panels
+│   │       ├── screens/    # Full screens
+│   │       └── theme/      # Dark synth theme
+│   ├── androidMain/        # Android-specific
+│   └── jvmMain/            # Desktop-specific (JSyn)
+```
+
+## Build & Run
+
+### Desktop (JVM)
+```bash
+./gradlew :composeApp:run
+```
+
+### Android
+```bash
+./gradlew :composeApp:assembleDebug
+```
+
+### Build All
+```bash
+./gradlew build
+```
+
+## Status
+
+🚧 **Work in Progress** - Phase 1 (Foundation) complete
 
 ---
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)
