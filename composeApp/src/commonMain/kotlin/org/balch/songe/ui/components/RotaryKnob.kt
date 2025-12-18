@@ -1,0 +1,241 @@
+package org.balch.songe.ui.components
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import org.balch.songe.ui.theme.SongeColors
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+
+@Composable
+@Preview
+fun RotaryKnobPreview() {
+    MaterialTheme {
+        RotaryKnob(value = 0.5f, onValueChange = {})
+    }
+}
+
+/**
+ * A synth-style rotary knob control.
+ * Supports vertical drag interaction for precision.
+ */
+@Composable
+fun RotaryKnob(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    range: ClosedFloatingPointRange<Float> = 0f..1f,
+    size: Dp = 64.dp,
+    trackColor: Color = SongeColors.deepPurple,
+    progressColor: Color = SongeColors.neonCyan,
+    knobColor: Color = SongeColors.softPurple,
+    indicatorColor: Color = SongeColors.neonCyan
+) {
+    // Sensitivity for drag (pixels per full range)
+    val sensitivity = 200f
+    
+    var dragStartValue by remember { mutableStateOf(0f) }
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { dragStartValue = value },
+                        onDrag = { _, dragAmount ->
+                            // Negative y because dragging up should increase value
+                            val delta = -dragAmount.y / sensitivity
+                            val rangeSize = range.endInclusive - range.start
+                            val rawNewValue = dragStartValue + (delta * rangeSize)
+                            val newValue = rawNewValue.coerceIn(range)
+                            if (newValue != value) {
+                                onValueChange(newValue)
+                                dragStartValue = newValue // update for continuous relative drag
+                            }
+                        }
+                    )
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = size.toPx() * 0.1f
+                val radius = (size.toPx() - strokeWidth) / 2
+                val center = Offset(size.toPx() / 2, size.toPx() / 2)
+                
+                // Track (background arc) - darker and deeper
+                val startAngle = 135f
+                val sweepAngle = 270f
+                
+                // Track Groove (Shadow)
+                drawArc(
+                    color = Color.Black.copy(alpha = 0.5f),
+                    startAngle = startAngle,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    topLeft = Offset(center.x - radius, center.y - radius),
+                    size = Size(radius * 2, radius * 2),
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+
+                drawArc(
+                    color = trackColor.copy(alpha = 0.3f),
+                    startAngle = startAngle,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    topLeft = Offset(center.x - radius, center.y - radius),
+                    size = Size(radius * 2, radius * 2),
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+                
+                // Active Progress Arc with Glow
+                val normalizedValue = (value - range.start) / (range.endInclusive - range.start)
+                val currentSweep = sweepAngle * normalizedValue
+                
+                // Progress Glow
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        colors = listOf(progressColor.copy(alpha = 0.0f), progressColor.copy(alpha = 0.6f)),
+                        center = center
+                    ),
+                    startAngle = startAngle,
+                    sweepAngle = currentSweep,
+                    useCenter = false,
+                    topLeft = Offset(center.x - radius, center.y - radius),
+                    size = Size(radius * 2, radius * 2),
+                    style = Stroke(width = strokeWidth * 1.5f, cap = StrokeCap.Round)
+                )
+
+                // Progress Core
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        colors = listOf(progressColor.copy(alpha = 0.5f), progressColor),
+                        center = center
+                    ),
+                    startAngle = startAngle,
+                    sweepAngle = currentSweep,
+                    useCenter = false,
+                    topLeft = Offset(center.x - radius, center.y - radius),
+                    size = Size(radius * 2, radius * 2),
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+                
+                // Knob Body Calculation
+                val knobRadius = radius * 0.7f
+                val angleInDegrees = startAngle + currentSweep
+                val angleInRadians = Math.toRadians(angleInDegrees.toDouble())
+                
+                // Knob Shadow (fake drop shadow)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent),
+                        center = center.copy(y = center.y + 4.dp.toPx()),
+                        radius = knobRadius + 4.dp.toPx()
+                    ),
+                    radius = knobRadius + 4.dp.toPx(),
+                    center = center.copy(y = center.y + 4.dp.toPx())
+                )
+
+                // Knob Main Body (Gradient for convexity)
+                drawCircle(
+                     brush = Brush.linearGradient(
+                        colors = listOf(
+                            SongeColors.softPurple.copy(alpha = 0.8f), // Highlight top-left
+                            SongeColors.deepPurple,                    // Mid
+                            Color.Black                                // Shadow bottom-right
+                        ),
+                        start = Offset(center.x - knobRadius, center.y - knobRadius),
+                        end = Offset(center.x + knobRadius, center.y + knobRadius)
+                    ),
+                    radius = knobRadius,
+                    center = center
+                )
+
+                // Knob Bevel/Edge
+                drawCircle(
+                    style = Stroke(width = 2.dp.toPx()),
+                    brush = Brush.linearGradient(
+                         colors = listOf(
+                            Color.White.copy(alpha = 0.3f),
+                            Color.Black.copy(alpha = 0.6f)
+                        ),
+                        start = Offset(center.x - knobRadius, center.y - knobRadius),
+                        end = Offset(center.x + knobRadius, center.y + knobRadius)
+                    ),
+                    radius = knobRadius,
+                    center = center
+                )
+
+                // Indicator (Notch)
+                val indicatorLength = knobRadius * 0.5f
+                val endX = center.x + indicatorLength * cos(angleInRadians).toFloat()
+                val endY = center.y + indicatorLength * sin(angleInRadians).toFloat()
+                
+                drawLine(
+                    color = indicatorColor,
+                    start = center,
+                    end = Offset(endX, endY),
+                    strokeWidth = strokeWidth * 0.8f,
+                    cap = StrokeCap.Round
+                )
+                
+                // Indicator Glow Point
+                drawCircle(
+                    color = indicatorColor,
+                    radius = strokeWidth * 0.6f,
+                    center = Offset(endX, endY)
+                )
+            }
+        }
+        
+        if (label != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = String.format("%.2f", value), // Will fix formatting for basic float display
+                style = MaterialTheme.typography.labelMedium,
+                color = progressColor,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
