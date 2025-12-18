@@ -7,6 +7,9 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.metro)
 }
 
 kotlin {
@@ -32,6 +35,19 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(libs.haze)
+            implementation(libs.haze.materials)
+            implementation(libs.jsyn)
+            implementation(libs.kmlogging)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.datetime)
+            
+            // Navigation3
+            implementation(libs.navigation3.runtime)
+            implementation(libs.navigation3.ui)
+            implementation(libs.lifecycle.viewmodel.navigation3)
+            implementation(libs.adaptive.navigation3)
+            implementation(libs.material3.adaptive.navigation.suite)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
