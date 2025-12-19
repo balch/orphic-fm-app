@@ -21,6 +21,18 @@ class AndroidSongeEngine : SongeEngine {
          // Stub
     }
 
+    override fun setVoiceFmDepth(index: Int, amount: Float) {
+         // Stub
+    }
+
+    override fun setVoiceEnvelopeMode(index: Int, isFast: Boolean) {
+         // Stub
+    }
+
+    override fun setPairSharpness(pairIndex: Int, sharpness: Float) {
+         // Stub
+    }
+
     override fun setGroupPitch(groupIndex: Int, pitch: Float) {
          // Stub
     }

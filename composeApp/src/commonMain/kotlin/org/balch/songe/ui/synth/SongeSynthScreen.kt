@@ -283,7 +283,15 @@ private fun DuoPairBox(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Knobs
-                VoiceColumnMod(voiceA + 1, viewModel.voiceStates[voiceA].tune) { viewModel.onVoiceTuneChange(voiceA, it) }
+                VoiceColumnMod(
+                    num = voiceA + 1,
+                    tune = viewModel.voiceStates[voiceA].tune,
+                    onTuneChange = { viewModel.onVoiceTuneChange(voiceA, it) },
+                    modDepth = viewModel.voiceModDepths[voiceA],
+                    onModDepthChange = { viewModel.onVoiceModDepthChange(voiceA, it) },
+                    isFastEnv = viewModel.voiceEnvelopeModes[voiceA],
+                    onEnvModeChange = { viewModel.onVoiceEnvelopeModeChange(voiceA, it) }
+                )
                 
                 // Buttons
                 Row(
@@ -305,8 +313,19 @@ private fun DuoPairBox(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Calculate pair index (0-3) from voice A (0,2,4,6)
+                val pairIndex = voiceA / 2
+                
                 // Knobs
-                VoiceColumnSharp(voiceB + 1, viewModel.voiceStates[voiceB].tune) { viewModel.onVoiceTuneChange(voiceB, it) }
+                VoiceColumnSharp(
+                    num = voiceB + 1,
+                    tune = viewModel.voiceStates[voiceB].tune,
+                    onTuneChange = { viewModel.onVoiceTuneChange(voiceB, it) },
+                    sharpness = viewModel.pairSharpness[pairIndex],
+                    onSharpnessChange = { viewModel.onPairSharpnessChange(pairIndex, it) },
+                    isFastEnv = viewModel.voiceEnvelopeModes[voiceB],
+                    onEnvModeChange = { viewModel.onVoiceEnvelopeModeChange(voiceB, it) }
+                )
                 
                 // Buttons
                 Row(
@@ -440,7 +459,15 @@ private fun VerticalLFOToggle(
 }
 
 @Composable
-private fun VoiceColumnMod(num: Int, tune: Float, onTuneChange: (Float) -> Unit) {
+private fun VoiceColumnMod(
+    num: Int,
+    tune: Float,
+    onTuneChange: (Float) -> Unit,
+    modDepth: Float,
+    onModDepthChange: (Float) -> Unit,
+    isFastEnv: Boolean,
+    onEnvModeChange: (Boolean) -> Unit
+) {
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
@@ -450,13 +477,44 @@ private fun VoiceColumnMod(num: Int, tune: Float, onTuneChange: (Float) -> Unit)
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text("$num", fontSize = 8.sp, color = SongeColors.electricBlue.copy(alpha = 0.6f))
-        RotaryKnob(value = 0.5f, onValueChange = {}, label = "MOD", size = 24.dp, progressColor = SongeColors.neonMagenta)
+        RotaryKnob(value = modDepth, onValueChange = onModDepthChange, label = "MOD", size = 24.dp, progressColor = SongeColors.neonMagenta)
         RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", size = 28.dp, progressColor = SongeColors.neonCyan)
+        // Envelope Toggle
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Box(
+                modifier = Modifier.height(16.dp).width(20.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (isFastEnv) SongeColors.neonCyan.copy(alpha = 0.8f) else Color(0xFF2A2A3A))
+                    .border(1.dp, if (isFastEnv) SongeColors.neonCyan else Color(0xFF4A4A5A), RoundedCornerShape(2.dp))
+                    .clickable { onEnvModeChange(true) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("F", fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = if (isFastEnv) Color.White else Color(0xFF888888))
+            }
+            Box(
+                modifier = Modifier.height(16.dp).width(20.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (!isFastEnv) SongeColors.softPurple.copy(alpha = 0.8f) else Color(0xFF2A2A3A))
+                    .border(1.dp, if (!isFastEnv) SongeColors.softPurple else Color(0xFF4A4A5A), RoundedCornerShape(2.dp))
+                    .clickable { onEnvModeChange(false) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("S", fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = if (!isFastEnv) Color.White else Color(0xFF888888))
+            }
+        }
     }
 }
 
 @Composable
-private fun VoiceColumnSharp(num: Int, tune: Float, onTuneChange: (Float) -> Unit) {
+private fun VoiceColumnSharp(
+    num: Int,
+    tune: Float,
+    onTuneChange: (Float) -> Unit,
+    sharpness: Float,
+    onSharpnessChange: (Float) -> Unit,
+    isFastEnv: Boolean,
+    onEnvModeChange: (Boolean) -> Unit
+) {
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
@@ -466,8 +524,31 @@ private fun VoiceColumnSharp(num: Int, tune: Float, onTuneChange: (Float) -> Uni
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text("$num", fontSize = 8.sp, color = SongeColors.electricBlue.copy(alpha = 0.6f))
-        RotaryKnob(value = 0.5f, onValueChange = {}, label = "SHARP", size = 24.dp, progressColor = SongeColors.synthGreen)
+        RotaryKnob(value = sharpness, onValueChange = onSharpnessChange, label = "SHARP", size = 24.dp, progressColor = SongeColors.synthGreen)
         RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", size = 28.dp, progressColor = SongeColors.neonCyan)
+        // Envelope Toggle
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            Box(
+                modifier = Modifier.height(16.dp).width(20.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (isFastEnv) SongeColors.neonCyan.copy(alpha = 0.8f) else Color(0xFF2A2A3A))
+                    .border(1.dp, if (isFastEnv) SongeColors.neonCyan else Color(0xFF4A4A5A), RoundedCornerShape(2.dp))
+                    .clickable { onEnvModeChange(true) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("F", fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = if (isFastEnv) Color.White else Color(0xFF888888))
+            }
+            Box(
+                modifier = Modifier.height(16.dp).width(20.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (!isFastEnv) SongeColors.softPurple.copy(alpha = 0.8f) else Color(0xFF2A2A3A))
+                    .border(1.dp, if (!isFastEnv) SongeColors.softPurple else Color(0xFF4A4A5A), RoundedCornerShape(2.dp))
+                    .clickable { onEnvModeChange(false) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("S", fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = if (!isFastEnv) Color.White else Color(0xFF888888))
+            }
+        }
     }
 }
 

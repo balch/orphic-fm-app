@@ -17,6 +17,19 @@ class SynthViewModel(
     // 8 Voices
     var voiceStates by mutableStateOf(List(8) { index -> VoiceState(index = index) })
         private set
+    
+    // Voice MOD Depths - only for ODD voices (1,3,5,7 = indices 0,2,4,6)
+    var voiceModDepths by mutableStateOf(List(8) { 0.0f })
+        private set
+    
+    // Pair Sharpness (Triangle->Square) - controls EVEN voice knobs (2,4,6,8)
+    // Index 0 = Pair 1-2, Index 1 = Pair 3-4, etc.
+    var pairSharpness by mutableStateOf(List(4) { 0.0f })
+        private set
+    
+    // Voice Envelope Modes (true=Fast, false=Slow)
+    var voiceEnvelopeModes by mutableStateOf(List(8) { false }) // Default: Slow/Drone
+        private set
 
     // Duo Groups (1-2, 3-4, 5-6, 7-8)
     private var duoGroupStates by mutableStateOf(List(4) { 0.0f }) // Mod Depth
@@ -51,6 +64,27 @@ class SynthViewModel(
         newVoices[index] = newVoices[index].copy(tune = newTune)
         voiceStates = newVoices
         engine.setVoiceTune(index, newTune)
+    }
+    
+    fun onVoiceModDepthChange(index: Int, newDepth: Float) {
+        val newDepths = voiceModDepths.toMutableList()
+        newDepths[index] = newDepth
+        voiceModDepths = newDepths
+        engine.setVoiceFmDepth(index, newDepth)
+    }
+    
+    fun onPairSharpnessChange(pairIndex: Int, newSharpness: Float) {
+        val newSharpnessList = pairSharpness.toMutableList()
+        newSharpnessList[pairIndex] = newSharpness
+        pairSharpness = newSharpnessList
+        engine.setPairSharpness(pairIndex, newSharpness)
+    }
+    
+    fun onVoiceEnvelopeModeChange(index: Int, isFast: Boolean) {
+        val newModes = voiceEnvelopeModes.toMutableList()
+        newModes[index] = isFast
+        voiceEnvelopeModes = newModes
+        engine.setVoiceEnvelopeMode(index, isFast)
     }
 
     // ... (Pulse/Hold methods are unchanged)

@@ -3,6 +3,7 @@ package org.balch.songe.ui.panels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,6 +31,9 @@ import org.balch.songe.ui.components.HoldButton
 import org.balch.songe.ui.components.PulseButton
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.theme.SongeColors
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.clickable
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
@@ -37,6 +41,10 @@ fun VoicePanel(
     voiceIndex: Int,
     tune: Float,
     onTuneChange: (Float) -> Unit,
+    fmDepth: Float,
+    onFmDepthChange: (Float) -> Unit,
+    isFastEnvelope: Boolean,
+    onEnvelopeModeChange: (Boolean) -> Unit,
     pulseStrength: Float, // Visual feedback only
     onPulseStart: () -> Unit,
     onPulseEnd: () -> Unit,
@@ -87,13 +95,65 @@ fun VoicePanel(
             color = SongeColors.electricBlue
         )
         
-        RotaryKnob(
-            value = tune,
-            onValueChange = onTuneChange,
-            label = "TUNE",
-            size = 40.dp,
-            indicatorColor = SongeColors.neonMagenta
-        )
+        // Knobs Row
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RotaryKnob(
+                value = tune,
+                onValueChange = onTuneChange,
+                label = "TUNE",
+                size = 36.dp,
+                indicatorColor = SongeColors.neonMagenta
+            )
+            RotaryKnob(
+                value = fmDepth,
+                onValueChange = onFmDepthChange,
+                label = "MOD",
+                size = 36.dp,
+                indicatorColor = SongeColors.electricBlue
+            )
+        }
+        
+        // Envelope Mode Toggle
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (isFastEnvelope) SongeColors.neonCyan else Color(0xFF2A2A3A))
+                    .border(1.dp, if (isFastEnvelope) SongeColors.neonCyan else Color(0xFF4A4A5A), RoundedCornerShape(4.dp))
+                    .clickable { onEnvelopeModeChange(true) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "FAST",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isFastEnvelope) Color.White else Color(0xFF888888)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (!isFastEnvelope) SongeColors.softPurple else Color(0xFF2A2A3A))
+                    .border(1.dp, if (!isFastEnvelope) SongeColors.softPurple else Color(0xFF4A4A5A), RoundedCornerShape(4.dp))
+                    .clickable { onEnvelopeModeChange(false) }
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "SLOW",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (!isFastEnvelope) Color.White else Color(0xFF888888)
+                )
+            }
+        }
         
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -122,6 +182,10 @@ fun VoicePanelPreview() {
             voiceIndex = 0,
             tune = 0.5f,
             onTuneChange = {},
+            fmDepth = 0.0f,
+            onFmDepthChange = {},
+            isFastEnvelope = false,
+            onEnvelopeModeChange = {},
             pulseStrength = 0f,
             onPulseStart = {},
             onPulseEnd = {},

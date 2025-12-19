@@ -10,8 +10,21 @@ class JvmSongeEngine : SongeEngine {
     private val synth: Synthesizer = JSyn.createSynthesizer()
     private val lineOut: LineOut = LineOut()
     
-    // 8 Voices
-    private val voices = List(8) { SongeVoice() }
+    // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
+    private val voices = listOf(
+        // Pair 1-2: Bass range
+        SongeVoice(pitchMultiplier = 0.5),
+        SongeVoice(pitchMultiplier = 0.5),
+        // Pair 3-4: Mid range
+        SongeVoice(pitchMultiplier = 1.0),
+        SongeVoice(pitchMultiplier = 1.0),
+        // Pair 5-6: Mid range
+        SongeVoice(pitchMultiplier = 1.0),
+        SongeVoice(pitchMultiplier = 1.0),
+        // Pair 7-8: High range (octave up)
+        SongeVoice(pitchMultiplier = 2.0),
+        SongeVoice(pitchMultiplier = 2.0)
+    )
     
     // Mixer
     private val mixer = LineOut() // Using LineOut as a summing point for now or direct connect
@@ -132,6 +145,23 @@ class JvmSongeEngine : SongeEngine {
         
         delay2.output.connect(delay2FeedbackGain.inputA)
         delay2FeedbackGain.output.connect(delay2.input)
+        
+        // 7. Voice FM Cross-Modulation (Pair-wise)
+        // Pair 1-2: Voice 1 <-> Voice 2
+        voices[0].outputPort.connect(voices[1].modInput)
+        voices[1].outputPort.connect(voices[0].modInput)
+        
+        // Pair 3-4
+        voices[2].outputPort.connect(voices[3].modInput)
+        voices[3].outputPort.connect(voices[2].modInput)
+        
+        // Pair 5-6
+        voices[4].outputPort.connect(voices[5].modInput)
+        voices[5].outputPort.connect(voices[4].modInput)
+        
+        // Pair 7-8
+        voices[6].outputPort.connect(voices[7].modInput)
+        voices[7].outputPort.connect(voices[6].modInput)
     }
     // ... (rest of start() remains mostly same, ensuring voices go to driveGain) ...
     
@@ -271,6 +301,25 @@ class JvmSongeEngine : SongeEngine {
 
     override fun setVoiceFeedback(index: Int, amount: Float) {
         // TODO: Implement Feedback routing later
+    }
+    
+    override fun setVoiceFmDepth(index: Int, amount: Float) {
+        // Set FM modulation depth (0.0 - 1.0)
+        voices[index].fmDepth.set(amount.toDouble())
+    }
+    
+    override fun setVoiceEnvelopeMode(index: Int, isFast: Boolean) {
+        voices[index].setEnvelopeMode(isFast)
+        Logger.debug { "Voice ${index + 1} Envelope: ${if (isFast) "FAST" else "SLOW"}" }
+    }
+    
+    override fun setPairSharpness(pairIndex: Int, sharpness: Float) {
+        // Set waveform (0.0=triangle, 1.0=square) for both voices in pair
+        val voiceA = pairIndex * 2
+        val voiceB = voiceA + 1
+        voices[voiceA].sharpness.set(sharpness.toDouble())
+        voices[voiceB].sharpness.set(sharpness.toDouble())
+        Logger.debug { "Pair ${pairIndex + 1} Sharpness: ${"%.2f".format(sharpness)}" }
     }
 
     override fun setGroupPitch(groupIndex: Int, pitch: Float) {
