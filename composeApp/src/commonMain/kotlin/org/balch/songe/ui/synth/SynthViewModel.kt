@@ -38,6 +38,7 @@ class SynthViewModel(
     var delayMod1 by mutableStateOf(0.0f)
     var delayMod2 by mutableStateOf(0.0f)
     var delayModSourceIsLfo by mutableStateOf(true) // true=LFO, false=SELF (Global switch for now, or per channel?)
+    var delayLfoWaveformIsTriangle by mutableStateOf(true) // true=Triangle, false=Square (AND)
 
     // Hyper LFO
     var hyperLfoA by mutableStateOf(0.5f)
@@ -111,6 +112,11 @@ class SynthViewModel(
         // Apply to both delays for now as per UI Toggle
         engine.setDelayModSource(0, isLfo)
         engine.setDelayModSource(1, isLfo)
+    }
+    
+    fun onDelayLfoWaveformChange(isTriangle: Boolean) {
+        delayLfoWaveformIsTriangle = isTriangle
+        engine.setDelayLfoWaveform(isTriangle)
     }
 
     fun onPulseStart(index: Int) {

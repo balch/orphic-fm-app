@@ -39,12 +39,18 @@ class JvmSongeEngine : SongeEngine {
     private val driveGain = com.jsyn.unitgen.Multiply()
     private val masterGain = com.jsyn.unitgen.Multiply() // Master Volume
     
+    // Dry/Wet Mix for Delays
+    private val dryGain = com.jsyn.unitgen.Multiply()  // Direct signal
+    private val wetGain = com.jsyn.unitgen.Multiply()  // Delayed signal
+    
     init {
         // FX Chain: Voices -> Delays -> Drive -> Limiter -> MasterGain -> Output
         synth.add(peakFollower)
         synth.add(limiter)
         synth.add(driveGain)
         synth.add(masterGain)
+        synth.add(dryGain)
+        synth.add(wetGain)
         synth.add(delay1)
         synth.add(delay2)
         synth.add(delay1FeedbackGain)
@@ -58,6 +64,10 @@ class JvmSongeEngine : SongeEngine {
         peakFollower.halfLife.set(0.1)
         driveGain.inputB.set(1.0) // Default unity gain
         masterGain.inputB.set(0.7) // Default master volume 70%
+        
+        // Dry/Wet defaults (50/50 mix)
+        dryGain.inputB.set(0.5)
+        wetGain.inputB.set(0.5)
         
         // Self-modulation attenuator (0.02 = only 2% of audio signal reaches mod input)
         selfMod1Attenuator.inputB.set(0.02)
@@ -91,14 +101,17 @@ class JvmSongeEngine : SongeEngine {
         
         // ROUTING ---------------------------------------------------------
         
-        // 1. Voices will connect to Delay Inputs (in start())
+        // 1. Voices will connect to Delay Inputs AND Dry Path (in start())
         
-        // 2. Delays -> Drive Input (Summed)
-        // Note: Using driveGain inputA as the summing bus for the delays
-        delay1.output.connect(driveGain.inputA)
-        delay2.output.connect(driveGain.inputA)
+        // 2. Delays -> WetGain -> DriveGain (wet path)
+        delay1.output.connect(wetGain.inputA)
+        delay2.output.connect(wetGain.inputA)
+        wetGain.output.connect(driveGain.inputA)
         
-        // 3. Drive Output -> Limiter
+        // 3. Voices -> DryGain -> DriveGain (dry path, wired in start())
+        dryGain.output.connect(driveGain.inputA)
+        
+        // 4. Drive Output -> Limiter
         driveGain.output.connect(limiter.input)
         
         // 4. Limiter -> Master Gain
@@ -154,7 +167,12 @@ class JvmSongeEngine : SongeEngine {
     }
     
     override fun setDelayMix(amount: Float) {
-        // Not implemented yet (needs Dry/Wet mixer)
+        // 0.0 = 100% Dry, 1.0 = 100% Wet
+        // Use equal-power crossfade for smooth transitions
+        val wetLevel = amount
+        val dryLevel = 1.0f - amount
+        dryGain.inputB.set(dryLevel.toDouble())
+        wetGain.inputB.set(wetLevel.toDouble())
     }
 
     override fun setDelayModDepth(index: Int, amount: Float) {
@@ -189,6 +207,13 @@ class JvmSongeEngine : SongeEngine {
              Logger.debug { "Delay $index Mod Source: SELF (attenuated)" }
         }
     }
+    
+    override fun setDelayLfoWaveform(isTriangle: Boolean) {
+        // When isTriangle=true, use smooth triangle wave for delay modulation
+        // When isTriangle=false, use square wave (AND formula) for rhythmic modulation
+        hyperLfo.setTriangleMode(isTriangle)
+        Logger.debug { "Delay LFO Waveform: ${if (isTriangle) "TRIANGLE" else "SQUARE"}" }
+    }
 
     override fun setDelay(time: Float, feedback: Float) {
         // Backward compatibility
@@ -206,9 +231,12 @@ class JvmSongeEngine : SongeEngine {
         voices.forEach { voice ->
             synth.add(voice)
             
-            // VOICES -> DELAYS (Parallel)
+            // VOICES -> DELAYS (wet path)
             voice.outputPort.connect(delay1.input)
             voice.outputPort.connect(delay2.input)
+            
+            // VOICES -> DRY GAIN (dry path)
+            voice.outputPort.connect(dryGain.inputA)
         }
         
         lineOut.start()

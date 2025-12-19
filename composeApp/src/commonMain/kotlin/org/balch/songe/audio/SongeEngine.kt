@@ -25,6 +25,7 @@ interface SongeEngine {
     // Delay Modulation
     fun setDelayModDepth(index: Int, amount: Float)
     fun setDelayModSource(index: Int, isLfo: Boolean) // true=LFO, false=Self
+    fun setDelayLfoWaveform(isTriangle: Boolean) // true=Triangle, false=Square (AND)
     
     @Deprecated("Use granular setDelayTime/Feedback instead")
     fun setDelay(time: Float, feedback: Float)

@@ -33,6 +33,7 @@ class PreviewSongeEngine(): SongeEngine {
     override fun setDelayMix(amount: Float) {}
     override fun setDelayModDepth(index: Int, amount: Float) {}
     override fun setDelayModSource(index: Int, isLfo: Boolean) {}
+    override fun setDelayLfoWaveform(isTriangle: Boolean) {}
 
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
     override fun setHyperLfoMode(andMode: Boolean) {}

@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
@@ -114,6 +115,8 @@ fun SongeSynthScreen(
                 onMixChange = viewModel::onDelayMixChange,
                 isLfoSource = viewModel.delayModSourceIsLfo,
                 onSourceChange = viewModel::onDelayModSourceChange,
+                isTriangleWave = viewModel.delayLfoWaveformIsTriangle,
+                onWaveformChange = viewModel::onDelayLfoWaveformChange,
                 modifier = Modifier.weight(1f).fillMaxHeight()
             )
             DistortionSection(
@@ -362,42 +365,75 @@ private fun LFOToggleSwitch(
 }
 
 @Composable
+private fun VerticalToggle(
+    modifier: Modifier = Modifier,
+    topLabel: String,
+    bottomLabel: String,
+    isTop: Boolean = true,
+    onToggle: (Boolean) -> Unit,
+    color: Color = SongeColors.warmGlow,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(0xFF1A1A2A))
+            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Top label
+        Text(
+            topLabel,
+            fontSize = 7.sp,
+            color = if (isTop) color else color.copy(alpha = 0.4f),
+            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal
+        )
+
+        // Vertical switch track
+        Box(
+            modifier = Modifier
+                .width(12.dp)
+                .height(22.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(color.copy(alpha = 0.2f))
+                .clickable { onToggle(!isTop) },
+            contentAlignment = if (isTop) Alignment.TopCenter else Alignment.BottomCenter
+        ) {
+            // Switch knob
+            Box(
+                modifier = Modifier
+                    .padding(2.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+        }
+
+        // Bottom label
+        Text(
+            bottomLabel,
+            fontSize = 7.sp,
+            color = if (!isTop) color else color.copy(alpha = 0.4f),
+            fontWeight = if (!isTop) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
+
+// Legacy alias for existing usages
+@Composable
 private fun VerticalLFOToggle(
     color: Color,
     isOn: Boolean = false,
     onToggle: (Boolean) -> Unit = {}
 ) {
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A2A))
-            .border(1.dp, if (isOn) color else color.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-            .clickable { onToggle(!isOn) }
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text("LFO", fontSize = 8.sp, color = if (isOn) color else color.copy(alpha = 0.5f))
-
-        // Vertical switch
-        Box(
-            modifier = Modifier
-                .width(10.dp)
-                .height(20.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(if (isOn) color.copy(alpha = 0.6f) else color.copy(alpha = 0.2f)),
-            contentAlignment = if (isOn) Alignment.BottomCenter else Alignment.TopCenter
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(1.dp)
-                    .width(8.dp)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(if (isOn) Color.White else Color.White.copy(alpha = 0.4f))
-            )
-        }
-    }
+    VerticalToggle(
+        topLabel = "LFO",
+        bottomLabel = "OFF",
+        isTop = isOn,
+        onToggle = { onToggle(!it) }, // Flip because isTop=true means LFO on
+        color = color
+    )
 }
 
 @Composable
@@ -494,6 +530,8 @@ private fun ModDelaySection(
     onMixChange: (Float) -> Unit,
     isLfoSource: Boolean,
     onSourceChange: (Boolean) -> Unit,
+    isTriangleWave: Boolean = true,
+    onWaveformChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -508,53 +546,52 @@ private fun ModDelaySection(
         // Title at TOP
         Text("MOD DELAY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SongeColors.warmGlow)
         
-        Spacer(modifier = Modifier.height(4.dp))
-        
-        // SELF/LFO toggles
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ToggleChip(
-                text = "SELF",
-                isSelected = !isLfoSource,
-                color = SongeColors.warmGlow,
-                // Passing !isLfoSource because click means "Make it Self" (false)
-                onClick = { onSourceChange(false) } 
-            )
-            ToggleChip(
-                text = "LFO",
-                isSelected = isLfoSource,
-                color = SongeColors.warmGlow,
-                onClick = { onSourceChange(true) }
-            )
-        }
-        
         Spacer(modifier = Modifier.height(8.dp))
         
-        // Main Control Grid - Aligned Structurally
+        // Main Control Grid with vertical switches
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp), // Increased spacing
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Bottom 
         ) {
+
             // Column 1: MOD 1 / TIME 1
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 RotaryKnob(value = mod1, onValueChange = onMod1Change, label = "MOD 1", size = 36.dp, progressColor = SongeColors.warmGlow)
                 RotaryKnob(value = time1, onValueChange = onTime1Change, label = "TIME 1", size = 36.dp, progressColor = SongeColors.warmGlow)
             }
             
             // Column 2: MOD 2 / TIME 2
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 RotaryKnob(value = mod2, onValueChange = onMod2Change, label = "MOD 2", size = 36.dp, progressColor = SongeColors.warmGlow)
                 RotaryKnob(value = time2, onValueChange = onTime2Change, label = "TIME 2", size = 36.dp, progressColor = SongeColors.warmGlow)
             }
             
-            // Column 3: Switch / FB
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                VerticalLFOToggle(color = SongeColors.warmGlow)
+            // Column 3: FB
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                VerticalToggle(
+                    modifier = Modifier.height(65.dp),
+                    topLabel = "SELF",
+                    bottomLabel = "LFO",
+                    isTop = !isLfoSource, // SELF is top, LFO is bottom
+                    onToggle = { isTop -> onSourceChange(!isTop) }, // isTop=true means SELF, so LFO=false
+                    color = SongeColors.warmGlow
+                )
                 RotaryKnob(value = feedback, onValueChange = onFeedbackChange, label = "FB", size = 36.dp, progressColor = SongeColors.warmGlow)
             }
             
-            // Column 4: Switch / MIX
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                VerticalLFOToggle(color = SongeColors.warmGlow)
+            // Column 6: MIX
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                VerticalToggle(
+                    modifier = Modifier.height(65.dp),
+                    topLabel = "TRI",
+                    bottomLabel = "SQR",
+                    isTop = isTriangleWave,
+                    onToggle = { isTop -> onWaveformChange(isTop) },
+                    color = SongeColors.warmGlow,
+                )
                 RotaryKnob(value = mix, onValueChange = onMixChange, label = "MIX", size = 36.dp, progressColor = SongeColors.warmGlow)
             }
         }

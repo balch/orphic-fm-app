@@ -3,21 +3,26 @@ package org.balch.songe.ui.panels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.snapping.SnapPosition
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterVertically
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -56,7 +61,7 @@ fun HyperLfoPanel(
 ) {
     Column(
         modifier = modifier
-            .fillMaxHeight()
+            .fillMaxSize()
             .shadow(elevation = 4.dp, shape = RoundedCornerShape(10.dp), clip = false)
             .clip(RoundedCornerShape(10.dp))
             .background(
@@ -92,40 +97,11 @@ fun HyperLfoPanel(
             color = SongeColors.neonCyan
         )
         
-        // AND/OR Toggle in MIDDLE
+        // Vertical Switches Row
         Row(
-            modifier = Modifier
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            ModeToggleButton(
-                modifier = Modifier.width(42.dp).size(28.dp),
-                text = "AND",
-                isSelected = mode == HyperLfoMode.AND,
-                onClick = { onModeChange(HyperLfoMode.AND) },
-                activeColor = SongeColors.neonCyan
-            )
-            ModeToggleButton(
-                modifier = Modifier.width(42.dp).size(28.dp),
-                text = "OR",
-                isSelected = mode == HyperLfoMode.OR,
-                onClick = { onModeChange(HyperLfoMode.OR) },
-                activeColor = SongeColors.neonMagenta
-            )
-        }
-        
-        // Link Switch (FM)
-        ModeToggleButton(
-            modifier = Modifier.width(60.dp).size(24.dp),
-            text = "LINK",
-            isSelected = linkEnabled,
-            onClick = { onLinkChange(!linkEnabled) },
-            activeColor = SongeColors.electricBlue
-        )
-
-        // LFO Rate Knobs at BOTTOM
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(vertical = 8.dp)
+                .align(Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             RotaryKnob(
                 value = lfo1Rate,
@@ -141,6 +117,25 @@ fun HyperLfoPanel(
                 size = 48.dp,
                 progressColor = SongeColors.neonCyan
             )
+
+            // AND/OR Vertical Switch
+            VerticalToggle(
+                topLabel = "AND",
+                bottomLabel = "OR",
+                isTop = mode == HyperLfoMode.AND,
+                onToggle = { isAnd -> onModeChange(if (isAnd) HyperLfoMode.AND else HyperLfoMode.OR) },
+                color = SongeColors.neonCyan
+            )
+            
+            // LINK Vertical Switch
+            VerticalToggle(
+                topLabel = "LINK",
+                bottomLabel = "OFF",
+                isTop = linkEnabled,
+                onToggle = { onLinkChange(it) },
+                color = SongeColors.electricBlue
+            )
+
         }
     }
 }
@@ -175,7 +170,62 @@ private fun ModeToggleButton(
     }
 }
 
-@Preview
+@Composable
+private fun VerticalToggle(
+    topLabel: String,
+    bottomLabel: String,
+    isTop: Boolean = true,
+    onToggle: (Boolean) -> Unit,
+    color: Color
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(0xFF1A1A2A))
+            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        // Top label
+        Text(
+            topLabel,
+            fontSize = 7.sp,
+            color = if (isTop) color else color.copy(alpha = 0.4f),
+            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal
+        )
+
+        // Vertical switch track
+        Box(
+            modifier = Modifier
+                .width(12.dp)
+                .height(22.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(color.copy(alpha = 0.2f))
+                .clickable { onToggle(!isTop) },
+            contentAlignment = if (isTop) Alignment.TopCenter else Alignment.BottomCenter
+        ) {
+            // Switch knob
+            Box(
+                modifier = Modifier
+                    .padding(2.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
+        }
+
+        // Bottom label
+        Text(
+            bottomLabel,
+            fontSize = 7.sp,
+            color = if (!isTop) color else color.copy(alpha = 0.4f),
+            fontWeight = if (!isTop) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
+
+@Preview(widthDp = 320, heightDp = 240)
 @Composable
 fun HyperLfoPanelPreview() {
     MaterialTheme {

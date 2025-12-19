@@ -4,12 +4,14 @@ import com.jsyn.ports.UnitInputPort
 import com.jsyn.ports.UnitOutputPort
 import com.jsyn.unitgen.Circuit
 import com.jsyn.unitgen.SquareOscillator
+import com.jsyn.unitgen.TriangleOscillator
 import com.jsyn.unitgen.Add
 import com.jsyn.unitgen.Multiply
 import com.jsyn.unitgen.PassThrough
 
 /**
  * Hyper LFO: Two Oscillators (A & B) with logical AND/OR combination.
+ * Supports both Square (AND formula) and Triangle waveforms.
  */
 class HyperLfo : Circuit() {
     // Interface Units (Proxies)
@@ -22,15 +24,23 @@ class HyperLfo : Circuit() {
     val frequencyB: UnitInputPort = inputB.input
     val output: UnitOutputPort = outputProxy.output
     
-    // Internal Components
-    private val lfoA = SquareOscillator()
-    private val lfoB = SquareOscillator()
+    // Internal Components - Square
+    private val lfoASquare = SquareOscillator()
+    private val lfoBSquare = SquareOscillator()
+    
+    // Internal Components - Triangle
+    private val lfoATriangle = TriangleOscillator()
+    private val lfoBTriangle = TriangleOscillator()
+    
+    // Logic units
     private val logicAnd = Multiply()
     private val logicOr = Add()
+    private val triangleMix = Add() // Average of two triangles
     private val fmGain = Multiply()
     
-    // Internal Switch Logic
+    // Internal State
     private var isAndMode = true
+    private var isTriangleMode = true // Default to triangle for delay mod
 
     init {
         // Name Ports
@@ -42,10 +52,13 @@ class HyperLfo : Circuit() {
         add(inputA)
         add(inputB)
         add(outputProxy)
-        add(lfoA)
-        add(lfoB)
+        add(lfoASquare)
+        add(lfoBSquare)
+        add(lfoATriangle)
+        add(lfoBTriangle)
         add(logicAnd)
         add(logicOr)
+        add(triangleMix)
         add(fmGain)
         
         // Add Ports to Circuit
@@ -54,36 +67,57 @@ class HyperLfo : Circuit() {
         addPort(output)
         
         // WIRING
-        // Inputs -> Oscillators
-        inputA.output.connect(lfoA.frequency)
-        inputB.output.connect(lfoB.frequency)
+        // Inputs -> All Oscillators
+        inputA.output.connect(lfoASquare.frequency)
+        inputA.output.connect(lfoATriangle.frequency)
+        inputB.output.connect(lfoBSquare.frequency)
+        inputB.output.connect(lfoBTriangle.frequency)
         
-        // Link: A -> FM -> B
+        // Link: A -> FM -> B (for square only)
         inputA.output.connect(fmGain.inputA)
         fmGain.inputB.set(0.0) // Link OFF
-        fmGain.output.connect(lfoB.frequency) // Modulate B
+        fmGain.output.connect(lfoBSquare.frequency) // Modulate B Square
         
-        // Logic Gates
-        lfoA.output.connect(logicAnd.inputA)
-        lfoB.output.connect(logicAnd.inputB)
+        // Logic Gates (Square)
+        lfoASquare.output.connect(logicAnd.inputA)
+        lfoBSquare.output.connect(logicAnd.inputB)
         
-        lfoA.output.connect(logicOr.inputA)
-        lfoB.output.connect(logicOr.inputB)
+        lfoASquare.output.connect(logicOr.inputA)
+        lfoBSquare.output.connect(logicOr.inputB)
         
-        // Initial Output: AND
-        logicAnd.output.connect(outputProxy.input)
+        // Triangle Mix (average of two triangle waves)
+        lfoATriangle.output.connect(triangleMix.inputA)
+        lfoBTriangle.output.connect(triangleMix.inputB)
+        
+        // Initial Output: Triangle
+        triangleMix.output.connect(outputProxy.input)
     }
 
     fun setMode(andMode: Boolean) {
         if (isAndMode == andMode) return
         isAndMode = andMode
-        
-        // Re-patch output
+        updateOutput()
+    }
+    
+    fun setTriangleMode(triangleMode: Boolean) {
+        if (isTriangleMode == triangleMode) return
+        isTriangleMode = triangleMode
+        updateOutput()
+    }
+    
+    private fun updateOutput() {
         outputProxy.input.disconnectAll()
-        if (andMode) {
-            logicAnd.output.connect(outputProxy.input)
+        
+        if (isTriangleMode) {
+            // Triangle mode: use averaged triangle waves
+            triangleMix.output.connect(outputProxy.input)
         } else {
-            logicOr.output.connect(outputProxy.input)
+            // Square mode: use AND/OR logic
+            if (isAndMode) {
+                logicAnd.output.connect(outputProxy.input)
+            } else {
+                logicOr.output.connect(outputProxy.input)
+            }
         }
     }
     
