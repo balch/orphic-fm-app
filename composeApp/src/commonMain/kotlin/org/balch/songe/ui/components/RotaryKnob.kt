@@ -66,33 +66,35 @@ fun RotaryKnob(
     // Sensitivity for drag (pixels per full range)
     val sensitivity = 200f
     
-    var dragStartValue by remember { mutableStateOf(0f) }
+
 
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Track current value internally for smooth updates, syncing with external value when it changes
+        var internalValue by remember(value) { mutableStateOf(value) }
+
         Box(
-            modifier = Modifier
-                .size(size)
-                .pointerInput(Unit) {
+            modifier = Modifier.size(size)
+        ) {
+            Canvas(modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(sensitivity, range) {
                     detectDragGestures(
-                        onDragStart = { dragStartValue = value },
-                        onDrag = { _, dragAmount ->
-                            // Negative y because dragging up should increase value
-                            val delta = -dragAmount.y / sensitivity
-                            val rangeSize = range.endInclusive - range.start
-                            val rawNewValue = dragStartValue + (delta * rangeSize)
-                            val newValue = rawNewValue.coerceIn(range)
-                            if (newValue != value) {
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            // Use both vertical and horizontal drag
+                            val delta = (-dragAmount.y + dragAmount.x) * (range.endInclusive - range.start) / sensitivity
+                            val newValue = (internalValue + delta).coerceIn(range)
+                            if (newValue != internalValue) {
+                                internalValue = newValue
                                 onValueChange(newValue)
-                                dragStartValue = newValue // update for continuous relative drag
                             }
                         }
                     )
                 }
-        ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            ) {
                 val strokeWidth = size.toPx() * 0.1f
                 val radius = (size.toPx() - strokeWidth) / 2
                 val center = Offset(size.toPx() / 2, size.toPx() / 2)
@@ -123,7 +125,7 @@ fun RotaryKnob(
                 )
                 
                 // Active Progress Arc with Glow
-                val normalizedValue = (value - range.start) / (range.endInclusive - range.start)
+                val normalizedValue = (internalValue - range.start) / (range.endInclusive - range.start)
                 val currentSweep = sweepAngle * normalizedValue
                 
                 // Progress Glow
@@ -231,7 +233,7 @@ fun RotaryKnob(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = String.format("%.2f", value), // Will fix formatting for basic float display
+                text = String.format("%.2f", internalValue), // Will fix formatting for basic float display
                 style = MaterialTheme.typography.labelMedium,
                 color = progressColor,
                 textAlign = TextAlign.Center
