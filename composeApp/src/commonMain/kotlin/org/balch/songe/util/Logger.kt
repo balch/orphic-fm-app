@@ -10,19 +10,49 @@ data class LogEntry(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+/**
+ * Logger that outputs to console and UI debug panel.
+ * Uses inline lambdas to avoid string allocation when logging is disabled.
+ */
 object Logger {
+    private const val TAG = "Songe"
+    
+    @PublishedApi internal var enabled: Boolean = true
+    @PublishedApi internal var debugEnabled: Boolean = true
+    
     private val _logs = mutableStateListOf<LogEntry>()
     val logs: List<LogEntry> get() = _logs
 
-    fun log(message: String, level: LogLevel = LogLevel.INFO) {
+    @PublishedApi
+    internal fun addToUi(message: String, level: LogLevel) {
+        println("[$TAG] ${level.name}: $message")
         _logs.add(0, LogEntry(level, message))
         if (_logs.size > 100) _logs.removeLast()
     }
     
-    fun info(message: String) = log(message, LogLevel.INFO)
-    fun warn(message: String) = log(message, LogLevel.WARNING)
-    fun error(message: String) = log(message, LogLevel.ERROR)
-    fun debug(message: String) = log(message, LogLevel.DEBUG)
+    inline fun info(crossinline message: () -> String) {
+        if (enabled) {
+            addToUi(message(), LogLevel.INFO)
+        }
+    }
+    
+    inline fun warn(crossinline message: () -> String) {
+        if (enabled) {
+            addToUi(message(), LogLevel.WARNING)
+        }
+    }
+    
+    inline fun error(crossinline message: () -> String) {
+        if (enabled) {
+            addToUi(message(), LogLevel.ERROR)
+        }
+    }
+    
+    inline fun debug(crossinline message: () -> String) {
+        if (enabled && debugEnabled) {
+            addToUi(message(), LogLevel.DEBUG)
+        }
+    }
     
     fun clear() {
         _logs.clear()

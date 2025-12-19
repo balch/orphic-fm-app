@@ -158,7 +158,7 @@ class SynthViewModel(
      fun onGlobalDistortionChange(v: Float) {
         distortion = v
         // engine.setDistortion(v)
-        Logger.info("Global Distortion: $v")
+        Logger.info { "Global Distortion: $v" }
     }
     
     // Lifecycle

@@ -156,10 +156,10 @@ class JvmSongeEngine : SongeEngine {
         
         if (isLfo) {
             hyperLfo.output.connect(targetMixer.inputA)
-             Logger.debug("Delay $index Mod Source: LFO")
+             Logger.debug { "Delay $index Mod Source: LFO" }
         } else {
             selfSource.connect(targetMixer.inputA)
-             Logger.debug("Delay $index Mod Source: SELF")
+             Logger.debug { "Delay $index Mod Source: SELF" }
         }
     }
 
@@ -172,7 +172,7 @@ class JvmSongeEngine : SongeEngine {
 
     override fun start() {
         if (synth.isRunning) return
-        Logger.info("Starting JSyn Audio Engine...")
+        Logger.info { "Starting JSyn Audio Engine..." }
         synth.add(lineOut)
         
         // Add and connect voices
@@ -186,13 +186,14 @@ class JvmSongeEngine : SongeEngine {
         
         lineOut.start()
         synth.start()
-        Logger.info("Audio Engine Started")
+        Logger.info { "Audio Engine Started" }
+        Logger.info { "Initial Gains - Master: ${masterGain.inputB.value}, Drive: ${driveGain.inputB.value}" }
     }
     override fun stop() {
-        Logger.info("Stopping Audio Engine...")
+        Logger.info { "Stopping Audio Engine..." }
         synth.stop()
         lineOut.stop()
-        Logger.info("Audio Engine Stopped")
+        Logger.info { "Audio Engine Stopped" }
     }
 
     override fun setVoiceTune(index: Int, tune: Float) {
@@ -209,7 +210,7 @@ class JvmSongeEngine : SongeEngine {
     override fun setVoiceGate(index: Int, active: Boolean) {
         if (index in voices.indices) {
             voices[index].gate.set(if (active) 1.0 else 0.0)
-            Logger.debug("Voice ${index + 1} Gate: ${if (active) "ON" else "OFF"}")
+            Logger.info { "Voice ${index + 1} Gate: ${if (active) "ON" else "OFF"} | MasterGain: ${masterGain.inputB.value} | DriveGain: ${driveGain.inputB.value}" }
         }
     }
 
@@ -238,12 +239,12 @@ class JvmSongeEngine : SongeEngine {
     
     override fun setHyperLfoMode(andMode: Boolean) {
         hyperLfo.setMode(andMode)
-        Logger.debug("HyperLFO Mode: ${if(andMode) "AND" else "OR"}")
+        Logger.debug { "HyperLFO Mode: ${if(andMode) "AND" else "OR"}" }
     }
     
     override fun setHyperLfoLink(active: Boolean) {
         hyperLfo.setLink(active)
-        Logger.debug("HyperLFO Link: $active")
+        Logger.debug { "HyperLFO Link: $active" }
     }
 
     // Test tone is now just overriding Voice 0 for simplicity if needed, or we keep the separate osc
@@ -255,16 +256,21 @@ class JvmSongeEngine : SongeEngine {
         testOsc.output.connect(delay1.input) 
         testOsc.frequency.set(frequency.toDouble())
         testOsc.amplitude.set(0.5)
-        Logger.info("Playing Test Tone: ${frequency}Hz (through FX chain)")
+        Logger.info { "Playing Test Tone: ${frequency}Hz (through FX chain)" }
     }
 
     override fun stopTestTone() {
         testOsc.amplitude.set(0.0)
-        Logger.info("Stopped Test Tone")
+        Logger.info { "Stopped Test Tone" }
     }
 
     override fun getPeak(): Float {
-        return peakFollower.output.value.toFloat()
+        // PeakFollower.current holds the tracked peak value
+        val peak = peakFollower.current.value.toFloat()
+        if (peak > 0.001f) {
+            Logger.debug { "PEAK: $peak" }
+        }
+        return peak
     }
 
     override fun getCpuLoad(): Float {
