@@ -2,6 +2,7 @@ package org.balch.songe.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -65,91 +66,72 @@ fun PulseButton(
     
     // Animate glow size based on press state
     val glowAlpha by animateFloatAsState(targetValue = if (isPressed) 0.8f else 0f)
-    val glowRadius by animateFloatAsState(targetValue = if (isPressed) 20f else 0f)
+    val glowRadius by animateFloatAsState(targetValue = if (isPressed) 10f else 0f)
 
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        OutlinedButton(
-            onClick = {}, // Interaction handled by interactionSource
-            interactionSource = interactionSource,
+        Box(
             modifier = Modifier
                 .size(size)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null, // Custom drawing handles feedback
+                    onClick = {} 
+                )
                 .drawBehind {
                     val radius = size.toPx() / 2
                     
-                    // Button Shadow (Drop Shadow)
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent),
-                            center = center.copy(y = center.y + 2.dp.toPx()),
-                            radius = radius + 4.dp.toPx()
-                        ),
-                        radius = radius + 4.dp.toPx(),
-                        center = center.copy(y = center.y + 2.dp.toPx())
-                    )
-
-                    if (isPressed) {
-                         // Pressed State: Inner Shadow / Recessed look
-                         drawCircle(
-                            color = Color.Black.copy(alpha = 0.3f), // Darken base
-                            radius = radius
-                        )
-                        drawCircle( // Inner shadow gradient
-                            brush = Brush.radialGradient(
-                                colors = listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent),
-                                radius = radius
-                            ),
-                            radius = radius
-                        )
-                    } else {
-                        // Unpressed: Convex Button Body
-                        drawCircle(
-                             brush = Brush.linearGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.1f), // Highlight top-left
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.3f)  // Shadow bottom-right
-                                ),
-                                start = Offset(center.x - radius, center.y - radius),
-                                end = Offset(center.x + radius, center.y + radius)
-                            ),
-                            radius = radius
-                        )
-                    }
-
-                    // Pulse Glow (existing logic, tweaked)
-                    if (glowAlpha > 0f) {
+                    // 1. Touch Glow (Underneath)
+                     if (glowAlpha > 0f) {
                         drawCircle(
                             brush = Brush.radialGradient(
                                 colors = listOf(activeColor.copy(alpha = glowAlpha), Color.Transparent),
                                 center = center,
-                                radius = size.toPx() / 2 + glowRadius.dp.toPx()
+                                radius = radius + glowRadius.dp.toPx() + 10f
                             ),
-                            radius = size.toPx() / 2 + glowRadius.dp.toPx(),
-                            center = center
+                            radius = radius + glowRadius.dp.toPx() + 10f
                         )
                     }
-                },
-            shape = CircleShape,
-            colors = ButtonDefaults.outlinedButtonColors(
-                containerColor = Color.White.copy(alpha = 0.05f), // Subtle base glass
-                contentColor = if (isPressed) activeColor else MaterialTheme.colorScheme.onSurface
-            ),
-            border = BorderStroke(
-                width = 1.dp, // Thinner border for cleaner look
-                color = if (isPressed) activeColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-            )
-        ) {
-            // Empty content or icon could go here
-        }
-        
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (isPressed) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
+
+                    // 2. Metal Contact Body (Sensor)
+                    // Silver/Steel look
+                    val metalGradient = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFE0E0E0), // Bright Silver
+                            Color(0xFFA0A0A0), // Standard Steel
+                            Color(0xFF505050)  // Dark Shadow
+                        ),
+                        start = Offset(center.x - radius, center.y - radius),
+                        end = Offset(center.x + radius, center.y + radius)
+                    )
+                    
+                    drawCircle(
+                        brush = metalGradient,
+                        radius = radius
+                    )
+                    
+                    // 3. Inner Detail (Concentric rings to look like machined metal)
+                    drawCircle(
+                        color = Color.Black.copy(alpha = 0.2f),
+                        radius = radius * 0.8f,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                    )
+                    drawCircle(
+                        color = Color.Black.copy(alpha = 0.2f),
+                        radius = radius * 0.5f,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
+                    )
+
+                    // 4. Pressed Overlay (Darkens when touched)
+                    if (isPressed) {
+                         drawCircle(
+                             color = Color.Black.copy(alpha = 0.3f),
+                             radius = radius
+                         )
+                    }
+                }
         )
     }
 }

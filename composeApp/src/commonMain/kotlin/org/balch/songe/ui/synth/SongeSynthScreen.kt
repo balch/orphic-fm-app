@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import org.balch.songe.audio.SongeEngine
+import org.balch.songe.ui.components.PulseButton
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.panels.HyperLfoMode
 import org.balch.songe.ui.panels.HyperLfoPanel
@@ -50,7 +51,7 @@ import org.balch.songe.ui.theme.SongeColors
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import javax.swing.text.View
 
-@Preview(widthDp = 600, heightDp = 480)
+@Preview(widthDp = 800, heightDp = 600)
 @Composable
 fun SongeSynthScreen(
     engine: SongeEngine = PreviewSongeEngine(),
@@ -230,7 +231,7 @@ private fun DuoPairBox(
             .clip(RoundedCornerShape(8.dp))
             .background(SongeColors.darkVoid.copy(alpha = 0.4f))
             .border(2.dp, color.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-            .padding(4.dp),
+            .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
@@ -249,22 +250,62 @@ private fun DuoPairBox(
             LFOToggleSwitch(color = color)
         }
         
-        // Voice pair: Left = MOD, Right = SHARP
+        // Main Content: Two Voice Columns side-by-side
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            VoiceColumnMod(voiceA + 1, viewModel.voiceStates[voiceA].tune) { viewModel.onVoiceTuneChange(voiceA, it) }
-            VoiceColumnSharp(voiceB + 1, viewModel.voiceStates[voiceB].tune) { viewModel.onVoiceTuneChange(voiceB, it) }
-        }
-        
-        // Trigger buttons
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            TriggerBtn(voiceA + 1, viewModel.voiceStates[voiceA].isHolding) { viewModel.onHoldChange(voiceA, it) }
-            TriggerBtn(voiceB + 1, viewModel.voiceStates[voiceB].isHolding) { viewModel.onHoldChange(voiceB, it) }
+            // VOICE A COLUMN
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Knobs
+                VoiceColumnMod(voiceA + 1, viewModel.voiceStates[voiceA].tune) { viewModel.onVoiceTuneChange(voiceA, it) }
+                
+                // Buttons
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TriggerBtn(voiceA + 1, viewModel.voiceStates[voiceA].isHolding) { viewModel.onHoldChange(voiceA, it) }
+                    PulseButton(
+                        onPulseStart = { viewModel.onPulseStart(voiceA) },
+                        onPulseEnd = { viewModel.onPulseEnd(voiceA) },
+                        size = 28.dp, 
+                        label = "" 
+                    )
+                }
+            }
+
+            // VOICE B COLUMN
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Knobs
+                VoiceColumnSharp(voiceB + 1, viewModel.voiceStates[voiceB].tune) { viewModel.onVoiceTuneChange(voiceB, it) }
+                
+                // Buttons
+                Row(
+                    verticalAlignment = Alignment.CenterVertically, 
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TriggerBtn(
+                        voiceB + 1,
+                        viewModel.voiceStates[voiceB].isHolding) {
+                            viewModel.onHoldChange(voiceB, it)
+                        }
+                    PulseButton(
+                        onPulseStart = { viewModel.onPulseStart(voiceB) },
+                        onPulseEnd = { viewModel.onPulseEnd(voiceB) },
+                        size = 28.dp,
+                        label = ""
+                    )
+                }
+            }
         }
     }
 }
@@ -378,15 +419,45 @@ private fun VoiceColumnSharp(num: Int, tune: Float, onTuneChange: (Float) -> Uni
 private fun TriggerBtn(num: Int, isHolding: Boolean, onHoldChange: (Boolean) -> Unit) {
     Box(
         modifier = Modifier
-            .width(36.dp)
-            .height(24.dp)
+            .width(42.dp) // Slightly wider
+            .height(28.dp) // Match PulseButton size
             .clip(RoundedCornerShape(4.dp))
-            .background(if (isHolding) SongeColors.electricBlue else Color(0xFF2A2A3A))
-            .border(1.dp, if (isHolding) SongeColors.electricBlue else Color(0xFF4A4A5A), RoundedCornerShape(4.dp))
+            .background(
+                // Metallic Gradient
+                Brush.verticalGradient(
+                    colors = if (isHolding) {
+                        listOf(Color(0xFFD0D0D0), Color(0xFFFFFFFFF), Color(0xFFD0D0D0)) // Bright "Lit" Metal
+                    } else {
+                         listOf(Color(0xFF808080), Color(0xFF505050), Color(0xFF303030)) // Dark Metal
+                    }
+                )
+            )
+            .border(
+                width = 1.dp, 
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFFE0E0E0), Color(0xFF202020))
+                ),
+                shape = RoundedCornerShape(4.dp)
+            )
             .clickable { onHoldChange(!isHolding) },
         contentAlignment = Alignment.Center
     ) {
-        Text("$num", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (isHolding) Color.White else Color(0xFF888888))
+        // Text / Label
+        Text(
+            text = "$num", 
+            fontSize = 12.sp, 
+            fontWeight = FontWeight.Bold, 
+            color = if (isHolding) Color(0xFF101010) else Color(0xFFAAAAAA)
+        )
+        
+        // Active Indicator (LED style)
+        if (isHolding) {
+             Box(
+                 modifier = Modifier
+                    .fillMaxSize()
+                    .background(SongeColors.electricBlue.copy(alpha = 0.2f)) // Blue tint overlay
+             )
+        }
     }
 }
 

@@ -35,7 +35,7 @@ class SongeVoice : Circuit(), UnitSource {
         oscillator.amplitude.set(0.3) // Reasonable level to prevent clipping
         
         // Simple Envelope Settings (Drone/Organ like)
-        ampEnv.attack.set(0.01)  // Fast attack
+        ampEnv.attack.set(0.2)  // "Semi-rapid" swell (non-linear capacitor feel)
         ampEnv.decay.set(0.1)
         ampEnv.sustain.set(1.0) // Full sustain
         ampEnv.release.set(0.3)
