@@ -4,6 +4,7 @@ import com.jsyn.JSyn
 import com.jsyn.Synthesizer
 import com.jsyn.unitgen.LineOut
 import com.jsyn.unitgen.SineOscillator
+import org.balch.songe.util.Logger
 
 class JvmSongeEngine : SongeEngine {
     private val synth: Synthesizer = JSyn.createSynthesizer()
@@ -17,6 +18,8 @@ class JvmSongeEngine : SongeEngine {
     // Actually, let's use a proper Add unit chain or just connect all to LineOut input (JSyn ports sum automatically)
 
     override fun start() {
+        if (synth.isRunning) return
+        Logger.info("Starting JSyn Audio Engine...")
         synth.add(lineOut)
         
         // Add and connect voices
@@ -29,11 +32,14 @@ class JvmSongeEngine : SongeEngine {
         
         lineOut.start()
         synth.start()
+        Logger.info("Audio Engine Started")
     }
 
     override fun stop() {
+        Logger.info("Stopping Audio Engine...")
         synth.stop()
         lineOut.stop()
+        Logger.info("Audio Engine Stopped")
     }
 
     override fun setVoiceTune(index: Int, tune: Float) {
@@ -44,12 +50,15 @@ class JvmSongeEngine : SongeEngine {
             val maxFreq = 2000.0
             val freq = minFreq * Math.pow(maxFreq / minFreq, tune.toDouble())
             voices[index].frequency.set(freq)
+            // Log less frequently or debug level to avoid spam
+            // Logger.debug("Voice $index Tune: $tune -> ${freq.toInt()}Hz") 
         }
     }
 
     override fun setVoiceGate(index: Int, active: Boolean) {
         if (index in voices.indices) {
             voices[index].gate.set(if (active) 1.0 else 0.0)
+            Logger.debug("Voice ${index + 1} Gate: ${if (active) "ON" else "OFF"}")
         }
     }
 
@@ -82,11 +91,11 @@ class JvmSongeEngine : SongeEngine {
         testOsc.output.connect(0, lineOut.input, 1)
         testOsc.frequency.set(frequency.toDouble())
         testOsc.amplitude.set(0.5)
+        Logger.info("Playing Test Tone: ${frequency}Hz")
     }
 
     override fun stopTestTone() {
-        // Disconnect test osc
         testOsc.amplitude.set(0.0)
-        // ideally remove it, but setting amp to 0 is safe
+        Logger.info("Stopped Test Tone")
     }
 }

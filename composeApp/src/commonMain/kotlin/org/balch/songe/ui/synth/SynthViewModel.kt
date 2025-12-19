@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import org.balch.songe.audio.SongeEngine
 import org.balch.songe.audio.VoiceState
+import org.balch.songe.util.Logger
 
 class SynthViewModel(
     private val engine: SongeEngine
@@ -69,15 +70,17 @@ class SynthViewModel(
         }
     }
     
-    // Group & Global setters... (implementing basic wiring)
+    // Group & Global setters...
     fun onGlobalDriveChange(v: Float) {
         drive = v
         engine.setDrive(v)
+        Logger.info("Global Drive: $v")
     }
     
      fun onGlobalDistortionChange(v: Float) {
         distortion = v
         // engine.setDistortion(v)
+        Logger.info("Global Distortion: $v")
     }
     
     // Lifecycle
