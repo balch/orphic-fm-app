@@ -30,15 +30,19 @@ class AndroidSongeEngine : SongeEngine {
     }
     
     override fun setDrive(amount: Float) {
-         // Stub
+        // TODO("Not yet implemented")
     }
 
     override fun setDelay(time: Float, feedback: Float) {
-         // Stub
+        // TODO("Not yet implemented")
     }
+    
+    override fun setHyperLfoFreq(index: Int, frequency: Float) {}
+    override fun setHyperLfoMode(andMode: Boolean) {}
+    override fun setHyperLfoLink(active: Boolean) {}
 
     override fun playTestTone(frequency: Float) {
-         // Stub
+        // TODO("Not yet implemented")
     }
 
     override fun stopTestTone() {

@@ -28,15 +28,45 @@ class SynthViewModel(
     // Global
     var masterVolume by mutableStateOf(0.7f)
     var delayTime by mutableStateOf(0.3f)
+    var delayFeedback by mutableStateOf(0.5f) // Added tracking
     var distortion by mutableStateOf(0.0f)
     var drive by mutableStateOf(0.0f)
     var vibrato by mutableStateOf(0.0f)
+
+    // Hyper LFO
+    var hyperLfoA by mutableStateOf(0.5f)
+    var hyperLfoB by mutableStateOf(0.3f)
+    var hyperLfoMode by mutableStateOf(org.balch.songe.ui.panels.HyperLfoMode.AND)
+    var hyperLfoLink by mutableStateOf(false)
 
     fun onVoiceTuneChange(index: Int, newTune: Float) {
         val newVoices = voiceStates.toMutableList()
         newVoices[index] = newVoices[index].copy(tune = newTune)
         voiceStates = newVoices
         engine.setVoiceTune(index, newTune)
+    }
+
+    // ... (Pulse/Hold methods are unchanged)
+
+    // Hyper LFO Handlers
+    fun onHyperLfoAChange(v: Float) {
+        hyperLfoA = v
+        engine.setHyperLfoFreq(0, v)
+    }
+    
+    fun onHyperLfoBChange(v: Float) {
+        hyperLfoB = v
+        engine.setHyperLfoFreq(1, v)
+    }
+    
+    fun onHyperLfoModeChange(mode: org.balch.songe.ui.panels.HyperLfoMode) {
+        hyperLfoMode = mode
+        engine.setHyperLfoMode(mode == org.balch.songe.ui.panels.HyperLfoMode.AND)
+    }
+    
+    fun onHyperLfoLinkChange(enabled: Boolean) {
+        hyperLfoLink = enabled
+        engine.setHyperLfoLink(enabled)
     }
 
     fun onPulseStart(index: Int) {

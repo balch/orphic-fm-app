@@ -50,6 +50,8 @@ fun HyperLfoPanel(
     onLfo2RateChange: (Float) -> Unit,
     mode: HyperLfoMode,
     onModeChange: (HyperLfoMode) -> Unit,
+    linkEnabled: Boolean,
+    onLinkChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -111,6 +113,15 @@ fun HyperLfoPanel(
                 activeColor = SongeColors.neonMagenta
             )
         }
+        
+        // Link Switch (FM)
+        ModeToggleButton(
+            modifier = Modifier.width(60.dp).size(24.dp),
+            text = "LINK",
+            isSelected = linkEnabled,
+            onClick = { onLinkChange(!linkEnabled) },
+            activeColor = SongeColors.electricBlue
+        )
 
         // LFO Rate Knobs at BOTTOM
         Row(
@@ -168,6 +179,15 @@ private fun ModeToggleButton(
 @Composable
 fun HyperLfoPanelPreview() {
     MaterialTheme {
-        HyperLfoPanel(lfo1Rate = 0.5f, onLfo1RateChange = {}, lfo2Rate = 0.2f, onLfo2RateChange = {}, mode = HyperLfoMode.AND, onModeChange = {})
+        HyperLfoPanel(
+            lfo1Rate = 0.5f, 
+            onLfo1RateChange = {}, 
+            lfo2Rate = 0.2f, 
+            onLfo2RateChange = {}, 
+            mode = HyperLfoMode.AND, 
+            onModeChange = {},
+            linkEnabled = false,
+            onLinkChange = {}
+        )
     }
 }

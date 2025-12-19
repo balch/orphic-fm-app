@@ -17,6 +17,11 @@ interface SongeEngine {
     fun setDrive(amount: Float)
     fun setDelay(time: Float, feedback: Float)
     
+    // Hyper LFO
+    fun setHyperLfoFreq(index: Int, frequency: Float) // 0=A, 1=B
+    fun setHyperLfoMode(andMode: Boolean)
+    fun setHyperLfoLink(active: Boolean)
+    
     // Test/Debug
     fun playTestTone(frequency: Float = 440f)
     fun stopTestTone()

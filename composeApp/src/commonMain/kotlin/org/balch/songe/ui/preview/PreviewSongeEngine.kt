@@ -24,18 +24,16 @@ class PreviewSongeEngine(): SongeEngine {
     override fun setGroupFm(groupIndex: Int, amount: Float) {
     }
 
-    override fun setDrive(amount: Float) {
-    }
+    override fun setDrive(amount: Float) {}
+    override fun setDelay(time: Float, feedback: Float) {}
+    
+    override fun setHyperLfoFreq(index: Int, frequency: Float) {}
+    override fun setHyperLfoMode(andMode: Boolean) {}
+    override fun setHyperLfoLink(active: Boolean) {}
 
-    override fun setDelay(time: Float, feedback: Float) {
-    }
-
-    override fun playTestTone(frequency: Float) {
-    }
-
-    override fun stopTestTone() {
-    }
-
-    override fun getPeak(): Float = 0f
-    override fun getCpuLoad(): Float = 0f
+    override fun playTestTone(frequency: Float) {}
+    override fun stopTestTone() {}
+    
+    override fun getPeak(): Float = 0.5f
+    override fun getCpuLoad(): Float = 12.5f
 }

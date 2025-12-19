@@ -87,12 +87,14 @@ fun SongeSynthScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             HyperLfoPanel(
-                lfo1Rate = viewModel.vibrato,
-                onLfo1RateChange = { viewModel.vibrato = it },
-                lfo2Rate = 0.3f,
-                onLfo2RateChange = {},
-                mode = HyperLfoMode.AND,
-                onModeChange = {},
+                lfo1Rate = viewModel.hyperLfoA,
+                onLfo1RateChange = viewModel::onHyperLfoAChange,
+                lfo2Rate = viewModel.hyperLfoB,
+                onLfo2RateChange = viewModel::onHyperLfoBChange,
+                mode = viewModel.hyperLfoMode,
+                onModeChange = viewModel::onHyperLfoModeChange,
+                linkEnabled = viewModel.hyperLfoLink,
+                onLinkChange = viewModel::onHyperLfoLinkChange,
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(.75f)

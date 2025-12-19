@@ -100,7 +100,9 @@ fun GlobalControlsPanel(
             lfo2Rate = lfo2Rate,
             onLfo2RateChange = onLfo2RateChange,
             mode = hyperLfoMode,
-            onModeChange = onHyperLfoModeChange
+            onModeChange = onHyperLfoModeChange,
+            linkEnabled = false, // TODO: Expose this up if needed
+            onLinkChange = {}
         )
 
         Spacer(modifier = Modifier.width(8.dp))
