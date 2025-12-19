@@ -2,8 +2,10 @@ package org.balch.songe.ui.debug
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -20,8 +22,9 @@ import org.balch.songe.audio.SongeEngine
 import org.balch.songe.ui.theme.SongeColors
 
 @Composable
-fun DebugAudioPanel(
-    engine: SongeEngine
+fun DebugScreen(
+    engine: SongeEngine,
+    onBack: () -> Unit
 ) {
     // Start engine when this screen opens, stop when it closes
     DisposableEffect(Unit) {
@@ -38,13 +41,26 @@ fun DebugAudioPanel(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "Audio Debug",
-            style = MaterialTheme.typography.headlineMedium,
-            color = SongeColors.neonCyan
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(onClick = onBack) {
+                Text("Back")
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "Debug & Logs",
+                style = MaterialTheme.typography.headlineSmall,
+                color = SongeColors.neonCyan
+            )
+            Spacer(modifier = Modifier.weight(1f))
+        }
         
         Spacer(modifier = Modifier.height(32.dp))
+        
+        Text("Audio Engine Test", color = Color.Gray)
+        Spacer(modifier = Modifier.height(16.dp))
         
         Button(
             onClick = { engine.playTestTone(440f) }

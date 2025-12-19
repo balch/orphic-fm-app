@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.balch.songe.audio.SongeEngine
-import org.balch.songe.ui.debug.DebugAudioPanel
 import org.balch.songe.ui.preview.PreviewSongeEngine
 import org.balch.songe.ui.synth.SongeSynthScreen
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -27,8 +26,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 enum class SongeScreen {
     Synth,
-    Settings,
-    Debug
+    Settings
 }
 
 /**
@@ -48,7 +46,6 @@ fun SongeNavigation(engine: SongeEngine = PreviewSongeEngine()) {
         SongeScreen.Settings -> SettingsScreenPlaceholder(
             onBack = { currentScreen = SongeScreen.Synth }
         )
-        SongeScreen.Debug -> DebugAudioPanel(engine = engine)
     }
     
 
