@@ -35,4 +35,7 @@ class PreviewSongeEngine(): SongeEngine {
 
     override fun stopTestTone() {
     }
+
+    override fun getPeak(): Float = 0f
+    override fun getCpuLoad(): Float = 0f
 }

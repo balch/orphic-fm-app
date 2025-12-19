@@ -44,4 +44,7 @@ class AndroidSongeEngine : SongeEngine {
     override fun stopTestTone() {
          // Stub
     }
+
+    override fun getPeak(): Float = 0f
+    override fun getCpuLoad(): Float = 0f
 }

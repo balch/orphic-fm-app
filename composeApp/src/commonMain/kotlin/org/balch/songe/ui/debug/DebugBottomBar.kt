@@ -24,6 +24,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,14 +89,59 @@ fun DebugBottomBar(
                 Box(modifier = Modifier.size(8.dp).background(statusColor, CircleShape))
                 Spacer(modifier = Modifier.width(8.dp))
                 
+                
                 Text(
                     text = lastLog?.message ?: "System Ready",
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     color = Color.LightGray,
                     maxLines = 1,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f, fill = false) // Allow text to shrink if needed
                 )
+                
+                // MONITORING METRICS
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                // Polling Loop
+                var peak by remember { mutableStateOf(0f) }
+                var cpu by remember { mutableStateOf(0f) }
+                LaunchedEffect(Unit) {
+                    while(true) {
+                        peak = engine.getPeak()
+                        cpu = engine.getCpuLoad()
+                        kotlinx.coroutines.delay(100)
+                    }
+                }
+                
+                // CPU Display
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("CPU:", fontSize = 10.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${cpu.toInt()}%", 
+                        fontSize = 10.sp, 
+                        fontFamily = FontFamily.Monospace,
+                        color = if (cpu > 80) SongeColors.neonMagenta else SongeColors.synthGreen
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // PEAK Display
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("PEAK:", fontSize = 10.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    val peakDb = if(peak > 0) 20 * kotlin.math.log10(peak) else -60f
+                    val displayPeak = ((peak * 100).toInt() / 100f) // Truncate
+                    
+                    Text(
+                        text = "$displayPeak", 
+                        fontSize = 10.sp, 
+                        fontFamily = FontFamily.Monospace,
+                        color = if (peak > 0.95f) Color.Red else if (peak > 0.8f) Color.Yellow else SongeColors.electricBlue
+                    )
+                }
             }
 
             // Right: Toggles & Expand

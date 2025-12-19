@@ -20,4 +20,8 @@ interface SongeEngine {
     // Test/Debug
     fun playTestTone(frequency: Float = 440f)
     fun stopTestTone()
+    
+    // Monitoring
+    fun getPeak(): Float
+    fun getCpuLoad(): Float
 }

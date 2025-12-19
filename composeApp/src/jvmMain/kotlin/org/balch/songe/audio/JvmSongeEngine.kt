@@ -17,6 +17,15 @@ class JvmSongeEngine : SongeEngine {
     private val mixer = LineOut() // Using LineOut as a summing point for now or direct connect
     // Actually, let's use a proper Add unit chain or just connect all to LineOut input (JSyn ports sum automatically)
 
+    // Monitoring
+    private val peakFollower = com.jsyn.unitgen.PeakFollower()
+    
+    init {
+        // Monitor Logic: PeakFollower sums inputs automatically
+        synth.add(peakFollower)
+        peakFollower.halfLife.set(0.1)
+    }
+
     override fun start() {
         if (synth.isRunning) return
         Logger.info("Starting JSyn Audio Engine...")
@@ -28,6 +37,9 @@ class JvmSongeEngine : SongeEngine {
             // Mix to Stereo L/R
             voice.outputPort.connect(0, lineOut.input, 0)
             voice.outputPort.connect(0, lineOut.input, 1)
+            
+            // Send to Monitor
+            voice.outputPort.connect(peakFollower.input)
         }
         
         lineOut.start()
@@ -41,6 +53,10 @@ class JvmSongeEngine : SongeEngine {
         lineOut.stop()
         Logger.info("Audio Engine Stopped")
     }
+    
+    // ... (rest of class)
+
+
 
     override fun setVoiceTune(index: Int, tune: Float) {
         if (index in voices.indices) {
@@ -97,5 +113,13 @@ class JvmSongeEngine : SongeEngine {
     override fun stopTestTone() {
         testOsc.amplitude.set(0.0)
         Logger.info("Stopped Test Tone")
+    }
+
+    override fun getPeak(): Float {
+        return peakFollower.output.value.toFloat()
+    }
+
+    override fun getCpuLoad(): Float {
+        return synth.usage.toFloat() * 100f // Return as percentage 0-100
     }
 }
