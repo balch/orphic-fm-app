@@ -11,14 +11,11 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 @Preview
-fun App() {
-    SongeTheme(darkTheme = true) {
+fun App(engine: org.balch.songe.audio.SongeEngine) {
+    SongeTheme {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Animated plasma background
             PlasmaBackground()
-            
-            // Navigation and content
-            SongeNavigation()
+            SongeNavigation(engine = engine)
         }
     }
 }

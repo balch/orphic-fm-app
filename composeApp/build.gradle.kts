@@ -42,12 +42,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
             
-            // Navigation3
-            implementation(libs.navigation3.runtime)
-            implementation(libs.navigation3.ui)
-            implementation(libs.lifecycle.viewmodel.navigation3)
-            implementation(libs.adaptive.navigation3)
-            implementation(libs.material3.adaptive.navigation.suite)
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

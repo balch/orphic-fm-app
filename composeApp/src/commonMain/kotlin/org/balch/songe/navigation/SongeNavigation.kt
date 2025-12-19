@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,7 +32,7 @@ enum class SongeScreen {
  * Can be upgraded to full Nav3 with SavedStateConfiguration later.
  */
 @Composable
-fun SongeNavigation() {
+fun SongeNavigation(engine: org.balch.songe.audio.SongeEngine) {
     var currentScreen by remember { mutableStateOf(SongeScreen.Synth) }
     
     when (currentScreen) {
@@ -42,9 +43,16 @@ fun SongeNavigation() {
         SongeScreen.Settings -> SettingsScreenPlaceholder(
             onBack = { currentScreen = SongeScreen.Synth }
         )
-        SongeScreen.Debug -> DebugScreenPlaceholder(
-            onBack = { currentScreen = SongeScreen.Synth }
-        )
+        SongeScreen.Debug -> org.balch.songe.ui.debug.DebugAudioPanel(engine = engine)
+    }
+    
+    // Temporary overlay to switch to debug
+    if (currentScreen != SongeScreen.Debug) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
+            Button(onClick = { currentScreen = SongeScreen.Debug }) {
+                Text("Debug")
+            }
+        }
     }
 }
 
