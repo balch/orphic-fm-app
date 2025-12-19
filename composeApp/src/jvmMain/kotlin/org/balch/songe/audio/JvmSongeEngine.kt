@@ -94,6 +94,10 @@ class JvmSongeEngine : SongeEngine {
         masterGain.output.connect(0, lineOut.input, 1)
         masterGain.output.connect(peakFollower.input)
         
+        // Connect PeakFollower output to LineOut (at 0 amplitude) so it gets processed
+        // This forces JSyn to include it in the audio graph
+        peakFollower.output.connect(0, lineOut.input, 0)
+        
         // 6. Feedback Loop (Tapped from Delay Output BEFORE Drive)
         delay1.output.connect(delayFeedbackGain.inputA)
         delay2.output.connect(delayFeedbackGain.inputA)
@@ -187,7 +191,7 @@ class JvmSongeEngine : SongeEngine {
         lineOut.start()
         synth.start()
         Logger.info { "Audio Engine Started" }
-        Logger.info { "Initial Gains - Master: ${masterGain.inputB.value}, Drive: ${driveGain.inputB.value}" }
+        Logger.info { "Initial Gains - Master: ${"%.2f".format(masterGain.inputB.value)}, Drive: ${"%.2f".format(driveGain.inputB.value)}" }
     }
     override fun stop() {
         Logger.info { "Stopping Audio Engine..." }
@@ -210,7 +214,7 @@ class JvmSongeEngine : SongeEngine {
     override fun setVoiceGate(index: Int, active: Boolean) {
         if (index in voices.indices) {
             voices[index].gate.set(if (active) 1.0 else 0.0)
-            Logger.info { "Voice ${index + 1} Gate: ${if (active) "ON" else "OFF"} | MasterGain: ${masterGain.inputB.value} | DriveGain: ${driveGain.inputB.value}" }
+            Logger.info { "Voice ${index + 1} Gate: ${if (active) "ON" else "OFF"} | Master: ${"%.2f".format(masterGain.inputB.value)} | Drive: ${"%.2f".format(driveGain.inputB.value)}" }
         }
     }
 
@@ -267,8 +271,9 @@ class JvmSongeEngine : SongeEngine {
     override fun getPeak(): Float {
         // PeakFollower.current holds the tracked peak value
         val peak = peakFollower.current.value.toFloat()
-        if (peak > 0.001f) {
-            Logger.debug { "PEAK: $peak" }
+        // Only log significant peaks to reduce spam
+        if (peak > 0.5f) {
+            Logger.debug { "PEAK: ${"%.2f".format(peak)}" }
         }
         return peak
     }

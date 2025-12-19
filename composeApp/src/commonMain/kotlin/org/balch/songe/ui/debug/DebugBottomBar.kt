@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 // Imports removed
@@ -133,10 +134,10 @@ fun DebugBottomBar(
                     Text("PEAK:", fontSize = 10.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.width(4.dp))
                     val peakDb = if(peak > 0) 20 * kotlin.math.log10(peak) else -60f
-                    val displayPeak = ((peak * 100).toInt() / 100f) // Truncate
+                    val displayPeak = "%.2f".format(peak)
                     
                     Text(
-                        text = "$displayPeak", 
+                        text = displayPeak,
                         fontSize = 10.sp, 
                         fontFamily = FontFamily.Monospace,
                         color = if (peak > 0.95f) Color.Red else if (peak > 0.8f) Color.Yellow else SongeColors.electricBlue
@@ -196,14 +197,52 @@ fun DebugBottomBar(
 
         // Expanded Content (Logs List)
         if (isExpanded) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 200.dp)
                     .background(Color(0xFF0D0D0D))
-                    .padding(8.dp)
             ) {
-                LazyColumn(reverseLayout = true) {
+                // Header with Clear button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF1A1A1A))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Logs (${Logger.logs.size})",
+                        fontSize = 10.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        text = "CLEAR",
+                        fontSize = 10.sp,
+                        color = SongeColors.neonMagenta,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { Logger.clear() }
+                            .padding(4.dp)
+                    )
+                }
+                
+                // Auto-scrolling log list
+                val listState = rememberLazyListState()
+                val logCount = Logger.logs.size
+                
+                // Auto-scroll to top (newest) when new logs arrive
+                LaunchedEffect(logCount) {
+                    if (logCount > 0) {
+                        listState.animateScrollToItem(0)
+                    }
+                }
+                
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.padding(8.dp)
+                ) {
                     items(Logger.logs) { log ->
                         val color = when(log.level) {
                             LogLevel.ERROR -> SongeColors.neonMagenta
