@@ -54,7 +54,7 @@ fun HyperLfoPanel(
 ) {
     Column(
         modifier = modifier
-            .wrapContentHeight()
+            .fillMaxHeight()
             .shadow(elevation = 4.dp, shape = RoundedCornerShape(10.dp), clip = false)
             .clip(RoundedCornerShape(10.dp))
             .background(
@@ -82,10 +82,18 @@ fun HyperLfoPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
+        // Title at TOP
+        Text(
+            text = "HYPER LFO",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = SongeColors.neonCyan
+        )
+        
         // AND/OR Toggle in MIDDLE
         Row(
             modifier = Modifier
-                .padding(12.dp),
+                .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             ModeToggleButton(

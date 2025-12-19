@@ -379,7 +379,8 @@ private fun TriggerBtn(num: Int, isHolding: Boolean, onHoldChange: (Boolean) -> 
             .height(24.dp)
             .clip(RoundedCornerShape(4.dp))
             .background(if (isHolding) SongeColors.electricBlue else Color(0xFF2A2A3A))
-            .border(1.dp, if (isHolding) SongeColors.electricBlue else Color(0xFF4A4A5A), RoundedCornerShape(4.dp)),
+            .border(1.dp, if (isHolding) SongeColors.electricBlue else Color(0xFF4A4A5A), RoundedCornerShape(4.dp))
+            .clickable { onHoldChange(!isHolding) },
         contentAlignment = Alignment.Center
     ) {
         Text("$num", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = if (isHolding) Color.White else Color(0xFF888888))
@@ -393,36 +394,51 @@ private fun ModDelaySection(modifier: Modifier = Modifier) {
             .clip(RoundedCornerShape(8.dp))
             .background(SongeColors.darkVoid.copy(alpha = 0.5f))
             .border(1.dp, SongeColors.warmGlow.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-            .padding(8.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         // Title at TOP
         Text("MOD DELAY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SongeColors.warmGlow)
         
+        Spacer(modifier = Modifier.height(4.dp))
+        
         // SELF/LFO toggles
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ToggleChip("SELF", isSelected = true, color = SongeColors.warmGlow)
             ToggleChip("LFO", isSelected = false, color = SongeColors.warmGlow)
         }
         
-        // MOD knobs row with vertical LFO toggles
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RotaryKnob(value = 0.3f, onValueChange = {}, label = "MOD 1", size = 32.dp, progressColor = SongeColors.warmGlow)
-            RotaryKnob(value = 0.3f, onValueChange = {}, label = "MOD 2", size = 32.dp, progressColor = SongeColors.warmGlow)
-            VerticalLFOToggle(color = SongeColors.warmGlow)
-            VerticalLFOToggle(color = SongeColors.warmGlow)
-        }
+        Spacer(modifier = Modifier.height(8.dp))
         
-        // TIME/FB/MIX knobs row
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            RotaryKnob(value = 0.3f, onValueChange = {}, label = "TIME 1", size = 32.dp, progressColor = SongeColors.warmGlow)
-            RotaryKnob(value = 0.3f, onValueChange = {}, label = "TIME 2", size = 32.dp, progressColor = SongeColors.warmGlow)
-            RotaryKnob(value = 0.4f, onValueChange = {}, label = "FB", size = 32.dp, progressColor = SongeColors.warmGlow)
-            RotaryKnob(value = 0.3f, onValueChange = {}, label = "MIX", size = 32.dp, progressColor = SongeColors.warmGlow)
+        // Main Control Grid - Aligned Structurally
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp), // Increased spacing
+            verticalAlignment = Alignment.Bottom 
+        ) {
+            // Column 1: MOD 1 / TIME 1
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                RotaryKnob(value = 0.3f, onValueChange = {}, label = "MOD 1", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = 0.3f, onValueChange = {}, label = "TIME 1", size = 36.dp, progressColor = SongeColors.warmGlow)
+            }
+            
+            // Column 2: MOD 2 / TIME 2
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                RotaryKnob(value = 0.3f, onValueChange = {}, label = "MOD 2", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = 0.3f, onValueChange = {}, label = "TIME 2", size = 36.dp, progressColor = SongeColors.warmGlow)
+            }
+            
+            // Column 3: Switch / FB
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                VerticalLFOToggle(color = SongeColors.warmGlow)
+                RotaryKnob(value = 0.4f, onValueChange = {}, label = "FB", size = 36.dp, progressColor = SongeColors.warmGlow)
+            }
+            
+            // Column 4: Switch / MIX
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                VerticalLFOToggle(color = SongeColors.warmGlow)
+                RotaryKnob(value = 0.3f, onValueChange = {}, label = "MIX", size = 36.dp, progressColor = SongeColors.warmGlow)
+            }
         }
     }
 }

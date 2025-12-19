@@ -5,7 +5,6 @@ import com.jsyn.ports.UnitOutputPort
 import com.jsyn.unitgen.Circuit
 import com.jsyn.unitgen.EnvelopeDAHDSR
 import com.jsyn.unitgen.Multiply
-import com.jsyn.unitgen.PassThrough
 import com.jsyn.unitgen.SineOscillator
 import com.jsyn.unitgen.UnitSource
 
@@ -13,44 +12,47 @@ class SongeVoice : Circuit(), UnitSource {
     // Core Oscillator
     private val oscillator = SineOscillator()
     
-    // Envelope / VCA (Simple Gate for now, can be expanded to full AR)
+    // Envelope for gating
     private val ampEnv = EnvelopeDAHDSR()
     
-    // Feedback handling
-    private val feedbackMult = Multiply()
-    private val feedbackInput = PassThrough() // Placeholder input for feedback from other voices or self
+    // VCA: Multiply oscillator by envelope
+    private val vca = Multiply()
     
     // Ports accessible to outside
     val frequency: UnitInputPort = oscillator.frequency
-    val amplitude: UnitInputPort = oscillator.amplitude
-    val outputPort: UnitOutputPort = ampEnv.output
     val gate: UnitInputPort = ampEnv.input
+    
+    // Output comes from the VCA
+    override fun getOutput(): UnitOutputPort = vca.output
 
     init {
         // Add units to circuit
         add(oscillator)
         add(ampEnv)
-        add(feedbackMult)
-        add(feedbackInput)
+        add(vca)
 
-        // Internal wiring
-        // Osc -> Envelope (VCA equivalent here)
-        oscillator.output.connect(ampEnv.amplitude)
+        // Set oscillator amplitude (full volume to envelope)
+        oscillator.amplitude.set(0.3) // Reasonable level to prevent clipping
         
         // Simple Envelope Settings (Drone/Organ like)
-        ampEnv.attack.set(0.05)
+        ampEnv.attack.set(0.01)  // Fast attack
         ampEnv.decay.set(0.1)
-        ampEnv.sustain.set(1.0)
-        ampEnv.release.set(0.5)
+        ampEnv.sustain.set(1.0) // Full sustain
+        ampEnv.release.set(0.3)
 
-        // Add ports to circuit for external connection
-        addPort(frequency)
-        addPort(amplitude)
-        addPort(outputPort)
-        addPort(gate)
+        // Wire: Oscillator -> VCA inputA, Envelope -> VCA inputB
+        oscillator.output.connect(vca.inputA)
+        ampEnv.output.connect(vca.inputB)
+
+        // Default frequency
+        oscillator.frequency.set(220.0)
+        
+        // Add primary ports to circuit for external connection
+        addPort(frequency, "frequency")
+        addPort(gate, "gate")
+        addPort(vca.output, "output")
     }
     
-    override fun getOutput(): UnitOutputPort {
-        return outputPort
-    }
+    val outputPort: UnitOutputPort = vca.output
 }
+
