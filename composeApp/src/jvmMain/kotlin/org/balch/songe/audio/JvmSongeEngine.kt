@@ -123,8 +123,10 @@ class JvmSongeEngine : SongeEngine {
     // ... (rest of start() remains mostly same, ensuring voices go to driveGain) ...
     
     override fun setDrive(amount: Float) {
-        val gain = 1.0 + (amount * 49.0)
-        driveGain.inputB.set(gain)
+        // Drive controls TanhLimiter's internal drive for saturation
+        // 0.0 = 1x (clean), 1.0 = 50x (extreme distortion)
+        val driveVal = 1.0 + (amount * 49.0)
+        limiter.drive.set(driveVal)
     }
 
     override fun setMasterVolume(amount: Float) {
