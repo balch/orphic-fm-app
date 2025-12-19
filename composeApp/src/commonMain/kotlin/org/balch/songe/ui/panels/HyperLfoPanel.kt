@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -87,7 +88,7 @@ fun HyperLfoPanel(
             )
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.Top // Changed from SpaceBetween
     ) {
         // Title at TOP
         Text(
@@ -97,11 +98,13 @@ fun HyperLfoPanel(
             color = SongeColors.neonCyan
         )
         
-        // Vertical Switches Row
+        Spacer(modifier = Modifier.weight(1f)) // Push content to center
+        
+        // Controls Row
         Row(
-            modifier = Modifier.padding(vertical = 8.dp)
-                .align(Alignment.CenterHorizontally),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically // Center align items vertically
         ) {
             RotaryKnob(
                 value = lfo1Rate,
@@ -137,6 +140,8 @@ fun HyperLfoPanel(
             )
 
         }
+        
+        Spacer(modifier = Modifier.weight(1f)) // Push content to center
     }
 }
 
@@ -183,23 +188,24 @@ private fun VerticalToggle(
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF1A1A2A))
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .padding(horizontal = 6.dp, vertical = 6.dp), // Increased vertical padding
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.spacedBy(3.dp) // Little more space
     ) {
         // Top label
         Text(
             topLabel,
             fontSize = 7.sp,
-            color = if (isTop) color else color.copy(alpha = 0.4f),
-            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal
+            color = if (isTop) color else color.copy(alpha = 0.5f),
+            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
+            lineHeight = 9.sp // Explicit line height
         )
 
         // Vertical switch track
         Box(
             modifier = Modifier
                 .width(12.dp)
-                .height(22.dp)
+                .height(40.dp) // Match height of rotary knob stack approx
                 .clip(RoundedCornerShape(6.dp))
                 .background(color.copy(alpha = 0.2f))
                 .clickable { onToggle(!isTop) },
@@ -209,8 +215,9 @@ private fun VerticalToggle(
             Box(
                 modifier = Modifier
                     .padding(2.dp)
-                    .size(8.dp)
-                    .clip(CircleShape)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.5f)
+                    .clip(RoundedCornerShape(4.dp))
                     .background(color)
             )
         }
@@ -219,8 +226,9 @@ private fun VerticalToggle(
         Text(
             bottomLabel,
             fontSize = 7.sp,
-            color = if (!isTop) color else color.copy(alpha = 0.4f),
-            fontWeight = if (!isTop) FontWeight.Bold else FontWeight.Normal
+            color = if (!isTop) color else color.copy(alpha = 0.5f),
+            fontWeight = if (!isTop) FontWeight.Bold else FontWeight.Normal,
+            lineHeight = 9.sp // Explicit line height
         )
     }
 }

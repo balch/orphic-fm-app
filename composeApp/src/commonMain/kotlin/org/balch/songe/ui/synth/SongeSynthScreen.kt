@@ -366,35 +366,36 @@ private fun LFOToggleSwitch(
 
 @Composable
 private fun VerticalToggle(
-    modifier: Modifier = Modifier,
     topLabel: String,
     bottomLabel: String,
     isTop: Boolean = true,
     onToggle: (Boolean) -> Unit,
     color: Color = SongeColors.warmGlow,
+    modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF1A1A2A))
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .padding(horizontal = 6.dp, vertical = 6.dp), // Increased vertical padding
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(3.dp) // Little more space
     ) {
         // Top label
         Text(
             topLabel,
             fontSize = 7.sp,
-            color = if (isTop) color else color.copy(alpha = 0.4f),
-            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal
+            color = if (isTop) color else color.copy(alpha = 0.5f),
+            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
+            lineHeight = 9.sp // Explicit line height
         )
 
         // Vertical switch track
         Box(
             modifier = Modifier
                 .width(12.dp)
-                .height(22.dp)
+                .height(40.dp) // Match height of rotary knob stack approx
                 .clip(RoundedCornerShape(6.dp))
                 .background(color.copy(alpha = 0.2f))
                 .clickable { onToggle(!isTop) },
@@ -404,8 +405,9 @@ private fun VerticalToggle(
             Box(
                 modifier = Modifier
                     .padding(2.dp)
-                    .size(8.dp)
-                    .clip(CircleShape)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.5f)
+                    .clip(RoundedCornerShape(4.dp))
                     .background(color)
             )
         }
@@ -414,8 +416,9 @@ private fun VerticalToggle(
         Text(
             bottomLabel,
             fontSize = 7.sp,
-            color = if (!isTop) color else color.copy(alpha = 0.4f),
-            fontWeight = if (!isTop) FontWeight.Bold else FontWeight.Normal
+            color = if (!isTop) color else color.copy(alpha = 0.5f),
+            fontWeight = if (!isTop) FontWeight.Bold else FontWeight.Normal,
+            lineHeight = 9.sp // Explicit line height
         )
     }
 }
@@ -572,7 +575,6 @@ private fun ModDelaySection(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 VerticalToggle(
-                    modifier = Modifier.height(65.dp),
                     topLabel = "SELF",
                     bottomLabel = "LFO",
                     isTop = !isLfoSource, // SELF is top, LFO is bottom
@@ -585,7 +587,6 @@ private fun ModDelaySection(
             // Column 6: MIX
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 VerticalToggle(
-                    modifier = Modifier.height(65.dp),
                     topLabel = "TRI",
                     bottomLabel = "SQR",
                     isTop = isTriangleWave,
