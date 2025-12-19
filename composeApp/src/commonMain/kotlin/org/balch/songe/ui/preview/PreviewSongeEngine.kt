@@ -25,8 +25,15 @@ class PreviewSongeEngine(): SongeEngine {
     }
 
     override fun setDrive(amount: Float) {}
+    override fun setMasterVolume(amount: Float) {}
     override fun setDelay(time: Float, feedback: Float) {}
     
+    override fun setDelayTime(index: Int, time: Float) {}
+    override fun setDelayFeedback(amount: Float) {}
+    override fun setDelayMix(amount: Float) {}
+    override fun setDelayModDepth(index: Int, amount: Float) {}
+    override fun setDelayModSource(index: Int, isLfo: Boolean) {}
+
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
     override fun setHyperLfoMode(andMode: Boolean) {}
     override fun setHyperLfoLink(active: Boolean) {}

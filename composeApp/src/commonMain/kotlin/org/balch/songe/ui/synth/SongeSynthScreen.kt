@@ -99,13 +99,28 @@ fun SongeSynthScreen(
                     .fillMaxHeight()
                     .weight(.75f)
             )
-            ModDelaySection(modifier = Modifier
-                .weight(1f).fillMaxHeight())
+            ModDelaySection(
+                time1 = viewModel.delayTime1,
+                onTime1Change = viewModel::onDelayTime1Change,
+                mod1 = viewModel.delayMod1,
+                onMod1Change = viewModel::onDelayMod1Change,
+                time2 = viewModel.delayTime2,
+                onTime2Change = viewModel::onDelayTime2Change,
+                mod2 = viewModel.delayMod2,
+                onMod2Change = viewModel::onDelayMod2Change,
+                feedback = viewModel.delayFeedback,
+                onFeedbackChange = viewModel::onDelayFeedbackChange,
+                mix = viewModel.delayMix,
+                onMixChange = viewModel::onDelayMixChange,
+                isLfoSource = viewModel.delayModSourceIsLfo,
+                onSourceChange = viewModel::onDelayModSourceChange,
+                modifier = Modifier.weight(1f).fillMaxHeight()
+            )
             DistortionSection(
                 drive = viewModel.drive,
                 onDriveChange = { viewModel.onGlobalDriveChange(it) },
                 volume = viewModel.masterVolume,
-                onVolumeChange = { viewModel.masterVolume = it },
+                onVolumeChange = viewModel::onMasterVolumeChange,
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(0.7f)
@@ -141,7 +156,7 @@ fun SongeSynthScreen(
                 Text("SONGE-8", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.6f))
                 CrossModSelector()
                 RotaryKnob(value = 0.5f, onValueChange = {}, label = "TOTAL FB", size = 32.dp, progressColor = SongeColors.neonCyan)
-                RotaryKnob(value = viewModel.vibrato, onValueChange = { viewModel.vibrato = it }, label = "VIB", size = 32.dp, progressColor = SongeColors.neonMagenta)
+                RotaryKnob(value = 0.5f, onValueChange = {}, label = "VIB", size = 32.dp, progressColor = SongeColors.neonMagenta)
             }
 
             // RIGHT GROUP (Voices 5-8)
@@ -464,7 +479,23 @@ private fun TriggerBtn(num: Int, isHolding: Boolean, onHoldChange: (Boolean) -> 
 }
 
 @Composable
-private fun ModDelaySection(modifier: Modifier = Modifier) {
+private fun ModDelaySection(
+    time1: Float,
+    onTime1Change: (Float) -> Unit,
+    mod1: Float,
+    onMod1Change: (Float) -> Unit,
+    time2: Float,
+    onTime2Change: (Float) -> Unit,
+    mod2: Float,
+    onMod2Change: (Float) -> Unit,
+    feedback: Float,
+    onFeedbackChange: (Float) -> Unit,
+    mix: Float,
+    onMixChange: (Float) -> Unit,
+    isLfoSource: Boolean,
+    onSourceChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
@@ -481,8 +512,19 @@ private fun ModDelaySection(modifier: Modifier = Modifier) {
         
         // SELF/LFO toggles
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ToggleChip("SELF", isSelected = true, color = SongeColors.warmGlow)
-            ToggleChip("LFO", isSelected = false, color = SongeColors.warmGlow)
+            ToggleChip(
+                text = "SELF",
+                isSelected = !isLfoSource,
+                color = SongeColors.warmGlow,
+                // Passing !isLfoSource because click means "Make it Self" (false)
+                onClick = { onSourceChange(false) } 
+            )
+            ToggleChip(
+                text = "LFO",
+                isSelected = isLfoSource,
+                color = SongeColors.warmGlow,
+                onClick = { onSourceChange(true) }
+            )
         }
         
         Spacer(modifier = Modifier.height(8.dp))
@@ -494,38 +536,39 @@ private fun ModDelaySection(modifier: Modifier = Modifier) {
         ) {
             // Column 1: MOD 1 / TIME 1
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                RotaryKnob(value = 0.3f, onValueChange = {}, label = "MOD 1", size = 36.dp, progressColor = SongeColors.warmGlow)
-                RotaryKnob(value = 0.3f, onValueChange = {}, label = "TIME 1", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = mod1, onValueChange = onMod1Change, label = "MOD 1", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = time1, onValueChange = onTime1Change, label = "TIME 1", size = 36.dp, progressColor = SongeColors.warmGlow)
             }
             
             // Column 2: MOD 2 / TIME 2
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                RotaryKnob(value = 0.3f, onValueChange = {}, label = "MOD 2", size = 36.dp, progressColor = SongeColors.warmGlow)
-                RotaryKnob(value = 0.3f, onValueChange = {}, label = "TIME 2", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = mod2, onValueChange = onMod2Change, label = "MOD 2", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = time2, onValueChange = onTime2Change, label = "TIME 2", size = 36.dp, progressColor = SongeColors.warmGlow)
             }
             
             // Column 3: Switch / FB
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 VerticalLFOToggle(color = SongeColors.warmGlow)
-                RotaryKnob(value = 0.4f, onValueChange = {}, label = "FB", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = feedback, onValueChange = onFeedbackChange, label = "FB", size = 36.dp, progressColor = SongeColors.warmGlow)
             }
             
             // Column 4: Switch / MIX
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 VerticalLFOToggle(color = SongeColors.warmGlow)
-                RotaryKnob(value = 0.3f, onValueChange = {}, label = "MIX", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = mix, onValueChange = onMixChange, label = "MIX", size = 36.dp, progressColor = SongeColors.warmGlow)
             }
         }
     }
 }
 
 @Composable
-private fun ToggleChip(text: String, isSelected: Boolean, color: Color) {
+private fun ToggleChip(text: String, isSelected: Boolean, color: Color, onClick: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
             .background(if (isSelected) color.copy(alpha = 0.3f) else Color(0xFF2A2A3A))
             .border(1.dp, if (isSelected) color else Color.Transparent, RoundedCornerShape(4.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
         Text(text, fontSize = 8.sp, color = if (isSelected) color else Color.White.copy(alpha = 0.5f))

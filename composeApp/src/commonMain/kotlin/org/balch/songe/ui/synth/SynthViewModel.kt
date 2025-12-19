@@ -27,11 +27,17 @@ class SynthViewModel(
 
     // Global
     var masterVolume by mutableStateOf(0.7f)
-    var delayTime by mutableStateOf(0.3f)
-    var delayFeedback by mutableStateOf(0.5f) // Added tracking
+    var delayFeedback by mutableStateOf(0.5f)
+    var delayMix by mutableStateOf(0.5f)
     var distortion by mutableStateOf(0.0f)
     var drive by mutableStateOf(0.0f)
-    var vibrato by mutableStateOf(0.0f)
+    
+    // Delay Lines (1 & 2)
+    var delayTime1 by mutableStateOf(0.3f)
+    var delayTime2 by mutableStateOf(0.3f)
+    var delayMod1 by mutableStateOf(0.0f)
+    var delayMod2 by mutableStateOf(0.0f)
+    var delayModSourceIsLfo by mutableStateOf(true) // true=LFO, false=SELF (Global switch for now, or per channel?)
 
     // Hyper LFO
     var hyperLfoA by mutableStateOf(0.5f)
@@ -68,6 +74,44 @@ class SynthViewModel(
         hyperLfoLink = enabled
         engine.setHyperLfoLink(enabled)
     }
+    
+    // Delay Handlers
+    fun onDelayTime1Change(v: Float) {
+        delayTime1 = v
+        engine.setDelayTime(0, v)
+    }
+    
+    fun onDelayTime2Change(v: Float) {
+        delayTime2 = v
+        engine.setDelayTime(1, v)
+    }
+    
+    fun onDelayMod1Change(v: Float) {
+        delayMod1 = v
+        engine.setDelayModDepth(0, v)
+    }
+    
+    fun onDelayMod2Change(v: Float) {
+        delayMod2 = v
+        engine.setDelayModDepth(1, v)
+    }
+    
+    fun onDelayFeedbackChange(v: Float) {
+        delayFeedback = v
+        engine.setDelayFeedback(v)
+    }
+    
+    fun onDelayMixChange(v: Float) {
+        delayMix = v
+        engine.setDelayMix(v)
+    }
+    
+    fun onDelayModSourceChange(isLfo: Boolean) {
+        delayModSourceIsLfo = isLfo
+        // Apply to both delays for now as per UI Toggle
+        engine.setDelayModSource(0, isLfo)
+        engine.setDelayModSource(1, isLfo)
+    }
 
     fun onPulseStart(index: Int) {
         val newVoices = voiceStates.toMutableList()
@@ -101,10 +145,14 @@ class SynthViewModel(
     }
     
     // Group & Global setters...
-    fun onGlobalDriveChange(v: Float) {
-        drive = v
-        engine.setDrive(v)
-        Logger.info("Global Drive: $v")
+    fun onGlobalDriveChange(newDrive: Float) {
+        drive = newDrive
+        engine.setDrive(newDrive)
+    }
+    
+    fun onMasterVolumeChange(newVolume: Float) {
+        masterVolume = newVolume
+        engine.setMasterVolume(newVolume)
     }
     
      fun onGlobalDistortionChange(v: Float) {

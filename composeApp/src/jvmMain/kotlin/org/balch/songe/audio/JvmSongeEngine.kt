@@ -32,12 +32,14 @@ class JvmSongeEngine : SongeEngine {
     private val peakFollower = com.jsyn.unitgen.PeakFollower()
     private val limiter = TanhLimiter()
     private val driveGain = com.jsyn.unitgen.Multiply()
+    private val masterGain = com.jsyn.unitgen.Multiply() // Master Volume
     
     init {
-        // FX Chain: Voices -> Delays -> Drive -> Limiter -> Output
+        // FX Chain: Voices -> Delays -> Drive -> Limiter -> MasterGain -> Output
         synth.add(peakFollower)
         synth.add(limiter)
         synth.add(driveGain)
+        synth.add(masterGain)
         synth.add(delay1)
         synth.add(delay2)
         synth.add(delayFeedbackGain)
@@ -47,6 +49,7 @@ class JvmSongeEngine : SongeEngine {
         
         peakFollower.halfLife.set(0.1)
         driveGain.inputB.set(1.0) // Default unity gain
+        masterGain.inputB.set(0.7) // Default master volume 70%
         
         // Delay Defaults
         delay1.allocate(44100) // 1 second max buffer
@@ -83,13 +86,15 @@ class JvmSongeEngine : SongeEngine {
         // 3. Drive Output -> Limiter
         driveGain.output.connect(limiter.input)
         
-        // 4. Limiter -> Master Out & Monitor
-        limiter.output.connect(0, lineOut.input, 0)
-        limiter.output.connect(0, lineOut.input, 1)
-        limiter.output.connect(peakFollower.input)
+        // 4. Limiter -> Master Gain
+        limiter.output.connect(masterGain.inputA)
         
-        // 5. Feedback Loop (Tapped from Delay Output BEFORE Drive? Or After?)
-        // Usually feedback is from the delay line output itself.
+        // 5. Master Gain -> LineOut & Monitor
+        masterGain.output.connect(0, lineOut.input, 0)
+        masterGain.output.connect(0, lineOut.input, 1)
+        masterGain.output.connect(peakFollower.input)
+        
+        // 6. Feedback Loop (Tapped from Delay Output BEFORE Drive)
         delay1.output.connect(delayFeedbackGain.inputA)
         delay2.output.connect(delayFeedbackGain.inputA)
         delayFeedbackGain.output.connect(delay1.input) 
@@ -97,22 +102,72 @@ class JvmSongeEngine : SongeEngine {
     }
     // ... (rest of start() remains mostly same, ensuring voices go to driveGain) ...
     
-    override fun setDelay(time: Float, feedback: Float) {
+    override fun setDrive(amount: Float) {
+        val gain = 1.0 + (amount * 49.0)
+        driveGain.inputB.set(gain)
+    }
+
+    override fun setMasterVolume(amount: Float) {
+        masterGain.inputB.set(amount.toDouble())
+    }
+
+    override fun setDelayTime(index: Int, time: Float) {
         // Time 0.0-1.0 mapped to 0.01s - 0.8s
-        val delayTime = 0.01 + (time * 0.79)
+        // Logarithmic feel helps fine tuning short delays
+        val delaySeconds = 0.01 + (time * 0.79)
         
-        // Set BASE TIME on mod mixer
-        delay1ModMixer.inputC.set(delayTime)
-        delay2ModMixer.inputC.set(delayTime * 1.1) // Stereo offset
+        if (index == 0) {
+            // delay1.delay.set(delaySeconds) -> No, we act on the ModMixer inputC (Base)
+            delay1ModMixer.inputC.set(delaySeconds)
+        } else {
+            delay2ModMixer.inputC.set(delaySeconds)
+        }
+    }
+
+    override fun setDelayFeedback(amount: Float) {
+        delayFeedbackGain.inputB.set(amount * 0.95) // Cap < 1.0!
+    }
+    
+    override fun setDelayMix(amount: Float) {
+        // Not implemented yet (needs Dry/Wet mixer)
+    }
+
+    override fun setDelayModDepth(index: Int, amount: Float) {
+         // Scale depth based on delay time? Or absolute?
+         // Absolute is safer for "wild" effects. 
+         // Let's allow full swing +/- 0.5s if maxed.
+         val depth = amount * 0.5 
+         if (index == 0) {
+             delay1ModMixer.inputB.set(depth)
+         } else {
+             delay2ModMixer.inputB.set(depth)
+         }
+    }
+    
+    override fun setDelayModSource(index: Int, isLfo: Boolean) {
+        // Switch ModMixer InputA source
+        // LFO -> hyperLfo.output
+        // Self -> delayX.output
         
-        // For now, hardcode mod depth slightly to test LFO
-        // Later we need setDelayModDepth()
-        delay1ModMixer.inputB.set(delayTime * 0.1) // 10% modulation depth
-        delay2ModMixer.inputB.set(delayTime * 0.1)
+        val targetMixer = if (index == 0) delay1ModMixer else delay2ModMixer
+        val selfSource = if (index == 0) delay1.output else delay2.output
         
-        delayFeedbackGain.inputB.set(feedback * 0.9) // Cap feedback < 1.0
+        targetMixer.inputA.disconnectAll()
         
-        Logger.debug("Delay: ${delayTime}s, FB: $feedback")
+        if (isLfo) {
+            hyperLfo.output.connect(targetMixer.inputA)
+             Logger.debug("Delay $index Mod Source: LFO")
+        } else {
+            selfSource.connect(targetMixer.inputA)
+             Logger.debug("Delay $index Mod Source: SELF")
+        }
+    }
+
+    override fun setDelay(time: Float, feedback: Float) {
+        // Backward compatibility
+        setDelayTime(0, time)
+        setDelayTime(1, time)
+        setDelayFeedback(feedback)
     }
 
     override fun start() {
@@ -169,13 +224,7 @@ class JvmSongeEngine : SongeEngine {
     override fun setGroupFm(groupIndex: Int, amount: Float) {
         // TODO: Implement FM Routing logic
     }
-    override fun setDrive(amount: Float) {
-        // Map 0.0-1.0 to Gain 1.0 - 50.0 (Hard Distortion)
-        // Logarithmic feel might be better, or linear for "drive"
-        val gain = 1.0 + (amount * 49.0)
-        driveGain.inputB.set(gain)
-        Logger.debug("Drive Set: ${amount} (Gain: x${gain.toInt()})")
-    }
+
 
     override fun setHyperLfoFreq(index: Int, frequency: Float) {
         // Map 0-1 to LFO frequency (e.g., 0.1Hz to 20Hz)
@@ -202,11 +251,11 @@ class JvmSongeEngine : SongeEngine {
     override fun playTestTone(frequency: Float) {
         if (!synth.isRunning) start()
         synth.add(testOsc)
-        testOsc.output.connect(0, lineOut.input, 0)
-        testOsc.output.connect(0, lineOut.input, 1)
+        // Route through FX chain so PeakFollower sees it
+        testOsc.output.connect(delay1.input) 
         testOsc.frequency.set(frequency.toDouble())
         testOsc.amplitude.set(0.5)
-        Logger.info("Playing Test Tone: ${frequency}Hz")
+        Logger.info("Playing Test Tone: ${frequency}Hz (through FX chain)")
     }
 
     override fun stopTestTone() {

@@ -13,8 +13,20 @@ interface SongeEngine {
     fun setGroupPitch(groupIndex: Int, pitch: Float) // 0 for 1-4, 1 for 5-8
     fun setGroupFm(groupIndex: Int, amount: Float)
     
-    // Global FX
+    // Global
     fun setDrive(amount: Float)
+    fun setMasterVolume(amount: Float)
+    
+    // Delay Controls
+    fun setDelayTime(index: Int, time: Float) // 0 or 1
+    fun setDelayFeedback(amount: Float)
+    fun setDelayMix(amount: Float)
+    
+    // Delay Modulation
+    fun setDelayModDepth(index: Int, amount: Float)
+    fun setDelayModSource(index: Int, isLfo: Boolean) // true=LFO, false=Self
+    
+    @Deprecated("Use granular setDelayTime/Feedback instead")
     fun setDelay(time: Float, feedback: Float)
     
     // Hyper LFO
