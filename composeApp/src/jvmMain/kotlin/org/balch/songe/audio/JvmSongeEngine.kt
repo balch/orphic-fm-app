@@ -17,13 +17,62 @@ class JvmSongeEngine : SongeEngine {
     private val mixer = LineOut() // Using LineOut as a summing point for now or direct connect
     // Actually, let's use a proper Add unit chain or just connect all to LineOut input (JSyn ports sum automatically)
 
-    // Monitoring
+    // Monitoring & FX
     private val peakFollower = com.jsyn.unitgen.PeakFollower()
+    private val limiter = TanhLimiter()
+    private val driveGain = com.jsyn.unitgen.Multiply()
+    
+    // Dual Delay
+    private val delay1 = com.jsyn.unitgen.InterpolatingDelay()
+    private val delay2 = com.jsyn.unitgen.InterpolatingDelay()
+    private val delayFeedbackGain = com.jsyn.unitgen.Multiply()
+
     
     init {
-        // Monitor Logic: PeakFollower sums inputs automatically
+        // FX Chain: Mix -> Drive -> Delays -> Limiter -> Output
         synth.add(peakFollower)
+        synth.add(limiter)
+        synth.add(driveGain)
+        synth.add(delay1)
+        synth.add(delay2)
+        synth.add(delayFeedbackGain)
+        
         peakFollower.halfLife.set(0.1)
+        driveGain.inputB.set(1.0) // Default unity gain
+        
+        // Delay Defaults
+        delay1.allocate(44100) // 1 second max buffer
+        delay2.allocate(44100)
+        delay1.delay.set(0.0) // Init off
+        delay2.delay.set(0.0) 
+        
+        // Connect Drive Output to Delays (Parallel)
+        driveGain.output.connect(delay1.input)
+        driveGain.output.connect(delay2.input)
+        
+        // Connect Delays to Limiter
+        delay1.output.connect(limiter.input)
+        delay2.output.connect(limiter.input)
+        
+        // Basic Feedback Loop (Mono sum for now, can be complex later)
+        delay1.output.connect(delayFeedbackGain.inputA)
+        delay2.output.connect(delayFeedbackGain.inputA)
+        delayFeedbackGain.output.connect(delay1.input) // Feedback mix back in
+        delayFeedbackGain.output.connect(delay2.input)
+    }
+    // ... (rest of start() remains mostly same, ensuring voices go to driveGain) ...
+    
+    override fun setDelay(time: Float, feedback: Float) {
+        // Time 0.0-1.0 mapped to 0.01s - 0.8s
+        val delayTime = 0.01 + (time * 0.79)
+        
+        // Set slightly different times for stereo width feel
+        delay1.delay.set(delayTime)
+        delay2.delay.set(delayTime * 1.1) // Slight offset for width
+        
+        delayFeedbackGain.inputB.set(feedback * 0.9) // Cap feedback < 1.0
+        
+        Logger.debug("Delay: ${delayTime}s, FB: $feedback")
     }
 
     override fun start() {
@@ -34,29 +83,27 @@ class JvmSongeEngine : SongeEngine {
         // Add and connect voices
         voices.forEach { voice ->
             synth.add(voice)
-            // Mix to Stereo L/R
-            voice.outputPort.connect(0, lineOut.input, 0)
-            voice.outputPort.connect(0, lineOut.input, 1)
             
-            // Send to Monitor
-            voice.outputPort.connect(peakFollower.input)
+            // Send to Drive Gain Input (Mix Bus)
+            voice.outputPort.connect(driveGain.inputA)
         }
+        
+        // Limiter Output -> Master Out & Monitor
+        limiter.output.connect(0, lineOut.input, 0)
+        limiter.output.connect(0, lineOut.input, 1)
+        limiter.output.connect(peakFollower.input)
+
         
         lineOut.start()
         synth.start()
         Logger.info("Audio Engine Started")
     }
-
     override fun stop() {
         Logger.info("Stopping Audio Engine...")
         synth.stop()
         lineOut.stop()
         Logger.info("Audio Engine Stopped")
     }
-    
-    // ... (rest of class)
-
-
 
     override fun setVoiceTune(index: Int, tune: Float) {
         if (index in voices.indices) {
@@ -66,8 +113,6 @@ class JvmSongeEngine : SongeEngine {
             val maxFreq = 2000.0
             val freq = minFreq * Math.pow(maxFreq / minFreq, tune.toDouble())
             voices[index].frequency.set(freq)
-            // Log less frequently or debug level to avoid spam
-            // Logger.debug("Voice $index Tune: $tune -> ${freq.toInt()}Hz") 
         }
     }
 
@@ -89,14 +134,15 @@ class JvmSongeEngine : SongeEngine {
     override fun setGroupFm(groupIndex: Int, amount: Float) {
         // TODO: Implement FM Routing logic
     }
-    
     override fun setDrive(amount: Float) {
-         // TODO: Global VCA/Distortion
+        // Map 0.0-1.0 to Gain 1.0 - 50.0 (Hard Distortion)
+        // Logarithmic feel might be better, or linear for "drive"
+        val gain = 1.0 + (amount * 49.0)
+        driveGain.inputB.set(gain)
+        Logger.debug("Drive Set: ${amount} (Gain: x${gain.toInt()})")
     }
 
-    override fun setDelay(time: Float, feedback: Float) {
-         // TODO: Delay Line
-    }
+
 
     // Test tone is now just overriding Voice 0 for simplicity if needed, or we keep the separate osc
     private val testOsc = SineOscillator()

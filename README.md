@@ -56,9 +56,37 @@ composeApp/
 ./gradlew build
 ```
 
+## Songe Audio Engine 🧬
+
+Authentic emulation of the organismic hardware design:
+
+### 1. Voices
+- **Non-linear Envelopes**: Capacitor-like attack/decay behavior.
+- **FM Routing**: Complex cross-modulation between voice pairs (1-2, 3-4, etc.) and groups.
+
+### 2. Hyper LFO
+A complex low-frequency modulator composed of two oscillators (A and B).
+- **AND Mode**: Multiplies signals for rhythmic stepping.
+- **OR Mode**: Sums signals for complex gradients.
+- **FM**: LFO A modulates LFO B frequency.
+
+### 3. Mod Delay
+Dual interpolating delay lines that form the "acoustic space".
+- **Self-Modulation**: Delay output modulates its own time parameter.
+- **LFO Modulation**: Driven by the Hyper LFO.
+- **Feedback**: Capable of self-oscillation.
+
+### 4. Distortion
+Global saturation stage applied **after** the delay line, creating gristly textures and taming resonant peaks.
+
 ## Status
 
-🚧 **Work in Progress** - Phase 1 (Foundation) complete
+🚧 **Work in Progress** - Phase 3.5 (Advanced Audio)
+- [x] Basic Synthesis (FM/AM)
+- [x] Dual Mod Delay
+- [x] Distortion (Drive)
+- [ ] Hyper LFO Logic
+- [ ] Android Audio Engine implementation
 
 ---
 
