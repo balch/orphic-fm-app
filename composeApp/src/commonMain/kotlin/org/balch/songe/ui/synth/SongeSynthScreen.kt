@@ -3,6 +3,7 @@ package org.balch.songe.ui.synth
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -302,26 +303,29 @@ private fun LFOToggleSwitch(
 @Composable
 private fun VerticalLFOToggle(
     color: Color,
+    isOn: Boolean = false,
+    onToggle: (Boolean) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF1A1A2A))
-            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+            .border(1.dp, if (isOn) color else color.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+            .clickable { onToggle(!isOn) }
             .padding(horizontal = 4.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Text("LFO", fontSize = 8.sp, color = color.copy(alpha = 0.7f))
+        Text("LFO", fontSize = 8.sp, color = if (isOn) color else color.copy(alpha = 0.5f))
 
-        // Vertical switch centered under it
+        // Vertical switch
         Box(
             modifier = Modifier
                 .width(10.dp)
                 .height(20.dp)
                 .clip(RoundedCornerShape(5.dp))
-                .background(color.copy(alpha = 0.3f)),
-            contentAlignment = Alignment.TopCenter
+                .background(if (isOn) color.copy(alpha = 0.6f) else color.copy(alpha = 0.2f)),
+            contentAlignment = if (isOn) Alignment.BottomCenter else Alignment.TopCenter
         ) {
             Box(
                 modifier = Modifier
@@ -329,7 +333,7 @@ private fun VerticalLFOToggle(
                     .width(8.dp)
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color.White.copy(alpha = 0.6f))
+                    .background(if (isOn) Color.White else Color.White.copy(alpha = 0.4f))
             )
         }
     }
@@ -396,91 +400,43 @@ private fun ModDelaySection(modifier: Modifier = Modifier) {
         // Title at TOP
         Text("MOD DELAY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SongeColors.warmGlow)
         
-        // Mode switches in MIDDLE (like Lyra-8's MOD/SELF/LFO)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(SongeColors.warmGlow.copy(alpha = 0.3f))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
-            ) {
-                Text("SELF", fontSize = 8.sp, color = SongeColors.warmGlow)
-            }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFF2A2A3A))
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
-            ) {
-                Text("LFO", fontSize = 8.sp, color = Color.White.copy(alpha = 0.5f))
-            }
+        // SELF/LFO toggles
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ToggleChip("SELF", isSelected = true, color = SongeColors.warmGlow)
+            ToggleChip("LFO", isSelected = false, color = SongeColors.warmGlow)
         }
         
-        // Knobs at BOTTOM (2x2 grid)
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp, horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                RotaryKnob(
-                    value = 0.3f,
-                    onValueChange = {},
-                    label = "MOD 1",
-                    size = 32.dp,
-                    progressColor = SongeColors.warmGlow
-                )
-                RotaryKnob(
-                    value = 0.3f,
-                    onValueChange = {},
-                    label = "MOD 2",
-                    size = 32.dp,
-                    progressColor = SongeColors.warmGlow
-                )
-
-                VerticalLFOToggle(color = SongeColors.warmGlow)
-                VerticalLFOToggle(color = SongeColors.warmGlow)
-
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp, horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                RotaryKnob(
-                    value = 0.3f,
-                    onValueChange = {},
-                    label = "TIME 1",
-                    size = 32.dp,
-                    progressColor = SongeColors.warmGlow
-                )
-                RotaryKnob(
-                    value = 0.3f,
-                    onValueChange = {},
-                    label = "TIME 2",
-                    size = 32.dp,
-                    progressColor = SongeColors.warmGlow
-                )
-                RotaryKnob(
-                    value = 0.4f,
-                    onValueChange = {},
-                    label = "FB",
-                    size = 32.dp,
-                    progressColor = SongeColors.warmGlow
-                )
-                RotaryKnob(
-                    value = 0.3f,
-                    onValueChange = {},
-                    label = "MIX",
-                    size = 32.dp,
-                    progressColor = SongeColors.warmGlow
-                )
-            }
+        // MOD knobs row with vertical LFO toggles
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RotaryKnob(value = 0.3f, onValueChange = {}, label = "MOD 1", size = 32.dp, progressColor = SongeColors.warmGlow)
+            RotaryKnob(value = 0.3f, onValueChange = {}, label = "MOD 2", size = 32.dp, progressColor = SongeColors.warmGlow)
+            VerticalLFOToggle(color = SongeColors.warmGlow)
+            VerticalLFOToggle(color = SongeColors.warmGlow)
         }
+        
+        // TIME/FB/MIX knobs row
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            RotaryKnob(value = 0.3f, onValueChange = {}, label = "TIME 1", size = 32.dp, progressColor = SongeColors.warmGlow)
+            RotaryKnob(value = 0.3f, onValueChange = {}, label = "TIME 2", size = 32.dp, progressColor = SongeColors.warmGlow)
+            RotaryKnob(value = 0.4f, onValueChange = {}, label = "FB", size = 32.dp, progressColor = SongeColors.warmGlow)
+            RotaryKnob(value = 0.3f, onValueChange = {}, label = "MIX", size = 32.dp, progressColor = SongeColors.warmGlow)
+        }
+    }
+}
+
+@Composable
+private fun ToggleChip(text: String, isSelected: Boolean, color: Color) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(if (isSelected) color.copy(alpha = 0.3f) else Color(0xFF2A2A3A))
+            .border(1.dp, if (isSelected) color else Color.Transparent, RoundedCornerShape(4.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(text, fontSize = 8.sp, color = if (isSelected) color else Color.White.copy(alpha = 0.5f))
     }
 }
 
