@@ -36,9 +36,8 @@ fun SongeNavigation(engine: org.balch.songe.audio.SongeEngine) {
     var currentScreen by remember { mutableStateOf(SongeScreen.Synth) }
     
     when (currentScreen) {
-        SongeScreen.Synth -> SynthScreenPlaceholder(
-            onSettingsClick = { currentScreen = SongeScreen.Settings },
-            onDebugClick = { currentScreen = SongeScreen.Debug }
+        SongeScreen.Synth -> org.balch.songe.ui.synth.SongeSynthScreen(
+            engine = engine
         )
         SongeScreen.Settings -> SettingsScreenPlaceholder(
             onBack = { currentScreen = SongeScreen.Synth }
@@ -46,14 +45,7 @@ fun SongeNavigation(engine: org.balch.songe.audio.SongeEngine) {
         SongeScreen.Debug -> org.balch.songe.ui.debug.DebugAudioPanel(engine = engine)
     }
     
-    // Temporary overlay to switch to debug
-    if (currentScreen != SongeScreen.Debug) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
-            Button(onClick = { currentScreen = SongeScreen.Debug }) {
-                Text("Debug")
-            }
-        }
-    }
+
 }
 
 // Placeholder composables - to be replaced with real implementations
