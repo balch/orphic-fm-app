@@ -81,8 +81,7 @@ fun QuadGroupPanel(
         )
         
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             RotaryKnob(
                 value = pitch,

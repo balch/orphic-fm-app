@@ -47,8 +47,8 @@ fun VoicePanel(
 ) {
     Column(
         modifier = modifier
-            .shadow(elevation = 8.dp, shape = RoundedCornerShape(16.dp), clip = false)
-            .clip(RoundedCornerShape(16.dp))
+            .shadow(elevation = 4.dp, shape = RoundedCornerShape(12.dp), clip = false)
+            .clip(RoundedCornerShape(12.dp))
             .then(
                 if (hazeState != null) {
                     Modifier.hazeEffect(state = hazeState, style = HazeMaterials.thin())
@@ -75,15 +75,15 @@ fun VoicePanel(
                     start = Offset(0f, 0f),
                     end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
                 ),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(12.dp)
             )
-            .padding(12.dp),
+            .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Text(
-            text = "VOICE ${voiceIndex + 1}",
-            style = MaterialTheme.typography.labelMedium,
+            text = "V${voiceIndex + 1}",
+            style = MaterialTheme.typography.labelSmall,
             color = SongeColors.electricBlue
         )
         
@@ -91,19 +91,18 @@ fun VoicePanel(
             value = tune,
             onValueChange = onTuneChange,
             label = "TUNE",
-            size = 56.dp,
+            size = 40.dp,
             indicatorColor = SongeColors.neonMagenta
         )
         
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             PulseButton(
                 onPulseStart = onPulseStart,
                 onPulseEnd = onPulseEnd,
-                size = 40.dp
+                size = 28.dp
             )
             
             HoldButton(

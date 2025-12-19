@@ -5,8 +5,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,23 +32,35 @@ import org.balch.songe.ui.theme.SongeColors
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun GlobalControlsPanel(
-    vibrato: Float,
+    // Hyper LFO
+    vibrato: Float, // LFO1 Rate
     onVibratoChange: (Float) -> Unit,
+    lfo2Rate: Float = 0.3f,
+    onLfo2RateChange: (Float) -> Unit = {},
+    hyperLfoMode: HyperLfoMode = HyperLfoMode.AND,
+    onHyperLfoModeChange: (HyperLfoMode) -> Unit = {},
+    // Effects
     distortion: Float,
     onDistortionChange: (Float) -> Unit,
+    masterDrive: Float,  // "Gain" like
+    onMasterDriveChange: (Float) -> Unit,
+    // Delay (new params - can be hooked later)
+    delayTime: Float = 0.3f,
+    onDelayTimeChange: (Float) -> Unit = {},
+    delayFeedback: Float = 0.4f,
+    onDelayFeedbackChange: (Float) -> Unit = {},
+    // Master output
     masterVolume: Float,
     onMasterVolumeChange: (Float) -> Unit,
     pan: Float,
     onPanChange: (Float) -> Unit,
-    masterDrive: Float,
-    onMasterDriveChange: (Float) -> Unit,
     hazeState: HazeState?,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier
-            .shadow(elevation = 12.dp, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp), clip = false)
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .shadow(elevation = 8.dp, shape = RoundedCornerShape(12.dp), clip = false)
+            .clip(RoundedCornerShape(12.dp))
             .then(
                 if (hazeState != null) {
                     Modifier.hazeEffect(state = hazeState, style = HazeMaterials.regular())
@@ -54,7 +68,7 @@ fun GlobalControlsPanel(
                     Modifier
                 }
             )
-             .background(
+            .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(
                         SongeColors.darkVoid.copy(alpha = 0.7f),
@@ -66,66 +80,91 @@ fun GlobalControlsPanel(
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        SongeColors.electricBlue.copy(alpha = 0.5f),
+                        SongeColors.electricBlue.copy(alpha = 0.4f),
                         Color.Transparent,
-                         Color.Black.copy(alpha = 0.6f)
+                        Color.Black.copy(alpha = 0.6f)
                     ),
                     start = Offset(0f, 0f),
                     end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
                 ),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                shape = RoundedCornerShape(12.dp)
             )
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "GLOBAL CONTROLS",
-            style = MaterialTheme.typography.titleMedium,
-            color = SongeColors.electricBlue,
-            modifier = Modifier.padding(bottom = 16.dp)
+        // LEFT: Hyper LFO Section
+        HyperLfoPanel(
+            lfo1Rate = vibrato, 
+            onLfo1RateChange = onVibratoChange,
+            lfo2Rate = lfo2Rate,
+            onLfo2RateChange = onLfo2RateChange,
+            mode = hyperLfoMode,
+            onModeChange = onHyperLfoModeChange
         )
-        
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // CENTER: Mode & Delay Section
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            RotaryKnob(
-                value = vibrato,
-                onValueChange = onVibratoChange,
-                label = "VIBRATO",
-                size = 64.dp,
-                progressColor = SongeColors.neonCyan
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("DELAY", style = MaterialTheme.typography.labelSmall, color = SongeColors.warmGlow)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RotaryKnob(
+                        value = delayTime,
+                        onValueChange = onDelayTimeChange,
+                        label = "TIME",
+                        size = 40.dp,
+                        progressColor = SongeColors.warmGlow
+                    )
+                    RotaryKnob(
+                        value = delayFeedback,
+                        onValueChange = onDelayFeedbackChange,
+                        label = "FB",
+                        size = 40.dp,
+                        progressColor = SongeColors.warmGlow
+                    )
+                }
+            }
             
             RotaryKnob(
                 value = distortion,
                 onValueChange = onDistortionChange,
                 label = "DIST",
-                size = 64.dp,
-                progressColor = SongeColors.warmGlow
+                size = 48.dp,
+                progressColor = SongeColors.neonMagenta
             )
-            
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // RIGHT: Master Output Section
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             RotaryKnob(
                 value = masterDrive,
                 onValueChange = onMasterDriveChange,
-                label = "DRIVE",
-                size = 64.dp,
-                progressColor = SongeColors.warmGlow
+                label = "GAIN",
+                size = 44.dp,
+                progressColor = SongeColors.synthGreen
             )
-             
             RotaryKnob(
                 value = pan,
                 onValueChange = onPanChange,
                 label = "PAN",
-                size = 64.dp,
+                size = 44.dp,
                 progressColor = SongeColors.neonMagenta
             )
-            
             RotaryKnob(
                 value = masterVolume,
                 onValueChange = onMasterVolumeChange,
-                label = "MAIN VOL",
-                size = 72.dp,
+                label = "VOL",
+                size = 52.dp,
                 progressColor = SongeColors.electricBlue
             )
         }
