@@ -7,13 +7,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -22,8 +28,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.chrisbanes.haze.HazeDefaults.style
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.theme.SongeColors
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import java.awt.SystemColor.text
 
 enum class HyperLfoMode { AND, OR }
 
@@ -45,6 +54,7 @@ fun HyperLfoPanel(
 ) {
     Column(
         modifier = modifier
+            .wrapContentHeight()
             .shadow(elevation = 4.dp, shape = RoundedCornerShape(10.dp), clip = false)
             .clip(RoundedCornerShape(10.dp))
             .background(
@@ -70,50 +80,47 @@ fun HyperLfoPanel(
             )
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            text = "HYPER LFO",
-            style = MaterialTheme.typography.labelSmall,
-            color = SongeColors.neonCyan,
-            fontWeight = FontWeight.Bold
-        )
-
-        // Two LFO Rate Knobs
+        // AND/OR Toggle in MIDDLE
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            RotaryKnob(
-                value = lfo1Rate,
-                onValueChange = onLfo1RateChange,
-                label = "LFO1",
-                size = 36.dp,
-                progressColor = SongeColors.neonCyan
-            )
-            RotaryKnob(
-                value = lfo2Rate,
-                onValueChange = onLfo2RateChange,
-                label = "LFO2",
-                size = 36.dp,
-                progressColor = SongeColors.neonCyan
-            )
-        }
-
-        // AND/OR Toggle
-        Row(
+            modifier = Modifier
+                .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             ModeToggleButton(
+                modifier = Modifier.width(42.dp).size(28.dp),
                 text = "AND",
                 isSelected = mode == HyperLfoMode.AND,
                 onClick = { onModeChange(HyperLfoMode.AND) },
                 activeColor = SongeColors.neonCyan
             )
             ModeToggleButton(
+                modifier = Modifier.width(42.dp).size(28.dp),
                 text = "OR",
                 isSelected = mode == HyperLfoMode.OR,
                 onClick = { onModeChange(HyperLfoMode.OR) },
                 activeColor = SongeColors.neonMagenta
+            )
+        }
+
+        // LFO Rate Knobs at BOTTOM
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            RotaryKnob(
+                value = lfo1Rate,
+                onValueChange = onLfo1RateChange,
+                label = "FREQ A",
+                size = 48.dp,
+                progressColor = SongeColors.neonCyan
+            )
+            RotaryKnob(
+                value = lfo2Rate,
+                onValueChange = onLfo2RateChange,
+                label = "FREQ B",
+                size = 48.dp,
+                progressColor = SongeColors.neonCyan
             )
         }
     }
@@ -121,13 +128,14 @@ fun HyperLfoPanel(
 
 @Composable
 private fun ModeToggleButton(
+    modifier: Modifier = Modifier,
     text: String,
     isSelected: Boolean,
     onClick: () -> Unit,
     activeColor: Color
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(if (isSelected) activeColor.copy(alpha = 0.8f) else Color(0xFF2A2A3A))
             .border(
@@ -145,5 +153,13 @@ private fun ModeToggleButton(
             fontWeight = FontWeight.SemiBold,
             color = if (isSelected) Color.White else Color(0xFF888888)
         )
+    }
+}
+
+@Preview
+@Composable
+fun HyperLfoPanelPreview() {
+    MaterialTheme {
+        HyperLfoPanel(lfo1Rate = 0.5f, onLfo1RateChange = {}, lfo2Rate = 0.2f, onLfo2RateChange = {}, mode = HyperLfoMode.AND, onModeChange = {})
     }
 }

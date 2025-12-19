@@ -16,6 +16,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.balch.songe.audio.SongeEngine
+import org.balch.songe.ui.debug.DebugAudioPanel
+import org.balch.songe.ui.preview.PreviewSongeEngine
+import org.balch.songe.ui.synth.SongeSynthScreen
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
  * Navigation destinations for Songe app
@@ -31,18 +36,19 @@ enum class SongeScreen {
  * This provides a basic navigation structure that works across all platforms.
  * Can be upgraded to full Nav3 with SavedStateConfiguration later.
  */
+@Preview(widthDp = 1080, heightDp = 720)
 @Composable
-fun SongeNavigation(engine: org.balch.songe.audio.SongeEngine) {
+fun SongeNavigation(engine: SongeEngine = PreviewSongeEngine()) {
     var currentScreen by remember { mutableStateOf(SongeScreen.Synth) }
     
     when (currentScreen) {
-        SongeScreen.Synth -> org.balch.songe.ui.synth.SongeSynthScreen(
+        SongeScreen.Synth -> SongeSynthScreen(
             engine = engine
         )
         SongeScreen.Settings -> SettingsScreenPlaceholder(
             onBack = { currentScreen = SongeScreen.Synth }
         )
-        SongeScreen.Debug -> org.balch.songe.ui.debug.DebugAudioPanel(engine = engine)
+        SongeScreen.Debug -> DebugAudioPanel(engine = engine)
     }
     
 

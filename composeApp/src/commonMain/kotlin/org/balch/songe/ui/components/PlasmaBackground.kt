@@ -15,6 +15,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import org.balch.songe.ui.theme.SongeColors
+import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -22,6 +23,7 @@ import kotlin.math.sin
  * Animated plasma/lava lamp background that creates an organic, flowing effect.
  * The animation is subtle to avoid distracting from the synthesizer controls.
  */
+@Preview(widthDp = 1080, heightDp = 720)
 @Composable
 fun PlasmaBackground(
     modifier: Modifier = Modifier,

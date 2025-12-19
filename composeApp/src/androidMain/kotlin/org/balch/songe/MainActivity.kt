@@ -4,12 +4,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
+import org.balch.songe.audio.AndroidSongeEngine
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val engine = org.balch.songe.audio.AndroidSongeEngine()
+        val engine = AndroidSongeEngine()
 
         setContent {
             App(engine)
@@ -17,8 +19,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Preview
+@Preview(device = Devices.DESKTOP)
 @Composable
 fun AppAndroidPreview() {
-    App()
+    App(AndroidSongeEngine())
 }
