@@ -20,13 +20,18 @@ class JvmSongeEngine : SongeEngine {
     // Dual Delay & Modulation
     private val delay1 = com.jsyn.unitgen.InterpolatingDelay()
     private val delay2 = com.jsyn.unitgen.InterpolatingDelay()
-    private val delayFeedbackGain = com.jsyn.unitgen.Multiply()
+    private val delay1FeedbackGain = com.jsyn.unitgen.Multiply() // Independent feedback per delay
+    private val delay2FeedbackGain = com.jsyn.unitgen.Multiply()
     
     // Delay Modulation
     private val hyperLfo = HyperLfo()
     private val delay1ModMixer = com.jsyn.unitgen.MultiplyAdd() // (LFO * Depth) + BaseTime
     private val delay2ModMixer = com.jsyn.unitgen.MultiplyAdd()
     private val delayLfoDepth = com.jsyn.unitgen.PassThrough() // Shared depth scaling
+    
+    // Self-modulation attenuators (scale down raw audio before it modulates delay time)
+    private val selfMod1Attenuator = com.jsyn.unitgen.Multiply()
+    private val selfMod2Attenuator = com.jsyn.unitgen.Multiply()
 
     // Monitoring & FX
     private val peakFollower = com.jsyn.unitgen.PeakFollower()
@@ -42,14 +47,24 @@ class JvmSongeEngine : SongeEngine {
         synth.add(masterGain)
         synth.add(delay1)
         synth.add(delay2)
-        synth.add(delayFeedbackGain)
+        synth.add(delay1FeedbackGain)
+        synth.add(delay2FeedbackGain)
         synth.add(hyperLfo)
         synth.add(delay1ModMixer)
         synth.add(delay2ModMixer)
+        synth.add(selfMod1Attenuator)
+        synth.add(selfMod2Attenuator)
         
         peakFollower.halfLife.set(0.1)
         driveGain.inputB.set(1.0) // Default unity gain
         masterGain.inputB.set(0.7) // Default master volume 70%
+        
+        // Self-modulation attenuator (0.02 = only 2% of audio signal reaches mod input)
+        selfMod1Attenuator.inputB.set(0.02)
+        selfMod2Attenuator.inputB.set(0.02)
+        // Wire delay outputs to attenuators
+        delay1.output.connect(selfMod1Attenuator.inputA)
+        delay2.output.connect(selfMod2Attenuator.inputA)
         
         // Delay Defaults
         delay1.allocate(44100) // 1 second max buffer
@@ -98,11 +113,12 @@ class JvmSongeEngine : SongeEngine {
         // This forces JSyn to include it in the audio graph
         peakFollower.output.connect(0, lineOut.input, 0)
         
-        // 6. Feedback Loop (Tapped from Delay Output BEFORE Drive)
-        delay1.output.connect(delayFeedbackGain.inputA)
-        delay2.output.connect(delayFeedbackGain.inputA)
-        delayFeedbackGain.output.connect(delay1.input) 
-        delayFeedbackGain.output.connect(delay2.input)
+        // 6. Independent Feedback Loops per Delay
+        delay1.output.connect(delay1FeedbackGain.inputA)
+        delay1FeedbackGain.output.connect(delay1.input)
+        
+        delay2.output.connect(delay2FeedbackGain.inputA)
+        delay2FeedbackGain.output.connect(delay2.input)
     }
     // ... (rest of start() remains mostly same, ensuring voices go to driveGain) ...
     
@@ -129,7 +145,10 @@ class JvmSongeEngine : SongeEngine {
     }
 
     override fun setDelayFeedback(amount: Float) {
-        delayFeedbackGain.inputB.set(amount * 0.95) // Cap < 1.0!
+        // Cap at 70% for stability with modulation effects
+        val fb = amount * 0.7
+        delay1FeedbackGain.inputB.set(fb)
+        delay2FeedbackGain.inputB.set(fb)
     }
     
     override fun setDelayMix(amount: Float) {
@@ -162,8 +181,10 @@ class JvmSongeEngine : SongeEngine {
             hyperLfo.output.connect(targetMixer.inputA)
              Logger.debug { "Delay $index Mod Source: LFO" }
         } else {
-            selfSource.connect(targetMixer.inputA)
-             Logger.debug { "Delay $index Mod Source: SELF" }
+            // Use attenuated self-modulation signal
+            val attenuatedSelf = if (index == 0) selfMod1Attenuator.output else selfMod2Attenuator.output
+            attenuatedSelf.connect(targetMixer.inputA)
+             Logger.debug { "Delay $index Mod Source: SELF (attenuated)" }
         }
     }
 
