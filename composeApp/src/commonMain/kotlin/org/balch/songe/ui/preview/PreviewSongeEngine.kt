@@ -37,6 +37,8 @@ class PreviewSongeEngine(): SongeEngine {
     override fun setDelayModSource(index: Int, isLfo: Boolean) {}
     override fun setDelayLfoWaveform(isTriangle: Boolean) {}
 
+    override fun setDuoModSource(duoIndex: Int, source: org.balch.songe.audio.ModSource) {}
+    
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
     override fun setHyperLfoMode(andMode: Boolean) {}
     override fun setHyperLfoLink(active: Boolean) {}

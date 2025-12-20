@@ -38,6 +38,9 @@ interface SongeEngine {
     fun setHyperLfoMode(andMode: Boolean)
     fun setHyperLfoLink(active: Boolean)
     
+    // Duo Mod Source
+    fun setDuoModSource(duoIndex: Int, source: ModSource)
+    
     // Test/Debug
     fun playTestTone(frequency: Float = 440f)
     fun stopTestTone()
@@ -45,4 +48,10 @@ interface SongeEngine {
     // Monitoring
     fun getPeak(): Float
     fun getCpuLoad(): Float
+}
+
+enum class ModSource {
+    VOICE_FM,
+    OFF,
+    LFO
 }

@@ -147,21 +147,8 @@ class JvmSongeEngine : SongeEngine {
         delay2FeedbackGain.output.connect(delay2.input)
         
         // 7. Voice FM Cross-Modulation (Pair-wise)
-        // Pair 1-2: Voice 1 <-> Voice 2
-        voices[0].outputPort.connect(voices[1].modInput)
-        voices[1].outputPort.connect(voices[0].modInput)
-        
-        // Pair 3-4
-        voices[2].outputPort.connect(voices[3].modInput)
-        voices[3].outputPort.connect(voices[2].modInput)
-        
-        // Pair 5-6
-        voices[4].outputPort.connect(voices[5].modInput)
-        voices[5].outputPort.connect(voices[4].modInput)
-        
-        // Pair 7-8
-        voices[6].outputPort.connect(voices[7].modInput)
-        voices[7].outputPort.connect(voices[6].modInput)
+        // INITIAL STATE: OFF (handled by DuoModSource default in ViewModel, but we should init safely here if we want)
+        // Leaving disconnected by default. Logic is controlled by setDuoModSource.
     }
     // ... (rest of start() remains mostly same, ensuring voices go to driveGain) ...
     
@@ -330,6 +317,34 @@ class JvmSongeEngine : SongeEngine {
         // TODO: Implement FM Routing logic
     }
 
+
+    override fun setDuoModSource(duoIndex: Int, source: org.balch.songe.audio.ModSource) {
+        // Duo Index 0..3 corresponds to Voice Pairs 0-1, 2-3, 4-5, 6-7
+        val voiceA = duoIndex * 2
+        val voiceB = voiceA + 1
+        
+        // Clear existing modulation sources
+        voices[voiceA].modInput.disconnectAll()
+        voices[voiceB].modInput.disconnectAll()
+        
+        when (source) {
+            org.balch.songe.audio.ModSource.OFF -> {
+                Logger.debug { "Duo $duoIndex Mod Source: OFF" }
+            }
+            org.balch.songe.audio.ModSource.LFO -> {
+                // Route HyperLFO to Mod Inputs
+                hyperLfo.output.connect(voices[voiceA].modInput)
+                hyperLfo.output.connect(voices[voiceB].modInput)
+                Logger.debug { "Duo $duoIndex Mod Source: LFO" }
+            }
+            org.balch.songe.audio.ModSource.VOICE_FM -> {
+                // Route Partner Voice to Mod Input (Cross-Modulation 0<->1)
+                voices[voiceA].outputPort.connect(voices[voiceB].modInput)
+                voices[voiceB].outputPort.connect(voices[voiceA].modInput)
+                Logger.debug { "Duo $duoIndex Mod Source: VOICE_FM (Cross-Mod)" }
+            }
+        }
+    }
 
     override fun setHyperLfoFreq(index: Int, frequency: Float) {
         // Map 0-1 to LFO frequency (e.g., 0.1Hz to 20Hz)

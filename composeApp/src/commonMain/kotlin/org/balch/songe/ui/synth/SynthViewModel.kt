@@ -58,6 +58,12 @@ class SynthViewModel(
     var hyperLfoB by mutableStateOf(0.3f)
     var hyperLfoMode by mutableStateOf(org.balch.songe.ui.panels.HyperLfoMode.AND)
     var hyperLfoLink by mutableStateOf(false)
+    
+    // Duo Mod Sources (4 pairs)
+    // Default: OFF (center) as per request "Central position means modulation for a group is turned off"
+    // Or LFO (down) if preferred default. Let's start OFF.
+    var duoModSources by mutableStateOf(List(4) { org.balch.songe.audio.ModSource.OFF })
+        private set
 
     fun onVoiceTuneChange(index: Int, newTune: Float) {
         val newVoices = voiceStates.toMutableList()
@@ -108,6 +114,13 @@ class SynthViewModel(
     fun onHyperLfoLinkChange(enabled: Boolean) {
         hyperLfoLink = enabled
         engine.setHyperLfoLink(enabled)
+    }
+    
+    fun onDuoModSourceChange(index: Int, source: org.balch.songe.audio.ModSource) {
+        val newSources = duoModSources.toMutableList()
+        newSources[index] = source
+        duoModSources = newSources
+        engine.setDuoModSource(index, source)
     }
     
     // Delay Handlers

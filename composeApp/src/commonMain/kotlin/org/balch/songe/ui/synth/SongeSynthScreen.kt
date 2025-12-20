@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import org.balch.songe.audio.SongeEngine
+import org.balch.songe.ui.components.HorizontalSwitch3Way
 import org.balch.songe.ui.components.HorizontalToggle
 import org.balch.songe.ui.components.PulseButton
 import org.balch.songe.ui.components.RotaryKnob
@@ -259,7 +260,15 @@ private fun DuoPairBox(
         ) {
             Text("${voiceA + 1}-${voiceB + 1}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = color)
             
-            LFOToggleSwitch(color = color)
+            // 3-Way Mod Source Switch (Horizontal)
+            // Calculate pair index (0,1,2,3)
+            val pairIndex = voiceA / 2
+            
+            HorizontalSwitch3Way(
+                state = viewModel.duoModSources[pairIndex],
+                onStateChange = { viewModel.onDuoModSourceChange(pairIndex, it) },
+                color = color
+            )
         }
         
         // Main Content: Two Voice Columns side-by-side
@@ -341,39 +350,7 @@ private fun DuoPairBox(
     }
 }
 
-@Composable
-private fun LFOToggleSwitch(
-    color: Color,
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A2A))
-            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("LFO", fontSize = 8.sp, color = color.copy(alpha = 0.7f))
-        Box(
-            modifier = Modifier
-                .width(20.dp)
-                .height(10.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(color.copy(alpha = 0.3f)),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(1.dp)
-                    .width(8.dp)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color.White.copy(alpha = 0.6f))
-            )
-        }
-    }
-}
+
 
 
 @Composable
