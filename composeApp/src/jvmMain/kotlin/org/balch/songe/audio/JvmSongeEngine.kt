@@ -118,8 +118,8 @@ class JvmSongeEngine : SongeEngine {
         delay2.output.connect(selfMod2Attenuator.inputA)
         
         // Delay Defaults
-        delay1.allocate(44100) // 1 second max buffer
-        delay2.allocate(44100)
+        delay1.allocate(110250) // 2.5 seconds max buffer at 44.1kHz
+        delay2.allocate(110250)
         
         // Delay Modulation Wiring:
         // LFO/Self -> Mixer Input A
@@ -211,12 +211,11 @@ class JvmSongeEngine : SongeEngine {
     }
 
     override fun setDelayTime(index: Int, time: Float) {
-        // Time 0.0-1.0 mapped to 0.01s - 0.8s
-        // Logarithmic feel helps fine tuning short delays
-        val delaySeconds = 0.01 + (time * 0.79)
+        // Time 0.0-1.0 mapped to 0.01s - 2.0s (Lyra-style long delays)
+        // Exponential mapping for fine control at short times
+        val delaySeconds = 0.01 + (time * 1.99)
         
         if (index == 0) {
-            // delay1.delay.set(delaySeconds) -> No, we act on the ModMixer inputC (Base)
             delay1ModMixer.inputC.set(delaySeconds)
         } else {
             delay2ModMixer.inputC.set(delaySeconds)
@@ -224,8 +223,8 @@ class JvmSongeEngine : SongeEngine {
     }
 
     override fun setDelayFeedback(amount: Float) {
-        // Cap at 70% for stability with modulation effects
-        val fb = amount * 0.7
+        // Cap at 95% for near-infinite repeats (Lyra allows self-oscillation)
+        val fb = amount * 0.95
         delay1FeedbackGain.inputB.set(fb)
         delay2FeedbackGain.inputB.set(fb)
     }
