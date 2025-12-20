@@ -318,6 +318,24 @@ class JvmSongeEngine : SongeEngine {
             // VIBRATO -> Voice frequency modulation
             vibratoDepthGain.output.connect(voice.vibratoInput)
             voice.vibratoDepth.set(1.0) // Pass through engine-scaled vibrato
+            
+            // COUPLING: Set default depth (controlled globally via setVoiceCoupling)
+            voice.couplingDepth.set(0.0) // Will be set by setVoiceCoupling
+        }
+        
+        // Wire voice coupling: Each voice's envelope -> partner's coupling input
+        // Pair 0: Voice 0 <-> Voice 1
+        // Pair 1: Voice 2 <-> Voice 3
+        // Pair 2: Voice 4 <-> Voice 5
+        // Pair 3: Voice 6 <-> Voice 7
+        for (pairIndex in 0 until 4) {
+            val voiceA = voices[pairIndex * 2]
+            val voiceB = voices[pairIndex * 2 + 1]
+            
+            // A's envelope -> B's coupling input
+            voiceA.envelopeOutput.connect(voiceB.couplingInput)
+            // B's envelope -> A's coupling input
+            voiceB.envelopeOutput.connect(voiceA.couplingInput)
         }
         
         lineOut.start()
@@ -543,6 +561,16 @@ class JvmSongeEngine : SongeEngine {
         val depthHz = amount * 20.0
         vibratoDepthGain.inputB.set(depthHz)
         Logger.debug { "Vibrato: ${"%.2f".format(amount)} (depth: ${"%.1f".format(depthHz)}Hz)" }
+    }
+    
+    override fun setVoiceCoupling(amount: Float) {
+        // Coupling depth: Partner envelope modulates our frequency
+        // 0.0 = no coupling, 1.0 = +/- 30Hz deviation based on partner amplitude
+        val depthHz = amount * 30.0
+        voices.forEach { voice ->
+            voice.couplingDepth.set(depthHz)
+        }
+        Logger.debug { "Voice Coupling: ${"%.2f".format(amount)} (depth: ${"%.1f".format(depthHz)}Hz)" }
     }
 
     // Test tone is now just overriding Voice 0 for simplicity if needed, or we keep the separate osc

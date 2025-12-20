@@ -8,6 +8,7 @@ import com.jsyn.unitgen.EnvelopeDAHDSR
 import com.jsyn.unitgen.Multiply
 import com.jsyn.unitgen.MultiplyAdd
 import com.jsyn.unitgen.PassThrough
+import com.jsyn.unitgen.PeakFollower
 import com.jsyn.unitgen.SquareOscillator
 import com.jsyn.unitgen.TriangleOscillator
 import com.jsyn.unitgen.UnitSource
@@ -34,6 +35,13 @@ class SongeVoice(
     // VCA: Multiply mixed oscillator by envelope
     private val vca = Multiply()
     
+    // Envelope Follower for voice coupling
+    private val envelopeFollower = PeakFollower()
+    
+    // Coupling: Partner voice envelope modulates our frequency
+    private val couplingScaler = Multiply() // PartnerEnvelope * CouplingDepth
+    private val couplingMixer = Add()       // Add coupling modulation to vibrato chain
+    
     // FM: (ModInput * FmDepth * Scaling) + (BaseFreq * PitchMult) -> Osc.frequency
     private val fmDepthControl = Multiply()
     private val fmFreqMixer = MultiplyAdd() // (FmSignal * 200Hz) + ActualFreq
@@ -51,6 +59,11 @@ class SongeVoice(
     val sharpness: UnitInputPort = sharpnessProxy.input // Waveform (0=tri, 1=sq)
     val vibratoInput: UnitInputPort = vibratoScaler.inputA // Vibrato LFO input
     val vibratoDepth: UnitInputPort = vibratoScaler.inputB // Vibrato depth (Hz range)
+    val couplingInput: UnitInputPort = couplingScaler.inputA // Partner envelope input
+    val couplingDepth: UnitInputPort = couplingScaler.inputB // Coupling depth (Hz range)
+    
+    // Envelope output for coupling to other voices
+    val envelopeOutput: UnitOutputPort = envelopeFollower.output
     
     // Output comes from the VCA
     override fun getOutput(): UnitOutputPort = vca.output
@@ -66,11 +79,17 @@ class SongeVoice(
         add(sharpnessInverter)
         add(ampEnv)
         add(vca)
+        add(envelopeFollower)
+        add(couplingScaler)
+        add(couplingMixer)
         add(fmDepthControl)
         add(fmFreqMixer)
         add(pitchScaler)
         add(vibratoScaler)
         add(vibratoMixer)
+        
+        // Envelope follower setup
+        envelopeFollower.halfLife.set(0.05) // 50ms response time
 
         // Set oscillator amplitudes
         triangleOsc.amplitude.set(0.3)
@@ -112,17 +131,22 @@ class SongeVoice(
         // Default sharpness = 0.0 (pure triangle)
         sharpness.set(0.0)
 
-        // FM Wiring with Vibrato:
+        // FM Wiring with Vibrato and Coupling:
         // PitchScaler -> VibratoMixer.inputA (base scaled frequency)
         // VibratoScaler -> VibratoMixer.inputB (LFO * depth)
-        // VibratoMixer.output -> FmFreqMixer.inputC (final freq before FM)
+        // VibratoMixer -> CouplingMixer.inputA
+        // CouplingScaler -> CouplingMixer.inputB (partner envelope * depth)
+        // CouplingMixer.output -> FmFreqMixer.inputC (final freq before FM)
         // FmDepthControl -> FmFreqMixer.inputA (FM modulation)
         // FmFreqMixer.output -> Both Oscillators
         
         pitchScaler.output.connect(vibratoMixer.inputA)
         vibratoScaler.output.connect(vibratoMixer.inputB)
         
-        vibratoMixer.output.connect(fmFreqMixer.inputC)
+        vibratoMixer.output.connect(couplingMixer.inputA)
+        couplingScaler.output.connect(couplingMixer.inputB)
+        
+        couplingMixer.output.connect(fmFreqMixer.inputC)
         fmDepthControl.output.connect(fmFreqMixer.inputA)
         fmFreqMixer.inputB.set(200.0) // FM Scaling factor
         
@@ -135,6 +159,9 @@ class SongeVoice(
         
         // Default vibrato depth = 0 (no wobble)
         vibratoDepth.set(0.0)
+        
+        // Default coupling depth = 0 (no partner influence)
+        couplingDepth.set(0.0)
 
         // Wire: Mixed Oscillator -> VCA inputA
         oscMixer.output.connect(vca.inputA)
@@ -164,6 +191,9 @@ class SongeVoice(
         val holdLevel: UnitInputPort = vcaControlMixer.inputB
         holdLevel.set(0.0)
         addPort(holdLevel, "holdLevel")
+        
+        // Wire VCA output to envelope follower for coupling
+        vca.output.connect(envelopeFollower.input)
         
         addPort(vca.output, "output")
     }

@@ -73,6 +73,8 @@ class SynthViewModel(
         private set
     var vibrato by mutableStateOf(0.0f) // 0-1, global pitch wobble
         private set
+    var voiceCoupling by mutableStateOf(0.0f) // 0-1, partner envelope->frequency
+        private set
 
     fun onVoiceTuneChange(index: Int, newTune: Float) {
         val newVoices = voiceStates.toMutableList()
@@ -262,6 +264,11 @@ class SynthViewModel(
     fun onVibratoChange(amount: Float) {
         vibrato = amount
         engine.setVibrato(amount)
+    }
+    
+    fun onVoiceCouplingChange(amount: Float) {
+        voiceCoupling = amount
+        engine.setVoiceCoupling(amount)
     }
 
     // Lifecycle

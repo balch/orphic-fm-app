@@ -58,6 +58,7 @@ class AndroidSongeEngine : SongeEngine {
     override fun setFmStructure(crossQuad: Boolean) {}
     override fun setTotalFeedback(amount: Float) {}
     override fun setVibrato(amount: Float) {}
+    override fun setVoiceCoupling(amount: Float) {}
 
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
     override fun setHyperLfoMode(andMode: Boolean) {}

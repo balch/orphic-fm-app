@@ -170,6 +170,13 @@ fun SongeSynthScreen(
                     size = 32.dp, 
                     progressColor = SongeColors.neonMagenta
                 )
+                RotaryKnob(
+                    value = viewModel.voiceCoupling, 
+                    onValueChange = { viewModel.onVoiceCouplingChange(it) }, 
+                    label = "COUPLE", 
+                    size = 32.dp, 
+                    progressColor = SongeColors.warmGlow
+                )
             }
 
             // RIGHT GROUP (Voices 5-8)
