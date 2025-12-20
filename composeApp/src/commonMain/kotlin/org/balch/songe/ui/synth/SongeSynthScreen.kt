@@ -6,27 +6,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,21 +30,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import org.balch.songe.audio.SongeEngine
+import org.balch.songe.ui.components.HorizontalToggle
 import org.balch.songe.ui.components.PulseButton
 import org.balch.songe.ui.components.RotaryKnob
-import org.balch.songe.ui.panels.HyperLfoMode
+import org.balch.songe.ui.components.VerticalToggle
 import org.balch.songe.ui.panels.HyperLfoPanel
 import org.balch.songe.ui.preview.PreviewSongeEngine
 import org.balch.songe.ui.theme.SongeColors
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import javax.swing.text.View
 
 @Preview(widthDp = 800, heightDp = 600)
 @Composable
@@ -383,80 +375,6 @@ private fun LFOToggleSwitch(
     }
 }
 
-@Composable
-private fun VerticalToggle(
-    topLabel: String,
-    bottomLabel: String,
-    isTop: Boolean = true,
-    onToggle: (Boolean) -> Unit,
-    color: Color = SongeColors.warmGlow,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A2A))
-            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 6.dp), // Increased vertical padding
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp) // Little more space
-    ) {
-        // Top label
-        Text(
-            topLabel,
-            fontSize = 7.sp,
-            color = if (isTop) color else color.copy(alpha = 0.5f),
-            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Normal,
-            lineHeight = 9.sp // Explicit line height
-        )
-
-        // Vertical switch track
-        Box(
-            modifier = Modifier
-                .width(12.dp)
-                .height(40.dp) // Match height of rotary knob stack approx
-                .clip(RoundedCornerShape(6.dp))
-                .background(color.copy(alpha = 0.2f))
-                .clickable { onToggle(!isTop) },
-            contentAlignment = if (isTop) Alignment.TopCenter else Alignment.BottomCenter
-        ) {
-            // Switch knob
-            Box(
-                modifier = Modifier
-                    .padding(2.dp)
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.5f)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(color)
-            )
-        }
-
-        // Bottom label
-        Text(
-            bottomLabel,
-            fontSize = 7.sp,
-            color = if (!isTop) color else color.copy(alpha = 0.5f),
-            fontWeight = if (!isTop) FontWeight.Bold else FontWeight.Normal,
-            lineHeight = 9.sp // Explicit line height
-        )
-    }
-}
-
-// Legacy alias for existing usages
-@Composable
-private fun VerticalLFOToggle(
-    color: Color,
-    isOn: Boolean = false,
-    onToggle: (Boolean) -> Unit = {}
-) {
-    VerticalToggle(
-        topLabel = "LFO",
-        bottomLabel = "OFF",
-        isTop = isOn,
-        onToggle = { onToggle(!it) }, // Flip because isTop=true means LFO on
-        color = color
-    )
-}
 
 @Composable
 private fun VoiceColumnMod(
@@ -480,28 +398,13 @@ private fun VoiceColumnMod(
         RotaryKnob(value = modDepth, onValueChange = onModDepthChange, label = "MOD", size = 24.dp, progressColor = SongeColors.neonMagenta)
         RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", size = 28.dp, progressColor = SongeColors.neonCyan)
         // Envelope Toggle
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Box(
-                modifier = Modifier.height(16.dp).width(20.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(if (isFastEnv) SongeColors.neonCyan.copy(alpha = 0.8f) else Color(0xFF2A2A3A))
-                    .border(1.dp, if (isFastEnv) SongeColors.neonCyan else Color(0xFF4A4A5A), RoundedCornerShape(2.dp))
-                    .clickable { onEnvModeChange(true) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("F", fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = if (isFastEnv) Color.White else Color(0xFF888888))
-            }
-            Box(
-                modifier = Modifier.height(16.dp).width(20.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(if (!isFastEnv) SongeColors.softPurple.copy(alpha = 0.8f) else Color(0xFF2A2A3A))
-                    .border(1.dp, if (!isFastEnv) SongeColors.softPurple else Color(0xFF4A4A5A), RoundedCornerShape(2.dp))
-                    .clickable { onEnvModeChange(false) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("S", fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = if (!isFastEnv) Color.White else Color(0xFF888888))
-            }
-        }
+        HorizontalToggle(
+            leftLabel = "F",
+            rightLabel = "S",
+            isLeft = isFastEnv,
+            onToggle = { onEnvModeChange(it) },
+            color = SongeColors.neonCyan
+        )
     }
 }
 
@@ -527,28 +430,13 @@ private fun VoiceColumnSharp(
         RotaryKnob(value = sharpness, onValueChange = onSharpnessChange, label = "SHARP", size = 24.dp, progressColor = SongeColors.synthGreen)
         RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", size = 28.dp, progressColor = SongeColors.neonCyan)
         // Envelope Toggle
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            Box(
-                modifier = Modifier.height(16.dp).width(20.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(if (isFastEnv) SongeColors.neonCyan.copy(alpha = 0.8f) else Color(0xFF2A2A3A))
-                    .border(1.dp, if (isFastEnv) SongeColors.neonCyan else Color(0xFF4A4A5A), RoundedCornerShape(2.dp))
-                    .clickable { onEnvModeChange(true) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("F", fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = if (isFastEnv) Color.White else Color(0xFF888888))
-            }
-            Box(
-                modifier = Modifier.height(16.dp).width(20.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(if (!isFastEnv) SongeColors.softPurple.copy(alpha = 0.8f) else Color(0xFF2A2A3A))
-                    .border(1.dp, if (!isFastEnv) SongeColors.softPurple else Color(0xFF4A4A5A), RoundedCornerShape(2.dp))
-                    .clickable { onEnvModeChange(false) },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("S", fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = if (!isFastEnv) Color.White else Color(0xFF888888))
-            }
-        }
+        HorizontalToggle(
+            leftLabel = "F",
+            rightLabel = "S",
+            isLeft = isFastEnv,
+            onToggle = { onEnvModeChange(it) },
+            color = SongeColors.neonCyan
+        )
     }
 }
 
