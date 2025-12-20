@@ -322,13 +322,14 @@ private fun DuoPairBox(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val pairIndex = voiceA / 2
                 // Knobs
                 VoiceColumnMod(
                     num = voiceA + 1,
                     tune = viewModel.voiceStates[voiceA].tune,
                     onTuneChange = { viewModel.onVoiceTuneChange(voiceA, it) },
                     modDepth = viewModel.voiceModDepths[voiceA],
-                    onModDepthChange = { viewModel.onVoiceModDepthChange(voiceA, it) },
+                    onModDepthChange = { viewModel.onDuoModDepthChange(pairIndex, it) }, // Apply to both voices
                     isFastEnv = viewModel.voiceEnvelopeModes[voiceA],
                     onEnvModeChange = { viewModel.onVoiceEnvelopeModeChange(voiceA, it) }
                 )

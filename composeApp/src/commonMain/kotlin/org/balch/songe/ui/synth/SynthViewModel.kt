@@ -90,6 +90,14 @@ class SynthViewModel(
         engine.setVoiceFmDepth(index, newDepth)
     }
     
+    // Apply FM depth to both voices in a Duo
+    fun onDuoModDepthChange(duoIndex: Int, newDepth: Float) {
+        val voiceA = duoIndex * 2
+        val voiceB = voiceA + 1
+        onVoiceModDepthChange(voiceA, newDepth)
+        onVoiceModDepthChange(voiceB, newDepth)
+    }
+    
     fun onPairSharpnessChange(pairIndex: Int, newSharpness: Float) {
         val newSharpnessList = pairSharpness.toMutableList()
         newSharpnessList[pairIndex] = newSharpness
