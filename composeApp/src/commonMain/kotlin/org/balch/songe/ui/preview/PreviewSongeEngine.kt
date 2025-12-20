@@ -41,6 +41,7 @@ class PreviewSongeEngine(): SongeEngine {
     override fun setDuoModSource(duoIndex: Int, source: org.balch.songe.audio.ModSource) {}
     override fun setFmStructure(crossQuad: Boolean) {}
     override fun setTotalFeedback(amount: Float) {}
+    override fun setVibrato(amount: Float) {}
     
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
     override fun setHyperLfoMode(andMode: Boolean) {}

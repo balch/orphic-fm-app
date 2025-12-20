@@ -46,6 +46,7 @@ interface SongeEngine {
     // Advanced FM
     fun setFmStructure(crossQuad: Boolean) // true = 34>56, 78>12 routing
     fun setTotalFeedback(amount: Float) // 0-1, output→LFO feedback
+    fun setVibrato(amount: Float) // 0-1, global pitch wobble depth
     
     // Test/Debug
     fun playTestTone(frequency: Float = 440f)

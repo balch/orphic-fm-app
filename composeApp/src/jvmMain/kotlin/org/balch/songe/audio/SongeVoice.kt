@@ -39,12 +39,18 @@ class SongeVoice(
     private val fmFreqMixer = MultiplyAdd() // (FmSignal * 200Hz) + ActualFreq
     private val pitchScaler = Multiply()    // BaseFreq * PitchMultiplier
     
+    // Vibrato: LFO input scaled and added to frequency
+    private val vibratoScaler = Multiply() // LFO * depth
+    private val vibratoMixer = Add()       // Base freq + vibrato
+    
     // Ports accessible to outside
     val frequency: UnitInputPort = pitchScaler.inputA // Base frequency (before pitch mult)
     val gate: UnitInputPort = ampEnv.input
     val modInput: UnitInputPort = fmDepthControl.inputA // FM signal input
     val fmDepth: UnitInputPort = fmDepthControl.inputB // FM depth (0-1)
     val sharpness: UnitInputPort = sharpnessProxy.input // Waveform (0=tri, 1=sq)
+    val vibratoInput: UnitInputPort = vibratoScaler.inputA // Vibrato LFO input
+    val vibratoDepth: UnitInputPort = vibratoScaler.inputB // Vibrato depth (Hz range)
     
     // Output comes from the VCA
     override fun getOutput(): UnitOutputPort = vca.output
@@ -63,6 +69,8 @@ class SongeVoice(
         add(fmDepthControl)
         add(fmFreqMixer)
         add(pitchScaler)
+        add(vibratoScaler)
+        add(vibratoMixer)
 
         // Set oscillator amplitudes
         triangleOsc.amplitude.set(0.3)
@@ -104,12 +112,17 @@ class SongeVoice(
         // Default sharpness = 0.0 (pure triangle)
         sharpness.set(0.0)
 
-        // FM Wiring:
-        // BaseFreq -> PitchScaler -> FmFreqMixer.inputC (final freq)
-        // ModInput -> FmDepthControl -> FmFreqMixer.inputA (modulation)
+        // FM Wiring with Vibrato:
+        // PitchScaler -> VibratoMixer.inputA (base scaled frequency)
+        // VibratoScaler -> VibratoMixer.inputB (LFO * depth)
+        // VibratoMixer.output -> FmFreqMixer.inputC (final freq before FM)
+        // FmDepthControl -> FmFreqMixer.inputA (FM modulation)
         // FmFreqMixer.output -> Both Oscillators
         
-        pitchScaler.output.connect(fmFreqMixer.inputC)
+        pitchScaler.output.connect(vibratoMixer.inputA)
+        vibratoScaler.output.connect(vibratoMixer.inputB)
+        
+        vibratoMixer.output.connect(fmFreqMixer.inputC)
         fmDepthControl.output.connect(fmFreqMixer.inputA)
         fmFreqMixer.inputB.set(200.0) // FM Scaling factor
         
@@ -119,6 +132,9 @@ class SongeVoice(
         
         // Default FM depth = 0 (no modulation)
         fmDepth.set(0.0)
+        
+        // Default vibrato depth = 0 (no wobble)
+        vibratoDepth.set(0.0)
 
         // Wire: Mixed Oscillator -> VCA inputA
         oscMixer.output.connect(vca.inputA)

@@ -4,8 +4,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.launch
 import org.balch.songe.audio.SongeEngine
 import org.balch.songe.audio.VoiceState
 import org.balch.songe.util.Logger
@@ -72,6 +70,8 @@ class SynthViewModel(
     var fmStructureCrossQuad by mutableStateOf(false) // false = within-pair, true = cross-quad
         private set
     var totalFeedback by mutableStateOf(0.0f) // 0-1, output→LFO feedback
+        private set
+    var vibrato by mutableStateOf(0.0f) // 0-1, global pitch wobble
         private set
 
     fun onVoiceTuneChange(index: Int, newTune: Float) {
@@ -257,6 +257,11 @@ class SynthViewModel(
     fun onTotalFeedbackChange(amount: Float) {
         totalFeedback = amount
         engine.setTotalFeedback(amount)
+    }
+    
+    fun onVibratoChange(amount: Float) {
+        vibrato = amount
+        engine.setVibrato(amount)
     }
 
     // Lifecycle

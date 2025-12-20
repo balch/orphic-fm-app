@@ -65,6 +65,10 @@ class JvmSongeEngine : SongeEngine {
     private val dryGain = com.jsyn.unitgen.Multiply()  // Direct signal
     private val wetGain = com.jsyn.unitgen.Multiply()  // Delayed signal
     
+    // Vibrato (Global pitch wobble)
+    private val vibratoLfo = com.jsyn.unitgen.SineOscillator()
+    private val vibratoDepthGain = com.jsyn.unitgen.Multiply() // LFO * depth
+    
     init {
         // FX Chain (Lyra-style with parallel clean/distorted paths):
         // Voices -> [Dry/Wet Delay Mix] -> PreDistortionSummer -> Split:
@@ -109,6 +113,16 @@ class JvmSongeEngine : SongeEngine {
         // Dry/Wet defaults (50/50 mix)
         dryGain.inputB.set(0.5)
         wetGain.inputB.set(0.5)
+        
+        // Vibrato LFO setup
+        synth.add(vibratoLfo)
+        synth.add(vibratoDepthGain)
+        vibratoLfo.frequency.set(5.0) // 5Hz wobble rate
+        vibratoLfo.amplitude.set(1.0) // Normalized output
+        vibratoLfo.output.connect(vibratoDepthGain.inputA)
+        vibratoDepthGain.inputB.set(0.0) // Default: no vibrato
+        
+        // Connect vibrato to all voices (wiring happens in start() with voices)
         
         // Self-modulation attenuator (0.02 = only 2% of audio signal reaches mod input)
         selfMod1Attenuator.inputB.set(0.02)
@@ -300,6 +314,10 @@ class JvmSongeEngine : SongeEngine {
             
             // VOICES -> DRY GAIN (dry path)
             voice.outputPort.connect(dryGain.inputA)
+            
+            // VIBRATO -> Voice frequency modulation
+            vibratoDepthGain.output.connect(voice.vibratoInput)
+            voice.vibratoDepth.set(1.0) // Pass through engine-scaled vibrato
         }
         
         lineOut.start()
@@ -517,6 +535,14 @@ class JvmSongeEngine : SongeEngine {
         val scaledAmount = amount * 20.0 // Max 20Hz frequency boost
         totalFbGain.inputB.set(scaledAmount)
         Logger.debug { "TOTAL FB: ${"%.2f".format(amount)} (scale: ${"%.1f".format(scaledAmount)}Hz)" }
+    }
+    
+    override fun setVibrato(amount: Float) {
+        // Vibrato depth: 0.0 = no wobble, 1.0 = +/- 20Hz pitch deviation
+        // At midpoint frequencies (~200Hz), this is about a semitone
+        val depthHz = amount * 20.0
+        vibratoDepthGain.inputB.set(depthHz)
+        Logger.debug { "Vibrato: ${"%.2f".format(amount)} (depth: ${"%.1f".format(depthHz)}Hz)" }
     }
 
     // Test tone is now just overriding Voice 0 for simplicity if needed, or we keep the separate osc

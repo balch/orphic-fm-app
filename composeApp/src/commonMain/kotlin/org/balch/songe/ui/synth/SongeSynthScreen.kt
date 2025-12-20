@@ -163,7 +163,13 @@ fun SongeSynthScreen(
                     size = 32.dp, 
                     progressColor = SongeColors.neonCyan
                 )
-                RotaryKnob(value = 0.5f, onValueChange = {}, label = "VIB", size = 32.dp, progressColor = SongeColors.neonMagenta)
+                RotaryKnob(
+                    value = viewModel.vibrato, 
+                    onValueChange = { viewModel.onVibratoChange(it) }, 
+                    label = "VIB", 
+                    size = 32.dp, 
+                    progressColor = SongeColors.neonMagenta
+                )
             }
 
             // RIGHT GROUP (Voices 5-8)
