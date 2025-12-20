@@ -45,6 +45,9 @@ class JvmSongeEngine : SongeEngine {
     // Self-modulation attenuators (scale down raw audio before it modulates delay time)
     private val selfMod1Attenuator = com.jsyn.unitgen.Multiply()
     private val selfMod2Attenuator = com.jsyn.unitgen.Multiply()
+    
+    // TOTAL FB: Output -> LFO Frequency Modulation
+    private val totalFbGain = com.jsyn.unitgen.Multiply() // Scale PeakFollower -> LFO
 
     // Monitoring & FX
     private val peakFollower = com.jsyn.unitgen.PeakFollower()
@@ -73,6 +76,12 @@ class JvmSongeEngine : SongeEngine {
         synth.add(delay2ModMixer)
         synth.add(selfMod1Attenuator)
         synth.add(selfMod2Attenuator)
+        
+        // TOTAL FB: PeakFollower -> scaled -> HyperLfo.feedbackInput
+        synth.add(totalFbGain)
+        peakFollower.output.connect(totalFbGain.inputA)
+        totalFbGain.inputB.set(0.0) // Default: no feedback
+        totalFbGain.output.connect(hyperLfo.feedbackInput)
         
         peakFollower.halfLife.set(0.1)
         driveGain.inputB.set(1.0) // Default unity gain
@@ -366,6 +375,13 @@ class JvmSongeEngine : SongeEngine {
         }
     }
 
+    // FM Structure State
+    private var fmStructureCrossQuad = false
+
+    override fun setFmStructure(crossQuad: Boolean) {
+        fmStructureCrossQuad = crossQuad
+        Logger.debug { "FM Structure: ${if (crossQuad) "Cross-Quad (34>56, 78>12)" else "Within-Pair"}" }
+    }
 
     override fun setDuoModSource(duoIndex: Int, source: org.balch.songe.audio.ModSource) {
         // Duo Index 0..3 corresponds to Voice Pairs 0-1, 2-3, 4-5, 6-7
@@ -387,10 +403,53 @@ class JvmSongeEngine : SongeEngine {
                 Logger.debug { "Duo $duoIndex Mod Source: LFO" }
             }
             org.balch.songe.audio.ModSource.VOICE_FM -> {
-                // Route Partner Voice to Mod Input (Cross-Modulation 0<->1)
-                voices[voiceA].outputPort.connect(voices[voiceB].modInput)
-                voices[voiceB].outputPort.connect(voices[voiceA].modInput)
-                Logger.debug { "Duo $duoIndex Mod Source: VOICE_FM (Cross-Mod)" }
+                if (fmStructureCrossQuad) {
+                    // Cross-Quad Routing:
+                    // Duo 1 (voices 2-3) -> modulates -> Duo 2 (voices 4-5)
+                    // Duo 3 (voices 6-7) -> modulates -> Duo 0 (voices 0-1)
+                    val sourceVoices = when (duoIndex) {
+                        0 -> Pair(6, 7) // Duo 0 (0-1) gets modulated by Duo 3 (6-7)
+                        1 -> Pair(2, 3) // Duo 1 (2-3) gets modulated by itself... wait
+                        2 -> Pair(2, 3) // Duo 2 (4-5) gets modulated by Duo 1 (2-3)
+                        3 -> Pair(6, 7) // Duo 3 (6-7) modulates Duo 0, but what modulates it?
+                        else -> Pair(voiceA, voiceB)
+                    }
+                    // Actually, let's simplify: 
+                    // 34>56: Duo 1 (2-3) outputs -> Duo 2 (4-5) inputs
+                    // 78>12: Duo 3 (6-7) outputs -> Duo 0 (0-1) inputs
+                    // So when Duo 2 is set to FM, it gets signal from Duo 1
+                    // When Duo 0 is set to FM, it gets signal from Duo 3
+                    // Duo 1 and Duo 3 in FM mode... modulate themselves? Or are sources only?
+                    
+                    // Let's implement: The pair RECEIVES modulation from its cross-quad source
+                    when (duoIndex) {
+                        0 -> { // Duo 0 (voices 0-1) receives from Duo 3 (voices 6-7)
+                            voices[6].outputPort.connect(voices[voiceA].modInput)
+                            voices[7].outputPort.connect(voices[voiceB].modInput)
+                            Logger.debug { "Duo $duoIndex Mod Source: VOICE_FM (from Duo 3)" }
+                        }
+                        1 -> { // Duo 1 (voices 2-3): Within-pair (no cross-quad source to receive)
+                            voices[voiceA].outputPort.connect(voices[voiceB].modInput)
+                            voices[voiceB].outputPort.connect(voices[voiceA].modInput)
+                            Logger.debug { "Duo $duoIndex Mod Source: VOICE_FM (Within-Pair)" }
+                        }
+                        2 -> { // Duo 2 (voices 4-5) receives from Duo 1 (voices 2-3)
+                            voices[2].outputPort.connect(voices[voiceA].modInput)
+                            voices[3].outputPort.connect(voices[voiceB].modInput)
+                            Logger.debug { "Duo $duoIndex Mod Source: VOICE_FM (from Duo 1)" }
+                        }
+                        3 -> { // Duo 3 (voices 6-7): Within-pair (no cross-quad source to receive)
+                            voices[voiceA].outputPort.connect(voices[voiceB].modInput)
+                            voices[voiceB].outputPort.connect(voices[voiceA].modInput)
+                            Logger.debug { "Duo $duoIndex Mod Source: VOICE_FM (Within-Pair)" }
+                        }
+                    }
+                } else {
+                    // Within-Pair Routing (default)
+                    voices[voiceA].outputPort.connect(voices[voiceB].modInput)
+                    voices[voiceB].outputPort.connect(voices[voiceA].modInput)
+                    Logger.debug { "Duo $duoIndex Mod Source: VOICE_FM (Cross-Mod)" }
+                }
             }
         }
     }
@@ -413,6 +472,14 @@ class JvmSongeEngine : SongeEngine {
     override fun setHyperLfoLink(active: Boolean) {
         hyperLfo.setLink(active)
         Logger.debug { "HyperLFO Link: $active" }
+    }
+    
+    override fun setTotalFeedback(amount: Float) {
+        // Scale peak follower output to modulate LFO frequency
+        // 0.0 = no feedback, 1.0 = full chaos (+20Hz modulation at max peak)
+        val scaledAmount = amount * 20.0 // Max 20Hz frequency boost
+        totalFbGain.inputB.set(scaledAmount)
+        Logger.debug { "TOTAL FB: ${"%.2f".format(amount)} (scale: ${"%.1f".format(scaledAmount)}Hz)" }
     }
 
     // Test tone is now just overriding Voice 0 for simplicity if needed, or we keep the separate osc

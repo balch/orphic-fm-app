@@ -66,6 +66,12 @@ class SynthViewModel(
     // Or LFO (down) if preferred default. Let's start OFF.
     var duoModSources by mutableStateOf(List(4) { org.balch.songe.audio.ModSource.OFF })
         private set
+    
+    // Advanced FM
+    var fmStructureCrossQuad by mutableStateOf(false) // false = within-pair, true = cross-quad
+        private set
+    var totalFeedback by mutableStateOf(0.0f) // 0-1, output→LFO feedback
+        private set
 
     fun onVoiceTuneChange(index: Int, newTune: Float) {
         val newVoices = voiceStates.toMutableList()
@@ -228,6 +234,23 @@ class SynthViewModel(
         newHolds[index] = amount
         quadGroupHolds = newHolds
         engine.setQuadHold(index, amount)
+    }
+
+    fun onFmStructureChange(crossQuad: Boolean) {
+        fmStructureCrossQuad = crossQuad
+        engine.setFmStructure(crossQuad)
+        // Re-apply all Duo mod sources with new structure
+        duoModSources.forEachIndexed { index, source ->
+            if (source == org.balch.songe.audio.ModSource.VOICE_FM) {
+                engine.setDuoModSource(index, source)
+            }
+        }
+        Logger.debug { "FM Structure: ${if (crossQuad) "Cross-Quad" else "Within-Pair"}" }
+    }
+    
+    fun onTotalFeedbackChange(amount: Float) {
+        totalFeedback = amount
+        engine.setTotalFeedback(amount)
     }
 
     // Lifecycle

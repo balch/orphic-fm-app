@@ -33,11 +33,11 @@ class AndroidSongeEngine : SongeEngine {
          // Stub
     }
 
-    override fun setGroupPitch(groupIndex: Int, pitch: Float) {
+    override fun setQuadPitch(quadIndex: Int, pitch: Float) {
          // Stub
     }
 
-    override fun setGroupFm(groupIndex: Int, amount: Float) {
+    override fun setQuadHold(quadIndex: Int, amount: Float) {
          // Stub
     }
     
@@ -52,6 +52,10 @@ class AndroidSongeEngine : SongeEngine {
     override fun setDelayModDepth(index: Int, amount: Float) {}
     override fun setDelayModSource(index: Int, isLfo: Boolean) {}
     override fun setDelayLfoWaveform(isTriangle: Boolean) {}
+    
+    override fun setDuoModSource(duoIndex: Int, source: ModSource) {}
+    override fun setFmStructure(crossQuad: Boolean) {}
+    override fun setTotalFeedback(amount: Float) {}
 
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
     override fun setHyperLfoMode(andMode: Boolean) {}

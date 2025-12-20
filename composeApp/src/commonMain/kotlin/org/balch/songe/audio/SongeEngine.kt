@@ -42,6 +42,10 @@ interface SongeEngine {
     // Duo Mod Source
     fun setDuoModSource(duoIndex: Int, source: ModSource)
     
+    // Advanced FM
+    fun setFmStructure(crossQuad: Boolean) // true = 34>56, 78>12 routing
+    fun setTotalFeedback(amount: Float) // 0-1, output→LFO feedback
+    
     // Test/Debug
     fun playTestTone(frequency: Float = 440f)
     fun stopTestTone()

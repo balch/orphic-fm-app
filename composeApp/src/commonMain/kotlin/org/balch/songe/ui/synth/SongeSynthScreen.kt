@@ -150,8 +150,17 @@ fun SongeSynthScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text("SONGE-8", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.6f))
-                CrossModSelector()
-                RotaryKnob(value = 0.5f, onValueChange = {}, label = "TOTAL FB", size = 32.dp, progressColor = SongeColors.neonCyan)
+                CrossModSelector(
+                    isCrossQuad = viewModel.fmStructureCrossQuad,
+                    onToggle = { viewModel.onFmStructureChange(it) }
+                )
+                RotaryKnob(
+                    value = viewModel.totalFeedback, 
+                    onValueChange = { viewModel.onTotalFeedbackChange(it) }, 
+                    label = "TOTAL FB", 
+                    size = 32.dp, 
+                    progressColor = SongeColors.neonCyan
+                )
                 RotaryKnob(value = 0.5f, onValueChange = {}, label = "VIB", size = 32.dp, progressColor = SongeColors.neonMagenta)
             }
 
@@ -644,15 +653,32 @@ private fun DistortionSection(drive: Float, onDriveChange: (Float) -> Unit, volu
 
 
 @Composable
-private fun CrossModSelector() {
+private fun CrossModSelector(
+    isCrossQuad: Boolean = false,
+    onToggle: (Boolean) -> Unit = {}
+) {
+    val activeColor = if (isCrossQuad) SongeColors.neonCyan else Color.White.copy(alpha = 0.3f)
+    
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(Color(0xFF1A1A2A))
-            .padding(4.dp),
+            .background(if (isCrossQuad) SongeColors.neonCyan.copy(alpha = 0.2f) else Color(0xFF1A1A2A))
+            .border(1.dp, activeColor, RoundedCornerShape(4.dp))
+            .clickable { onToggle(!isCrossQuad) }
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("34→56", fontSize = 7.sp, color = Color.White.copy(alpha = 0.4f))
-        Text("78→12", fontSize = 7.sp, color = Color.White.copy(alpha = 0.4f))
+        Text(
+            "34→56", 
+            fontSize = 7.sp, 
+            color = if (isCrossQuad) SongeColors.neonCyan else Color.White.copy(alpha = 0.4f),
+            fontWeight = if (isCrossQuad) FontWeight.Bold else FontWeight.Normal
+        )
+        Text(
+            "78→12", 
+            fontSize = 7.sp, 
+            color = if (isCrossQuad) SongeColors.neonCyan else Color.White.copy(alpha = 0.4f),
+            fontWeight = if (isCrossQuad) FontWeight.Bold else FontWeight.Normal
+        )
     }
 }

@@ -19,9 +19,15 @@ class HyperLfo : Circuit() {
     private val inputB = PassThrough()
     private val outputProxy = PassThrough()
     
+    // Feedback Modulation
+    private val feedbackProxy = PassThrough()
+    private val freqAModMixer = Add() // BaseFreqA + Feedback
+    private val freqBModMixer = Add() // BaseFreqB + Feedback
+    
     // Public Ports (for external connection)
     val frequencyA: UnitInputPort = inputA.input
     val frequencyB: UnitInputPort = inputB.input
+    val feedbackInput: UnitInputPort = feedbackProxy.input // TOTAL FB input
     val output: UnitOutputPort = outputProxy.output
     
     // Internal Components - Square
@@ -46,12 +52,16 @@ class HyperLfo : Circuit() {
         // Name Ports
         frequencyA.name = "FreqA"
         frequencyB.name = "FreqB"
+        feedbackInput.name = "FeedbackIn"
         output.name = "Output"
     
         // Add Units
         add(inputA)
         add(inputB)
         add(outputProxy)
+        add(feedbackProxy)
+        add(freqAModMixer)
+        add(freqBModMixer)
         add(lfoASquare)
         add(lfoBSquare)
         add(lfoATriangle)
@@ -64,14 +74,23 @@ class HyperLfo : Circuit() {
         // Add Ports to Circuit
         addPort(frequencyA)
         addPort(frequencyB)
+        addPort(feedbackInput)
         addPort(output)
         
         // WIRING
-        // Inputs -> All Oscillators
-        inputA.output.connect(lfoASquare.frequency)
-        inputA.output.connect(lfoATriangle.frequency)
-        inputB.output.connect(lfoBSquare.frequency)
-        inputB.output.connect(lfoBTriangle.frequency)
+        // Base Frequencies -> Mixers (inputA of each)
+        inputA.output.connect(freqAModMixer.inputA)
+        inputB.output.connect(freqBModMixer.inputA)
+        
+        // Feedback -> Both Mixers (inputB of each)
+        feedbackProxy.output.connect(freqAModMixer.inputB)
+        feedbackProxy.output.connect(freqBModMixer.inputB)
+        
+        // Mixers -> All Oscillators
+        freqAModMixer.output.connect(lfoASquare.frequency)
+        freqAModMixer.output.connect(lfoATriangle.frequency)
+        freqBModMixer.output.connect(lfoBSquare.frequency)
+        freqBModMixer.output.connect(lfoBTriangle.frequency)
         
         // Link: A -> FM -> B (for square only)
         inputA.output.connect(fmGain.inputA)
