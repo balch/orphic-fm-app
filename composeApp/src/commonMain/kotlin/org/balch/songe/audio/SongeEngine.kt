@@ -19,6 +19,7 @@ interface SongeEngine {
     
     // Global
     fun setDrive(amount: Float)
+    fun setDistortionMix(amount: Float) // 0=clean, 1=distorted (post-delay)
     fun setMasterVolume(amount: Float)
     
     // Delay Controls

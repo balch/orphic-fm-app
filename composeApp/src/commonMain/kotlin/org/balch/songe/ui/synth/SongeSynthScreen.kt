@@ -117,6 +117,8 @@ fun SongeSynthScreen(
                 onDriveChange = { viewModel.onGlobalDriveChange(it) },
                 volume = viewModel.masterVolume,
                 onVolumeChange = viewModel::onMasterVolumeChange,
+                mix = viewModel.distortionMix,
+                onMixChange = viewModel::onDistortionMixChange,
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(0.7f)
@@ -584,7 +586,15 @@ private fun ToggleChip(text: String, isSelected: Boolean, color: Color, onClick:
 }
 
 @Composable
-private fun DistortionSection(drive: Float, onDriveChange: (Float) -> Unit, volume: Float, onVolumeChange: (Float) -> Unit, modifier: Modifier = Modifier) {
+private fun DistortionSection(
+    drive: Float, 
+    onDriveChange: (Float) -> Unit, 
+    volume: Float, 
+    onVolumeChange: (Float) -> Unit, 
+    mix: Float,
+    onMixChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier
             .width(140.dp)
@@ -630,11 +640,11 @@ private fun DistortionSection(drive: Float, onDriveChange: (Float) -> Unit, volu
             horizontalArrangement = Arrangement.SpaceAround
         ) {
             RotaryKnob(
-                value = drive,
-                onValueChange = onDriveChange,
-                label = "PAN",
+                value = mix,
+                onValueChange = onMixChange,
+                label = "MIX",
                 size = 42.dp,
-                progressColor = SongeColors.neonMagenta
+                progressColor = SongeColors.warmGlow
             )
             Canvas(
                 modifier = Modifier

@@ -55,16 +55,31 @@ class JvmSongeEngine : SongeEngine {
     private val driveGain = com.jsyn.unitgen.Multiply()
     private val masterGain = com.jsyn.unitgen.Multiply() // Master Volume
     
+    // Parallel Clean/Distorted Paths (Lyra MIX)
+    private val preDistortionSummer = com.jsyn.unitgen.Add() // Combines dry+wet before split
+    private val cleanPathGain = com.jsyn.unitgen.Multiply()  // Clean signal level
+    private val distortedPathGain = com.jsyn.unitgen.Multiply() // Distorted signal level
+    private val postMixSummer = com.jsyn.unitgen.Add() // Combines clean + distorted
+    
     // Dry/Wet Mix for Delays
     private val dryGain = com.jsyn.unitgen.Multiply()  // Direct signal
     private val wetGain = com.jsyn.unitgen.Multiply()  // Delayed signal
     
     init {
-        // FX Chain: Voices -> Delays -> Drive -> Limiter -> MasterGain -> Output
+        // FX Chain (Lyra-style with parallel clean/distorted paths):
+        // Voices -> [Dry/Wet Delay Mix] -> PreDistortionSummer -> Split:
+        //   Path A: -> CleanPathGain -> PostMixSummer
+        //   Path B: -> DriveGain -> Limiter -> DistortedPathGain -> PostMixSummer
+        // PostMixSummer -> MasterGain -> Output
+        
         synth.add(peakFollower)
         synth.add(limiter)
         synth.add(driveGain)
         synth.add(masterGain)
+        synth.add(preDistortionSummer)
+        synth.add(cleanPathGain)
+        synth.add(distortedPathGain)
+        synth.add(postMixSummer)
         synth.add(dryGain)
         synth.add(wetGain)
         synth.add(delay1)
@@ -84,8 +99,12 @@ class JvmSongeEngine : SongeEngine {
         totalFbGain.output.connect(hyperLfo.feedbackInput)
         
         peakFollower.halfLife.set(0.1)
-        driveGain.inputB.set(1.0) // Default unity gain
+        driveGain.inputB.set(1.0) // Default unity gain (drive applied via limiter)
         masterGain.inputB.set(0.7) // Default master volume 70%
+        
+        // Clean/Distorted Mix defaults (50/50)
+        cleanPathGain.inputB.set(0.5)
+        distortedPathGain.inputB.set(0.5)
         
         // Dry/Wet defaults (50/50 mix)
         dryGain.inputB.set(0.5)
@@ -125,21 +144,29 @@ class JvmSongeEngine : SongeEngine {
         
         // 1. Voices will connect to Delay Inputs AND Dry Path (in start())
         
-        // 2. Delays -> WetGain -> DriveGain (wet path)
+        // 2. Delays -> WetGain -> PreDistortionSummer
         delay1.output.connect(wetGain.inputA)
         delay2.output.connect(wetGain.inputA)
-        wetGain.output.connect(driveGain.inputA)
+        wetGain.output.connect(preDistortionSummer.inputA)
         
-        // 3. Voices -> DryGain -> DriveGain (dry path, wired in start())
-        dryGain.output.connect(driveGain.inputA)
+        // 3. Voices -> DryGain -> PreDistortionSummer (wired in start())
+        dryGain.output.connect(preDistortionSummer.inputB)
         
-        // 4. Drive Output -> Limiter
+        // 4. PreDistortionSummer -> SPLIT into Clean and Distorted paths
+        //    Clean Path: PreDistortionSummer -> CleanPathGain -> PostMixSummer
+        preDistortionSummer.output.connect(cleanPathGain.inputA)
+        cleanPathGain.output.connect(postMixSummer.inputA)
+        
+        //    Distorted Path: PreDistortionSummer -> DriveGain -> Limiter -> DistortedPathGain -> PostMixSummer
+        preDistortionSummer.output.connect(driveGain.inputA)
         driveGain.output.connect(limiter.input)
+        limiter.output.connect(distortedPathGain.inputA)
+        distortedPathGain.output.connect(postMixSummer.inputB)
         
-        // 4. Limiter -> Master Gain
-        limiter.output.connect(masterGain.inputA)
+        // 5. PostMixSummer -> Master Gain
+        postMixSummer.output.connect(masterGain.inputA)
         
-        // 5. Master Gain -> LineOut & Monitor
+        // 6. Master Gain -> LineOut & Monitor
         masterGain.output.connect(0, lineOut.input, 0)
         masterGain.output.connect(0, lineOut.input, 1)
         masterGain.output.connect(peakFollower.input)
@@ -166,6 +193,17 @@ class JvmSongeEngine : SongeEngine {
         // 0.0 = 1x (clean), 1.0 = 50x (extreme distortion)
         val driveVal = 1.0 + (amount * 49.0)
         limiter.drive.set(driveVal)
+    }
+    
+    override fun setDistortionMix(amount: Float) {
+        // Lyra-style MIX: Balance between clean and distorted paths
+        // 0.0 = 100% clean, 1.0 = 100% distorted
+        // Use equal-power crossfade for smooth transitions
+        val distortedLevel = amount
+        val cleanLevel = 1.0f - amount
+        cleanPathGain.inputB.set(cleanLevel.toDouble())
+        distortedPathGain.inputB.set(distortedLevel.toDouble())
+        Logger.debug { "Distortion MIX: Clean=${"%.2f".format(cleanLevel)}, Distorted=${"%.2f".format(distortedLevel)}" }
     }
 
     override fun setMasterVolume(amount: Float) {

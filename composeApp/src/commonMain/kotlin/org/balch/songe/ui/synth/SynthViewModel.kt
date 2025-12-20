@@ -46,6 +46,7 @@ class SynthViewModel(
     var delayMix by mutableStateOf(0.5f)
     var distortion by mutableStateOf(0.0f)
     var drive by mutableStateOf(0.0f)
+    var distortionMix by mutableStateOf(0.5f) // 0=clean, 1=distorted (Lyra MIX)
     
     // Delay Lines (1 & 2)
     var delayTime1 by mutableStateOf(0.3f)
@@ -220,6 +221,11 @@ class SynthViewModel(
         distortion = v
         // engine.setDistortion(v)
         Logger.info { "Global Distortion: $v" }
+    }
+    
+    fun onDistortionMixChange(amount: Float) {
+        distortionMix = amount
+        engine.setDistortionMix(amount)
     }
     
     fun onQuadPitchChange(index: Int, pitch: Float) {

@@ -27,6 +27,7 @@ class PreviewSongeEngine(): SongeEngine {
     }
 
     override fun setDrive(amount: Float) {}
+    override fun setDistortionMix(amount: Float) {}
     override fun setMasterVolume(amount: Float) {}
     override fun setDelay(time: Float, feedback: Float) {}
     
