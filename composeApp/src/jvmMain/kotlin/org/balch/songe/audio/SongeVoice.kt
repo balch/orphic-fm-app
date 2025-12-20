@@ -211,10 +211,10 @@ class SongeVoice(
             ampEnv.release.set(0.1)
         } else {
             // Slow: Drone, slow swell
-            ampEnv.attack.set(0.5)
-            ampEnv.decay.set(0.2)
+            ampEnv.attack.set(1.5)
+            ampEnv.decay.set(0.8)
             ampEnv.sustain.set(1.0)
-            ampEnv.release.set(0.8)
+            ampEnv.release.set(1.2)
         }
     }
     

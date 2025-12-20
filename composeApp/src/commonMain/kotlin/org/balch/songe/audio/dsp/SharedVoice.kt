@@ -177,10 +177,10 @@ class SharedVoice(
             ampEnv.setRelease(0.1)
         } else {
             // Slow: Drone, slow swell
-            ampEnv.setAttack(0.5)
-            ampEnv.setDecay(0.2)
+            ampEnv.setAttack(1.5)
+            ampEnv.setDecay(0.8)
             ampEnv.setSustain(1.0)
-            ampEnv.setRelease(0.8)
+            ampEnv.setRelease(1.2)
         }
     }
 }

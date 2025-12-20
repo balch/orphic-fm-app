@@ -55,8 +55,8 @@ class SynthViewModel(
     var delayLfoWaveformIsTriangle by mutableStateOf(true) // true=Triangle, false=Square (AND)
 
     // Hyper LFO
-    var hyperLfoA by mutableStateOf(0.5f)
-    var hyperLfoB by mutableStateOf(0.3f)
+    var hyperLfoA by mutableStateOf(0.0f)
+    var hyperLfoB by mutableStateOf(0.0f)
     var hyperLfoMode by mutableStateOf(org.balch.songe.ui.panels.HyperLfoMode.AND)
     var hyperLfoLink by mutableStateOf(false)
     
