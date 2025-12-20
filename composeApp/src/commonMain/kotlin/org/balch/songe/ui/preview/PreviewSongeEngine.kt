@@ -20,10 +20,10 @@ class PreviewSongeEngine(): SongeEngine {
     override fun setVoiceEnvelopeMode(index: Int, isFast: Boolean) {}
     override fun setPairSharpness(pairIndex: Int, sharpness: Float) {}
 
-    override fun setGroupPitch(groupIndex: Int, pitch: Float) {
+    override fun setQuadPitch(quadIndex: Int, pitch: Float) {
     }
 
-    override fun setGroupFm(groupIndex: Int, amount: Float) {
+    override fun setQuadHold(quadIndex: Int, amount: Float) {
     }
 
     override fun setDrive(amount: Float) {}

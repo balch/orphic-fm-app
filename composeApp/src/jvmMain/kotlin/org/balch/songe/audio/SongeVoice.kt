@@ -120,9 +120,19 @@ class SongeVoice(
         // Default FM depth = 0 (no modulation)
         fmDepth.set(0.0)
 
-        // Wire: Mixed Oscillator -> VCA inputA, Envelope -> VCA inputB
+        // Wire: Mixed Oscillator -> VCA inputA
         oscMixer.output.connect(vca.inputA)
-        ampEnv.output.connect(vca.inputB)
+        
+        // VCA inputB = Envelope + HoldLevel
+        // Note: HoldLevel is essentially "Min Volume"
+        // We use an Add unit to sum envelope output and hold level
+        val vcaControlMixer = Add()
+        add(vcaControlMixer)
+        
+        ampEnv.output.connect(vcaControlMixer.inputA)
+        // inputB of vcaControlMixer will be our hold level
+        
+        vcaControlMixer.output.connect(vca.inputB)
 
         // Default frequency
         frequency.set(220.0)
@@ -133,8 +143,18 @@ class SongeVoice(
         addPort(modInput, "modInput")
         addPort(fmDepth, "fmDepth")
         addPort(sharpness, "sharpness")
+        
+        // Expose Hold Level (using vcaControlMixer.inputB directly)
+        val holdLevel: UnitInputPort = vcaControlMixer.inputB
+        holdLevel.set(0.0)
+        addPort(holdLevel, "holdLevel")
+        
         addPort(vca.output, "output")
     }
+
+    // Expose for JvmSongeEngine
+    val holdLevelPort: UnitInputPort
+        get() = (getPortByName("holdLevel") as UnitInputPort)
     
     fun setEnvelopeMode(isFast: Boolean) {
         if (isFast) {

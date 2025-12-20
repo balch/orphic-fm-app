@@ -203,8 +203,23 @@ private fun VoiceGroupSection(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RotaryKnob(value = 0.5f, onValueChange = {}, label = "PITCH", size = 28.dp, progressColor = quadColor)
-            RotaryKnob(value = 0.5f, onValueChange = {}, label = "HOLD", size = 28.dp, progressColor = SongeColors.warmGlow)
+            // Quad Index: voiceStartIndex 0 -> 0, voiceStartIndex 4 -> 1
+            val quadIndex = voiceStartIndex / 4
+            
+            RotaryKnob(
+                value = viewModel.quadGroupPitches[quadIndex], 
+                onValueChange = { viewModel.onQuadPitchChange(quadIndex, it) }, 
+                label = "PITCH", 
+                size = 28.dp, 
+                progressColor = quadColor
+            )
+            RotaryKnob(
+                value = viewModel.quadGroupHolds[quadIndex], 
+                onValueChange = { viewModel.onQuadHoldChange(quadIndex, it) }, 
+                label = "HOLD", 
+                size = 28.dp, 
+                progressColor = SongeColors.warmGlow
+            )
         }
         
         // Two Duo groups side by side

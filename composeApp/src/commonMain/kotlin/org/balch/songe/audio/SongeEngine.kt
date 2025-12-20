@@ -12,9 +12,10 @@ interface SongeEngine {
     fun setVoiceEnvelopeMode(index: Int, isFast: Boolean) // true=Fast, false=Slow
     fun setPairSharpness(pairIndex: Int, sharpness: Float) // Waveform (0=tri, 1=sq) per pair
     
-    // Group Control
-    fun setGroupPitch(groupIndex: Int, pitch: Float) // 0 for 1-4, 1 for 5-8
-    fun setGroupFm(groupIndex: Int, amount: Float)
+
+    // Group Control (Quad 1-4, 5-8)
+    fun setQuadPitch(quadIndex: Int, pitch: Float) // 0-1, 0.5=Unity
+    fun setQuadHold(quadIndex: Int, amount: Float) // 0-1, VCA bias
     
     // Global
     fun setDrive(amount: Float)

@@ -268,15 +268,43 @@ class JvmSongeEngine : SongeEngine {
         Logger.info { "Audio Engine Stopped" }
     }
 
+    // State for Quad Pitch Offsets (0-1 range). 0.5 is unity (no shift).
+    // Quad 0 = Voices 0-3, Quad 1 = Voices 4-7
+    private val quadPitchOffsets = DoubleArray(2) { 0.5 }
+    
+    // Cache voice tunes to recalculate when Quad Pitch changes
+    private val voiceTuneCache = DoubleArray(8) { 0.5 }
+
     override fun setVoiceTune(index: Int, tune: Float) {
         if (index in voices.indices) {
-            // Map 0.0-1.0 to Frequency Range (e.g., 50Hz to 2000Hz)
-            // Exponential mapping is better for pitch
-            val minFreq = 50.0
-            val maxFreq = 2000.0
-            val freq = minFreq * Math.pow(maxFreq / minFreq, tune.toDouble())
-            voices[index].frequency.set(freq)
+            voiceTuneCache[index] = tune.toDouble()
+            updateVoiceFrequency(index)
         }
+    }
+    
+    private fun updateVoiceFrequency(index: Int) {
+        // Quad Index: 0-3 -> 0, 4-7 -> 1
+        val quadIndex = index / 4
+        val quadPitch = quadPitchOffsets[quadIndex]
+        
+        // Pitch Formula:
+        // Base Tune (0..1) -> 50Hz..2000Hz (Exponential)
+        // Quad Pitch (0..1) -> Transpose +/- 1 Octave?
+        // Let's say Quad Pitch 0.5 = 0 semitones.
+        // 1.0 = +12 semitones (2x freq)
+        // 0.0 = -12 semitones (0.5x freq)
+        
+        val tune = voiceTuneCache[index]
+        val minFreq = 50.0
+        val maxFreq = 2000.0
+        val baseFreq = minFreq * Math.pow(maxFreq / minFreq, tune)
+        
+        // Apply Quad Pitch Scaling
+        // 2^( (pitch - 0.5) * 2 ) -> Range 2^-1 (0.5x) to 2^1 (2x)
+        val transposeMultiplier = Math.pow(2.0, (quadPitch - 0.5) * 2.0)
+        
+        val finalFreq = baseFreq * transposeMultiplier
+        voices[index].frequency.set(finalFreq)
     }
 
     override fun setVoiceGate(index: Int, active: Boolean) {
@@ -309,12 +337,33 @@ class JvmSongeEngine : SongeEngine {
         Logger.debug { "Pair ${pairIndex + 1} Sharpness: ${"%.2f".format(sharpness)}" }
     }
 
-    override fun setGroupPitch(groupIndex: Int, pitch: Float) {
-        // TODO: Implement Group Pitch Logic
+    override fun setQuadPitch(quadIndex: Int, pitch: Float) {
+        // Update Quad Pitch Offset
+        if (quadIndex in 0..1) {
+            quadPitchOffsets[quadIndex] = pitch.toDouble()
+            
+            // Recalculate frequency for all 4 voices in this quad
+            val startVoice = quadIndex * 4
+            for (i in startVoice until (startVoice + 4)) {
+                updateVoiceFrequency(i)
+            }
+            Logger.debug { "Quad $quadIndex Pitch: ${"%.2f".format(pitch)}" }
+        }
     }
-
-    override fun setGroupFm(groupIndex: Int, amount: Float) {
-        // TODO: Implement FM Routing logic
+    
+    override fun setQuadHold(quadIndex: Int, amount: Float) {
+        // Update Hold Level for all 4 voices
+        if (quadIndex in 0..1) {
+            val startVoice = quadIndex * 4
+            for (i in startVoice until (startVoice + 4)) {
+                // Hold Level: Directly control volume floor.
+                // 0.0 = Silence (unless gated), 1.0 = Full Volume
+                // We use cubic mapping for natural volume swell
+                val level = amount * amount * amount
+                voices[i].holdLevelPort.set(level.toDouble())
+            }
+             Logger.debug { "Quad $quadIndex Hold: ${"%.2f".format(amount)}" }
+        }
     }
 
 

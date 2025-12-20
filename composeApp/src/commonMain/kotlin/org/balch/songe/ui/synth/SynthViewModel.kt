@@ -35,8 +35,10 @@ class SynthViewModel(
     private var duoGroupStates by mutableStateOf(List(4) { 0.0f }) // Mod Depth
 
     // Quad Groups (1-4, 5-8)
-    private var quadGroupPitches by mutableStateOf(List(2) { 0.5f })
-    private var quadGroupSustains by mutableStateOf(List(2) { 0.5f }) // Placeholder
+    var quadGroupPitches by mutableStateOf(List(2) { 0.5f }) // 0.5 = Unity
+        private set
+    var quadGroupHolds by mutableStateOf(List(2) { 0.0f }) // 0.0 = Silence
+        private set
 
     // Global
     var masterVolume by mutableStateOf(0.7f)
@@ -214,6 +216,20 @@ class SynthViewModel(
         Logger.info { "Global Distortion: $v" }
     }
     
+    fun onQuadPitchChange(index: Int, pitch: Float) {
+        val newPitches = quadGroupPitches.toMutableList()
+        newPitches[index] = pitch
+        quadGroupPitches = newPitches
+        engine.setQuadPitch(index, pitch)
+    }
+    
+    fun onQuadHoldChange(index: Int, amount: Float) {
+        val newHolds = quadGroupHolds.toMutableList()
+        newHolds[index] = amount
+        quadGroupHolds = newHolds
+        engine.setQuadHold(index, amount)
+    }
+
     // Lifecycle
     fun startAudio() {
         engine.start()
