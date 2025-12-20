@@ -3,7 +3,12 @@ package org.balch.songe.audio.dsp
 /**
  * Shared HyperLFO implementation using DSP primitive interfaces.
  * Two Oscillators (A & B) with logical AND/OR combination.
- * Supports both Square (AND formula) and Triangle waveforms.
+ * Supports both Square (AND/OR logic) and Triangle waveforms.
+ * 
+ * For square waves (-1 to +1), proper AND/OR logic requires:
+ * 1. Convert bipolar (-1,+1) to unipolar (0,1): u = (x + 1) / 2 = x * 0.5 + 0.5
+ * 2. Apply logic: AND = Ua * Ub, OR = Ua + Ub - Ua*Ub
+ * 3. Convert back to bipolar: x = u * 2 - 1
  */
 class SharedHyperLfo(private val audioEngine: AudioEngine) {
     // Interface Units (Proxies)
@@ -30,9 +35,22 @@ class SharedHyperLfo(private val audioEngine: AudioEngine) {
     private val lfoATriangle = audioEngine.createTriangleOscillator()
     private val lfoBTriangle = audioEngine.createTriangleOscillator()
     
-    // Logic units
-    private val logicAnd = audioEngine.createMultiply()
-    private val logicOr = audioEngine.createAdd()
+    // Bipolar to Unipolar converters: u = x * 0.5 + 0.5
+    private val toUnipolarA = audioEngine.createMultiplyAdd()
+    private val toUnipolarB = audioEngine.createMultiplyAdd()
+    
+    // Logic units (operate on unipolar 0-1 signals)
+    private val logicAnd = audioEngine.createMultiply() // Ua * Ub
+    
+    // OR logic: Ua + Ub - Ua*Ub
+    private val orProduct = audioEngine.createMultiply()  // Ua * Ub
+    private val orSum = audioEngine.createAdd()           // Ua + Ub
+    private val orResult = audioEngine.createMultiplyAdd() // orSum + (-1 * orProduct) = Ua + Ub - Ua*Ub
+    
+    // Unipolar to Bipolar converter: x = u * 2 - 1
+    private val toBipolarAnd = audioEngine.createMultiplyAdd()
+    private val toBipolarOr = audioEngine.createMultiplyAdd()
+    
     private val triangleMix = audioEngine.createAdd() // Average of two triangles
     private val fmGain = audioEngine.createMultiply()
     
@@ -52,8 +70,14 @@ class SharedHyperLfo(private val audioEngine: AudioEngine) {
         audioEngine.addUnit(lfoBSquare)
         audioEngine.addUnit(lfoATriangle)
         audioEngine.addUnit(lfoBTriangle)
+        audioEngine.addUnit(toUnipolarA)
+        audioEngine.addUnit(toUnipolarB)
         audioEngine.addUnit(logicAnd)
-        audioEngine.addUnit(logicOr)
+        audioEngine.addUnit(orProduct)
+        audioEngine.addUnit(orSum)
+        audioEngine.addUnit(orResult)
+        audioEngine.addUnit(toBipolarAnd)
+        audioEngine.addUnit(toBipolarOr)
         audioEngine.addUnit(triangleMix)
         audioEngine.addUnit(fmGain)
         
@@ -77,12 +101,49 @@ class SharedHyperLfo(private val audioEngine: AudioEngine) {
         fmGain.inputB.set(0.0) // Link OFF
         fmGain.output.connect(lfoBSquare.frequency) // Modulate B Square
         
-        // Logic Gates (Square)
-        lfoASquare.output.connect(logicAnd.inputA)
-        lfoBSquare.output.connect(logicAnd.inputB)
+        // ═══════════════════════════════════════════════════════════
+        // BIPOLAR TO UNIPOLAR CONVERSION
+        // u = x * 0.5 + 0.5 (converts -1,+1 to 0,1)
+        // ═══════════════════════════════════════════════════════════
+        lfoASquare.output.connect(toUnipolarA.inputA)
+        toUnipolarA.inputB.set(0.5)
+        toUnipolarA.inputC.set(0.5)
         
-        lfoASquare.output.connect(logicOr.inputA)
-        lfoBSquare.output.connect(logicOr.inputB)
+        lfoBSquare.output.connect(toUnipolarB.inputA)
+        toUnipolarB.inputB.set(0.5)
+        toUnipolarB.inputC.set(0.5)
+        
+        // ═══════════════════════════════════════════════════════════
+        // AND LOGIC: Ua * Ub (works correctly for 0/1 values)
+        // ═══════════════════════════════════════════════════════════
+        toUnipolarA.output.connect(logicAnd.inputA)
+        toUnipolarB.output.connect(logicAnd.inputB)
+        
+        // Convert AND result back to bipolar: x = u * 2 - 1
+        logicAnd.output.connect(toBipolarAnd.inputA)
+        toBipolarAnd.inputB.set(2.0)
+        toBipolarAnd.inputC.set(-1.0)
+        
+        // ═══════════════════════════════════════════════════════════
+        // OR LOGIC: Ua + Ub - Ua*Ub
+        // ═══════════════════════════════════════════════════════════
+        // First: Ua * Ub
+        toUnipolarA.output.connect(orProduct.inputA)
+        toUnipolarB.output.connect(orProduct.inputB)
+        
+        // Second: Ua + Ub
+        toUnipolarA.output.connect(orSum.inputA)
+        toUnipolarB.output.connect(orSum.inputB)
+        
+        // Third: (Ua + Ub) + (-1 * Ua*Ub) = Ua + Ub - Ua*Ub
+        orProduct.output.connect(orResult.inputA)
+        orResult.inputB.set(-1.0)
+        orSum.output.connect(orResult.inputC)
+        
+        // Convert OR result back to bipolar: x = u * 2 - 1
+        orResult.output.connect(toBipolarOr.inputA)
+        toBipolarOr.inputB.set(2.0)
+        toBipolarOr.inputC.set(-1.0)
         
         // Triangle Mix (average of two triangle waves)
         lfoATriangle.output.connect(triangleMix.inputA)
@@ -111,11 +172,11 @@ class SharedHyperLfo(private val audioEngine: AudioEngine) {
             // Triangle mode: use averaged triangle waves
             triangleMix.output.connect(outputProxy.input)
         } else {
-            // Square mode: use AND/OR logic
+            // Square mode: use AND/OR logic (with proper bipolar conversion)
             if (isAndMode) {
-                logicAnd.output.connect(outputProxy.input)
+                toBipolarAnd.output.connect(outputProxy.input)
             } else {
-                logicOr.output.connect(outputProxy.input)
+                toBipolarOr.output.connect(outputProxy.input)
             }
         }
     }

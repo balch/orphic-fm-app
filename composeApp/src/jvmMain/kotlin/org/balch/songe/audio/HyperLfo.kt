@@ -2,16 +2,22 @@ package org.balch.songe.audio
 
 import com.jsyn.ports.UnitInputPort
 import com.jsyn.ports.UnitOutputPort
+import com.jsyn.unitgen.Add
 import com.jsyn.unitgen.Circuit
+import com.jsyn.unitgen.Multiply
+import com.jsyn.unitgen.MultiplyAdd
+import com.jsyn.unitgen.PassThrough
 import com.jsyn.unitgen.SquareOscillator
 import com.jsyn.unitgen.TriangleOscillator
-import com.jsyn.unitgen.Add
-import com.jsyn.unitgen.Multiply
-import com.jsyn.unitgen.PassThrough
 
 /**
  * Hyper LFO: Two Oscillators (A & B) with logical AND/OR combination.
- * Supports both Square (AND formula) and Triangle waveforms.
+ * Supports both Square (AND/OR logic) and Triangle waveforms.
+ * 
+ * For square waves (-1 to +1), proper AND/OR logic requires:
+ * 1. Convert bipolar (-1,+1) to unipolar (0,1): u = (x + 1) / 2 = x * 0.5 + 0.5
+ * 2. Apply logic: AND = Ua * Ub, OR = Ua + Ub - Ua*Ub
+ * 3. Convert back to bipolar: x = u * 2 - 1
  */
 class HyperLfo : Circuit() {
     // Interface Units (Proxies)
@@ -38,9 +44,22 @@ class HyperLfo : Circuit() {
     private val lfoATriangle = TriangleOscillator()
     private val lfoBTriangle = TriangleOscillator()
     
-    // Logic units
-    private val logicAnd = Multiply()
-    private val logicOr = Add()
+    // Bipolar to Unipolar converters: u = x * 0.5 + 0.5
+    private val toUnipolarA = MultiplyAdd()
+    private val toUnipolarB = MultiplyAdd()
+    
+    // Logic units (operate on unipolar 0-1 signals)
+    private val logicAnd = Multiply() // Ua * Ub
+    
+    // OR logic: Ua + Ub - Ua*Ub
+    private val orProduct = Multiply()  // Ua * Ub
+    private val orSum = Add()           // Ua + Ub
+    private val orResult = MultiplyAdd() // orSum + (-1 * orProduct) = Ua + Ub - Ua*Ub
+    
+    // Unipolar to Bipolar converter: x = u * 2 - 1
+    private val toBipolarAnd = MultiplyAdd()
+    private val toBipolarOr = MultiplyAdd()
+    
     private val triangleMix = Add() // Average of two triangles
     private val fmGain = Multiply()
     
@@ -66,8 +85,14 @@ class HyperLfo : Circuit() {
         add(lfoBSquare)
         add(lfoATriangle)
         add(lfoBTriangle)
+        add(toUnipolarA)
+        add(toUnipolarB)
         add(logicAnd)
-        add(logicOr)
+        add(orProduct)
+        add(orSum)
+        add(orResult)
+        add(toBipolarAnd)
+        add(toBipolarOr)
         add(triangleMix)
         add(fmGain)
         
@@ -97,12 +122,49 @@ class HyperLfo : Circuit() {
         fmGain.inputB.set(0.0) // Link OFF
         fmGain.output.connect(lfoBSquare.frequency) // Modulate B Square
         
-        // Logic Gates (Square)
-        lfoASquare.output.connect(logicAnd.inputA)
-        lfoBSquare.output.connect(logicAnd.inputB)
+        // ═══════════════════════════════════════════════════════════
+        // BIPOLAR TO UNIPOLAR CONVERSION
+        // u = x * 0.5 + 0.5 (converts -1,+1 to 0,1)
+        // ═══════════════════════════════════════════════════════════
+        lfoASquare.output.connect(toUnipolarA.inputA)
+        toUnipolarA.inputB.set(0.5)
+        toUnipolarA.inputC.set(0.5)
         
-        lfoASquare.output.connect(logicOr.inputA)
-        lfoBSquare.output.connect(logicOr.inputB)
+        lfoBSquare.output.connect(toUnipolarB.inputA)
+        toUnipolarB.inputB.set(0.5)
+        toUnipolarB.inputC.set(0.5)
+        
+        // ═══════════════════════════════════════════════════════════
+        // AND LOGIC: Ua * Ub (works correctly for 0/1 values)
+        // ═══════════════════════════════════════════════════════════
+        toUnipolarA.output.connect(logicAnd.inputA)
+        toUnipolarB.output.connect(logicAnd.inputB)
+        
+        // Convert AND result back to bipolar: x = u * 2 - 1
+        logicAnd.output.connect(toBipolarAnd.inputA)
+        toBipolarAnd.inputB.set(2.0)
+        toBipolarAnd.inputC.set(-1.0)
+        
+        // ═══════════════════════════════════════════════════════════
+        // OR LOGIC: Ua + Ub - Ua*Ub
+        // ═══════════════════════════════════════════════════════════
+        // First: Ua * Ub
+        toUnipolarA.output.connect(orProduct.inputA)
+        toUnipolarB.output.connect(orProduct.inputB)
+        
+        // Second: Ua + Ub
+        toUnipolarA.output.connect(orSum.inputA)
+        toUnipolarB.output.connect(orSum.inputB)
+        
+        // Third: (Ua + Ub) + (-1 * Ua*Ub) = Ua + Ub - Ua*Ub
+        orProduct.output.connect(orResult.inputA)
+        orResult.inputB.set(-1.0)
+        orSum.output.connect(orResult.inputC)
+        
+        // Convert OR result back to bipolar: x = u * 2 - 1
+        orResult.output.connect(toBipolarOr.inputA)
+        toBipolarOr.inputB.set(2.0)
+        toBipolarOr.inputC.set(-1.0)
         
         // Triangle Mix (average of two triangle waves)
         lfoATriangle.output.connect(triangleMix.inputA)
@@ -131,11 +193,11 @@ class HyperLfo : Circuit() {
             // Triangle mode: use averaged triangle waves
             triangleMix.output.connect(outputProxy.input)
         } else {
-            // Square mode: use AND/OR logic
+            // Square mode: use AND/OR logic (with proper bipolar conversion)
             if (isAndMode) {
-                logicAnd.output.connect(outputProxy.input)
+                toBipolarAnd.output.connect(outputProxy.input)
             } else {
-                logicOr.output.connect(outputProxy.input)
+                toBipolarOr.output.connect(outputProxy.input)
             }
         }
     }
