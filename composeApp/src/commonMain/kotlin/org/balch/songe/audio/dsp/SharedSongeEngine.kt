@@ -431,10 +431,10 @@ class SharedSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun getPeak(): Float {
-        return 0f // Would need platform-specific implementation
+        return peakFollower.getCurrent().toFloat()
     }
 
     override fun getCpuLoad(): Float {
-        return 0f // Would need platform-specific implementation
+        return audioEngine.getCpuLoad()
     }
 }

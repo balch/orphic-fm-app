@@ -64,6 +64,9 @@ expect interface PeakFollower : AudioUnit {
     
     /** Set half-life decay time in seconds */
     fun setHalfLife(seconds: Double)
+    
+    /** Get current peak value */
+    fun getCurrent(): Double
 }
 
 /**

@@ -45,6 +45,7 @@ class StubDelayLine : DelayLine {
 actual interface PeakFollower : AudioUnit {
     actual val input: AudioInput
     actual fun setHalfLife(seconds: Double)
+    actual fun getCurrent(): Double
 }
 
 class StubPeakFollower : PeakFollower {
@@ -52,6 +53,7 @@ class StubPeakFollower : PeakFollower {
     override val input: AudioInput = StubAudioInput()
     override val output: AudioOutput = stubOutput
     override fun setHalfLife(seconds: Double) {}
+    override fun getCurrent(): Double = 0.0
 }
 
 actual interface Limiter : AudioUnit {

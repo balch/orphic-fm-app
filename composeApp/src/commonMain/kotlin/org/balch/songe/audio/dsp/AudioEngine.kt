@@ -35,4 +35,9 @@ expect class AudioEngine() {
     /** Master output - connect final audio here */
     val lineOutLeft: AudioInput
     val lineOutRight: AudioInput
+    
+    // Monitoring
+    /** Get current CPU load (0.0 - 1.0) */
+    fun getCpuLoad(): Float
 }
+

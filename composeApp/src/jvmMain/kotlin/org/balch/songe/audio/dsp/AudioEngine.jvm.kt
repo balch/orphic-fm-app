@@ -80,5 +80,7 @@ actual class AudioEngine actual constructor() {
     
     actual val lineOutRight: AudioInput
         get() = JsynAudioInput(lineOutRightProxy.input)
+    
+    actual fun getCpuLoad(): Float = (synth.usage * 100f).toFloat()
 }
 

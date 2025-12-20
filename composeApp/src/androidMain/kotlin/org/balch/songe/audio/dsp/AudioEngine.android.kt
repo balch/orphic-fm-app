@@ -27,4 +27,6 @@ actual class AudioEngine actual constructor() {
     
     actual val lineOutLeft: AudioInput = StubAudioInput()
     actual val lineOutRight: AudioInput = StubAudioInput()
+    
+    actual fun getCpuLoad(): Float = 0f
 }

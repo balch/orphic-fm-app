@@ -55,6 +55,7 @@ class JsynDelayLine : DelayLine {
 actual interface PeakFollower : AudioUnit {
     actual val input: AudioInput
     actual fun setHalfLife(seconds: Double)
+    actual fun getCurrent(): Double
 }
 
 class JsynPeakFollowerWrapper : PeakFollower {
@@ -65,6 +66,10 @@ class JsynPeakFollowerWrapper : PeakFollower {
     
     override fun setHalfLife(seconds: Double) {
         jsPeak.halfLife.set(seconds)
+    }
+    
+    override fun getCurrent(): Double {
+        return jsPeak.output.get()
     }
 }
 
