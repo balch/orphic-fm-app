@@ -79,20 +79,20 @@ fun DebugBottomBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f).padding(end = 16.dp)
             ) {
-                // Determine status color based on last log level
-                val lastLog = Logger.logs.firstOrNull()
-                val statusColor = when(lastLog?.level) {
+                // Find last INFO or ERROR message (skip warnings and debug)
+                val lastRelevantLog = Logger.logs.firstOrNull { 
+                    it.level == LogLevel.INFO || it.level == LogLevel.ERROR 
+                }
+                val statusColor = when(lastRelevantLog?.level) {
                     LogLevel.ERROR -> SongeColors.neonMagenta
-                    LogLevel.WARNING -> Color.Yellow
                     else -> SongeColors.synthGreen
                 }
                 
                 Box(modifier = Modifier.size(8.dp).background(statusColor, CircleShape))
                 Spacer(modifier = Modifier.width(8.dp))
                 
-                
                 Text(
-                    text = lastLog?.message ?: "System Ready",
+                    text = lastRelevantLog?.message ?: "System Ready",
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     color = Color.LightGray,

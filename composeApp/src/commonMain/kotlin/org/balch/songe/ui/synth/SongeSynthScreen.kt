@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,25 +25,38 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import org.balch.songe.audio.SongeEngine
+import org.balch.songe.input.KeyboardInputHandler
 import org.balch.songe.ui.components.HorizontalSwitch3Way
 import org.balch.songe.ui.components.HorizontalToggle
 import org.balch.songe.ui.components.PulseButton
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.components.VerticalToggle
+import org.balch.songe.ui.dialogs.MidiMappingDialog
 import org.balch.songe.ui.panels.HyperLfoPanel
+import org.balch.songe.ui.panels.SettingsPanel
 import org.balch.songe.ui.preview.PreviewSongeEngine
 import org.balch.songe.ui.theme.SongeColors
+import org.balch.songe.util.Logger
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Preview(widthDp = 800, heightDp = 600)
@@ -52,14 +66,73 @@ fun SongeSynthScreen(
     viewModel: SynthViewModel = remember { SynthViewModel(engine) },
     hazeState: HazeState = remember { HazeState() }
 ) {
+    val focusRequester = remember { FocusRequester() }
+    
     DisposableEffect(Unit) {
         viewModel.startAudio()
-        onDispose { viewModel.stopAudio() }
+        viewModel.initMidi()
+        Logger.info { "Songe Ready ✓" }
+        onDispose {
+            viewModel.stopMidi()
+            viewModel.stopAudio()
+        }
+    }
+    
+    // Show MIDI mapping dialog if requested
+    if (viewModel.showMidiMappingDialog) {
+        MidiMappingDialog(
+            mappingState = viewModel.midiMappingState,
+            onMappingChange = { viewModel.updateMidiMapping(it) },
+            onDismiss = { viewModel.showMidiMappingDialog = false }
+        )
+    }
+    
+    // Request focus on launch to capture keyboard events
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .focusRequester(focusRequester)
+            .focusable()
+            .onPreviewKeyEvent { keyEvent ->
+                val key = keyEvent.key
+                val isKeyDown = keyEvent.type == KeyEventType.KeyDown
+                val isKeyUp = keyEvent.type == KeyEventType.KeyUp
+                
+                // Handle voice trigger keys (A/S/D/F/G/H/J/K)
+                KeyboardInputHandler.getVoiceFromKey(key)?.let { voiceIndex ->
+                    if (isKeyDown && !KeyboardInputHandler.isVoiceKeyPressed(voiceIndex)) {
+                        KeyboardInputHandler.onVoiceKeyDown(voiceIndex)
+                        viewModel.onPulseStart(voiceIndex)
+                        return@onPreviewKeyEvent true
+                    } else if (isKeyUp) {
+                        KeyboardInputHandler.onVoiceKeyUp(voiceIndex)
+                        viewModel.onPulseEnd(voiceIndex)
+                        return@onPreviewKeyEvent true
+                    }
+                }
+                
+                // Handle tune adjustment keys (1-8)
+                if (isKeyDown) {
+                    KeyboardInputHandler.getTuneVoiceFromKey(key)?.let { voiceIndex ->
+                        val currentTune = viewModel.voiceStates[voiceIndex].tune
+                        val delta = KeyboardInputHandler.getTuneDelta(keyEvent.isShiftPressed)
+                        val newTune = (currentTune + delta).coerceIn(0f, 1f)
+                        viewModel.onVoiceTuneChange(voiceIndex, newTune)
+                        return@onPreviewKeyEvent true
+                    }
+                    
+                    // Handle octave shift (Z/X)
+                    if (KeyboardInputHandler.handleOctaveKey(key)) {
+                        return@onPreviewKeyEvent true
+                    }
+                }
+                
+                false
+            }
             .background(
                 brush = Brush.verticalGradient(
                     colors = listOf(Color(0xFF0A0A12), Color(0xFF12121A), Color(0xFF0A0A12))
@@ -80,6 +153,12 @@ fun SongeSynthScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            SettingsPanel(
+                midiDeviceName = viewModel.midiController.currentDeviceName,
+                isMidiOpen = viewModel.midiController.isOpen,
+                onMidiClick = { viewModel.showMidiMappingDialog = true },
+                modifier = Modifier.fillMaxHeight()
+            )
             HyperLfoPanel(
                 lfo1Rate = viewModel.hyperLfoA,
                 onLfo1RateChange = viewModel::onHyperLfoAChange,

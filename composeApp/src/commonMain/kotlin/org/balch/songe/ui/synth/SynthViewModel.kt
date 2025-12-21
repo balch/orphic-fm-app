@@ -6,14 +6,29 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import org.balch.songe.audio.SongeEngine
 import org.balch.songe.audio.VoiceState
+import org.balch.songe.input.MidiController
+import org.balch.songe.input.MidiEventListener
+import org.balch.songe.input.MidiMappingState
 import org.balch.songe.util.Logger
 
 class SynthViewModel(
-    private val engine: SongeEngine
+    private val engine: SongeEngine,
+    val midiController: MidiController = MidiController()
 ) : ViewModel() {
 
-    // 8 Voices
-    var voiceStates by mutableStateOf(List(8) { index -> VoiceState(index = index) })
+    // 8 Voices - Default tunings set to F# minor chord (F#, A, C#, E, F#, A, C#, F#)
+    // Tune values map 0-1 to frequency range. These values create an F#min7 spread.
+    private val fSharpMinorTunings = listOf(
+        0.20f,  // Voice 1: F#2
+        0.27f,  // Voice 2: A2
+        0.34f,  // Voice 3: C#3
+        0.40f,  // Voice 4: E3 (minor 7th)
+        0.47f,  // Voice 5: F#3
+        0.54f,  // Voice 6: A3
+        0.61f,  // Voice 7: C#4
+        0.68f   // Voice 8: F#4
+    )
+    var voiceStates by mutableStateOf(List(8) { index -> VoiceState(index = index, tune = fSharpMinorTunings[index]) })
         private set
     
     // Voice MOD Depths - only for ODD voices (1,3,5,7 = indices 0,2,4,6)
@@ -73,8 +88,73 @@ class SynthViewModel(
         private set
     var vibrato by mutableStateOf(0.0f) // 0-1, global pitch wobble
         private set
-    var voiceCoupling by mutableStateOf(0.0f) // 0-1, partner envelope->frequency
+    var voiceCoupling by mutableStateOf(0.0f) // 0-1, partner envelope→frequency
         private set
+    
+    // MIDI Mapping
+    var midiMappingState by mutableStateOf(MidiMappingState())
+        private set
+    
+    var showMidiMappingDialog by mutableStateOf(false)
+    
+    // MIDI Event Listener
+    private val midiEventListener = object : MidiEventListener {
+        override fun onNoteOn(note: Int, velocity: Int) {
+            // Check if we're in learn mode
+            midiMappingState.learnMode?.let { voiceIndex ->
+                midiMappingState = midiMappingState.assignNote(note, voiceIndex)
+                Logger.info { "Assigned MIDI note ${MidiMappingState.noteName(note)} to Voice ${voiceIndex + 1}" }
+                return
+            }
+            
+            // Normal operation: trigger voice based on mapping
+            midiMappingState.getVoiceForNote(note)?.let { voiceIndex ->
+                onPulseStart(voiceIndex)
+            }
+        }
+        
+        override fun onNoteOff(note: Int) {
+            midiMappingState.getVoiceForNote(note)?.let { voiceIndex ->
+                onPulseEnd(voiceIndex)
+            }
+        }
+        
+        override fun onControlChange(controller: Int, value: Int) {
+            // CC1 = Mod wheel → could map to vibrato or coupling
+            if (controller == 1) {
+                val normalized = value / 127f
+                onVibratoChange(normalized)
+            }
+        }
+        
+        override fun onPitchBend(value: Int) {
+            // Could apply to quad pitch or other parameter
+            // -8192 to 8191, map to some parameter range
+        }
+    }
+    
+    fun updateMidiMapping(newState: MidiMappingState) {
+        midiMappingState = newState
+    }
+    
+    fun initMidi() {
+        val devices = midiController.getAvailableDevices()
+        if (devices.isNotEmpty()) {
+            Logger.info { "Available MIDI devices: $devices" }
+            // Auto-connect to first device, then start listening
+            if (midiController.openDevice(devices.first())) {
+                midiController.start(midiEventListener)
+                Logger.info { "MIDI initialized and listening on: ${devices.first()}" }
+            }
+        } else {
+            Logger.info { "No MIDI devices found" }
+        }
+    }
+    
+    fun stopMidi() {
+        midiController.stop()
+        midiController.closeDevice()
+    }
 
     fun onVoiceTuneChange(index: Int, newTune: Float) {
         val newVoices = voiceStates.toMutableList()
@@ -282,6 +362,16 @@ class SynthViewModel(
     // Lifecycle
     fun startAudio() {
         engine.start()
+        // Initialize all voice tunings to match UI state
+        voiceStates.forEachIndexed { index, state ->
+            engine.setVoiceTune(index, state.tune)
+        }
+        // Initialize other default parameters
+        engine.setMasterVolume(masterVolume)
+        engine.setDrive(drive)
+        engine.setDistortionMix(distortionMix)
+        engine.setDelayFeedback(delayFeedback)
+        engine.setDelayMix(delayMix)
     }
     
     fun stopAudio() {
