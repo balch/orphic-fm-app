@@ -153,7 +153,7 @@ fun SongeSynthScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Max),
+                .height(IntrinsicSize.Max), // Responsive height based on tallest child
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {

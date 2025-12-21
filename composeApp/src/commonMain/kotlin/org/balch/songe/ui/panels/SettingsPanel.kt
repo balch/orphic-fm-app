@@ -60,81 +60,89 @@ fun SettingsPanel(
         animationSpec = tween(durationMillis = 200)
     )
     
+    // Always reserve expanded width to prevent layout jump
     Box(
         modifier = modifier
-            .width(targetWidth)
+            .width(140.dp) // Always full width
             .fillMaxHeight()
             .clip(RoundedCornerShape(8.dp))
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        SongeColors.darkVoid.copy(alpha = 0.6f),
-                        SongeColors.darkVoid.copy(alpha = 0.9f)
+    ) {
+        // Animated content container
+        Box(
+            modifier = Modifier
+                .width(targetWidth)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            SongeColors.darkVoid.copy(alpha = 0.6f),
+                            SongeColors.darkVoid.copy(alpha = 0.9f)
+                        )
                     )
                 )
-            )
-            .border(
-                width = if (isLearnModeActive) 2.dp else 1.dp,
-                color = if (isLearnModeActive) SongeColors.neonMagenta.copy(alpha = 0.7f) 
-                       else Color.White.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(8.dp)
-            )
-            .animateContentSize()
-    ) {
-        if (isExpanded) {
-            // Expanded content
-            Column(
-                modifier = Modifier.padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Collapse arrow (now points left)
-                Row(
-                    modifier = Modifier
-                        .clickable { if (!isLearnModeActive) isExpanded = false }
-                        .padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                .border(
+                    width = if (isLearnModeActive) 2.dp else 1.dp,
+                    color = if (isLearnModeActive) SongeColors.neonMagenta.copy(alpha = 0.7f) 
+                           else Color.White.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp)
+                )
+        ) {
+            if (isExpanded) {
+                // Expanded content
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        "◀",
-                        fontSize = 10.sp,
-                        color = if (isLearnModeActive) SongeColors.neonMagenta.copy(alpha = 0.6f)
-                               else Color.White.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        if (isLearnModeActive) "LEARNING" else "SETTINGS",
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isLearnModeActive) SongeColors.neonMagenta
-                               else Color.White.copy(alpha = 0.5f)
+                    // Collapse arrow (now points left)
+                    Row(
+                        modifier = Modifier
+                            .clickable { if (!isLearnModeActive) isExpanded = false }
+                            .padding(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "◀",
+                            fontSize = 10.sp,
+                            color = if (isLearnModeActive) SongeColors.neonMagenta.copy(alpha = 0.6f)
+                                   else Color.White.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            if (isLearnModeActive) "LEARNING" else "SETTINGS",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isLearnModeActive) SongeColors.neonMagenta
+                                   else Color.White.copy(alpha = 0.5f)
+                        )
+                    }
+                    
+                    // MIDI Section with integrated Learn button
+                    MidiSettingSection(
+                        deviceName = midiDeviceName,
+                        isOpen = isMidiOpen,
+                        isLearnModeActive = isLearnModeActive,
+                        onMidiClick = onMidiClick,
+                        onLearnToggle = onLearnToggle,
+                        onLearnSave = onLearnSave,
+                        onLearnCancel = onLearnCancel
                     )
                 }
-                
-                // MIDI Section with integrated Learn button
-                MidiSettingSection(
-                    deviceName = midiDeviceName,
-                    isOpen = isMidiOpen,
-                    isLearnModeActive = isLearnModeActive,
-                    onMidiClick = onMidiClick,
-                    onLearnToggle = onLearnToggle,
-                    onLearnSave = onLearnSave,
-                    onLearnCancel = onLearnCancel
-                )
-            }
-        } else {
-            // Collapsed - just the expand arrow
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(32.dp)
-                    .clickable { isExpanded = true },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "▶",
-                    fontSize = 12.sp,
-                    color = SongeColors.neonCyan.copy(alpha = 0.7f)
-                )
+            } else {
+                // Collapsed - just the expand arrow
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(32.dp)
+                        .clickable { isExpanded = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "▶",
+                        fontSize = 12.sp,
+                        color = SongeColors.neonCyan.copy(alpha = 0.7f)
+                    )
+                }
             }
         }
     }
