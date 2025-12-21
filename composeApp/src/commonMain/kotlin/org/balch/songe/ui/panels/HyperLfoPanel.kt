@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,8 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,7 +36,7 @@ import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.theme.SongeColors
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
-enum class HyperLfoMode { AND, OR }
+enum class HyperLfoMode { AND, OFF, OR }
 
 /**
  * Hyper LFO Panel - Two LFOs combined with AND/OR logic
@@ -53,6 +56,8 @@ fun HyperLfoPanel(
     onLinkChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isActive = mode != HyperLfoMode.OFF
+    
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -81,23 +86,43 @@ fun HyperLfoPanel(
             )
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top // Changed from SpaceBetween
+        verticalArrangement = Arrangement.Top
     ) {
-        // Title at TOP
-        Text(
-            text = "HYPER LFO",
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = SongeColors.neonCyan
-        )
+        // Title with Activity Indicator
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Green activity indicator
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(
+                        if (isActive) SongeColors.synthGreen else Color(0xFF2A2A2A)
+                    )
+                    .border(
+                        1.dp,
+                        if (isActive) SongeColors.synthGreen.copy(alpha = 0.5f) else Color(0xFF3A3A3A),
+                        RoundedCornerShape(4.dp)
+                    )
+            )
+            
+            Text(
+                text = "HYPER LFO",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.5f)
+            )
+        }
         
-        Spacer(modifier = Modifier.weight(1f)) // Push content to center
+        Spacer(modifier = Modifier.weight(1f))
         
         // Controls Row
         Row(
             modifier = Modifier.padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically // Center align items vertically
+            verticalAlignment = Alignment.CenterVertically
         ) {
             RotaryKnob(
                 value = lfo1Rate,
@@ -105,7 +130,7 @@ fun HyperLfoPanel(
                 label = "FREQ A",
                 controlId = ControlIds.HYPER_LFO_A,
                 size = 48.dp,
-                progressColor = SongeColors.neonCyan
+                progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
             )
             RotaryKnob(
                 value = lfo2Rate,
@@ -113,15 +138,26 @@ fun HyperLfoPanel(
                 label = "FREQ B",
                 controlId = ControlIds.HYPER_LFO_B,
                 size = 48.dp,
-                progressColor = SongeColors.neonCyan
+                progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
             )
 
-            // AND/OR Vertical Switch
-            VerticalToggle(
+            // 3-way AND/OFF/OR Switch
+            Vertical3WaySwitch(
                 topLabel = "AND",
+                middleLabel = "OFF",
                 bottomLabel = "OR",
-                isTop = mode == HyperLfoMode.AND,
-                onToggle = { isAnd -> onModeChange(if (isAnd) HyperLfoMode.AND else HyperLfoMode.OR) },
+                position = when (mode) {
+                    HyperLfoMode.AND -> 0
+                    HyperLfoMode.OFF -> 1
+                    HyperLfoMode.OR -> 2
+                },
+                onPositionChange = { pos ->
+                    onModeChange(when (pos) {
+                        0 -> HyperLfoMode.AND
+                        1 -> HyperLfoMode.OFF
+                        else -> HyperLfoMode.OR
+                    })
+                },
                 color = SongeColors.neonCyan
             )
             
@@ -136,7 +172,7 @@ fun HyperLfoPanel(
 
         }
         
-        Spacer(modifier = Modifier.weight(1f)) // Push content to center
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
@@ -196,11 +232,11 @@ private fun VerticalToggle(
             lineHeight = 9.sp // Explicit line height
         )
 
-        // Vertical switch track
+        // Vertical switch track - Taller to match 3-way switch
         Box(
             modifier = Modifier
                 .width(12.dp)
-                .height(40.dp) // Match height of rotary knob stack approx
+                .height(56.dp) // Increased to match 3-way switch visual mass
                 .clip(RoundedCornerShape(6.dp))
                 .background(color.copy(alpha = 0.2f))
                 .clickable { onToggle(!isTop) },
@@ -223,7 +259,107 @@ private fun VerticalToggle(
             fontSize = 7.sp,
             color = if (!isTop) color else color.copy(alpha = 0.5f),
             fontWeight = if (!isTop) FontWeight.Bold else FontWeight.Normal,
-            lineHeight = 9.sp // Explicit line height
+            lineHeight = 9.sp
+        )
+    }
+}
+
+/**
+ * 3-way vertical switch for AND/OFF/OR selection.
+ * position: 0 = top (AND), 1 = middle (OFF), 2 = bottom (OR)
+ */
+@Composable
+private fun Vertical3WaySwitch(
+    topLabel: String,
+    middleLabel: String,
+    bottomLabel: String,
+    position: Int, // 0=top, 1=middle, 2=bottom
+    onPositionChange: (Int) -> Unit,
+    color: Color
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color(0xFF1A1A2A))
+            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        // Top label (AND)
+        Text(
+            topLabel,
+            fontSize = 7.sp,
+            color = if (position == 0) color else color.copy(alpha = 0.5f),
+            fontWeight = if (position == 0) FontWeight.Bold else FontWeight.Normal,
+            lineHeight = 9.sp,
+            modifier = Modifier.clickable { onPositionChange(0) }
+        )
+
+        // 3-way switch track
+        Box(
+            modifier = Modifier
+                .width(12.dp)
+                .height(44.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(color.copy(alpha = 0.2f))
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == PointerEventType.Press || event.type == PointerEventType.Move) {
+                                val change = event.changes.firstOrNull() ?: continue
+                                if (change.pressed) {
+                                    val y = change.position.y
+                                    val height = size.height
+                                    
+                                    // Calculate section (0, 1, 2)
+                                    // 0 = Top, 1 = Middle, 2 = Bottom
+                                    val section = (y / (height / 3)).toInt().coerceIn(0, 2)
+                                    onPositionChange(section)
+                                    change.consume()
+                                }
+                            }
+                        }
+                    }
+                }
+        ) {
+            // Switch knob - position determines alignment
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.33f)
+                    .align(
+                        when (position) {
+                            0 -> Alignment.TopCenter
+                            1 -> Alignment.Center
+                            else -> Alignment.BottomCenter
+                        }
+                    )
+                    .padding(2.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (position == 1) color.copy(alpha = 0.5f) else color)
+            )
+        }
+
+        // Middle label (OFF) - clickable
+        Text(
+            middleLabel,
+            fontSize = 6.sp,
+            color = if (position == 1) color else color.copy(alpha = 0.4f),
+            fontWeight = if (position == 1) FontWeight.Bold else FontWeight.Normal,
+            lineHeight = 8.sp,
+            modifier = Modifier.clickable { onPositionChange(1) }
+        )
+
+        // Bottom label (OR)
+        Text(
+            bottomLabel,
+            fontSize = 7.sp,
+            color = if (position == 2) color else color.copy(alpha = 0.5f),
+            fontWeight = if (position == 2) FontWeight.Bold else FontWeight.Normal,
+            lineHeight = 9.sp,
+            modifier = Modifier.clickable { onPositionChange(2) }
         )
     }
 }

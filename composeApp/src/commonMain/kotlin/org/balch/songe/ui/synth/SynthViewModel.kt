@@ -82,7 +82,7 @@ class SynthViewModel(
     // Hyper LFO
     var hyperLfoA by mutableStateOf(0.0f)
     var hyperLfoB by mutableStateOf(0.0f)
-    var hyperLfoMode by mutableStateOf(org.balch.songe.ui.panels.HyperLfoMode.AND)
+    var hyperLfoMode by mutableStateOf(org.balch.songe.ui.panels.HyperLfoMode.OFF)
     var hyperLfoLink by mutableStateOf(false)
     
     // Duo Mod Sources (4 pairs)
@@ -441,7 +441,7 @@ class SynthViewModel(
     
     fun onHyperLfoModeChange(mode: org.balch.songe.ui.panels.HyperLfoMode) {
         hyperLfoMode = mode
-        engine.setHyperLfoMode(mode == org.balch.songe.ui.panels.HyperLfoMode.AND)
+        engine.setHyperLfoMode(mode.ordinal) // 0=AND, 1=OFF, 2=OR
     }
     
     fun onHyperLfoLinkChange(enabled: Boolean) {

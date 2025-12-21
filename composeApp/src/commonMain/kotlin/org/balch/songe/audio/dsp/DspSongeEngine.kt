@@ -292,8 +292,8 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         }
     }
 
-    override fun setHyperLfoMode(andMode: Boolean) {
-        hyperLfo.setMode(andMode)
+    override fun setHyperLfoMode(mode: Int) {
+        hyperLfo.setMode(mode)
     }
 
     override fun setHyperLfoLink(active: Boolean) {

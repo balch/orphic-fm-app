@@ -45,7 +45,7 @@ class PreviewSongeEngine(): SongeEngine {
     override fun setVoiceCoupling(amount: Float) {}
     
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
-    override fun setHyperLfoMode(andMode: Boolean) {}
+    override fun setHyperLfoMode(mode: Int) {}
     override fun setHyperLfoLink(active: Boolean) {}
 
     override fun playTestTone(frequency: Float) {}

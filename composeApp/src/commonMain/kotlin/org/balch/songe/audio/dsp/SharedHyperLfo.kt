@@ -153,10 +153,23 @@ class SharedHyperLfo(private val audioEngine: AudioEngine) {
         triangleMix.output.connect(outputProxy.input)
     }
 
-    fun setMode(andMode: Boolean) {
-        if (isAndMode == andMode) return
-        isAndMode = andMode
-        updateOutput()
+    /**
+     * Set LFO mode: 0=AND, 1=OFF, 2=OR
+     */
+    fun setMode(mode: Int) {
+        when (mode) {
+            0 -> { // AND
+                isAndMode = true
+                updateOutput()
+            }
+            1 -> { // OFF - mute output
+                outputProxy.input.disconnectAll()
+            }
+            2 -> { // OR
+                isAndMode = false
+                updateOutput()
+            }
+        }
     }
     
     fun setTriangleMode(triangleMode: Boolean) {

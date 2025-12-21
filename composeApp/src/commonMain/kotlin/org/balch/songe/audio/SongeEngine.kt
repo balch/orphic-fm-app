@@ -37,7 +37,7 @@ interface SongeEngine {
     
     // Hyper LFO
     fun setHyperLfoFreq(index: Int, frequency: Float) // 0=A, 1=B
-    fun setHyperLfoMode(andMode: Boolean)
+    fun setHyperLfoMode(mode: Int) // 0=AND, 1=OFF, 2=OR
     fun setHyperLfoLink(active: Boolean)
     
     // Duo Mod Source
