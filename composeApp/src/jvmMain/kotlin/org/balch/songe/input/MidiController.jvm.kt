@@ -1,6 +1,7 @@
 package org.balch.songe.input
 
 import org.balch.songe.util.Logger
+import uk.co.xfactorylibrarians.coremidi4j.CoreMidiDeviceProvider
 import javax.sound.midi.MidiDevice
 import javax.sound.midi.MidiMessage
 import javax.sound.midi.MidiSystem
@@ -8,9 +9,23 @@ import javax.sound.midi.Receiver
 import javax.sound.midi.ShortMessage
 
 /**
- * JVM actual implementation of MidiController using javax.sound.midi.
+ * JVM actual implementation of MidiController using javax.sound.midi with CoreMIDI4J.
+ * CoreMIDI4J provides proper macOS USB MIDI device support.
  */
 actual class MidiController actual constructor() {
+    
+    init {
+        // Initialize CoreMIDI4J to register macOS CoreMIDI devices
+        try {
+            if (CoreMidiDeviceProvider.isLibraryLoaded()) {
+                Logger.info { "CoreMIDI4J initialized - macOS MIDI devices available" }
+            } else {
+                Logger.warn { "CoreMIDI4J not available on this platform" }
+            }
+        } catch (e: Exception) {
+            Logger.warn { "CoreMIDI4J initialization failed: ${e.message}" }
+        }
+    }
     
     private var currentDevice: MidiDevice? = null
     private var listener: MidiEventListener? = null
