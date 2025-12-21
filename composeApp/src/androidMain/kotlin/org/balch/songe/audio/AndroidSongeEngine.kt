@@ -25,7 +25,7 @@ class AndroidSongeEngine : SongeEngine {
          // Stub
     }
 
-    override fun setVoiceEnvelopeMode(index: Int, isFast: Boolean) {
+    override fun setVoiceEnvelopeSpeed(index: Int, speed: Float) {
          // Stub
     }
 

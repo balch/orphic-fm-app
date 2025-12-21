@@ -17,7 +17,7 @@ class PreviewSongeEngine(): SongeEngine {
 
     override fun setVoiceFeedback(index: Int, amount: Float) {}
     override fun setVoiceFmDepth(index: Int, amount: Float) {}
-    override fun setVoiceEnvelopeMode(index: Int, isFast: Boolean) {}
+    override fun setVoiceEnvelopeSpeed(index: Int, speed: Float) {}
     override fun setPairSharpness(pairIndex: Int, sharpness: Float) {}
 
     override fun setQuadPitch(quadIndex: Int, pitch: Float) {

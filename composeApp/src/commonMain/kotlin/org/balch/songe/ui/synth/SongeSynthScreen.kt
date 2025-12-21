@@ -47,6 +47,7 @@ import org.balch.songe.audio.SongeEngine
 import org.balch.songe.input.KeyboardInputHandler
 import org.balch.songe.input.LearnTarget
 import org.balch.songe.input.MidiMappingState.Companion.ControlIds
+import org.balch.songe.ui.components.HorizontalEnvelopeSlider
 import org.balch.songe.ui.components.HorizontalSwitch3Way
 import org.balch.songe.ui.components.HorizontalToggle
 import org.balch.songe.ui.components.LearnModeProvider
@@ -422,8 +423,8 @@ private fun DuoPairBox(
                     onTuneChange = { viewModel.onVoiceTuneChange(voiceA, it) },
                     modDepth = viewModel.voiceModDepths[voiceA],
                     onModDepthChange = { viewModel.onDuoModDepthChange(pairIndex, it) }, // Apply to both voices
-                    isFastEnv = viewModel.voiceEnvelopeModes[voiceA],
-                    onEnvModeChange = { viewModel.onVoiceEnvelopeModeChange(voiceA, it) }
+                    envSpeed = viewModel.voiceEnvelopeSpeeds[voiceA],
+                    onEnvSpeedChange = { viewModel.onVoiceEnvelopeSpeedChange(voiceA, it) }
                 )
                 
                 // Buttons
@@ -461,8 +462,8 @@ private fun DuoPairBox(
                     onTuneChange = { viewModel.onVoiceTuneChange(voiceB, it) },
                     sharpness = viewModel.pairSharpness[pairIndex],
                     onSharpnessChange = { viewModel.onPairSharpnessChange(pairIndex, it) },
-                    isFastEnv = viewModel.voiceEnvelopeModes[voiceB],
-                    onEnvModeChange = { viewModel.onVoiceEnvelopeModeChange(voiceB, it) }
+                    envSpeed = viewModel.voiceEnvelopeSpeeds[voiceB],
+                    onEnvSpeedChange = { viewModel.onVoiceEnvelopeSpeedChange(voiceB, it) }
                 )
                 
                 // Buttons
@@ -502,8 +503,8 @@ private fun VoiceColumnMod(
     onTuneChange: (Float) -> Unit,
     modDepth: Float,
     onModDepthChange: (Float) -> Unit,
-    isFastEnv: Boolean,
-    onEnvModeChange: (Boolean) -> Unit
+    envSpeed: Float,
+    onEnvSpeedChange: (Float) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -516,12 +517,10 @@ private fun VoiceColumnMod(
         Text("$num", fontSize = 8.sp, color = SongeColors.electricBlue.copy(alpha = 0.6f))
         RotaryKnob(value = modDepth, onValueChange = onModDepthChange, label = "MOD", controlId = ControlIds.voiceFmDepth(voiceIndex), size = 24.dp, progressColor = SongeColors.neonMagenta)
         RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", controlId = ControlIds.voiceTune(voiceIndex), size = 28.dp, progressColor = SongeColors.neonCyan)
-        // Envelope Toggle
-        HorizontalToggle(
-            leftLabel = "F",
-            rightLabel = "S",
-            isLeft = isFastEnv,
-            onToggle = { onEnvModeChange(it) },
+        // Envelope Speed Slider
+        HorizontalEnvelopeSlider(
+            value = envSpeed,
+            onValueChange = onEnvSpeedChange,
             color = SongeColors.neonCyan
         )
     }
@@ -536,8 +535,8 @@ private fun VoiceColumnSharp(
     onTuneChange: (Float) -> Unit,
     sharpness: Float,
     onSharpnessChange: (Float) -> Unit,
-    isFastEnv: Boolean,
-    onEnvModeChange: (Boolean) -> Unit
+    envSpeed: Float,
+    onEnvSpeedChange: (Float) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -550,12 +549,10 @@ private fun VoiceColumnSharp(
         Text("$num", fontSize = 8.sp, color = SongeColors.electricBlue.copy(alpha = 0.6f))
         RotaryKnob(value = sharpness, onValueChange = onSharpnessChange, label = "SHARP", controlId = ControlIds.pairSharpness(pairIndex), size = 24.dp, progressColor = SongeColors.synthGreen)
         RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", controlId = ControlIds.voiceTune(voiceIndex), size = 28.dp, progressColor = SongeColors.neonCyan)
-        // Envelope Toggle
-        HorizontalToggle(
-            leftLabel = "F",
-            rightLabel = "S",
-            isLeft = isFastEnv,
-            onToggle = { onEnvModeChange(it) },
+        // Envelope Speed Slider
+        HorizontalEnvelopeSlider(
+            value = envSpeed,
+            onValueChange = onEnvSpeedChange,
             color = SongeColors.neonCyan
         )
     }

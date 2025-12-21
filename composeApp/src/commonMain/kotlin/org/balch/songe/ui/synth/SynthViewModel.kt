@@ -50,8 +50,8 @@ class SynthViewModel(
     var pairSharpness by mutableStateOf(List(4) { 0.0f })
         private set
     
-    // Voice Envelope Modes (true=Fast, false=Slow)
-    var voiceEnvelopeModes by mutableStateOf(List(8) { false }) // Default: Slow/Drone
+    // Voice Envelope Speeds (0=Fast, 1=Slow, continuous)
+    var voiceEnvelopeSpeeds by mutableStateOf(List(8) { 0.0f }) // Default: Fast
         private set
 
     // Duo Groups (1-2, 3-4, 5-6, 7-8)
@@ -419,11 +419,11 @@ class SynthViewModel(
         engine.setPairSharpness(pairIndex, newSharpness)
     }
     
-    fun onVoiceEnvelopeModeChange(index: Int, isFast: Boolean) {
-        val newModes = voiceEnvelopeModes.toMutableList()
-        newModes[index] = isFast
-        voiceEnvelopeModes = newModes
-        engine.setVoiceEnvelopeMode(index, isFast)
+    fun onVoiceEnvelopeSpeedChange(index: Int, speed: Float) {
+        val newSpeeds = voiceEnvelopeSpeeds.toMutableList()
+        newSpeeds[index] = speed
+        voiceEnvelopeSpeeds = newSpeeds
+        engine.setVoiceEnvelopeSpeed(index, speed)
     }
 
     // ... (Pulse/Hold methods are unchanged)

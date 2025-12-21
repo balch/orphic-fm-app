@@ -90,8 +90,8 @@ class SharedVoice(
         triangleOsc.amplitude.set(0.3)
         squareOsc.amplitude.set(0.3)
         
-        // Default Envelope Settings (Slow/Drone)
-        setEnvelopeMode(isFast = false)
+        // Default Envelope Settings (Fast/Percussive)
+        setEnvelopeSpeed(0.0f)
         
         // Pitch Scaling
         pitchScaler.inputB.set(pitchMultiplier)
@@ -168,19 +168,22 @@ class SharedVoice(
         frequency.set(220.0)
     }
     
-    fun setEnvelopeMode(isFast: Boolean) {
-        if (isFast) {
-            // Fast: Percussive, quick attack/release
-            ampEnv.setAttack(0.005)
-            ampEnv.setDecay(0.05)
-            ampEnv.setSustain(0.8)
-            ampEnv.setRelease(0.1)
-        } else {
-            // Slow: Drone, slow swell
-            ampEnv.setAttack(1.5)
-            ampEnv.setDecay(0.8)
-            ampEnv.setSustain(1.0)
-            ampEnv.setRelease(1.2)
-        }
+    fun setEnvelopeSpeed(speed: Float) {
+        // Ease-in curve (quadratic) for more musical feel
+        // Lower values give finer fast control, higher values expand to drone
+        val eased = speed * speed
+        
+        // Interpolate between Fast (0) and Slow (1)
+        // Fast: attack=0.005s, decay=0.05s, sustain=0.8, release=0.1s
+        // Slow: attack=3.0s, decay=3.0s, sustain=1.0, release=4.0s (long drone)
+        val attack = 0.005 + (eased * (3.0 - 0.005))
+        val decay = 0.05 + (eased * (3.0 - 0.05))  // Increased for more linger
+        val sustain = 0.8 + (eased * 0.2) // 0.8 → 1.0 (full sustain at slow)
+        val release = 0.1 + (eased * (4.0 - 0.1))  // Longer release for drone
+        
+        ampEnv.setAttack(attack)
+        ampEnv.setDecay(decay)
+        ampEnv.setSustain(sustain)
+        ampEnv.setRelease(release)
     }
 }

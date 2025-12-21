@@ -9,7 +9,7 @@ interface SongeEngine {
     fun setVoiceGate(index: Int, active: Boolean)
     fun setVoiceFeedback(index: Int, amount: Float)
     fun setVoiceFmDepth(index: Int, amount: Float) // FM modulation from pair
-    fun setVoiceEnvelopeMode(index: Int, isFast: Boolean) // true=Fast, false=Slow
+    fun setVoiceEnvelopeSpeed(index: Int, speed: Float) // 0=Fast, 1=Slow (continuous)
     fun setPairSharpness(pairIndex: Int, sharpness: Float) // Waveform (0=tri, 1=sq) per pair
     
 

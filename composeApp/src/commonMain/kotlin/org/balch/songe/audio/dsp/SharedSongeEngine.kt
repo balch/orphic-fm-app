@@ -214,7 +214,7 @@ class SharedSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setDrive(amount: Float) {
-        val driveVal = 1.0 + (amount * 49.0)
+        val driveVal = 1.0 + (amount * 14.0) // Reduced from 49 for warmer saturation
         limiter.drive.set(driveVal)
     }
 
@@ -332,8 +332,8 @@ class SharedSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         voices[index].fmDepth.set(amount.toDouble())
     }
 
-    override fun setVoiceEnvelopeMode(index: Int, isFast: Boolean) {
-        voices[index].setEnvelopeMode(isFast)
+    override fun setVoiceEnvelopeSpeed(index: Int, speed: Float) {
+        voices[index].setEnvelopeSpeed(speed)
     }
 
     override fun setPairSharpness(pairIndex: Int, sharpness: Float) {

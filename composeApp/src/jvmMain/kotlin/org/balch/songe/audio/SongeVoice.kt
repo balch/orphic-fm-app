@@ -95,8 +95,8 @@ class SongeVoice(
         triangleOsc.amplitude.set(0.3)
         squareOsc.amplitude.set(0.3)
         
-        // Default Envelope Settings (Slow/Drone)
-        setEnvelopeMode(isFast = false)
+        // Default Envelope Settings (Fast/Percussive)
+        setEnvelopeSpeed(0.0f)
 
         // Pitch Scaling
         pitchScaler.inputB.set(pitchMultiplier)
@@ -202,20 +202,17 @@ class SongeVoice(
     val holdLevelPort: UnitInputPort
         get() = (getPortByName("holdLevel") as UnitInputPort)
     
-    fun setEnvelopeMode(isFast: Boolean) {
-        if (isFast) {
-            // Fast: Percussive, quick attack/release
-            ampEnv.attack.set(0.005)
-            ampEnv.decay.set(0.05)
-            ampEnv.sustain.set(0.8)
-            ampEnv.release.set(0.1)
-        } else {
-            // Slow: Drone, slow swell
-            ampEnv.attack.set(1.5)
-            ampEnv.decay.set(0.8)
-            ampEnv.sustain.set(1.0)
-            ampEnv.release.set(1.2)
-        }
+    fun setEnvelopeSpeed(speed: Float) {
+        // Ease-in curve (quadratic) for more musical feel
+        val eased = speed * speed
+        
+        // Interpolate between Fast (0) and Slow (1)
+        // Fast: attack=0.005s, decay=0.05s, sustain=0.8, release=0.1s
+        // Slow: attack=3.0s, decay=3.0s, sustain=1.0, release=4.0s (long drone)
+        ampEnv.attack.set(0.005 + (eased * (3.0 - 0.005)))
+        ampEnv.decay.set(0.05 + (eased * (3.0 - 0.05)))  // Increased for more linger
+        ampEnv.sustain.set(0.8 + (eased * 0.2))
+        ampEnv.release.set(0.1 + (eased * (4.0 - 0.1)))  // Longer release for drone
     }
     
     val outputPort: UnitOutputPort = vca.output
