@@ -46,6 +46,10 @@ class SharedVoice(
     // VCA control (envelope + hold)
     private val vcaControlMixer = audioEngine.createAdd()
     
+    // State for Hold-Envelope interaction
+    private var currentEnvelopeSpeed = 0f
+    private var rawHoldLevel = 0.0
+    
     // Exposed ports for external wiring
     val frequency: AudioInput get() = pitchScaler.inputA           // Base frequency
     val gate: AudioInput get() = ampEnv.input                      // Gate trigger
@@ -169,6 +173,7 @@ class SharedVoice(
     }
     
     fun setEnvelopeSpeed(speed: Float) {
+        currentEnvelopeSpeed = speed
         // Ease-in curve (quadratic) for more musical feel
         // Lower values give finer fast control, higher values expand to drone
         val eased = speed * speed
@@ -185,5 +190,26 @@ class SharedVoice(
         ampEnv.setDecay(decay)
         ampEnv.setSustain(sustain)
         ampEnv.setRelease(release)
+        
+        // Re-apply hold with new speed scaling
+        applyScaledHold()
+    }
+    
+    /**
+     * Set hold level with speed-based scaling.
+     * Like Lyra-8: slow envelopes make Hold more effective (lower threshold to drone).
+     */
+    fun setHoldLevel(level: Double) {
+        rawHoldLevel = level
+        applyScaledHold()
+    }
+    
+    private fun applyScaledHold() {
+        // Scale factor: slow mode (speed=1) → 2x, fast mode (speed=0) → 0.5x
+        // This means in slow mode, a low Hold value still creates a drone
+        // In fast mode, you need higher Hold to sustain
+        val scaleFactor = 0.5 + (currentEnvelopeSpeed * 1.5) // 0.5 → 2.0
+        val scaledHold = (rawHoldLevel * scaleFactor).coerceAtMost(1.0)
+        vcaControlMixer.inputB.set(scaledHold)
     }
 }

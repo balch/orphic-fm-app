@@ -9,7 +9,7 @@ import org.balch.songe.util.Logger
  * Shared implementation of SongeEngine using DSP primitive interfaces.
  * All audio routing logic is platform-independent.
  */
-class SharedSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
+class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
@@ -354,7 +354,7 @@ class SharedSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     override fun setQuadHold(quadIndex: Int, amount: Float) {
         val startVoice = quadIndex * 4
         for (i in startVoice until startVoice + 4) {
-            voices[i].holdLevel.set(amount.toDouble())
+            voices[i].setHoldLevel(amount.toDouble())
         }
     }
 

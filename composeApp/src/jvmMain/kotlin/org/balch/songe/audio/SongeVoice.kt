@@ -51,6 +51,13 @@ class SongeVoice(
     private val vibratoScaler = Multiply() // LFO * depth
     private val vibratoMixer = Add()       // Base freq + vibrato
     
+    // VCA control (envelope + hold)
+    private val vcaControlMixer = Add()
+    
+    // State for Hold-Envelope interaction
+    private var currentEnvelopeSpeed = 0f
+    private var rawHoldLevel = 0.0
+    
     // Ports accessible to outside
     val frequency: UnitInputPort = pitchScaler.inputA // Base frequency (before pitch mult)
     val gate: UnitInputPort = ampEnv.input
@@ -162,14 +169,11 @@ class SongeVoice(
         
         // Default coupling depth = 0 (no partner influence)
         couplingDepth.set(0.0)
-
         // Wire: Mixed Oscillator -> VCA inputA
         oscMixer.output.connect(vca.inputA)
         
         // VCA inputB = Envelope + HoldLevel
         // Note: HoldLevel is essentially "Min Volume"
-        // We use an Add unit to sum envelope output and hold level
-        val vcaControlMixer = Add()
         add(vcaControlMixer)
         
         ampEnv.output.connect(vcaControlMixer.inputA)
@@ -203,6 +207,7 @@ class SongeVoice(
         get() = (getPortByName("holdLevel") as UnitInputPort)
     
     fun setEnvelopeSpeed(speed: Float) {
+        currentEnvelopeSpeed = speed
         // Ease-in curve (quadratic) for more musical feel
         val eased = speed * speed
         
@@ -213,8 +218,26 @@ class SongeVoice(
         ampEnv.decay.set(0.05 + (eased * (3.0 - 0.05)))  // Increased for more linger
         ampEnv.sustain.set(0.8 + (eased * 0.2))
         ampEnv.release.set(0.1 + (eased * (4.0 - 0.1)))  // Longer release for drone
+        
+        // Re-apply hold with new speed scaling
+        applyScaledHold()
+    }
+    
+    /**
+     * Set hold level with speed-based scaling.
+     * Like Lyra-8: slow envelopes make Hold more effective (lower threshold to drone).
+     */
+    fun setHoldLevel(level: Double) {
+        rawHoldLevel = level
+        applyScaledHold()
+    }
+    
+    private fun applyScaledHold() {
+        // Scale factor: slow mode (speed=1) -> 2x, fast mode (speed=0) -> 0.5x
+        val scaleFactor = 0.5 + (currentEnvelopeSpeed * 1.5) // 0.5 -> 2.0
+        val scaledHold = (rawHoldLevel * scaleFactor).coerceAtMost(1.0)
+        vcaControlMixer.inputB.set(scaledHold)
     }
     
     val outputPort: UnitOutputPort = vca.output
 }
-

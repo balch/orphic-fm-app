@@ -1,10 +1,10 @@
 package org.balch.songe.audio
 
 import org.balch.songe.audio.dsp.AudioEngine
-import org.balch.songe.audio.dsp.SharedSongeEngine
+import org.balch.songe.audio.dsp.DspSongeEngine
 
 /**
  * JVM implementation of SongeEngine.
- * Delegates to SharedSongeEngine using the JVM AudioEngine (JSyn).
+ * Delegates to DspSongeEngine using the JVM AudioEngine (JSyn).
  */
-class JvmSongeEngine : SongeEngine by SharedSongeEngine(AudioEngine())
+class JvmSongeEngine : SongeEngine by DspSongeEngine(AudioEngine())
