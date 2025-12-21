@@ -127,24 +127,7 @@ fun HyperLfoPanel(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RotaryKnob(
-                value = lfo1Rate,
-                onValueChange = onLfo1RateChange,
-                label = "FREQ A",
-                controlId = ControlIds.HYPER_LFO_A,
-                size = 48.dp,
-                progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
-            )
-            RotaryKnob(
-                value = lfo2Rate,
-                onValueChange = onLfo2RateChange,
-                label = "FREQ B",
-                controlId = ControlIds.HYPER_LFO_B,
-                size = 48.dp,
-                progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
-            )
-
-            // 3-way AND/OFF/OR Switch
+            // 3-way AND/OFF/OR Switch (Left)
             Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_MODE, learnState)) {
                 Vertical3WaySwitch(
                     topLabel = "AND",
@@ -166,8 +149,26 @@ fun HyperLfoPanel(
                     enabled = !learnState.isActive
                 )
             }
-            
-            // LINK Vertical Switch - padded Box for better touch target
+
+            // Knobs (Middle)
+            RotaryKnob(
+                value = lfo1Rate,
+                onValueChange = onLfo1RateChange,
+                label = "FREQ A",
+                controlId = ControlIds.HYPER_LFO_A,
+                size = 48.dp,
+                progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
+            )
+            RotaryKnob(
+                value = lfo2Rate,
+                onValueChange = onLfo2RateChange,
+                label = "FREQ B",
+                controlId = ControlIds.HYPER_LFO_B,
+                size = 48.dp,
+                progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
+            )
+
+            // LINK Vertical Switch (Right) - padded Box for better touch target
             Box(
                 modifier = Modifier
                     .learnable(ControlIds.HYPER_LFO_LINK, learnState)
@@ -182,7 +183,6 @@ fun HyperLfoPanel(
                     enabled = !learnState.isActive
                 )
             }
-
         }
         
         Spacer(modifier = Modifier.weight(1f))
@@ -299,9 +299,9 @@ private fun Vertical3WaySwitch(
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF1A1A2A))
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .padding(horizontal = 6.dp, vertical = 6.dp), // Increased vertical padding
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.spacedBy(3.dp) // Little more space
     ) {
         // Top label (AND)
         Text(
@@ -317,7 +317,7 @@ private fun Vertical3WaySwitch(
         Box(
             modifier = Modifier
                 .width(12.dp)
-                .height(44.dp)
+                .height(56.dp) // Increased to match VerticalToggle height
                 .clip(RoundedCornerShape(6.dp))
                 .background(color.copy(alpha = 0.2f))
                 .pointerInput(enabled) {

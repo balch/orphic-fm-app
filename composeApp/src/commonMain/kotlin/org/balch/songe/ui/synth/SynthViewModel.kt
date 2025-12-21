@@ -19,6 +19,7 @@ import org.balch.songe.input.MidiMappingState
 import org.balch.songe.input.MidiMappingState.Companion.ControlIds
 import org.balch.songe.input.createMidiAccess
 import org.balch.songe.util.Logger
+import kotlin.math.roundToInt
 
 class SynthViewModel(
     private val engine: SongeEngine,
@@ -126,6 +127,7 @@ class SynthViewModel(
     
     // Track last CC values for button toggle detection (controlId -> lastValue)
     private val lastCcValues = mutableMapOf<String, Float>()
+    private val lastRawCcValues = mutableMapOf<String, Float>()
     
     // MIDI Event Listener
     private val midiEventListener = object : MidiEventListener {
@@ -253,17 +255,44 @@ class SynthViewModel(
     }
     
     private fun applyCCToControl(controlId: String, value: Float) {
-        // Button toggle detection: if value is high (>=0.9) and last value was also high,
-        // interpret as a button press and toggle between 0 and 1
-        val lastValue = lastCcValues[controlId] ?: 0f
-        val effectiveValue = if (value >= 0.9f && lastValue >= 0.9f) {
-            // Repeated high value = button press -> toggle
-            if (lastValue > 0.5f) 0f else 1f
-        } else {
-            value
-        }
-        lastCcValues[controlId] = effectiveValue
+        val lastRaw = lastRawCcValues[controlId] ?: 0f
         
+        // Identify control type for logic
+        val isCycleControl = controlId == ControlIds.HYPER_LFO_MODE || 
+                             (controlId.startsWith("pair_") && controlId.endsWith("_mod_source"))
+
+        var effectiveValue = value
+
+        if (!isCycleControl) {
+            // Apply "Jump Toggle" logic for continuous/binary controls
+            // Check for Jump (Button Press/Release)
+            // Thresholds: High >= 0.9, Low < 0.1. Jump if crossing 0.5 boundary significantly.
+            val isJumpUp = value >= 0.9f && lastRaw < 0.5f
+            val isJumpDown = value < 0.1f && lastRaw > 0.5f
+            
+            // Get last EFFECTIVE value to toggle it
+            val lastEffective = lastCcValues[controlId] ?: 0f
+
+            if (isJumpUp) {
+                // Button Press: Toggle state
+                effectiveValue = if (lastEffective > 0.5f) 0f else 1f
+            } else if (isJumpDown) {
+                // Button Release: Ignore (Latch)
+                effectiveValue = lastEffective 
+            } else {
+                // Continuous change (Knob/Slider) or slow button fade
+                // Check if delta suggests continuous move
+                // If it is NOT a Jump Up/Down, pass through.
+                effectiveValue = value
+            }
+        } else {
+            // Cycle controls: Pass RAW value. 
+            // Handler manages logic using lastRawCcValues (accessible before update).
+            effectiveValue = value
+        }
+        
+        // Dispatch to handlers
+        // Handler logic for Cycle controls will read 'lastRawCcValues' (which is still 'lastRaw').
         when (controlId) {
             // Voice tunes
             ControlIds.voiceTune(0) -> onVoiceTuneChange(0, effectiveValue)
@@ -321,13 +350,22 @@ class SynthViewModel(
             
             // New Mappings
             ControlIds.HYPER_LFO_MODE -> {
-                // Map 0-1 to 3 states (AND, OFF, OR)
-                val mode = when {
-                    effectiveValue < 0.33f -> org.balch.songe.ui.panels.HyperLfoMode.AND
-                    effectiveValue < 0.66f -> org.balch.songe.ui.panels.HyperLfoMode.OFF
-                    else -> org.balch.songe.ui.panels.HyperLfoMode.OR
+                // 3-way switch: AND/OFF/OR
+                // If button press detected (jump from low to high), cycle to next mode
+                // Use RAW history for jump detection
+                val lastRawForMode = lastRawCcValues[ControlIds.HYPER_LFO_MODE] ?: 0f
+                if (effectiveValue >= 0.9f && lastRawForMode < 0.5f) {
+                    // Button Pulse: Cycle
+                    val currentMode = hyperLfoMode
+                    val modes = org.balch.songe.ui.panels.HyperLfoMode.values()
+                    val nextIndex = (currentMode.ordinal + 1) % modes.size
+                    onHyperLfoModeChange(modes[nextIndex])
+                } else {
+                   // Standard Knob mapping (if not a jump, or continuous change)
+                   val modes = org.balch.songe.ui.panels.HyperLfoMode.values()
+                   val index = (effectiveValue * (modes.size - 1)).roundToInt()
+                   onHyperLfoModeChange(modes[index])
                 }
-                onHyperLfoModeChange(mode)
             }
             ControlIds.HYPER_LFO_LINK -> onHyperLfoLinkChange(effectiveValue >= 0.5f)
             
@@ -362,15 +400,30 @@ class SynthViewModel(
                     }
                     controlId.startsWith("pair_") && controlId.endsWith("_mod_source") -> {
                         val index = controlId.removePrefix("pair_").removeSuffix("_mod_source").toIntOrNull()
-                         if (index != null) {
-                             // Map 0-1 to 3 ModSource states (LFO, OFF, FM)
-                             val source = when {
-                                 effectiveValue < 0.33f -> org.balch.songe.audio.ModSource.LFO
-                                 effectiveValue < 0.66f -> org.balch.songe.audio.ModSource.OFF
-                                 else -> org.balch.songe.audio.ModSource.VOICE_FM
-                             }
-                             onDuoModSourceChange(index, source)
-                         }
+                        if (index != null) {
+                            // Use RAW history for jump detection
+                            val lastRaw = lastRawCcValues[controlId] ?: 0f
+                            // Jump detection for Button Cycle (0 -> >=0.9)
+                            if (effectiveValue >= 0.9f && lastRaw < 0.5f) {
+                                // Cycle
+                                val current = duoModSources[index] // from ViewModel state
+                                val sources = org.balch.songe.audio.ModSource.values()
+                                val nextIndex = (current.ordinal + 1) % sources.size
+                                onDuoModSourceChange(index, sources[nextIndex])
+                            } else if (effectiveValue != lastRaw) {
+                                // Map (only if not a jump, effectively knob turn)
+                                if (!(effectiveValue >= 0.9f && lastRaw < 0.5f)) {
+                                    val sources = org.balch.songe.audio.ModSource.values()
+                                    // Order in UI seems to be: LFO (Top?), OFF (Middle?), FM (Bottom?)
+                                    // But logic was: <0.33 LFO, <0.66 OFF, else FM.
+                                    // Enum order is likely LFO, OFF, VOICE_FM (based on mapping).
+                                    // If we use values()[index], index 0=LFO?
+                                    // I'll assume standard order matches the range mapping.
+                                    val srcIndex = (effectiveValue * (sources.size - 1)).roundToInt()
+                                    onDuoModSourceChange(index, sources[srcIndex])
+                                }
+                            }
+                        }
                     }
                     else -> Logger.warn { "Unknown control ID for CC mapping: $controlId" }
                 }
