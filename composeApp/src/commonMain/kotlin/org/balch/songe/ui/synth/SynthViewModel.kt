@@ -5,6 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.songe.audio.SongeEngine
 import org.balch.songe.audio.VoiceState
@@ -14,11 +17,12 @@ import org.balch.songe.input.MidiEventListener
 import org.balch.songe.input.MidiMappingRepository
 import org.balch.songe.input.MidiMappingState
 import org.balch.songe.input.MidiMappingState.Companion.ControlIds
+import org.balch.songe.input.createMidiAccess
 import org.balch.songe.util.Logger
 
 class SynthViewModel(
     private val engine: SongeEngine,
-    val midiController: MidiController = MidiController(),
+    val midiController: MidiController = MidiController { createMidiAccess() },
     private val midiRepository: MidiMappingRepository = MidiMappingRepository()
 ) : ViewModel() {
 
@@ -107,6 +111,18 @@ class SynthViewModel(
     
     // Backup state for cancellation
     private var mappingBeforeLearn: MidiMappingState? = null
+    
+    // MIDI polling job
+    private var midiPollingJob: Job? = null
+    
+    // Last known device name for reconnection
+    private var lastDeviceName: String? = null
+    
+    // Observable MIDI connection state for UI updates
+    var isMidiConnected by mutableStateOf(false)
+        private set
+    var connectedMidiDeviceName by mutableStateOf<String?>(null)
+        private set
     
     // MIDI Event Listener
     private val midiEventListener = object : MidiEventListener {
@@ -292,13 +308,30 @@ class SynthViewModel(
     }
     
     fun initMidi() {
+        tryConnectMidi()
+        startMidiPolling()
+    }
+    
+    private fun tryConnectMidi(): Boolean {
         val devices = midiController.getAvailableDevices()
         if (devices.isNotEmpty()) {
             Logger.info { "Available MIDI devices: $devices" }
-            // Auto-connect to first device, then start listening
-            val deviceName = devices.first()
+            
+            // Prefer last known device if available, otherwise use first device
+            val deviceName = if (lastDeviceName != null && devices.contains(lastDeviceName)) {
+                lastDeviceName!!
+            } else {
+                devices.first()
+            }
+            
             if (midiController.openDevice(deviceName)) {
                 midiController.start(midiEventListener)
+                lastDeviceName = deviceName
+                
+                // Update observable state for UI
+                isMidiConnected = true
+                connectedMidiDeviceName = deviceName
+                
                 Logger.info { "MIDI initialized and listening on: $deviceName" }
                 
                 // Load saved mappings for this device
@@ -308,15 +341,53 @@ class SynthViewModel(
                         Logger.info { "Loaded saved MIDI mappings for $deviceName" }
                     }
                 }
+                return true
             }
         } else {
             Logger.info { "No MIDI devices found" }
         }
+        return false
+    }
+    
+    private fun startMidiPolling() {
+        midiPollingJob?.cancel()
+        midiPollingJob = viewModelScope.launch {
+            while (isActive) {
+                delay(2000) // Check every 2 seconds
+                
+                val wasOpen = midiController.isOpen
+                val stillAvailable = midiController.isCurrentDeviceAvailable()
+                
+                if (wasOpen && !stillAvailable) {
+                    // Device was disconnected
+                    val name = midiController.currentDeviceName
+                    Logger.info { "MIDI device disconnected: $name" }
+                    midiController.closeDevice()
+                    
+                    // Update observable state for UI
+                    isMidiConnected = false
+                    connectedMidiDeviceName = null
+                } else if (!wasOpen) {
+                    // Try to reconnect
+                    val devices = midiController.getAvailableDevices()
+                    if (devices.isNotEmpty()) {
+                        Logger.info { "MIDI device(s) available, attempting to connect..." }
+                        tryConnectMidi()
+                    }
+                }
+            }
+        }
     }
     
     fun stopMidi() {
+        midiPollingJob?.cancel()
+        midiPollingJob = null
         midiController.stop()
         midiController.closeDevice()
+        
+        // Update observable state
+        isMidiConnected = false
+        connectedMidiDeviceName = null
     }
 
     fun onVoiceTuneChange(index: Int, newTune: Float) {

@@ -41,8 +41,7 @@ kotlin {
             implementation(libs.kmlogging)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
-            
-
+            implementation(libs.ktmidi)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -50,6 +49,7 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+            implementation(libs.ktmidi.jvm.desktop)
             implementation(libs.coremidi4j)
         }
     }

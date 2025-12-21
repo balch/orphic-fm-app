@@ -34,7 +34,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
@@ -46,8 +45,11 @@ import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import org.balch.songe.audio.SongeEngine
 import org.balch.songe.input.KeyboardInputHandler
+import org.balch.songe.input.LearnTarget
+import org.balch.songe.input.MidiMappingState.Companion.ControlIds
 import org.balch.songe.ui.components.HorizontalSwitch3Way
 import org.balch.songe.ui.components.HorizontalToggle
+import org.balch.songe.ui.components.LearnModeProvider
 import org.balch.songe.ui.components.PulseButton
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.components.VerticalToggle
@@ -82,6 +84,15 @@ fun SongeSynthScreen(
         focusRequester.requestFocus()
     }
 
+    // Get the selected control ID for learn mode
+    val selectedControlId = (viewModel.midiMappingState.learnTarget as? LearnTarget.Control)?.controlId
+    
+    // Wrap everything in LearnModeProvider to make learn state available to all controls
+    LearnModeProvider(
+        isActive = viewModel.isLearnModeActive,
+        selectedControlId = selectedControlId,
+        onSelectControl = { controlId -> viewModel.selectControlForLearning(controlId) }
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -144,8 +155,8 @@ fun SongeSynthScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SettingsPanel(
-                midiDeviceName = viewModel.midiController.currentDeviceName,
-                isMidiOpen = viewModel.midiController.isOpen,
+                midiDeviceName = viewModel.connectedMidiDeviceName,
+                isMidiOpen = viewModel.isMidiConnected,
                 isLearnModeActive = viewModel.isLearnModeActive,
                 onMidiClick = { /* Could open MIDI device selector */ },
                 onLearnToggle = { viewModel.toggleLearnMode() },
@@ -232,21 +243,24 @@ fun SongeSynthScreen(
                 RotaryKnob(
                     value = viewModel.totalFeedback, 
                     onValueChange = { viewModel.onTotalFeedbackChange(it) }, 
-                    label = "TOTAL FB", 
+                    label = "TOTAL FB",
+                    controlId = ControlIds.TOTAL_FEEDBACK,
                     size = 32.dp, 
                     progressColor = SongeColors.neonCyan
                 )
                 RotaryKnob(
                     value = viewModel.vibrato, 
                     onValueChange = { viewModel.onVibratoChange(it) }, 
-                    label = "VIB", 
+                    label = "VIB",
+                    controlId = ControlIds.VIBRATO,
                     size = 32.dp, 
                     progressColor = SongeColors.neonMagenta
                 )
                 RotaryKnob(
                     value = viewModel.voiceCoupling, 
                     onValueChange = { viewModel.onVoiceCouplingChange(it) }, 
-                    label = "COUPLE", 
+                    label = "COUPLE",
+                    controlId = ControlIds.VOICE_COUPLING,
                     size = 32.dp, 
                     progressColor = SongeColors.warmGlow
                 )
@@ -262,6 +276,7 @@ fun SongeSynthScreen(
             )
         }
     }
+    } // LearnModeProvider
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -306,14 +321,16 @@ private fun VoiceGroupSection(
             RotaryKnob(
                 value = viewModel.quadGroupPitches[quadIndex], 
                 onValueChange = { viewModel.onQuadPitchChange(quadIndex, it) }, 
-                label = "PITCH", 
+                label = "PITCH",
+                controlId = ControlIds.quadPitch(quadIndex),
                 size = 28.dp, 
                 progressColor = quadColor
             )
             RotaryKnob(
                 value = viewModel.quadGroupHolds[quadIndex], 
                 onValueChange = { viewModel.onQuadHoldChange(quadIndex, it) }, 
-                label = "HOLD", 
+                label = "HOLD",
+                controlId = ControlIds.quadHold(quadIndex),
                 size = 28.dp, 
                 progressColor = SongeColors.warmGlow
             )
@@ -399,6 +416,8 @@ private fun DuoPairBox(
                 // Knobs
                 VoiceColumnMod(
                     num = voiceA + 1,
+                    voiceIndex = voiceA,
+                    pairIndex = pairIndex,
                     tune = viewModel.voiceStates[voiceA].tune,
                     onTuneChange = { viewModel.onVoiceTuneChange(voiceA, it) },
                     modDepth = viewModel.voiceModDepths[voiceA],
@@ -436,6 +455,8 @@ private fun DuoPairBox(
                 // Knobs
                 VoiceColumnSharp(
                     num = voiceB + 1,
+                    voiceIndex = voiceB,
+                    pairIndex = pairIndex,
                     tune = viewModel.voiceStates[voiceB].tune,
                     onTuneChange = { viewModel.onVoiceTuneChange(voiceB, it) },
                     sharpness = viewModel.pairSharpness[pairIndex],
@@ -475,6 +496,8 @@ private fun DuoPairBox(
 @Composable
 private fun VoiceColumnMod(
     num: Int,
+    voiceIndex: Int,
+    pairIndex: Int,
     tune: Float,
     onTuneChange: (Float) -> Unit,
     modDepth: Float,
@@ -491,8 +514,8 @@ private fun VoiceColumnMod(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text("$num", fontSize = 8.sp, color = SongeColors.electricBlue.copy(alpha = 0.6f))
-        RotaryKnob(value = modDepth, onValueChange = onModDepthChange, label = "MOD", size = 24.dp, progressColor = SongeColors.neonMagenta)
-        RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", size = 28.dp, progressColor = SongeColors.neonCyan)
+        RotaryKnob(value = modDepth, onValueChange = onModDepthChange, label = "MOD", controlId = ControlIds.voiceFmDepth(voiceIndex), size = 24.dp, progressColor = SongeColors.neonMagenta)
+        RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", controlId = ControlIds.voiceTune(voiceIndex), size = 28.dp, progressColor = SongeColors.neonCyan)
         // Envelope Toggle
         HorizontalToggle(
             leftLabel = "F",
@@ -507,6 +530,8 @@ private fun VoiceColumnMod(
 @Composable
 private fun VoiceColumnSharp(
     num: Int,
+    voiceIndex: Int,
+    pairIndex: Int,
     tune: Float,
     onTuneChange: (Float) -> Unit,
     sharpness: Float,
@@ -523,8 +548,8 @@ private fun VoiceColumnSharp(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text("$num", fontSize = 8.sp, color = SongeColors.electricBlue.copy(alpha = 0.6f))
-        RotaryKnob(value = sharpness, onValueChange = onSharpnessChange, label = "SHARP", size = 24.dp, progressColor = SongeColors.synthGreen)
-        RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", size = 28.dp, progressColor = SongeColors.neonCyan)
+        RotaryKnob(value = sharpness, onValueChange = onSharpnessChange, label = "SHARP", controlId = ControlIds.pairSharpness(pairIndex), size = 24.dp, progressColor = SongeColors.synthGreen)
+        RotaryKnob(value = tune, onValueChange = onTuneChange, label = "TUNE", controlId = ControlIds.voiceTune(voiceIndex), size = 28.dp, progressColor = SongeColors.neonCyan)
         // Envelope Toggle
         HorizontalToggle(
             leftLabel = "F",
@@ -624,14 +649,14 @@ private fun ModDelaySection(
 
             // Column 1: MOD 1 / TIME 1
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                RotaryKnob(value = mod1, onValueChange = onMod1Change, label = "MOD 1", size = 36.dp, progressColor = SongeColors.warmGlow)
-                RotaryKnob(value = time1, onValueChange = onTime1Change, label = "TIME 1", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = mod1, onValueChange = onMod1Change, label = "MOD 1", controlId = ControlIds.DELAY_MOD_1, size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = time1, onValueChange = onTime1Change, label = "TIME 1", controlId = ControlIds.DELAY_TIME_1, size = 36.dp, progressColor = SongeColors.warmGlow)
             }
             
             // Column 2: MOD 2 / TIME 2
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                RotaryKnob(value = mod2, onValueChange = onMod2Change, label = "MOD 2", size = 36.dp, progressColor = SongeColors.warmGlow)
-                RotaryKnob(value = time2, onValueChange = onTime2Change, label = "TIME 2", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = mod2, onValueChange = onMod2Change, label = "MOD 2", controlId = ControlIds.DELAY_MOD_2, size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = time2, onValueChange = onTime2Change, label = "TIME 2", controlId = ControlIds.DELAY_TIME_2, size = 36.dp, progressColor = SongeColors.warmGlow)
             }
             
             // Column 3: FB
@@ -646,10 +671,10 @@ private fun ModDelaySection(
                     onToggle = { isTop -> onSourceChange(!isTop) }, // isTop=true means SELF, so LFO=false
                     color = SongeColors.warmGlow
                 )
-                RotaryKnob(value = feedback, onValueChange = onFeedbackChange, label = "FB", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = feedback, onValueChange = onFeedbackChange, label = "FB", controlId = ControlIds.DELAY_FEEDBACK, size = 36.dp, progressColor = SongeColors.warmGlow)
             }
             
-            // Column 6: MIX
+            // Column 4: MIX
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 VerticalToggle(
                     topLabel = "TRI",
@@ -658,7 +683,7 @@ private fun ModDelaySection(
                     onToggle = { isTop -> onWaveformChange(isTop) },
                     color = SongeColors.warmGlow,
                 )
-                RotaryKnob(value = mix, onValueChange = onMixChange, label = "MIX", size = 36.dp, progressColor = SongeColors.warmGlow)
+                RotaryKnob(value = mix, onValueChange = onMixChange, label = "MIX", controlId = ControlIds.DELAY_MIX, size = 36.dp, progressColor = SongeColors.warmGlow)
             }
         }
     }
@@ -717,6 +742,7 @@ private fun DistortionSection(
                 value = drive,
                 onValueChange = onDriveChange,
                 label = "DRIVE",
+                controlId = ControlIds.DRIVE,
                 size = 42.dp,
                 progressColor = SongeColors.neonMagenta
             )
@@ -724,6 +750,7 @@ private fun DistortionSection(
                 value = volume,
                 onValueChange = onVolumeChange,
                 label = "VOLUME",
+                controlId = ControlIds.MASTER_VOLUME,
                 size = 42.dp,
                 progressColor = SongeColors.electricBlue
             )
@@ -736,6 +763,7 @@ private fun DistortionSection(
                 value = mix,
                 onValueChange = onMixChange,
                 label = "MIX",
+                controlId = ControlIds.DISTORTION_MIX,
                 size = 42.dp,
                 progressColor = SongeColors.warmGlow
             )

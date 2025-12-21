@@ -15,9 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -167,33 +165,54 @@ private fun MidiSettingSection(
     ) {
         // Device info row
         Row(
-            modifier = Modifier.clickable(onClick = onMidiClick),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onMidiClick),
+            verticalAlignment = Alignment.Top
         ) {
-            // Status indicator
-            Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .background(
-                        if (isOpen) SongeColors.synthGreen else Color.Gray,
-                        CircleShape
-                    )
-            )
-            
-            Column(modifier = Modifier.weight(1f)) {
+            Column {
                 Text(
                     "MIDI",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Text(
-                    deviceName?.take(12) ?: "No Device",
-                    fontSize = 7.sp,
-                    color = Color.White.copy(alpha = 0.5f),
-                    maxLines = 1
-                )
+                
+                // Extract friendly device name (e.g., "S-1" from "CoreMIDI4J - S-1")
+                val friendlyName = deviceName?.let { name ->
+                    if (name.contains(" - ")) {
+                        name.substringAfter(" - ")
+                    } else {
+                        name.take(15)
+                    }
+                }
+                
+                if (isOpen && friendlyName != null) {
+                    // Connected state: "S-1: Connected" in green
+                    Text(
+                        "$friendlyName: Connected",
+                        fontSize = 7.sp,
+                        color = SongeColors.synthGreen,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
+                    )
+                } else if (friendlyName != null) {
+                    // Known device but not connected
+                    Text(
+                        "$friendlyName: Not Connected",
+                        fontSize = 7.sp,
+                        color = Color.Red.copy(alpha = 0.7f),
+                        maxLines = 1
+                    )
+                } else {
+                    // No device known
+                    Text(
+                        "Not Connected",
+                        fontSize = 7.sp,
+                        color = Color.White.copy(alpha = 0.5f),
+                        maxLines = 1
+                    )
+                }
             }
         }
         

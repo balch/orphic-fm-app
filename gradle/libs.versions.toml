@@ -22,6 +22,7 @@ haze = "1.7.1"
 jsyn = "v17.2.0"
 kmlogging = "2.1.0"
 metro = "0.9.1"
+ktmidi = "0.11.2"
 coremidi4j = "1.6"
 navigation3 = "1.0.0"
 adaptiveNavigation3 = "1.0.0-alpha03"
@@ -32,6 +33,8 @@ haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 haze-materials = { module = "dev.chrisbanes.haze:haze-materials", version.ref = "haze" }
 jsyn = { module = "com.github.philburk:jsyn", version.ref = "jsyn" }
 kmlogging = { module = "com.diamondedge:logging", version.ref = "kmlogging" }
+ktmidi = { module = "dev.atsushieno:ktmidi", version.ref = "ktmidi" }
+ktmidi-jvm-desktop = { module = "dev.atsushieno:ktmidi-jvm-desktop", version.ref = "ktmidi" }
 coremidi4j = { module = "uk.co.xfactory-librarians:coremidi4j", version.ref = "coremidi4j" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }

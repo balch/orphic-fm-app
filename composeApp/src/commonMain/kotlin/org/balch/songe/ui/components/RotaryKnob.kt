@@ -5,10 +5,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,16 +23,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.balch.songe.ui.theme.SongeColors
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import kotlin.math.PI
-import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -49,6 +43,8 @@ fun RotaryKnobPreview() {
 /**
  * A synth-style rotary knob control.
  * Supports vertical drag interaction for precision.
+ * 
+ * @param controlId Optional ID for MIDI learn mode. If provided, this knob can be selected for CC mapping.
  */
 @Composable
 fun RotaryKnob(
@@ -56,6 +52,7 @@ fun RotaryKnob(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
     label: String? = null,
+    controlId: String? = null,
     range: ClosedFloatingPointRange<Float> = 0f..1f,
     size: Dp = 64.dp,
     trackColor: Color = SongeColors.deepPurple,
@@ -66,10 +63,19 @@ fun RotaryKnob(
     // Sensitivity for drag (pixels per full range)
     val sensitivity = 200f
     
-
+    // Get learn mode state from composition local
+    val learnState = LocalLearnModeState.current
+    val isLearning = controlId != null && learnState.isLearning(controlId)
 
     Column(
-        modifier = modifier,
+        modifier = modifier
+            .then(
+                if (controlId != null && learnState.isActive) {
+                    Modifier.learnable(controlId, learnState)
+                } else {
+                    Modifier
+                }
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Track current value internally for smooth updates, syncing with external value when it changes
