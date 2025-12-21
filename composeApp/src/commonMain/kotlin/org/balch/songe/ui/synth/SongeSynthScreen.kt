@@ -51,7 +51,6 @@ import org.balch.songe.ui.components.HorizontalToggle
 import org.balch.songe.ui.components.PulseButton
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.components.VerticalToggle
-import org.balch.songe.ui.dialogs.MidiMappingDialog
 import org.balch.songe.ui.panels.HyperLfoPanel
 import org.balch.songe.ui.panels.SettingsPanel
 import org.balch.songe.ui.preview.PreviewSongeEngine
@@ -76,15 +75,6 @@ fun SongeSynthScreen(
             viewModel.stopMidi()
             viewModel.stopAudio()
         }
-    }
-    
-    // Show MIDI mapping dialog if requested
-    if (viewModel.showMidiMappingDialog) {
-        MidiMappingDialog(
-            mappingState = viewModel.midiMappingState,
-            onMappingChange = { viewModel.updateMidiMapping(it) },
-            onDismiss = { viewModel.showMidiMappingDialog = false }
-        )
     }
     
     // Request focus on launch to capture keyboard events
@@ -156,7 +146,11 @@ fun SongeSynthScreen(
             SettingsPanel(
                 midiDeviceName = viewModel.midiController.currentDeviceName,
                 isMidiOpen = viewModel.midiController.isOpen,
-                onMidiClick = { viewModel.showMidiMappingDialog = true },
+                isLearnModeActive = viewModel.isLearnModeActive,
+                onMidiClick = { /* Could open MIDI device selector */ },
+                onLearnToggle = { viewModel.toggleLearnMode() },
+                onLearnSave = { viewModel.saveLearnedMappings() },
+                onLearnCancel = { viewModel.cancelLearnMode() },
                 modifier = Modifier.fillMaxHeight()
             )
             HyperLfoPanel(
@@ -423,7 +417,10 @@ private fun DuoPairBox(
                         onPulseStart = { viewModel.onPulseStart(voiceA) },
                         onPulseEnd = { viewModel.onPulseEnd(voiceA) },
                         size = 28.dp, 
-                        label = "" 
+                        label = "",
+                        isLearnMode = viewModel.isLearnModeActive,
+                        isLearning = viewModel.isVoiceBeingLearned(voiceA),
+                        onLearnSelect = { viewModel.selectVoiceForLearning(voiceA) }
                     )
                 }
             }
@@ -461,7 +458,10 @@ private fun DuoPairBox(
                         onPulseStart = { viewModel.onPulseStart(voiceB) },
                         onPulseEnd = { viewModel.onPulseEnd(voiceB) },
                         size = 28.dp,
-                        label = ""
+                        label = "",
+                        isLearnMode = viewModel.isLearnModeActive,
+                        isLearning = viewModel.isVoiceBeingLearned(voiceB),
+                        onLearnSelect = { viewModel.selectVoiceForLearning(voiceB) }
                     )
                 }
             }

@@ -34,6 +34,12 @@ import org.balch.songe.ui.theme.SongeColors
 /**
  * A momentary push button that generates a pulse.
  * The longer it's held, the stronger the pulse visual becomes.
+ * 
+ * @param onPulseStart Called when the button is pressed down
+ * @param onPulseEnd Called when the button is released
+ * @param isLearnMode If true, clicking selects this for MIDI learning
+ * @param isLearning If true, this button is currently selected for learning
+ * @param onLearnSelect Called when clicked in learn mode to select for MIDI mapping
  */
 @Composable
 @Preview
@@ -50,23 +56,38 @@ fun PulseButton(
     modifier: Modifier = Modifier,
     label: String = "PULSE",
     size: Dp = 48.dp,
-    activeColor: Color = SongeColors.neonMagenta
+    activeColor: Color = SongeColors.neonMagenta,
+    isLearnMode: Boolean = false,
+    isLearning: Boolean = false,
+    onLearnSelect: () -> Unit = {}
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     
     // Logic to trigger start/end callbacks
     LaunchedEffect(isPressed) {
-        if (isPressed) {
-            onPulseStart()
+        if (isLearnMode) {
+            // In learn mode, a click selects this for learning
+            if (isPressed) {
+                onLearnSelect()
+            }
         } else {
-            onPulseEnd()
+            // Normal operation
+            if (isPressed) {
+                onPulseStart()
+            } else {
+                onPulseEnd()
+            }
         }
     }
     
-    // Animate glow size based on press state
-    val glowAlpha by animateFloatAsState(targetValue = if (isPressed) 0.8f else 0f)
-    val glowRadius by animateFloatAsState(targetValue = if (isPressed) 10f else 0f)
+    // Animate glow size based on press state or learning state
+    val showGlow = isPressed || isLearning
+    val glowAlpha by animateFloatAsState(targetValue = if (showGlow) 0.8f else 0f)
+    val glowRadius by animateFloatAsState(targetValue = if (showGlow) 10f else 0f)
+    
+    // Use magenta for learning state
+    val glowColor = if (isLearning) SongeColors.neonMagenta else activeColor
 
     Column(
         modifier = modifier,
@@ -83,15 +104,24 @@ fun PulseButton(
                 .drawBehind {
                     val radius = size.toPx() / 2
                     
-                    // 1. Touch Glow (Underneath)
+                    // 1. Touch/Learn Glow (Underneath)
                      if (glowAlpha > 0f) {
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(activeColor.copy(alpha = glowAlpha), Color.Transparent),
+                                colors = listOf(glowColor.copy(alpha = glowAlpha), Color.Transparent),
                                 center = center,
                                 radius = radius + glowRadius.dp.toPx() + 10f
                             ),
                             radius = radius + glowRadius.dp.toPx() + 10f
+                        )
+                    }
+                    
+                    // Learning outline
+                    if (isLearning) {
+                        drawCircle(
+                            color = SongeColors.neonMagenta,
+                            radius = radius + 3f,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
                         )
                     }
 
@@ -125,7 +155,7 @@ fun PulseButton(
                     )
 
                     // 4. Pressed Overlay (Darkens when touched)
-                    if (isPressed) {
+                    if (isPressed && !isLearnMode) {
                          drawCircle(
                              color = Color.Black.copy(alpha = 0.3f),
                              radius = radius

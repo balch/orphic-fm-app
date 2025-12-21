@@ -4,16 +4,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import org.balch.songe.audio.SongeEngine
 import org.balch.songe.audio.VoiceState
+import org.balch.songe.input.LearnTarget
 import org.balch.songe.input.MidiController
 import org.balch.songe.input.MidiEventListener
+import org.balch.songe.input.MidiMappingRepository
 import org.balch.songe.input.MidiMappingState
+import org.balch.songe.input.MidiMappingState.Companion.ControlIds
 import org.balch.songe.util.Logger
 
 class SynthViewModel(
     private val engine: SongeEngine,
-    val midiController: MidiController = MidiController()
+    val midiController: MidiController = MidiController(),
+    private val midiRepository: MidiMappingRepository = MidiMappingRepository()
 ) : ViewModel() {
 
     // 8 Voices - Default tunings set to F# minor chord (F#, A, C#, E, F#, A, C#, F#)
@@ -95,15 +101,21 @@ class SynthViewModel(
     var midiMappingState by mutableStateOf(MidiMappingState())
         private set
     
-    var showMidiMappingDialog by mutableStateOf(false)
+    // Learn mode state
+    var isLearnModeActive by mutableStateOf(false)
+        private set
+    
+    // Backup state for cancellation
+    private var mappingBeforeLearn: MidiMappingState? = null
     
     // MIDI Event Listener
     private val midiEventListener = object : MidiEventListener {
         override fun onNoteOn(note: Int, velocity: Int) {
-            // Check if we're in learn mode
-            midiMappingState.learnMode?.let { voiceIndex ->
-                midiMappingState = midiMappingState.assignNote(note, voiceIndex)
-                Logger.info { "Assigned MIDI note ${MidiMappingState.noteName(note)} to Voice ${voiceIndex + 1}" }
+            // Check if we're learning a voice
+            val learnTarget = midiMappingState.learnTarget
+            if (learnTarget is LearnTarget.Voice) {
+                midiMappingState = midiMappingState.assignNoteToVoice(note, learnTarget.index)
+                Logger.info { "Assigned MIDI note ${MidiMappingState.noteName(note)} to Voice ${learnTarget.index + 1}" }
                 return
             }
             
@@ -120,21 +132,163 @@ class SynthViewModel(
         }
         
         override fun onControlChange(controller: Int, value: Int) {
-            // CC1 = Mod wheel → could map to vibrato or coupling
-            if (controller == 1) {
-                val normalized = value / 127f
+            val normalized = value / 127f
+            
+            // Check if we're learning a control
+            val learnTarget = midiMappingState.learnTarget
+            if (learnTarget is LearnTarget.Control) {
+                midiMappingState = midiMappingState.assignCCToControl(controller, learnTarget.controlId)
+                Logger.info { "Assigned CC$controller to ${learnTarget.controlId}" }
+                return
+            }
+            
+            // Normal operation: apply CC to mapped control
+            midiMappingState.getControlForCC(controller)?.let { controlId ->
+                applyCCToControl(controlId, normalized)
+            }
+            
+            // Legacy: CC1 = Mod wheel → vibrato (if not mapped)
+            if (controller == 1 && midiMappingState.getControlForCC(1) == null) {
                 onVibratoChange(normalized)
             }
         }
         
         override fun onPitchBend(value: Int) {
+            // -8192 to 8191, map to 0-1 range
+            val normalized = (value + 8192) / 16383f
             // Could apply to quad pitch or other parameter
-            // -8192 to 8191, map to some parameter range
         }
     }
     
-    fun updateMidiMapping(newState: MidiMappingState) {
-        midiMappingState = newState
+    // ═══════════════════════════════════════════════════════════
+    // LEARN MODE
+    // ═══════════════════════════════════════════════════════════
+    
+    fun toggleLearnMode() {
+        if (isLearnModeActive) {
+            // Exit learn mode without saving
+            cancelLearnMode()
+        } else {
+            // Enter learn mode
+            isLearnModeActive = true
+            mappingBeforeLearn = midiMappingState
+            Logger.info { "Entered MIDI Learn Mode" }
+        }
+    }
+    
+    fun saveLearnedMappings() {
+        isLearnModeActive = false
+        midiMappingState = midiMappingState.cancelLearn() // Clear any pending learn target
+        mappingBeforeLearn = null
+        
+        // Persist to storage
+        midiController.currentDeviceName?.let { deviceName ->
+            viewModelScope.launch {
+                midiRepository.save(deviceName, midiMappingState)
+            }
+        }
+        Logger.info { "Saved MIDI mappings" }
+    }
+    
+    fun cancelLearnMode() {
+        isLearnModeActive = false
+        mappingBeforeLearn?.let { midiMappingState = it }
+        mappingBeforeLearn = null
+        Logger.info { "Cancelled MIDI Learn Mode" }
+    }
+    
+    /**
+     * Select a control for MIDI CC learning.
+     * Call this when a knob/control is clicked in learn mode.
+     */
+    fun selectControlForLearning(controlId: String) {
+        if (isLearnModeActive) {
+            midiMappingState = midiMappingState.startLearnControl(controlId)
+            Logger.info { "Learning MIDI CC for: $controlId" }
+        }
+    }
+    
+    /**
+     * Check if a control is currently being learned.
+     */
+    fun isControlBeingLearned(controlId: String): Boolean {
+        return midiMappingState.isLearningControl(controlId)
+    }
+    
+    /**
+     * Select a voice for MIDI note learning.
+     * Call this when a pulse button is clicked in learn mode.
+     */
+    fun selectVoiceForLearning(voiceIndex: Int) {
+        if (isLearnModeActive) {
+            midiMappingState = midiMappingState.startLearnVoice(voiceIndex)
+            Logger.info { "Learning MIDI note for Voice ${voiceIndex + 1}" }
+        }
+    }
+    
+    /**
+     * Check if a voice is currently being learned.
+     */
+    fun isVoiceBeingLearned(voiceIndex: Int): Boolean {
+        return midiMappingState.isLearningVoice(voiceIndex)
+    }
+    
+    private fun applyCCToControl(controlId: String, value: Float) {
+        when (controlId) {
+            // Voice tunes
+            ControlIds.voiceTune(0) -> onVoiceTuneChange(0, value)
+            ControlIds.voiceTune(1) -> onVoiceTuneChange(1, value)
+            ControlIds.voiceTune(2) -> onVoiceTuneChange(2, value)
+            ControlIds.voiceTune(3) -> onVoiceTuneChange(3, value)
+            ControlIds.voiceTune(4) -> onVoiceTuneChange(4, value)
+            ControlIds.voiceTune(5) -> onVoiceTuneChange(5, value)
+            ControlIds.voiceTune(6) -> onVoiceTuneChange(6, value)
+            ControlIds.voiceTune(7) -> onVoiceTuneChange(7, value)
+            
+            // Voice FM depths
+            ControlIds.voiceFmDepth(0) -> onDuoModDepthChange(0, value)
+            ControlIds.voiceFmDepth(1) -> onDuoModDepthChange(0, value)
+            ControlIds.voiceFmDepth(2) -> onDuoModDepthChange(1, value)
+            ControlIds.voiceFmDepth(3) -> onDuoModDepthChange(1, value)
+            ControlIds.voiceFmDepth(4) -> onDuoModDepthChange(2, value)
+            ControlIds.voiceFmDepth(5) -> onDuoModDepthChange(2, value)
+            ControlIds.voiceFmDepth(6) -> onDuoModDepthChange(3, value)
+            ControlIds.voiceFmDepth(7) -> onDuoModDepthChange(3, value)
+            
+            // Pair sharpness
+            ControlIds.pairSharpness(0) -> onPairSharpnessChange(0, value)
+            ControlIds.pairSharpness(1) -> onPairSharpnessChange(1, value)
+            ControlIds.pairSharpness(2) -> onPairSharpnessChange(2, value)
+            ControlIds.pairSharpness(3) -> onPairSharpnessChange(3, value)
+            
+            // Delay
+            ControlIds.DELAY_TIME_1 -> onDelayTime1Change(value)
+            ControlIds.DELAY_TIME_2 -> onDelayTime2Change(value)
+            ControlIds.DELAY_MOD_1 -> onDelayMod1Change(value)
+            ControlIds.DELAY_MOD_2 -> onDelayMod2Change(value)
+            ControlIds.DELAY_FEEDBACK -> onDelayFeedbackChange(value)
+            ControlIds.DELAY_MIX -> onDelayMixChange(value)
+            
+            // Hyper LFO
+            ControlIds.HYPER_LFO_A -> onHyperLfoAChange(value)
+            ControlIds.HYPER_LFO_B -> onHyperLfoBChange(value)
+            
+            // Global
+            ControlIds.MASTER_VOLUME -> onMasterVolumeChange(value)
+            ControlIds.DRIVE -> onGlobalDriveChange(value)
+            ControlIds.DISTORTION_MIX -> onDistortionMixChange(value)
+            ControlIds.VIBRATO -> onVibratoChange(value)
+            ControlIds.VOICE_COUPLING -> onVoiceCouplingChange(value)
+            ControlIds.TOTAL_FEEDBACK -> onTotalFeedbackChange(value)
+            
+            // Quad controls
+            ControlIds.quadPitch(0) -> onQuadPitchChange(0, value)
+            ControlIds.quadPitch(1) -> onQuadPitchChange(1, value)
+            ControlIds.quadHold(0) -> onQuadHoldChange(0, value)
+            ControlIds.quadHold(1) -> onQuadHoldChange(1, value)
+            
+            else -> Logger.warn { "Unknown control ID for CC mapping: $controlId" }
+        }
     }
     
     fun initMidi() {
@@ -142,9 +296,18 @@ class SynthViewModel(
         if (devices.isNotEmpty()) {
             Logger.info { "Available MIDI devices: $devices" }
             // Auto-connect to first device, then start listening
-            if (midiController.openDevice(devices.first())) {
+            val deviceName = devices.first()
+            if (midiController.openDevice(deviceName)) {
                 midiController.start(midiEventListener)
-                Logger.info { "MIDI initialized and listening on: ${devices.first()}" }
+                Logger.info { "MIDI initialized and listening on: $deviceName" }
+                
+                // Load saved mappings for this device
+                viewModelScope.launch {
+                    midiRepository.load(deviceName)?.let { savedMapping ->
+                        midiMappingState = savedMapping
+                        Logger.info { "Loaded saved MIDI mappings for $deviceName" }
+                    }
+                }
             }
         } else {
             Logger.info { "No MIDI devices found" }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,10 +43,19 @@ import org.balch.songe.ui.theme.SongeColors
 fun SettingsPanel(
     midiDeviceName: String?,
     isMidiOpen: Boolean,
+    isLearnModeActive: Boolean,
     onMidiClick: () -> Unit,
+    onLearnToggle: () -> Unit,
+    onLearnSave: () -> Unit,
+    onLearnCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+    
+    // Auto-expand when learn mode is active
+    if (isLearnModeActive && !isExpanded) {
+        isExpanded = true
+    }
     
     val targetWidth by animateDpAsState(
         targetValue = if (isExpanded) 140.dp else 32.dp,
@@ -65,7 +75,12 @@ fun SettingsPanel(
                     )
                 )
             )
-            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+            .border(
+                width = if (isLearnModeActive) 2.dp else 1.dp,
+                color = if (isLearnModeActive) SongeColors.neonMagenta.copy(alpha = 0.7f) 
+                       else Color.White.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(8.dp)
+            )
             .animateContentSize()
     ) {
         if (isExpanded) {
@@ -77,33 +92,36 @@ fun SettingsPanel(
                 // Collapse arrow (now points left)
                 Row(
                     modifier = Modifier
-                        .clickable { isExpanded = false }
+                        .clickable { if (!isLearnModeActive) isExpanded = false }
                         .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "◀",
                         fontSize = 10.sp,
-                        color = Color.White.copy(alpha = 0.6f)
+                        color = if (isLearnModeActive) SongeColors.neonMagenta.copy(alpha = 0.6f)
+                               else Color.White.copy(alpha = 0.6f)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        "SETTINGS",
+                        if (isLearnModeActive) "LEARNING" else "SETTINGS",
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.5f)
+                        color = if (isLearnModeActive) SongeColors.neonMagenta
+                               else Color.White.copy(alpha = 0.5f)
                     )
                 }
                 
-                // MIDI Setting Row
-                SettingRow(
-                    label = "MIDI",
-                    status = midiDeviceName?.take(10) ?: "No Device",
-                    isActive = isMidiOpen,
-                    onClick = onMidiClick
+                // MIDI Section with integrated Learn button
+                MidiSettingSection(
+                    deviceName = midiDeviceName,
+                    isOpen = isMidiOpen,
+                    isLearnModeActive = isLearnModeActive,
+                    onMidiClick = onMidiClick,
+                    onLearnToggle = onLearnToggle,
+                    onLearnSave = onLearnSave,
+                    onLearnCancel = onLearnCancel
                 )
-                
-                // Future: Audio, Display, etc.
             }
         } else {
             // Collapsed - just the expand arrow
@@ -125,45 +143,137 @@ fun SettingsPanel(
 }
 
 @Composable
-private fun SettingRow(
-    label: String,
-    status: String,
-    isActive: Boolean,
-    onClick: () -> Unit
+private fun MidiSettingSection(
+    deviceName: String?,
+    isOpen: Boolean,
+    isLearnModeActive: Boolean,
+    onMidiClick: () -> Unit,
+    onLearnToggle: () -> Unit,
+    onLearnSave: () -> Unit,
+    onLearnCancel: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
+            .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
             .background(Color(0xFF1A1A2A))
-            .border(1.dp, if (isActive) SongeColors.synthGreen.copy(alpha = 0.5f) else Color.Transparent, RoundedCornerShape(4.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        // Status indicator
-        Box(
-            modifier = Modifier
-                .size(6.dp)
-                .background(
-                    if (isActive) SongeColors.synthGreen else Color.Gray,
-                    CircleShape
-                )
-        )
-        
-        Column {
-            Text(
-                label,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+            .border(
+                1.dp, 
+                if (isOpen) SongeColors.synthGreen.copy(alpha = 0.5f) else Color.Transparent, 
+                RoundedCornerShape(4.dp)
             )
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        // Device info row
+        Row(
+            modifier = Modifier.clickable(onClick = onMidiClick),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Status indicator
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(
+                        if (isOpen) SongeColors.synthGreen else Color.Gray,
+                        CircleShape
+                    )
+            )
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "MIDI",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    deviceName?.take(12) ?: "No Device",
+                    fontSize = 7.sp,
+                    color = Color.White.copy(alpha = 0.5f),
+                    maxLines = 1
+                )
+            }
+        }
+        
+        // Learn mode controls
+        if (isLearnModeActive) {
+            // Save/Cancel row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                // Cancel button (Red X)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(24.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFF8B0000).copy(alpha = 0.3f))
+                        .border(1.dp, Color.Red.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                        .clickable(onClick = onLearnCancel),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "✗",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Red
+                    )
+                }
+                
+                // Save button (Green Check)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(24.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(SongeColors.synthGreen.copy(alpha = 0.2f))
+                        .border(1.dp, SongeColors.synthGreen.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                        .clickable(onClick = onLearnSave),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "✓",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SongeColors.synthGreen
+                    )
+                }
+            }
+            
+            // Instructions
             Text(
-                status,
-                fontSize = 7.sp,
-                color = Color.White.copy(alpha = 0.5f),
+                "Click a control, then MIDI key",
+                fontSize = 6.sp,
+                color = SongeColors.neonMagenta.copy(alpha = 0.7f),
                 maxLines = 1
             )
+        } else {
+            // Learn button (small, disabled if no MIDI)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(
+                        if (isOpen) SongeColors.neonMagenta.copy(alpha = 0.15f)
+                        else Color.Gray.copy(alpha = 0.1f)
+                    )
+                    .then(
+                        if (isOpen) Modifier.clickable(onClick = onLearnToggle)
+                        else Modifier
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "LEARN",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isOpen) SongeColors.neonMagenta else Color.Gray.copy(alpha = 0.4f)
+                )
+            }
         }
     }
 }
