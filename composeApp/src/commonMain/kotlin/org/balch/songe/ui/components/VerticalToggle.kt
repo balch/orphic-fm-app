@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.songe.ui.theme.SongeColors
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.balch.songe.ui.components.learnable
+import org.balch.songe.ui.components.LocalLearnModeState
+
 
 @Composable
 fun VerticalToggle(
@@ -32,16 +35,33 @@ fun VerticalToggle(
     isTop: Boolean = true,
     onToggle: (Boolean) -> Unit,
     color: Color = SongeColors.warmGlow,
+    enabled: Boolean = true,
+    controlId: String? = null
 ) {
+    val learnState = LocalLearnModeState.current
+    val isActive = learnState.isActive
+    
+    val finalModifier = if (controlId != null) {
+        modifier.learnable(controlId, learnState)
+    } else {
+        modifier
+    }
+
     // Outer Box for robust click handling
     Box(
-        modifier = modifier
+        modifier = finalModifier
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF1A1A2A))
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-            .clickable { 
-                println("[VerticalToggle] Clicked! Current isTop=$isTop -> New: ${!isTop}")
-                onToggle(!isTop) 
+            .let {
+                if (enabled && !isActive) {
+                    it.clickable { 
+                        println("[VerticalToggle] Clicked! Current isTop=$isTop -> New: ${!isTop}")
+                        onToggle(!isTop) 
+                    }
+                } else {
+                    it
+                }
             }
             .padding(horizontal = 6.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center

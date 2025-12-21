@@ -14,17 +14,17 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
         // Pair 1-2: Bass range
-        SharedVoice(audioEngine, pitchMultiplier = 0.5),
-        SharedVoice(audioEngine, pitchMultiplier = 0.5),
+        DspVoice(audioEngine, pitchMultiplier = 0.5),
+        DspVoice(audioEngine, pitchMultiplier = 0.5),
         // Pair 3-4: Mid range
-        SharedVoice(audioEngine, pitchMultiplier = 1.0),
-        SharedVoice(audioEngine, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, pitchMultiplier = 1.0),
         // Pair 5-6: Mid range
-        SharedVoice(audioEngine, pitchMultiplier = 1.0),
-        SharedVoice(audioEngine, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, pitchMultiplier = 1.0),
         // Pair 7-8: High range (octave up)
-        SharedVoice(audioEngine, pitchMultiplier = 2.0),
-        SharedVoice(audioEngine, pitchMultiplier = 2.0)
+        DspVoice(audioEngine, pitchMultiplier = 2.0),
+        DspVoice(audioEngine, pitchMultiplier = 2.0)
     )
 
     // Dual Delay & Modulation
@@ -34,7 +34,7 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     private val delay2FeedbackGain = audioEngine.createMultiply()
 
     // Delay Modulation
-    private val hyperLfo = SharedHyperLfo(audioEngine)
+    private val hyperLfo = DspHyperLfo(audioEngine)
     private val delay1ModMixer = audioEngine.createMultiplyAdd() // (LFO * Depth) + BaseTime
     private val delay2ModMixer = audioEngine.createMultiplyAdd()
 

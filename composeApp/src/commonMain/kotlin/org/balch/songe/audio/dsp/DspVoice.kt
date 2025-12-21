@@ -4,7 +4,7 @@ package org.balch.songe.audio.dsp
  * Shared voice implementation using DSP primitive interfaces.
  * This class contains the voice wiring logic in a platform-independent way.
  */
-class SharedVoice(
+class DspVoice(
     private val audioEngine: AudioEngine,
     private val pitchMultiplier: Double = 1.0 // 0.5=bass, 1.0=mid, 2.0=high
 ) {

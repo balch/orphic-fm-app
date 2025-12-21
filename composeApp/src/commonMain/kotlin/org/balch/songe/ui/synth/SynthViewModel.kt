@@ -124,6 +124,9 @@ class SynthViewModel(
     var connectedMidiDeviceName by mutableStateOf<String?>(null)
         private set
     
+    // Track last CC values for button toggle detection (controlId -> lastValue)
+    private val lastCcValues = mutableMapOf<String, Float>()
+    
     // MIDI Event Listener
     private val midiEventListener = object : MidiEventListener {
         override fun onNoteOn(note: Int, velocity: Int) {
@@ -250,60 +253,128 @@ class SynthViewModel(
     }
     
     private fun applyCCToControl(controlId: String, value: Float) {
+        // Button toggle detection: if value is high (>=0.9) and last value was also high,
+        // interpret as a button press and toggle between 0 and 1
+        val lastValue = lastCcValues[controlId] ?: 0f
+        val effectiveValue = if (value >= 0.9f && lastValue >= 0.9f) {
+            // Repeated high value = button press -> toggle
+            if (lastValue > 0.5f) 0f else 1f
+        } else {
+            value
+        }
+        lastCcValues[controlId] = effectiveValue
+        
         when (controlId) {
             // Voice tunes
-            ControlIds.voiceTune(0) -> onVoiceTuneChange(0, value)
-            ControlIds.voiceTune(1) -> onVoiceTuneChange(1, value)
-            ControlIds.voiceTune(2) -> onVoiceTuneChange(2, value)
-            ControlIds.voiceTune(3) -> onVoiceTuneChange(3, value)
-            ControlIds.voiceTune(4) -> onVoiceTuneChange(4, value)
-            ControlIds.voiceTune(5) -> onVoiceTuneChange(5, value)
-            ControlIds.voiceTune(6) -> onVoiceTuneChange(6, value)
-            ControlIds.voiceTune(7) -> onVoiceTuneChange(7, value)
+            ControlIds.voiceTune(0) -> onVoiceTuneChange(0, effectiveValue)
+            ControlIds.voiceTune(1) -> onVoiceTuneChange(1, effectiveValue)
+            ControlIds.voiceTune(2) -> onVoiceTuneChange(2, effectiveValue)
+            ControlIds.voiceTune(3) -> onVoiceTuneChange(3, effectiveValue)
+            ControlIds.voiceTune(4) -> onVoiceTuneChange(4, effectiveValue)
+            ControlIds.voiceTune(5) -> onVoiceTuneChange(5, effectiveValue)
+            ControlIds.voiceTune(6) -> onVoiceTuneChange(6, effectiveValue)
+            ControlIds.voiceTune(7) -> onVoiceTuneChange(7, effectiveValue)
             
             // Voice FM depths
-            ControlIds.voiceFmDepth(0) -> onDuoModDepthChange(0, value)
-            ControlIds.voiceFmDepth(1) -> onDuoModDepthChange(0, value)
-            ControlIds.voiceFmDepth(2) -> onDuoModDepthChange(1, value)
-            ControlIds.voiceFmDepth(3) -> onDuoModDepthChange(1, value)
-            ControlIds.voiceFmDepth(4) -> onDuoModDepthChange(2, value)
-            ControlIds.voiceFmDepth(5) -> onDuoModDepthChange(2, value)
-            ControlIds.voiceFmDepth(6) -> onDuoModDepthChange(3, value)
-            ControlIds.voiceFmDepth(7) -> onDuoModDepthChange(3, value)
+            ControlIds.voiceFmDepth(0) -> onDuoModDepthChange(0, effectiveValue)
+            ControlIds.voiceFmDepth(1) -> onDuoModDepthChange(0, effectiveValue)
+            ControlIds.voiceFmDepth(2) -> onDuoModDepthChange(1, effectiveValue)
+            ControlIds.voiceFmDepth(3) -> onDuoModDepthChange(1, effectiveValue)
+            ControlIds.voiceFmDepth(4) -> onDuoModDepthChange(2, effectiveValue)
+            ControlIds.voiceFmDepth(5) -> onDuoModDepthChange(2, effectiveValue)
+            ControlIds.voiceFmDepth(6) -> onDuoModDepthChange(3, effectiveValue)
+            ControlIds.voiceFmDepth(7) -> onDuoModDepthChange(3, effectiveValue)
             
             // Pair sharpness
-            ControlIds.pairSharpness(0) -> onPairSharpnessChange(0, value)
-            ControlIds.pairSharpness(1) -> onPairSharpnessChange(1, value)
-            ControlIds.pairSharpness(2) -> onPairSharpnessChange(2, value)
-            ControlIds.pairSharpness(3) -> onPairSharpnessChange(3, value)
+            ControlIds.pairSharpness(0) -> onPairSharpnessChange(0, effectiveValue)
+            ControlIds.pairSharpness(1) -> onPairSharpnessChange(1, effectiveValue)
+            ControlIds.pairSharpness(2) -> onPairSharpnessChange(2, effectiveValue)
+            ControlIds.pairSharpness(3) -> onPairSharpnessChange(3, effectiveValue)
             
             // Delay
-            ControlIds.DELAY_TIME_1 -> onDelayTime1Change(value)
-            ControlIds.DELAY_TIME_2 -> onDelayTime2Change(value)
-            ControlIds.DELAY_MOD_1 -> onDelayMod1Change(value)
-            ControlIds.DELAY_MOD_2 -> onDelayMod2Change(value)
-            ControlIds.DELAY_FEEDBACK -> onDelayFeedbackChange(value)
-            ControlIds.DELAY_MIX -> onDelayMixChange(value)
+            ControlIds.DELAY_TIME_1 -> onDelayTime1Change(effectiveValue)
+            ControlIds.DELAY_TIME_2 -> onDelayTime2Change(effectiveValue)
+            ControlIds.DELAY_MOD_1 -> onDelayMod1Change(effectiveValue)
+            ControlIds.DELAY_MOD_2 -> onDelayMod2Change(effectiveValue)
+            ControlIds.DELAY_FEEDBACK -> onDelayFeedbackChange(effectiveValue)
+            ControlIds.DELAY_MIX -> onDelayMixChange(effectiveValue)
+            ControlIds.DELAY_MOD_SOURCE -> onDelayModSourceChange(effectiveValue >= 0.5f)
+            ControlIds.DELAY_LFO_WAVEFORM -> onDelayLfoWaveformChange(effectiveValue < 0.5f)
             
             // Hyper LFO
-            ControlIds.HYPER_LFO_A -> onHyperLfoAChange(value)
-            ControlIds.HYPER_LFO_B -> onHyperLfoBChange(value)
+            ControlIds.HYPER_LFO_A -> onHyperLfoAChange(effectiveValue)
+            ControlIds.HYPER_LFO_B -> onHyperLfoBChange(effectiveValue)
             
             // Global
-            ControlIds.MASTER_VOLUME -> onMasterVolumeChange(value)
-            ControlIds.DRIVE -> onGlobalDriveChange(value)
-            ControlIds.DISTORTION_MIX -> onDistortionMixChange(value)
-            ControlIds.VIBRATO -> onVibratoChange(value)
-            ControlIds.VOICE_COUPLING -> onVoiceCouplingChange(value)
-            ControlIds.TOTAL_FEEDBACK -> onTotalFeedbackChange(value)
+            ControlIds.MASTER_VOLUME -> onMasterVolumeChange(effectiveValue)
+            ControlIds.DRIVE -> onGlobalDriveChange(effectiveValue)
+            ControlIds.DISTORTION_MIX -> onDistortionMixChange(effectiveValue)
+            ControlIds.VIBRATO -> onVibratoChange(effectiveValue)
+            ControlIds.VOICE_COUPLING -> onVoiceCouplingChange(effectiveValue)
+            ControlIds.TOTAL_FEEDBACK -> onTotalFeedbackChange(effectiveValue)
             
             // Quad controls
-            ControlIds.quadPitch(0) -> onQuadPitchChange(0, value)
-            ControlIds.quadPitch(1) -> onQuadPitchChange(1, value)
-            ControlIds.quadHold(0) -> onQuadHoldChange(0, value)
-            ControlIds.quadHold(1) -> onQuadHoldChange(1, value)
+            ControlIds.quadPitch(0) -> onQuadPitchChange(0, effectiveValue)
+            ControlIds.quadPitch(1) -> onQuadPitchChange(1, effectiveValue)
+            ControlIds.quadHold(0) -> onQuadHoldChange(0, effectiveValue)
+            ControlIds.quadHold(1) -> onQuadHoldChange(1, effectiveValue)
             
-            else -> Logger.warn { "Unknown control ID for CC mapping: $controlId" }
+            // New Mappings
+            ControlIds.HYPER_LFO_MODE -> {
+                // Map 0-1 to 3 states (AND, OFF, OR)
+                val mode = when {
+                    effectiveValue < 0.33f -> org.balch.songe.ui.panels.HyperLfoMode.AND
+                    effectiveValue < 0.66f -> org.balch.songe.ui.panels.HyperLfoMode.OFF
+                    else -> org.balch.songe.ui.panels.HyperLfoMode.OR
+                }
+                onHyperLfoModeChange(mode)
+            }
+            ControlIds.HYPER_LFO_LINK -> onHyperLfoLinkChange(effectiveValue >= 0.5f)
+            
+            else -> {
+                // Check parameterized patterns
+                when {
+                    controlId.startsWith("voice_") && controlId.endsWith("_tune") -> {
+                        val index = controlId.removePrefix("voice_").removeSuffix("_tune").toIntOrNull()
+                        if (index != null) onVoiceTuneChange(index, effectiveValue)
+                    }
+                    controlId.startsWith("voice_") && controlId.endsWith("_fm_depth") -> {
+                         val index = controlId.removePrefix("voice_").removeSuffix("_fm_depth").toIntOrNull()
+                         if (index != null) onVoiceModDepthChange(index, effectiveValue)
+                    }
+                     controlId.startsWith("voice_") && controlId.endsWith("_env_speed") -> {
+                          val index = controlId.removePrefix("voice_").removeSuffix("_env_speed").toIntOrNull()
+                          if (index != null) onVoiceEnvelopeSpeedChange(index, effectiveValue)
+                     }
+                     controlId.startsWith("voice_") && controlId.endsWith("_hold") -> {
+                          val index = controlId.removePrefix("voice_").removeSuffix("_hold").toIntOrNull()
+                          // For hold, we likely want a toggle behavior.
+                          // effectiveValue (from button toggle logic) will be 0 or 1.
+                          // But wait, applyCCToControl calculates effectiveValue based on LAST value.
+                          // If effectiveValue toggles between 0/1, we can use it to set hold state?
+                          // onHoldChange takes a boolean.
+                          // If effectiveValue >= 0.5 -> true (hold), < 0.5 -> false.
+                          if (index != null) onHoldChange(index, effectiveValue >= 0.5f)
+                     }
+                    controlId.startsWith("pair_") && controlId.endsWith("_sharpness") -> {
+                        val index = controlId.removePrefix("pair_").removeSuffix("_sharpness").toIntOrNull()
+                        if (index != null) onPairSharpnessChange(index, effectiveValue)
+                    }
+                    controlId.startsWith("pair_") && controlId.endsWith("_mod_source") -> {
+                        val index = controlId.removePrefix("pair_").removeSuffix("_mod_source").toIntOrNull()
+                         if (index != null) {
+                             // Map 0-1 to 3 ModSource states (LFO, OFF, FM)
+                             val source = when {
+                                 effectiveValue < 0.33f -> org.balch.songe.audio.ModSource.LFO
+                                 effectiveValue < 0.66f -> org.balch.songe.audio.ModSource.OFF
+                                 else -> org.balch.songe.audio.ModSource.VOICE_FM
+                             }
+                             onDuoModSourceChange(index, source)
+                         }
+                    }
+                    else -> Logger.warn { "Unknown control ID for CC mapping: $controlId" }
+                }
+            }
         }
     }
     

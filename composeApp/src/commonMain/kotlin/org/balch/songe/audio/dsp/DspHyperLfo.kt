@@ -10,7 +10,8 @@ package org.balch.songe.audio.dsp
  * 2. Apply logic: AND = Ua * Ub, OR = Ua + Ub - Ua*Ub
  * 3. Convert back to bipolar: x = u * 2 - 1
  */
-class SharedHyperLfo(private val audioEngine: AudioEngine) {
+// Rename to DspHyperLfo
+class DspHyperLfo(private val audioEngine: AudioEngine) {
     // Interface Units (Proxies)
     private val inputA = audioEngine.createPassThrough()
     private val inputB = audioEngine.createPassThrough()

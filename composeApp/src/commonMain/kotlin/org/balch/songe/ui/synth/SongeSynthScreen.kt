@@ -51,9 +51,11 @@ import org.balch.songe.ui.components.HorizontalEnvelopeSlider
 import org.balch.songe.ui.components.HorizontalSwitch3Way
 import org.balch.songe.ui.components.HorizontalToggle
 import org.balch.songe.ui.components.LearnModeProvider
+import org.balch.songe.ui.components.LocalLearnModeState
 import org.balch.songe.ui.components.PulseButton
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.components.VerticalToggle
+import org.balch.songe.ui.components.learnable
 import org.balch.songe.ui.panels.HyperLfoPanel
 import org.balch.songe.ui.panels.SettingsPanel
 import org.balch.songe.ui.preview.PreviewSongeEngine
@@ -397,7 +399,8 @@ private fun DuoPairBox(
             HorizontalSwitch3Way(
                 state = viewModel.duoModSources[pairIndex],
                 onStateChange = { viewModel.onDuoModSourceChange(pairIndex, it) },
-                color = color
+                color = color,
+                controlId = ControlIds.duoModSource(pairIndex)
             )
         }
         
@@ -432,7 +435,7 @@ private fun DuoPairBox(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TriggerBtn(voiceA + 1, viewModel.voiceStates[voiceA].isHolding) { viewModel.onHoldChange(voiceA, it) }
+                    TriggerBtn(voiceA + 1, viewModel.voiceStates[voiceA].isHolding, { viewModel.onHoldChange(voiceA, it) }, ControlIds.voiceHold(voiceA))
                     PulseButton(
                         onPulseStart = { viewModel.onPulseStart(voiceA) },
                         onPulseEnd = { viewModel.onPulseEnd(voiceA) },
@@ -471,11 +474,7 @@ private fun DuoPairBox(
                     verticalAlignment = Alignment.CenterVertically, 
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TriggerBtn(
-                        voiceB + 1,
-                        viewModel.voiceStates[voiceB].isHolding) {
-                            viewModel.onHoldChange(voiceB, it)
-                        }
+                    TriggerBtn(voiceB + 1, viewModel.voiceStates[voiceB].isHolding, { viewModel.onHoldChange(voiceB, it) }, ControlIds.voiceHold(voiceB))
                     PulseButton(
                         onPulseStart = { viewModel.onPulseStart(voiceB) },
                         onPulseEnd = { viewModel.onPulseEnd(voiceB) },
@@ -521,7 +520,8 @@ private fun VoiceColumnMod(
         HorizontalEnvelopeSlider(
             value = envSpeed,
             onValueChange = onEnvSpeedChange,
-            color = SongeColors.neonCyan
+            color = SongeColors.neonCyan,
+            controlId = ControlIds.voiceEnvelopeSpeed(voiceIndex)
         )
     }
 }
@@ -553,17 +553,24 @@ private fun VoiceColumnSharp(
         HorizontalEnvelopeSlider(
             value = envSpeed,
             onValueChange = onEnvSpeedChange,
-            color = SongeColors.neonCyan
+            color = SongeColors.neonCyan,
+            controlId = ControlIds.voiceEnvelopeSpeed(voiceIndex)
         )
     }
 }
 
 @Composable
-private fun TriggerBtn(num: Int, isHolding: Boolean, onHoldChange: (Boolean) -> Unit) {
+private fun TriggerBtn(num: Int, isHolding: Boolean, onHoldChange: (Boolean) -> Unit, controlId: String? = null) {
+    val learnState = LocalLearnModeState.current
+    val modifier = Modifier
+        .width(42.dp) // Slightly wider
+        .height(28.dp) // Match PulseButton size
+        .then(
+            if (controlId != null) Modifier.learnable(controlId, learnState) else Modifier
+        )
+
     Box(
-        modifier = Modifier
-            .width(42.dp) // Slightly wider
-            .height(28.dp) // Match PulseButton size
+        modifier = modifier
             .clip(RoundedCornerShape(4.dp))
             .background(
                 // Metallic Gradient
@@ -582,7 +589,7 @@ private fun TriggerBtn(num: Int, isHolding: Boolean, onHoldChange: (Boolean) -> 
                 ),
                 shape = RoundedCornerShape(4.dp)
             )
-            .clickable { onHoldChange(!isHolding) },
+            .clickable(enabled = !learnState.isActive) { onHoldChange(!isHolding) },
         contentAlignment = Alignment.Center
     ) {
         // Text / Label
@@ -665,8 +672,10 @@ private fun ModDelaySection(
                     topLabel = "SELF",
                     bottomLabel = "LFO",
                     isTop = !isLfoSource, // SELF is top, LFO is bottom
-                    onToggle = { isTop -> onSourceChange(!isTop) }, // isTop=true means SELF, so LFO=false
-                    color = SongeColors.warmGlow
+                    onToggle = { isTop -> onSourceChange(!isTop) },
+                    color = SongeColors.warmGlow,
+                    enabled = !LocalLearnModeState.current.isActive,
+                    controlId = ControlIds.DELAY_MOD_SOURCE
                 )
                 RotaryKnob(value = feedback, onValueChange = onFeedbackChange, label = "FB", controlId = ControlIds.DELAY_FEEDBACK, size = 36.dp, progressColor = SongeColors.warmGlow)
             }
@@ -679,6 +688,8 @@ private fun ModDelaySection(
                     isTop = isTriangleWave,
                     onToggle = { isTop -> onWaveformChange(isTop) },
                     color = SongeColors.warmGlow,
+                    enabled = !LocalLearnModeState.current.isActive,
+                    controlId = ControlIds.DELAY_LFO_WAVEFORM
                 )
                 RotaryKnob(value = mix, onValueChange = onMixChange, label = "MIX", controlId = ControlIds.DELAY_MIX, size = 36.dp, progressColor = SongeColors.warmGlow)
             }

@@ -31,6 +31,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.balch.songe.ui.components.learnable
+import org.balch.songe.ui.components.LocalLearnModeState
 import org.balch.songe.input.MidiMappingState.Companion.ControlIds
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.theme.SongeColors
@@ -56,6 +58,7 @@ fun HyperLfoPanel(
     onLinkChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val learnState = LocalLearnModeState.current
     val isActive = mode != HyperLfoMode.OFF
     
     Column(
@@ -142,33 +145,43 @@ fun HyperLfoPanel(
             )
 
             // 3-way AND/OFF/OR Switch
-            Vertical3WaySwitch(
-                topLabel = "AND",
-                middleLabel = "OFF",
-                bottomLabel = "OR",
-                position = when (mode) {
-                    HyperLfoMode.AND -> 0
-                    HyperLfoMode.OFF -> 1
-                    HyperLfoMode.OR -> 2
-                },
-                onPositionChange = { pos ->
-                    onModeChange(when (pos) {
-                        0 -> HyperLfoMode.AND
-                        1 -> HyperLfoMode.OFF
-                        else -> HyperLfoMode.OR
-                    })
-                },
-                color = SongeColors.neonCyan
-            )
+            Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_MODE, learnState)) {
+                Vertical3WaySwitch(
+                    topLabel = "AND",
+                    middleLabel = "OFF",
+                    bottomLabel = "OR",
+                    position = when (mode) {
+                        HyperLfoMode.AND -> 0
+                        HyperLfoMode.OFF -> 1
+                        HyperLfoMode.OR -> 2
+                    },
+                    onPositionChange = { pos ->
+                        onModeChange(when (pos) {
+                            0 -> HyperLfoMode.AND
+                            1 -> HyperLfoMode.OFF
+                            else -> HyperLfoMode.OR
+                        })
+                    },
+                    color = SongeColors.neonCyan,
+                    enabled = !learnState.isActive
+                )
+            }
             
-            // LINK Vertical Switch
-            VerticalToggle(
-                topLabel = "LINK",
-                bottomLabel = "OFF",
-                isTop = linkEnabled,
-                onToggle = { onLinkChange(it) },
-                color = SongeColors.electricBlue
-            )
+            // LINK Vertical Switch - padded Box for better touch target
+            Box(
+                modifier = Modifier
+                    .learnable(ControlIds.HYPER_LFO_LINK, learnState)
+                    .padding(4.dp) // Expand touch target
+            ) {
+                VerticalToggle(
+                    topLabel = "LINK",
+                    bottomLabel = "OFF",
+                    isTop = linkEnabled,
+                    onToggle = { onLinkChange(it) },
+                    color = SongeColors.electricBlue,
+                    enabled = !learnState.isActive
+                )
+            }
 
         }
         
@@ -212,7 +225,8 @@ private fun VerticalToggle(
     bottomLabel: String,
     isTop: Boolean = true,
     onToggle: (Boolean) -> Unit,
-    color: Color
+    color: Color,
+    enabled: Boolean = true
 ) {
     Column(
         modifier = Modifier
@@ -239,7 +253,9 @@ private fun VerticalToggle(
                 .height(56.dp) // Increased to match 3-way switch visual mass
                 .clip(RoundedCornerShape(6.dp))
                 .background(color.copy(alpha = 0.2f))
-                .clickable { onToggle(!isTop) },
+                .let {
+                    if (enabled) it.clickable { onToggle(!isTop) } else it
+                },
             contentAlignment = if (isTop) Alignment.TopCenter else Alignment.BottomCenter
         ) {
             // Switch knob
@@ -275,7 +291,8 @@ private fun Vertical3WaySwitch(
     bottomLabel: String,
     position: Int, // 0=top, 1=middle, 2=bottom
     onPositionChange: (Int) -> Unit,
-    color: Color
+    color: Color,
+    enabled: Boolean = true
 ) {
     Column(
         modifier = Modifier
@@ -293,7 +310,7 @@ private fun Vertical3WaySwitch(
             color = if (position == 0) color else color.copy(alpha = 0.5f),
             fontWeight = if (position == 0) FontWeight.Bold else FontWeight.Normal,
             lineHeight = 9.sp,
-            modifier = Modifier.clickable { onPositionChange(0) }
+            modifier = Modifier.clickable(enabled = enabled) { onPositionChange(0) }
         )
 
         // 3-way switch track
@@ -303,7 +320,8 @@ private fun Vertical3WaySwitch(
                 .height(44.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(color.copy(alpha = 0.2f))
-                .pointerInput(Unit) {
+                .pointerInput(enabled) {
+                    if (!enabled) return@pointerInput
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent()

@@ -52,7 +52,12 @@ data class MidiMappingState(
             // Voice controls (index 0-7)
             fun voiceTune(index: Int) = "voice_${index}_tune"
             fun voiceFmDepth(index: Int) = "voice_${index}_fm_depth"
+            fun voiceEnvelopeSpeed(index: Int) = "voice_${index}_env_speed"
+            fun voiceHold(index: Int) = "voice_${index}_hold"
+            
+            // Pair controls
             fun pairSharpness(pairIndex: Int) = "pair_${pairIndex}_sharpness"
+            fun duoModSource(pairIndex: Int) = "pair_${pairIndex}_mod_source"
             
             // Delay controls
             const val DELAY_TIME_1 = "delay_time_1"
@@ -61,10 +66,14 @@ data class MidiMappingState(
             const val DELAY_MOD_2 = "delay_mod_2"
             const val DELAY_FEEDBACK = "delay_feedback"
             const val DELAY_MIX = "delay_mix"
+            const val DELAY_MOD_SOURCE = "delay_mod_source" // SELF / LFO
+            const val DELAY_LFO_WAVEFORM = "delay_lfo_waveform" // TRI / SQR
             
             // Hyper LFO
             const val HYPER_LFO_A = "hyper_lfo_a"
             const val HYPER_LFO_B = "hyper_lfo_b"
+            const val HYPER_LFO_MODE = "hyper_lfo_mode"
+            const val HYPER_LFO_LINK = "hyper_lfo_link"
             
             // Global
             const val MASTER_VOLUME = "master_volume"

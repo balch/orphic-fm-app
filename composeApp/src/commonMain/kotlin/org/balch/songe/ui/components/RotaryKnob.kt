@@ -86,7 +86,10 @@ fun RotaryKnob(
         ) {
             Canvas(modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(sensitivity, range) {
+                .pointerInput(sensitivity, range, isLearning) {
+                    if (isLearning) {
+                        return@pointerInput
+                    }
                     detectDragGestures(
                         onDrag = { change, dragAmount ->
                             change.consume()

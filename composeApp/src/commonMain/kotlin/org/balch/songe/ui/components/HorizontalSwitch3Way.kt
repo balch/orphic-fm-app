@@ -30,20 +30,34 @@ import org.balch.songe.audio.ModSource
 import org.balch.songe.ui.theme.SongeColors
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
+import org.balch.songe.ui.components.learnable
+import org.balch.songe.ui.components.LocalLearnModeState
+
 @Composable
 fun HorizontalSwitch3Way(
     modifier: Modifier = Modifier,
     state: ModSource,
     onStateChange: (ModSource) -> Unit,
-    color: Color = SongeColors.warmGlow
+    color: Color = SongeColors.warmGlow,
+    controlId: String? = null
 ) {
+    val learnState = LocalLearnModeState.current
+    val isActive = learnState.isActive
+    
+    val finalModifier = if (controlId != null) {
+        modifier.learnable(controlId, learnState)
+    } else {
+        modifier
+    }
+
     // Outer Box for robust click handling
     Box(
-        modifier = modifier
+        modifier = finalModifier
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF1A1A2A))
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-            .pointerInput(Unit) {
+            .pointerInput(isActive) {
+                if (isActive) return@pointerInput
                 detectTapGestures { offset ->
                     val width = size.width
                     // Tighter Center Zone (Visual Thumb is approx 15% of total width)

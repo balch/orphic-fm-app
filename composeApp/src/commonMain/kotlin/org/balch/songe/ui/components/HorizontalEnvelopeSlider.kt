@@ -38,6 +38,9 @@ import org.balch.songe.ui.theme.SongeColors
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.roundToInt
 
+import org.balch.songe.ui.components.learnable
+import org.balch.songe.ui.components.LocalLearnModeState
+
 /**
  * Horizontal slider for envelope speed (attack/decay).
  * 
@@ -51,7 +54,8 @@ fun HorizontalEnvelopeSlider(
     modifier: Modifier = Modifier,
     color: Color = SongeColors.neonCyan,
     trackWidth: Int = 44, // dp
-    thumbSize: Int = 10   // dp
+    thumbSize: Int = 10,   // dp
+    controlId: String? = null // Optional for MIDI learn
 ) {
     val density = LocalDensity.current
     val trackWidthPx = with(density) { trackWidth.dp.toPx() }
@@ -60,8 +64,15 @@ fun HorizontalEnvelopeSlider(
     
     var offsetX by remember(value) { mutableFloatStateOf(value * usableRange) }
     
+    // Apply learnable if controlId is provided
+    val finalModifier = if (controlId != null) {
+        modifier.learnable(controlId, LocalLearnModeState.current)
+    } else {
+        modifier
+    }
+    
     Row(
-        modifier = modifier
+        modifier = finalModifier
             .clip(RoundedCornerShape(4.dp))
             .background(Color(0xFF1A1A2A))
             .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
