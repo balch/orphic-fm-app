@@ -21,12 +21,14 @@ sealed class LearnTarget {
  * 
  * @param voiceMappings MIDI note number → voice index (0-7)
  * @param ccMappings MIDI CC number → control ID string
+ * @param noteControlMappings MIDI note number → control ID string (for button toggles)
  * @param learnTarget What's currently being learned (null if not in learn mode)
  */
 @Serializable
 data class MidiMappingState(
     val voiceMappings: Map<Int, Int> = defaultMappings(),
     val ccMappings: Map<Int, String> = emptyMap(),
+    val noteControlMappings: Map<Int, String> = emptyMap(),
     val learnTarget: LearnTarget? = null
 ) {
     companion object {
@@ -98,6 +100,11 @@ data class MidiMappingState(
      * Get the control ID for a MIDI CC, or null if not mapped.
      */
     fun getControlForCC(ccNumber: Int): String? = ccMappings[ccNumber]
+
+    /**
+     * Get the control ID for a MIDI Note, or null if not mapped.
+     */
+    fun getControlForNote(note: Int): String? = noteControlMappings[note]
     
     /**
      * Check if we're currently learning.
@@ -123,9 +130,35 @@ data class MidiMappingState(
         // Remove any existing mapping to this voice
         val newMappings = voiceMappings.filterValues { it != voiceIndex }.toMutableMap()
         newMappings[midiNote] = voiceIndex
-        return copy(voiceMappings = newMappings, learnTarget = null)
+        
+        // Remove conflicting Control mapping (if we want exclusive mapping per note)
+        val newNoteControlMappings = noteControlMappings.minus(midiNote)
+
+        return copy(
+            voiceMappings = newMappings, 
+            noteControlMappings = newNoteControlMappings,
+            learnTarget = null
+        )
     }
     
+    /**
+     * Assign a MIDI Note to a control.
+     */
+    fun assignNoteToControl(note: Int, controlId: String): MidiMappingState {
+        // Remove any existing note mapping to this control
+        val newMappings = noteControlMappings.filterValues { it != controlId }.toMutableMap()
+        newMappings[note] = controlId
+        
+        // Remove conflicting Voice mapping
+        val newVoiceMappings = voiceMappings.minus(note)
+        
+        return copy(
+            noteControlMappings = newMappings, 
+            voiceMappings = newVoiceMappings,
+            learnTarget = null
+        )
+    }
+
     /**
      * Assign a MIDI CC to a control.
      */

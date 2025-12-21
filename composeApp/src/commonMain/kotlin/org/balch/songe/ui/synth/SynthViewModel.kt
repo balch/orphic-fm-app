@@ -132,24 +132,47 @@ class SynthViewModel(
     // MIDI Event Listener
     private val midiEventListener = object : MidiEventListener {
         override fun onNoteOn(note: Int, velocity: Int) {
-            // Check if we're learning a voice
+            // Check if we're learning
             val learnTarget = midiMappingState.learnTarget
+            
             if (learnTarget is LearnTarget.Voice) {
                 midiMappingState = midiMappingState.assignNoteToVoice(note, learnTarget.index)
                 Logger.info { "Assigned MIDI note ${MidiMappingState.noteName(note)} to Voice ${learnTarget.index + 1}" }
                 return
+            } else if (learnTarget is LearnTarget.Control) {
+                midiMappingState = midiMappingState.assignNoteToControl(note, learnTarget.controlId)
+                Logger.info { "Assigned MIDI note $note to Control ${learnTarget.controlId}" }
+                return
             }
             
-            // Normal operation: trigger voice based on mapping
+            // Normal operation
+            // 1. Check Voice Mappings
             midiMappingState.getVoiceForNote(note)?.let { voiceIndex ->
                 onPulseStart(voiceIndex)
+            }
+            
+            // 2. Check Control Mappings (Note as Button)
+            midiMappingState.getControlForNote(note)?.let { controlId ->
+                // Toggle/Cycle Logic: Only trigger on Press (Velocity > 0).
+                // Ignore Release (Velocity 0).
+                if (velocity > 0) {
+                    if (isCycleControl(controlId)) {
+                        cycleControl(controlId, 3) // 3 states for switches
+                    } else {
+                        toggleControl(controlId)
+                    }
+                }
             }
         }
         
         override fun onNoteOff(note: Int) {
+            // Voice
             midiMappingState.getVoiceForNote(note)?.let { voiceIndex ->
                 onPulseEnd(voiceIndex)
             }
+            
+            // Control
+            // Ignore Note Off for controls (Latch behavior handled by ignoring release)
         }
         
         override fun onControlChange(controller: Int, value: Int) {
@@ -157,14 +180,18 @@ class SynthViewModel(
             
             // Check if we're learning a control
             val learnTarget = midiMappingState.learnTarget
+            Logger.info { "MIDI CC Rcv: $controller, Val: $value. LearnTarget: $learnTarget" }
+            
             if (learnTarget is LearnTarget.Control) {
+                Logger.info { "Attempting assignment. Control: ${learnTarget.controlId}, CC: $controller" }
                 midiMappingState = midiMappingState.assignCCToControl(controller, learnTarget.controlId)
-                Logger.info { "Assigned CC$controller to ${learnTarget.controlId}" }
+                Logger.info { "Assigned CC$controller to ${learnTarget.controlId}. New Target: ${midiMappingState.learnTarget}" }
                 return
             }
             
             // Normal operation: apply CC to mapped control
             midiMappingState.getControlForCC(controller)?.let { controlId ->
+                // Logger.info { "Mapping found: $controlId" } // Too verbose for normal ops?
                 applyCCToControl(controlId, normalized)
             }
             
@@ -265,6 +292,8 @@ class SynthViewModel(
 
         if (!isCycleControl) {
             // Apply "Jump Toggle" logic for continuous/binary controls
+            val lastRaw = lastRawCcValues[controlId] ?: 0f
+            
             // Check for Jump (Button Press/Release)
             // Thresholds: High >= 0.9, Low < 0.1. Jump if crossing 0.5 boundary significantly.
             val isJumpUp = value >= 0.9f && lastRaw < 0.5f
@@ -281,16 +310,50 @@ class SynthViewModel(
                 effectiveValue = lastEffective 
             } else {
                 // Continuous change (Knob/Slider) or slow button fade
-                // Check if delta suggests continuous move
-                // If it is NOT a Jump Up/Down, pass through.
                 effectiveValue = value
             }
         } else {
             // Cycle controls: Pass RAW value. 
-            // Handler manages logic using lastRawCcValues (accessible before update).
             effectiveValue = value
         }
         
+        // Dispatch
+        dispatchControlChange(controlId, effectiveValue)
+        
+        // Update state tracking
+        lastCcValues[controlId] = effectiveValue
+        lastRawCcValues[controlId] = value
+    }
+
+    private fun toggleControl(controlId: String) {
+        val lastValue = lastCcValues[controlId] ?: 0f
+        val newValue = if (lastValue > 0.5f) 0f else 1f
+        
+        // Update state
+        lastCcValues[controlId] = newValue
+        
+        dispatchControlChange(controlId, newValue)
+    }
+    
+    private fun cycleControl(controlId: String, numStates: Int) {
+        val lastValue = lastCcValues[controlId] ?: 0f
+        // Map lastValue to ordinal: index = round(lastValue * (numStates - 1))
+        val currentIndex = (lastValue * (numStates - 1)).roundToInt()
+        val nextIndex = (currentIndex + 1) % numStates
+        val newValue = nextIndex.toFloat() / (numStates - 1)
+        
+        // Update state
+        lastCcValues[controlId] = newValue
+        
+        dispatchControlChange(controlId, newValue)
+    }
+    
+    private fun isCycleControl(controlId: String): Boolean {
+        return controlId == ControlIds.HYPER_LFO_MODE ||
+               (controlId.startsWith("pair_") && controlId.endsWith("_mod_source"))
+    }
+
+    private fun dispatchControlChange(controlId: String, effectiveValue: Float) {
         // Dispatch to handlers
         // Handler logic for Cycle controls will read 'lastRawCcValues' (which is still 'lastRaw').
         when (controlId) {
@@ -328,7 +391,7 @@ class SynthViewModel(
             ControlIds.DELAY_FEEDBACK -> onDelayFeedbackChange(effectiveValue)
             ControlIds.DELAY_MIX -> onDelayMixChange(effectiveValue)
             ControlIds.DELAY_MOD_SOURCE -> onDelayModSourceChange(effectiveValue >= 0.5f)
-            ControlIds.DELAY_LFO_WAVEFORM -> onDelayLfoWaveformChange(effectiveValue < 0.5f)
+            ControlIds.DELAY_LFO_WAVEFORM -> onDelayLfoWaveformChange(effectiveValue >= 0.5f)
             
             // Hyper LFO
             ControlIds.HYPER_LFO_A -> onHyperLfoAChange(effectiveValue)
