@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.songe.ui.theme.SongeColors
@@ -32,31 +33,36 @@ import org.balch.songe.ui.theme.SongeColors
 /**
  * Collapsible settings panel for the left side of top row.
  * Shows a persistent vertical header strip on the left.
+ * 
+ * When collapsed: only shows 28dp header strip
+ * When expanded: shows header strip + expandedWidth content area
  */
 @Composable
 fun CollapsibleColumnPanel(
     title: String,
     color: Color,
     initialExpanded: Boolean = false,
-    expandedWidth: androidx.compose.ui.unit.Dp = 140.dp,
+    expandedWidth: Dp = 140.dp,
     modifier: Modifier = Modifier,
+    // Kept for API compatibility but not used
+    minExpandedWidth: Dp = 120.dp,
+    maxExpandedWidth: Dp = 400.dp,
+    useFlexWidth: Boolean = false,
     content: @Composable () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(initialExpanded) }
     
-    // Width for the expanded content area (excluding the header strip)
-    // When collapsed, width is 0.
+    val collapsedWidth = 28.dp
+    
+    // Animate the content width
     val contentWidth by animateDpAsState(
         targetValue = if (isExpanded) expandedWidth else 0.dp,
         animationSpec = tween(durationMillis = 300)
     )
-    
-    // Total width is header strip (say 24dp) + content width
-    // But since we are in a Row, we can just layout them side by side.
-    
+
     Box(
         modifier = modifier
-            .width(28.dp + contentWidth) // 28dp for header strip
+            .width(collapsedWidth + contentWidth)
             .fillMaxHeight()
             .clip(RoundedCornerShape(8.dp))
             .background(
@@ -77,7 +83,7 @@ fun CollapsibleColumnPanel(
             // [LEFT] Vertical Header Strip (Always visible)
             Box(
                 modifier = Modifier
-                    .width(28.dp) // Slight increase for comfort
+                    .width(collapsedWidth)
                     .fillMaxHeight()
                     .clickable { isExpanded = !isExpanded }
                     .background(color.copy(alpha = 0.1f)),
@@ -95,17 +101,15 @@ fun CollapsibleColumnPanel(
             }
             
             // [RIGHT] Content Area (Visible only when expanded, animated width)
-            // Use clipping to prevent spillover during animation
-            Box(
-                modifier = Modifier
-                    .width(contentWidth)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp))
-            ) {
-                if (contentWidth > 0.dp) {
-                    Box(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-                        content()
-                    }
+            if (contentWidth > 0.dp) {
+                Box(
+                    modifier = Modifier
+                        .width(contentWidth)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp))
+                        .padding(8.dp)
+                ) {
+                    content()
                 }
             }
         }

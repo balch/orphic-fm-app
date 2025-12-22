@@ -48,6 +48,7 @@ fun MidiPanel(
         color = SongeColors.synthGreen,
         initialExpanded = false,
         expandedWidth = 180.dp,
+        useFlexWidth = true,
         modifier = modifier
     ) {
         Column(

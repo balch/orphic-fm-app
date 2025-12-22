@@ -172,7 +172,7 @@ fun SongeSynthScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(340.dp), // Fixed height to prevent stretching and ensure alignment
+                .height(260.dp), // Reduced height for more compact panels
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

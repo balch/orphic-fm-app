@@ -41,6 +41,7 @@ fun DistortionPanel(
         color = SongeColors.neonMagenta,
         initialExpanded = true,
         expandedWidth = 200.dp,
+        useFlexWidth = true,
         modifier = modifier
     ) {
         Column(

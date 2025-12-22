@@ -63,6 +63,7 @@ fun HyperLfoPanel(
         color = SongeColors.neonCyan,
         initialExpanded = true,
         expandedWidth = 280.dp,
+        useFlexWidth = true,
         modifier = modifier
     ) {
         val learnState = LocalLearnModeState.current

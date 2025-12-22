@@ -52,6 +52,7 @@ fun PresetsPanel(
         color = SongeColors.neonCyan,
         initialExpanded = false,
         expandedWidth = 200.dp,
+        useFlexWidth = true,
         modifier = modifier
     ) {
         Column(

@@ -42,6 +42,7 @@ fun ModDelayPanel(
         color = SongeColors.warmGlow,
         initialExpanded = true,
         expandedWidth = 240.dp,
+        useFlexWidth = true,
         modifier = modifier
     ) {
         Column(
