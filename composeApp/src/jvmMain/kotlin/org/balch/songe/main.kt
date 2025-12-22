@@ -1,13 +1,13 @@
 package org.balch.songe
 
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import androidx.compose.runtime.remember
 
 fun main() = application {
-    val engine = remember { org.balch.songe.audio.JvmSongeEngine() }
+    val engine = remember { org.balch.songe.core.audio.JvmSongeEngine() }
     Window(
         onCloseRequest = ::exitApplication,
         title = "Songe",

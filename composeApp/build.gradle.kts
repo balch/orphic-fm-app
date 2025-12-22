@@ -55,6 +55,11 @@ kotlin {
     }
 }
 
+// Exclude libremidi-panama from test configurations (requires JVM 22+, we use JVM 21)
+configurations.matching { it.name.contains("test", ignoreCase = true) }.all {
+    exclude(group = "dev.atsushieno", module = "libremidi-panama")
+}
+
 android {
     namespace = "org.balch.songe"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
