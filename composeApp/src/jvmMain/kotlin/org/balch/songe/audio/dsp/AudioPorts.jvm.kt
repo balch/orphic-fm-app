@@ -2,6 +2,9 @@ package org.balch.songe.audio.dsp
 
 import com.jsyn.ports.UnitInputPort
 import com.jsyn.ports.UnitOutputPort
+import org.balch.songe.core.audio.dsp.AudioInput
+import org.balch.songe.core.audio.dsp.AudioOutput
+import org.balch.songe.core.audio.dsp.AudioPort
 
 /**
  * JVM implementation of AudioInput wrapping JSyn UnitInputPort.

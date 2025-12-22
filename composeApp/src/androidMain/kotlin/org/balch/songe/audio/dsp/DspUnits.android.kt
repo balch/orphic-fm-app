@@ -1,5 +1,13 @@
 package org.balch.songe.audio.dsp
 
+import org.balch.songe.core.audio.dsp.AudioInput
+import org.balch.songe.core.audio.dsp.AudioOutput
+import org.balch.songe.core.audio.dsp.AudioUnit
+import org.balch.songe.core.audio.dsp.DelayLine
+import org.balch.songe.core.audio.dsp.Envelope
+import org.balch.songe.core.audio.dsp.Limiter
+import org.balch.songe.core.audio.dsp.PeakFollower
+
 /**
  * Android stub implementations of DSP units.
  * TODO: Replace with Oboe implementations.

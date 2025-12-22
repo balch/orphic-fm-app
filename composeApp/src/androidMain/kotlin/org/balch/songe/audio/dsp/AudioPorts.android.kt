@@ -1,5 +1,9 @@
 package org.balch.songe.audio.dsp
 
+import org.balch.songe.core.audio.dsp.AudioInput
+import org.balch.songe.core.audio.dsp.AudioOutput
+import org.balch.songe.core.audio.dsp.AudioPort
+
 /**
  * Android stub implementation of AudioInput.
  */

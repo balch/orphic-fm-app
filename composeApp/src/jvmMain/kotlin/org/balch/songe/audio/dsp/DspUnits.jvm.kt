@@ -2,8 +2,15 @@ package org.balch.songe.audio.dsp
 
 import com.jsyn.unitgen.EnvelopeDAHDSR
 import com.jsyn.unitgen.InterpolatingDelay
-import com.jsyn.unitgen.PeakFollower as JsynPeakFollower
 import org.balch.songe.audio.TanhLimiter
+import org.balch.songe.core.audio.dsp.AudioInput
+import org.balch.songe.core.audio.dsp.AudioOutput
+import org.balch.songe.core.audio.dsp.AudioUnit
+import org.balch.songe.core.audio.dsp.DelayLine
+import org.balch.songe.core.audio.dsp.Envelope
+import org.balch.songe.core.audio.dsp.Limiter
+import org.balch.songe.core.audio.dsp.PeakFollower
+import com.jsyn.unitgen.PeakFollower as JsynPeakFollower
 
 /**
  * JVM actual implementations of DSP units.

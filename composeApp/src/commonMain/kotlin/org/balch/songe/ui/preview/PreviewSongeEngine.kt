@@ -3,7 +3,8 @@ package org.balch.songe.ui.preview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.balch.songe.audio.SongeEngine
+import org.balch.songe.core.audio.ModSource
+import org.balch.songe.core.audio.SongeEngine
 
 class PreviewSongeEngine(): SongeEngine {
     override fun start() {
@@ -41,7 +42,7 @@ class PreviewSongeEngine(): SongeEngine {
     override fun setDelayModSource(index: Int, isLfo: Boolean) {}
     override fun setDelayLfoWaveform(isTriangle: Boolean) {}
 
-    override fun setDuoModSource(duoIndex: Int, source: org.balch.songe.audio.ModSource) {}
+    override fun setDuoModSource(duoIndex: Int, source: ModSource) {}
     override fun setFmStructure(crossQuad: Boolean) {}
     override fun setTotalFeedback(amount: Float) {}
     override fun setVibrato(amount: Float) {}

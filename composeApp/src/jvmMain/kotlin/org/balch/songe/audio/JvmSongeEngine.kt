@@ -1,7 +1,8 @@
 package org.balch.songe.audio
 
-import org.balch.songe.audio.dsp.AudioEngine
-import org.balch.songe.audio.dsp.DspSongeEngine
+import org.balch.songe.core.audio.SongeEngine
+import org.balch.songe.core.audio.dsp.AudioEngine
+import org.balch.songe.core.audio.dsp.DspSongeEngine
 
 /**
  * JVM implementation of SongeEngine.

@@ -1,14 +1,26 @@
 package org.balch.songe.audio.dsp
 
+import org.balch.songe.core.audio.dsp.Add
+import org.balch.songe.core.audio.dsp.AudioInput
+import org.balch.songe.core.audio.dsp.AudioOutput
+import org.balch.songe.core.audio.dsp.AudioUnit
+import org.balch.songe.core.audio.dsp.Maximum
+import org.balch.songe.core.audio.dsp.Minimum
+import org.balch.songe.core.audio.dsp.Multiply
+import org.balch.songe.core.audio.dsp.MultiplyAdd
+import org.balch.songe.core.audio.dsp.PassThrough
+import org.balch.songe.core.audio.dsp.SineOscillator
+import org.balch.songe.core.audio.dsp.SquareOscillator
+import org.balch.songe.core.audio.dsp.TriangleOscillator
 import com.jsyn.unitgen.Add as JsynAdd
+import com.jsyn.unitgen.Maximum as JsynMaximum
+import com.jsyn.unitgen.Minimum as JsynMinimum
 import com.jsyn.unitgen.Multiply as JsynMultiply
 import com.jsyn.unitgen.MultiplyAdd as JsynMultiplyAdd
 import com.jsyn.unitgen.PassThrough as JsynPassThrough
 import com.jsyn.unitgen.SineOscillator as JsynSineOsc
-import com.jsyn.unitgen.TriangleOscillator as JsynTriangleOsc
 import com.jsyn.unitgen.SquareOscillator as JsynSquareOsc
-import com.jsyn.unitgen.Minimum as JsynMinimum
-import com.jsyn.unitgen.Maximum as JsynMaximum
+import com.jsyn.unitgen.TriangleOscillator as JsynTriangleOsc
 
 /**
  * JVM actual implementations of math/utility units.

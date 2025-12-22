@@ -1,5 +1,18 @@
 package org.balch.songe.audio.dsp
 
+import org.balch.songe.core.audio.dsp.Add
+import org.balch.songe.core.audio.dsp.AudioInput
+import org.balch.songe.core.audio.dsp.AudioOutput
+import org.balch.songe.core.audio.dsp.AudioUnit
+import org.balch.songe.core.audio.dsp.Maximum
+import org.balch.songe.core.audio.dsp.Minimum
+import org.balch.songe.core.audio.dsp.Multiply
+import org.balch.songe.core.audio.dsp.MultiplyAdd
+import org.balch.songe.core.audio.dsp.PassThrough
+import org.balch.songe.core.audio.dsp.SineOscillator
+import org.balch.songe.core.audio.dsp.SquareOscillator
+import org.balch.songe.core.audio.dsp.TriangleOscillator
+
 /**
  * Android stub implementations of math/utility units.
  * TODO: Replace with Oboe implementations.

@@ -5,12 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import org.balch.songe.audio.SongeEngine
-import org.balch.songe.navigation.SongeNavigation
-import org.balch.songe.ui.components.PlasmaBackground
-import org.balch.songe.ui.debug.DebugBottomBar
+import org.balch.songe.core.audio.SongeEngine
+import org.balch.songe.features.debug.DebugBottomBar
+import org.balch.songe.features.navigation.SongeNavigation
 import org.balch.songe.ui.preview.PreviewSongeEngine
 import org.balch.songe.ui.theme.SongeTheme
+import org.balch.songe.ui.widgets.PlasmaBackground
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable

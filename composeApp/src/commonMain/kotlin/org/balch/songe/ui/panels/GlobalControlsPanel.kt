@@ -24,8 +24,8 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
-import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.theme.SongeColors
+import org.balch.songe.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
@@ -36,8 +36,8 @@ fun GlobalControlsPanel(
     onVibratoChange: (Float) -> Unit,
     lfo2Rate: Float = 0.3f,
     onLfo2RateChange: (Float) -> Unit = {},
-    hyperLfoMode: HyperLfoMode = HyperLfoMode.AND,
-    onHyperLfoModeChange: (HyperLfoMode) -> Unit = {},
+    hyperLfoMode: org.balch.songe.features.lfo.HyperLfoMode = _root_ide_package_.org.balch.songe.features.lfo.HyperLfoMode.AND,
+    onHyperLfoModeChange: (org.balch.songe.features.lfo.HyperLfoMode) -> Unit = {},
     // Effects
     distortion: Float,
     onDistortionChange: (Float) -> Unit,
@@ -93,8 +93,8 @@ fun GlobalControlsPanel(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // LEFT: Hyper LFO Section
-        HyperLfoPanel(
-            lfo1Rate = vibrato, 
+        _root_ide_package_.org.balch.songe.features.lfo.HyperLfoPanel(
+            lfo1Rate = vibrato,
             onLfo1RateChange = onVibratoChange,
             lfo2Rate = lfo2Rate,
             onLfo2RateChange = onLfo2RateChange,
