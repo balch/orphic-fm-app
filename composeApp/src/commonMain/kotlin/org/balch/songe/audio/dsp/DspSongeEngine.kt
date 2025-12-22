@@ -1,9 +1,9 @@
 package org.balch.songe.audio.dsp
 
-import kotlin.math.pow
 import org.balch.songe.audio.ModSource
 import org.balch.songe.audio.SongeEngine
 import org.balch.songe.util.Logger
+import kotlin.math.pow
 
 /**
  * Shared implementation of SongeEngine using DSP primitive interfaces.
@@ -35,7 +35,11 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
     // Delay Modulation
     private val hyperLfo = DspHyperLfo(audioEngine)
-    private val delay1ModMixer = audioEngine.createMultiplyAdd() // (LFO * Depth) + BaseTime
+    // Convert bipolar LFO (-1 to +1) to unipolar (0 to 1) to prevent negative delay times
+    // Formula: unipolar = (bipolar * 0.5) + 0.5
+    private val lfoToUnipolar1 = audioEngine.createMultiplyAdd()
+    private val lfoToUnipolar2 = audioEngine.createMultiplyAdd()
+    private val delay1ModMixer = audioEngine.createMultiplyAdd() // (UnipolarLFO * Depth) + BaseTime
     private val delay2ModMixer = audioEngine.createMultiplyAdd()
 
     // Self-modulation attenuators
@@ -76,6 +80,8 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         audioEngine.addUnit(delay2)
         audioEngine.addUnit(delay1FeedbackGain)
         audioEngine.addUnit(delay2FeedbackGain)
+        audioEngine.addUnit(lfoToUnipolar1)
+        audioEngine.addUnit(lfoToUnipolar2)
         audioEngine.addUnit(delay1ModMixer)
         audioEngine.addUnit(delay2ModMixer)
         audioEngine.addUnit(selfMod1Attenuator)
@@ -131,8 +137,18 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         delay2.allocate(110250)
 
         // Delay Modulation Wiring
-        hyperLfo.output.connect(delay1ModMixer.inputA)
-        hyperLfo.output.connect(delay2ModMixer.inputA)
+        // Convert bipolar LFO (-1 to +1) to unipolar (0 to 1): u = (x * 0.5) + 0.5
+        hyperLfo.output.connect(lfoToUnipolar1.inputA)
+        lfoToUnipolar1.inputB.set(0.5)
+        lfoToUnipolar1.inputC.set(0.5)
+        
+        hyperLfo.output.connect(lfoToUnipolar2.inputA)
+        lfoToUnipolar2.inputB.set(0.5)
+        lfoToUnipolar2.inputC.set(0.5)
+        
+        // Connect unipolar LFO to modulation mixers
+        lfoToUnipolar1.output.connect(delay1ModMixer.inputA)
+        lfoToUnipolar2.output.connect(delay2ModMixer.inputA)
         delay1ModMixer.inputB.set(0.0) // Mod depth
         delay2ModMixer.inputB.set(0.0)
         delay1ModMixer.output.connect(delay1.delay)
@@ -252,6 +268,9 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setDelayModDepth(index: Int, amount: Float) {
+        // Modulation depth: max 0.5 seconds
+        // Since LFO is unipolar (0-1), delay time = baseTime + (unipolarLFO * depth)
+        // This ensures delay times are always >= baseTime (no negative values)
         val depth = amount * 0.5
         if (index == 0) {
             delay1ModMixer.inputB.set(depth)
@@ -261,14 +280,20 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setDelayModSource(index: Int, isLfo: Boolean) {
+        val targetConverter = if (index == 0) lfoToUnipolar1 else lfoToUnipolar2
         val targetMixer = if (index == 0) delay1ModMixer else delay2ModMixer
-        targetMixer.inputA.disconnectAll()
+        
+        // Disconnect the converter's input
+        targetConverter.inputA.disconnectAll()
         
         if (isLfo) {
-            hyperLfo.output.connect(targetMixer.inputA)
+            // Connect LFO -> Unipolar Converter -> Mixer (already wired at init)
+            hyperLfo.output.connect(targetConverter.inputA)
         } else {
+            // Connect Self-Modulation -> Unipolar Converter
+            // Self-mod is already bipolar audio signal, so needs conversion too
             val attenuatedSelf = if (index == 0) selfMod1Attenuator.output else selfMod2Attenuator.output
-            attenuatedSelf.connect(targetMixer.inputA)
+            attenuatedSelf.connect(targetConverter.inputA)
         }
     }
 
