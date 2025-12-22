@@ -26,7 +26,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,7 +52,6 @@ import org.balch.songe.input.LearnTarget
 import org.balch.songe.input.MidiMappingState.Companion.ControlIds
 import org.balch.songe.ui.components.HorizontalEnvelopeSlider
 import org.balch.songe.ui.components.HorizontalSwitch3Way
-import org.balch.songe.ui.components.HorizontalToggle
 import org.balch.songe.ui.components.LearnModeProvider
 import org.balch.songe.ui.components.LocalLearnModeState
 import org.balch.songe.ui.components.PulseButton
@@ -57,6 +59,8 @@ import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.components.VerticalToggle
 import org.balch.songe.ui.components.learnable
 import org.balch.songe.ui.panels.HyperLfoPanel
+import org.balch.songe.ui.panels.MidiProps
+import org.balch.songe.ui.panels.PresetProps
 import org.balch.songe.ui.panels.SettingsPanel
 import org.balch.songe.ui.preview.PreviewSongeEngine
 import org.balch.songe.ui.theme.SongeColors
@@ -75,6 +79,7 @@ fun SongeSynthScreen(
     DisposableEffect(Unit) {
         viewModel.startAudio()
         viewModel.initMidi()
+        viewModel.loadPresets()
         Logger.info { "Songe Ready ✓" }
         onDispose {
             viewModel.stopMidi()
@@ -90,6 +95,9 @@ fun SongeSynthScreen(
     // Get the selected control ID for learn mode
     val selectedControlId = (viewModel.midiMappingState.learnTarget as? LearnTarget.Control)?.controlId
     
+    // Track if a dialog is active to suppress keyboard handling
+    var isDialogActive by remember { mutableStateOf(false) }
+    
     // Wrap everything in LearnModeProvider to make learn state available to all controls
     LearnModeProvider(
         isActive = viewModel.isLearnModeActive,
@@ -102,6 +110,9 @@ fun SongeSynthScreen(
             .focusRequester(focusRequester)
             .focusable()
             .onPreviewKeyEvent { keyEvent ->
+                // Skip keyboard handling when dialog is active
+                if (isDialogActive) return@onPreviewKeyEvent false
+                
                 val key = keyEvent.key
                 val isKeyDown = keyEvent.type == KeyEventType.KeyDown
                 val isKeyUp = keyEvent.type == KeyEventType.KeyUp
@@ -158,13 +169,25 @@ fun SongeSynthScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SettingsPanel(
-                midiDeviceName = viewModel.connectedMidiDeviceName,
-                isMidiOpen = viewModel.isMidiConnected,
-                isLearnModeActive = viewModel.isLearnModeActive,
-                onMidiClick = { /* Could open MIDI device selector */ },
-                onLearnToggle = { viewModel.toggleLearnMode() },
-                onLearnSave = { viewModel.saveLearnedMappings() },
-                onLearnCancel = { viewModel.cancelLearnMode() },
+                presetProps = PresetProps(
+                    presets = viewModel.presetList,
+                    selectedPreset = viewModel.selectedPreset,
+                    onSelect = { viewModel.selectPreset(it) },
+                    onNew = { viewModel.saveNewPreset(it) },
+                    onOverride = { viewModel.overridePreset() },
+                    onDelete = { viewModel.deletePreset() },
+                    onApply = { viewModel.applyPreset(it) },
+                    onDialogActiveChange = { isDialogActive = it }
+                ),
+                midiProps = MidiProps(
+                    deviceName = viewModel.connectedMidiDeviceName,
+                    isOpen = viewModel.isMidiConnected,
+                    isLearnModeActive = viewModel.isLearnModeActive,
+                    onClick = { /* Could open MIDI device selector */ },
+                    onLearnToggle = { viewModel.toggleLearnMode() },
+                    onLearnSave = { viewModel.saveLearnedMappings() },
+                    onLearnCancel = { viewModel.cancelLearnMode() }
+                ),
                 modifier = Modifier.fillMaxHeight()
             )
             HyperLfoPanel(

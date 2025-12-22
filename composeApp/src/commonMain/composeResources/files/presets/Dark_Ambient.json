@@ -1,0 +1,63 @@
+{
+    "name": "Dark Ambient",
+    "voiceTunes": [
+        0.15,
+        0.18,
+        0.22,
+        0.28,
+        0.35,
+        0.38,
+        0.42,
+        0.48
+    ],
+    "voiceModDepths": [
+        0.35,
+        0.0,
+        0.4,
+        0.0,
+        0.3,
+        0.0,
+        0.35,
+        0.0
+    ],
+    "voiceEnvelopeSpeeds": [
+        0.7,
+        0.7,
+        0.8,
+        0.8,
+        0.7,
+        0.7,
+        0.8,
+        0.8
+    ],
+    "pairSharpness": [
+        0.5,
+        0.6,
+        0.5,
+        0.6
+    ],
+    "duoModSources": [
+        "ENV",
+        "ENV",
+        "ENV",
+        "ENV"
+    ],
+    "hyperLfoA": 0.08,
+    "hyperLfoB": 0.05,
+    "hyperLfoMode": "DELAY",
+    "hyperLfoLink": false,
+    "delayTime1": 0.55,
+    "delayTime2": 0.75,
+    "delayMod1": 0.3,
+    "delayMod2": 0.4,
+    "delayFeedback": 0.7,
+    "delayMix": 0.55,
+    "delayModSourceIsLfo": true,
+    "delayLfoWaveformIsTriangle": false,
+    "masterVolume": 0.6,
+    "drive": 0.25,
+    "distortionMix": 0.35,
+    "fmStructureCrossQuad": true,
+    "totalFeedback": 0.25,
+    "createdAt": 0
+}

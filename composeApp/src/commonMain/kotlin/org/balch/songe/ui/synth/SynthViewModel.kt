@@ -18,13 +18,16 @@ import org.balch.songe.input.MidiMappingRepository
 import org.balch.songe.input.MidiMappingState
 import org.balch.songe.input.MidiMappingState.Companion.ControlIds
 import org.balch.songe.input.createMidiAccess
+import org.balch.songe.preset.DronePreset
+import org.balch.songe.preset.DronePresetRepository
 import org.balch.songe.util.Logger
 import kotlin.math.roundToInt
 
 class SynthViewModel(
     private val engine: SongeEngine,
     val midiController: MidiController = MidiController { createMidiAccess() },
-    private val midiRepository: MidiMappingRepository = MidiMappingRepository()
+    private val midiRepository: MidiMappingRepository = MidiMappingRepository(),
+    private val presetRepository: DronePresetRepository = DronePresetRepository()
 ) : ViewModel() {
 
     // 8 Voices - Default tunings set to F# minor chord (F#, A, C#, E, F#, A, C#, F#)
@@ -123,6 +126,12 @@ class SynthViewModel(
     var isMidiConnected by mutableStateOf(false)
         private set
     var connectedMidiDeviceName by mutableStateOf<String?>(null)
+        private set
+    
+    // Drone Presets
+    var presetList by mutableStateOf<List<DronePreset>>(emptyList())
+        private set
+    var selectedPreset by mutableStateOf<DronePreset?>(null)
         private set
     
     // Track last CC values for button toggle detection (controlId -> lastValue)
@@ -778,6 +787,137 @@ class SynthViewModel(
     fun onVoiceCouplingChange(amount: Float) {
         voiceCoupling = amount
         engine.setVoiceCoupling(amount)
+    }
+    
+    // ========== Drone Preset Management ==========
+    
+    fun loadPresets() {
+        viewModelScope.launch {
+            presetList = presetRepository.list()
+            Logger.info { "Loaded ${presetList.size} presets" }
+        }
+    }
+    
+    fun selectPreset(preset: DronePreset?) {
+        selectedPreset = preset
+    }
+    
+    fun saveNewPreset(name: String) {
+        viewModelScope.launch {
+            val preset = currentStateAsPreset(name)
+            presetRepository.save(preset)
+            presetList = presetRepository.list()
+            selectedPreset = presetList.find { it.name == name }
+            Logger.info { "Saved new preset: $name" }
+        }
+    }
+    
+    fun overridePreset() {
+        val current = selectedPreset ?: return
+        viewModelScope.launch {
+            val preset = currentStateAsPreset(current.name).copy(createdAt = current.createdAt)
+            presetRepository.save(preset)
+            presetList = presetRepository.list()
+            selectedPreset = presetList.find { it.name == current.name }
+            Logger.info { "Overrode preset: ${current.name}" }
+        }
+    }
+    
+    fun deletePreset() {
+        val current = selectedPreset ?: return
+        viewModelScope.launch {
+            presetRepository.delete(current.name)
+            presetList = presetRepository.list()
+            selectedPreset = null
+            Logger.info { "Deleted preset: ${current.name}" }
+        }
+    }
+    
+    fun applyPreset(preset: DronePreset) {
+        // Apply all preset values to current state
+        voiceStates = voiceStates.mapIndexed { index, state ->
+            state.copy(tune = preset.voiceTunes.getOrElse(index) { state.tune })
+        }
+        voiceModDepths = preset.voiceModDepths.take(8) + List(8 - preset.voiceModDepths.size) { 0f }
+        pairSharpness = preset.pairSharpness.take(4) + List(4 - preset.pairSharpness.size) { 0f }
+        voiceEnvelopeSpeeds = preset.voiceEnvelopeSpeeds.take(8) + List(8 - preset.voiceEnvelopeSpeeds.size) { 0f }
+        
+        // Duo Mod Sources
+        duoModSources = preset.duoModSources.mapIndexed { index, sourceStr ->
+            try {
+                org.balch.songe.audio.ModSource.valueOf(sourceStr)
+            } catch (e: Exception) {
+                org.balch.songe.audio.ModSource.OFF
+            }
+        }.take(4) + List(maxOf(0, 4 - preset.duoModSources.size)) { org.balch.songe.audio.ModSource.OFF }
+        
+        // Hyper LFO
+        hyperLfoA = preset.hyperLfoA
+        hyperLfoB = preset.hyperLfoB
+        hyperLfoMode = try {
+            org.balch.songe.ui.panels.HyperLfoMode.valueOf(preset.hyperLfoMode)
+        } catch (e: Exception) {
+            org.balch.songe.ui.panels.HyperLfoMode.OFF
+        }
+        hyperLfoLink = preset.hyperLfoLink
+        
+        // Delay
+        delayTime1 = preset.delayTime1
+        delayTime2 = preset.delayTime2
+        delayMod1 = preset.delayMod1
+        delayMod2 = preset.delayMod2
+        delayFeedback = preset.delayFeedback
+        delayMix = preset.delayMix
+        delayModSourceIsLfo = preset.delayModSourceIsLfo
+        delayLfoWaveformIsTriangle = preset.delayLfoWaveformIsTriangle
+        
+        // Global
+        masterVolume = preset.masterVolume
+        drive = preset.drive
+        distortionMix = preset.distortionMix
+        
+        // Advanced
+        fmStructureCrossQuad = preset.fmStructureCrossQuad
+        totalFeedback = preset.totalFeedback
+        
+        // Apply to engine
+        voiceStates.forEachIndexed { index, state -> engine.setVoiceTune(index, state.tune) }
+        engine.setMasterVolume(masterVolume)
+        engine.setDrive(drive)
+        engine.setDistortionMix(distortionMix)
+        engine.setDelayFeedback(delayFeedback)
+        engine.setDelayMix(delayMix)
+        
+        selectedPreset = preset
+        Logger.info { "Applied preset: ${preset.name}" }
+    }
+    
+    private fun currentStateAsPreset(name: String): DronePreset {
+        return DronePreset(
+            name = name,
+            voiceTunes = voiceStates.map { it.tune },
+            voiceModDepths = voiceModDepths,
+            voiceEnvelopeSpeeds = voiceEnvelopeSpeeds,
+            pairSharpness = pairSharpness,
+            duoModSources = duoModSources.map { it.name },
+            hyperLfoA = hyperLfoA,
+            hyperLfoB = hyperLfoB,
+            hyperLfoMode = hyperLfoMode.name,
+            hyperLfoLink = hyperLfoLink,
+            delayTime1 = delayTime1,
+            delayTime2 = delayTime2,
+            delayMod1 = delayMod1,
+            delayMod2 = delayMod2,
+            delayFeedback = delayFeedback,
+            delayMix = delayMix,
+            delayModSourceIsLfo = delayModSourceIsLfo,
+            delayLfoWaveformIsTriangle = delayLfoWaveformIsTriangle,
+            masterVolume = masterVolume,
+            drive = drive,
+            distortionMix = distortionMix,
+            fmStructureCrossQuad = fmStructureCrossQuad,
+            totalFeedback = totalFeedback
+        )
     }
 
     // Lifecycle
