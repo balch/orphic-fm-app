@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,87 +43,123 @@ fun MidiPanel(
     midiProps: MidiProps,
     modifier: Modifier = Modifier
 ) {
-     // Auto-expand if learning logic is needed? Or let user expand.
-     // For now, simple independent panel.
     CollapsibleColumnPanel(
         title = "MIDI",
         color = SongeColors.synthGreen,
-        initialExpanded = false, // Collapsed initially
+        initialExpanded = false,
+        expandedWidth = 180.dp,
         modifier = modifier
     ) {
-        MidiSettingSectionContent(
-            deviceName = midiProps.deviceName,
-            isOpen = midiProps.isOpen,
-            isLearnModeActive = midiProps.isLearnModeActive,
-            onMidiClick = midiProps.onClick,
-            onLearnToggle = midiProps.onLearnToggle,
-            onLearnSave = midiProps.onLearnSave,
-            onLearnCancel = midiProps.onLearnCancel
-        )
-    }
-}
-
-@Composable
-private fun MidiSettingSectionContent(
-    deviceName: String?,
-    isOpen: Boolean,
-    isLearnModeActive: Boolean,
-    onMidiClick: () -> Unit,
-    onLearnToggle: () -> Unit,
-    onLearnSave: () -> Unit,
-    onLearnCancel: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        // Device info
-        Column {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Header
             Text(
-                "DEVICE",
-                fontSize = 8.sp,
+                text = "MIDI",
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = 0.6f)
+                color = SongeColors.synthGreen
             )
-            val friendlyName = deviceName?.substringAfter(" - ") ?: deviceName ?: "No Device"
-            Text(
-                if (isOpen) "$friendlyName\nConnected" else "$friendlyName\nNot Connected",
-                fontSize = 8.sp,
-                color = if (isOpen) SongeColors.synthGreen else Color.Red.copy(alpha = 0.7f),
-                lineHeight = 10.sp
-            )
-        }
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        // Learn controls
-        if (isLearnModeActive) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Box(
-                    modifier = Modifier.weight(1f).height(24.dp).clip(RoundedCornerShape(4.dp))
-                        .background(Color.Red.copy(alpha = 0.2f)).clickable(onClick = onLearnCancel),
-                    contentAlignment = Alignment.Center
-                ) { Text("✗", color = Color.Red) }
-                
-                Box(
-                    modifier = Modifier.weight(1f).height(24.dp).clip(RoundedCornerShape(4.dp))
-                        .background(SongeColors.synthGreen.copy(alpha = 0.2f)).clickable(onClick = onLearnSave),
-                    contentAlignment = Alignment.Center
-                ) { Text("✓", color = SongeColors.synthGreen) }
-            }
-            Text("Select → Key", fontSize = 8.sp, color = SongeColors.neonMagenta)
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(24.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(if (isOpen) SongeColors.neonMagenta.copy(alpha = 0.2f) else Color.Gray.copy(alpha = 0.1f))
-                    .clickable(enabled = isOpen, onClick = onLearnToggle),
-                contentAlignment = Alignment.Center
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            // Device status with connection dot
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("LEARN", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = if (isOpen) SongeColors.neonMagenta else Color.Gray)
+                // Connection status dot
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(if (midiProps.isOpen) SongeColors.synthGreen else Color.Red)
+                )
+                
+                // Device name and status
+                Column {
+                    val friendlyName = midiProps.deviceName?.substringAfter(" - ") 
+                        ?: midiProps.deviceName ?: "No Device"
+                    Text(
+                        text = friendlyName,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = if (midiProps.isOpen) "Connected" else "Not Connected",
+                        fontSize = 10.sp,
+                        color = if (midiProps.isOpen) SongeColors.synthGreen else Color.Red.copy(alpha = 0.7f)
+                    )
+                }
             }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Learn controls - directly under device info
+            if (midiProps.isLearnModeActive) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Red.copy(alpha = 0.2f))
+                            .clickable(onClick = midiProps.onLearnCancel),
+                        contentAlignment = Alignment.Center
+                    ) { 
+                        Text("CANCEL", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Red) 
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(32.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(SongeColors.synthGreen.copy(alpha = 0.2f))
+                            .clickable(onClick = midiProps.onLearnSave),
+                        contentAlignment = Alignment.Center
+                    ) { 
+                        Text("SAVE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SongeColors.synthGreen) 
+                    }
+                }
+                
+                Text(
+                    "Select control → Press key",
+                    fontSize = 9.sp,
+                    color = SongeColors.neonMagenta
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (midiProps.isOpen) SongeColors.neonMagenta.copy(alpha = 0.2f) 
+                            else Color.Gray.copy(alpha = 0.1f)
+                        )
+                        .clickable(enabled = midiProps.isOpen, onClick = midiProps.onLearnToggle),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "LEARN",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (midiProps.isOpen) SongeColors.neonMagenta else Color.Gray
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }
