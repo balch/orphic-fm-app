@@ -3,12 +3,16 @@ package org.balch.songe.audio.dsp
 /**
  * Shared HyperLFO implementation using DSP primitive interfaces.
  * Two Oscillators (A & B) with logical AND/OR combination.
- * Supports both Square (AND/OR logic) and Triangle waveforms.
+ * Supports both Square and Triangle waveforms with AND/OR modes.
  * 
  * For square waves (-1 to +1), proper AND/OR logic requires:
  * 1. Convert bipolar (-1,+1) to unipolar (0,1): u = (x + 1) / 2 = x * 0.5 + 0.5
  * 2. Apply logic: AND = Ua * Ub, OR = Ua + Ub - Ua*Ub
  * 3. Convert back to bipolar: x = u * 2 - 1
+ * 
+ * For triangle waves, AND/OR is implemented as:
+ * - AND = MIN(A, B) - output follows the lower of the two
+ * - OR = MAX(A, B) - output follows the higher of the two
  */
 // Rename to DspHyperLfo
 class DspHyperLfo(private val audioEngine: AudioEngine) {
@@ -52,7 +56,9 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
     private val toBipolarAnd = audioEngine.createMultiplyAdd()
     private val toBipolarOr = audioEngine.createMultiplyAdd()
     
-    private val triangleMix = audioEngine.createAdd() // Average of two triangles
+    // Triangle AND/OR using Min/Max
+    private val triangleMin = audioEngine.createMinimum() // AND = MIN(A, B)
+    private val triangleMax = audioEngine.createMaximum() // OR = MAX(A, B)
     private val fmGain = audioEngine.createMultiply()
     
     // Internal State
@@ -79,7 +85,8 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
         audioEngine.addUnit(orResult)
         audioEngine.addUnit(toBipolarAnd)
         audioEngine.addUnit(toBipolarOr)
-        audioEngine.addUnit(triangleMix)
+        audioEngine.addUnit(triangleMin)
+        audioEngine.addUnit(triangleMax)
         audioEngine.addUnit(fmGain)
         
         // WIRING
@@ -146,12 +153,14 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
         toBipolarOr.inputB.set(2.0)
         toBipolarOr.inputC.set(-1.0)
         
-        // Triangle Mix (average of two triangle waves)
-        lfoATriangle.output.connect(triangleMix.inputA)
-        lfoBTriangle.output.connect(triangleMix.inputB)
+        // Triangle AND/OR using Min/Max
+        lfoATriangle.output.connect(triangleMin.inputA)
+        lfoBTriangle.output.connect(triangleMin.inputB)
+        lfoATriangle.output.connect(triangleMax.inputA)
+        lfoBTriangle.output.connect(triangleMax.inputB)
         
-        // Initial Output: Triangle
-        triangleMix.output.connect(outputProxy.input)
+        // Initial Output: Triangle AND (MIN)
+        triangleMin.output.connect(outputProxy.input)
     }
 
     /**
@@ -183,8 +192,12 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
         outputProxy.input.disconnectAll()
         
         if (isTriangleMode) {
-            // Triangle mode: use averaged triangle waves
-            triangleMix.output.connect(outputProxy.input)
+            // Triangle mode: AND = MIN, OR = MAX
+            if (isAndMode) {
+                triangleMin.output.connect(outputProxy.input)
+            } else {
+                triangleMax.output.connect(outputProxy.input)
+            }
         } else {
             // Square mode: use AND/OR logic (with proper bipolar conversion)
             if (isAndMode) {

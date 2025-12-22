@@ -31,6 +31,8 @@ expect class AudioEngine() {
     fun createAdd(): Add
     fun createMultiplyAdd(): MultiplyAdd
     fun createPassThrough(): PassThrough
+    fun createMinimum(): Minimum
+    fun createMaximum(): Maximum
     
     /** Master output - connect final audio here */
     val lineOutLeft: AudioInput

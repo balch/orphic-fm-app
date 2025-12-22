@@ -55,3 +55,19 @@ expect interface SquareOscillator : AudioUnit {
     val frequency: AudioInput
     val amplitude: AudioInput
 }
+
+/**
+ * Minimum: output = min(inputA, inputB)
+ */
+expect interface Minimum : AudioUnit {
+    val inputA: AudioInput
+    val inputB: AudioInput
+}
+
+/**
+ * Maximum: output = max(inputA, inputB)
+ */
+expect interface Maximum : AudioUnit {
+    val inputA: AudioInput
+    val inputB: AudioInput
+}

@@ -55,6 +55,8 @@ actual class AudioEngine actual constructor() {
             is JsynSineOscillatorWrapper -> synth.add(unit.jsOsc)
             is JsynTriangleOscillatorWrapper -> synth.add(unit.jsOsc)
             is JsynSquareOscillatorWrapper -> synth.add(unit.jsOsc)
+            is JsynMinimumWrapper -> synth.add(unit.jsUnit)
+            is JsynMaximumWrapper -> synth.add(unit.jsUnit)
         }
     }
     
@@ -74,6 +76,8 @@ actual class AudioEngine actual constructor() {
     actual fun createAdd(): Add = JsynAddWrapper()
     actual fun createMultiplyAdd(): MultiplyAdd = JsynMultiplyAddWrapper()
     actual fun createPassThrough(): PassThrough = JsynPassThroughWrapper()
+    actual fun createMinimum(): Minimum = JsynMinimumWrapper()
+    actual fun createMaximum(): Maximum = JsynMaximumWrapper()
     
     actual val lineOutLeft: AudioInput
         get() = JsynAudioInput(lineOutLeftProxy.input)

@@ -88,3 +88,27 @@ class StubSquareOscillator : SquareOscillator {
     override val amplitude: AudioInput = StubAudioInput()
     override val output: AudioOutput = stubOutput
 }
+
+actual interface Minimum : AudioUnit {
+    actual val inputA: AudioInput
+    actual val inputB: AudioInput
+}
+
+class StubMinimum : Minimum {
+    private val stubOutput = StubAudioOutput()
+    override val inputA: AudioInput = StubAudioInput()
+    override val inputB: AudioInput = StubAudioInput()
+    override val output: AudioOutput = stubOutput
+}
+
+actual interface Maximum : AudioUnit {
+    actual val inputA: AudioInput
+    actual val inputB: AudioInput
+}
+
+class StubMaximum : Maximum {
+    private val stubOutput = StubAudioOutput()
+    override val inputA: AudioInput = StubAudioInput()
+    override val inputB: AudioInput = StubAudioInput()
+    override val output: AudioOutput = stubOutput
+}

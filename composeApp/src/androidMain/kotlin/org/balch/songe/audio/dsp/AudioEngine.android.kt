@@ -24,6 +24,8 @@ actual class AudioEngine actual constructor() {
     actual fun createAdd(): Add = StubAdd()
     actual fun createMultiplyAdd(): MultiplyAdd = StubMultiplyAdd()
     actual fun createPassThrough(): PassThrough = StubPassThrough()
+    actual fun createMinimum(): Minimum = StubMinimum()
+    actual fun createMaximum(): Maximum = StubMaximum()
     
     actual val lineOutLeft: AudioInput = StubAudioInput()
     actual val lineOutRight: AudioInput = StubAudioInput()

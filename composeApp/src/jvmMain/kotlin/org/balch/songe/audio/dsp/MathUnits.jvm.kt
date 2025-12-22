@@ -7,6 +7,8 @@ import com.jsyn.unitgen.PassThrough as JsynPassThrough
 import com.jsyn.unitgen.SineOscillator as JsynSineOsc
 import com.jsyn.unitgen.TriangleOscillator as JsynTriangleOsc
 import com.jsyn.unitgen.SquareOscillator as JsynSquareOsc
+import com.jsyn.unitgen.Minimum as JsynMinimum
+import com.jsyn.unitgen.Maximum as JsynMaximum
 
 /**
  * JVM actual implementations of math/utility units.
@@ -101,4 +103,30 @@ class JsynSquareOscillatorWrapper : SquareOscillator {
     override val frequency: AudioInput = JsynAudioInput(jsOsc.frequency)
     override val amplitude: AudioInput = JsynAudioInput(jsOsc.amplitude)
     override val output: AudioOutput = JsynAudioOutput(jsOsc.output)
+}
+
+actual interface Minimum : AudioUnit {
+    actual val inputA: AudioInput
+    actual val inputB: AudioInput
+}
+
+class JsynMinimumWrapper : Minimum {
+    internal val jsUnit = JsynMinimum()
+    
+    override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
+    override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
+    override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
+}
+
+actual interface Maximum : AudioUnit {
+    actual val inputA: AudioInput
+    actual val inputB: AudioInput
+}
+
+class JsynMaximumWrapper : Maximum {
+    internal val jsUnit = JsynMaximum()
+    
+    override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
+    override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
+    override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
 }
