@@ -58,134 +58,117 @@ fun HyperLfoPanel(
     onLinkChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val learnState = LocalLearnModeState.current
-    val isActive = mode != HyperLfoMode.OFF
-    
-    Column(
+    CollapsibleColumnPanel(
+        title = "HYPER LFO",
+        color = SongeColors.neonCyan,
+        initialExpanded = true,
+        expandedWidth = 240.dp,
         modifier = modifier
-            .fillMaxSize()
-            .shadow(elevation = 4.dp, shape = RoundedCornerShape(10.dp), clip = false)
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        SongeColors.darkVoid.copy(alpha = 0.6f),
-                        SongeColors.darkVoid.copy(alpha = 0.9f)
-                    )
-                )
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        SongeColors.neonCyan.copy(alpha = 0.4f),
-                        Color.Transparent,
-                        Color.Black.copy(alpha = 0.5f)
-                    ),
-                    start = Offset(0f, 0f),
-                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                ),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
     ) {
-        // Title with Activity Indicator
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            // Green activity indicator
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(
-                        if (isActive) SongeColors.synthGreen else Color(0xFF2A2A2A)
-                    )
-                    .border(
-                        1.dp,
-                        if (isActive) SongeColors.synthGreen.copy(alpha = 0.5f) else Color(0xFF3A3A3A),
-                        RoundedCornerShape(4.dp)
-                    )
-            )
-            
-            Text(
-                text = "HYPER LFO",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.5f)
-            )
-        }
+        val learnState = LocalLearnModeState.current
+        val isActive = mode != HyperLfoMode.OFF
         
-        Spacer(modifier = Modifier.weight(1f))
-        
-        // Controls Row
-        Row(
-            modifier = Modifier.padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
         ) {
-            // 3-way AND/OFF/OR Switch (Left)
-            Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_MODE, learnState)) {
-                Vertical3WaySwitch(
-                    topLabel = "AND",
-                    middleLabel = "OFF",
-                    bottomLabel = "OR",
-                    position = when (mode) {
-                        HyperLfoMode.AND -> 0
-                        HyperLfoMode.OFF -> 1
-                        HyperLfoMode.OR -> 2
-                    },
-                    onPositionChange = { pos ->
-                        onModeChange(when (pos) {
-                            0 -> HyperLfoMode.AND
-                            1 -> HyperLfoMode.OFF
-                            else -> HyperLfoMode.OR
-                        })
-                    },
-                    color = SongeColors.neonCyan,
-                    enabled = !learnState.isActive
-                )
-            }
-
-            // Knobs (Middle)
-            RotaryKnob(
-                value = lfo1Rate,
-                onValueChange = onLfo1RateChange,
-                label = "FREQ A",
-                controlId = ControlIds.HYPER_LFO_A,
-                size = 48.dp,
-                progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
-            )
-            RotaryKnob(
-                value = lfo2Rate,
-                onValueChange = onLfo2RateChange,
-                label = "FREQ B",
-                controlId = ControlIds.HYPER_LFO_B,
-                size = 48.dp,
-                progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
-            )
-
-            // LINK Vertical Switch (Right) - padded Box for better touch target
-            Box(
-                modifier = Modifier
-                    .learnable(ControlIds.HYPER_LFO_LINK, learnState)
-                    .padding(4.dp) // Expand touch target
+            // Title with Activity Indicator (Internal view)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                VerticalToggle(
-                    topLabel = "LINK",
-                    bottomLabel = "OFF",
-                    isTop = linkEnabled,
-                    onToggle = { onLinkChange(it) },
-                    color = SongeColors.electricBlue,
-                    enabled = !learnState.isActive
+                // Green activity indicator
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            if (isActive) SongeColors.synthGreen else Color(0xFF2A2A2A)
+                        )
+                        .border(
+                            1.dp,
+                            if (isActive) SongeColors.synthGreen.copy(alpha = 0.5f) else Color(0xFF3A3A3A),
+                            RoundedCornerShape(4.dp)
+                        )
+                )
+                
+                Text(
+                    text = "HYPER LFO",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.5f)
                 )
             }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Controls Row
+            Row(
+                modifier = Modifier.padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 3-way AND/OFF/OR Switch (Left)
+                Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_MODE, learnState)) {
+                    Vertical3WaySwitch(
+                        topLabel = "AND",
+                        middleLabel = "OFF",
+                        bottomLabel = "OR",
+                        position = when (mode) {
+                            HyperLfoMode.AND -> 0
+                            HyperLfoMode.OFF -> 1
+                            HyperLfoMode.OR -> 2
+                        },
+                        onPositionChange = { pos ->
+                            onModeChange(when (pos) {
+                                0 -> HyperLfoMode.AND
+                                1 -> HyperLfoMode.OFF
+                                else -> HyperLfoMode.OR
+                            })
+                        },
+                        color = SongeColors.neonCyan,
+                        enabled = !learnState.isActive
+                    )
+                }
+
+                // Knobs (Middle)
+                RotaryKnob(
+                    value = lfo1Rate,
+                    onValueChange = onLfo1RateChange,
+                    label = "FREQ A",
+                    controlId = ControlIds.HYPER_LFO_A,
+                    size = 48.dp,
+                    progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
+                )
+                RotaryKnob(
+                    value = lfo2Rate,
+                    onValueChange = onLfo2RateChange,
+                    label = "FREQ B",
+                    controlId = ControlIds.HYPER_LFO_B,
+                    size = 48.dp,
+                    progressColor = if (isActive) SongeColors.neonCyan else SongeColors.neonCyan.copy(alpha = 0.4f)
+                )
+
+                // LINK Vertical Switch (Right) - padded Box for better touch target
+                Box(
+                    modifier = Modifier
+                        .learnable(ControlIds.HYPER_LFO_LINK, learnState)
+                        .padding(4.dp) // Expand touch target
+                ) {
+                    VerticalToggle(
+                        topLabel = "LINK",
+                        bottomLabel = "OFF",
+                        isTop = linkEnabled,
+                        onToggle = { onLinkChange(it) },
+                        color = SongeColors.electricBlue,
+                        enabled = !learnState.isActive
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.weight(1f))
         }
-        
-        Spacer(modifier = Modifier.weight(1f))
     }
 }
 

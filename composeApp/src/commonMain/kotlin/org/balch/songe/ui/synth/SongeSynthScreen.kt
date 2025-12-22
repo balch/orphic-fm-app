@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -58,10 +59,13 @@ import org.balch.songe.ui.components.PulseButton
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.components.VerticalToggle
 import org.balch.songe.ui.components.learnable
+import org.balch.songe.ui.panels.DistortionPanel
 import org.balch.songe.ui.panels.HyperLfoPanel
+import org.balch.songe.ui.panels.MidiPanel
 import org.balch.songe.ui.panels.MidiProps
+import org.balch.songe.ui.panels.ModDelayPanel
 import org.balch.songe.ui.panels.PresetProps
-import org.balch.songe.ui.panels.SettingsPanel
+import org.balch.songe.ui.panels.PresetsPanel
 import org.balch.songe.ui.preview.PreviewSongeEngine
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.util.Logger
@@ -159,16 +163,16 @@ fun SongeSynthScreen(
         verticalArrangement = Arrangement.Top
     ) {
         // ═══════════════════════════════════════════════════════════
-        // TOP ROW: Hyper LFO | Mod Delay | Distortion
+        // TOP ROW: Presets | MIDI | Hyper LFO | Mod Delay | Distortion
         // ═══════════════════════════════════════════════════════════
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(IntrinsicSize.Max), // Responsive height based on tallest child
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .height(340.dp), // Fixed height to prevent stretching and ensure alignment
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SettingsPanel(
+            PresetsPanel(
                 presetProps = PresetProps(
                     presets = viewModel.presetList,
                     selectedPreset = viewModel.selectedPreset,
@@ -179,6 +183,10 @@ fun SongeSynthScreen(
                     onApply = { viewModel.applyPreset(it) },
                     onDialogActiveChange = { isDialogActive = it }
                 ),
+                modifier = Modifier.fillMaxHeight()
+            )
+            
+            MidiPanel(
                 midiProps = MidiProps(
                     deviceName = viewModel.connectedMidiDeviceName,
                     isOpen = viewModel.isMidiConnected,
@@ -190,6 +198,7 @@ fun SongeSynthScreen(
                 ),
                 modifier = Modifier.fillMaxHeight()
             )
+
             HyperLfoPanel(
                 lfo1Rate = viewModel.hyperLfoA,
                 onLfo1RateChange = viewModel::onHyperLfoAChange,
@@ -199,11 +208,10 @@ fun SongeSynthScreen(
                 onModeChange = viewModel::onHyperLfoModeChange,
                 linkEnabled = viewModel.hyperLfoLink,
                 onLinkChange = viewModel::onHyperLfoLinkChange,
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(.75f)
+                modifier = Modifier.fillMaxHeight()
             )
-            ModDelaySection(
+
+            ModDelayPanel(
                 time1 = viewModel.delayTime1,
                 onTime1Change = viewModel::onDelayTime1Change,
                 mod1 = viewModel.delayMod1,
@@ -220,18 +228,17 @@ fun SongeSynthScreen(
                 onSourceChange = viewModel::onDelayModSourceChange,
                 isTriangleWave = viewModel.delayLfoWaveformIsTriangle,
                 onWaveformChange = viewModel::onDelayLfoWaveformChange,
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier.fillMaxHeight()
             )
-            DistortionSection(
+
+            DistortionPanel(
                 drive = viewModel.drive,
                 onDriveChange = { viewModel.onGlobalDriveChange(it) },
                 volume = viewModel.masterVolume,
                 onVolumeChange = viewModel::onMasterVolumeChange,
                 mix = viewModel.distortionMix,
                 onMixChange = viewModel::onDistortionMixChange,
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(0.7f)
+                modifier = Modifier.fillMaxHeight()
             )
         }
 
@@ -634,184 +641,7 @@ private fun TriggerBtn(num: Int, isHolding: Boolean, onHoldChange: (Boolean) -> 
     }
 }
 
-@Composable
-private fun ModDelaySection(
-    time1: Float,
-    onTime1Change: (Float) -> Unit,
-    mod1: Float,
-    onMod1Change: (Float) -> Unit,
-    time2: Float,
-    onTime2Change: (Float) -> Unit,
-    mod2: Float,
-    onMod2Change: (Float) -> Unit,
-    feedback: Float,
-    onFeedbackChange: (Float) -> Unit,
-    mix: Float,
-    onMixChange: (Float) -> Unit,
-    isLfoSource: Boolean,
-    onSourceChange: (Boolean) -> Unit,
-    isTriangleWave: Boolean = true,
-    onWaveformChange: (Boolean) -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(SongeColors.darkVoid.copy(alpha = 0.5f))
-            .border(1.dp, SongeColors.warmGlow.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        // Title at TOP
-        Text("MOD DELAY", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = SongeColors.warmGlow)
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        // Main Control Grid with vertical switches
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Bottom 
-        ) {
 
-            // Column 1: MOD 1 / TIME 1
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                RotaryKnob(value = mod1, onValueChange = onMod1Change, label = "MOD 1", controlId = ControlIds.DELAY_MOD_1, size = 36.dp, progressColor = SongeColors.warmGlow)
-                RotaryKnob(value = time1, onValueChange = onTime1Change, label = "TIME 1", controlId = ControlIds.DELAY_TIME_1, size = 36.dp, progressColor = SongeColors.warmGlow)
-            }
-            
-            // Column 2: MOD 2 / TIME 2
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                RotaryKnob(value = mod2, onValueChange = onMod2Change, label = "MOD 2", controlId = ControlIds.DELAY_MOD_2, size = 36.dp, progressColor = SongeColors.warmGlow)
-                RotaryKnob(value = time2, onValueChange = onTime2Change, label = "TIME 2", controlId = ControlIds.DELAY_TIME_2, size = 36.dp, progressColor = SongeColors.warmGlow)
-            }
-            
-            // Column 3: FB
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                VerticalToggle(
-                    topLabel = "SELF",
-                    bottomLabel = "LFO",
-                    isTop = !isLfoSource, // SELF is top, LFO is bottom
-                    onToggle = { isTop -> onSourceChange(!isTop) },
-                    color = SongeColors.warmGlow,
-                    enabled = !LocalLearnModeState.current.isActive,
-                    controlId = ControlIds.DELAY_MOD_SOURCE
-                )
-                RotaryKnob(value = feedback, onValueChange = onFeedbackChange, label = "FB", controlId = ControlIds.DELAY_FEEDBACK, size = 36.dp, progressColor = SongeColors.warmGlow)
-            }
-            
-            // Column 4: MIX
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                VerticalToggle(
-                    topLabel = "TRI",
-                    bottomLabel = "SQR",
-                    isTop = isTriangleWave,
-                    onToggle = { isTop -> onWaveformChange(isTop) },
-                    color = SongeColors.warmGlow,
-                    enabled = !LocalLearnModeState.current.isActive,
-                    controlId = ControlIds.DELAY_LFO_WAVEFORM
-                )
-                RotaryKnob(value = mix, onValueChange = onMixChange, label = "MIX", controlId = ControlIds.DELAY_MIX, size = 36.dp, progressColor = SongeColors.warmGlow)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ToggleChip(text: String, isSelected: Boolean, color: Color, onClick: () -> Unit = {}) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(if (isSelected) color.copy(alpha = 0.3f) else Color(0xFF2A2A3A))
-            .border(1.dp, if (isSelected) color else Color.Transparent, RoundedCornerShape(4.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-    ) {
-        Text(text, fontSize = 8.sp, color = if (isSelected) color else Color.White.copy(alpha = 0.5f))
-    }
-}
-
-@Composable
-private fun DistortionSection(
-    drive: Float, 
-    onDriveChange: (Float) -> Unit, 
-    volume: Float, 
-    onVolumeChange: (Float) -> Unit, 
-    mix: Float,
-    onMixChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .width(140.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(SongeColors.darkVoid.copy(alpha = 0.5f))
-            .border(1.dp, SongeColors.neonMagenta.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-            .padding(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
-    ) {
-        // Title at TOP
-        Text(
-            "DISTORTION",
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = SongeColors.neonMagenta
-        )
-
-        // Spacer to push knobs down
-        Spacer(modifier = Modifier.weight(1f))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            RotaryKnob(
-                value = drive,
-                onValueChange = onDriveChange,
-                label = "DRIVE",
-                controlId = ControlIds.DRIVE,
-                size = 42.dp,
-                progressColor = SongeColors.neonMagenta
-            )
-            RotaryKnob(
-                value = volume,
-                onValueChange = onVolumeChange,
-                label = "VOLUME",
-                controlId = ControlIds.MASTER_VOLUME,
-                size = 42.dp,
-                progressColor = SongeColors.electricBlue
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            RotaryKnob(
-                value = mix,
-                onValueChange = onMixChange,
-                label = "MIX",
-                controlId = ControlIds.DISTORTION_MIX,
-                size = 42.dp,
-                progressColor = SongeColors.warmGlow
-            )
-            Canvas(
-                modifier = Modifier
-                    .size(12.dp)
-                    .align(Alignment.CenterVertically)
-            ) { // Size the canvas
-                drawCircle(
-                    color = Color.Red, // Set the fill color
-                    radius = size.minDimension / 2f // Radius to fill the canvas
-                    // Center is automatically the center of the Canvas
-                )
-            }
-        }
-    }
-}
 
 
 @Composable
