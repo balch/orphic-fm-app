@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,17 +16,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.ui.tooling.preview.Preview
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 import org.balch.songe.ui.components.RotaryKnob
 import org.balch.songe.ui.theme.SongeColors
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
@@ -175,7 +174,7 @@ fun GlobalControlsPanel(
 
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
-@Preview
+@Preview(widthDp = 800, heightDp = 240)
 fun GlobalControlsPanelPreview() {
     MaterialTheme {
         GlobalControlsPanel(

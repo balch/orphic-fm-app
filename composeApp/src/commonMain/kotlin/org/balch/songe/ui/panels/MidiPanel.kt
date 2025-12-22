@@ -56,7 +56,7 @@ fun MidiPanel(
                 .fillMaxSize()
                 .padding(horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.Center
         ) {
             // Header
             Text(
