@@ -1,5 +1,14 @@
 package org.balch.songe.audio.dsp
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.balch.songe.audio.ModSource
 import org.balch.songe.audio.SongeEngine
 import org.balch.songe.util.Logger
@@ -73,6 +82,16 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     private val quadPitchOffsets = DoubleArray(2) { 0.5 }
     private val voiceTuneCache = DoubleArray(8) { 0.5 }
     private var fmStructureCrossQuad = false
+    
+    // Reactive monitoring flows
+    private val _peakFlow = MutableStateFlow(0f)
+    override val peakFlow: StateFlow<Float> = _peakFlow.asStateFlow()
+    
+    private val _cpuLoadFlow = MutableStateFlow(0f)
+    override val cpuLoadFlow: StateFlow<Float> = _cpuLoadFlow.asStateFlow()
+    
+    // Monitoring coroutine scope
+    private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     init {
         // Add all units to audio engine
@@ -215,16 +234,29 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     // ═══════════════════════════════════════════════════════════
     // SongeEngine Implementation
     // ═══════════════════════════════════════════════════════════
+    
+    private var monitoringJob: kotlinx.coroutines.Job? = null
 
     override fun start() {
         if (audioEngine.isRunning) return
         Logger.info { "Starting Shared Audio Engine..." }
         audioEngine.start()
+        
+        // Start monitoring flow updates
+        monitoringJob = monitoringScope.launch {
+            while (isActive) {
+                _peakFlow.value = peakFollower.getCurrent().toFloat()
+                _cpuLoadFlow.value = audioEngine.getCpuLoad()
+                delay(100)
+            }
+        }
         Logger.info { "Audio Engine Started" }
     }
 
     override fun stop() {
         Logger.info { "Stopping Audio Engine..." }
+        monitoringJob?.cancel()
+        monitoringJob = null
         audioEngine.stop()
         Logger.info { "Audio Engine Stopped" }
     }

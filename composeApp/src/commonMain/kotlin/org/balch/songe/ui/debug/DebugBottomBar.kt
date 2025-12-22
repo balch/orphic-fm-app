@@ -26,6 +26,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -104,16 +105,9 @@ fun DebugBottomBar(
                 // MONITORING METRICS
                 Spacer(modifier = Modifier.width(16.dp))
                 
-                // Polling Loop
-                var peak by remember { mutableStateOf(0f) }
-                var cpu by remember { mutableStateOf(0f) }
-                LaunchedEffect(Unit) {
-                    while(true) {
-                        peak = engine.getPeak()
-                        cpu = engine.getCpuLoad()
-                        kotlinx.coroutines.delay(100)
-                    }
-                }
+                // Collect from engine flows
+                val peak by engine.peakFlow.collectAsState()
+                val cpu by engine.cpuLoadFlow.collectAsState()
                 
                 // CPU Display
                 Row(verticalAlignment = Alignment.CenterVertically) {

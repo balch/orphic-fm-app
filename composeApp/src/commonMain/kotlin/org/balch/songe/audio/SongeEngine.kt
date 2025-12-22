@@ -56,6 +56,10 @@ interface SongeEngine {
     // Monitoring
     fun getPeak(): Float
     fun getCpuLoad(): Float
+    
+    // Reactive monitoring flows (emit at ~100ms intervals)
+    val peakFlow: kotlinx.coroutines.flow.StateFlow<Float>
+    val cpuLoadFlow: kotlinx.coroutines.flow.StateFlow<Float>
 }
 
 enum class ModSource {

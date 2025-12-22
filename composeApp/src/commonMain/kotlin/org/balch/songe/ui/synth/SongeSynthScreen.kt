@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,6 +96,9 @@ fun SongeSynthScreen(
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
+    
+    // Collect peak level from engine's flow
+    val peak by engine.peakFlow.collectAsState()
 
     // Get the selected control ID for learn mode
     val selectedControlId = (viewModel.midiMappingState.learnTarget as? LearnTarget.Control)?.controlId
@@ -238,6 +242,7 @@ fun SongeSynthScreen(
                 onVolumeChange = viewModel::onMasterVolumeChange,
                 mix = viewModel.distortionMix,
                 onMixChange = viewModel::onDistortionMixChange,
+                peak = peak,
                 modifier = Modifier.fillMaxHeight()
             )
         }

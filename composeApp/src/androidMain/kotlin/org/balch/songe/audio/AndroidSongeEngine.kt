@@ -1,5 +1,9 @@
 package org.balch.songe.audio
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
 class AndroidSongeEngine : SongeEngine {
     override fun start() {
         // Stub
@@ -74,4 +78,8 @@ class AndroidSongeEngine : SongeEngine {
 
     override fun getPeak(): Float = 0f
     override fun getCpuLoad(): Float = 0f
+    
+    // Reactive monitoring flows (stub values)
+    override val peakFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
+    override val cpuLoadFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
 }

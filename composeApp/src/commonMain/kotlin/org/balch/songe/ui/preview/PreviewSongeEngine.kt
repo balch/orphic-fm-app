@@ -1,5 +1,8 @@
 package org.balch.songe.ui.preview
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.balch.songe.audio.SongeEngine
 
 class PreviewSongeEngine(): SongeEngine {
@@ -53,4 +56,8 @@ class PreviewSongeEngine(): SongeEngine {
     
     override fun getPeak(): Float = 0.5f
     override fun getCpuLoad(): Float = 12.5f
+    
+    // Reactive monitoring flows (static preview values)
+    override val peakFlow: StateFlow<Float> = MutableStateFlow(0.5f).asStateFlow()
+    override val cpuLoadFlow: StateFlow<Float> = MutableStateFlow(12.5f).asStateFlow()
 }
