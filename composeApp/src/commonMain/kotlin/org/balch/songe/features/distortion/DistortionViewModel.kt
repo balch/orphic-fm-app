@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.songe.core.audio.SongeEngine
 import org.balch.songe.core.coroutines.DispatcherProvider
+import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.songe.core.midi.MidiRouter
 import org.balch.songe.core.presets.PresetLoader
 
 /** UI state for the Distortion/Volume panel. */
@@ -47,6 +49,7 @@ private sealed interface DistortionIntent {
 class DistortionViewModel(
     private val engine: SongeEngine,
     private val presetLoader: PresetLoader,
+    private val midiRouter: Lazy<MidiRouter>,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
@@ -87,6 +90,17 @@ class DistortionViewModel(
             launch {
                 engine.peakFlow.collect { peak ->
                     intents.tryEmit(DistortionIntent.Peak(peak))
+                }
+            }
+
+            // Subscribe to MIDI control changes for Distortion controls
+            launch {
+                midiRouter.value.onControlChange.collect { event ->
+                    when (event.controlId) {
+                        ControlIds.MASTER_VOLUME -> intents.tryEmit(DistortionIntent.Volume(event.value))
+                        ControlIds.DRIVE -> intents.tryEmit(DistortionIntent.Drive(event.value))
+                        ControlIds.DISTORTION_MIX -> intents.tryEmit(DistortionIntent.Mix(event.value))
+                    }
                 }
             }
         }

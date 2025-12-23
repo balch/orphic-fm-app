@@ -5,11 +5,13 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
@@ -19,7 +21,10 @@ import org.balch.songe.core.audio.ModSource
 import org.balch.songe.core.audio.SongeEngine
 import org.balch.songe.core.audio.VoiceState
 import org.balch.songe.core.coroutines.DispatcherProvider
+import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.songe.core.midi.MidiRouter
 import org.balch.songe.core.presets.PresetLoader
+import kotlin.math.roundToInt
 
 /** UI state for voice management. */
 data class VoiceUiState(
@@ -80,6 +85,7 @@ private sealed interface VoiceIntent {
 class VoiceViewModel(
     private val engine: SongeEngine,
     private val presetLoader: PresetLoader,
+    private val midiRouter: Lazy<MidiRouter>,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
@@ -106,33 +112,138 @@ class VoiceViewModel(
             uiState.value.voiceStates.forEachIndexed { i, v -> engine.setVoiceTune(i, v.tune) }
 
             // Subscribe to preset changes
-            presetLoader.presetFlow.collect { preset ->
-                val voiceState =
-                    VoiceUiState(
-                        voiceStates =
-                            uiState.value.voiceStates.mapIndexed { index, state ->
-                                state.copy(
-                                    tune = preset.voiceTunes.getOrElse(index) { state.tune }
-                                )
-                            },
-                        voiceModDepths = preset.voiceModDepths.take(8).padEnd(8, 0f),
-                        pairSharpness = preset.pairSharpness.take(4).padEnd(4, 0f),
-                        voiceEnvelopeSpeeds = preset.voiceEnvelopeSpeeds.take(8).padEnd(8, 0f),
-                        duoModSources =
-                            preset.duoModSources
-                                .mapNotNull {
-                                    try {
-                                        ModSource.valueOf(it)
-                                    } catch (e: Exception) {
-                                        ModSource.OFF
+            launch {
+                presetLoader.presetFlow.collect { preset ->
+                    val voiceState =
+                        VoiceUiState(
+                            voiceStates =
+                                uiState.value.voiceStates.mapIndexed { index, state ->
+                                    state.copy(
+                                        tune = preset.voiceTunes.getOrElse(index) { state.tune }
+                                    )
+                                },
+                            voiceModDepths = preset.voiceModDepths.take(8).padEnd(8, 0f),
+                            pairSharpness = preset.pairSharpness.take(4).padEnd(4, 0f),
+                            voiceEnvelopeSpeeds = preset.voiceEnvelopeSpeeds.take(8).padEnd(8, 0f),
+                            duoModSources =
+                                preset.duoModSources
+                                    .mapNotNull {
+                                        try {
+                                            ModSource.valueOf(it)
+                                        } catch (e: Exception) {
+                                            ModSource.OFF
+                                        }
                                     }
-                                }
-                                .take(4)
-                                .padEnd(4, ModSource.OFF),
-                        fmStructureCrossQuad = preset.fmStructureCrossQuad,
-                        totalFeedback = preset.totalFeedback
-                    )
-                intents.tryEmit(VoiceIntent.Restore(voiceState))
+                                    .take(4)
+                                    .padEnd(4, ModSource.OFF),
+                            fmStructureCrossQuad = preset.fmStructureCrossQuad,
+                            totalFeedback = preset.totalFeedback
+                        )
+                    intents.tryEmit(VoiceIntent.Restore(voiceState))
+                }
+            }
+
+            // Subscribe to MIDI pulse events
+            launch {
+                midiRouter.value.onPulseStart.collect { voiceIndex ->
+                    intents.tryEmit(VoiceIntent.PulseStart(voiceIndex))
+                }
+            }
+            launch {
+                midiRouter.value.onPulseEnd.collect { voiceIndex ->
+                    intents.tryEmit(VoiceIntent.PulseEnd(voiceIndex))
+                }
+            }
+
+            // Subscribe to MIDI control changes for voice-related controls
+            launch {
+                midiRouter.value.onControlChange.collect { event ->
+                    handleMidiControlChange(event.controlId, event.value)
+                }
+            }
+        }
+    }
+
+    /**
+     * Routes MIDI control changes to the appropriate voice intents.
+     */
+    private fun handleMidiControlChange(controlId: String, value: Float) {
+        when (controlId) {
+            // Voice tunes
+            ControlIds.voiceTune(0) -> intents.tryEmit(VoiceIntent.Tune(0, value))
+            ControlIds.voiceTune(1) -> intents.tryEmit(VoiceIntent.Tune(1, value))
+            ControlIds.voiceTune(2) -> intents.tryEmit(VoiceIntent.Tune(2, value))
+            ControlIds.voiceTune(3) -> intents.tryEmit(VoiceIntent.Tune(3, value))
+            ControlIds.voiceTune(4) -> intents.tryEmit(VoiceIntent.Tune(4, value))
+            ControlIds.voiceTune(5) -> intents.tryEmit(VoiceIntent.Tune(5, value))
+            ControlIds.voiceTune(6) -> intents.tryEmit(VoiceIntent.Tune(6, value))
+            ControlIds.voiceTune(7) -> intents.tryEmit(VoiceIntent.Tune(7, value))
+
+            // Voice FM depths (duo-level)
+            ControlIds.voiceFmDepth(0), ControlIds.voiceFmDepth(1) ->
+                onDuoModDepthChange(0, value)
+            ControlIds.voiceFmDepth(2), ControlIds.voiceFmDepth(3) ->
+                onDuoModDepthChange(1, value)
+            ControlIds.voiceFmDepth(4), ControlIds.voiceFmDepth(5) ->
+                onDuoModDepthChange(2, value)
+            ControlIds.voiceFmDepth(6), ControlIds.voiceFmDepth(7) ->
+                onDuoModDepthChange(3, value)
+
+            // Pair sharpness
+            ControlIds.pairSharpness(0) -> intents.tryEmit(VoiceIntent.PairSharpness(0, value))
+            ControlIds.pairSharpness(1) -> intents.tryEmit(VoiceIntent.PairSharpness(1, value))
+            ControlIds.pairSharpness(2) -> intents.tryEmit(VoiceIntent.PairSharpness(2, value))
+            ControlIds.pairSharpness(3) -> intents.tryEmit(VoiceIntent.PairSharpness(3, value))
+
+            // Advanced FM
+            ControlIds.VIBRATO -> intents.tryEmit(VoiceIntent.Vibrato(value))
+            ControlIds.VOICE_COUPLING -> intents.tryEmit(VoiceIntent.VoiceCoupling(value))
+            ControlIds.TOTAL_FEEDBACK -> intents.tryEmit(VoiceIntent.TotalFeedback(value))
+
+            // Quad controls
+            ControlIds.quadPitch(0) -> intents.tryEmit(VoiceIntent.QuadPitch(0, value))
+            ControlIds.quadPitch(1) -> intents.tryEmit(VoiceIntent.QuadPitch(1, value))
+            ControlIds.quadHold(0) -> intents.tryEmit(VoiceIntent.QuadHold(0, value))
+            ControlIds.quadHold(1) -> intents.tryEmit(VoiceIntent.QuadHold(1, value))
+
+            else -> handleDynamicControlId(controlId, value)
+        }
+    }
+
+    private fun handleDynamicControlId(controlId: String, value: Float) {
+        when {
+            controlId.startsWith("voice_") && controlId.endsWith("_tune") -> {
+                val index = controlId.removePrefix("voice_").removeSuffix("_tune").toIntOrNull()
+                if (index != null) intents.tryEmit(VoiceIntent.Tune(index, value))
+            }
+
+            controlId.startsWith("voice_") && controlId.endsWith("_fm_depth") -> {
+                val index = controlId.removePrefix("voice_").removeSuffix("_fm_depth").toIntOrNull()
+                if (index != null) intents.tryEmit(VoiceIntent.ModDepth(index, value))
+            }
+
+            controlId.startsWith("voice_") && controlId.endsWith("_env_speed") -> {
+                val index = controlId.removePrefix("voice_").removeSuffix("_env_speed").toIntOrNull()
+                if (index != null) intents.tryEmit(VoiceIntent.EnvelopeSpeed(index, value))
+            }
+
+            controlId.startsWith("voice_") && controlId.endsWith("_hold") -> {
+                val index = controlId.removePrefix("voice_").removeSuffix("_hold").toIntOrNull()
+                if (index != null) intents.tryEmit(VoiceIntent.Hold(index, value >= 0.5f))
+            }
+
+            controlId.startsWith("pair_") && controlId.endsWith("_sharpness") -> {
+                val index = controlId.removePrefix("pair_").removeSuffix("_sharpness").toIntOrNull()
+                if (index != null) intents.tryEmit(VoiceIntent.PairSharpness(index, value))
+            }
+
+            controlId.startsWith("pair_") && controlId.endsWith("_mod_source") -> {
+                val index = controlId.removePrefix("pair_").removeSuffix("_mod_source").toIntOrNull()
+                if (index != null) {
+                    val sources = ModSource.values()
+                    val srcIndex = (value * (sources.size - 1)).roundToInt()
+                    intents.tryEmit(VoiceIntent.DuoModSource(index, sources[srcIndex]))
+                }
             }
         }
     }

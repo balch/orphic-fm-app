@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.songe.core.audio.SongeEngine
 import org.balch.songe.core.coroutines.DispatcherProvider
+import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.songe.core.midi.MidiRouter
 import org.balch.songe.core.presets.PresetLoader
 
 /** UI state for the Hyper LFO panel. */
@@ -47,6 +50,7 @@ private sealed interface LfoIntent {
 class LfoViewModel(
     private val engine: SongeEngine,
     private val presetLoader: PresetLoader,
+    private val midiRouter: Lazy<MidiRouter>,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
@@ -72,20 +76,38 @@ class LfoViewModel(
         viewModelScope.launch(dispatcherProvider.io) {
             applyFullState(uiState.value)
 
-            presetLoader.presetFlow.collect { preset ->
-                val lfoState =
-                    LfoUiState(
-                        lfoA = preset.hyperLfoA,
-                        lfoB = preset.hyperLfoB,
-                        mode =
-                            try {
-                                HyperLfoMode.valueOf(preset.hyperLfoMode)
-                            } catch (e: Exception) {
-                                HyperLfoMode.OFF
-                            },
-                        linkEnabled = preset.hyperLfoLink
-                    )
-                intents.tryEmit(LfoIntent.Restore(lfoState))
+            launch {
+                presetLoader.presetFlow.collect { preset ->
+                    val lfoState =
+                        LfoUiState(
+                            lfoA = preset.hyperLfoA,
+                            lfoB = preset.hyperLfoB,
+                            mode =
+                                try {
+                                    HyperLfoMode.valueOf(preset.hyperLfoMode)
+                                } catch (e: Exception) {
+                                    HyperLfoMode.OFF
+                                },
+                            linkEnabled = preset.hyperLfoLink
+                        )
+                    intents.tryEmit(LfoIntent.Restore(lfoState))
+                }
+            }
+
+            // Subscribe to MIDI control changes for LFO controls
+            launch {
+                midiRouter.value.onControlChange.collect { event ->
+                    when (event.controlId) {
+                        ControlIds.HYPER_LFO_A -> intents.tryEmit(LfoIntent.LfoA(event.value))
+                        ControlIds.HYPER_LFO_B -> intents.tryEmit(LfoIntent.LfoB(event.value))
+                        ControlIds.HYPER_LFO_MODE -> {
+                            val modes = HyperLfoMode.values()
+                            val index = (event.value * (modes.size - 1)).toInt().coerceIn(0, modes.size - 1)
+                            intents.tryEmit(LfoIntent.Mode(modes[index]))
+                        }
+                        ControlIds.HYPER_LFO_LINK -> intents.tryEmit(LfoIntent.Link(event.value >= 0.5f))
+                    }
+                }
             }
         }
     }

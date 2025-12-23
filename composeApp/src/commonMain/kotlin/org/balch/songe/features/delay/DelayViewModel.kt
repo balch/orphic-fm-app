@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.songe.core.audio.SongeEngine
 import org.balch.songe.core.coroutines.DispatcherProvider
+import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.songe.core.midi.MidiRouter
 import org.balch.songe.core.presets.PresetLoader
 
 /** UI state for the Mod Delay panel. */
@@ -55,7 +58,8 @@ private sealed interface DelayIntent {
 class DelayViewModel(
     private val engine: SongeEngine,
     private val presetLoader: PresetLoader,
-    dispatcherProvider: DispatcherProvider
+    private val midiRouter: Lazy<MidiRouter>,
+    private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
     private val intents =
@@ -80,19 +84,37 @@ class DelayViewModel(
         viewModelScope.launch(dispatcherProvider.io) {
             applyFullState(uiState.value)
 
-            presetLoader.presetFlow.collect { preset ->
-                val delayState =
-                    DelayUiState(
-                        time1 = preset.delayTime1,
-                        time2 = preset.delayTime2,
-                        mod1 = preset.delayMod1,
-                        mod2 = preset.delayMod2,
-                        feedback = preset.delayFeedback,
-                        mix = preset.delayMix,
-                        isLfoSource = preset.delayModSourceIsLfo,
-                        isTriangleWave = preset.delayLfoWaveformIsTriangle
-                    )
-                intents.tryEmit(DelayIntent.Restore(delayState))
+            launch {
+                presetLoader.presetFlow.collect { preset ->
+                    val delayState =
+                        DelayUiState(
+                            time1 = preset.delayTime1,
+                            time2 = preset.delayTime2,
+                            mod1 = preset.delayMod1,
+                            mod2 = preset.delayMod2,
+                            feedback = preset.delayFeedback,
+                            mix = preset.delayMix,
+                            isLfoSource = preset.delayModSourceIsLfo,
+                            isTriangleWave = preset.delayLfoWaveformIsTriangle
+                        )
+                    intents.tryEmit(DelayIntent.Restore(delayState))
+                }
+            }
+
+            // Subscribe to MIDI control changes for Delay controls
+            launch {
+                midiRouter.value.onControlChange.collect { event ->
+                    when (event.controlId) {
+                        ControlIds.DELAY_TIME_1 -> intents.tryEmit(DelayIntent.Time1(event.value))
+                        ControlIds.DELAY_TIME_2 -> intents.tryEmit(DelayIntent.Time2(event.value))
+                        ControlIds.DELAY_MOD_1 -> intents.tryEmit(DelayIntent.Mod1(event.value))
+                        ControlIds.DELAY_MOD_2 -> intents.tryEmit(DelayIntent.Mod2(event.value))
+                        ControlIds.DELAY_FEEDBACK -> intents.tryEmit(DelayIntent.Feedback(event.value))
+                        ControlIds.DELAY_MIX -> intents.tryEmit(DelayIntent.Mix(event.value))
+                        ControlIds.DELAY_MOD_SOURCE -> intents.tryEmit(DelayIntent.Source(event.value >= 0.5f))
+                        ControlIds.DELAY_LFO_WAVEFORM -> intents.tryEmit(DelayIntent.Waveform(event.value >= 0.5f))
+                    }
+                }
             }
         }
     }

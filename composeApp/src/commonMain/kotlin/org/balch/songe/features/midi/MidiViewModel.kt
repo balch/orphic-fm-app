@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.balch.songe.MidiRouter
+import org.balch.songe.core.midi.MidiRouter
 import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.core.midi.LearnTarget
 import org.balch.songe.core.midi.MidiController
@@ -182,56 +182,78 @@ class MidiViewModel(
     // ═══════════════════════════════════════════════════════════
 
     internal fun handleNoteOn(note: Int, velocity: Int): Boolean {
-        val learnTarget = uiState.value.mappingState.learnTarget
+        val state = uiState.value
+        val learnTarget = state.mappingState.learnTarget
 
-        return when (learnTarget) {
-            is LearnTarget.Voice -> {
-                intents.tryEmit(
-                    MidiIntent.SetMappingState(
-                        uiState.value.mappingState.assignNoteToVoice(
-                            note,
-                            learnTarget.index
+        // When in learn mode, always suppress normal note routing
+        if (state.isLearnModeActive) {
+            when (learnTarget) {
+                is LearnTarget.Voice -> {
+                    intents.tryEmit(
+                        MidiIntent.SetMappingState(
+                            state.mappingState.assignNoteToVoice(
+                                note,
+                                learnTarget.index
+                            )
                         )
                     )
-                )
-                Logger.info {
-                    "Assigned MIDI note ${MidiMappingState.noteName(note)} to Voice ${learnTarget.index + 1}"
+                    Logger.info {
+                        "Assigned MIDI note ${MidiMappingState.noteName(note)} to Voice ${learnTarget.index + 1}"
+                    }
                 }
-                true
-            }
 
-            is LearnTarget.Control -> {
+                is LearnTarget.Control -> {
+                    intents.tryEmit(
+                        MidiIntent.SetMappingState(
+                            state.mappingState.assignNoteToControl(
+                                note,
+                                learnTarget.controlId
+                            )
+                        )
+                    )
+                    Logger.info { "Assigned MIDI note $note to Control ${learnTarget.controlId}" }
+                }
+
+                else -> {
+                    // No target selected - just log and ignore
+                    Logger.info { "Learn mode active but no target selected, ignoring note $note" }
+                }
+            }
+            // Always return true in learn mode to suppress normal note routing
+            return true
+        }
+        
+        return false
+    }
+
+    internal fun handleControlChange(controller: Int): Boolean {
+        val state = uiState.value
+        val learnTarget = state.mappingState.learnTarget
+        
+        // Log for debugging
+        Logger.info { "handleControlChange: CC=$controller, isLearnModeActive=${state.isLearnModeActive}, learnTarget=$learnTarget" }
+
+        // When in learn mode, always suppress normal CC routing
+        if (state.isLearnModeActive) {
+            if (learnTarget is LearnTarget.Control) {
+                // A control is selected - bind the CC to it
                 intents.tryEmit(
                     MidiIntent.SetMappingState(
-                        uiState.value.mappingState.assignNoteToControl(
-                            note,
+                        state.mappingState.assignCCToControl(
+                            controller,
                             learnTarget.controlId
                         )
                     )
                 )
-                Logger.info { "Assigned MIDI note $note to Control ${learnTarget.controlId}" }
-                true
+                Logger.info { "Assigned CC$controller to ${learnTarget.controlId}" }
+            } else {
+                // No control selected - just log and ignore
+                Logger.info { "Learn mode active but no control selected, ignoring CC$controller" }
             }
-
-            else -> false
-        }
-    }
-
-    internal fun handleControlChange(controller: Int): Boolean {
-        val learnTarget = uiState.value.mappingState.learnTarget
-
-        if (learnTarget is LearnTarget.Control) {
-            intents.tryEmit(
-                MidiIntent.SetMappingState(
-                    uiState.value.mappingState.assignCCToControl(
-                        controller,
-                        learnTarget.controlId
-                    )
-                )
-            )
-            Logger.info { "Assigned CC$controller to ${learnTarget.controlId}" }
+            // Always return true in learn mode to suppress normal routing
             return true
         }
+        
         return false
     }
 

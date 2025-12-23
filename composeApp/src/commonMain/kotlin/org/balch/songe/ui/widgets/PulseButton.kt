@@ -49,6 +49,7 @@ fun PulseButton(
     label: String = "PULSE",
     size: Dp = 48.dp,
     activeColor: Color = SongeColors.neonMagenta,
+    isActive: Boolean = false,  // External trigger active (MIDI/keyboard)
     isLearnMode: Boolean = false,
     isLearning: Boolean = false,
     onLearnSelect: () -> Unit = {}
@@ -73,12 +74,12 @@ fun PulseButton(
         }
     }
 
-    // Animate glow size based on press state or learning state
-    val showGlow = isPressed || isLearning
+    // Animate glow size based on press state, active state, or learning state
+    val showGlow = isPressed || isActive || isLearning
     val glowAlpha by animateFloatAsState(targetValue = if (showGlow) 0.8f else 0f)
     val glowRadius by animateFloatAsState(targetValue = if (showGlow) 10f else 0f)
 
-    // Use magenta for learning state
+    // Use magenta for learning state, activeColor for normal active
     val glowColor = if (isLearning) SongeColors.neonMagenta else activeColor
 
     Column(
@@ -149,8 +150,8 @@ fun PulseButton(
                         style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx())
                     )
 
-                    // 4. Pressed Overlay (Darkens when touched)
-                    if (isPressed && !isLearnMode) {
+                    // 4. Pressed/Active Overlay (Darkens when touched or active)
+                    if ((isPressed || isActive) && !isLearnMode) {
                         drawCircle(
                             color = Color.Black.copy(alpha = 0.3f),
                             radius = radius

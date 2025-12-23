@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -18,6 +19,8 @@ import kotlinx.coroutines.launch
 import org.balch.songe.core.audio.SongeEngine
 import org.balch.songe.core.audio.StereoMode
 import org.balch.songe.core.coroutines.DispatcherProvider
+import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.songe.core.midi.MidiRouter
 
 /** UI state for the Stereo panel. */
 data class StereoUiState(
@@ -43,6 +46,7 @@ private sealed interface StereoIntent {
 @ContributesIntoMap(AppScope::class)
 class StereoViewModel(
     private val engine: SongeEngine,
+    private val midiRouter: Lazy<MidiRouter>,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
@@ -67,6 +71,23 @@ class StereoViewModel(
         viewModelScope.launch(dispatcherProvider.io) {
             // Apply initial state to engine
             applyFullState(uiState.value)
+
+            // Subscribe to MIDI control changes for Stereo controls
+            launch {
+                midiRouter.value.onControlChange.collect { event ->
+                    when (event.controlId) {
+                        ControlIds.STEREO_PAN -> {
+                            // Convert 0-1 to -1..1 for pan
+                            intents.tryEmit(StereoIntent.SetMasterPan((event.value * 2f) - 1f))
+                        }
+                        ControlIds.STEREO_MODE -> {
+                            intents.tryEmit(StereoIntent.SetMode(
+                                if (event.value >= 0.5f) StereoMode.STEREO_DELAYS else StereoMode.VOICE_PAN
+                            ))
+                        }
+                    }
+                }
+            }
         }
     }
 

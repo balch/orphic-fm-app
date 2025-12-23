@@ -146,6 +146,7 @@ fun DuoPairBox(
                         },
                         size = 28.dp,
                         label = "",
+                        isActive = voiceState.voiceStates[voiceA].pulse,
                         isLearnMode = midiState.isLearnModeActive,
                         isLearning =
                             midiViewModel.isVoiceBeingLearned(
@@ -222,6 +223,7 @@ fun DuoPairBox(
                         },
                         size = 28.dp,
                         label = "",
+                        isActive = voiceState.voiceStates[voiceB].pulse,
                         isLearnMode = midiState.isLearnModeActive,
                         isLearning =
                             midiViewModel.isVoiceBeingLearned(
