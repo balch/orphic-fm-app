@@ -36,12 +36,13 @@ fun GlobalControlsPanel(
     onVibratoChange: (Float) -> Unit,
     lfo2Rate: Float = 0.3f,
     onLfo2RateChange: (Float) -> Unit = {},
-    hyperLfoMode: org.balch.songe.features.lfo.HyperLfoMode = _root_ide_package_.org.balch.songe.features.lfo.HyperLfoMode.AND,
+    hyperLfoMode: org.balch.songe.features.lfo.HyperLfoMode =
+        _root_ide_package_.org.balch.songe.features.lfo.HyperLfoMode.AND,
     onHyperLfoModeChange: (org.balch.songe.features.lfo.HyperLfoMode) -> Unit = {},
     // Effects
     distortion: Float,
     onDistortionChange: (Float) -> Unit,
-    masterDrive: Float,  // "Gain" like
+    masterDrive: Float, // "Gain" like
     onMasterDriveChange: (Float) -> Unit,
     // Delay (new params - can be hooked later)
     delayTime: Float = 0.3f,
@@ -57,43 +58,64 @@ fun GlobalControlsPanel(
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier
-            .shadow(elevation = 8.dp, shape = RoundedCornerShape(12.dp), clip = false)
-            .clip(RoundedCornerShape(12.dp))
-            .then(
-                if (hazeState != null) {
-                    Modifier.hazeEffect(state = hazeState, style = HazeMaterials.regular())
-                } else {
-                    Modifier
-                }
+        modifier =
+            modifier.shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(12.dp),
+                clip = false
             )
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        SongeColors.darkVoid.copy(alpha = 0.7f),
-                        SongeColors.darkVoid.copy(alpha = 0.95f)
-                    )
+                .clip(RoundedCornerShape(12.dp))
+                .then(
+                    if (hazeState != null) {
+                        Modifier.hazeEffect(
+                            state = hazeState,
+                            style = HazeMaterials.regular()
+                        )
+                    } else {
+                        Modifier
+                    }
                 )
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        SongeColors.electricBlue.copy(alpha = 0.4f),
-                        Color.Transparent,
-                        Color.Black.copy(alpha = 0.6f)
-                    ),
-                    start = Offset(0f, 0f),
-                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                ),
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(12.dp),
+                .background(
+                    brush =
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    SongeColors.darkVoid.copy(
+                                        alpha = 0.7f
+                                    ),
+                                    SongeColors.darkVoid.copy(
+                                        alpha = 0.95f
+                                    )
+                                )
+                        )
+                )
+                .border(
+                    width = 1.dp,
+                    brush =
+                        Brush.linearGradient(
+                            colors =
+                                listOf(
+                                    SongeColors.electricBlue.copy(
+                                        alpha = 0.4f
+                                    ),
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.6f)
+                                ),
+                            start = Offset(0f, 0f),
+                            end =
+                                Offset(
+                                    Float.POSITIVE_INFINITY,
+                                    Float.POSITIVE_INFINITY
+                                )
+                        ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         // LEFT: Hyper LFO Section
-        _root_ide_package_.org.balch.songe.features.lfo.HyperLfoPanel(
+        _root_ide_package_.org.balch.songe.features.lfo.HyperLfoPanelLayout(
             lfo1Rate = vibrato,
             onLfo1RateChange = onVibratoChange,
             lfo2Rate = lfo2Rate,
@@ -112,7 +134,11 @@ fun GlobalControlsPanel(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("DELAY", style = MaterialTheme.typography.labelSmall, color = SongeColors.warmGlow)
+                Text(
+                    "DELAY",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = SongeColors.warmGlow
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RotaryKnob(
                         value = delayTime,
@@ -130,7 +156,7 @@ fun GlobalControlsPanel(
                     )
                 }
             }
-            
+
             RotaryKnob(
                 value = distortion,
                 onValueChange = onDistortionChange,

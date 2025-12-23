@@ -54,7 +54,7 @@ fun HoldButton(
                 .clip(RoundedCornerShape(14.dp))
                 .background(
                     Brush.verticalGradient(
-                         colors = listOf(
+                        colors = listOf(
                             Color.Black.copy(alpha = 0.8f),
                             SongeColors.darkVoid
                         )
@@ -67,7 +67,7 @@ fun HoldButton(
                 )
                 .clickable { onCheckedChange(!checked) }
         ) {
-             // Thumb (The moving part)
+            // Thumb (The moving part)
             Box(
                 modifier = Modifier
                     .align(if (checked) Alignment.CenterEnd else Alignment.CenterStart)
@@ -91,7 +91,7 @@ fun HoldButton(
                     )
             )
         }
-        
+
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = label,

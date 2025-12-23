@@ -6,13 +6,13 @@ import com.jsyn.unitgen.UnitGenerator
 
 /**
  * A Soft Clipper / Distortion using Tanh waveshaping.
- * 
+ *
  * Output = tanh(Input * Drive)
- * 
+ *
  * - Drive = 1.0: Clean pass-through (gentle limiting)
  * - Drive = 3-5: Warm saturation
  * - Drive = 10+: Heavy distortion with harmonic content
- * 
+ *
  * Post-gain compensates for volume loss at high drive settings.
  */
 class TanhLimiter : UnitGenerator() {

@@ -19,13 +19,13 @@ fun App(engine: SongeEngine = PreviewSongeEngine()) {
     SongeTheme {
         Box(modifier = Modifier.fillMaxSize()) {
             PlasmaBackground()
-            
+
             Column(modifier = Modifier.fillMaxSize()) {
                 // Main Content
                 Box(modifier = Modifier.weight(1f)) {
                     SongeNavigation(engine = engine)
                 }
-                
+
                 // Persistent Debug Bar
                 DebugBottomBar(engine = engine)
             }

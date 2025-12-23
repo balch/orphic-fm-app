@@ -26,7 +26,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 /**
  * A momentary push button that generates a pulse.
  * The longer it's held, the stronger the pulse visual becomes.
- * 
+ *
  * @param onPulseStart Called when the button is pressed down
  * @param onPulseEnd Called when the button is released
  * @param isLearnMode If true, clicking selects this for MIDI learning
@@ -55,7 +55,7 @@ fun PulseButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    
+
     // Logic to trigger start/end callbacks
     LaunchedEffect(isPressed) {
         if (isLearnMode) {
@@ -72,12 +72,12 @@ fun PulseButton(
             }
         }
     }
-    
+
     // Animate glow size based on press state or learning state
     val showGlow = isPressed || isLearning
     val glowAlpha by animateFloatAsState(targetValue = if (showGlow) 0.8f else 0f)
     val glowRadius by animateFloatAsState(targetValue = if (showGlow) 10f else 0f)
-    
+
     // Use magenta for learning state
     val glowColor = if (isLearning) SongeColors.neonMagenta else activeColor
 
@@ -91,23 +91,26 @@ fun PulseButton(
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null, // Custom drawing handles feedback
-                    onClick = {} 
+                    onClick = {}
                 )
                 .drawBehind {
                     val radius = size.toPx() / 2
-                    
+
                     // 1. Touch/Learn Glow (Underneath)
-                     if (glowAlpha > 0f) {
+                    if (glowAlpha > 0f) {
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(glowColor.copy(alpha = glowAlpha), Color.Transparent),
+                                colors = listOf(
+                                    glowColor.copy(alpha = glowAlpha),
+                                    Color.Transparent
+                                ),
                                 center = center,
                                 radius = radius + glowRadius.dp.toPx() + 10f
                             ),
                             radius = radius + glowRadius.dp.toPx() + 10f
                         )
                     }
-                    
+
                     // Learning outline
                     if (isLearning) {
                         drawCircle(
@@ -128,12 +131,12 @@ fun PulseButton(
                         start = Offset(center.x - radius, center.y - radius),
                         end = Offset(center.x + radius, center.y + radius)
                     )
-                    
+
                     drawCircle(
                         brush = metalGradient,
                         radius = radius
                     )
-                    
+
                     // 3. Inner Detail (Concentric rings to look like machined metal)
                     drawCircle(
                         color = Color.Black.copy(alpha = 0.2f),
@@ -148,10 +151,10 @@ fun PulseButton(
 
                     // 4. Pressed Overlay (Darkens when touched)
                     if (isPressed && !isLearnMode) {
-                         drawCircle(
-                             color = Color.Black.copy(alpha = 0.3f),
-                             radius = radius
-                         )
+                        drawCircle(
+                            color = Color.Black.copy(alpha = 0.3f),
+                            radius = radius
+                        )
                     }
                 }
         )

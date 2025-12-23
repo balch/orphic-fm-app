@@ -40,7 +40,7 @@ import kotlin.math.roundToInt
 
 /**
  * Horizontal slider for envelope speed (attack/decay).
- * 
+ *
  * Left (F) = Fast/Percussive, Right (S) = Slow/Drone
  * Responds immediately on mouse down and supports drag.
  */
@@ -58,16 +58,16 @@ fun HorizontalEnvelopeSlider(
     val trackWidthPx = with(density) { trackWidth.dp.toPx() }
     val thumbSizePx = with(density) { thumbSize.dp.toPx() }
     val usableRange = trackWidthPx - thumbSizePx
-    
+
     var offsetX by remember(value) { mutableFloatStateOf(value * usableRange) }
-    
+
     // Apply learnable if controlId is provided
     val finalModifier = if (controlId != null) {
         modifier.learnable(controlId, LocalLearnModeState.current)
     } else {
         modifier
     }
-    
+
     Row(
         modifier = finalModifier
             .clip(RoundedCornerShape(4.dp))
@@ -86,13 +86,13 @@ fun HorizontalEnvelopeSlider(
             lineHeight = 9.sp,
             modifier = Modifier
                 .clip(RoundedCornerShape(2.dp))
-                .clickable { 
+                .clickable {
                     offsetX = 0f
-                    onValueChange(0f) 
+                    onValueChange(0f)
                 }
                 .padding(horizontal = 2.dp, vertical = 2.dp)
         )
-        
+
         // Track with thumb - responds on press and drag
         Box(
             modifier = Modifier
@@ -113,11 +113,12 @@ fun HorizontalEnvelopeSlider(
                         while (true) {
                             val event = awaitPointerEvent()
                             val position = event.changes.firstOrNull()?.position ?: continue
-                            
+
                             when (event.type) {
                                 PointerEventType.Press, PointerEventType.Move -> {
                                     if (event.changes.any { it.pressed }) {
-                                        val newOffset = (position.x - thumbSizePx / 2).coerceIn(0f, usableRange)
+                                        val newOffset =
+                                            (position.x - thumbSizePx / 2).coerceIn(0f, usableRange)
                                         offsetX = newOffset
                                         onValueChange(newOffset / usableRange)
                                         event.changes.forEach { it.consume() }
@@ -147,7 +148,7 @@ fun HorizontalEnvelopeSlider(
                     .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
             )
         }
-        
+
         // Right label (S = Slow) - clickable to snap to 1
         Text(
             "S",
@@ -157,9 +158,9 @@ fun HorizontalEnvelopeSlider(
             lineHeight = 9.sp,
             modifier = Modifier
                 .clip(RoundedCornerShape(2.dp))
-                .clickable { 
+                .clickable {
                     offsetX = usableRange
-                    onValueChange(1f) 
+                    onValueChange(1f)
                 }
                 .padding(horizontal = 2.dp, vertical = 2.dp)
         )

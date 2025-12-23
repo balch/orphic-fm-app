@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -21,18 +23,42 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 
-/**
- * Distortion/Volume panel with output metering.
- * Layout: 2x2 grid with Drive, Volume in top row; Mix, Peak LED in bottom row.
- */
+/** Smart wrapper that connects DistortionViewModel to the layout. */
 @Composable
 fun DistortionPanel(
-    drive: Float, onDriveChange: (Float) -> Unit,
-    volume: Float, onVolumeChange: (Float) -> Unit,
-    mix: Float, onMixChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: DistortionViewModel = metroViewModel()
+) {
+    val state by viewModel.uiState.collectAsState()
+
+    DistortionPanelLayout(
+        drive = state.drive,
+        onDriveChange = viewModel::onDriveChange,
+        volume = state.volume,
+        onVolumeChange = viewModel::onVolumeChange,
+        mix = state.mix,
+        onMixChange = viewModel::onMixChange,
+        peak = state.peak,
+        modifier = modifier
+    )
+}
+
+/**
+ * Distortion/Volume panel with output metering. Layout: 2x2 grid with Drive, Volume in top row;
+ * Mix, Peak LED in bottom row.
+ */
+@Composable
+fun DistortionPanelLayout(
+    drive: Float,
+    onDriveChange: (Float) -> Unit,
+    volume: Float,
+    onVolumeChange: (Float) -> Unit,
+    mix: Float,
+    onMixChange: (Float) -> Unit,
     peak: Float,
     modifier: Modifier = Modifier
 ) {
@@ -105,54 +131,40 @@ fun DistortionPanel(
 }
 
 /**
- * LED indicator that shows peak level with color coding.
- * Blue: Normal (< 0.8)
- * Yellow: Hot (0.8 - 0.95)
- * Red: Clipping (> 0.95)
+ * LED indicator that shows peak level with color coding. Blue: Normal (< 0.8) Yellow: Hot (0.8 -
+ * 0.95) Red: Clipping (> 0.95)
  */
 @Composable
-private fun PeakLed(
-    peak: Float,
-    modifier: Modifier = Modifier
-) {
-    val ledColor = when {
-        peak > 0.95f -> Color.Red
-        peak > 0.8f -> Color.Yellow
-        else -> SongeColors.electricBlue
-    }
-    
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier.size(40.dp),
-            contentAlignment = Alignment.Center
-        ) {
+private fun PeakLed(peak: Float, modifier: Modifier = Modifier) {
+    val ledColor =
+        when {
+            peak > 0.95f -> Color.Red
+            peak > 0.8f -> Color.Yellow
+            else -> SongeColors.electricBlue
+        }
+
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
             // Subtle glow
             Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .blur(8.dp)
-                    .background(ledColor.copy(alpha = 0.4f), CircleShape)
+                modifier =
+                    Modifier.size(28.dp)
+                        .blur(8.dp)
+                        .background(ledColor.copy(alpha = 0.4f), CircleShape)
             )
             // LED core
-            Box(
-                modifier = Modifier
-                    .size(16.dp)
-                    .background(ledColor, CircleShape)
-            )
+            Box(modifier = Modifier.size(16.dp).background(ledColor, CircleShape))
             // Highlight
             Box(
-                modifier = Modifier
-                    .size(6.dp)
-                    .align(Alignment.TopCenter)
-                    .background(Color.White.copy(alpha = 0.4f), CircleShape)
+                modifier =
+                    Modifier.size(6.dp)
+                        .align(Alignment.TopCenter)
+                        .background(Color.White.copy(alpha = 0.4f), CircleShape)
             )
         }
-        
+
         Spacer(modifier = Modifier.height(2.dp))
-        
+
         Text(
             text = "PEAK",
             style = MaterialTheme.typography.labelSmall,

@@ -85,7 +85,7 @@ object SongeColors {
     val softPurple = SoftPurple
     val warmGlow = WarmGlow
     val synthGreen = SynthGreen
-    
+
     // Glow colors for knobs/buttons
     val knobGlow = NeonCyan.copy(alpha = 0.6f)
     val pulseGlow = NeonMagenta.copy(alpha = 0.8f)

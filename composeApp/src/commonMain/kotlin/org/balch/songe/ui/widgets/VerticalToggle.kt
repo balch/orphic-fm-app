@@ -38,7 +38,7 @@ fun VerticalToggle(
 ) {
     val learnState = LocalLearnModeState.current
     val isActive = learnState.isActive
-    
+
     val finalModifier = if (controlId != null) {
         modifier.learnable(controlId, learnState)
     } else {
@@ -53,9 +53,9 @@ fun VerticalToggle(
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
             .let {
                 if (enabled && !isActive) {
-                    it.clickable { 
+                    it.clickable {
                         println("[VerticalToggle] Clicked! Current isTop=$isTop -> New: ${!isTop}")
-                        onToggle(!isTop) 
+                        onToggle(!isTop)
                     }
                 } else {
                     it
@@ -108,6 +108,7 @@ fun VerticalToggle(
         }
     }
 }
+
 @Preview
 @Composable
 fun VerticalTogglePreview() {

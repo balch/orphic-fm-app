@@ -33,7 +33,7 @@ import org.balch.songe.ui.theme.SongeColors
 /**
  * Collapsible settings panel for the left side of top row.
  * Shows a persistent vertical header strip on the left.
- * 
+ *
  * When collapsed: only shows 28dp header strip
  * When expanded: shows header strip + expandedWidth content area
  */
@@ -51,9 +51,9 @@ fun CollapsibleColumnPanel(
     content: @Composable () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(initialExpanded) }
-    
+
     val collapsedWidth = 28.dp
-    
+
     // Animate the content width
     val contentWidth by animateDpAsState(
         targetValue = if (isExpanded) expandedWidth else 0.dp,
@@ -99,7 +99,7 @@ fun CollapsibleColumnPanel(
                     textAlign = TextAlign.Center
                 )
             }
-            
+
             // [RIGHT] Content Area (Visible only when expanded, animated width)
             if (contentWidth > 0.dp) {
                 Box(

@@ -9,12 +9,12 @@ import java.io.File
  * Stores mappings in ~/.config/songe/midi-mappings/
  */
 actual class MidiMappingRepository actual constructor() {
-    
-    private val json = Json { 
+
+    private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
     }
-    
+
     private val configDir: File by lazy {
         val userHome = System.getProperty("user.home")
         File(userHome, ".config/songe/midi-mappings").also { dir ->
@@ -24,13 +24,13 @@ actual class MidiMappingRepository actual constructor() {
             }
         }
     }
-    
+
     private fun fileForDevice(deviceName: String): File {
         // Sanitize device name for use as filename
         val safeName = deviceName.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         return File(configDir, "$safeName.json")
     }
-    
+
     actual suspend fun save(deviceName: String, mapping: MidiMappingState) {
         try {
             val file = fileForDevice(deviceName)
@@ -41,7 +41,7 @@ actual class MidiMappingRepository actual constructor() {
             Logger.error { "Failed to save MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
-    
+
     actual suspend fun load(deviceName: String): MidiMappingState? {
         return try {
             val file = fileForDevice(deviceName)
@@ -59,7 +59,7 @@ actual class MidiMappingRepository actual constructor() {
             null
         }
     }
-    
+
     actual suspend fun delete(deviceName: String) {
         try {
             val file = fileForDevice(deviceName)
@@ -71,7 +71,7 @@ actual class MidiMappingRepository actual constructor() {
             Logger.error { "Failed to delete MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
-    
+
     actual suspend fun listDevices(): List<String> {
         return try {
             configDir.listFiles()

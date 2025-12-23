@@ -10,37 +10,37 @@ import com.jsyn.unitgen.UnitGenerator
 actual class AudioEngine actual constructor() {
     private val synth = JSyn.createSynthesizer()
     private val lineOut = LineOut()
-    
+
     // Use JSyn PassThrough units as connection points for stereo output
     private val lineOutLeftProxy = com.jsyn.unitgen.PassThrough()
     private val lineOutRightProxy = com.jsyn.unitgen.PassThrough()
-    
+
     init {
         synth.add(lineOutLeftProxy)
         synth.add(lineOutRightProxy)
-        
+
         // Connect proxies to LineOut
         lineOutLeftProxy.output.connect(0, lineOut.input, 0)
         lineOutRightProxy.output.connect(0, lineOut.input, 1)
     }
-    
+
     actual fun start() {
         synth.add(lineOut)
         synth.start()
         lineOut.start()
     }
-    
+
     actual fun stop() {
         lineOut.stop()
         synth.stop()
     }
-    
+
     actual val isRunning: Boolean
         get() = synth.isRunning
-    
+
     actual val sampleRate: Int
         get() = synth.frameRate.toInt()
-    
+
     actual fun addUnit(unit: AudioUnit) {
         // Extract the underlying JSyn unit and add to synth
         when (unit) {
@@ -59,12 +59,12 @@ actual class AudioEngine actual constructor() {
             is JsynMaximumWrapper -> synth.add(unit.jsUnit)
         }
     }
-    
+
     // Helper to add raw JSyn units (for migration)
     fun addJsynUnit(unit: UnitGenerator) {
         synth.add(unit)
     }
-    
+
     actual fun createSineOscillator(): SineOscillator = JsynSineOscillatorWrapper()
     actual fun createTriangleOscillator(): TriangleOscillator = JsynTriangleOscillatorWrapper()
     actual fun createSquareOscillator(): SquareOscillator = JsynSquareOscillatorWrapper()
@@ -78,13 +78,13 @@ actual class AudioEngine actual constructor() {
     actual fun createPassThrough(): PassThrough = JsynPassThroughWrapper()
     actual fun createMinimum(): Minimum = JsynMinimumWrapper()
     actual fun createMaximum(): Maximum = JsynMaximumWrapper()
-    
+
     actual val lineOutLeft: AudioInput
         get() = JsynAudioInput(lineOutLeftProxy.input)
-    
+
     actual val lineOutRight: AudioInput
         get() = JsynAudioInput(lineOutRightProxy.input)
-    
+
     actual fun getCpuLoad(): Float = (synth.usage * 100f).toFloat()
 }
 

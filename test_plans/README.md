@@ -8,7 +8,8 @@ This directory contains comprehensive test plans for all major features of the S
 2. **[HyperLFO Test Plan](hyper_lfo_test_plan.md)** - Dual oscillator LFO with AND/OR logic
 3. **[Voice & FM Synthesis Test Plan](voice_fm_test_plan.md)** - 8-voice FM synthesis system
 4. **[Distortion & Dynamics Test Plan](distortion_test_plan.md)** - Drive, limiter, and mix controls
-5. **[Global Controls Test Plan](global_controls_test_plan.md)** - Cross-modulation, feedback, vibrato, coupling
+5. **[Global Controls Test Plan](global_controls_test_plan.md)** - Cross-modulation, feedback,
+   vibrato, coupling
 6. **[MIDI Integration Test Plan](midi_test_plan.md)** - MIDI mapping and learn mode
 7. **[Preset System Test Plan](preset_test_plan.md)** - Preset management and persistence
 8. **[Integration Test Plan](integration_test_plan.md)** - Full system testing scenarios
@@ -24,6 +25,7 @@ This directory contains comprehensive test plans for all major features of the S
 ## Quick Start
 
 For initial testing, we recommend this order:
+
 1. Voice & FM Synthesis (basic sound generation)
 2. Distortion & Dynamics (output stage)
 3. HyperLFO (modulation source)
@@ -36,6 +38,7 @@ For initial testing, we recommend this order:
 ## Bug Reporting
 
 When reporting issues, please include:
+
 - Platform (JVM/Android)
 - Steps to reproduce
 - Expected behavior

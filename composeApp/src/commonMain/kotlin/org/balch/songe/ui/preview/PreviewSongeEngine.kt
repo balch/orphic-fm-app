@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.balch.songe.core.audio.ModSource
 import org.balch.songe.core.audio.SongeEngine
 
-class PreviewSongeEngine(): SongeEngine {
+class PreviewSongeEngine() : SongeEngine {
     override fun start() {
     }
 
@@ -34,7 +34,7 @@ class PreviewSongeEngine(): SongeEngine {
     override fun setDistortionMix(amount: Float) {}
     override fun setMasterVolume(amount: Float) {}
     override fun setDelay(time: Float, feedback: Float) {}
-    
+
     override fun setDelayTime(index: Int, time: Float) {}
     override fun setDelayFeedback(amount: Float) {}
     override fun setDelayMix(amount: Float) {}
@@ -47,18 +47,42 @@ class PreviewSongeEngine(): SongeEngine {
     override fun setTotalFeedback(amount: Float) {}
     override fun setVibrato(amount: Float) {}
     override fun setVoiceCoupling(amount: Float) {}
-    
+
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
     override fun setHyperLfoMode(mode: Int) {}
     override fun setHyperLfoLink(active: Boolean) {}
 
     override fun playTestTone(frequency: Float) {}
     override fun stopTestTone() {}
-    
+
     override fun getPeak(): Float = 0.5f
     override fun getCpuLoad(): Float = 12.5f
-    
+
     // Reactive monitoring flows (static preview values)
     override val peakFlow: StateFlow<Float> = MutableStateFlow(0.5f).asStateFlow()
     override val cpuLoadFlow: StateFlow<Float> = MutableStateFlow(12.5f).asStateFlow()
+
+    override fun getVoiceTune(index: Int): Float = 0f
+    override fun getVoiceFmDepth(index: Int): Float = 0f
+    override fun getVoiceEnvelopeSpeed(index: Int): Float = 0f
+    override fun getPairSharpness(pairIndex: Int): Float = 0f
+    override fun getDuoModSource(duoIndex: Int): ModSource = ModSource.OFF
+    override fun getQuadPitch(quadIndex: Int): Float = 0.5f
+    override fun getQuadHold(quadIndex: Int): Float = 0f
+    override fun getFmStructureCrossQuad(): Boolean = false
+    override fun getTotalFeedback(): Float = 0f
+    override fun getVibrato(): Float = 0f
+    override fun getVoiceCoupling(): Float = 0f
+    override fun getDelayTime(index: Int): Float = 0f
+    override fun getDelayFeedback(): Float = 0f
+    override fun getDelayMix(): Float = 0f
+    override fun getDelayModDepth(index: Int): Float = 0f
+    override fun getDelayModSourceIsLfo(index: Int): Boolean = false
+    override fun getDelayLfoWaveformIsTriangle(): Boolean = true
+    override fun getHyperLfoFreq(index: Int): Float = 0f
+    override fun getHyperLfoMode(): Int = 1 // OFF
+    override fun getHyperLfoLink(): Boolean = false
+    override fun getDrive(): Float = 0f
+    override fun getDistortionMix(): Float = 0f
+    override fun getMasterVolume(): Float = 0.5f
 }

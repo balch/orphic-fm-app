@@ -40,9 +40,9 @@ fun HorizontalToggle(
             .clip(RoundedCornerShape(6.dp))
             .background(Color(0xFF1A1A2A))
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-            .clickable { 
+            .clickable {
                 println("[HorizontalToggle] Clicked! Current isLeft=$isLeft -> New: ${!isLeft}")
-                onToggle(!isLeft) 
+                onToggle(!isLeft)
             }
             .padding(horizontal = 6.dp, vertical = 6.dp), // Padding inside container
         contentAlignment = Alignment.Center

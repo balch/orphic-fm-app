@@ -10,32 +10,69 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.ui.panels.CollapsibleColumnPanel
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 import org.balch.songe.ui.widgets.VerticalToggle
 
 /**
- * Mod Delay panel with dual delay lines, modulation, and mix controls.
- * Layout:
- *   Row 1: MOD 1, MOD 2, LFO/SELF toggle, TRI/SQR toggle
- *   Row 2: TIME 1, TIME 2, FB, MIX
+ * Smart wrapper that connects DelayViewModel to the layout. Collects state and dispatches events.
  */
 @Composable
-fun ModDelayPanel(
-    time1: Float, onTime1Change: (Float) -> Unit,
-    mod1: Float, onMod1Change: (Float) -> Unit,
-    time2: Float, onTime2Change: (Float) -> Unit,
-    mod2: Float, onMod2Change: (Float) -> Unit,
-    feedback: Float, onFeedbackChange: (Float) -> Unit,
-    mix: Float, onMixChange: (Float) -> Unit,
-    isLfoSource: Boolean, onSourceChange: (Boolean) -> Unit,
-    isTriangleWave: Boolean, onWaveformChange: (Boolean) -> Unit,
+fun ModDelayPanel(modifier: Modifier = Modifier, viewModel: DelayViewModel = metroViewModel()) {
+    val state by viewModel.uiState.collectAsState()
+
+    ModDelayPanelLayout(
+        time1 = state.time1,
+        onTime1Change = viewModel::onTime1Change,
+        mod1 = state.mod1,
+        onMod1Change = viewModel::onMod1Change,
+        time2 = state.time2,
+        onTime2Change = viewModel::onTime2Change,
+        mod2 = state.mod2,
+        onMod2Change = viewModel::onMod2Change,
+        feedback = state.feedback,
+        onFeedbackChange = viewModel::onFeedbackChange,
+        mix = state.mix,
+        onMixChange = viewModel::onMixChange,
+        isLfoSource = state.isLfoSource,
+        onSourceChange = viewModel::onSourceChange,
+        isTriangleWave = state.isTriangleWave,
+        onWaveformChange = viewModel::onWaveformChange,
+        modifier = modifier
+    )
+}
+
+/**
+ * Mod Delay panel with dual delay lines, modulation, and mix controls. Layout: Row 1: MOD 1, MOD 2,
+ * LFO/SELF toggle, TRI/SQR toggle Row 2: TIME 1, TIME 2, FB, MIX
+ */
+@Composable
+fun ModDelayPanelLayout(
+    time1: Float,
+    onTime1Change: (Float) -> Unit,
+    mod1: Float,
+    onMod1Change: (Float) -> Unit,
+    time2: Float,
+    onTime2Change: (Float) -> Unit,
+    mod2: Float,
+    onMod2Change: (Float) -> Unit,
+    feedback: Float,
+    onFeedbackChange: (Float) -> Unit,
+    mix: Float,
+    onMixChange: (Float) -> Unit,
+    isLfoSource: Boolean,
+    onSourceChange: (Boolean) -> Unit,
+    isTriangleWave: Boolean,
+    onWaveformChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     CollapsibleColumnPanel(

@@ -1,4 +1,4 @@
-package org.balch.songe.features.preset
+package org.balch.songe.core.presets
 
 import kotlinx.serialization.json.Json
 import org.balch.songe.util.Logger
@@ -10,12 +10,12 @@ import java.io.File
  * Stores presets in ~/.config/songe/presets/
  */
 actual class DronePresetRepository actual constructor() {
-    
-    private val json = Json { 
+
+    private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
     }
-    
+
     private val presetsDir: File by lazy {
         val userHome = System.getProperty("user.home")
         File(userHome, ".config/songe/presets").also { dir ->
@@ -31,7 +31,7 @@ actual class DronePresetRepository actual constructor() {
             copyBundledPresets(presetsDir)
         }
     }
-    
+
     private suspend fun copyBundledPresets(dir: File) {
         val bundledPresets = listOf(
             "F__Minor_Drift.json",
@@ -50,13 +50,13 @@ actual class DronePresetRepository actual constructor() {
             }
         }
     }
-    
+
     private fun fileForPreset(name: String): File {
         // Sanitize name for use as filename
         val safeName = name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         return File(presetsDir, "$safeName.json")
     }
-    
+
     actual suspend fun save(preset: DronePreset) {
         ensurePresetsInitialized()
         try {
@@ -68,7 +68,7 @@ actual class DronePresetRepository actual constructor() {
             Logger.error { "Failed to save preset '${preset.name}': ${e.message}" }
         }
     }
-    
+
     actual suspend fun load(name: String): DronePreset? {
         ensurePresetsInitialized()
         return try {
@@ -87,7 +87,7 @@ actual class DronePresetRepository actual constructor() {
             null
         }
     }
-    
+
     actual suspend fun delete(name: String) {
         ensurePresetsInitialized()
         try {
@@ -100,7 +100,7 @@ actual class DronePresetRepository actual constructor() {
             Logger.error { "Failed to delete preset '$name': ${e.message}" }
         }
     }
-    
+
     actual suspend fun list(): List<DronePreset> {
         ensurePresetsInitialized()
         return try {

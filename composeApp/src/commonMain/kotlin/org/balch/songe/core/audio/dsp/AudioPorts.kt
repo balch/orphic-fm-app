@@ -12,7 +12,7 @@ interface AudioPort
 expect interface AudioInput : AudioPort {
     /** Set a constant value on this input */
     fun set(value: Double)
-    
+
     /** Disconnect all sources from this input */
     fun disconnectAll()
 }
@@ -23,7 +23,7 @@ expect interface AudioInput : AudioPort {
 expect interface AudioOutput : AudioPort {
     /** Connect this output to an input */
     fun connect(input: AudioInput)
-    
+
     /** Connect to a specific channel of a multi-channel input */
     fun connect(channel: Int, input: AudioInput, inputChannel: Int)
 }

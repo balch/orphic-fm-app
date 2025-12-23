@@ -76,18 +76,18 @@ fun Learnable(
 ) {
     val learnState = LocalLearnModeState.current
     val isLearning = learnState.isLearning(controlId)
-    
+
     // Animate the learning indicator
     val borderAlpha by animateFloatAsState(
         targetValue = if (isLearning) 1f else 0f,
         animationSpec = tween(durationMillis = 200)
     )
-    
+
     val glowAlpha by animateFloatAsState(
         targetValue = if (isLearning) 0.3f else 0f,
         animationSpec = tween(durationMillis = 200)
     )
-    
+
     Box(
         modifier = modifier
             .then(
@@ -124,9 +124,9 @@ fun Modifier.learnable(
     learnState: LearnModeState
 ): Modifier {
     if (!learnState.isActive) return this
-    
+
     val isLearning = learnState.isLearning(controlId)
-    
+
     return this
         .clip(RoundedCornerShape(6.dp))
         .background(

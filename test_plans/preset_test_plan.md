@@ -2,7 +2,8 @@
 
 ## Overview
 
-The preset system manages complete synth state snapshots including voice settings, global parameters, effects, and modulation routing. Presets are stored as JSON files with timestamps.
+The preset system manages complete synth state snapshots including voice settings, global
+parameters, effects, and modulation routing. Presets are stored as JSON files with timestamps.
 
 ## Features
 
@@ -21,11 +22,13 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Verify preset list loads and displays
 
 **Procedure:**
+
 1. Launch app
 2. Open settings panel
 3. Check preset dropdown/list
 
 **Expected Results:**
+
 - ✓ Factory presets visible
 - ✓ Presets sorted (newest first or alphabetical)
 - ✓ Preset names clear and readable
@@ -40,12 +43,14 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Verify factory presets load correctly
 
 **Procedure:**
+
 1. Note current synth state
 2. Select factory preset (e.g., "Dark_Ambient")
 3. Verify parameters change
 4. Listen to sound
 
 **Expected Results:**
+
 - ✓ All parameters updated
 - ✓ Voice tunings match preset
 - ✓ Effect settings match preset
@@ -61,16 +66,18 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Create and save a new preset
 
 **Procedure:**
+
 1. Create custom sound:
-   - Adjust voice tunings
-   - Set delay times
-   - Configure LFO
-   - Set distortion
+    - Adjust voice tunings
+    - Set delay times
+    - Configure LFO
+    - Set distortion
 2. Click "New Preset"
 3. Enter name: "Test_Patch_1"
 4. Save
 
 **Expected Results:**
+
 - ✓ Preset appears in list
 - ✓ Preset is selected/highlighted
 - ✓ Console confirms save
@@ -85,12 +92,14 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Verify custom preset recalls correctly
 
 **Procedure:**
+
 1. Continue from Test 3
 2. Change all parameters significantly
 3. Load "Test_Patch_1"
 4. Verify parameters restored
 
 **Expected Results:**
+
 - ✓ All parameters return to saved values
 - ✓ Sound matches original
 - ✓ No parameters missed
@@ -105,15 +114,17 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Update existing preset with current state
 
 **Procedure:**
+
 1. Load "Test_Patch_1"
 2. Make modifications:
-   - Change delay feedback
-   - Adjust LFO rates
+    - Change delay feedback
+    - Adjust LFO rates
 3. Click "Override"
 4. Confirm override
 5. Reload preset to verify
 
 **Expected Results:**
+
 - ✓ Override confirmation dialog
 - ✓ Preset updated with new values
 - ✓ Creation timestamp preserved
@@ -129,12 +140,14 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Remove custom preset
 
 **Procedure:**
+
 1. Select "Test_Patch_1"
 2. Click "Delete"
 3. Confirm deletion
 4. Check preset list
 
 **Expected Results:**
+
 - ✓ Deletion confirmation dialog
 - ✓ Preset removed from list
 - ✓ File deleted from storage
@@ -150,13 +163,15 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Verify preset name restrictions
 
 **Procedure:**
+
 1. Try to save presets with problematic names:
-   - Empty name
-   - Very long name (>100 chars)
-   - Special characters: `<>:"/\|?*`
-   - Duplicate name
+    - Empty name
+    - Very long name (>100 chars)
+    - Special characters: `<>:"/\|?*`
+    - Duplicate name
 
 **Expected Results:**
+
 - ✓ Empty name rejected
 - ✓ Long names handled or truncated
 - ✓ Special chars sanitized or rejected
@@ -171,6 +186,7 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Verify all parameters saved
 
 **Parameters to verify:**
+
 - Voice tunings (8)
 - Voice mod depths (8)
 - Voice envelope speeds (8)
@@ -192,6 +208,7 @@ The preset system manages complete synth state snapshots including voice setting
 - Total feedback
 
 **Procedure:**
+
 1. Set all parameters to known values
 2. Save preset
 3. Randomize all parameters
@@ -199,6 +216,7 @@ The preset system manages complete synth state snapshots including voice setting
 5. Verify each parameter
 
 **Expected Results:**
+
 - ✓ All parameters restored correctly
 - ✓ No missing values
 - ✓ No incorrect values
@@ -212,6 +230,7 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Verify extreme parameter values save/load
 
 **Procedure:**
+
 1. Set all parameters to maximum (100%)
 2. Save as "Max_Preset"
 3. Set all parameters to minimum (0%)
@@ -219,6 +238,7 @@ The preset system manages complete synth state snapshots including voice setting
 5. Load each and verify
 
 **Expected Results:**
+
 - ✓ Max preset: All values at 100%
 - ✓ Min preset: All values at 0%
 - ✓ No clamping or rounding errors
@@ -233,12 +253,14 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Verify stable operation when switching presets quickly
 
 **Procedure:**
+
 1. Load preset A
 2. Immediately load preset B
 3. Immediately load preset C
 4. Repeat cycle rapidly 5 times
 
 **Expected Results:**
+
 - ✓ No crashes or hangs
 - ✓ Each preset loads correctly
 - ✓ No audio glitches
@@ -254,11 +276,13 @@ The preset system manages complete synth state snapshots including voice setting
 **Objective:** Verify smooth preset changes while playing
 
 **Procedure:**
+
 1. Play sustained chord (multiple voices)
 2. While playing, load different preset
 3. Listen for artifacts
 
 **Expected Results:**
+
 - ✓ Preset loads smoothly
 - ✓ No audio dropouts
 - ✓ No clicks or pops
@@ -275,6 +299,7 @@ The preset system manages complete synth state snapshots including voice setting
 
 **Procedure:**
 Test each factory preset:
+
 1. Load preset
 2. Check levels (not clipping)
 3. Verify musical character
@@ -283,6 +308,7 @@ Test each factory preset:
 **Expected Results:**
 
 **Each Factory Preset:**
+
 - ✓ No clipping or distortion (unless intended)
 - ✓ Clear sonic identity
 - ✓ Musical and usable
@@ -297,6 +323,7 @@ Test each factory preset:
 **Objective:** Verify presets survive app restart
 
 **Procedure:**
+
 1. Create and save "Restart_Test"
 2. Note preset count
 3. Close app completely
@@ -304,6 +331,7 @@ Test each factory preset:
 5. Check preset list
 
 **Expected Results:**
+
 - ✓ "Restart_Test" still in list
 - ✓ Preset count unchanged
 - ✓ Preset loads correctly
@@ -318,12 +346,14 @@ Test each factory preset:
 **Objective:** Verify preset files are valid JSON
 
 **Procedure:**
+
 1. Save a preset
 2. Locate JSON file in filesystem
 3. Open in text editor
 4. Validate JSON structure
 
 **Expected Results:**
+
 - ✓ Valid JSON syntax
 - ✓ Human-readable
 - ✓ All parameters present
@@ -339,14 +369,16 @@ Test each factory preset:
 **Objective:** Verify graceful handling of invalid preset files
 
 **Procedure:**
+
 1. Manually corrupt a preset JSON file:
-   - Invalid JSON syntax
-   - Missing required fields
-   - Invalid data types
+    - Invalid JSON syntax
+    - Missing required fields
+    - Invalid data types
 2. Launch app
 3. Attempt to load corrupted preset
 
 **Expected Results:**
+
 - ✓ App doesn't crash
 - ✓ Error logged to console
 - ✓ Corrupted preset skipped or flagged
@@ -362,10 +394,12 @@ Test each factory preset:
 **Objective:** Verify preset list order
 
 **Procedure:**
+
 1. Create multiple presets with different names
 2. Observe list order
 
 **Expected Results:**
+
 - ✓ Consistent sort order
 - ✓ Either alphabetical or by date
 - ✓ Factory presets positioned appropriately
@@ -380,10 +414,12 @@ Test each factory preset:
 **Objective:** Verify UI shows which preset is active
 
 **Procedure:**
+
 1. Load various presets
 2. Check visual indication
 
 **Expected Results:**
+
 - ✓ Active preset highlighted in list
 - ✓ Preset name displayed
 - ✓ Clear which preset is loaded
@@ -398,11 +434,13 @@ Test each factory preset:
 **Objective:** Verify user knows when changes haven't been saved
 
 **Procedure:**
+
 1. Load preset
 2. Modify a parameter
 3. Check for unsaved indicator
 
 **Expected Results:**
+
 - ✓ Indicator shows unsaved changes (if implemented)
 - ✓ User aware state diverged from preset
 - ✓ Can choose to override or save new
@@ -418,6 +456,7 @@ Test each factory preset:
 **Objective:** Complete preset creation workflow
 
 **Procedure:**
+
 1. Start with factory preset
 2. Tweak to taste
 3. Save as new preset
@@ -428,6 +467,7 @@ Test each factory preset:
 8. Switch between both
 
 **Expected Results:**
+
 - ✓ Smooth workflow
 - ✓ All operations work
 - ✓ Both presets distinct and recallable
@@ -441,11 +481,13 @@ Test each factory preset:
 **Objective:** Verify presets don't affect MIDI mappings
 
 **Procedure:**
+
 1. Create MIDI mappings
 2. Load different presets
 3. Verify MIDI still works
 
 **Expected Results:**
+
 - ✓ MIDI mappings independent of presets
 - ✓ Presets don't overwrite MIDI config
 - ✓ Both systems coexist
@@ -469,9 +511,10 @@ None currently.
 
 **Storage Format:** JSON  
 **Storage Location:** `composeResources/files/presets/`  
-**Filename Pattern:** `PresetName.json`  
+**Filename Pattern:** `PresetName.json`
 
 **Preset Structure:**
+
 ```json
 {
   "name": "String",
@@ -507,7 +550,7 @@ None currently.
 **Total Tests:** 20  
 **Passed:** ____  
 **Failed:** ____  
-**Blocked:** ____  
+**Blocked:** ____
 
 **Tester:** ________________  
 **Date:** ________________  

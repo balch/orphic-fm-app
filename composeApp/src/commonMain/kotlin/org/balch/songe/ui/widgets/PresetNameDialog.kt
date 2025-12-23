@@ -40,7 +40,7 @@ fun PresetNameDialog(
     onDismiss: () -> Unit
 ) {
     var presetName by remember { mutableStateOf("") }
-    
+
     Popup(
         alignment = Alignment.TopStart,
         onDismissRequest = onDismiss,
@@ -63,7 +63,7 @@ fun PresetNameDialog(
                     fontWeight = FontWeight.Bold,
                     color = SongeColors.neonCyan
                 )
-                
+
                 TextField(
                     value = presetName,
                     onValueChange = { presetName = it },
@@ -81,7 +81,7 @@ fun PresetNameDialog(
                     ),
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 11.sp)
                 )
-                
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -98,7 +98,7 @@ fun PresetNameDialog(
                     ) {
                         Text("Cancel", fontSize = 10.sp, color = Color.White.copy(alpha = 0.7f))
                     }
-                    
+
                     // OK button
                     Box(
                         modifier = Modifier
@@ -110,7 +110,11 @@ fun PresetNameDialog(
                                 else Color.Gray.copy(alpha = 0.2f)
                             )
                             .then(
-                                if (presetName.isNotBlank()) Modifier.clickable { onConfirm(presetName.trim()) }
+                                if (presetName.isNotBlank()) Modifier.clickable {
+                                    onConfirm(
+                                        presetName.trim()
+                                    )
+                                }
                                 else Modifier
                             ),
                         contentAlignment = Alignment.Center

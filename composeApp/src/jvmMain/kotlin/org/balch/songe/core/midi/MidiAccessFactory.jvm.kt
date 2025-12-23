@@ -21,47 +21,54 @@ import javax.sound.midi.Transmitter
  * to properly detect USB MIDI devices on macOS.
  */
 class CoreMidiJvmAccess : MidiAccess() {
-    
+
     // Internal Java MIDI device names to filter out
     private val internalDevices = setOf(
         "Real Time Sequencer",
         "Gervill",
         "MIDI OUT"
     )
-    
+
     override val name: String = "CoreMIDI4J-JVM"
-    
+
     override val inputs: Iterable<MidiPortDetails>
         get() {
             val devices = mutableListOf<MidiPortDetails>()
-            
+
             for (info in MidiSystem.getMidiDeviceInfo()) {
                 try {
                     val device = MidiSystem.getMidiDevice(info)
                     // Only include devices that can transmit (have transmitters)
                     // and are not internal Java devices
                     if (device.maxTransmitters != 0 && info.name !in internalDevices) {
-                        devices.add(CoreMidiPortDetails(info.name, info.name, info.vendor, info.version))
+                        devices.add(
+                            CoreMidiPortDetails(
+                                info.name,
+                                info.name,
+                                info.vendor,
+                                info.version
+                            )
+                        )
                     }
                 } catch (e: Exception) {
                     // Skip devices that can't be opened
                 }
             }
-            
+
             return devices.distinctBy { it.id }
         }
-    
+
     override val outputs: Iterable<MidiPortDetails>
         get() = emptyList() // We only care about inputs for now
-    
+
     override suspend fun openInput(portId: String): MidiInput {
         val info = MidiSystem.getMidiDeviceInfo().find { it.name == portId }
             ?: throw IllegalArgumentException("Port ID $portId does not exist.")
-        
+
         val device = MidiSystem.getMidiDevice(info)
         return CoreMidiInputPort(device, portId)
     }
-    
+
     override suspend fun openOutput(portId: String): MidiOutput {
         throw UnsupportedOperationException("Output not implemented")
     }
@@ -80,17 +87,17 @@ private class CoreMidiInputPort(
     private val device: MidiDevice,
     private val portName: String
 ) : MidiInput {
-    
+
     override val details: MidiPortDetails = CoreMidiPortDetails(
         portName, portName, device.deviceInfo?.vendor, device.deviceInfo?.version
     )
-    
+
     private var _connectionState = MidiPortConnectionState.CLOSED
     override val connectionState: MidiPortConnectionState
         get() = _connectionState
-    
+
     private var transmitter: Transmitter? = null
-    
+
     init {
         try {
             if (!device.isOpen) {
@@ -103,7 +110,7 @@ private class CoreMidiInputPort(
             _connectionState = MidiPortConnectionState.CLOSED
         }
     }
-    
+
     override fun setMessageReceivedListener(listener: OnMidiReceivedEventListener) {
         transmitter?.receiver = object : Receiver {
             override fun send(message: MidiMessage?, timeStamp: Long) {
@@ -116,13 +123,13 @@ private class CoreMidiInputPort(
                     )
                 }
             }
-            
+
             override fun close() {
                 // Nothing to clean up
             }
         }
     }
-    
+
     override fun close() {
         try {
             transmitter?.close()
@@ -147,7 +154,7 @@ actual fun createMidiAccess(): MidiAccess {
     } catch (e: Exception) {
         Logger.debug { "CoreMIDI4J not available: ${e.message}" }
     }
-    
+
     // Fallback to empty access if CoreMIDI4J not available
     Logger.warn { "No MIDI backend available" }
     return EmptyMidiAccess()

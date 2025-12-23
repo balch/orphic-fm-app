@@ -40,14 +40,14 @@ fun HorizontalSlidingSwitch(
     // Thumb properties
     val thumbSize = height - 4.dp
     val trackPadding = 2.dp
-    
+
     // Animate thumb position
     val thumbOffset by animateDpAsState(
         targetValue = if (isLeft) trackPadding else (width - thumbSize - trackPadding),
         animationSpec = tween(durationMillis = 200),
         label = "thumbOffset"
     )
-    
+
     // Main Track Container
     Box(
         modifier = modifier
@@ -80,7 +80,7 @@ fun HorizontalSlidingSwitch(
                 color = if (!isLeft) Color.White else Color.Gray.copy(alpha = 0.5f)
             )
         }
-        
+
         // Sliding Circular Thumb
         Box(
             modifier = Modifier
@@ -89,7 +89,7 @@ fun HorizontalSlidingSwitch(
                 .height(thumbSize)
                 .clip(RoundedCornerShape(50)) // Circle
                 .background(activeColor)
-                // Add a subtle shadow or overlay for depth if possible, or just solid color
+            // Add a subtle shadow or overlay for depth if possible, or just solid color
         )
     }
 }

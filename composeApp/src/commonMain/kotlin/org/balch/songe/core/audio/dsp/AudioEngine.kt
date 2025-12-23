@@ -6,19 +6,19 @@ package org.balch.songe.core.audio.dsp
 expect class AudioEngine() {
     /** Start audio processing */
     fun start()
-    
+
     /** Stop audio processing */
     fun stop()
-    
+
     /** Check if engine is running */
     val isRunning: Boolean
-    
+
     /** Sample rate in Hz */
     val sampleRate: Int
-    
+
     /** Add a unit to the synthesis graph */
     fun addUnit(unit: AudioUnit)
-    
+
     // Unit factories
     fun createSineOscillator(): SineOscillator
     fun createTriangleOscillator(): TriangleOscillator
@@ -33,11 +33,11 @@ expect class AudioEngine() {
     fun createPassThrough(): PassThrough
     fun createMinimum(): Minimum
     fun createMaximum(): Maximum
-    
+
     /** Master output - connect final audio here */
     val lineOutLeft: AudioInput
     val lineOutRight: AudioInput
-    
+
     // Monitoring
     /** Get current CPU load (0.0 - 1.0) */
     fun getCpuLoad(): Float

@@ -21,7 +21,7 @@ actual interface Multiply : AudioUnit {
 
 class JsynMultiplyWrapper : Multiply {
     internal val jsUnit = JsynMultiply()
-    
+
     override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
     override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
     override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
@@ -34,7 +34,7 @@ actual interface Add : AudioUnit {
 
 class JsynAddWrapper : Add {
     internal val jsUnit = JsynAdd()
-    
+
     override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
     override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
     override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
@@ -48,7 +48,7 @@ actual interface MultiplyAdd : AudioUnit {
 
 class JsynMultiplyAddWrapper : MultiplyAdd {
     internal val jsUnit = JsynMultiplyAdd()
-    
+
     override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
     override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
     override val inputC: AudioInput = JsynAudioInput(jsUnit.inputC)
@@ -61,7 +61,7 @@ actual interface PassThrough : AudioUnit {
 
 class JsynPassThroughWrapper : PassThrough {
     internal val jsUnit = JsynPassThrough()
-    
+
     override val input: AudioInput = JsynAudioInput(jsUnit.input)
     override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
 }
@@ -73,7 +73,7 @@ actual interface SineOscillator : AudioUnit {
 
 class JsynSineOscillatorWrapper : SineOscillator {
     internal val jsOsc = JsynSineOsc()
-    
+
     override val frequency: AudioInput = JsynAudioInput(jsOsc.frequency)
     override val amplitude: AudioInput = JsynAudioInput(jsOsc.amplitude)
     override val output: AudioOutput = JsynAudioOutput(jsOsc.output)
@@ -86,7 +86,7 @@ actual interface TriangleOscillator : AudioUnit {
 
 class JsynTriangleOscillatorWrapper : TriangleOscillator {
     internal val jsOsc = JsynTriangleOsc()
-    
+
     override val frequency: AudioInput = JsynAudioInput(jsOsc.frequency)
     override val amplitude: AudioInput = JsynAudioInput(jsOsc.amplitude)
     override val output: AudioOutput = JsynAudioOutput(jsOsc.output)
@@ -99,7 +99,7 @@ actual interface SquareOscillator : AudioUnit {
 
 class JsynSquareOscillatorWrapper : SquareOscillator {
     internal val jsOsc = JsynSquareOsc()
-    
+
     override val frequency: AudioInput = JsynAudioInput(jsOsc.frequency)
     override val amplitude: AudioInput = JsynAudioInput(jsOsc.amplitude)
     override val output: AudioOutput = JsynAudioOutput(jsOsc.output)
@@ -112,7 +112,7 @@ actual interface Minimum : AudioUnit {
 
 class JsynMinimumWrapper : Minimum {
     internal val jsUnit = JsynMinimum()
-    
+
     override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
     override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
     override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
@@ -125,7 +125,7 @@ actual interface Maximum : AudioUnit {
 
 class JsynMaximumWrapper : Maximum {
     internal val jsUnit = JsynMaximum()
-    
+
     override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
     override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
     override val output: AudioOutput = JsynAudioOutput(jsUnit.output)

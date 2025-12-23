@@ -20,7 +20,7 @@ import kotlin.math.pow
  * All audio routing logic is platform-independent.
  */
 class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
-    
+
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
         // Pair 1-2: Bass range
@@ -45,6 +45,7 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
     // Delay Modulation
     private val hyperLfo = DspHyperLfo(audioEngine)
+
     // Convert bipolar LFO (-1 to +1) to unipolar (0 to 1) to prevent negative delay times
     // Formula: unipolar = (bipolar * 0.5) + 0.5
     private val lfoToUnipolar1 = audioEngine.createMultiplyAdd()
@@ -79,18 +80,52 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     private val vibratoLfo = audioEngine.createSineOscillator()
     private val vibratoDepthGain = audioEngine.createMultiply()
 
-    // State caches
+    // State caches (Optimized specifically for dsp calculation reuse if any)
     private val quadPitchOffsets = DoubleArray(2) { 0.5 }
+    // voiceTuneCache merged into _voiceTune below, keeping distinct for now to avoid breaking existing internal logic immediately, but ideally should merge.
+    // Existing logic uses voiceTuneCache[index] as Double. _voiceTune is Float.
     private val voiceTuneCache = DoubleArray(8) { 0.5 }
-    private var fmStructureCrossQuad = false
-    
+    // fmStructureCrossQuad removed in favor of _fmStructureCrossQuad
+
     // Reactive monitoring flows
     private val _peakFlow = MutableStateFlow(0f)
     override val peakFlow: StateFlow<Float> = _peakFlow.asStateFlow()
-    
+
     private val _cpuLoadFlow = MutableStateFlow(0f)
     override val cpuLoadFlow: StateFlow<Float> = _cpuLoadFlow.asStateFlow()
-    
+
+    // State Caches (Backing fields for getters)
+    // Voices
+    private val _voiceTune = FloatArray(8) { 0.5f } // Default from VoiceUiState
+    private val _voiceFmDepth = FloatArray(8) { 0.0f }
+    private val _voiceEnvelopeSpeed = FloatArray(8) { 0.0f }
+    private val _pairSharpness = FloatArray(4) { 0.0f }
+    private val _duoModSource = Array(4) { ModSource.OFF }
+    private val _quadPitch = FloatArray(2) { 0.5f }
+    private val _quadHold = FloatArray(2) { 0.0f }
+    private var _fmStructureCrossQuad = false
+    private var _totalFeedback = 0.0f
+    private var _vibrato = 0.0f
+    private var _voiceCoupling = 0.0f
+
+    // Delay
+    private val _delayTime = FloatArray(2) { 0.3f }
+    private var _delayFeedback = 0.5f
+    private var _delayMix = 0.5f
+    private val _delayModDepth = FloatArray(2) { 0.0f }
+    private val _delayModSourceIsLfo = BooleanArray(2) { true }
+    private var _delayLfoWaveformIsTriangle = true
+
+    // LFO
+    private val _hyperLfoFreq = FloatArray(2) { 0.0f }
+    private var _hyperLfoMode = 1 // OFF (from HyperLfoMode.OFF.ordinal which is typically 1 if OFF is middle, checking enum... actually OFF is usually 0 or 1 depending on list. In UI State default is OFF. Logic below will confirm)
+    private var _hyperLfoLink = false
+
+    // Distortion
+    private var _drive = 0.0f
+    private var _distortionMix = 0.5f
+    private var _masterVolume = 0.7f
+
     // Monitoring coroutine scope
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -161,11 +196,11 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         hyperLfo.output.connect(lfoToUnipolar1.inputA)
         lfoToUnipolar1.inputB.set(0.5)
         lfoToUnipolar1.inputC.set(0.5)
-        
+
         hyperLfo.output.connect(lfoToUnipolar2.inputA)
         lfoToUnipolar2.inputB.set(0.5)
         lfoToUnipolar2.inputC.set(0.5)
-        
+
         // Connect unipolar LFO to modulation mixers
         lfoToUnipolar1.output.connect(delay1ModMixer.inputA)
         lfoToUnipolar2.output.connect(delay2ModMixer.inputA)
@@ -235,14 +270,14 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     // ═══════════════════════════════════════════════════════════
     // SongeEngine Implementation
     // ═══════════════════════════════════════════════════════════
-    
+
     private var monitoringJob: Job? = null
 
     override fun start() {
         if (audioEngine.isRunning) return
         Logger.info { "Starting Shared Audio Engine..." }
         audioEngine.start()
-        
+
         // Start monitoring flow updates
         monitoringJob = monitoringScope.launch {
             while (isActive) {
@@ -263,11 +298,13 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setDrive(amount: Float) {
+        _drive = amount
         val driveVal = 1.0 + (amount * 14.0) // Reduced from 49 for warmer saturation
         limiter.drive.set(driveVal)
     }
 
     override fun setDistortionMix(amount: Float) {
+        _distortionMix = amount
         val distortedLevel = amount
         val cleanLevel = 1.0f - amount
         cleanPathGain.inputB.set(cleanLevel.toDouble())
@@ -275,10 +312,12 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setMasterVolume(amount: Float) {
+        _masterVolume = amount
         masterGain.inputB.set(amount.toDouble())
     }
 
     override fun setDelayTime(index: Int, time: Float) {
+        _delayTime[index] = time
         val delaySeconds = 0.01 + (time * 1.99)
         if (index == 0) {
             delay1ModMixer.inputC.set(delaySeconds)
@@ -288,12 +327,14 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setDelayFeedback(amount: Float) {
+        _delayFeedback = amount
         val fb = amount * 0.95
         delay1FeedbackGain.inputB.set(fb)
         delay2FeedbackGain.inputB.set(fb)
     }
 
     override fun setDelayMix(amount: Float) {
+        _delayMix = amount
         val wetLevel = amount
         val dryLevel = 1.0f - amount
         dryGain.inputB.set(dryLevel.toDouble())
@@ -301,6 +342,7 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setDelayModDepth(index: Int, amount: Float) {
+        _delayModDepth[index] = amount
         // Modulation depth: max 0.5 seconds
         // Since LFO is unipolar (0-1), delay time = baseTime + (unipolarLFO * depth)
         // This ensures delay times are always >= baseTime (no negative values)
@@ -313,24 +355,27 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setDelayModSource(index: Int, isLfo: Boolean) {
+        _delayModSourceIsLfo[index] = isLfo
         val targetConverter = if (index == 0) lfoToUnipolar1 else lfoToUnipolar2
         val targetMixer = if (index == 0) delay1ModMixer else delay2ModMixer
-        
+
         // Disconnect the converter's input
         targetConverter.inputA.disconnectAll()
-        
+
         if (isLfo) {
             // Connect LFO -> Unipolar Converter -> Mixer (already wired at init)
             hyperLfo.output.connect(targetConverter.inputA)
         } else {
             // Connect Self-Modulation -> Unipolar Converter
             // Self-mod is already bipolar audio signal, so needs conversion too
-            val attenuatedSelf = if (index == 0) selfMod1Attenuator.output else selfMod2Attenuator.output
+            val attenuatedSelf =
+                if (index == 0) selfMod1Attenuator.output else selfMod2Attenuator.output
             attenuatedSelf.connect(targetConverter.inputA)
         }
     }
 
     override fun setDelayLfoWaveform(isTriangle: Boolean) {
+        _delayLfoWaveformIsTriangle = isTriangle
         hyperLfo.setTriangleMode(isTriangle)
     }
 
@@ -342,6 +387,7 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setHyperLfoFreq(index: Int, frequency: Float) {
+        _hyperLfoFreq[index] = frequency
         val freqHz = 0.01 + (frequency * 10.0)
         if (index == 0) {
             hyperLfo.frequencyA.set(freqHz)
@@ -351,14 +397,17 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setHyperLfoMode(mode: Int) {
+        _hyperLfoMode = mode
         hyperLfo.setMode(mode)
     }
 
     override fun setHyperLfoLink(active: Boolean) {
+        _hyperLfoLink = active
         hyperLfo.setLink(active)
     }
 
     override fun setVoiceTune(index: Int, tune: Float) {
+        _voiceTune[index] = tune
         voiceTuneCache[index] = tune.toDouble()
         updateVoiceFrequency(index)
     }
@@ -367,14 +416,14 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         val tune = voiceTuneCache[index]
         val quadIndex = index / 4
         val quadPitch = quadPitchOffsets[quadIndex]
-        
+
         // Base frequency range: 55Hz - 880Hz (4 octaves)
         val baseFreq = 55.0 * 2.0.pow(tune * 4.0)
-        
+
         // Apply quad pitch offset (-1 to +1 octave)
         val pitchMultiplier = 2.0.pow((quadPitch - 0.5) * 2.0)
         val finalFreq = baseFreq * pitchMultiplier
-        
+
         voices[index].frequency.set(finalFreq)
     }
 
@@ -387,14 +436,17 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setVoiceFmDepth(index: Int, amount: Float) {
+        _voiceFmDepth[index] = amount
         voices[index].fmDepth.set(amount.toDouble())
     }
 
     override fun setVoiceEnvelopeSpeed(index: Int, speed: Float) {
+        _voiceEnvelopeSpeed[index] = speed
         voices[index].setEnvelopeSpeed(speed)
     }
 
     override fun setPairSharpness(pairIndex: Int, sharpness: Float) {
+        _pairSharpness[pairIndex] = sharpness
         val voiceA = pairIndex * 2
         val voiceB = voiceA + 1
         voices[voiceA].sharpness.set(sharpness.toDouble())
@@ -402,6 +454,7 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setQuadPitch(quadIndex: Int, pitch: Float) {
+        _quadPitch[quadIndex] = pitch
         quadPitchOffsets[quadIndex] = pitch.toDouble()
         val startVoice = quadIndex * 4
         for (i in startVoice until startVoice + 4) {
@@ -410,6 +463,7 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setQuadHold(quadIndex: Int, amount: Float) {
+        _quadHold[quadIndex] = amount
         val startVoice = quadIndex * 4
         for (i in startVoice until startVoice + 4) {
             voices[i].setHoldLevel(amount.toDouble())
@@ -417,34 +471,41 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setDuoModSource(duoIndex: Int, source: ModSource) {
+        _duoModSource[duoIndex] = source
         val voiceA = duoIndex * 2
         val voiceB = voiceA + 1
-        
+
         voices[voiceA].modInput.disconnectAll()
         voices[voiceB].modInput.disconnectAll()
-        
+
         when (source) {
-            ModSource.OFF -> { /* Already disconnected */ }
+            ModSource.OFF -> { /* Already disconnected */
+            }
+
             ModSource.LFO -> {
                 hyperLfo.output.connect(voices[voiceA].modInput)
                 hyperLfo.output.connect(voices[voiceB].modInput)
             }
+
             ModSource.VOICE_FM -> {
-                if (fmStructureCrossQuad) {
+                if (_fmStructureCrossQuad) {
                     // Cross-quad routing
                     when (duoIndex) {
                         0 -> { // Duo 0 (voices 0-1) receives from Duo 3 (voices 6-7)
                             voices[6].output.connect(voices[voiceA].modInput)
                             voices[7].output.connect(voices[voiceB].modInput)
                         }
+
                         1 -> { // Duo 1 (voices 2-3): Within-pair
                             voices[voiceA].output.connect(voices[voiceB].modInput)
                             voices[voiceB].output.connect(voices[voiceA].modInput)
                         }
+
                         2 -> { // Duo 2 (voices 4-5) receives from Duo 1 (voices 2-3)
                             voices[2].output.connect(voices[voiceA].modInput)
                             voices[3].output.connect(voices[voiceB].modInput)
                         }
+
                         3 -> { // Duo 3 (voices 6-7): Within-pair
                             voices[voiceA].output.connect(voices[voiceB].modInput)
                             voices[voiceB].output.connect(voices[voiceA].modInput)
@@ -460,20 +521,23 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     }
 
     override fun setFmStructure(crossQuad: Boolean) {
-        fmStructureCrossQuad = crossQuad
+        _fmStructureCrossQuad = crossQuad
     }
 
     override fun setTotalFeedback(amount: Float) {
+        _totalFeedback = amount
         val scaledAmount = amount * 20.0
         totalFbGain.inputB.set(scaledAmount)
     }
 
     override fun setVibrato(amount: Float) {
+        _vibrato = amount
         val depthHz = amount * 20.0
         vibratoDepthGain.inputB.set(depthHz)
     }
 
     override fun setVoiceCoupling(amount: Float) {
+        _voiceCoupling = amount
         val depthHz = amount * 30.0
         voices.forEach { voice ->
             voice.couplingDepth.set(depthHz)
@@ -495,4 +559,34 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     override fun getCpuLoad(): Float {
         return audioEngine.getCpuLoad()
     }
-}
+
+    // ═══════════════════════════════════════════════════════════
+    // Getters for State Saving
+    // ═══════════════════════════════════════════════════════════
+
+    override fun getVoiceTune(index: Int): Float = _voiceTune[index]
+    override fun getVoiceFmDepth(index: Int): Float = _voiceFmDepth[index]
+    override fun getVoiceEnvelopeSpeed(index: Int): Float = _voiceEnvelopeSpeed[index]
+    override fun getPairSharpness(pairIndex: Int): Float = _pairSharpness[pairIndex]
+    override fun getDuoModSource(duoIndex: Int): ModSource = _duoModSource[duoIndex]
+    override fun getQuadPitch(quadIndex: Int): Float = _quadPitch[quadIndex]
+    override fun getQuadHold(quadIndex: Int): Float = _quadHold[quadIndex]
+    override fun getFmStructureCrossQuad(): Boolean = _fmStructureCrossQuad
+    override fun getTotalFeedback(): Float = _totalFeedback
+    override fun getVibrato(): Float = _vibrato
+    override fun getVoiceCoupling(): Float = _voiceCoupling
+
+    override fun getDelayTime(index: Int): Float = _delayTime[index]
+    override fun getDelayFeedback(): Float = _delayFeedback
+    override fun getDelayMix(): Float = _delayMix
+    override fun getDelayModDepth(index: Int): Float = _delayModDepth[index]
+    override fun getDelayModSourceIsLfo(index: Int): Boolean = _delayModSourceIsLfo[index]
+    override fun getDelayLfoWaveformIsTriangle(): Boolean = _delayLfoWaveformIsTriangle
+
+    override fun getHyperLfoFreq(index: Int): Float = _hyperLfoFreq[index]
+    override fun getHyperLfoMode(): Int = _hyperLfoMode
+    override fun getHyperLfoLink(): Boolean = _hyperLfoLink
+
+    override fun getDrive(): Float = _drive
+    override fun getDistortionMix(): Float = _distortionMix
+    override fun getMasterVolume(): Float = _masterVolume}

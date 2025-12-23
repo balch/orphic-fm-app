@@ -95,9 +95,9 @@ fun LfoSwitch(
                     )
             )
         }
-        
+
         Spacer(modifier = Modifier.height(12.dp))
-        
+
         // Waveform selector - 3D Buttons Style
         Row(
             modifier = Modifier
@@ -114,7 +114,7 @@ fun LfoSwitch(
         ) {
             LfoWaveform.entries.forEach { wf ->
                 val selected = wf == waveform
-                
+
                 // Individual Waveform Button
                 Box(
                     modifier = Modifier
@@ -122,18 +122,18 @@ fun LfoSwitch(
                         .padding(2.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .then(
-                             if (selected && enabled) {
-                                 Modifier.background(
-                                     brush = Brush.verticalGradient(
-                                         colors = listOf(
-                                             activeColor.copy(alpha = 0.2f),
-                                             activeColor.copy(alpha = 0.5f)
-                                         )
-                                     )
-                                 )
-                             } else {
-                                 Modifier.background(Color.Transparent)
-                             }
+                            if (selected && enabled) {
+                                Modifier.background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            activeColor.copy(alpha = 0.2f),
+                                            activeColor.copy(alpha = 0.5f)
+                                        )
+                                    )
+                                )
+                            } else {
+                                Modifier.background(Color.Transparent)
+                            }
                         )
                         .border(
                             width = if (selected && enabled) 1.dp else 0.dp,
@@ -145,12 +145,14 @@ fun LfoSwitch(
                     Text(
                         text = wf.name.take(3), // SIN, TRI, SQU
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (selected && enabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = if (selected && enabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                            alpha = 0.7f
+                        )
                     )
                 }
             }
         }
-        
+
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "LFO",

@@ -39,7 +39,7 @@ fun HorizontalSwitch3Way(
 ) {
     val learnState = LocalLearnModeState.current
     val isActive = learnState.isActive
-    
+
     val finalModifier = if (controlId != null) {
         modifier.learnable(controlId, learnState)
     } else {
@@ -61,7 +61,7 @@ fun HorizontalSwitch3Way(
                     // 0.42..0.58 -> Center (OFF)
                     // 0.58..1.0 -> Right (FM)
                     val fraction = offset.x / width.toFloat()
-                    
+
                     val newState = when {
                         fraction < 0.42f -> ModSource.LFO
                         fraction < 0.58f -> ModSource.OFF
@@ -98,21 +98,21 @@ fun HorizontalSwitch3Way(
                 // 3 positions: Left (LFO), Center (OFF), Right (FM)
                 // Track Width = 40.dp
                 // Thumb Width = 13.dp (approx 1/3)
-                
+
                 val thumbWidth = 13.dp
                 val trackWidth = 40.dp
-                
+
                 // Offsets (from left)
                 // LFO (Left) = 0.dp
                 // OFF (Center) = (40 - 13) / 2 = 13.5dp
                 // FM (Right) = 40 - 13 = 27.dp
-                
+
                 val targetOffset = when (state) {
                     ModSource.LFO -> 0.dp
                     ModSource.OFF -> (trackWidth - thumbWidth) / 2
                     ModSource.VOICE_FM -> trackWidth - thumbWidth
                 }
-                
+
                 val animatedOffset by animateDpAsState(targetOffset)
 
                 // Thumb
@@ -121,7 +121,7 @@ fun HorizontalSwitch3Way(
                         .offset(x = animatedOffset)
                         .padding(2.dp)
                         .fillMaxHeight()
-                        .width(thumbWidth) 
+                        .width(thumbWidth)
                         .clip(RoundedCornerShape(4.dp))
                         .background(color)
                 )
@@ -143,8 +143,20 @@ fun HorizontalSwitch3Way(
 @Composable
 fun HorizontalSwitch3WayPreview() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        HorizontalSwitch3Way(state = ModSource.OFF, onStateChange = {}, color = SongeColors.neonMagenta)
-        HorizontalSwitch3Way(state = ModSource.VOICE_FM, onStateChange = {}, color = SongeColors.neonMagenta)
-        HorizontalSwitch3Way(state = ModSource.LFO, onStateChange = {}, color = SongeColors.neonMagenta)
+        HorizontalSwitch3Way(
+            state = ModSource.OFF,
+            onStateChange = {},
+            color = SongeColors.neonMagenta
+        )
+        HorizontalSwitch3Way(
+            state = ModSource.VOICE_FM,
+            onStateChange = {},
+            color = SongeColors.neonMagenta
+        )
+        HorizontalSwitch3Way(
+            state = ModSource.LFO,
+            onStateChange = {},
+            color = SongeColors.neonMagenta
+        )
     }
 }

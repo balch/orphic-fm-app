@@ -43,7 +43,7 @@ fun RotaryKnobPreview() {
 /**
  * A synth-style rotary knob control.
  * Supports vertical drag interaction for precision.
- * 
+ *
  * @param controlId Optional ID for MIDI learn mode. If provided, this knob can be selected for CC mapping.
  */
 @Composable
@@ -62,7 +62,7 @@ fun RotaryKnob(
 ) {
     // Sensitivity for drag (pixels per full range)
     val sensitivity = 200f
-    
+
     // Get learn mode state from composition local
     val learnState = LocalLearnModeState.current
     val isLearning = controlId != null && learnState.isLearning(controlId)
@@ -84,34 +84,36 @@ fun RotaryKnob(
         Box(
             modifier = Modifier.size(size)
         ) {
-            Canvas(modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(sensitivity, range, isLearning) {
-                    if (isLearning) {
-                        return@pointerInput
-                    }
-                    detectDragGestures(
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            // Use both vertical and horizontal drag
-                            val delta = (-dragAmount.y + dragAmount.x) * (range.endInclusive - range.start) / sensitivity
-                            val newValue = (internalValue + delta).coerceIn(range)
-                            if (newValue != internalValue) {
-                                internalValue = newValue
-                                onValueChange(newValue)
-                            }
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(sensitivity, range, isLearning) {
+                        if (isLearning) {
+                            return@pointerInput
                         }
-                    )
-                }
+                        detectDragGestures(
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                // Use both vertical and horizontal drag
+                                val delta =
+                                    (-dragAmount.y + dragAmount.x) * (range.endInclusive - range.start) / sensitivity
+                                val newValue = (internalValue + delta).coerceIn(range)
+                                if (newValue != internalValue) {
+                                    internalValue = newValue
+                                    onValueChange(newValue)
+                                }
+                            }
+                        )
+                    }
             ) {
                 val strokeWidth = size.toPx() * 0.1f
                 val radius = (size.toPx() - strokeWidth) / 2
                 val center = Offset(size.toPx() / 2, size.toPx() / 2)
-                
+
                 // Track (background arc) - darker and deeper
                 val startAngle = 135f
                 val sweepAngle = 270f
-                
+
                 // Track Groove (Shadow)
                 drawArc(
                     color = Color.Black.copy(alpha = 0.5f),
@@ -132,15 +134,19 @@ fun RotaryKnob(
                     size = Size(radius * 2, radius * 2),
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
-                
+
                 // Active Progress Arc with Glow
-                val normalizedValue = (internalValue - range.start) / (range.endInclusive - range.start)
+                val normalizedValue =
+                    (internalValue - range.start) / (range.endInclusive - range.start)
                 val currentSweep = sweepAngle * normalizedValue
-                
+
                 // Progress Glow
                 drawArc(
                     brush = Brush.sweepGradient(
-                        colors = listOf(progressColor.copy(alpha = 0.0f), progressColor.copy(alpha = 0.6f)),
+                        colors = listOf(
+                            progressColor.copy(alpha = 0.0f),
+                            progressColor.copy(alpha = 0.6f)
+                        ),
                         center = center
                     ),
                     startAngle = startAngle,
@@ -164,12 +170,12 @@ fun RotaryKnob(
                     size = Size(radius * 2, radius * 2),
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
-                
+
                 // Knob Body Calculation
                 val knobRadius = radius * 0.7f
                 val angleInDegrees = startAngle + currentSweep
                 val angleInRadians = Math.toRadians(angleInDegrees.toDouble())
-                
+
                 // Knob Shadow (fake drop shadow)
                 drawCircle(
                     brush = Brush.radialGradient(
@@ -183,7 +189,7 @@ fun RotaryKnob(
 
                 // Knob Main Body (Gradient for convexity)
                 drawCircle(
-                     brush = Brush.linearGradient(
+                    brush = Brush.linearGradient(
                         colors = listOf(
                             SongeColors.softPurple.copy(alpha = 0.8f), // Highlight top-left
                             SongeColors.deepPurple,                    // Mid
@@ -200,7 +206,7 @@ fun RotaryKnob(
                 drawCircle(
                     style = Stroke(width = 2.dp.toPx()),
                     brush = Brush.linearGradient(
-                         colors = listOf(
+                        colors = listOf(
                             Color.White.copy(alpha = 0.3f),
                             Color.Black.copy(alpha = 0.6f)
                         ),
@@ -215,7 +221,7 @@ fun RotaryKnob(
                 val indicatorLength = knobRadius * 0.5f
                 val endX = center.x + indicatorLength * cos(angleInRadians).toFloat()
                 val endY = center.y + indicatorLength * sin(angleInRadians).toFloat()
-                
+
                 drawLine(
                     color = indicatorColor,
                     start = center,
@@ -223,7 +229,7 @@ fun RotaryKnob(
                     strokeWidth = strokeWidth * 0.8f,
                     cap = StrokeCap.Round
                 )
-                
+
                 // Indicator Glow Point
                 drawCircle(
                     color = indicatorColor,
@@ -232,7 +238,7 @@ fun RotaryKnob(
                 )
             }
         }
-        
+
         if (label != null) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -242,7 +248,10 @@ fun RotaryKnob(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = String.format("%.2f", internalValue), // Will fix formatting for basic float display
+                text = String.format(
+                    "%.2f",
+                    internalValue
+                ), // Will fix formatting for basic float display
                 style = MaterialTheme.typography.labelMedium,
                 color = progressColor,
                 textAlign = TextAlign.Center

@@ -34,7 +34,7 @@ fun PlasmaBackground(
     accentColor3: Color = SongeColors.electricBlue.copy(alpha = 0.12f)
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "plasma")
-    
+
     // Slow, organic movement phases
     val phase1 by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -45,7 +45,7 @@ fun PlasmaBackground(
         ),
         label = "phase1"
     )
-    
+
     val phase2 by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -55,7 +55,7 @@ fun PlasmaBackground(
         ),
         label = "phase2"
     )
-    
+
     val phase3 by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
@@ -65,22 +65,23 @@ fun PlasmaBackground(
         ),
         label = "phase3"
     )
-    
+
     Canvas(modifier = modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
-        
+
         // Base gradient
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(baseColor1, baseColor2)
             )
         )
-        
+
         // Animated blob 1 (magenta)
         val blob1X = width * 0.3f + cos(Math.toRadians(phase1.toDouble())).toFloat() * width * 0.2f
-        val blob1Y = height * 0.4f + sin(Math.toRadians(phase1.toDouble() * 0.7)).toFloat() * height * 0.15f
-        
+        val blob1Y =
+            height * 0.4f + sin(Math.toRadians(phase1.toDouble() * 0.7)).toFloat() * height * 0.15f
+
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(accentColor1, Color.Transparent),
@@ -90,11 +91,13 @@ fun PlasmaBackground(
             radius = width * 0.4f,
             center = Offset(blob1X, blob1Y)
         )
-        
+
         // Animated blob 2 (cyan)
-        val blob2X = width * 0.7f + cos(Math.toRadians(phase2.toDouble() + 120)).toFloat() * width * 0.15f
-        val blob2Y = height * 0.6f + sin(Math.toRadians(phase2.toDouble() * 0.8)).toFloat() * height * 0.2f
-        
+        val blob2X =
+            width * 0.7f + cos(Math.toRadians(phase2.toDouble() + 120)).toFloat() * width * 0.15f
+        val blob2Y =
+            height * 0.6f + sin(Math.toRadians(phase2.toDouble() * 0.8)).toFloat() * height * 0.2f
+
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(accentColor2, Color.Transparent),
@@ -104,11 +107,13 @@ fun PlasmaBackground(
             radius = width * 0.35f,
             center = Offset(blob2X, blob2Y)
         )
-        
+
         // Animated blob 3 (blue)
-        val blob3X = width * 0.5f + cos(Math.toRadians(phase3.toDouble() + 240)).toFloat() * width * 0.25f
-        val blob3Y = height * 0.3f + sin(Math.toRadians(phase3.toDouble() * 0.6)).toFloat() * height * 0.1f
-        
+        val blob3X =
+            width * 0.5f + cos(Math.toRadians(phase3.toDouble() + 240)).toFloat() * width * 0.25f
+        val blob3Y =
+            height * 0.3f + sin(Math.toRadians(phase3.toDouble() * 0.6)).toFloat() * height * 0.1f
+
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(accentColor3, Color.Transparent),

@@ -9,21 +9,21 @@ import java.io.File
  * Android implementation of MidiMappingRepository using internal storage.
  */
 actual class MidiMappingRepository actual constructor() {
-    
-    private val json = Json { 
+
+    private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
     }
-    
+
     private var context: Context? = null
-    
+
     /**
      * Initialize with Android context. Must be called before using the repository.
      */
     fun init(context: Context) {
         this.context = context.applicationContext
     }
-    
+
     private fun getMappingsDir(): File? {
         return context?.let { ctx ->
             File(ctx.filesDir, "midi-mappings").also { dir ->
@@ -33,12 +33,12 @@ actual class MidiMappingRepository actual constructor() {
             }
         }
     }
-    
+
     private fun fileForDevice(deviceName: String): File? {
         val safeName = deviceName.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         return getMappingsDir()?.let { File(it, "$safeName.json") }
     }
-    
+
     actual suspend fun save(deviceName: String, mapping: MidiMappingState) {
         try {
             val file = fileForDevice(deviceName) ?: run {
@@ -52,7 +52,7 @@ actual class MidiMappingRepository actual constructor() {
             Logger.error { "Failed to save MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
-    
+
     actual suspend fun load(deviceName: String): MidiMappingState? {
         return try {
             val file = fileForDevice(deviceName) ?: run {
@@ -72,7 +72,7 @@ actual class MidiMappingRepository actual constructor() {
             null
         }
     }
-    
+
     actual suspend fun delete(deviceName: String) {
         try {
             fileForDevice(deviceName)?.let { file ->
@@ -85,7 +85,7 @@ actual class MidiMappingRepository actual constructor() {
             Logger.error { "Failed to delete MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
-    
+
     actual suspend fun listDevices(): List<String> {
         return try {
             getMappingsDir()?.listFiles()

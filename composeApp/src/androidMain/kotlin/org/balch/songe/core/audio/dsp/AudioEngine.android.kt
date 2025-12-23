@@ -7,12 +7,12 @@ package org.balch.songe.core.audio.dsp
 actual class AudioEngine actual constructor() {
     actual fun start() {}
     actual fun stop() {}
-    
+
     actual val isRunning: Boolean = false
     actual val sampleRate: Int = 44100
-    
+
     actual fun addUnit(unit: AudioUnit) {}
-    
+
     actual fun createSineOscillator(): SineOscillator = StubSineOscillator()
     actual fun createTriangleOscillator(): TriangleOscillator = StubTriangleOscillator()
     actual fun createSquareOscillator(): SquareOscillator = StubSquareOscillator()
@@ -26,9 +26,9 @@ actual class AudioEngine actual constructor() {
     actual fun createPassThrough(): PassThrough = StubPassThrough()
     actual fun createMinimum(): Minimum = StubMinimum()
     actual fun createMaximum(): Maximum = StubMaximum()
-    
+
     actual val lineOutLeft: AudioInput = StubAudioInput()
     actual val lineOutRight: AudioInput = StubAudioInput()
-    
+
     actual fun getCpuLoad(): Float = 0f
 }

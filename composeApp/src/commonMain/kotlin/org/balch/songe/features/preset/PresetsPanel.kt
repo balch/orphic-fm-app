@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.balch.songe.core.presets.DronePreset
 import org.balch.songe.ui.panels.CollapsibleColumnPanel
 import org.balch.songe.ui.theme.SongeColors
 
@@ -48,7 +49,7 @@ fun PresetsPanel(
     modifier: Modifier = Modifier
 ) {
     CollapsibleColumnPanel(
-        title = "FILES",
+        title = "PATCHES",
         color = SongeColors.neonCyan,
         initialExpanded = false,
         expandedWidth = 200.dp,

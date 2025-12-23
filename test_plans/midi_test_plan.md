@@ -2,7 +2,8 @@
 
 ## Overview
 
-MIDI integration includes device connectivity, learn mode for mapping, note-to-voice mapping, CC-to-control mapping, and persistence of mappings per device.
+MIDI integration includes device connectivity, learn mode for mapping, note-to-voice mapping,
+CC-to-control mapping, and persistence of mappings per device.
 
 ## Features
 
@@ -21,12 +22,14 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify automatic device detection
 
 **Procedure:**
+
 1. Launch app with no MIDI device connected
 2. Connect MIDI device
 3. Wait up to 2 seconds (polling interval)
 4. Check MIDI indicator
 
 **Expected Results:**
+
 - ✓ Device detected automatically
 - ✓ MIDI indicator shows connected
 - ✓ Device name displayed
@@ -41,11 +44,13 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify graceful handling of device removal
 
 **Procedure:**
+
 1. Connect MIDI device
 2. Disconnect device while app running
 3. Monitor app behavior
 
 **Expected Results:**
+
 - ✓ Disconnect detected within 2 seconds
 - ✓ MIDI indicator shows disconnected
 - ✓ No crashes or errors
@@ -60,12 +65,14 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify device auto-reconnects after removal
 
 **Procedure:**
+
 1. Connect device
 2. Disconnect device
 3. Reconnect same device
 4. Wait for auto-connect
 
 **Expected Results:**
+
 - ✓ Device reconnects automatically
 - ✓ Previous mappings restored
 - ✓ MIDI functionality resumes
@@ -80,6 +87,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Learn MIDI notes for voice triggers
 
 **Procedure:**
+
 1. Click LEARN button (enters learn mode)
 2. Click Voice 1 trigger button (starts learning)
 3. Press MIDI note C3
@@ -87,6 +95,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 5. Test: Press C3, voice 1 should trigger
 
 **Expected Results:**
+
 - ✓ Learn mode activates
 - ✓ Voice 1 button highlighted
 - ✓ Note C3 assigned to voice 1
@@ -102,6 +111,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Learn MIDI CC for continuous controls
 
 **Procedure:**
+
 1. Enter learn mode
 2. Click a knob (e.g., MOD 1 on voice pair)
 3. Move CC knob/slider on MIDI controller (e.g., CC 1)
@@ -109,6 +119,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 5. Move CC 1 again
 
 **Expected Results:**
+
 - ✓ Knob highlighted in learn mode
 - ✓ CC 1 assigned to MOD 1
 - ✓ Console shows assignment
@@ -124,11 +135,13 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify CC buttons toggle controls
 
 **Procedure:**
+
 1. Map MIDI note to a toggle control (e.g., voice hold)
 2. Press MIDI button once: Hold on
 3. Press MIDI button again: Hold off
 
 **Expected Results:**
+
 - ✓ First press: Toggle ON
 - ✓ Second press: Toggle OFF
 - ✓ Latching behavior (ignores note-off)
@@ -143,11 +156,13 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify CC buttons cycle through modes
 
 **Procedure:**
+
 1. Map MIDI note to HyperLFO mode (3-way switch)
 2. Press button repeatedly
 3. Should cycle: AND → OFF → OR → AND...
 
 **Expected Results:**
+
 - ✓ Each press cycles to next state
 - ✓ 3 states: AND, OFF, OR
 - ✓ Wraps around after OR
@@ -162,13 +177,15 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify jump detection distinguishes knobs from buttons
 
 **Procedure:**
+
 1. Map CC 1 to a continuous control
 2. Move CC slider slowly (knob behavior)
-   - Control should follow smoothly
+    - Control should follow smoothly
 3. Press CC button (0→127 jump)
-   - Control should toggle, not jump to 100%
+    - Control should toggle, not jump to 100%
 
 **Expected Results:**
+
 - ✓ Slow movements: Direct mapping
 - ✓ Quick jumps (0→≥0.9): Toggle/cycle behavior
 - ✓ No accidental toggles from knob turns
@@ -183,17 +200,19 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Map multiple controls in one learn session
 
 **Procedure:**
+
 1. Enter learn mode
 2. Map 5 different controls:
-   - Voice 1 note
-   - MOD 1 CC
-   - Delay Time CC
-   - HyperLFO A CC
-   - Master Volume CC
+    - Voice 1 note
+    - MOD 1 CC
+    - Delay Time CC
+    - HyperLFO A CC
+    - Master Volume CC
 3. Save mappings
 4. Test all 5 mappings
 
 **Expected Results:**
+
 - ✓ All 5 mappings work independently
 - ✓ No conflicts or interference
 - ✓ Each control responds correctly
@@ -208,6 +227,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify CANCEL discards changes
 
 **Procedure:**
+
 1. Note existing mappings (or lack thereof)
 2. Enter learn mode
 3. Create several new mappings
@@ -215,6 +235,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 5. Test previous mappings
 
 **Expected Results:**
+
 - ✓ New mappings discarded
 - ✓ Previous mappings restored
 - ✓ No changes applied
@@ -229,6 +250,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify mappings save and load per device
 
 **Procedure:**
+
 1. Create mappings for "Controller A"
 2. Click SAVE
 3. Restart app
@@ -236,6 +258,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 5. Test mappings
 
 **Expected Results:**
+
 - ✓ Mappings saved to storage
 - ✓ Mappings load on reconnect
 - ✓ All mappings restored correctly
@@ -250,6 +273,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify different devices have separate mappings
 
 **Procedure:**
+
 1. Connect "Controller A", create mappings
 2. Save mappings
 3. Disconnect "Controller A"
@@ -259,6 +283,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 7. Switch back to "Controller A"
 
 **Expected Results:**
+
 - ✓ Controller A: Original mappings
 - ✓ Controller B: Different mappings
 - ✓ No cross-contamination
@@ -273,11 +298,13 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify CC 1 defaults to vibrato if unmapped
 
 **Procedure:**
+
 1. Ensure CC 1 is unmapped
 2. Move mod wheel (CC 1)
 3. Check vibrato knob
 
 **Expected Results:**
+
 - ✓ Vibrato controlled by mod wheel
 - ✓ Fallback behavior works
 - ✓ Can be overridden by mapping CC 1
@@ -291,12 +318,14 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify UI provides clear learn mode indication
 
 **Procedure:**
+
 1. Enter learn mode
 2. Observe UI changes
 3. Click various controls
 4. Exit learn mode
 
 **Expected Results:**
+
 - ✓ Learn mode indicator visible
 - ✓ LEARN button highlighted
 - ✓ Selected control highlighted
@@ -313,12 +342,14 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify full MIDI note range supported
 
 **Procedure:**
+
 1. Map voices to extreme notes:
-   - Voice 1: Note 0 (C-2)
-   - Voice 8: Note 127 (G8)
+    - Voice 1: Note 0 (C-2)
+    - Voice 8: Note 127 (G8)
 2. Test playback
 
 **Expected Results:**
+
 - ✓ Full 0-127 range supported
 - ✓ No range restrictions
 - ✓ All notes trigger correctly
@@ -332,12 +363,14 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify full CC range (0-127) maps correctly
 
 **Procedure:**
+
 1. Map CC to a knob
 2. Send CC value 0: Knob at 0%
 3. Send CC value 63: Knob at ~50%
 4. Send CC value 127: Knob at 100%
 
 **Expected Results:**
+
 - ✓ 0 → 0% (minimum)
 - ✓ 63 → 49.6% (midpoint)
 - ✓ 127 → 100% (maximum)
@@ -353,12 +386,14 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify velocity is received (even if not used)
 
 **Procedure:**
+
 1. Map note to voice
 2. Send note with velocity 64
 3. Send note with velocity 127
 4. Check console logs
 
 **Expected Results:**
+
 - ✓ Velocity value logged
 - ✓ Note triggers regardless of velocity
 - ✓ System ready for future velocity mapping
@@ -372,11 +407,13 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify multiple simultaneous notes
 
 **Procedure:**
+
 1. Map 4 notes to 4 voices
 2. Play all 4 notes at once (chord)
 3. Hold chord
 
 **Expected Results:**
+
 - ✓ All 4 voices trigger
 - ✓ No voice stealing
 - ✓ Chord sustains
@@ -391,11 +428,13 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify learn mode doesn't interfere with presets
 
 **Procedure:**
+
 1. Create mappings in learn mode
 2. While in learn mode, load a preset
 3. Exit learn mode
 
 **Expected Results:**
+
 - ✓ Preset loads correctly
 - ✓ MIDI mappings unaffected by preset
 - ✓ Both systems independent
@@ -409,11 +448,13 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify system handles fast MIDI data
 
 **Procedure:**
+
 1. Map multiple CCs
 2. Rapidly move multiple knobs on controller
 3. Play rapid note sequences
 
 **Expected Results:**
+
 - ✓ No missed events
 - ✓ No audio glitches
 - ✓ Smooth parameter changes
@@ -430,18 +471,20 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Create full performance setup
 
 **Procedure:**
+
 1. Map all 8 voices to keyboard
 2. Map key parameters to CCs:
-   - Delay times
-   - Feedback
-   - Mix
-   - Drive
-   - Volume
-   - LFO rates
+    - Delay times
+    - Feedback
+    - Mix
+    - Drive
+    - Volume
+    - LFO rates
 3. Map mode switches to buttons
 4. Save and test performance
 
 **Expected Results:**
+
 - ✓ Complete control from MIDI
 - ✓ No computer interaction needed
 - ✓ Expressive performance possible
@@ -455,6 +498,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 **Objective:** Verify mapping data integrity
 
 **Procedure:**
+
 1. Create complex mapping
 2. Close app
 3. Reopen app
@@ -462,6 +506,7 @@ MIDI integration includes device connectivity, learn mode for mapping, note-to-v
 5. Verify mappings
 
 **Expected Results:**
+
 - ✓ All mappings restored
 - ✓ Data persists correctly
 - ✓ No corruption
@@ -480,7 +525,7 @@ None currently.
 **Jump Threshold:** 0.9 (for button detection)  
 **CC Resolution:** 128 steps (0-127)  
 **Note Range:** 0-127 (C-2 to G8)  
-**Storage:** Per-device JSON files  
+**Storage:** Per-device JSON files
 
 ## Test Summary
 
@@ -488,7 +533,7 @@ None currently.
 **Passed:** ____  
 **Failed:** ____  
 **Blocked:** ____  
-**Requires MIDI Device:** Yes  
+**Requires MIDI Device:** Yes
 
 **Tester:** ________________  
 **Date:** ________________  

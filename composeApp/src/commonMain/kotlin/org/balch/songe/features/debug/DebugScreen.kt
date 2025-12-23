@@ -55,20 +55,20 @@ fun DebugScreen(
             )
             Spacer(modifier = Modifier.weight(1f))
         }
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         Text("Audio Engine Test", color = Color.Gray)
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Button(
             onClick = { engine.playTestTone(440f) }
         ) {
             Text("Play 440Hz Tone")
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Button(
             onClick = { engine.stopTestTone() }
         ) {
