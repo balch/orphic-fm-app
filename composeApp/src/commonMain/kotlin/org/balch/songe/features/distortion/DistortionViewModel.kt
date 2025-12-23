@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
@@ -60,6 +61,7 @@ class DistortionViewModel(
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(DistortionUiState()) { state, intent -> reduce(state, intent) }
+            .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -67,23 +69,25 @@ class DistortionViewModel(
             )
 
     init {
-        applyFullState(uiState.value)
+        viewModelScope.launch(dispatcherProvider.io) {
+            applyFullState(uiState.value)
 
-        viewModelScope.launch {
-            presetLoader.presetFlow.collect { preset ->
-                val distortionState =
-                    DistortionUiState(
-                        drive = preset.drive,
-                        volume = preset.masterVolume,
-                        mix = preset.distortionMix
-                    )
-                intents.tryEmit(DistortionIntent.Restore(distortionState))
+            launch {
+                presetLoader.presetFlow.collect { preset ->
+                    val distortionState =
+                        DistortionUiState(
+                            drive = preset.drive,
+                            volume = preset.masterVolume,
+                            mix = preset.distortionMix
+                        )
+                    intents.tryEmit(DistortionIntent.Restore(distortionState))
+                }
             }
-        }
 
-        viewModelScope.launch {
-            engine.peakFlow.collect { peak ->
-                intents.tryEmit(DistortionIntent.Peak(peak))
+            launch {
+                engine.peakFlow.collect { peak ->
+                    intents.tryEmit(DistortionIntent.Peak(peak))
+                }
             }
         }
     }

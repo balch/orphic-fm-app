@@ -1,4 +1,4 @@
-package org.balch.songe.features.preset
+package org.balch.songe.features.presets
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

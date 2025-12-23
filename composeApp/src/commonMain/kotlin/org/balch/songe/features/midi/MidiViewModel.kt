@@ -12,6 +12,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
@@ -65,6 +66,7 @@ class MidiViewModel(
     val uiState: StateFlow<MidiUiState> =
         intents
             .scan(MidiUiState()) { state, intent -> reduce(state, intent) }
+            .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -86,8 +88,10 @@ class MidiViewModel(
     }
 
     init {
-        tryConnectMidi()
-        startMidiPolling()
+        viewModelScope.launch(dispatcherProvider.io) {
+            tryConnectMidi()
+            startMidiPolling()
+        }
     }
 
     // ═══════════════════════════════════════════════════════════

@@ -36,9 +36,9 @@ import org.balch.songe.features.lfo.HyperLfoPanel
 import org.balch.songe.features.midi.MidiPanel
 import org.balch.songe.features.midi.MidiProps
 import org.balch.songe.features.midi.MidiViewModel
-import org.balch.songe.features.preset.PresetProps
-import org.balch.songe.features.preset.PresetViewModel
-import org.balch.songe.features.preset.PresetsPanel
+import org.balch.songe.features.presets.PresetProps
+import org.balch.songe.features.presets.PresetViewModel
+import org.balch.songe.features.presets.PresetsPanel
 import org.balch.songe.features.voice.SynthKeyboardHandler
 import org.balch.songe.features.voice.VoiceViewModel
 import org.balch.songe.features.voice.ui.VoiceGroupSection

@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
@@ -60,6 +61,7 @@ class LfoViewModel(
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(LfoUiState()) { state, intent -> reduce(state, intent) }
+            .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -67,9 +69,9 @@ class LfoViewModel(
             )
 
     init {
-        applyFullState(uiState.value)
+        viewModelScope.launch(dispatcherProvider.io) {
+            applyFullState(uiState.value)
 
-        viewModelScope.launch {
             presetLoader.presetFlow.collect { preset ->
                 val lfoState =
                     LfoUiState(

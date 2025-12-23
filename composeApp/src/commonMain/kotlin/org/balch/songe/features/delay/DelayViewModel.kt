@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
@@ -54,7 +55,7 @@ private sealed interface DelayIntent {
 class DelayViewModel(
     private val engine: SongeEngine,
     private val presetLoader: PresetLoader,
-    private val dispatcherProvider: DispatcherProvider
+    dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
     private val intents =
@@ -68,6 +69,7 @@ class DelayViewModel(
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(DelayUiState()) { state, intent -> reduce(state, intent) }
+            .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -75,9 +77,9 @@ class DelayViewModel(
             )
 
     init {
-        applyFullState(uiState.value)
+        viewModelScope.launch(dispatcherProvider.io) {
+            applyFullState(uiState.value)
 
-        viewModelScope.launch {
             presetLoader.presetFlow.collect { preset ->
                 val delayState =
                     DelayUiState(

@@ -1,4 +1,4 @@
-package org.balch.songe.features.preset
+package org.balch.songe.features.presets
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -57,6 +58,7 @@ class PresetViewModel(
     val uiState: StateFlow<PresetUiState> =
         intents
             .scan(PresetUiState()) { state, intent -> reduce(state, intent) }
+            .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,

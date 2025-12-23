@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
@@ -93,6 +94,7 @@ class VoiceViewModel(
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(VoiceUiState()) { state, intent -> reduce(state, intent) }
+            .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -100,10 +102,10 @@ class VoiceViewModel(
             )
 
     init {
-        uiState.value.voiceStates.forEachIndexed { i, v -> engine.setVoiceTune(i, v.tune) }
+        viewModelScope.launch(dispatcherProvider.io) {
+            uiState.value.voiceStates.forEachIndexed { i, v -> engine.setVoiceTune(i, v.tune) }
 
-        // Subscribe to preset changes
-        viewModelScope.launch {
+            // Subscribe to preset changes
             presetLoader.presetFlow.collect { preset ->
                 val voiceState =
                     VoiceUiState(
