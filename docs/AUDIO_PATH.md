@@ -128,6 +128,19 @@ rightGain = sin(angle)
 | 5-6     | +0.3        | Slight Right |
 | 7-8     | ±0.7        | Wide L/R     |
 
+### Stereo Modes
+
+The stereo mode switch controls delay routing:
+
+| Mode | Delay 1 | Delay 2 | Effect |
+|------|---------|---------|--------|
+| **Voice Pan** | Both L+R | Both L+R | Traditional mono wet mix |
+| **Stereo Delays** | Left only | Right only | Ping-pong stereo effect |
+
+Each delay has dedicated L/R wet gains (`delay1WetLeft/Right`, `delay2WetLeft/Right`) that are set by `setStereoMode()`:
+- VOICE_PAN: All gains = 1.0 (delays to both channels)
+- STEREO_DELAYS: D1→L=1.0, D1→R=0.0, D2→L=0.0, D2→R=1.0
+
 ### Modulation Routing
 
 - **Hyper LFO** → Delay time modulation (converted to unipolar 0-1)
