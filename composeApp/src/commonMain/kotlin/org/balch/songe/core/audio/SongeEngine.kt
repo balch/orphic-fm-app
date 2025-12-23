@@ -90,10 +90,23 @@ interface SongeEngine {
     fun getDrive(): Float
     fun getDistortionMix(): Float
     fun getMasterVolume(): Float
+
+    // Stereo Control
+    fun setVoicePan(index: Int, pan: Float) // -1=Left, 0=Center, 1=Right
+    fun getVoicePan(index: Int): Float
+    fun setMasterPan(pan: Float)
+    fun getMasterPan(): Float
+    fun setStereoMode(mode: StereoMode)
+    fun getStereoMode(): StereoMode
 }
 
 enum class ModSource {
     VOICE_FM,
     OFF,
     LFO
+}
+
+enum class StereoMode {
+    VOICE_PAN,      // Per-voice stereo positioning
+    STEREO_DELAYS   // Delay 1→Left, Delay 2→Right (future)
 }

@@ -39,6 +39,7 @@ import org.balch.songe.features.midi.MidiViewModel
 import org.balch.songe.features.presets.PresetProps
 import org.balch.songe.features.presets.PresetViewModel
 import org.balch.songe.features.presets.PresetsPanel
+import org.balch.songe.features.stereo.StereoPanel
 import org.balch.songe.features.voice.SynthKeyboardHandler
 import org.balch.songe.features.voice.VoiceViewModel
 import org.balch.songe.features.voice.ui.VoiceGroupSection
@@ -155,6 +156,7 @@ fun SongeSynthScreen(
                     modifier = Modifier.fillMaxHeight()
                 )
 
+                StereoPanel(modifier = Modifier.fillMaxHeight())
                 HyperLfoPanel(modifier = Modifier.fillMaxHeight())
                 ModDelayPanel(modifier = Modifier.fillMaxHeight())
                 DistortionPanel(modifier = Modifier.fillMaxHeight())

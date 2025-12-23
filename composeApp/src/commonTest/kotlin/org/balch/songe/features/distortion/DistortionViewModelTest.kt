@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.balch.songe.core.audio.ModSource
 import org.balch.songe.core.audio.SongeEngine
+import org.balch.songe.core.audio.StereoMode
 import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.core.presets.PresetLoader
 import kotlin.test.AfterTest
@@ -129,5 +130,13 @@ class DistortionViewModelTest {
         override fun getHyperLfoFreq(index: Int): Float = 0f
         override fun getHyperLfoMode(): Int = 1 // OFF
         override fun getHyperLfoLink(): Boolean = false
+
+        // Stereo stubs
+        override fun setVoicePan(index: Int, pan: Float) {}
+        override fun getVoicePan(index: Int): Float = 0f
+        override fun setMasterPan(pan: Float) {}
+        override fun getMasterPan(): Float = 0f
+        override fun setStereoMode(mode: StereoMode) {}
+        override fun getStereoMode(): StereoMode = StereoMode.VOICE_PAN
     }
 }

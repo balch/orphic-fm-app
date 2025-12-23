@@ -12,8 +12,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.songe.core.audio.ModSource
 import org.balch.songe.core.audio.SongeEngine
+import org.balch.songe.core.audio.StereoMode
 import org.balch.songe.util.Logger
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.pow
+import kotlin.math.sin
 
 /**
  * Shared implementation of SongeEngine using DSP primitive interfaces.
@@ -64,7 +68,18 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     private val peakFollower = audioEngine.createPeakFollower()
     private val limiter = audioEngine.createLimiter()
     private val driveGain = audioEngine.createMultiply()
-    private val masterGain = audioEngine.createMultiply()
+    
+    // Stereo Output Bus
+    private val masterGainLeft = audioEngine.createMultiply()
+    private val masterGainRight = audioEngine.createMultiply()
+    private val stereoSumLeft = audioEngine.createPassThrough()  // Sum all L channels
+    private val stereoSumRight = audioEngine.createPassThrough() // Sum all R channels
+    private val masterPanLeft = audioEngine.createMultiply()
+    private val masterPanRight = audioEngine.createMultiply()
+    
+    // Per-voice stereo panning (equal-power pan law)
+    private val voicePanLeft = List(8) { audioEngine.createMultiply() }
+    private val voicePanRight = List(8) { audioEngine.createMultiply() }
 
     // Parallel Clean/Distorted Paths (Lyra MIX)
     private val preDistortionSummer = audioEngine.createAdd()
@@ -126,6 +141,14 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     private var _distortionMix = 0.5f
     private var _masterVolume = 0.7f
 
+    // Stereo
+    private val _voicePan = FloatArray(8) { 0f }  // -1=L, 0=Center, 1=R
+    private var _masterPan = 0f
+    private var _stereoMode = StereoMode.VOICE_PAN
+    
+    // Default voice pan positions (bass center, mids slight L/R, highs wide)
+    private val defaultVoicePans = floatArrayOf(0f, 0f, -0.3f, -0.3f, 0.3f, 0.3f, -0.7f, 0.7f)
+
     // Monitoring coroutine scope
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -145,7 +168,14 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         audioEngine.addUnit(peakFollower)
         audioEngine.addUnit(limiter)
         audioEngine.addUnit(driveGain)
-        audioEngine.addUnit(masterGain)
+        audioEngine.addUnit(masterGainLeft)
+        audioEngine.addUnit(masterGainRight)
+        audioEngine.addUnit(stereoSumLeft)
+        audioEngine.addUnit(stereoSumRight)
+        audioEngine.addUnit(masterPanLeft)
+        audioEngine.addUnit(masterPanRight)
+        voicePanLeft.forEach { audioEngine.addUnit(it) }
+        voicePanRight.forEach { audioEngine.addUnit(it) }
         audioEngine.addUnit(preDistortionSummer)
         audioEngine.addUnit(cleanPathGain)
         audioEngine.addUnit(distortedPathGain)
@@ -165,7 +195,10 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
         // Drive/Master defaults
         driveGain.inputB.set(1.0)
-        masterGain.inputB.set(0.7)
+        masterGainLeft.inputB.set(0.7)
+        masterGainRight.inputB.set(0.7)
+        masterPanLeft.inputB.set(1.0)  // Default: center (equal L/R)
+        masterPanRight.inputB.set(1.0)
 
         // Clean/Distorted Mix defaults (50/50)
         cleanPathGain.inputB.set(0.5)
@@ -227,13 +260,21 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         limiter.output.connect(distortedPathGain.inputA)
         distortedPathGain.output.connect(postMixSummer.inputB)
 
-        // PostMixSummer -> Master Gain
-        postMixSummer.output.connect(masterGain.inputA)
-
-        // Master Gain -> LineOut & Monitor
-        masterGain.output.connect(audioEngine.lineOutLeft)
-        masterGain.output.connect(audioEngine.lineOutRight)
-        masterGain.output.connect(peakFollower.input)
+        // PostMixSummer -> Stereo Master Path
+        // postMixSummer feeds both stereo channels (panned at voice level)
+        postMixSummer.output.connect(stereoSumLeft.input)
+        postMixSummer.output.connect(stereoSumRight.input)
+        
+        // Stereo Sum -> Master Pan -> Master Gain -> LineOut
+        stereoSumLeft.output.connect(masterPanLeft.inputA)
+        stereoSumRight.output.connect(masterPanRight.inputA)
+        masterPanLeft.output.connect(masterGainLeft.inputA)
+        masterPanRight.output.connect(masterGainRight.inputA)
+        masterGainLeft.output.connect(audioEngine.lineOutLeft)
+        masterGainRight.output.connect(audioEngine.lineOutRight)
+        
+        // Peak follower monitors left channel (representative of output)
+        masterGainLeft.output.connect(peakFollower.input)
 
         // Independent Feedback Loops per Delay
         delay1.output.connect(delay1FeedbackGain.inputA)
@@ -264,6 +305,20 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
             val voiceB = voices[pairIndex * 2 + 1]
             voiceA.envelopeOutput.connect(voiceB.couplingInput)
             voiceB.envelopeOutput.connect(voiceA.couplingInput)
+        }
+        
+        // Wire per-voice pan gains to stereo bus
+        // Voice -> PanL/PanR -> StereoSumL/StereoSumR  
+        voices.forEachIndexed { index, voice ->
+            voice.output.connect(voicePanLeft[index].inputA)
+            voice.output.connect(voicePanRight[index].inputA)
+            voicePanLeft[index].output.connect(stereoSumLeft.input)
+            voicePanRight[index].output.connect(stereoSumRight.input)
+        }
+        
+        // Apply default voice pan positions
+        defaultVoicePans.forEachIndexed { index, pan ->
+            setVoicePan(index, pan)
         }
     }
 
@@ -313,7 +368,8 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
     override fun setMasterVolume(amount: Float) {
         _masterVolume = amount
-        masterGain.inputB.set(amount.toDouble())
+        masterGainLeft.inputB.set(amount.toDouble())
+        masterGainRight.inputB.set(amount.toDouble())
     }
 
     override fun setDelayTime(index: Int, time: Float) {
@@ -589,4 +645,42 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
     override fun getDrive(): Float = _drive
     override fun getDistortionMix(): Float = _distortionMix
-    override fun getMasterVolume(): Float = _masterVolume}
+    override fun getMasterVolume(): Float = _masterVolume
+
+    // ═══════════════════════════════════════════════════════════
+    // Stereo Control
+    // ═══════════════════════════════════════════════════════════
+
+    override fun setVoicePan(index: Int, pan: Float) {
+        _voicePan[index] = pan.coerceIn(-1f, 1f)
+        // Equal-power pan law: L = cos(angle), R = sin(angle)
+        // angle: 0 = hard left (L=1, R=0), π/2 = hard right (L=0, R=1)
+        // Map pan (-1 to +1) to angle (0 to π/2)
+        val angle = ((pan + 1f) / 2f) * (PI / 2).toFloat()
+        val leftGain = cos(angle.toDouble())
+        val rightGain = sin(angle.toDouble())
+        voicePanLeft[index].inputB.set(leftGain)
+        voicePanRight[index].inputB.set(rightGain)
+    }
+
+    override fun getVoicePan(index: Int): Float = _voicePan[index]
+
+    override fun setMasterPan(pan: Float) {
+        _masterPan = pan.coerceIn(-1f, 1f)
+        // Equal-power pan for master
+        val angle = ((pan + 1f) / 2f) * (PI / 2).toFloat()
+        val leftGain = cos(angle.toDouble())
+        val rightGain = sin(angle.toDouble())
+        masterPanLeft.inputB.set(leftGain)
+        masterPanRight.inputB.set(rightGain)
+    }
+
+    override fun getMasterPan(): Float = _masterPan
+
+    override fun setStereoMode(mode: StereoMode) {
+        _stereoMode = mode
+        // Future: implement routing changes for STEREO_DELAYS mode
+    }
+
+    override fun getStereoMode(): StereoMode = _stereoMode
+}

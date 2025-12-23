@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.balch.songe.core.audio.ModSource
 import org.balch.songe.core.audio.SongeEngine
+import org.balch.songe.core.audio.StereoMode
 
 class PreviewSongeEngine() : SongeEngine {
     override fun start() {
@@ -85,4 +86,12 @@ class PreviewSongeEngine() : SongeEngine {
     override fun getDrive(): Float = 0f
     override fun getDistortionMix(): Float = 0f
     override fun getMasterVolume(): Float = 0.5f
+
+    // Stereo
+    override fun setVoicePan(index: Int, pan: Float) {}
+    override fun getVoicePan(index: Int): Float = 0f
+    override fun setMasterPan(pan: Float) {}
+    override fun getMasterPan(): Float = 0f
+    override fun setStereoMode(mode: StereoMode) {}
+    override fun getStereoMode(): StereoMode = StereoMode.VOICE_PAN
 }

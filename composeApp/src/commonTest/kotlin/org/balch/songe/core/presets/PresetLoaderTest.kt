@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.balch.songe.core.audio.ModSource
 import org.balch.songe.core.audio.SongeEngine
+import org.balch.songe.core.audio.StereoMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -108,5 +109,14 @@ class PresetLoaderTest {
         override fun getHyperLfoFreq(index: Int): Float = 0f
         override fun getHyperLfoMode(): Int = 1 // OFF
         override fun getHyperLfoLink(): Boolean = false
+
+        // Stereo stubs
+        override fun setVoicePan(index: Int, pan: Float) {}
+        override fun getVoicePan(index: Int): Float = 0f
+        override fun setMasterPan(pan: Float) {}
+        override fun getMasterPan(): Float = 0f
+        override fun setStereoMode(mode: StereoMode) {}
+        override fun getStereoMode(): StereoMode = StereoMode.VOICE_PAN
     }
 }
+
