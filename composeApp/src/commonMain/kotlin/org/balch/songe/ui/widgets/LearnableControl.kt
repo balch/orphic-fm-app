@@ -94,13 +94,13 @@ fun Learnable(
             .then(
                 if (learnState.isActive) {
                     Modifier
-                        .padding(4.dp)  // Padding for visual separation
-                        .clip(RoundedCornerShape(6.dp))
+                        .padding(2.dp)  // Minimal padding for border visibility
+                        .clip(RoundedCornerShape(4.dp))
                         .background(SongeColors.neonMagenta.copy(alpha = glowAlpha))
                         .border(
-                            width = 3.dp,  // Increased from 2dp for visibility
+                            width = 2.dp,
                             color = SongeColors.neonMagenta.copy(alpha = borderAlpha),
-                            shape = RoundedCornerShape(6.dp)
+                            shape = RoundedCornerShape(4.dp)
                         )
                         // Use detectTapGestures instead of clickable to not consume drag events
                         .pointerInput(controlId, learnState.isActive, learnState.selectedControlId) {
@@ -133,16 +133,16 @@ fun Modifier.learnable(
     val isLearning = learnState.isLearning(controlId)
 
     return this
-        .padding(4.dp)  // Padding for visual separation
-        .clip(RoundedCornerShape(6.dp))
+        .padding(2.dp)  // Minimal padding for border visibility
+        .clip(RoundedCornerShape(4.dp))
         .background(
-            if (isLearning) SongeColors.neonMagenta.copy(alpha = 0.3f)
+            if (isLearning) SongeColors.neonMagenta.copy(alpha = 0.25f)
             else Color.Transparent
         )
         .border(
-            width = if (isLearning) 3.dp else 1.dp,  // Always show subtle border in learn mode
-            color = if (isLearning) SongeColors.neonMagenta else SongeColors.neonMagenta.copy(alpha = 0.3f),
-            shape = RoundedCornerShape(6.dp)
+            width = if (isLearning) 2.dp else 1.dp,
+            color = if (isLearning) SongeColors.neonMagenta else SongeColors.neonMagenta.copy(alpha = 0.2f),
+            shape = RoundedCornerShape(4.dp)
         )
         // Use pointerInput with detectTapGestures to not consume drag events
         // Key includes learnState.isActive so handler updates when state changes

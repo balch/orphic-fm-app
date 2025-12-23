@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
@@ -46,6 +47,7 @@ private sealed interface MidiIntent {
  *
  * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
  */
+@SingleIn(AppScope::class)
 @Inject
 @ViewModelKey(MidiViewModel::class)
 @ContributesIntoMap(AppScope::class)
@@ -116,12 +118,13 @@ class MidiViewModel(
 
     fun toggleLearnMode() {
         val current = uiState.value
+        Logger.info { "toggleLearnMode: current isLearnModeActive=${current.isLearnModeActive}" }
         if (current.isLearnModeActive) {
             cancelLearnMode()
         } else {
             mappingBeforeLearn = current.mappingState
             intents.tryEmit(MidiIntent.SetLearnMode(true))
-            Logger.info { "Entered MIDI Learn Mode" }
+            Logger.info { "Entered MIDI Learn Mode - intents emitted" }
         }
     }
 
@@ -148,13 +151,16 @@ class MidiViewModel(
     }
 
     fun selectControlForLearning(controlId: String) {
+        Logger.info { "selectControlForLearning: controlId=$controlId, isLearnModeActive=${uiState.value.isLearnModeActive}" }
         if (uiState.value.isLearnModeActive) {
             intents.tryEmit(
                 MidiIntent.SetMappingState(
                     uiState.value.mappingState.startLearnControl(controlId)
                 )
             )
-            Logger.info { "Learning MIDI CC for: $controlId" }
+            Logger.info { "Learning MIDI CC for: $controlId - intent emitted" }
+        } else {
+            Logger.warn { "selectControlForLearning called but learn mode is NOT active!" }
         }
     }
 
@@ -233,27 +239,24 @@ class MidiViewModel(
         // Log for debugging
         Logger.info { "handleControlChange: CC=$controller, isLearnModeActive=${state.isLearnModeActive}, learnTarget=$learnTarget" }
 
-        // When in learn mode, always suppress normal CC routing
-        if (state.isLearnModeActive) {
-            if (learnTarget is LearnTarget.Control) {
-                // A control is selected - bind the CC to it
-                intents.tryEmit(
-                    MidiIntent.SetMappingState(
-                        state.mappingState.assignCCToControl(
-                            controller,
-                            learnTarget.controlId
-                        )
+        // When in learn mode AND a control is selected, capture the CC for binding
+        if (state.isLearnModeActive && learnTarget is LearnTarget.Control) {
+            // A control is selected - bind the CC to it
+            intents.tryEmit(
+                MidiIntent.SetMappingState(
+                    state.mappingState.assignCCToControl(
+                        controller,
+                        learnTarget.controlId
                     )
                 )
-                Logger.info { "Assigned CC$controller to ${learnTarget.controlId}" }
-            } else {
-                // No control selected - just log and ignore
-                Logger.info { "Learn mode active but no control selected, ignoring CC$controller" }
-            }
-            // Always return true in learn mode to suppress normal routing
+            )
+            Logger.info { "Assigned CC$controller to ${learnTarget.controlId}" }
+            // Suppress normal routing so binding takes effect immediately
             return true
         }
         
+        // In all other cases (including learn mode with no control selected),
+        // allow normal routing so UI updates
         return false
     }
 
