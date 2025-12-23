@@ -90,6 +90,12 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     // Dry/Wet Mix for Delays
     private val dryGain = audioEngine.createMultiply()
     private val wetGain = audioEngine.createMultiply()
+    
+    // Stereo Delays: Per-delay L/R wet gains for stereo routing
+    private val delay1WetLeft = audioEngine.createMultiply()
+    private val delay1WetRight = audioEngine.createMultiply()
+    private val delay2WetLeft = audioEngine.createMultiply()
+    private val delay2WetRight = audioEngine.createMultiply()
 
     // Vibrato (Global pitch wobble)
     private val vibratoLfo = audioEngine.createSineOscillator()
@@ -182,6 +188,10 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         audioEngine.addUnit(postMixSummer)
         audioEngine.addUnit(dryGain)
         audioEngine.addUnit(wetGain)
+        audioEngine.addUnit(delay1WetLeft)
+        audioEngine.addUnit(delay1WetRight)
+        audioEngine.addUnit(delay2WetLeft)
+        audioEngine.addUnit(delay2WetRight)
         audioEngine.addUnit(vibratoLfo)
         audioEngine.addUnit(vibratoDepthGain)
 
@@ -207,6 +217,12 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         // Dry/Wet defaults (50/50 mix)
         dryGain.inputB.set(0.5)
         wetGain.inputB.set(0.5)
+        
+        // Stereo delay wet gains default (VOICE_PAN mode: both delays to both channels)
+        delay1WetLeft.inputB.set(1.0)
+        delay1WetRight.inputB.set(1.0)
+        delay2WetLeft.inputB.set(1.0)
+        delay2WetRight.inputB.set(1.0)
 
         // Vibrato LFO setup
         vibratoLfo.frequency.set(5.0) // 5Hz wobble rate
@@ -243,10 +259,20 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         delay2ModMixer.output.connect(delay2.delay)
 
         // ROUTING
-        // Delays -> WetGain -> PreDistortionSummer
+        // Delays -> WetGain -> PreDistortionSummer (for mono mix path)
         delay1.output.connect(wetGain.inputA)
         delay2.output.connect(wetGain.inputA)
         wetGain.output.connect(preDistortionSummer.inputA)
+        
+        // Delays -> Stereo Wet Gains -> Stereo Sum (for stereo delay mode)
+        delay1.output.connect(delay1WetLeft.inputA)
+        delay1.output.connect(delay1WetRight.inputA)
+        delay2.output.connect(delay2WetLeft.inputA)
+        delay2.output.connect(delay2WetRight.inputA)
+        delay1WetLeft.output.connect(stereoSumLeft.input)
+        delay1WetRight.output.connect(stereoSumRight.input)
+        delay2WetLeft.output.connect(stereoSumLeft.input)
+        delay2WetRight.output.connect(stereoSumRight.input)
 
         // DryGain -> PreDistortionSummer
         dryGain.output.connect(preDistortionSummer.inputB)
@@ -679,7 +705,22 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
     override fun setStereoMode(mode: StereoMode) {
         _stereoMode = mode
-        // Future: implement routing changes for STEREO_DELAYS mode
+        when (mode) {
+            StereoMode.VOICE_PAN -> {
+                // Both delays go to both channels equally (mono wet mix)
+                delay1WetLeft.inputB.set(1.0)
+                delay1WetRight.inputB.set(1.0)
+                delay2WetLeft.inputB.set(1.0)
+                delay2WetRight.inputB.set(1.0)
+            }
+            StereoMode.STEREO_DELAYS -> {
+                // Delay 1 -> Left only, Delay 2 -> Right only
+                delay1WetLeft.inputB.set(1.0)
+                delay1WetRight.inputB.set(0.0)
+                delay2WetLeft.inputB.set(0.0)
+                delay2WetRight.inputB.set(1.0)
+            }
+        }
     }
 
     override fun getStereoMode(): StereoMode = _stereoMode
