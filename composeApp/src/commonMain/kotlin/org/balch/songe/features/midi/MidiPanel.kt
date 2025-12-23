@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.ui.panels.CollapsibleColumnPanel
 import org.balch.songe.ui.theme.SongeColors
 
@@ -33,7 +36,6 @@ data class MidiProps(
     val deviceName: String?,
     val isOpen: Boolean,
     val isLearnModeActive: Boolean,
-    val onClick: () -> Unit,
     val onLearnToggle: () -> Unit,
     val onLearnSave: () -> Unit,
     val onLearnCancel: () -> Unit
@@ -41,9 +43,31 @@ data class MidiProps(
 
 @Composable
 fun MidiPanel(
-    midiProps: MidiProps,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    midiViewModel: MidiViewModel = metroViewModel(),
 ) {
+    val midiState by midiViewModel.uiState.collectAsState()
+
+    MidiPanelLayout(
+        modifier = modifier,
+        midiProps = MidiProps(
+            deviceName = midiState.deviceName,
+            isOpen = midiState.isConnected,
+            isLearnModeActive = midiState.isLearnModeActive,
+            onLearnToggle = { midiViewModel.toggleLearnMode() },
+            onLearnSave = { midiViewModel.saveLearnedMappings() },
+            onLearnCancel = { midiViewModel.cancelLearnMode() }
+        ),
+    )
+}
+
+@Composable
+private fun MidiPanelLayout(
+midiProps: MidiProps,
+modifier: Modifier = Modifier
+) {
+
+
     CollapsibleColumnPanel(
         title = "MIDI",
         color = SongeColors.synthGreen,

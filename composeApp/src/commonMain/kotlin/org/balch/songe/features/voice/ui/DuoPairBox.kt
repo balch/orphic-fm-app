@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.songe.features.midi.MidiViewModel
 import org.balch.songe.features.voice.VoiceViewModel
@@ -29,12 +30,12 @@ import org.balch.songe.ui.widgets.PulseButton
 
 @Composable
 fun DuoPairBox(
+    modifier: Modifier = Modifier,
     voiceA: Int,
     voiceB: Int,
     color: Color,
-    voiceViewModel: VoiceViewModel,
-    midiViewModel: MidiViewModel,
-    modifier: Modifier = Modifier
+    voiceViewModel: VoiceViewModel = metroViewModel(),
+    midiViewModel: MidiViewModel = metroViewModel(),
 ) {
     val voiceState by voiceViewModel.uiState.collectAsState()
     val midiState by midiViewModel.uiState.collectAsState()

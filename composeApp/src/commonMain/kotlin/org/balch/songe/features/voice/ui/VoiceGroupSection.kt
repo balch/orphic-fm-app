@@ -19,20 +19,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.songe.features.midi.MidiViewModel
 import org.balch.songe.features.voice.VoiceViewModel
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 
 @Composable
 fun VoiceGroupSection(
+    modifier: Modifier = Modifier,
     quadLabel: String,
     quadColor: Color,
     voiceStartIndex: Int,
-    voiceViewModel: VoiceViewModel,
-    midiViewModel: MidiViewModel,
-    modifier: Modifier = Modifier
+    voiceViewModel: VoiceViewModel = metroViewModel(),
 ) {
     val voiceState by voiceViewModel.uiState.collectAsState()
 
@@ -99,16 +98,12 @@ fun VoiceGroupSection(
                 voiceA = voiceStartIndex,
                 voiceB = voiceStartIndex + 1,
                 color = duoColors[0],
-                voiceViewModel = voiceViewModel,
-                midiViewModel = midiViewModel,
                 modifier = Modifier.weight(1f)
             )
             DuoPairBox(
                 voiceA = voiceStartIndex + 2,
                 voiceB = voiceStartIndex + 3,
                 color = duoColors[1],
-                voiceViewModel = voiceViewModel,
-                midiViewModel = midiViewModel,
                 modifier = Modifier.weight(1f)
             )
         }

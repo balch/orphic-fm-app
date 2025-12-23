@@ -14,10 +14,11 @@ import org.balch.songe.core.input.KeyboardInputHandler
 object SynthKeyboardHandler {
     fun handleKeyEvent(
         keyEvent: KeyEvent,
+        isDialogActive: Boolean,
         voiceState: VoiceUiState,
         voiceViewModel: VoiceViewModel,
-        isDialogActive: Boolean
     ): Boolean {
+
         // Skip keyboard handling when dialog is active
         if (isDialogActive) return false
 
@@ -27,65 +28,30 @@ object SynthKeyboardHandler {
 
         // Handle voice trigger keys (A/S/D/F/G/H/J/K)
         KeyboardInputHandler.getVoiceFromKey(key)?.let { voiceIndex ->
-            if (isKeyDown &&
-                !KeyboardInputHandler
-                    .isVoiceKeyPressed(
-                        voiceIndex
-                    )
-            ) {
-                KeyboardInputHandler.onVoiceKeyDown(
-                    voiceIndex
-                )
-                voiceViewModel
-                    .onPulseStart(voiceIndex)
+            if (isKeyDown && !KeyboardInputHandler.isVoiceKeyPressed(voiceIndex)) {
+                KeyboardInputHandler.onVoiceKeyDown(voiceIndex)
+                voiceViewModel.onPulseStart(voiceIndex)
                 return true
             } else if (isKeyUp) {
-                KeyboardInputHandler.onVoiceKeyUp(
-                    voiceIndex
-                )
-                voiceViewModel.onPulseEnd(
-                    voiceIndex
-                )
+                KeyboardInputHandler.onVoiceKeyUp(voiceIndex)
+                voiceViewModel.onPulseEnd(voiceIndex)
                 return true
             }
         }
 
         // Handle tune adjustment keys (1-8)
         if (isKeyDown) {
-            KeyboardInputHandler.getTuneVoiceFromKey(
-                key
-            )
+            KeyboardInputHandler.getTuneVoiceFromKey(key)
                 ?.let { voiceIndex ->
-                    val currentTune =
-                        voiceState
-                            .voiceStates[
-                            voiceIndex]
-                            .tune
-                    val delta =
-                        KeyboardInputHandler
-                            .getTuneDelta(
-                                keyEvent.isShiftPressed
-                            )
-                    val newTune =
-                        (currentTune +
-                                delta)
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
-                    voiceViewModel
-                        .onVoiceTuneChange(
-                            voiceIndex,
-                            newTune
-                        )
+                    val currentTune = voiceState.voiceStates[voiceIndex].tune
+                    val delta =KeyboardInputHandler.getTuneDelta(keyEvent.isShiftPressed)
+                    val newTune = (currentTune + delta).coerceIn(0f, 1f )
+                    voiceViewModel.onVoiceTuneChange(voiceIndex,newTune)
                     return true
                 }
 
             // Handle octave shift (Z/X)
-            if (KeyboardInputHandler.handleOctaveKey(
-                    key
-                )
-            ) {
+            if (KeyboardInputHandler.handleOctaveKey(key)) {
                 return true
             }
         }

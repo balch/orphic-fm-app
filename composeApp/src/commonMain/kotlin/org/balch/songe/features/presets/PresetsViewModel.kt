@@ -40,9 +40,9 @@ private sealed interface PresetIntent {
  * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
  */
 @Inject
-@ViewModelKey(PresetViewModel::class)
+@ViewModelKey(PresetsViewModel::class)
 @ContributesIntoMap(AppScope::class)
-class PresetViewModel(
+class PresetsViewModel(
     private val repository: DronePresetRepository,
     private val presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider

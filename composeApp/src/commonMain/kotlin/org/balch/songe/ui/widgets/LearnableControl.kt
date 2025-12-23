@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -17,6 +18,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.songe.core.midi.LearnTarget
+import org.balch.songe.features.midi.MidiViewModel
 import org.balch.songe.ui.theme.SongeColors
 
 /**
@@ -45,16 +49,24 @@ val LocalLearnModeState = compositionLocalOf { LearnModeState() }
  */
 @Composable
 fun LearnModeProvider(
-    isActive: Boolean,
-    selectedControlId: String?,
-    onSelectControl: (String) -> Unit,
+    midiViewModel: MidiViewModel = metroViewModel(),
     content: @Composable () -> Unit
 ) {
+    val midiState by midiViewModel.uiState.collectAsState()
+
+    // Get the selected control ID for learn mode
+    val selectedControlId =
+        (midiState.mappingState.learnTarget as? LearnTarget.Control)?.controlId
+
     CompositionLocalProvider(
         LocalLearnModeState provides LearnModeState(
-            isActive = isActive,
+            isActive = midiState.isLearnModeActive,
             selectedControlId = selectedControlId,
-            onSelectControl = onSelectControl
+            onSelectControl = { controlId ->
+                if (midiState.isLearnModeActive) {
+                    midiViewModel.selectControlForLearning(controlId)
+                }
+            }
         )
     ) {
         content()

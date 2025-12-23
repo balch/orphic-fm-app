@@ -5,26 +5,23 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.balch.songe.core.midi.MidiRouter
 import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.core.midi.LearnTarget
 import org.balch.songe.core.midi.MidiController
 import org.balch.songe.core.midi.MidiEventListener
 import org.balch.songe.core.midi.MidiMappingRepository
 import org.balch.songe.core.midi.MidiMappingState
+import org.balch.songe.core.midi.MidiMappingStateHolder
+import org.balch.songe.core.midi.MidiRouter
 import org.balch.songe.util.Logger
 
 /** UI state for the MIDI panel. */
@@ -35,45 +32,45 @@ data class MidiUiState(
     val mappingState: MidiMappingState = MidiMappingState()
 )
 
-/** User intents for the MIDI panel. */
-private sealed interface MidiIntent {
-    data class SetDevice(val name: String?, val connected: Boolean) : MidiIntent
-    data class SetLearnMode(val active: Boolean) : MidiIntent
-    data class SetMappingState(val state: MidiMappingState) : MidiIntent
-}
-
 /**
  * ViewModel for the MIDI panel.
  *
- * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
+ * Delegates mapping state to MidiMappingStateHolder (a singleton) so that 
+ * MidiRouter and all MidiViewModel instances share the same state.
  */
-@SingleIn(AppScope::class)
 @Inject
 @ViewModelKey(MidiViewModel::class)
 @ContributesIntoMap(AppScope::class)
 class MidiViewModel(
     val midiController: MidiController,
     private val midiRepository: MidiMappingRepository,
+    private val stateHolder: MidiMappingStateHolder,
     private val midiRouter: Lazy<MidiRouter>,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
-    private val intents =
-        MutableSharedFlow<MidiIntent>(
-            replay = 1,
-            extraBufferCapacity = 256,
-            onBufferOverflow = BufferOverflow.DROP_OLDEST
-        )
+    // Local device connection state
+    private val _deviceName = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val _isConnected = kotlinx.coroutines.flow.MutableStateFlow(false)
 
-    val uiState: StateFlow<MidiUiState> =
-        intents
-            .scan(MidiUiState()) { state, intent -> reduce(state, intent) }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.Eagerly,
-                initialValue = MidiUiState()
-            )
+    // UI state combines local device state with shared mapping state
+    val uiState: StateFlow<MidiUiState> = combine(
+        _deviceName,
+        _isConnected,
+        stateHolder.isLearnModeActive,
+        stateHolder.state
+    ) { deviceName, isConnected, isLearnModeActive, mappingState ->
+        MidiUiState(
+            deviceName = deviceName,
+            isConnected = isConnected,
+            isLearnModeActive = isLearnModeActive,
+            mappingState = mappingState
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = MidiUiState()
+    )
 
     // Backup state for cancellation
     private var mappingBeforeLearn: MidiMappingState? = null
@@ -97,172 +94,66 @@ class MidiViewModel(
     }
 
     // ═══════════════════════════════════════════════════════════
-    // REDUCER
-    // ═══════════════════════════════════════════════════════════
-
-    private fun reduce(state: MidiUiState, intent: MidiIntent): MidiUiState =
-        when (intent) {
-            is MidiIntent.SetDevice ->
-                state.copy(deviceName = intent.name, isConnected = intent.connected)
-
-            is MidiIntent.SetLearnMode ->
-                state.copy(isLearnModeActive = intent.active)
-
-            is MidiIntent.SetMappingState ->
-                state.copy(mappingState = intent.state)
-        }
-
-    // ═══════════════════════════════════════════════════════════
     // PUBLIC INTENT METHODS
     // ═══════════════════════════════════════════════════════════
 
     fun toggleLearnMode() {
-        val current = uiState.value
-        Logger.info { "toggleLearnMode: current isLearnModeActive=${current.isLearnModeActive}" }
-        if (current.isLearnModeActive) {
+        val isActive = stateHolder.isLearnModeActive.value
+        if (isActive) {
             cancelLearnMode()
         } else {
-            mappingBeforeLearn = current.mappingState
-            intents.tryEmit(MidiIntent.SetLearnMode(true))
-            Logger.info { "Entered MIDI Learn Mode - intents emitted" }
+            mappingBeforeLearn = stateHolder.state.value
+            stateHolder.setLearnModeActive(true)
         }
     }
 
     fun saveLearnedMappings() {
-        val current = uiState.value
-        intents.tryEmit(MidiIntent.SetMappingState(current.mappingState.cancelLearn()))
-        intents.tryEmit(MidiIntent.SetLearnMode(false))
+        // Clear learn target and exit learn mode
+        stateHolder.updateState { it.cancelLearn() }
+        stateHolder.setLearnModeActive(false)
         mappingBeforeLearn = null
 
         // Persist to storage
         midiController.currentDeviceName?.let { deviceName ->
             viewModelScope.launch(dispatcherProvider.io) {
-                midiRepository.save(deviceName, uiState.value.mappingState)
+                midiRepository.save(deviceName, stateHolder.state.value)
             }
         }
-        Logger.info { "Saved MIDI mappings" }
     }
 
     fun cancelLearnMode() {
-        mappingBeforeLearn?.let { backup -> intents.tryEmit(MidiIntent.SetMappingState(backup)) }
-        intents.tryEmit(MidiIntent.SetLearnMode(false))
+        mappingBeforeLearn?.let { backup -> stateHolder.updateState(backup) }
+        stateHolder.setLearnModeActive(false)
         mappingBeforeLearn = null
-        Logger.info { "Cancelled MIDI Learn Mode" }
     }
 
     fun selectControlForLearning(controlId: String) {
-        Logger.info { "selectControlForLearning: controlId=$controlId, isLearnModeActive=${uiState.value.isLearnModeActive}" }
-        if (uiState.value.isLearnModeActive) {
-            intents.tryEmit(
-                MidiIntent.SetMappingState(
-                    uiState.value.mappingState.startLearnControl(controlId)
-                )
-            )
-            Logger.info { "Learning MIDI CC for: $controlId - intent emitted" }
-        } else {
-            Logger.warn { "selectControlForLearning called but learn mode is NOT active!" }
+        if (stateHolder.isLearnModeActive.value) {
+            stateHolder.updateState { it.startLearnControl(controlId) }
         }
     }
 
     fun isControlBeingLearned(controlId: String): Boolean {
-        return uiState.value.mappingState.isLearningControl(controlId)
+        return stateHolder.state.value.isLearningControl(controlId)
     }
 
     fun selectVoiceForLearning(voiceIndex: Int) {
-        if (uiState.value.isLearnModeActive) {
-            intents.tryEmit(
-                MidiIntent.SetMappingState(
-                    uiState.value.mappingState.startLearnVoice(voiceIndex)
-                )
-            )
-            Logger.info { "Learning MIDI note for Voice ${voiceIndex + 1}" }
+        if (stateHolder.isLearnModeActive.value) {
+            stateHolder.updateState { it.startLearnVoice(voiceIndex) }
         }
     }
 
     fun isVoiceBeingLearned(voiceIndex: Int): Boolean {
-        return uiState.value.mappingState.isLearningVoice(voiceIndex)
+        return stateHolder.state.value.isLearningVoice(voiceIndex)
     }
 
     // ═══════════════════════════════════════════════════════════
-    // MIDI EVENT HANDLING
+    // MAPPING LOOKUPS (delegate to stateHolder)
     // ═══════════════════════════════════════════════════════════
 
-    internal fun handleNoteOn(note: Int, velocity: Int): Boolean {
-        val state = uiState.value
-        val learnTarget = state.mappingState.learnTarget
-
-        // When in learn mode, always suppress normal note routing
-        if (state.isLearnModeActive) {
-            when (learnTarget) {
-                is LearnTarget.Voice -> {
-                    intents.tryEmit(
-                        MidiIntent.SetMappingState(
-                            state.mappingState.assignNoteToVoice(
-                                note,
-                                learnTarget.index
-                            )
-                        )
-                    )
-                    Logger.info {
-                        "Assigned MIDI note ${MidiMappingState.noteName(note)} to Voice ${learnTarget.index + 1}"
-                    }
-                }
-
-                is LearnTarget.Control -> {
-                    intents.tryEmit(
-                        MidiIntent.SetMappingState(
-                            state.mappingState.assignNoteToControl(
-                                note,
-                                learnTarget.controlId
-                            )
-                        )
-                    )
-                    Logger.info { "Assigned MIDI note $note to Control ${learnTarget.controlId}" }
-                }
-
-                else -> {
-                    // No target selected - just log and ignore
-                    Logger.info { "Learn mode active but no target selected, ignoring note $note" }
-                }
-            }
-            // Always return true in learn mode to suppress normal note routing
-            return true
-        }
-        
-        return false
-    }
-
-    internal fun handleControlChange(controller: Int): Boolean {
-        val state = uiState.value
-        val learnTarget = state.mappingState.learnTarget
-        
-        // Log for debugging
-        Logger.info { "handleControlChange: CC=$controller, isLearnModeActive=${state.isLearnModeActive}, learnTarget=$learnTarget" }
-
-        // When in learn mode AND a control is selected, capture the CC for binding
-        if (state.isLearnModeActive && learnTarget is LearnTarget.Control) {
-            // A control is selected - bind the CC to it
-            intents.tryEmit(
-                MidiIntent.SetMappingState(
-                    state.mappingState.assignCCToControl(
-                        controller,
-                        learnTarget.controlId
-                    )
-                )
-            )
-            Logger.info { "Assigned CC$controller to ${learnTarget.controlId}" }
-            // Suppress normal routing so binding takes effect immediately
-            return true
-        }
-        
-        // In all other cases (including learn mode with no control selected),
-        // allow normal routing so UI updates
-        return false
-    }
-
-    fun getControlForCC(cc: Int): String? = uiState.value.mappingState.getControlForCC(cc)
-    fun getVoiceForNote(note: Int): Int? = uiState.value.mappingState.getVoiceForNote(note)
-    fun getControlForNote(note: Int): String? = uiState.value.mappingState.getControlForNote(note)
+    fun getControlForCC(cc: Int): String? = stateHolder.getControlForCC(cc)
+    fun getVoiceForNote(note: Int): Int? = stateHolder.getVoiceForNote(note)
+    fun getControlForNote(note: Int): String? = stateHolder.getControlForNote(note)
 
     // ═══════════════════════════════════════════════════════════
     // MIDI CONNECTION MANAGEMENT
@@ -281,16 +172,16 @@ class MidiViewModel(
                 }
 
             if (midiController.openDevice(deviceName)) {
-                val internalListener = createInternalListener()
-                midiController.start(internalListener)
+                midiController.start(externalListener)
                 lastDeviceName = deviceName
 
-                intents.tryEmit(MidiIntent.SetDevice(deviceName, true))
+                _deviceName.value = deviceName
+                _isConnected.value = true
                 Logger.info { "MIDI initialized and listening on: $deviceName" }
 
                 viewModelScope.launch(dispatcherProvider.io) {
                     midiRepository.load(deviceName)?.let { savedMapping ->
-                        intents.tryEmit(MidiIntent.SetMappingState(savedMapping))
+                        stateHolder.updateState(savedMapping)
                         Logger.info { "Loaded saved MIDI mappings for $deviceName" }
                     }
                 }
@@ -300,30 +191,6 @@ class MidiViewModel(
             Logger.info { "No MIDI devices found" }
         }
         return false
-    }
-
-    private fun createInternalListener(): MidiEventListener {
-        return object : MidiEventListener {
-            override fun onNoteOn(note: Int, velocity: Int) {
-                if (!handleNoteOn(note, velocity)) {
-                    externalListener.onNoteOn(note, velocity)
-                }
-            }
-
-            override fun onNoteOff(note: Int) {
-                externalListener.onNoteOff(note)
-            }
-
-            override fun onControlChange(controller: Int, value: Int) {
-                if (!handleControlChange(controller)) {
-                    externalListener.onControlChange(controller, value)
-                }
-            }
-
-            override fun onPitchBend(value: Int) {
-                externalListener.onPitchBend(value)
-            }
-        }
     }
 
     private fun startMidiPolling() {
@@ -340,7 +207,8 @@ class MidiViewModel(
                         val name = midiController.currentDeviceName
                         Logger.info { "MIDI device disconnected: $name" }
                         midiController.closeDevice()
-                        intents.tryEmit(MidiIntent.SetDevice(null, false))
+                        _deviceName.value = null
+                        _isConnected.value = false
                     } else if (!wasOpen) {
                         val devices = midiController.getAvailableDevices()
                         if (devices.isNotEmpty()) {
@@ -357,7 +225,8 @@ class MidiViewModel(
         midiPollingJob = null
         midiController.stop()
         midiController.closeDevice()
-        intents.tryEmit(MidiIntent.SetDevice(null, false))
+        _deviceName.value = null
+        _isConnected.value = false
     }
 
     override fun onCleared() {

@@ -29,15 +29,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import org.balch.songe.core.midi.LearnTarget
 import org.balch.songe.features.delay.ModDelayPanel
 import org.balch.songe.features.distortion.DistortionPanel
 import org.balch.songe.features.lfo.HyperLfoPanel
 import org.balch.songe.features.midi.MidiPanel
-import org.balch.songe.features.midi.MidiProps
-import org.balch.songe.features.midi.MidiViewModel
-import org.balch.songe.features.presets.PresetProps
-import org.balch.songe.features.presets.PresetViewModel
 import org.balch.songe.features.presets.PresetsPanel
 import org.balch.songe.features.stereo.StereoPanel
 import org.balch.songe.features.voice.SynthKeyboardHandler
@@ -55,17 +50,7 @@ fun SongeSynthScreen(
     orchestrator: SynthOrchestrator,
     hazeState: HazeState = remember { HazeState() }
 ) {
-    // Inject ViewModels
-    val voiceViewModel: VoiceViewModel = metroViewModel()
-    val midiViewModel: MidiViewModel = metroViewModel()
-    val presetViewModel: PresetViewModel = metroViewModel()
-
     val focusRequester = remember { FocusRequester() }
-
-    // Collect states from feature ViewModels
-    val voiceState by voiceViewModel.uiState.collectAsState()
-    val midiState by midiViewModel.uiState.collectAsState()
-    val presetState by presetViewModel.uiState.collectAsState()
 
     // Start engine and request focus on composition
     LaunchedEffect(Unit) {
@@ -77,23 +62,13 @@ fun SongeSynthScreen(
     // Collect peak level from orchestrator's flow
     val peak by orchestrator.peakFlow.collectAsState()
 
-    // Get the selected control ID for learn mode
-    val selectedControlId =
-        (midiState.mappingState.learnTarget as? LearnTarget.Control)?.controlId
-
     // Track if a dialog is active to suppress keyboard handling
     var isDialogActive by remember { mutableStateOf(false) }
 
+    val voiceViewModel: VoiceViewModel = metroViewModel()
+
     // Wrap everything in LearnModeProvider
-    LearnModeProvider(
-        isActive = midiState.isLearnModeActive,
-        selectedControlId = selectedControlId,
-        onSelectControl = { controlId ->
-            if (midiState.isLearnModeActive) {
-                midiViewModel.selectControlForLearning(controlId)
-            }
-        }
-    ) {
+    LearnModeProvider {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -102,7 +77,7 @@ fun SongeSynthScreen(
                 .onPreviewKeyEvent { event ->
                     SynthKeyboardHandler.handleKeyEvent(
                         keyEvent = event,
-                        voiceState = voiceState,
+                        voiceState = voiceViewModel.uiState.value,
                         voiceViewModel = voiceViewModel,
                         isDialogActive = isDialogActive
                     )
@@ -129,33 +104,8 @@ fun SongeSynthScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                PresetsPanel(
-                    presetProps = PresetProps(
-                        presets = presetState.presets,
-                        selectedPreset = presetState.selectedPreset,
-                        onSelect = { presetViewModel.selectPreset(it) },
-                        onNew = { presetViewModel.saveNewPreset(it) },
-                        onOverride = { presetViewModel.overridePreset() },
-                        onDelete = { presetViewModel.deletePreset() },
-                        onApply = { presetViewModel.applyPreset(it) },
-                        onDialogActiveChange = { isDialogActive = it }
-                    ),
-                    modifier = Modifier.fillMaxHeight()
-                )
-
-                MidiPanel(
-                    midiProps = MidiProps(
-                        deviceName = midiState.deviceName,
-                        isOpen = midiState.isConnected,
-                        isLearnModeActive = midiState.isLearnModeActive,
-                        onClick = { /* Could open MIDI device selector */ },
-                        onLearnToggle = { midiViewModel.toggleLearnMode() },
-                        onLearnSave = { midiViewModel.saveLearnedMappings() },
-                        onLearnCancel = { midiViewModel.cancelLearnMode() }
-                    ),
-                    modifier = Modifier.fillMaxHeight()
-                )
-
+                PresetsPanel(modifier = Modifier.fillMaxHeight())
+                MidiPanel(modifier = Modifier.fillMaxHeight())
                 StereoPanel(modifier = Modifier.fillMaxHeight())
                 HyperLfoPanel(modifier = Modifier.fillMaxHeight())
                 ModDelayPanel(modifier = Modifier.fillMaxHeight())
@@ -174,8 +124,6 @@ fun SongeSynthScreen(
                     quadLabel = "1-4",
                     quadColor = SongeColors.neonMagenta,
                     voiceStartIndex = 0,
-                    voiceViewModel = voiceViewModel,
-                    midiViewModel = midiViewModel,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -187,8 +135,6 @@ fun SongeSynthScreen(
                     quadLabel = "5-8",
                     quadColor = SongeColors.synthGreen,
                     voiceStartIndex = 4,
-                    voiceViewModel = voiceViewModel,
-                    midiViewModel = midiViewModel,
                     modifier = Modifier.weight(1f)
                 )
             }

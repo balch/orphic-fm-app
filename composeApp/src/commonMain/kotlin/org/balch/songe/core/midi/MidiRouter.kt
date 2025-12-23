@@ -7,7 +7,6 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import org.balch.songe.features.midi.MidiViewModel
 import org.balch.songe.util.Logger
 import kotlin.math.roundToInt
 
@@ -24,15 +23,15 @@ data class MidiControlEvent(val controlId: String, val value: Float)
  * directly calling ViewModel methods. This allows for proper dependency
  * injection without circular dependencies.
  * 
- * Usage pattern:
- * - ViewModels inject MidiRouter and collect from relevant flows
- * - MidiRouter handles CC value tracking, button toggling, and cycle control logic
+ * Uses MidiMappingStateHolder (a singleton) for mapping lookups and learn mode,
+ * so it shares the same state as MidiViewModel without needing a ViewModel reference.
  */
 @SingleIn(AppScope::class)
 @Inject
 class MidiRouter(
-    private val midiViewModel: MidiViewModel
+    private val stateHolder: MidiMappingStateHolder
 ) {
+
     // Track last CC values for button toggle detection
     private val lastCcValues = mutableMapOf<String, Float>()
     private val lastRawCcValues = mutableMapOf<String, Float>()
@@ -64,13 +63,18 @@ class MidiRouter(
     fun createMidiEventListener(): MidiEventListener {
         return object : MidiEventListener {
             override fun onNoteOn(note: Int, velocity: Int) {
+                // First check if we're in learn mode and should capture this note
+                if (stateHolder.tryLearnNote(note)) {
+                    return
+                }
+                
                 // Voice trigger
-                midiViewModel.getVoiceForNote(note)?.let { voiceIndex ->
+                stateHolder.getVoiceForNote(note)?.let { voiceIndex ->
                     _onPulseStart.tryEmit(voiceIndex)
                 }
 
                 // Control trigger (for buttons mapped to notes)
-                midiViewModel.getControlForNote(note)?.let { controlId ->
+                stateHolder.getControlForNote(note)?.let { controlId ->
                     if (velocity > 0) {
                         if (isCycleControl(controlId)) {
                             cycleControl(controlId, 3)
@@ -82,15 +86,20 @@ class MidiRouter(
             }
 
             override fun onNoteOff(note: Int) {
-                midiViewModel.getVoiceForNote(note)?.let { voiceIndex ->
+                stateHolder.getVoiceForNote(note)?.let { voiceIndex ->
                     _onPulseEnd.tryEmit(voiceIndex)
                 }
             }
 
             override fun onControlChange(controller: Int, value: Int) {
                 val normalized = value / 127f
-                val controlId = midiViewModel.getControlForCC(controller)
-                Logger.info { "MidiRouter.onControlChange: CC=$controller, value=$value (${normalized}), controlId=$controlId" }
+                
+                // First check if we're in learn mode and should capture this CC
+                if (stateHolder.tryLearnCC(controller)) {
+                    return
+                }
+                
+                val controlId = stateHolder.getControlForCC(controller)
                 controlId?.let {
                     applyCCToControl(it, normalized)
                 }

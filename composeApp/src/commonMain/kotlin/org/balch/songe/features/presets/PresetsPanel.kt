@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.core.presets.DronePreset
 import org.balch.songe.ui.panels.CollapsibleColumnPanel
 import org.balch.songe.ui.theme.SongeColors
@@ -51,8 +53,31 @@ data class PresetProps(
 
 @Composable
 fun PresetsPanel(
-    presetProps: PresetProps,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    presetsViewModel: PresetsViewModel = metroViewModel(),
+    onDialogActiveChange: (Boolean) -> Unit = { } ,
+) {
+    val presetState by presetsViewModel.uiState.collectAsState()
+
+    PresetsPanelLayout(
+        modifier = modifier,
+        presetProps = PresetProps(
+            presets = presetState.presets,
+            selectedPreset = presetState.selectedPreset,
+            onSelect = { presetsViewModel.selectPreset(it) },
+            onNew = { presetsViewModel.saveNewPreset(it) },
+            onOverride = { presetsViewModel.overridePreset() },
+            onDelete = { presetsViewModel.deletePreset() },
+            onApply = { presetsViewModel.applyPreset(it) },
+            onDialogActiveChange = onDialogActiveChange
+        ),
+    )
+}
+
+@Composable
+fun PresetsPanelLayout(
+    modifier: Modifier = Modifier,
+    presetProps: PresetProps
 ) {
     var showNewDialog by remember { mutableStateOf(false) }
     var showOverrideDialog by remember { mutableStateOf(false) }
