@@ -17,6 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import org.balch.songe.core.presets.DronePreset
 import org.balch.songe.ui.panels.CollapsibleColumnPanel
 import org.balch.songe.ui.theme.SongeColors
+import org.balch.songe.ui.widgets.ConfirmDialog
+import org.balch.songe.ui.widgets.PresetNameDialog
 
 /**
  * Preset management properties
@@ -48,6 +54,10 @@ fun PresetsPanel(
     presetProps: PresetProps,
     modifier: Modifier = Modifier
 ) {
+    var showNewDialog by remember { mutableStateOf(false) }
+    var showOverrideDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     CollapsibleColumnPanel(
         title = "PATCHES",
         color = SongeColors.neonCyan,
@@ -85,7 +95,10 @@ fun PresetsPanel(
                         .height(28.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(SongeColors.neonCyan.copy(alpha = 0.2f))
-                        .clickable { presetProps.onNew("New Preset") },
+                        .clickable {
+                            showNewDialog = true
+                            presetProps.onDialogActiveChange(true)
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -107,7 +120,10 @@ fun PresetsPanel(
                             else Color.Gray.copy(alpha = 0.1f)
                         )
                         .then(
-                            if (presetProps.selectedPreset != null) Modifier.clickable { presetProps.onOverride() }
+                            if (presetProps.selectedPreset != null) Modifier.clickable {
+                                showOverrideDialog = true
+                                presetProps.onDialogActiveChange(true)
+                            }
                             else Modifier
                         ),
                     contentAlignment = Alignment.Center
@@ -131,7 +147,10 @@ fun PresetsPanel(
                             else Color.Gray.copy(alpha = 0.1f)
                         )
                         .then(
-                            if (presetProps.selectedPreset != null) Modifier.clickable { presetProps.onDelete() }
+                            if (presetProps.selectedPreset != null) Modifier.clickable {
+                                showDeleteDialog = true
+                                presetProps.onDialogActiveChange(true)
+                            }
                             else Modifier
                         ),
                     contentAlignment = Alignment.Center
@@ -193,5 +212,54 @@ fun PresetsPanel(
                 }
             }
         }
+    }
+
+    // Dialogs
+    if (showNewDialog) {
+        PresetNameDialog(
+            onConfirm = { name ->
+                presetProps.onNew(name)
+                showNewDialog = false
+                presetProps.onDialogActiveChange(false)
+            },
+            onDismiss = {
+                showNewDialog = false
+                presetProps.onDialogActiveChange(false)
+            }
+        )
+    }
+
+    if (showOverrideDialog) {
+        ConfirmDialog(
+            title = "Overwrite Preset",
+            message = "Overwrite '${presetProps.selectedPreset?.name ?: ""}'?",
+            onConfirm = {
+                presetProps.onOverride()
+                showOverrideDialog = false
+                presetProps.onDialogActiveChange(false)
+            },
+            onDismiss = {
+                showOverrideDialog = false
+                presetProps.onDialogActiveChange(false)
+            },
+            isDestructive = true
+        )
+    }
+
+    if (showDeleteDialog) {
+         ConfirmDialog(
+            title = "Delete Preset",
+            message = "Delete '${presetProps.selectedPreset?.name ?: ""}'?",
+            onConfirm = {
+                presetProps.onDelete()
+                showDeleteDialog = false
+                presetProps.onDialogActiveChange(false)
+            },
+            onDismiss = {
+                showDeleteDialog = false
+                presetProps.onDialogActiveChange(false)
+            },
+            isDestructive = true
+        )
     }
 }
