@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
+import org.balch.songe.features.viz.GalaxyViz
+import org.balch.songe.features.viz.LavaLampViz
 import org.balch.songe.features.viz.SwirlyViz
 import org.balch.songe.ui.panels.LocalLiquidEffects
 import org.balch.songe.ui.panels.LocalLiquidState
@@ -27,6 +29,8 @@ class LiquidEffectsProvider : PreviewParameterProvider<VisualizationLiquidEffect
     private val effectsList = listOf(
         VisualizationLiquidEffects.Off,
         SwirlyViz.Default,
+        GalaxyViz.Default,
+        LavaLampViz.Default,
     )
     override val values = effectsList.asSequence()
 }

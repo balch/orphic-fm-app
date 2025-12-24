@@ -70,20 +70,7 @@ class LavaLampViz(
     override val knob2Label = "SIZE"
     
     // Moderate translucency for lava lamp blobs
-    override val liquidEffects = VisualizationLiquidEffects(
-        frostSmall = 5f,
-        frostMedium = 7f,
-        frostLarge = 9f,
-        tintAlpha = 0.12f,
-        top = VisualizationLiquidScope(
-            saturation = 0.70f,
-            contrast = 0.75f,
-        ),
-        bottom = VisualizationLiquidScope(
-            saturation = 0.70f,
-            contrast = 0.75f,
-        ),
-    )
+    override val liquidEffects = Default
 
     // Knob values (0-1 normalized, default 0.5)
     private var _speedKnob = 0.5f
@@ -315,6 +302,23 @@ class LavaLampViz(
             voiceIndex = parent.voiceIndex,
             energy = parent.energy * 0.7f,
             alpha = 0.8f
+        )
+    }
+
+    companion object {
+        val Default = VisualizationLiquidEffects(
+            frostSmall = 5f,
+            frostMedium = 7f,
+            frostLarge = 9f,
+            tintAlpha = 0.12f,
+            top = VisualizationLiquidScope(
+                saturation = 0.70f,
+                contrast = 0.75f,
+            ),
+            bottom = VisualizationLiquidScope(
+                saturation = 0.70f,
+                contrast = 0.75f,
+            ),
         )
     }
 }

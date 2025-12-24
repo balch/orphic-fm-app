@@ -96,20 +96,7 @@ class GalaxyViz(
     override val knob2Label = "ARMS"
     
     // Low frost for crisper stars, high saturation for vibrant colors
-    override val liquidEffects = VisualizationLiquidEffects(
-        frostSmall = 3f,
-        frostMedium = 5f,
-        frostLarge = 7f,
-        tintAlpha = 0.08f,
-        top = VisualizationLiquidScope(
-            saturation = 0.80f,
-            contrast = 0.85f,
-        ),
-        bottom = VisualizationLiquidScope(
-            saturation = 0.80f,
-            contrast = 0.85f,
-        ),
-    )
+    override val liquidEffects = Default
 
     private var _spinKnob = 0.5f
     private var _armsKnob = 0.5f
@@ -298,6 +285,23 @@ class GalaxyViz(
             green = c1.green + (c2.green - c1.green) * ct,
             blue = c1.blue + (c2.blue - c1.blue) * ct,
             alpha = c1.alpha + (c2.alpha - c1.alpha) * ct
+        )
+    }
+
+    companion object {
+        val Default = VisualizationLiquidEffects(
+            frostSmall = 3f,
+            frostMedium = 5f,
+            frostLarge = 7f,
+            tintAlpha = 0.08f,
+            top = VisualizationLiquidScope(
+                saturation = 0.80f,
+                contrast = 0.85f,
+            ),
+            bottom = VisualizationLiquidScope(
+                saturation = 0.80f,
+                contrast = 0.85f,
+            ),
         )
     }
 }

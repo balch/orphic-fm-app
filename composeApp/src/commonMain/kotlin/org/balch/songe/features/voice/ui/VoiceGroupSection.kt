@@ -1,6 +1,5 @@
 package org.balch.songe.features.voice.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,18 +13,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import io.github.fletchmckee.liquid.liquid
 import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.songe.features.voice.VoiceViewModel
 import org.balch.songe.ui.panels.LocalLiquidEffects
 import org.balch.songe.ui.panels.LocalLiquidState
 import org.balch.songe.ui.theme.SongeColors
+import org.balch.songe.ui.viz.liquidVizEffects
 import org.balch.songe.ui.widgets.RotaryKnob
 
 @Composable
@@ -38,6 +36,7 @@ fun VoiceGroupSection(
 ) {
     val voiceState by voiceViewModel.uiState.collectAsState()
     val liquidState = LocalLiquidState.current
+    val effects = LocalLiquidEffects.current
 
     // More varied duo colors for visual interest
     val duoColors =
@@ -48,28 +47,17 @@ fun VoiceGroupSection(
         }
 
     val shape = RoundedCornerShape(10.dp)
-    
-    // Base modifier with liquid effect - using viz-specific effects
-    val effects = LocalLiquidEffects.current
-    val baseModifier = modifier.clip(shape)
-    val liquidModifier = if (liquidState != null) {
-        baseModifier.liquid(liquidState) {
-            frost = effects.frostMedium.dp
-            this.shape = shape
-            tint = quadColor.copy(alpha = effects.tintAlpha)
-            saturation = effects.bottom.saturation
-            contrast = effects.bottom.contrast
-            edge = effects.bottom.edge
-            dispersion = effects.bottom.dispersion
-            refraction = effects.bottom.refraction
-            curve = effects.bottom.curve
-        }
-    } else {
-        baseModifier.background(SongeColors.darkVoid.copy(alpha = 0.5f))
-    }
 
     Column(
-        modifier = liquidModifier
+        modifier = modifier
+            .liquidVizEffects(
+                liquidState = liquidState,
+                scope = effects.bottom,
+                frostAmount = effects.frostMedium.dp,
+                color = quadColor,
+                tintAlpha = effects.tintAlpha,
+                shape = shape,
+            )
             .border(1.dp, quadColor.copy(alpha = 0.3f), shape)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -129,3 +117,4 @@ fun VoiceGroupSection(
         }
     }
 }
+
