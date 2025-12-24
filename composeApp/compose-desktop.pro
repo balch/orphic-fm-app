@@ -10,3 +10,8 @@
 # Suppress warnings from LibreMidi Panama (Foreign Function API)
 -dontwarn dev.atsushieno.panama.libremidi.**
 -keep class dev.atsushieno.panama.libremidi.** { *; }
+
+# Keep JSyn audio synthesis library - required for audio device manager initialization
+-keep class com.jsyn.** { *; }
+-keepclassmembers class com.jsyn.** { *; }
+-keep class com.softsynth.** { *; }
