@@ -25,6 +25,7 @@ import org.balch.songe.core.audio.SongeEngine
 import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.Visualization
+import org.balch.songe.ui.viz.VisualizationLiquidEffects
 import org.balch.songe.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos
@@ -70,6 +71,7 @@ data class Star(
     val color: Color             // Pre-computed color based on radius
 )
 
+
 /**
  * Galaxy visualization - procedural spiral galaxy with particle stars.
  * 
@@ -91,6 +93,12 @@ class GalaxyViz(
     override val color = SongeColors.neonCyan
     override val knob1Label = "SPIN"
     override val knob2Label = "ARMS"
+    
+    // Low frost for crisper stars, high saturation for vibrant colors
+    override val liquidEffects = VisualizationLiquidEffects(
+        frostSmall = 3f, frostMedium = 5f, frostLarge = 7f,
+        tintAlpha = 0.08f, saturation = 0.80f, contrast = 0.85f
+    )
 
     private var _spinKnob = 0.5f
     private var _armsKnob = 0.5f
@@ -205,8 +213,8 @@ class GalaxyViz(
             val lfo = state.lfoModulation
             val spinFactor = 1.0f + _armsKnob * 2.0f
 
-            // Brighter base intensity (+10%)
-            val baseIntensity = 0.4f + energy * 0.45f  // 0.4-0.85 range
+            // Doubled base intensity (2x brighter)
+            val baseIntensity = 0.8f + energy * 0.2f  // 0.8-1.0 range
 
             // Deep space background
             drawRect(Color(0xFF000008))

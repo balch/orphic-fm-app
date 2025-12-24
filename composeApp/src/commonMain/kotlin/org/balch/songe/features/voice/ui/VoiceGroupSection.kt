@@ -23,8 +23,8 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.liquid
 import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.songe.features.voice.VoiceViewModel
+import org.balch.songe.ui.panels.LocalLiquidEffects
 import org.balch.songe.ui.panels.LocalLiquidState
-import org.balch.songe.ui.theme.LiquidEffects
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 
@@ -49,17 +49,18 @@ fun VoiceGroupSection(
 
     val shape = RoundedCornerShape(10.dp)
     
-    // Base modifier with liquid effect - using theme constants
+    // Base modifier with liquid effect - using viz-specific effects
+    val effects = LocalLiquidEffects.current
     val baseModifier = modifier.clip(shape)
     val liquidModifier = if (liquidState != null) {
         baseModifier.liquid(liquidState) {
-            frost = LiquidEffects.FROST_MEDIUM.dp
+            frost = effects.frostMedium.dp
             this.shape = shape
-            refraction = LiquidEffects.REFRACTION
-            curve = LiquidEffects.CURVE
-            tint = quadColor.copy(alpha = LiquidEffects.TINT_ALPHA)
-            saturation = LiquidEffects.SATURATION
-            contrast = LiquidEffects.CONTRAST
+            refraction = 0f
+            curve = 0f
+            tint = quadColor.copy(alpha = effects.tintAlpha)
+            saturation = effects.saturation
+            contrast = effects.contrast
         }
     } else {
         baseModifier.background(SongeColors.darkVoid.copy(alpha = 0.5f))

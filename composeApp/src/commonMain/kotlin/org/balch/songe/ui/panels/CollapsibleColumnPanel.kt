@@ -34,13 +34,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
-import org.balch.songe.ui.theme.LiquidEffects
 import org.balch.songe.ui.theme.SongeColors
+import org.balch.songe.ui.viz.VisualizationLiquidEffects
 
 /**
  * CompositionLocal for sharing LiquidState across panels.
  */
 val LocalLiquidState = compositionLocalOf<LiquidState?> { null }
+
+/**
+ * CompositionLocal for sharing visualization-specific liquid effects across panels.
+ */
+val LocalLiquidEffects = compositionLocalOf { VisualizationLiquidEffects.Default }
 
 /**
  * Collapsible settings panel for the left side of top row.
@@ -83,16 +88,17 @@ fun CollapsibleColumnPanel(
         .fillMaxHeight()
         .clip(shape)
 
-    // Apply liquid effect if LiquidState is provided - using theme constants
+    // Apply liquid effect if LiquidState is provided - using visualization-specific constants
+    val effects = LocalLiquidEffects.current
     val liquidModifier = if (liquidState != null) {
         baseModifier.liquid(liquidState) {
-            frost = LiquidEffects.FROST_SMALL.dp
+            frost = effects.frostSmall.dp
             this.shape = shape
-            tint = color.copy(alpha = LiquidEffects.TINT_ALPHA)
-            refraction = LiquidEffects.REFRACTION
-            curve = LiquidEffects.CURVE
-            saturation = LiquidEffects.SATURATION
-            contrast = LiquidEffects.CONTRAST
+            tint = color.copy(alpha = effects.tintAlpha)
+            refraction = 0f
+            curve = 0f
+            saturation = effects.saturation
+            contrast = effects.contrast
         }
     } else {
         baseModifier.background(SongeColors.darkVoid.copy(alpha = 0.8f))

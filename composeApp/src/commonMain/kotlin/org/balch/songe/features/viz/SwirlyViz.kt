@@ -28,6 +28,7 @@ import org.balch.songe.core.audio.SongeEngine
 import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.Visualization
+import org.balch.songe.ui.viz.VisualizationLiquidEffects
 import org.balch.songe.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos
@@ -58,6 +59,7 @@ data class SwirlyUiState(
     }
 }
 
+
 /**
  * Swirly vortex visualization - funnel with spiral lines.
  * 
@@ -79,6 +81,12 @@ class SwirlyViz(
     override val color = SongeColors.electricBlue
     override val knob1Label = "SPIN"
     override val knob2Label = "DEPTH"
+    
+    // Higher saturation to let swirl colors shine through
+    override val liquidEffects = VisualizationLiquidEffects(
+        frostSmall = 4f, frostMedium = 6f, frostLarge = 8f,
+        tintAlpha = 0.10f, saturation = 0.75f, contrast = 0.8f
+    )
 
     private var _spinKnob = 0.5f
     private var _depthKnob = 0.5f

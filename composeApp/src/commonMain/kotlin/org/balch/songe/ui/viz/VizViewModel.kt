@@ -18,7 +18,8 @@ import org.balch.songe.core.preferences.AppPreferencesRepository
 data class VizUiState(
     val selectedViz: Visualization,
     val visualizations: List<Visualization>,
-    val showKnobs: Boolean
+    val showKnobs: Boolean,
+    val liquidEffects: VisualizationLiquidEffects = selectedViz.liquidEffects
 )
 
 /**
@@ -45,7 +46,8 @@ class VizViewModel(
         VizUiState(
             selectedViz = sortedVisualizations.first(),
             visualizations = sortedVisualizations,
-            showKnobs = sortedVisualizations.first().id != "off"
+            showKnobs = sortedVisualizations.first().id != "off",
+            liquidEffects = sortedVisualizations.first().liquidEffects
         )
     )
     val uiState: StateFlow<VizUiState> = _uiState.asStateFlow()
@@ -104,7 +106,8 @@ class VizViewModel(
     private fun updateState() {
         _uiState.value = _uiState.value.copy(
             selectedViz = _currentViz.value,
-            showKnobs = _currentViz.value.id != "off"
+            showKnobs = _currentViz.value.id != "off",
+            liquidEffects = _currentViz.value.liquidEffects
         )
     }
     

@@ -7,6 +7,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.songe.ui.viz.Visualization
+import org.balch.songe.ui.viz.VisualizationLiquidEffects
 
 @Inject
 @ContributesIntoSet(AppScope::class)
@@ -16,6 +17,7 @@ class OffViz : Visualization {
     override val color = Color.Gray // Neutral color
     override val knob1Label = "N/A"
     override val knob2Label = "N/A"
+    override val liquidEffects = VisualizationLiquidEffects.Off
 
     override fun setKnob1(value: Float) {}
     override fun setKnob2(value: Float) {}

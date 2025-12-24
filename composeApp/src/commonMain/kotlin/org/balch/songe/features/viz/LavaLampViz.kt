@@ -21,6 +21,7 @@ import org.balch.songe.core.audio.SongeEngine
 import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.Visualization
+import org.balch.songe.ui.viz.VisualizationLiquidEffects
 import org.balch.songe.ui.widgets.VizBackground
 import org.balch.songe.util.currentTimeMillis
 import kotlin.random.Random
@@ -50,6 +51,7 @@ data class Blob(
     var age: Float = 0f        // age in seconds for lifecycle
 )
 
+
 /**
  * Lava Lamp visualization implementation.
  */
@@ -65,6 +67,12 @@ class LavaLampViz(
     override val color = SongeColors.deepPurple
     override val knob1Label = "SPEED"
     override val knob2Label = "SIZE"
+    
+    // Moderate translucency for lava lamp blobs
+    override val liquidEffects = VisualizationLiquidEffects(
+        frostSmall = 5f, frostMedium = 7f, frostLarge = 9f,
+        tintAlpha = 0.12f, saturation = 0.70f, contrast = 0.75f
+    )
 
     // Knob values (0-1 normalized, default 0.5)
     private var _speedKnob = 0.5f

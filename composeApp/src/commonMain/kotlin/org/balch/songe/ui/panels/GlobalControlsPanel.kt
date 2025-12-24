@@ -24,7 +24,6 @@ import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
 import org.balch.songe.features.lfo.HyperLfoMode
 import org.balch.songe.features.lfo.HyperLfoPanelLayout
-import org.balch.songe.ui.theme.LiquidEffects
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -58,6 +57,7 @@ fun GlobalControlsPanel(
     liquidState: LiquidState?,
 ) {
     val shape = RoundedCornerShape(12.dp)
+    val effects = LocalLiquidEffects.current
     Row(
         modifier =
             modifier.shadow(
@@ -69,13 +69,13 @@ fun GlobalControlsPanel(
                 .then(
                     if (liquidState != null) {
                         Modifier.liquid(liquidState) {
-                            frost = LiquidEffects.FROST_MEDIUM.dp
+                            frost = effects.frostMedium.dp
                             this.shape = shape
-                            refraction = LiquidEffects.REFRACTION
-                            curve = LiquidEffects.CURVE
-                            tint = SongeColors.darkVoid.copy(alpha = LiquidEffects.TINT_ALPHA)
-                            saturation = LiquidEffects.SATURATION
-                            contrast = LiquidEffects.CONTRAST
+                            refraction = 0f
+                            curve = 0f
+                            tint = SongeColors.darkVoid.copy(alpha = effects.tintAlpha)
+                            saturation = effects.saturation
+                            contrast = effects.contrast
                         }
                     } else {
                         Modifier

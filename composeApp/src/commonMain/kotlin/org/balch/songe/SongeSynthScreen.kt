@@ -40,6 +40,7 @@ import org.balch.songe.features.voice.SynthKeyboardHandler
 import org.balch.songe.features.voice.VoiceViewModel
 import org.balch.songe.features.voice.ui.VoiceGroupSection
 import org.balch.songe.ui.panels.CenterControlPanel
+import org.balch.songe.ui.panels.LocalLiquidEffects
 import org.balch.songe.ui.panels.LocalLiquidState
 import org.balch.songe.ui.panels.VizPanel
 import org.balch.songe.ui.theme.SongeColors
@@ -85,8 +86,11 @@ fun SongeSynthScreen(
                     .liquefiable(liquidState)
             )
 
-            // Provide LiquidState to all child panels via CompositionLocal
-            CompositionLocalProvider(LocalLiquidState provides liquidState) {
+            // Provide LiquidState and LiquidEffects to all child panels via CompositionLocal
+            CompositionLocalProvider(
+                LocalLiquidState provides liquidState,
+                LocalLiquidEffects provides vizState.liquidEffects
+            ) {
                 // Main UI content layer
                 Column(
                     modifier = Modifier
