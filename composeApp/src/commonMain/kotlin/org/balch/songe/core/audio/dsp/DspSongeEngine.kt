@@ -115,6 +115,16 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
     private val _cpuLoadFlow = MutableStateFlow(0f)
     override val cpuLoadFlow: StateFlow<Float> = _cpuLoadFlow.asStateFlow()
 
+    // Visualization flows (for plasma background)
+    private val _voiceLevelsFlow = MutableStateFlow(FloatArray(8))
+    override val voiceLevelsFlow: StateFlow<FloatArray> = _voiceLevelsFlow.asStateFlow()
+
+    private val _lfoOutputFlow = MutableStateFlow(0f)
+    override val lfoOutputFlow: StateFlow<Float> = _lfoOutputFlow.asStateFlow()
+
+    private val _masterLevelFlow = MutableStateFlow(0f)
+    override val masterLevelFlow: StateFlow<Float> = _masterLevelFlow.asStateFlow()
+
     // State Caches (Backing fields for getters)
     // Voices
     private val _voiceTune = FloatArray(8) { 0.5f } // Default from VoiceUiState
@@ -361,10 +371,29 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
         // Start monitoring flow updates
         monitoringJob = monitoringScope.launch {
+            val voiceLevels = FloatArray(8)
             while (isActive) {
-                _peakFlow.value = peakFollower.getCurrent().toFloat()
+                // Update peak and CPU at 30fps
+                val currentPeak = peakFollower.getCurrent().toFloat()
+                _peakFlow.value = currentPeak
                 _cpuLoadFlow.value = audioEngine.getCpuLoad()
-                delay(100)
+
+                // Update visualization at 30fps (every ~33ms)
+                var voiceSum = 0f
+                for (i in 0 until 8) {
+                    val level = voices[i].getCurrentLevel()
+                    voiceLevels[i] = level
+                    voiceSum += level
+                }
+                _voiceLevelsFlow.value = voiceLevels.copyOf()
+                _lfoOutputFlow.value = hyperLfo.getCurrentValue()
+                
+                // Use max of peakFollower and voice sum for master level
+                // This ensures hold/delay effects are captured even if peakFollower position differs
+                val computedMaster = (voiceSum / 8f).coerceIn(0f, 1f)
+                _masterLevelFlow.value = maxOf(currentPeak.coerceIn(0f, 1f), computedMaster)
+
+                delay(33) // ~30fps for smooth visualization
             }
         }
         Logger.info { "Audio Engine Started" }

@@ -1,0 +1,63 @@
+{
+  "name": "Swirly Dreams",
+  "voiceTunes": [
+    0.20,
+    0.25,
+    0.30,
+    0.35,
+    0.40,
+    0.45,
+    0.50,
+    0.55
+  ],
+  "voiceModDepths": [
+    0.6,
+    0.5,
+    0.6,
+    0.5,
+    0.6,
+    0.5,
+    0.6,
+    0.5
+  ],
+  "voiceEnvelopeSpeeds": [
+    0.4,
+    0.4,
+    0.5,
+    0.5,
+    0.6,
+    0.6,
+    0.7,
+    0.7
+  ],
+  "pairSharpness": [
+    0.4,
+    0.5,
+    0.4,
+    0.5
+  ],
+  "duoModSources": [
+    "LFO",
+    "LFO",
+    "LFO",
+    "LFO"
+  ],
+  "hyperLfoA": 0.15,
+  "hyperLfoB": 0.12,
+  "hyperLfoMode": "AND",
+  "hyperLfoLink": true,
+  "delayTime1": 0.45,
+  "delayTime2": 0.65,
+  "delayMod1": 0.5,
+  "delayMod2": 0.6,
+  "delayFeedback": 0.65,
+  "delayMix": 0.5,
+  "delayModSourceIsLfo": true,
+  "delayLfoWaveformIsTriangle": true,
+  "masterVolume": 0.7,
+  "drive": 0.2,
+  "distortionMix": 0.25,
+  "fmStructureCrossQuad": false,
+  "totalFeedback": 0.35,
+  "createdAt": 0
+}

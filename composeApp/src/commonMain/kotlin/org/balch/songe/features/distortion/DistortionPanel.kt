@@ -20,12 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.songe.ui.panels.CollapsibleColumnPanel
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
+import java.util.Locale
 
 /** Smart wrapper that connects DistortionViewModel to the layout. */
 @Composable
@@ -62,12 +62,12 @@ fun DistortionPanelLayout(
     peak: Float,
     modifier: Modifier = Modifier
 ) {
-    _root_ide_package_.org.balch.songe.ui.panels.CollapsibleColumnPanel(
+    CollapsibleColumnPanel(
         title = "VOL",
         color = SongeColors.neonMagenta,
+        expandedTitle = "Distortion",
         initialExpanded = true,
         expandedWidth = 200.dp,
-        useFlexWidth = true,
         modifier = modifier
     ) {
         Column(
@@ -75,13 +75,7 @@ fun DistortionPanelLayout(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header - Centered
-            Text(
-                text = "Distortion",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = SongeColors.neonMagenta
-            )
+            Spacer(modifier = Modifier.height(4.dp))
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -171,7 +165,7 @@ private fun PeakLed(peak: Float, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = String.format("%.2f", peak),
+            text = String.format(Locale.getDefault(), "%.2f", peak),
             style = MaterialTheme.typography.labelMedium,
             color = ledColor
         )

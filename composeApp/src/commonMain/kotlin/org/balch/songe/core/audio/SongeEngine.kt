@@ -63,6 +63,11 @@ interface SongeEngine {
     val peakFlow: StateFlow<Float>
     val cpuLoadFlow: StateFlow<Float>
 
+    // Visualization flows (emit at ~30fps for plasma background)
+    val voiceLevelsFlow: StateFlow<FloatArray>  // 8 voice levels, 0-1 range
+    val lfoOutputFlow: StateFlow<Float>         // -1 to 1 range
+    val masterLevelFlow: StateFlow<Float>       // 0-1 range, overall output including delay
+
     // Getters for State Saving
     fun getVoiceTune(index: Int): Float
     fun getVoiceFmDepth(index: Int): Float

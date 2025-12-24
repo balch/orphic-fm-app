@@ -6,21 +6,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.core.audio.StereoMode
 import org.balch.songe.ui.panels.CollapsibleColumnPanel
-import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 import org.balch.songe.ui.widgets.VerticalToggle
+
+// Darker cyan for PAN panel
+private val PanColor = Color(0xFF008B8B)  // Dark cyan
 
 /**
  * Smart wrapper that connects StereoViewModel to the layout.
@@ -59,24 +59,17 @@ fun StereoPanelLayout(
 ) {
     CollapsibleColumnPanel(
         title = "PAN",
-        color = SongeColors.neonCyan,
+        color = PanColor,
+        expandedTitle = "Stereo",
         initialExpanded = false,
         expandedWidth = 120.dp,
-        useFlexWidth = true,
         modifier = modifier
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
-            // Header
-            Text(
-                text = "Stereo",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = SongeColors.neonCyan
-            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -94,7 +87,7 @@ fun StereoPanelLayout(
                             if (isVoicePan) StereoMode.VOICE_PAN else StereoMode.STEREO_DELAYS
                         )
                     },
-                    color = SongeColors.neonCyan,
+                    color = PanColor,
                     controlId = "stereo_mode",
                     enabled = true  // Delay mode not yet implemented, but toggle enabled
                 )
@@ -112,7 +105,7 @@ fun StereoPanelLayout(
                 label = "PAN",
                 controlId = "stereo_pan",
                 size = 64.dp,
-                progressColor = SongeColors.neonCyan
+                progressColor = PanColor
             )
         }
     }

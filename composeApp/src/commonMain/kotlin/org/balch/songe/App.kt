@@ -12,14 +12,14 @@ import org.balch.songe.di.SongeGraph
 import org.balch.songe.features.debug.DebugBottomBar
 import org.balch.songe.features.navigation.SongeNavigation
 import org.balch.songe.ui.theme.SongeTheme
-import org.balch.songe.ui.widgets.PlasmaBackground
+import org.balch.songe.ui.widgets.VizBackground
 
 @Composable
 fun App(engine: SongeEngine, graph: SongeGraph) {
     CompositionLocalProvider(LocalMetroViewModelFactory provides graph.metroViewModelFactory) {
         SongeTheme {
             Box(modifier = Modifier.fillMaxSize()) {
-                PlasmaBackground()
+                VizBackground()
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     // Main Content

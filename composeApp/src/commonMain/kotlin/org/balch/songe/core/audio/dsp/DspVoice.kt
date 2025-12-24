@@ -67,6 +67,12 @@ class DspVoice(
     val output: AudioOutput get() = vca.output
     val envelopeOutput: AudioOutput get() = envelopeFollower.output
 
+    /**
+     * Get the current envelope level (0-1 range) for visualization.
+     * This is the smoothed output level of the voice.
+     */
+    fun getCurrentLevel(): Float = envelopeFollower.getCurrent().toFloat().coerceIn(0f, 1f)
+
     init {
         // Register all units with audio engine
         audioEngine.addUnit(triangleOsc)
@@ -88,8 +94,8 @@ class DspVoice(
         audioEngine.addUnit(vibratoMixer)
         audioEngine.addUnit(vcaControlMixer)
 
-        // Envelope follower setup
-        envelopeFollower.setHalfLife(0.05) // 50ms response time
+        // Envelope follower setup - longer halflife for better hold/sustain detection
+        envelopeFollower.setHalfLife(0.15) // 150ms response time for sustained signals
 
         // Set oscillator amplitudes
         triangleOsc.amplitude.set(0.3)

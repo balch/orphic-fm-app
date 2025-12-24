@@ -27,29 +27,36 @@ actual class DronePresetRepository actual constructor() {
     }
 
     private suspend fun ensurePresetsInitialized() {
-        if (presetsDir.listFiles()?.isEmpty() == true) {
-            copyBundledPresets(presetsDir)
-        }
+        // ALWAYS copy bundled presets to ensure updates are picked up during dev
+        // In prod we might want to be more careful, but for now this fixes the missing preset issue
+        copyBundledPresets(presetsDir)
     }
 
     private suspend fun copyBundledPresets(dir: File) {
         val bundledPresets = listOf(
             "F__Minor_Drift.json",
             "Warm_Pad.json",
-            "Dark_Ambient.json"
+            "Dark_Ambient.json",
+            "Swirly_Dreams.json"
         )
         bundledPresets.forEach { filename ->
             try {
+                // Check if file exists in resources first to debug
+                Logger.debug { "Attempting to copy bundled preset: $filename" }
                 val path = "files/presets/$filename"
                 val bytes = Res.readBytes(path)
                 val targetFile = File(dir, filename)
+                
+                // Only overwrite if it doesn't exist or we want to force update
+                // For now, let's overwrite to ensure new presets appear
                 targetFile.writeBytes(bytes)
-                Logger.info { "Copied bundled preset: $filename" }
+                Logger.debug { "Successfully copied bundled preset: $filename to ${targetFile.absolutePath}" }
             } catch (e: Exception) {
                 Logger.error { "Failed to copy bundled preset $filename: ${e.message}" }
             }
         }
     }
+
 
     private fun fileForPreset(name: String): File {
         // Sanitize name for use as filename

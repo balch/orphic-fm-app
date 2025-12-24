@@ -9,6 +9,7 @@ import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.core.midi.MidiController
 import org.balch.songe.core.midi.MidiMappingRepository
 import org.balch.songe.core.midi.createMidiAccess
+import org.balch.songe.core.preferences.AppPreferencesRepository
 import org.balch.songe.core.presets.DronePresetRepository
 
 /**
@@ -33,5 +34,9 @@ interface SongeModule {
         @Provides
         @SingleIn(AppScope::class)
         fun provideDronePresetRepository(): DronePresetRepository = DronePresetRepository()
+
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideAppPreferencesRepository(): AppPreferencesRepository = AppPreferencesRepository()
     }
 }

@@ -63,6 +63,11 @@ class PreviewSongeEngine() : SongeEngine {
     override val peakFlow: StateFlow<Float> = MutableStateFlow(0.5f).asStateFlow()
     override val cpuLoadFlow: StateFlow<Float> = MutableStateFlow(12.5f).asStateFlow()
 
+    // Visualization flows (static preview values for plasma background)
+    override val voiceLevelsFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(8) { 0.3f }).asStateFlow()
+    override val lfoOutputFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
+    override val masterLevelFlow: StateFlow<Float> = MutableStateFlow(0.4f).asStateFlow()
+
     override fun getVoiceTune(index: Int): Float = 0f
     override fun getVoiceFmDepth(index: Int): Float = 0f
     override fun getVoiceEnvelopeSpeed(index: Int): Float = 0f

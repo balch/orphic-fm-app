@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.core.presets.DronePreset
 import org.balch.songe.ui.panels.CollapsibleColumnPanel
-import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.ConfirmDialog
 import org.balch.songe.ui.widgets.PresetNameDialog
 
@@ -50,6 +49,9 @@ data class PresetProps(
     val onApply: (DronePreset) -> Unit,
     val onDialogActiveChange: (Boolean) -> Unit = {} // Called when naming dialog opens/closes
 )
+
+// Lighter orange for PATCHES panel
+private val PatchesColor = Color(0xFFFFAB40)  // Light orange/amber
 
 @Composable
 fun PresetsPanel(
@@ -84,11 +86,11 @@ fun PresetsPanelLayout(
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     CollapsibleColumnPanel(
-        title = "PATCHES",
-        color = SongeColors.neonCyan,
+        title = "PATCH",
+        color = PatchesColor,
+        expandedTitle = "Presets",
         initialExpanded = false,
         expandedWidth = 200.dp,
-        useFlexWidth = true,
         modifier = modifier
     ) {
         Column(
@@ -98,14 +100,6 @@ fun PresetsPanelLayout(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header
-            Text(
-                text = "Presets",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = SongeColors.neonCyan
-            )
-
             Spacer(modifier = Modifier.height(4.dp))
 
             // Buttons row - ABOVE file list
@@ -119,7 +113,7 @@ fun PresetsPanelLayout(
                         .weight(1f)
                         .height(28.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(SongeColors.neonCyan.copy(alpha = 0.2f))
+                        .background(PatchesColor.copy(alpha = 0.2f))
                         .clickable {
                             showNewDialog = true
                             presetProps.onDialogActiveChange(true)
@@ -130,7 +124,7 @@ fun PresetsPanelLayout(
                         "NEW",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = SongeColors.neonCyan
+                        color = PatchesColor
                     )
                 }
 
@@ -197,7 +191,7 @@ fun PresetsPanelLayout(
                     .weight(1f)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
-                    .border(1.dp, SongeColors.neonCyan.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                    .border(1.dp, PatchesColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                     .background(Color.Black.copy(alpha = 0.3f))
             ) {
                 Column(
@@ -214,7 +208,7 @@ fun PresetsPanelLayout(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(
-                                    if (isSelected) SongeColors.neonCyan.copy(alpha = 0.2f)
+                                    if (isSelected) PatchesColor.copy(alpha = 0.2f)
                                     else Color.Transparent
                                 )
                                 .clickable {
@@ -226,7 +220,7 @@ fun PresetsPanelLayout(
                             Text(
                                 preset.name,
                                 fontSize = 10.sp,
-                                color = if (isSelected) SongeColors.neonCyan else Color.White.copy(
+                                color = if (isSelected) PatchesColor else Color.White.copy(
                                     alpha = 0.7f
                                 ),
                                 maxLines = 1,

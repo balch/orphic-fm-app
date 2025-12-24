@@ -22,8 +22,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.materials.CupertinoMaterials
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
-import dev.chrisbanes.haze.materials.HazeMaterials
+import org.balch.songe.features.lfo.HyperLfoMode
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -32,13 +33,13 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun GlobalControlsPanel(
     // Hyper LFO
+    modifier: Modifier = Modifier,
     vibrato: Float, // LFO1 Rate
     onVibratoChange: (Float) -> Unit,
     lfo2Rate: Float = 0.3f,
     onLfo2RateChange: (Float) -> Unit = {},
-    hyperLfoMode: org.balch.songe.features.lfo.HyperLfoMode =
-        _root_ide_package_.org.balch.songe.features.lfo.HyperLfoMode.AND,
-    onHyperLfoModeChange: (org.balch.songe.features.lfo.HyperLfoMode) -> Unit = {},
+    hyperLfoMode: HyperLfoMode = HyperLfoMode.AND,
+    onHyperLfoModeChange: (HyperLfoMode) -> Unit = {},
     // Effects
     distortion: Float,
     onDistortionChange: (Float) -> Unit,
@@ -55,7 +56,6 @@ fun GlobalControlsPanel(
     pan: Float,
     onPanChange: (Float) -> Unit,
     hazeState: HazeState?,
-    modifier: Modifier = Modifier
 ) {
     Row(
         modifier =
@@ -69,7 +69,7 @@ fun GlobalControlsPanel(
                     if (hazeState != null) {
                         Modifier.hazeEffect(
                             state = hazeState,
-                            style = HazeMaterials.regular()
+                            style = CupertinoMaterials.thick()
                         )
                     } else {
                         Modifier

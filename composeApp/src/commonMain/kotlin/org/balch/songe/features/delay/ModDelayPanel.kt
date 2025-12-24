@@ -8,15 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.ui.panels.CollapsibleColumnPanel
 import org.balch.songe.ui.theme.SongeColors
@@ -78,24 +75,16 @@ fun ModDelayPanelLayout(
     CollapsibleColumnPanel(
         title = "DELAY",
         color = SongeColors.warmGlow,
+        expandedTitle = "Mod Delay",
         initialExpanded = true,
         expandedWidth = 240.dp,
-        useFlexWidth = true,
         modifier = modifier
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Top
         ) {
-            // Header - Centered
-            Text(
-                text = "Mod Delay",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = SongeColors.warmGlow
-            )
-
             Spacer(modifier = Modifier.height(4.dp))
 
             // Row 1: MOD 1, MOD 2, LFO/SELF toggle, TRI/SQR toggle

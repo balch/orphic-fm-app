@@ -66,14 +66,12 @@ private fun MidiPanelLayout(
 midiProps: MidiProps,
 modifier: Modifier = Modifier
 ) {
-
-
     CollapsibleColumnPanel(
         title = "MIDI",
         color = SongeColors.synthGreen,
+        expandedTitle = "MIDI",
         initialExpanded = false,
         expandedWidth = 180.dp,
-        useFlexWidth = true,
         modifier = modifier
     ) {
         Column(
@@ -83,13 +81,7 @@ modifier: Modifier = Modifier
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Header
-            Text(
-                text = "MIDI",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = SongeColors.synthGreen
-            )
+            Spacer(modifier = Modifier.height(4.dp))
 
             Spacer(modifier = Modifier.height(4.dp))
 

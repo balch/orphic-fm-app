@@ -62,6 +62,9 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
     private val triangleMax = audioEngine.createMaximum() // OR = MAX(A, B)
     private val fmGain = audioEngine.createMultiply()
 
+    // LFO Output Monitoring for visualization
+    private val lfoMonitor = audioEngine.createPeakFollower()
+
     // Internal State
     private var isAndMode = true
     private var isTriangleMode = true // Default to triangle for delay mod
@@ -89,6 +92,11 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
         audioEngine.addUnit(triangleMin)
         audioEngine.addUnit(triangleMax)
         audioEngine.addUnit(fmGain)
+        audioEngine.addUnit(lfoMonitor)
+
+        // Monitor the LFO output for visualization
+        outputProxy.output.connect(lfoMonitor.input)
+        lfoMonitor.setHalfLife(0.016) // ~60fps response
 
         // WIRING
         // Base Frequencies -> Mixers (inputA of each)
@@ -215,4 +223,9 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
         // Simple FM depth switch
         fmGain.inputB.set(if (enabled) 10.0 else 0.0)
     }
+
+    /**
+     * Get the current LFO output value (-1 to 1 range) for visualization.
+     */
+    fun getCurrentValue(): Float = lfoMonitor.getCurrent().toFloat().coerceIn(-1f, 1f)
 }

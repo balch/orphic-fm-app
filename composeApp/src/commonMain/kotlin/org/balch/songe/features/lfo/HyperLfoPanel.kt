@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.songe.ui.panels.CollapsibleColumnPanel
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.LocalLearnModeState
 import org.balch.songe.ui.widgets.RotaryKnob
@@ -78,12 +79,12 @@ fun HyperLfoPanelLayout(
     onLinkChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    _root_ide_package_.org.balch.songe.ui.panels.CollapsibleColumnPanel(
+    CollapsibleColumnPanel(
         title = "LFO",
         color = SongeColors.neonCyan,
+        expandedTitle = "Hyper LFO",
         initialExpanded = true,
         expandedWidth = 280.dp,
-        useFlexWidth = true,
         modifier = modifier
     ) {
         val learnState = LocalLearnModeState.current
@@ -94,15 +95,7 @@ fun HyperLfoPanelLayout(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Header - centered like other panels
-            Text(
-                text = "Hyper LFO",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color =
-                    if (isActive) SongeColors.neonCyan
-                    else SongeColors.neonCyan.copy(alpha = 0.5f)
-            )
+            Spacer(modifier = Modifier.height(4.dp))
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -116,7 +109,6 @@ fun HyperLfoPanelLayout(
                 Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_MODE, learnState)) {
                     Vertical3WaySwitch(
                         topLabel = "AND",
-                        middleLabel = "OFF",
                         bottomLabel = "OR",
                         position =
                             when (mode) {
@@ -280,7 +272,6 @@ private fun VerticalToggle(
 @Composable
 private fun Vertical3WaySwitch(
     topLabel: String,
-    middleLabel: String,
     bottomLabel: String,
     position: Int, // 0=top, 1=middle, 2=bottom
     onPositionChange: (Int) -> Unit,

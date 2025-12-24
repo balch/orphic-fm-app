@@ -58,7 +58,8 @@ fun RotaryKnob(
     trackColor: Color = SongeColors.deepPurple,
     progressColor: Color = SongeColors.neonCyan,
     knobColor: Color = SongeColors.softPurple,
-    indicatorColor: Color = SongeColors.neonCyan
+    indicatorColor: Color = SongeColors.neonCyan,
+    enabled: Boolean = true
 ) {
     // Sensitivity for drag (pixels per full range)
     val sensitivity = 200f
@@ -87,8 +88,8 @@ fun RotaryKnob(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(sensitivity, range, isLearning) {
-                        if (isLearning) {
+                    .pointerInput(sensitivity, range, isLearning, enabled) {
+                        if (isLearning || !enabled) {
                             return@pointerInput
                         }
                         detectDragGestures(
