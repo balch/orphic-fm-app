@@ -1,12 +1,12 @@
 package org.balch.songe.ui.panels
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -14,19 +14,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
-import io.github.fletchmckee.liquid.liquid
 import org.balch.songe.features.lfo.HyperLfoMode
 import org.balch.songe.features.lfo.HyperLfoPanelLayout
+import org.balch.songe.ui.preview.LiquidEffectsProvider
+import org.balch.songe.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.songe.ui.theme.SongeColors
+import org.balch.songe.ui.viz.VisualizationLiquidEffects
+import org.balch.songe.ui.viz.liquidVizEffects
 import org.balch.songe.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 
 @Composable
@@ -54,70 +54,21 @@ fun GlobalControlsPanel(
     onMasterVolumeChange: (Float) -> Unit,
     pan: Float,
     onPanChange: (Float) -> Unit,
-    liquidState: LiquidState?,
+    liquidState: LiquidState? = LocalLiquidState.current,
+    effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
 ) {
     val shape = RoundedCornerShape(12.dp)
-    val effects = LocalLiquidEffects.current
     Row(
         modifier =
-            modifier.shadow(
-                elevation = 8.dp,
+            modifier.liquidVizEffects(
+                liquidState = liquidState,
+                scope = effects.bottom,
+                frostAmount = effects.frostLarge.dp,
+                color = SongeColors.darkVoid,
+                tintAlpha = effects.tintAlpha,
                 shape = shape,
-                clip = false
             )
-                .clip(shape)
-                .then(
-                    if (liquidState != null) {
-                        Modifier.liquid(liquidState) {
-                            frost = effects.frostMedium.dp
-                            this.shape = shape
-                            tint = SongeColors.darkVoid.copy(alpha = effects.tintAlpha)
-                            saturation = effects.top.saturation
-                            contrast = effects.top.contrast
-                            edge = effects.top.edge
-                            dispersion = effects.top.dispersion
-                            refraction = effects.top.refraction
-                            curve = effects.top.curve
-                        }
-                    } else {
-                        Modifier
-                    }
-                )
-                .background(
-                    brush =
-                        Brush.verticalGradient(
-                            colors =
-                                listOf(
-                                    SongeColors.darkVoid.copy(
-                                        alpha = 0.7f
-                                    ),
-                                    SongeColors.darkVoid.copy(
-                                        alpha = 0.95f
-                                    )
-                                )
-                        )
-                )
-                .border(
-                    width = 1.dp,
-                    brush =
-                        Brush.linearGradient(
-                            colors =
-                                listOf(
-                                    SongeColors.electricBlue.copy(
-                                        alpha = 0.4f
-                                    ),
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.6f)
-                                ),
-                            start = Offset(0f, 0f),
-                            end =
-                                Offset(
-                                    Float.POSITIVE_INFINITY,
-                                    Float.POSITIVE_INFINITY
-                                )
-                        ),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
                 .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -206,22 +157,26 @@ fun GlobalControlsPanel(
     }
 }
 
-@Composable
 @Preview(widthDp = 800, heightDp = 240)
-fun GlobalControlsPanelPreview() {
-    MaterialTheme {
-        GlobalControlsPanel(
-            vibrato = 0.2f,
-            onVibratoChange = {},
-            distortion = 0.4f,
-            onDistortionChange = {},
-            masterVolume = 0.8f,
-            onMasterVolumeChange = {},
-            pan = 0.5f,
-            onPanChange = {},
-            masterDrive = 0.3f,
-            onMasterDriveChange = {},
-            liquidState = null
-        )
+@Composable
+fun GlobalControlsPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects, modifier = Modifier.size(900.dp, 300.dp)) {
+        MaterialTheme {
+            GlobalControlsPanel(
+                vibrato = 0.2f,
+                onVibratoChange = {},
+                distortion = 0.4f,
+                onDistortionChange = {},
+                masterVolume = 0.8f,
+                onMasterVolumeChange = {},
+                pan = 0.5f,
+                onPanChange = {},
+                masterDrive = 0.3f,
+                onMasterDriveChange = {},
+                effects = effects
+            )
+        }
     }
 }
