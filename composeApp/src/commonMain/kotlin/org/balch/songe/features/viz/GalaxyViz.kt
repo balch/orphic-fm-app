@@ -295,12 +295,18 @@ class GalaxyViz(
             frostLarge = 7f,
             tintAlpha = 0.08f,
             top = VisualizationLiquidScope(
-                saturation = 0.80f,
-                contrast = 0.85f,
+                saturation = 1.5f,
+                contrast = 0.8f,
+                refraction = .2f,
+                curve = .2f,
+                dispersion = .8f,
             ),
             bottom = VisualizationLiquidScope(
-                saturation = 0.80f,
-                contrast = 0.85f,
+                saturation = .5f,
+                contrast = .8f,
+                refraction = .5f,
+                curve = .1f,
+                dispersion = .5f,
             ),
         )
     }

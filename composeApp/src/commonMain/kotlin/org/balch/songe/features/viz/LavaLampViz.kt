@@ -312,12 +312,14 @@ class LavaLampViz(
             frostLarge = 9f,
             tintAlpha = 0.12f,
             top = VisualizationLiquidScope(
-                saturation = 0.70f,
+                saturation = 0.40f,
                 contrast = 0.75f,
+                dispersion = .8f,
             ),
             bottom = VisualizationLiquidScope(
-                saturation = 0.70f,
+                saturation = 0.50f,
                 contrast = 0.75f,
+                dispersion = .4f,
             ),
         )
     }
