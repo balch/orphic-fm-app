@@ -22,7 +22,7 @@ hierarchical modulation structure:
 - **Navigation3** with adaptive layouts
 - **Material3** with dark synth theme
 - **Haze** for glassmorphism effects
-- **JSyn** for audio synthesis (Desktop/JVM)
+- **JSyn** for audio synthesis (Desktop & Android)
 - **KmLogging** for structured logging
 
 ## Project Structure
@@ -91,18 +91,6 @@ Dual interpolating delay lines that form the "acoustic space".
 
 Global saturation stage applied **after** the delay line, creating gristly textures and taming
 resonant peaks.
-
-## Status
-
-🚧 **Work in Progress** - Phase 3.5 (Advanced Audio)
-
-- [x] Basic Synthesis (FM/AM)
-- [x] Dual Mod Delay
-- [x] Distortion (Drive)
-- [ ] Hyper LFO Logic
-- [ ] Android Audio Engine implementation
-
----
 
 Learn more
 about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)

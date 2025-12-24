@@ -1,8 +1,17 @@
 package org.balch.songe.core.audio.dsp
 
+import com.jsyn.unitgen.Add as JsynAdd
+import com.jsyn.unitgen.Maximum as JsynMaximum
+import com.jsyn.unitgen.Minimum as JsynMinimum
+import com.jsyn.unitgen.Multiply as JsynMultiply
+import com.jsyn.unitgen.MultiplyAdd as JsynMultiplyAdd
+import com.jsyn.unitgen.PassThrough as JsynPassThrough
+import com.jsyn.unitgen.SineOscillator as JsynSineOsc
+import com.jsyn.unitgen.SquareOscillator as JsynSquareOsc
+import com.jsyn.unitgen.TriangleOscillator as JsynTriangleOsc
+
 /**
- * Android stub implementations of math/utility units.
- * TODO: Replace with Oboe implementations.
+ * Android actual implementations of math/utility units using JSyn.
  */
 
 actual interface Multiply : AudioUnit {
@@ -10,11 +19,12 @@ actual interface Multiply : AudioUnit {
     actual val inputB: AudioInput
 }
 
-class StubMultiply : Multiply {
-    private val stubOutput = StubAudioOutput()
-    override val inputA: AudioInput = StubAudioInput()
-    override val inputB: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynMultiplyWrapper : Multiply {
+    internal val jsUnit = JsynMultiply()
+
+    override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
+    override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
+    override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
 }
 
 actual interface Add : AudioUnit {
@@ -22,11 +32,12 @@ actual interface Add : AudioUnit {
     actual val inputB: AudioInput
 }
 
-class StubAdd : Add {
-    private val stubOutput = StubAudioOutput()
-    override val inputA: AudioInput = StubAudioInput()
-    override val inputB: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynAddWrapper : Add {
+    internal val jsUnit = JsynAdd()
+
+    override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
+    override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
+    override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
 }
 
 actual interface MultiplyAdd : AudioUnit {
@@ -35,22 +46,24 @@ actual interface MultiplyAdd : AudioUnit {
     actual val inputC: AudioInput
 }
 
-class StubMultiplyAdd : MultiplyAdd {
-    private val stubOutput = StubAudioOutput()
-    override val inputA: AudioInput = StubAudioInput()
-    override val inputB: AudioInput = StubAudioInput()
-    override val inputC: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynMultiplyAddWrapper : MultiplyAdd {
+    internal val jsUnit = JsynMultiplyAdd()
+
+    override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
+    override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
+    override val inputC: AudioInput = JsynAudioInput(jsUnit.inputC)
+    override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
 }
 
 actual interface PassThrough : AudioUnit {
     actual val input: AudioInput
 }
 
-class StubPassThrough : PassThrough {
-    private val stubOutput = StubAudioOutput()
-    override val input: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynPassThroughWrapper : PassThrough {
+    internal val jsUnit = JsynPassThrough()
+
+    override val input: AudioInput = JsynAudioInput(jsUnit.input)
+    override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
 }
 
 actual interface SineOscillator : AudioUnit {
@@ -58,11 +71,12 @@ actual interface SineOscillator : AudioUnit {
     actual val amplitude: AudioInput
 }
 
-class StubSineOscillator : SineOscillator {
-    private val stubOutput = StubAudioOutput()
-    override val frequency: AudioInput = StubAudioInput()
-    override val amplitude: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynSineOscillatorWrapper : SineOscillator {
+    internal val jsOsc = JsynSineOsc()
+
+    override val frequency: AudioInput = JsynAudioInput(jsOsc.frequency)
+    override val amplitude: AudioInput = JsynAudioInput(jsOsc.amplitude)
+    override val output: AudioOutput = JsynAudioOutput(jsOsc.output)
 }
 
 actual interface TriangleOscillator : AudioUnit {
@@ -70,11 +84,12 @@ actual interface TriangleOscillator : AudioUnit {
     actual val amplitude: AudioInput
 }
 
-class StubTriangleOscillator : TriangleOscillator {
-    private val stubOutput = StubAudioOutput()
-    override val frequency: AudioInput = StubAudioInput()
-    override val amplitude: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynTriangleOscillatorWrapper : TriangleOscillator {
+    internal val jsOsc = JsynTriangleOsc()
+
+    override val frequency: AudioInput = JsynAudioInput(jsOsc.frequency)
+    override val amplitude: AudioInput = JsynAudioInput(jsOsc.amplitude)
+    override val output: AudioOutput = JsynAudioOutput(jsOsc.output)
 }
 
 actual interface SquareOscillator : AudioUnit {
@@ -82,11 +97,12 @@ actual interface SquareOscillator : AudioUnit {
     actual val amplitude: AudioInput
 }
 
-class StubSquareOscillator : SquareOscillator {
-    private val stubOutput = StubAudioOutput()
-    override val frequency: AudioInput = StubAudioInput()
-    override val amplitude: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynSquareOscillatorWrapper : SquareOscillator {
+    internal val jsOsc = JsynSquareOsc()
+
+    override val frequency: AudioInput = JsynAudioInput(jsOsc.frequency)
+    override val amplitude: AudioInput = JsynAudioInput(jsOsc.amplitude)
+    override val output: AudioOutput = JsynAudioOutput(jsOsc.output)
 }
 
 actual interface Minimum : AudioUnit {
@@ -94,11 +110,12 @@ actual interface Minimum : AudioUnit {
     actual val inputB: AudioInput
 }
 
-class StubMinimum : Minimum {
-    private val stubOutput = StubAudioOutput()
-    override val inputA: AudioInput = StubAudioInput()
-    override val inputB: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynMinimumWrapper : Minimum {
+    internal val jsUnit = JsynMinimum()
+
+    override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
+    override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
+    override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
 }
 
 actual interface Maximum : AudioUnit {
@@ -106,9 +123,10 @@ actual interface Maximum : AudioUnit {
     actual val inputB: AudioInput
 }
 
-class StubMaximum : Maximum {
-    private val stubOutput = StubAudioOutput()
-    override val inputA: AudioInput = StubAudioInput()
-    override val inputB: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynMaximumWrapper : Maximum {
+    internal val jsUnit = JsynMaximum()
+
+    override val inputA: AudioInput = JsynAudioInput(jsUnit.inputA)
+    override val inputB: AudioInput = JsynAudioInput(jsUnit.inputB)
+    override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
 }

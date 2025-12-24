@@ -1,34 +1,90 @@
 package org.balch.songe.core.audio.dsp
 
+import com.jsyn.JSyn
+import com.jsyn.unitgen.LineOut
+import com.jsyn.unitgen.UnitGenerator
+import org.balch.songe.core.audio.AndroidAudioDeviceManager
+
 /**
- * Android stub implementation of AudioEngine.
- * TODO: Replace with Oboe-based implementation.
+ * Android actual implementation of AudioEngine using JSyn.
  */
 actual class AudioEngine actual constructor() {
-    actual fun start() {}
-    actual fun stop() {}
+    private val synth = JSyn.createSynthesizer(AndroidAudioDeviceManager())
+    private val lineOut = LineOut()
 
-    actual val isRunning: Boolean = false
-    actual val sampleRate: Int = 44100
+    // Use JSyn PassThrough units as connection points for stereo output
+    private val lineOutLeftProxy = com.jsyn.unitgen.PassThrough()
+    private val lineOutRightProxy = com.jsyn.unitgen.PassThrough()
 
-    actual fun addUnit(unit: AudioUnit) {}
+    init {
+        synth.add(lineOutLeftProxy)
+        synth.add(lineOutRightProxy)
 
-    actual fun createSineOscillator(): SineOscillator = StubSineOscillator()
-    actual fun createTriangleOscillator(): TriangleOscillator = StubTriangleOscillator()
-    actual fun createSquareOscillator(): SquareOscillator = StubSquareOscillator()
-    actual fun createEnvelope(): Envelope = StubEnvelope()
-    actual fun createDelayLine(): DelayLine = StubDelayLine()
-    actual fun createPeakFollower(): PeakFollower = StubPeakFollower()
-    actual fun createLimiter(): Limiter = StubLimiter()
-    actual fun createMultiply(): Multiply = StubMultiply()
-    actual fun createAdd(): Add = StubAdd()
-    actual fun createMultiplyAdd(): MultiplyAdd = StubMultiplyAdd()
-    actual fun createPassThrough(): PassThrough = StubPassThrough()
-    actual fun createMinimum(): Minimum = StubMinimum()
-    actual fun createMaximum(): Maximum = StubMaximum()
+        // Connect proxies to LineOut
+        lineOutLeftProxy.output.connect(0, lineOut.input, 0)
+        lineOutRightProxy.output.connect(0, lineOut.input, 1)
+    }
 
-    actual val lineOutLeft: AudioInput = StubAudioInput()
-    actual val lineOutRight: AudioInput = StubAudioInput()
+    actual fun start() {
+        synth.add(lineOut)
+        synth.start()
+        lineOut.start()
+    }
 
-    actual fun getCpuLoad(): Float = 0f
+    actual fun stop() {
+        lineOut.stop()
+        synth.stop()
+    }
+
+    actual val isRunning: Boolean
+        get() = synth.isRunning
+
+    actual val sampleRate: Int
+        get() = synth.frameRate
+
+    actual fun addUnit(unit: AudioUnit) {
+        // Extract the underlying JSyn unit and add to synth
+        when (unit) {
+            is JsynEnvelope -> synth.add(unit.jsEnv)
+            is JsynDelayLine -> synth.add(unit.jsDelay)
+            is JsynPeakFollowerWrapper -> synth.add(unit.jsPeak)
+            is JsynLimiter -> synth.add(unit.jsLimiter)
+            is JsynMultiplyWrapper -> synth.add(unit.jsUnit)
+            is JsynAddWrapper -> synth.add(unit.jsUnit)
+            is JsynMultiplyAddWrapper -> synth.add(unit.jsUnit)
+            is JsynPassThroughWrapper -> synth.add(unit.jsUnit)
+            is JsynSineOscillatorWrapper -> synth.add(unit.jsOsc)
+            is JsynTriangleOscillatorWrapper -> synth.add(unit.jsOsc)
+            is JsynSquareOscillatorWrapper -> synth.add(unit.jsOsc)
+            is JsynMinimumWrapper -> synth.add(unit.jsUnit)
+            is JsynMaximumWrapper -> synth.add(unit.jsUnit)
+        }
+    }
+
+    // Helper to add raw JSyn units (for migration)
+    fun addJsynUnit(unit: UnitGenerator) {
+        synth.add(unit)
+    }
+
+    actual fun createSineOscillator(): SineOscillator = JsynSineOscillatorWrapper()
+    actual fun createTriangleOscillator(): TriangleOscillator = JsynTriangleOscillatorWrapper()
+    actual fun createSquareOscillator(): SquareOscillator = JsynSquareOscillatorWrapper()
+    actual fun createEnvelope(): Envelope = JsynEnvelope()
+    actual fun createDelayLine(): DelayLine = JsynDelayLine()
+    actual fun createPeakFollower(): PeakFollower = JsynPeakFollowerWrapper()
+    actual fun createLimiter(): Limiter = JsynLimiter()
+    actual fun createMultiply(): Multiply = JsynMultiplyWrapper()
+    actual fun createAdd(): Add = JsynAddWrapper()
+    actual fun createMultiplyAdd(): MultiplyAdd = JsynMultiplyAddWrapper()
+    actual fun createPassThrough(): PassThrough = JsynPassThroughWrapper()
+    actual fun createMinimum(): Minimum = JsynMinimumWrapper()
+    actual fun createMaximum(): Maximum = JsynMaximumWrapper()
+
+    actual val lineOutLeft: AudioInput
+        get() = JsynAudioInput(lineOutLeftProxy.input)
+
+    actual val lineOutRight: AudioInput
+        get() = JsynAudioInput(lineOutRightProxy.input)
+
+    actual fun getCpuLoad(): Float = (synth.usage * 100f).toFloat()
 }

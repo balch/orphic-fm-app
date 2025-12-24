@@ -1,8 +1,12 @@
 package org.balch.songe.core.audio.dsp
 
+import com.jsyn.unitgen.EnvelopeDAHDSR
+import com.jsyn.unitgen.InterpolatingDelay
+import org.balch.songe.core.audio.TanhLimiter
+import com.jsyn.unitgen.PeakFollower as JsynPeakFollower
+
 /**
- * Android stub implementations of DSP units.
- * TODO: Replace with Oboe implementations.
+ * Android actual implementations of DSP units using JSyn.
  */
 
 actual interface Oscillator : AudioUnit {
@@ -18,14 +22,27 @@ actual interface Envelope : AudioUnit {
     actual fun setRelease(seconds: Double)
 }
 
-class StubEnvelope : Envelope {
-    private val stubOutput = StubAudioOutput()
-    override val input: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
-    override fun setAttack(seconds: Double) {}
-    override fun setDecay(seconds: Double) {}
-    override fun setSustain(level: Double) {}
-    override fun setRelease(seconds: Double) {}
+class JsynEnvelope : Envelope {
+    internal val jsEnv = EnvelopeDAHDSR()
+
+    override val input: AudioInput = JsynAudioInput(jsEnv.input)
+    override val output: AudioOutput = JsynAudioOutput(jsEnv.output)
+
+    override fun setAttack(seconds: Double) {
+        jsEnv.attack.set(seconds)
+    }
+
+    override fun setDecay(seconds: Double) {
+        jsEnv.decay.set(seconds)
+    }
+
+    override fun setSustain(level: Double) {
+        jsEnv.sustain.set(level)
+    }
+
+    override fun setRelease(seconds: Double) {
+        jsEnv.release.set(seconds)
+    }
 }
 
 actual interface DelayLine : AudioUnit {
@@ -34,12 +51,16 @@ actual interface DelayLine : AudioUnit {
     actual fun allocate(maxSamples: Int)
 }
 
-class StubDelayLine : DelayLine {
-    private val stubOutput = StubAudioOutput()
-    override val input: AudioInput = StubAudioInput()
-    override val delay: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
-    override fun allocate(maxSamples: Int) {}
+class JsynDelayLine : DelayLine {
+    internal val jsDelay = InterpolatingDelay()
+
+    override val input: AudioInput = JsynAudioInput(jsDelay.input)
+    override val delay: AudioInput = JsynAudioInput(jsDelay.delay)
+    override val output: AudioOutput = JsynAudioOutput(jsDelay.output)
+
+    override fun allocate(maxSamples: Int) {
+        jsDelay.allocate(maxSamples)
+    }
 }
 
 actual interface PeakFollower : AudioUnit {
@@ -48,12 +69,19 @@ actual interface PeakFollower : AudioUnit {
     actual fun getCurrent(): Double
 }
 
-class StubPeakFollower : PeakFollower {
-    private val stubOutput = StubAudioOutput()
-    override val input: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
-    override fun setHalfLife(seconds: Double) {}
-    override fun getCurrent(): Double = 0.0
+class JsynPeakFollowerWrapper : PeakFollower {
+    internal val jsPeak = JsynPeakFollower()
+
+    override val input: AudioInput = JsynAudioInput(jsPeak.input)
+    override val output: AudioOutput = JsynAudioOutput(jsPeak.output)
+
+    override fun setHalfLife(seconds: Double) {
+        jsPeak.halfLife.set(seconds)
+    }
+
+    override fun getCurrent(): Double {
+        return jsPeak.output.get()
+    }
 }
 
 actual interface Limiter : AudioUnit {
@@ -61,9 +89,10 @@ actual interface Limiter : AudioUnit {
     actual val drive: AudioInput
 }
 
-class StubLimiter : Limiter {
-    private val stubOutput = StubAudioOutput()
-    override val input: AudioInput = StubAudioInput()
-    override val drive: AudioInput = StubAudioInput()
-    override val output: AudioOutput = stubOutput
+class JsynLimiter : Limiter {
+    internal val jsLimiter = TanhLimiter()
+
+    override val input: AudioInput = JsynAudioInput(jsLimiter.input)
+    override val drive: AudioInput = JsynAudioInput(jsLimiter.drive)
+    override val output: AudioOutput = JsynAudioOutput(jsLimiter.output)
 }
