@@ -1,6 +1,7 @@
 package org.balch.songe.core.presets
 
 import kotlinx.serialization.Serializable
+import org.balch.songe.util.currentTimeMillis
 
 /**
  * Represents a saved Songe Drone preset containing all synthesizer parameters.
@@ -44,5 +45,5 @@ data class DronePreset(
     val totalFeedback: Float = 0.0f,
 
     // Metadata
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = currentTimeMillis()
 )

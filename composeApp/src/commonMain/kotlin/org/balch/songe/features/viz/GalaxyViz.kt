@@ -25,6 +25,7 @@ import org.balch.songe.core.audio.SongeEngine
 import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.Visualization
+import org.balch.songe.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.pow
@@ -150,10 +151,10 @@ class GalaxyViz(
         smoothedEnergy = 0f
 
         vizJob = scope.launch(dispatcherProvider.default) {
-            var lastFrameTime = System.currentTimeMillis()
+            var lastFrameTime = currentTimeMillis()
 
             while (isActive) {
-                val currentTime = System.currentTimeMillis()
+                val currentTime = currentTimeMillis()
                 val deltaTime = (currentTime - lastFrameTime) / 1000f
                 lastFrameTime = currentTime
 

@@ -133,7 +133,7 @@ fun DebugBottomBar(engine: SongeEngine, modifier: Modifier = Modifier) {
                     Text("PEAK:", fontSize = 10.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.width(4.dp))
                     val peakDb = if (peak > 0) 20 * log10(peak) else -60f
-                    val displayPeak = "%.2f".format(peak)
+                    val displayPeak = ((peak * 100).toInt() / 100.0).toString()
 
                     Text(
                         text = displayPeak,

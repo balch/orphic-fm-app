@@ -21,10 +21,20 @@ kotlin {
 
     jvm()
 
+    wasmJs {
+        browser {
+            commonWebpackConfig {
+                outputFileName = "songe.js"
+            }
+        }
+        binaries.executable()
+    }
+
     sourceSets {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.jsyn)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -37,7 +47,6 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.haze)
             implementation(libs.haze.materials)
-            implementation(libs.jsyn)
             implementation(libs.kmlogging)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.datetime)
@@ -51,8 +60,13 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+            implementation(libs.jsyn)
             implementation(libs.ktmidi.jvm.desktop)
             implementation(libs.coremidi4j)
+        }
+        wasmJsMain.dependencies {
+            // ktmidi provides WebMidiAccess for browser MIDI
+            // Web Audio API used directly via Kotlin/JS interop
         }
     }
 }

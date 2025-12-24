@@ -25,7 +25,7 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.ui.panels.CollapsibleColumnPanel
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
-import java.util.Locale
+import kotlin.math.roundToInt
 
 /** Smart wrapper that connects DistortionViewModel to the layout. */
 @Composable
@@ -165,7 +165,7 @@ private fun PeakLed(peak: Float, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = String.format(Locale.getDefault(), "%.2f", peak),
+            text = ((peak * 100).roundToInt() / 100.0).toString(),
             style = MaterialTheme.typography.labelMedium,
             color = ledColor
         )

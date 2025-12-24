@@ -25,6 +25,7 @@ import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.materials.CupertinoMaterials
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import org.balch.songe.features.lfo.HyperLfoMode
+import org.balch.songe.features.lfo.HyperLfoPanelLayout
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -115,7 +116,7 @@ fun GlobalControlsPanel(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // LEFT: Hyper LFO Section
-        _root_ide_package_.org.balch.songe.features.lfo.HyperLfoPanelLayout(
+        HyperLfoPanelLayout(
             lfo1Rate = vibrato,
             onLfo1RateChange = onVibratoChange,
             lfo2Rate = lfo2Rate,

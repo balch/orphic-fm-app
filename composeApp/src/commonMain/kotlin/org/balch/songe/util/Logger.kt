@@ -14,7 +14,7 @@ enum class LogLevel {
 data class LogEntry(
     val level: LogLevel,
     val message: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = currentTimeMillis()
 )
 
 /**

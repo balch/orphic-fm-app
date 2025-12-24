@@ -225,14 +225,7 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         distortedPathGain.inputB.set(0.5)
 
         // Dry/Wet defaults (50/50 mix)
-        dryGain.inputB.set(0.5)
-        wetGain.inputB.set(0.5)
-        
-        // Stereo delay wet gains default (VOICE_PAN mode: both delays to both channels)
-        delay1WetLeft.inputB.set(1.0)
-        delay1WetRight.inputB.set(1.0)
-        delay2WetLeft.inputB.set(1.0)
-        delay2WetRight.inputB.set(1.0)
+        setDelayMix(0.5f)
 
         // Vibrato LFO setup
         vibratoLfo.frequency.set(5.0) // 5Hz wobble rate
@@ -444,12 +437,41 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         delay2FeedbackGain.inputB.set(fb)
     }
 
+    private var _delayWetLevel = 0.5f
+
     override fun setDelayMix(amount: Float) {
         _delayMix = amount
-        val wetLevel = amount
+        _delayWetLevel = amount
         val dryLevel = 1.0f - amount
         dryGain.inputB.set(dryLevel.toDouble())
-        wetGain.inputB.set(wetLevel.toDouble())
+        
+        // Update mono wet gain (for distorted path)
+        wetGain.inputB.set(amount.toDouble())
+        
+        // Update stereo wet gains (for clean/stereo path)
+        updateStereoDelayGains()
+    }
+    
+    private fun updateStereoDelayGains() {
+        // Apply stereo logic AND wet level
+        when (_stereoMode) {
+            StereoMode.VOICE_PAN -> {
+                // Mono wet mix distributed to both channels
+                val gain = _delayWetLevel.toDouble()
+                delay1WetLeft.inputB.set(gain)
+                delay1WetRight.inputB.set(gain)
+                delay2WetLeft.inputB.set(gain)
+                delay2WetRight.inputB.set(gain)
+            }
+            StereoMode.STEREO_DELAYS -> {
+                // Ping Pong / Discrete routing
+                val gain = _delayWetLevel.toDouble()
+                delay1WetLeft.inputB.set(gain)
+                delay1WetRight.inputB.set(0.0)
+                delay2WetLeft.inputB.set(0.0)
+                delay2WetRight.inputB.set(gain)
+            }
+        }
     }
 
     override fun setDelayModDepth(index: Int, amount: Float) {
@@ -655,12 +677,40 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         }
     }
 
+    // Test tone oscillator (bypasses complex DSP chain for debugging)
+    private var testOsc: SineOscillator? = null
+    private var testGain: Multiply? = null
+    
     override fun playTestTone(frequency: Float) {
-        // Not implemented in shared engine
+        Logger.info { "Playing test tone at ${frequency}Hz" }
+        // Ensure audio is started  
+        if (!audioEngine.isRunning) {
+            Logger.info { "Starting audio engine for test tone" }
+            audioEngine.start()
+        }
+        
+        // Create test oscillator if not exists
+        if (testOsc == null) {
+            testOsc = audioEngine.createSineOscillator()
+            testGain = audioEngine.createMultiply()
+            audioEngine.addUnit(testOsc!!)
+            audioEngine.addUnit(testGain!!)
+            
+            // Wire: Osc -> Gain -> Output
+            testOsc!!.output.connect(testGain!!.inputA)
+            testGain!!.output.connect(audioEngine.lineOutLeft)
+            testGain!!.output.connect(audioEngine.lineOutRight)
+        }
+        
+        testOsc!!.frequency.set(frequency.toDouble())
+        testOsc!!.amplitude.set(1.0)
+        testGain!!.inputB.set(0.3) // 30% volume
+        Logger.info { "Test tone started" }
     }
 
     override fun stopTestTone() {
-        // Not implemented in shared engine
+        Logger.info { "Stopping test tone" }
+        testGain?.inputB?.set(0.0)
     }
 
     override fun getPeak(): Float {
@@ -734,22 +784,7 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
     override fun setStereoMode(mode: StereoMode) {
         _stereoMode = mode
-        when (mode) {
-            StereoMode.VOICE_PAN -> {
-                // Both delays go to both channels equally (mono wet mix)
-                delay1WetLeft.inputB.set(1.0)
-                delay1WetRight.inputB.set(1.0)
-                delay2WetLeft.inputB.set(1.0)
-                delay2WetRight.inputB.set(1.0)
-            }
-            StereoMode.STEREO_DELAYS -> {
-                // Delay 1 -> Left only, Delay 2 -> Right only
-                delay1WetLeft.inputB.set(1.0)
-                delay1WetRight.inputB.set(0.0)
-                delay2WetLeft.inputB.set(0.0)
-                delay2WetRight.inputB.set(1.0)
-            }
-        }
+        updateStereoDelayGains()
     }
 
     override fun getStereoMode(): StereoMode = _stereoMode

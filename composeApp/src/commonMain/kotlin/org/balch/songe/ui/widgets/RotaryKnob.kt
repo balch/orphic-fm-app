@@ -29,7 +29,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.balch.songe.ui.theme.SongeColors
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 @Composable
@@ -175,7 +177,7 @@ fun RotaryKnob(
                 // Knob Body Calculation
                 val knobRadius = radius * 0.7f
                 val angleInDegrees = startAngle + currentSweep
-                val angleInRadians = Math.toRadians(angleInDegrees.toDouble())
+                val angleInRadians = angleInDegrees.toDouble() * PI / 180.0
 
                 // Knob Shadow (fake drop shadow)
                 drawCircle(
@@ -249,10 +251,7 @@ fun RotaryKnob(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = String.format(
-                    "%.2f",
-                    internalValue
-                ), // Will fix formatting for basic float display
+                text = ((internalValue * 100).roundToInt() / 100.0).toString(),
                 style = MaterialTheme.typography.labelMedium,
                 color = progressColor,
                 textAlign = TextAlign.Center
