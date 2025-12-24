@@ -33,9 +33,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
-import io.github.fletchmckee.liquid.liquid
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.VisualizationLiquidEffects
+import org.balch.songe.ui.viz.liquidVizEffects
 
 /**
  * CompositionLocal for sharing LiquidState across panels.
@@ -88,23 +88,16 @@ fun CollapsibleColumnPanel(
         .fillMaxHeight()
         .clip(shape)
 
-    // Apply liquid effect if LiquidState is provided - using visualization-specific constants
+    // Apply liquid effect using shared helper
     val effects = LocalLiquidEffects.current
-    val liquidModifier = if (liquidState != null) {
-        baseModifier.liquid(liquidState) {
-            frost = effects.frostSmall.dp
-            this.shape = shape
-            tint = color.copy(alpha = effects.tintAlpha)
-            saturation = effects.top.saturation
-            contrast = effects.top.contrast
-            edge = effects.top.edge
-            dispersion = effects.top.dispersion
-            refraction = effects.top.refraction
-            curve = effects.top.curve
-        }
-    } else {
-        baseModifier.background(SongeColors.darkVoid.copy(alpha = 0.8f))
-    }
+    val liquidModifier = baseModifier.liquidVizEffects(
+        liquidState = liquidState,
+        scope = effects.top,
+        frostAmount = effects.frostSmall.dp,
+        color = color,
+        tintAlpha = effects.tintAlpha,
+        shape = shape
+    )
 
     Box(
         modifier = liquidModifier
