@@ -159,7 +159,7 @@ fun HyperLfoPanelLayout(
                         bottomLabel = "OFF",
                         isTop = linkEnabled,
                         onToggle = { onLinkChange(it) },
-                        color = SongeColors.electricBlue,
+                        color = SongeColors.neonCyan,
                         enabled = !learnState.isActive
                     )
                 }

@@ -98,7 +98,7 @@ fun DistortionPanelLayout(
                     label = "VOL",
                     controlId = null,
                     size = 56.dp,
-                    progressColor = SongeColors.electricBlue
+                    progressColor = SongeColors.neonMagenta
                 )
             }
 
@@ -114,7 +114,7 @@ fun DistortionPanelLayout(
                     label = "MIX",
                     controlId = null,
                     size = 56.dp,
-                    progressColor = SongeColors.warmGlow
+                    progressColor = SongeColors.neonMagenta
                 )
 
                 // Peak LED indicator
