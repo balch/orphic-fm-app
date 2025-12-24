@@ -15,3 +15,15 @@
 -keep class com.jsyn.** { *; }
 -keepclassmembers class com.jsyn.** { *; }
 -keep class com.softsynth.** { *; }
+
+# Keep CoreMIDI4J library - required for MIDI device detection on macOS
+# Uses JNI and Java Service Provider Interface (SPI)
+-keep class uk.co.xfactorylibrarians.coremidi4j.** { *; }
+-keepclassmembers class uk.co.xfactorylibrarians.coremidi4j.** { *; }
+
+# Keep javax.sound.midi SPI - required for MIDI device provider discovery
+-keep class javax.sound.midi.** { *; }
+-keep class javax.sound.midi.spi.** { *; }
+# Keep all MidiDeviceProvider implementations
+-keep class * extends javax.sound.midi.spi.MidiDeviceProvider { *; }
+
