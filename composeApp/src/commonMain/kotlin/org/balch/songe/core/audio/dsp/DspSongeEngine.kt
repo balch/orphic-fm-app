@@ -22,6 +22,47 @@ import kotlin.math.sin
 /**
  * Shared implementation of SongeEngine using DSP primitive interfaces.
  * All audio routing logic is platform-independent.
+ *
+ * ## AUDIO SIGNAL PATH ARCHITECTURE
+ *
+ * This is the authoritative reference for signal routing. Any changes to
+ * routing logic should be reflected here and validated by tests.
+ *
+ * ### Voice Path (per voice 0-7):
+ * ```
+ * TriangleOsc ─┬─> oscMixer ──> VCA ──> voiceOutput
+ * SquareOsc  ─┘     ↑            ↑
+ *                   │            │
+ *             (sharpness)    (envelope + hold)
+ * ```
+ *
+ * ### Main Signal Flow:
+ * ```
+ * Voices ──┬──> dryGain ──> preDistortionSummer ──> cleanPathGain ──┬──> postMixSummer
+ *          │                      │                                  │        │
+ *          │                      └──> driveGain ──> limiter ──> distortedPathGain
+ *          │                                                                  │
+ *          ├──> delay1/delay2 ──> stereo wet gains ─────────────────────> stereoSum
+ *          │                                                                  │
+ *          └──> voicePanL/R ─────────────────────────────────────────────> stereoSum
+ *                                                      postMixSummer ────────┘
+ * ```
+ *
+ * ### Stereo Output:
+ * ```
+ * stereoSumL/R ──> masterPanL/R ──> masterGainL/R ──> lineOut
+ * ```
+ *
+ * ### Delay Routing:
+ * - Wet signal: delay1/2 → delay*WetLeft/Right (4 gain units) → stereoSum
+ * - Feedback: delay*.output → delay*FeedbackGain → delay*.input
+ * - Modulation: hyperLfo → lfoToUnipolar → delayModMixer → delay*.delay
+ *
+ * ### CRITICAL ROUTING RULES:
+ * 1. Wet signal goes ONLY through stereo wet gains (delay1WetLeft, etc.)
+ * 2. NO duplicate paths - each signal should reach stereoSum once
+ * 3. Dry path goes through distortion chain; wet path bypasses it
+ * 4. Voice pan gains provide per-voice stereo positioning
  */
 class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
@@ -89,7 +130,6 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
 
     // Dry/Wet Mix for Delays
     private val dryGain = audioEngine.createMultiply()
-    private val wetGain = audioEngine.createMultiply()
     
     // Stereo Delays: Per-delay L/R wet gains for stereo routing
     private val delay1WetLeft = audioEngine.createMultiply()
@@ -197,7 +237,6 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         audioEngine.addUnit(distortedPathGain)
         audioEngine.addUnit(postMixSummer)
         audioEngine.addUnit(dryGain)
-        audioEngine.addUnit(wetGain)
         audioEngine.addUnit(delay1WetLeft)
         audioEngine.addUnit(delay1WetRight)
         audioEngine.addUnit(delay2WetLeft)
@@ -262,12 +301,8 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         delay2ModMixer.output.connect(delay2.delay)
 
         // ROUTING
-        // Delays -> WetGain -> PreDistortionSummer (for mono mix path)
-        delay1.output.connect(wetGain.inputA)
-        delay2.output.connect(wetGain.inputA)
-        wetGain.output.connect(preDistortionSummer.inputA)
-        
-        // Delays -> Stereo Wet Gains -> Stereo Sum (for stereo delay mode)
+        // Delays -> Stereo Wet Gains -> Stereo Sum
+        // NOTE: Removed duplicate mono wet path (wetGain->preDistortion) which was doubling signal
         delay1.output.connect(delay1WetLeft.inputA)
         delay1.output.connect(delay1WetRight.inputA)
         delay2.output.connect(delay2WetLeft.inputA)
@@ -289,8 +324,8 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         limiter.output.connect(distortedPathGain.inputA)
         distortedPathGain.output.connect(postMixSummer.inputB)
 
-        // PostMixSummer -> Stereo Master Path
-        // postMixSummer feeds both stereo channels (panned at voice level)
+        // PostMixSummer (Dry + Distortion) -> Stereo Sum
+        // This is a mono signal, goes to both channels equally
         postMixSummer.output.connect(stereoSumLeft.input)
         postMixSummer.output.connect(stereoSumRight.input)
         
@@ -445,10 +480,7 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         val dryLevel = 1.0f - amount
         dryGain.inputB.set(dryLevel.toDouble())
         
-        // Update mono wet gain (for distorted path)
-        wetGain.inputB.set(amount.toDouble())
-        
-        // Update stereo wet gains (for clean/stereo path)
+        // Update stereo wet gains (handles both mono and stereo modes)
         updateStereoDelayGains()
     }
     
