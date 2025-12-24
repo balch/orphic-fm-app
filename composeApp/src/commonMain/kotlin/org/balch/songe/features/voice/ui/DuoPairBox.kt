@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,7 +25,6 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.songe.features.midi.MidiViewModel
 import org.balch.songe.features.voice.VoiceViewModel
-import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.HorizontalSwitch3Way
 import org.balch.songe.ui.widgets.PulseButton
 
@@ -137,6 +137,7 @@ fun DuoPairBox(
                         ControlIds.voiceHold(voiceA)
                     )
                     PulseButton(
+                        modifier = Modifier.offset(y = (-2).dp),
                         onPulseStart = {
                             voiceViewModel.onPulseStart(
                                 voiceA
@@ -214,6 +215,7 @@ fun DuoPairBox(
                         ControlIds.voiceHold(voiceB)
                     )
                     PulseButton(
+                        modifier = Modifier.offset(y = (-2).dp),
                         onPulseStart = {
                             voiceViewModel.onPulseStart(
                                 voiceB
