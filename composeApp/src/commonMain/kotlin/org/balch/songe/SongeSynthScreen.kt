@@ -26,8 +26,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
+import io.github.fletchmckee.liquid.LiquidState
+import io.github.fletchmckee.liquid.liquefiable
+import io.github.fletchmckee.liquid.rememberLiquidState
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.songe.features.delay.ModDelayPanel
 import org.balch.songe.features.distortion.DistortionPanel
@@ -39,7 +40,7 @@ import org.balch.songe.features.voice.SynthKeyboardHandler
 import org.balch.songe.features.voice.VoiceViewModel
 import org.balch.songe.features.voice.ui.VoiceGroupSection
 import org.balch.songe.ui.panels.CenterControlPanel
-import org.balch.songe.ui.panels.LocalHazeState
+import org.balch.songe.ui.panels.LocalLiquidState
 import org.balch.songe.ui.panels.VizPanel
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.VizViewModel
@@ -52,7 +53,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun SongeSynthScreen(
     orchestrator: SynthOrchestrator,
-    hazeState: HazeState = remember { HazeState() }
+    liquidState: LiquidState = rememberLiquidState()
 ) {
     val focusRequester = remember { FocusRequester() }
 
@@ -76,17 +77,16 @@ fun SongeSynthScreen(
     // Wrap everything in LearnModeProvider
     LearnModeProvider {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Audio-reactive visualization background layer (source for haze blur)
+            // Audio-reactive visualization background layer (source for liquid blur)
             // Only enabled when viz is not "off"
-            // Audio-reactive visualization background layer (source for haze blur)
             VizBackground(
                 modifier = Modifier
                     .fillMaxSize()
-                    .hazeSource(hazeState)
+                    .liquefiable(liquidState)
             )
 
-            // Provide HazeState to all child panels via CompositionLocal
-            CompositionLocalProvider(LocalHazeState provides hazeState) {
+            // Provide LiquidState to all child panels via CompositionLocal
+            CompositionLocalProvider(LocalLiquidState provides liquidState) {
                 // Main UI content layer
                 Column(
                     modifier = Modifier

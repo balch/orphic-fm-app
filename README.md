@@ -21,7 +21,7 @@ hierarchical modulation structure:
 - **Metro** for compile-time dependency injection
 - **Navigation3** with adaptive layouts
 - **Material3** with dark synth theme
-- **Haze** for glassmorphism effects
+- **Liquid** for glassmorphism effects
 - **JSyn** for audio synthesis (Desktop & Android)
 - **KmLogging** for structured logging
 

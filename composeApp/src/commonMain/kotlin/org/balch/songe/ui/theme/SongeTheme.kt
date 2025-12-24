@@ -91,3 +91,26 @@ object SongeColors {
     val pulseGlow = NeonMagenta.copy(alpha = 0.8f)
     val holdGlow = SynthGreen.copy(alpha = 0.7f)
 }
+
+/**
+ * Liquid glassmorphism effect constants - tweak these for easy adjustments.
+ */
+object LiquidEffects {
+    // Frost blur amount (in dp)
+    const val FROST_SMALL = 8f      // For smaller panels
+    const val FROST_MEDIUM = 10f    // Default
+    const val FROST_LARGE = 12f     // For larger panels
+    
+    // Tint overlay alpha (0-1)
+    const val TINT_ALPHA = 0.18f
+    
+    // Saturation adjustment (<1 = desaturate, >1 = saturate)
+    const val SATURATION = 0.4f
+    
+    // Contrast adjustment (<1 = reduce contrast/brightness)
+    const val CONTRAST = 0.7f
+    
+    // Refraction and curve (0 = disabled for cleaner look)
+    const val REFRACTION = 0f
+    const val CURVE = 0f
+}

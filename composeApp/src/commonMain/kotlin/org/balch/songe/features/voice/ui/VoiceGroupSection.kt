@@ -20,8 +20,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import io.github.fletchmckee.liquid.liquid
 import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.songe.features.voice.VoiceViewModel
+import org.balch.songe.ui.panels.LocalLiquidState
+import org.balch.songe.ui.theme.LiquidEffects
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 
@@ -34,24 +37,38 @@ fun VoiceGroupSection(
     voiceViewModel: VoiceViewModel = metroViewModel(),
 ) {
     val voiceState by voiceViewModel.uiState.collectAsState()
+    val liquidState = LocalLiquidState.current
 
+    // More varied duo colors for visual interest
     val duoColors =
         if (voiceStartIndex == 0) {
-            listOf(SongeColors.neonMagenta, SongeColors.warmGlow) // 1-2, 3-4
+            listOf(SongeColors.neonMagenta, SongeColors.electricBlue) // 1-2, 3-4
         } else {
-            listOf(SongeColors.neonCyan, SongeColors.synthGreen) // 5-6, 7-8
+            listOf(SongeColors.warmGlow, SongeColors.synthGreen) // 5-6, 7-8
         }
 
+    val shape = RoundedCornerShape(10.dp)
+    
+    // Base modifier with liquid effect - using theme constants
+    val baseModifier = modifier.clip(shape)
+    val liquidModifier = if (liquidState != null) {
+        baseModifier.liquid(liquidState) {
+            frost = LiquidEffects.FROST_MEDIUM.dp
+            this.shape = shape
+            refraction = LiquidEffects.REFRACTION
+            curve = LiquidEffects.CURVE
+            tint = quadColor.copy(alpha = LiquidEffects.TINT_ALPHA)
+            saturation = LiquidEffects.SATURATION
+            contrast = LiquidEffects.CONTRAST
+        }
+    } else {
+        baseModifier.background(SongeColors.darkVoid.copy(alpha = 0.5f))
+    }
+
     Column(
-        modifier =
-            modifier.clip(RoundedCornerShape(10.dp))
-                .background(SongeColors.darkVoid.copy(alpha = 0.5f))
-                .border(
-                    1.dp,
-                    quadColor.copy(alpha = 0.3f),
-                    RoundedCornerShape(10.dp)
-                )
-                .padding(6.dp),
+        modifier = liquidModifier
+            .border(1.dp, quadColor.copy(alpha = 0.3f), shape)
+            .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {

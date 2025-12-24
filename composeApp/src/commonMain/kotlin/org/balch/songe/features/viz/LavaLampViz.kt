@@ -250,7 +250,7 @@ class LavaLampViz(
             y = -0.05f + Random.nextFloat() * 0.1f,
             radius = (0.02f + (masterLevel * 0.04f)) * sizeMultiplier, // Affected by SIZE
             velocityY = baseDriftSpeed * 0.8f,
-            color = color.copy(alpha = 0.7f),
+            color = color.copy(alpha = 0.5f),  // Reduced brightness
             voiceIndex = colorIndex * 2,
             energy = masterLevel
         ))
@@ -276,7 +276,7 @@ class LavaLampViz(
             y = -0.05f + Random.nextFloat() * 0.1f,
             radius = (0.03f + (level * 0.05f)) * sizeMultiplier, // Affected by SIZE
             velocityY = baseDriftSpeed,
-            color = color,
+            color = color.copy(alpha = 0.6f),  // Reduced brightness
             voiceIndex = voiceIndex,
             energy = level
         ))
@@ -292,7 +292,7 @@ class LavaLampViz(
             y = parent.y,
             radius = parent.radius * 0.4f,
             velocityY = baseDriftSpeed * 1.5f,
-            color = parent.color.copy(alpha = 0.8f),
+            color = parent.color.copy(alpha = 0.5f),  // Reduced brightness
             voiceIndex = parent.voiceIndex,
             energy = parent.energy * 0.7f,
             alpha = 0.8f

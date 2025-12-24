@@ -32,21 +32,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeStyle
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
+import io.github.fletchmckee.liquid.LiquidState
+import io.github.fletchmckee.liquid.liquid
+import org.balch.songe.ui.theme.LiquidEffects
 import org.balch.songe.ui.theme.SongeColors
 
 /**
- * CompositionLocal for sharing HazeState across panels.
+ * CompositionLocal for sharing LiquidState across panels.
  */
-val LocalHazeState = compositionLocalOf<HazeState?> { null }
+val LocalLiquidState = compositionLocalOf<LiquidState?> { null }
 
 /**
  * Collapsible settings panel for the left side of top row.
  * Shows a persistent vertical header strip on the left.
- * Applies haze blur effect when HazeState is provided via LocalHazeState.
+ * Applies liquid blur effect when LiquidState is provided via LocalLiquidState.
  *
  * When collapsed: only shows 28dp header strip with vertical title
  * When expanded: shows header strip + content area with expandedTitle at top
@@ -66,7 +65,7 @@ fun CollapsibleColumnPanel(
     content: @Composable () -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(initialExpanded) }
-    val hazeState = LocalHazeState.current
+    val liquidState = LocalLiquidState.current
 
     val collapsedWidth = 28.dp
 
@@ -78,28 +77,29 @@ fun CollapsibleColumnPanel(
 
     val shape = RoundedCornerShape(8.dp)
     
-    // Base modifier with haze effect if available
+    // Base modifier with liquid effect if available
     val baseModifier = modifier
         .width(collapsedWidth + contentWidth)
         .fillMaxHeight()
         .clip(shape)
 
-    // Apply haze effect if HazeState is provided (using new API)
-    val hazeModifier = if (hazeState != null) {
-        baseModifier.hazeEffect(
-            state = hazeState,
-            style = HazeStyle(
-                backgroundColor = SongeColors.darkVoid.copy(alpha = 0.5f),
-                tint = HazeTint(color.copy(alpha = 0.08f)),
-                blurRadius = 12.dp
-            )
-        )
+    // Apply liquid effect if LiquidState is provided - using theme constants
+    val liquidModifier = if (liquidState != null) {
+        baseModifier.liquid(liquidState) {
+            frost = LiquidEffects.FROST_SMALL.dp
+            this.shape = shape
+            tint = color.copy(alpha = LiquidEffects.TINT_ALPHA)
+            refraction = LiquidEffects.REFRACTION
+            curve = LiquidEffects.CURVE
+            saturation = LiquidEffects.SATURATION
+            contrast = LiquidEffects.CONTRAST
+        }
     } else {
         baseModifier.background(SongeColors.darkVoid.copy(alpha = 0.8f))
     }
 
     Box(
-        modifier = hazeModifier
+        modifier = liquidModifier
             .border(
                 width = 1.dp,
                 color = if (isExpanded) color.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.15f),

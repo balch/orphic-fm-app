@@ -20,17 +20,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.materials.CupertinoMaterials
-import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import io.github.fletchmckee.liquid.LiquidState
+import io.github.fletchmckee.liquid.liquid
 import org.balch.songe.features.lfo.HyperLfoMode
 import org.balch.songe.features.lfo.HyperLfoPanelLayout
+import org.balch.songe.ui.theme.LiquidEffects
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
-@OptIn(ExperimentalHazeMaterialsApi::class)
+
 @Composable
 fun GlobalControlsPanel(
     // Hyper LFO
@@ -56,22 +55,28 @@ fun GlobalControlsPanel(
     onMasterVolumeChange: (Float) -> Unit,
     pan: Float,
     onPanChange: (Float) -> Unit,
-    hazeState: HazeState?,
+    liquidState: LiquidState?,
 ) {
+    val shape = RoundedCornerShape(12.dp)
     Row(
         modifier =
             modifier.shadow(
                 elevation = 8.dp,
-                shape = RoundedCornerShape(12.dp),
+                shape = shape,
                 clip = false
             )
-                .clip(RoundedCornerShape(12.dp))
+                .clip(shape)
                 .then(
-                    if (hazeState != null) {
-                        Modifier.hazeEffect(
-                            state = hazeState,
-                            style = CupertinoMaterials.thick()
-                        )
+                    if (liquidState != null) {
+                        Modifier.liquid(liquidState) {
+                            frost = LiquidEffects.FROST_MEDIUM.dp
+                            this.shape = shape
+                            refraction = LiquidEffects.REFRACTION
+                            curve = LiquidEffects.CURVE
+                            tint = SongeColors.darkVoid.copy(alpha = LiquidEffects.TINT_ALPHA)
+                            saturation = LiquidEffects.SATURATION
+                            contrast = LiquidEffects.CONTRAST
+                        }
                     } else {
                         Modifier
                     }
@@ -199,7 +204,6 @@ fun GlobalControlsPanel(
     }
 }
 
-@OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 @Preview(widthDp = 800, heightDp = 240)
 fun GlobalControlsPanelPreview() {
@@ -215,7 +219,7 @@ fun GlobalControlsPanelPreview() {
             onPanChange = {},
             masterDrive = 0.3f,
             onMasterDriveChange = {},
-            hazeState = null
+            liquidState = null
         )
     }
 }

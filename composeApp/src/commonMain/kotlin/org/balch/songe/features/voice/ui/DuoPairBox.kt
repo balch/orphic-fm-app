@@ -44,8 +44,8 @@ fun DuoPairBox(
         modifier =
             modifier.widthIn(min = 100.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(SongeColors.darkVoid.copy(alpha = 0.4f))
-                .border(2.dp, color.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                .background(color.copy(alpha = 0.12f))  // Tinted with duo color for visibility
+                .border(2.dp, color.copy(alpha = 0.7f), RoundedCornerShape(8.dp))  // Brighter border
                 .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -55,7 +55,7 @@ fun DuoPairBox(
             modifier =
                 Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(4.dp))
-                    .background(color.copy(alpha = 0.15f))
+                    .background(color.copy(alpha = 0.25f))  // More visible header
                     .padding(horizontal = 6.dp, vertical = 3.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
