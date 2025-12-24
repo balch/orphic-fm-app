@@ -16,12 +16,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import io.github.fletchmckee.liquid.LiquidState
-import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.songe.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.songe.features.voice.VoiceUiState
 import org.balch.songe.features.voice.VoiceViewModel
 import org.balch.songe.ui.preview.LiquidEffectsProvider
+import org.balch.songe.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.VisualizationLiquidEffects
 import org.balch.songe.ui.viz.liquidVizEffects
@@ -34,11 +33,11 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 fun CenterControlPanel() {
     val voiceViewModel: VoiceViewModel = metroViewModel()
     val voiceState by voiceViewModel.uiState.collectAsState()
+    val effects = LocalLiquidEffects.current
 
     CenterControlPanelLayout(
-        liquidState = LocalLiquidState.current,
-        effects = LocalLiquidEffects.current,
         voiceState = voiceState,
+        effects = effects,
         onVibratoChange = voiceViewModel::onVibratoChange,
         onVoiceCouplingChange = voiceViewModel::onVoiceCouplingChange,
         onTotalFeedbackChange = voiceViewModel::onTotalFeedbackChange,
@@ -48,7 +47,6 @@ fun CenterControlPanel() {
 
 @Composable
 private fun CenterControlPanelLayout(
-    liquidState: LiquidState?,
     voiceState: VoiceUiState,
     effects: VisualizationLiquidEffects,
     onFmStructureChange: (Boolean) -> Unit,
@@ -56,16 +54,17 @@ private fun CenterControlPanelLayout(
     onVibratoChange: (Float) -> Unit,
     onVoiceCouplingChange: (Float) -> Unit,
 ) {
+    val liquidState = LocalLiquidState.current
     val shape = RoundedCornerShape(8.dp)
 
     Column(
         modifier = Modifier
             .liquidVizEffects(
                 liquidState = liquidState,
-                effects = effects,
                 scope = effects.bottom,
                 frostAmount = effects.frostLarge.dp,
                 color = SongeColors.electricBlue,
+                tintAlpha = effects.tintAlpha,
                 shape = shape,
             )
             .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
@@ -109,18 +108,21 @@ private fun CenterControlPanelLayout(
         )
     }
 }
+
 @Preview
 @Composable
 fun CenterControlPanelPreview(
-    @PreviewParameter(LiquidEffectsProvider::class) liquidEffects: VisualizationLiquidEffects,
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
-    CenterControlPanelLayout(
-        liquidState = rememberLiquidState(),
-        effects = liquidEffects,
-        voiceState = VoiceUiState(),
-        onVibratoChange = {},
-        onVoiceCouplingChange = {},
-        onTotalFeedbackChange = {},
-        onFmStructureChange = {}
-    )
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        CenterControlPanelLayout(
+            voiceState = VoiceUiState(),
+            effects = effects,
+            onVibratoChange = {},
+            onVoiceCouplingChange = {},
+            onTotalFeedbackChange = {},
+            onFmStructureChange = {}
+        )
+    }
 }
+

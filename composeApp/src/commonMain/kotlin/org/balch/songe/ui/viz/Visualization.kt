@@ -1,7 +1,6 @@
 package org.balch.songe.ui.viz
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -81,19 +80,19 @@ interface Visualization {
  * Applies liquid glassmorphism effect or falls back to solid background.
  * 
  * @param liquidState The LiquidState from composition local (null if not available)
- * @param effects The visualization-specific liquid effects configuration
- * @param size Size category that determines frost blur amount (Small/Medium/Large)
+ * @param scope The liquid scope settings (saturation, contrast, etc.)
+ * @param frostAmount Amount of frost blur (dp)
  * @param color Tint color for the liquid effect
+ * @param tintAlpha Alpha value for the tint color
  * @param shape Shape for clipping and liquid effect
- * @param scope Whether to use Top or Bottom effects (saturation, contrast, etc.)
  * @param block Optional additional configuration for the liquid scope
  */
 fun Modifier.liquidVizEffects(
     liquidState: LiquidState?,
-    effects: VisualizationLiquidEffects,
     scope: VisualizationLiquidScope,
     frostAmount: Dp,
     color: Color,
+    tintAlpha: Float = 0.12f,
     shape: Shape = RoundedCornerShape(8.dp),
     block: LiquidScope.() -> Unit = {},
 ): Modifier {
@@ -103,7 +102,7 @@ fun Modifier.liquidVizEffects(
         baseModifier.liquid(liquidState) {
             frost = frostAmount
             this.shape = shape
-            tint = color.copy(alpha = effects.tintAlpha)
+            tint = color.copy(alpha = tintAlpha)
             saturation = scope.saturation
             contrast = scope.contrast
             edge = scope.edge
