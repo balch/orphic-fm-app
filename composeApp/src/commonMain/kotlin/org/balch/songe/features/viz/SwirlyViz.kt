@@ -29,6 +29,7 @@ import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.Visualization
 import org.balch.songe.ui.viz.VisualizationLiquidEffects
+import org.balch.songe.ui.viz.VisualizationLiquidScope
 import org.balch.songe.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos
@@ -83,10 +84,7 @@ class SwirlyViz(
     override val knob2Label = "DEPTH"
     
     // Higher saturation to let swirl colors shine through
-    override val liquidEffects = VisualizationLiquidEffects(
-        frostSmall = 4f, frostMedium = 6f, frostLarge = 8f,
-        tintAlpha = 0.10f, saturation = 0.75f, contrast = 0.8f
-    )
+    override val liquidEffects = Default
 
     private var _spinKnob = 0.5f
     private var _depthKnob = 0.5f
@@ -296,6 +294,23 @@ class SwirlyViz(
             green = c1.green + (c2.green - c1.green) * ct,
             blue = c1.blue + (c2.blue - c1.blue) * ct,
             alpha = c1.alpha + (c2.alpha - c1.alpha) * ct
+        )
+    }
+
+    companion object {
+        val Default = VisualizationLiquidEffects(
+            frostSmall = 4f,
+            frostMedium = 6f,
+            frostLarge = 8f,
+            tintAlpha = 0.10f,
+            top = VisualizationLiquidScope(
+                saturation = 0.75f,
+                contrast = 0.8f,
+            ),
+            bottom = VisualizationLiquidScope(
+                saturation = 0.75f,
+                contrast = 0.8f,
+            ),
         )
     }
 }

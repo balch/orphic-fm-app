@@ -95,10 +95,12 @@ fun CollapsibleColumnPanel(
             frost = effects.frostSmall.dp
             this.shape = shape
             tint = color.copy(alpha = effects.tintAlpha)
-            refraction = 0f
-            curve = 0f
-            saturation = effects.saturation
-            contrast = effects.contrast
+            saturation = effects.top.saturation
+            contrast = effects.top.contrast
+            edge = effects.top.edge
+            dispersion = effects.top.dispersion
+            refraction = effects.top.refraction
+            curve = effects.top.curve
         }
     } else {
         baseModifier.background(SongeColors.darkVoid.copy(alpha = 0.8f))

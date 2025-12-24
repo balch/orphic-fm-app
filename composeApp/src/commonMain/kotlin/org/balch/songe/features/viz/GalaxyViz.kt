@@ -26,6 +26,7 @@ import org.balch.songe.core.coroutines.DispatcherProvider
 import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.Visualization
 import org.balch.songe.ui.viz.VisualizationLiquidEffects
+import org.balch.songe.ui.viz.VisualizationLiquidScope
 import org.balch.songe.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos
@@ -96,8 +97,18 @@ class GalaxyViz(
     
     // Low frost for crisper stars, high saturation for vibrant colors
     override val liquidEffects = VisualizationLiquidEffects(
-        frostSmall = 3f, frostMedium = 5f, frostLarge = 7f,
-        tintAlpha = 0.08f, saturation = 0.80f, contrast = 0.85f
+        frostSmall = 3f,
+        frostMedium = 5f,
+        frostLarge = 7f,
+        tintAlpha = 0.08f,
+        top = VisualizationLiquidScope(
+            saturation = 0.80f,
+            contrast = 0.85f,
+        ),
+        bottom = VisualizationLiquidScope(
+            saturation = 0.80f,
+            contrast = 0.85f,
+        ),
     )
 
     private var _spinKnob = 0.5f

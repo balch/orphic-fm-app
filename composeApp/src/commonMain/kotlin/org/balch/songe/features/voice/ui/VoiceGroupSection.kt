@@ -56,11 +56,13 @@ fun VoiceGroupSection(
         baseModifier.liquid(liquidState) {
             frost = effects.frostMedium.dp
             this.shape = shape
-            refraction = 0f
-            curve = 0f
             tint = quadColor.copy(alpha = effects.tintAlpha)
-            saturation = effects.saturation
-            contrast = effects.contrast
+            saturation = effects.bottom.saturation
+            contrast = effects.bottom.contrast
+            edge = effects.bottom.edge
+            dispersion = effects.bottom.dispersion
+            refraction = effects.bottom.refraction
+            curve = effects.bottom.curve
         }
     } else {
         baseModifier.background(SongeColors.darkVoid.copy(alpha = 0.5f))

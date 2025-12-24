@@ -71,11 +71,13 @@ fun GlobalControlsPanel(
                         Modifier.liquid(liquidState) {
                             frost = effects.frostMedium.dp
                             this.shape = shape
-                            refraction = 0f
-                            curve = 0f
                             tint = SongeColors.darkVoid.copy(alpha = effects.tintAlpha)
-                            saturation = effects.saturation
-                            contrast = effects.contrast
+                            saturation = effects.top.saturation
+                            contrast = effects.top.contrast
+                            edge = effects.top.edge
+                            dispersion = effects.top.dispersion
+                            refraction = effects.top.refraction
+                            curve = effects.top.curve
                         }
                     } else {
                         Modifier
