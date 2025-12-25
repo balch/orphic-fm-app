@@ -21,7 +21,7 @@ data class VisualizationLiquidScope(
     val edge: Float = 0f,
     val saturation: Float = .65f,
     val dispersion: Float = 0f,
-    val contrast: Float = 0.75f,
+    val contrast: Float = 1f,
 )
 
 /**

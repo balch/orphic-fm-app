@@ -290,23 +290,21 @@ class GalaxyViz(
 
     companion object {
         val Default = VisualizationLiquidEffects(
-            frostSmall = 0.1f,
-            frostMedium = 0.1f,
-            frostLarge = 0.1f,
+            frostSmall = 2f,
+            frostMedium = 4f,
+            frostLarge = 6f,
             tintAlpha = 0.02f,
             top = VisualizationLiquidScope(
-                saturation = 1.5f,
-                contrast = 1f,
-                refraction = .6f,
-                curve = .2f,
-                dispersion = .8f,
+                refraction = .75f,
+                curve = .5f,
+                saturation = 3f,
+                dispersion = 3f,
             ),
             bottom = VisualizationLiquidScope(
-                saturation = .5f,
-                contrast = 1f,
-                refraction = .5f,
-                curve = .1f,
-                dispersion = .5f,
+                refraction = .25f,
+                curve = .25f,
+                saturation = 2f,
+                dispersion = 2f,
             ),
         )
     }
