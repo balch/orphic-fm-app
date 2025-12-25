@@ -13,8 +13,13 @@ import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VerticalToggle
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 // Darker cyan for PAN panel
 private val PanColor = Color(0xFF008B8B)  // Dark cyan
@@ -103,5 +108,21 @@ fun StereoPanelLayout(
                 progressColor = PanColor
             )
         }
+    }
+}
+
+@Preview(widthDp = 160, heightDp = 240)
+@Composable
+fun StereoPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        StereoPanelLayout(
+            mode = StereoMode.VOICE_PAN,
+            isExpanded = true,
+            onModeChange = {},
+            masterPan = 0f,
+            onMasterPanChange = {}
+        )
     }
 }

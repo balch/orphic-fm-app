@@ -23,8 +23,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 import kotlin.math.roundToInt
 
 /** Smart wrapper that connects DistortionViewModel to the layout. */
@@ -172,6 +177,24 @@ private fun PeakLed(peak: Float, modifier: Modifier = Modifier) {
             text = ((peak * 100).roundToInt() / 100.0).toString(),
             style = MaterialTheme.typography.labelMedium,
             color = ledColor
+        )
+    }
+}
+
+@Preview(widthDp = 240, heightDp = 200)
+@Composable
+fun DistortionPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        DistortionPanelLayout(
+            drive = 0.5f,
+            onDriveChange = {},
+            volume = 0.7f,
+            onVolumeChange = {},
+            mix = 0.5f,
+            onMixChange = {},
+            peak = 0.2f
         )
     }
 }

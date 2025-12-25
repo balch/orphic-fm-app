@@ -30,10 +30,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Visualization
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 // VIZ panel color - lighter lime green for visibility
 private val VizColor = Color(0xFF90EE90)  // Light green
@@ -182,3 +187,36 @@ fun VizPanelLayout(
 }
 
 
+
+
+private object PreviewViz : Visualization {
+    override val id = "preview_viz"
+    override val name = "Swirly"
+    override val color = Color.White
+    override val knob1Label = "Speed"
+    override val knob2Label = "Zoom"
+    override fun setKnob1(value: Float) {}
+    override fun setKnob2(value: Float) {}
+    override fun onActivate() {}
+    override fun onDeactivate() {}
+    @Composable
+    override fun Content(modifier: Modifier) {}
+}
+
+@Preview(widthDp = 180, heightDp = 240)
+@Composable
+fun VizPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        VizPanelLayout(
+            currentViz = PreviewViz,
+            visualizations = listOf(PreviewViz),
+            showKnobs = true,
+            isExpanded = true,
+            onSelectViz = {},
+            onKnob1Change = {},
+            onKnob2Change = {}
+        )
+    }
+}
