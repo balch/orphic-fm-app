@@ -91,6 +91,7 @@ open class TestSongeEngine : SongeEngine {
     override fun setDuoModSource(duoIndex: Int, source: ModSource) { _duoModSources[duoIndex] = source }
     override fun setQuadPitch(quadIndex: Int, pitch: Float) { _quadPitch[quadIndex] = pitch }
     override fun setQuadHold(quadIndex: Int, amount: Float) { _quadHold[quadIndex] = amount }
+    override fun setVoiceHold(index: Int, amount: Float) {}
     override fun setFmStructure(crossQuad: Boolean) { _fmStructureCrossQuad = crossQuad }
     override fun setTotalFeedback(amount: Float) { _totalFeedback = amount }
     override fun setVibrato(amount: Float) { _vibrato = amount }

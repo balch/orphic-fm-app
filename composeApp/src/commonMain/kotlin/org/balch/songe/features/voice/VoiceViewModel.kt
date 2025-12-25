@@ -342,8 +342,13 @@ class VoiceViewModel(
 
             is VoiceIntent.Hold -> {
                 if (intent.holding) {
-                    engine.setVoiceGate(intent.index, true)
+                    // Set hold level based on envelope speed (same as QuadHold behavior)
+                    // Speed 0 (fast) → 0.5 hold level, Speed 1 (slow) → 1.0 hold level
+                    val envSpeed = uiState.value.voiceEnvelopeSpeeds[intent.index]
+                    val holdLevel = 0.5f + (envSpeed * 0.5f)
+                    engine.setVoiceHold(intent.index, holdLevel)
                 } else {
+                    engine.setVoiceHold(intent.index, 0f)
                     val voice = uiState.value.voiceStates[intent.index]
                     if (!voice.pulse) engine.setVoiceGate(intent.index, false)
                 }

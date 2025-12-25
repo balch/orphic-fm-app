@@ -31,6 +31,9 @@ class PreviewSongeEngine() : SongeEngine {
     override fun setQuadHold(quadIndex: Int, amount: Float) {
     }
 
+    override fun setVoiceHold(index: Int, amount: Float) {
+    }
+
     override fun setDrive(amount: Float) {}
     override fun setDistortionMix(amount: Float) {}
     override fun setMasterVolume(amount: Float) {}

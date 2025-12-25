@@ -635,6 +635,10 @@ class DspSongeEngine(private val audioEngine: AudioEngine) : SongeEngine {
         }
     }
 
+    override fun setVoiceHold(index: Int, amount: Float) {
+        voices[index].setHoldLevel(amount.toDouble())
+    }
+
     override fun setDuoModSource(duoIndex: Int, source: ModSource) {
         _duoModSource[duoIndex] = source
         val voiceA = duoIndex * 2

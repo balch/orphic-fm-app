@@ -18,6 +18,7 @@ interface SongeEngine {
     // Group Control (Quad 1-4, 5-8)
     fun setQuadPitch(quadIndex: Int, pitch: Float) // 0-1, 0.5=Unity
     fun setQuadHold(quadIndex: Int, amount: Float) // 0-1, VCA bias
+    fun setVoiceHold(index: Int, amount: Float) // 0-1, per-voice VCA bias
 
     // Global
     fun setDrive(amount: Float)
