@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -40,7 +41,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.ui.panels.LocalLiquidEffects
+import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.util.LogLevel
 import org.balch.orpheus.util.Logger
 import kotlin.math.log10
@@ -56,16 +60,24 @@ fun DebugBottomBar(engine: SynthEngine, modifier: Modifier = Modifier) {
     // Collect logs from StateFlow
     val logs by Logger.logsFlow.collectAsState()
 
+    val liquidState = LocalLiquidState.current
+    val effects = LocalLiquidEffects.current
+    val shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+
     Column(
-        modifier =
-            modifier.fillMaxWidth()
-                .background(Color(0xFF1A1A1A))
-                // Removed specific border(top=...) logic as standard border is all
-                // sides.
-                // Using a simple top-padding or box if needed, or just full border.
-                // For now simple border.
-                .border(width = 1.dp, color = Color(0xFF333333))
-                .animateContentSize()
+        modifier = modifier
+            .fillMaxWidth()
+            .liquidVizEffects(
+                liquidState = liquidState,
+                scope = effects.bottom,
+                frostAmount = effects.frostSmall.dp,
+                color = Color(0xFF1A1A1A),
+                tintAlpha = effects.tintAlpha,
+                shape = shape
+            )
+            .border(width = 1.dp, color = Color(0xFF333333).copy(alpha = 0.5f), shape = shape)
+            .animateContentSize()
+            .clip(shape)
     ) {
         // Compact Row (Always Visible)
         Row(

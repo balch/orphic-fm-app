@@ -47,7 +47,6 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun SynthScreen(
     orchestrator: SynthOrchestrator,
-    liquidState: LiquidState = rememberLiquidState()
 ) {
     val focusRequester = remember { FocusRequester() }
 
@@ -61,37 +60,25 @@ fun SynthScreen(
     var isDialogActive by remember { mutableStateOf(false) }
 
     val voiceViewModel: VoiceViewModel = metroViewModel()
-    val vizViewModel: VizViewModel = metroViewModel()
-    val vizState by vizViewModel.uiState.collectAsState()
 
     LearnModeProvider {
         Box(modifier = Modifier.fillMaxSize()) {
-            VizBackground(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .liquefiable(liquidState)
-            )
-
-            CompositionLocalProvider(
-                LocalLiquidState provides liquidState,
-                LocalLiquidEffects provides vizState.liquidEffects
+                    .focusRequester(focusRequester)
+                    .focusable()
+                    .onPreviewKeyEvent { event ->
+                        SynthKeyboardHandler.handleKeyEvent(
+                            keyEvent = event,
+                            voiceState = voiceViewModel.uiState.value,
+                            voiceViewModel = voiceViewModel,
+                            isDialogActive = isDialogActive
+                        )
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Top
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .focusRequester(focusRequester)
-                        .focusable()
-                        .onPreviewKeyEvent { event ->
-                            SynthKeyboardHandler.handleKeyEvent(
-                                keyEvent = event,
-                                voiceState = voiceViewModel.uiState.value,
-                                voiceViewModel = voiceViewModel,
-                                isDialogActive = isDialogActive
-                            )
-                        },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Top
-                ) {
                     // Top panel row
                     HeaderPanel(onDialogActiveChange = { isDialogActive = it })
 
@@ -119,7 +106,6 @@ fun SynthScreen(
                         )
                     }
                 }
-            }
         }
     }
 }

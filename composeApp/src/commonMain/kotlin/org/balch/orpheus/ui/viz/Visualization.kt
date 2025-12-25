@@ -29,9 +29,9 @@ data class VisualizationLiquidScope(
  * Each visualization can define its own settings to adjust how UI panels look.
  */
 data class VisualizationLiquidEffects(
-    val frostSmall: Float = 5f,      // Frost blur for small panels (dp)
-    val frostMedium: Float = 7f,     // Frost blur for medium panels (dp)
-    val frostLarge: Float = 9f,      // Frost blur for large panels (dp)
+    val frostSmall: Float = 4f,
+    val frostMedium: Float = 6f,
+    val frostLarge: Float = 8f,
     val tintAlpha: Float = 0.12f,
     val top: VisualizationLiquidScope = VisualizationLiquidScope(),
     val bottom: VisualizationLiquidScope = VisualizationLiquidScope(),
