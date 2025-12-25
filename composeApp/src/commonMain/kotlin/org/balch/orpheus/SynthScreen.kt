@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -30,19 +29,13 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
-import org.balch.orpheus.features.delay.ModDelayPanel
-import org.balch.orpheus.features.distortion.DistortionPanel
-import org.balch.orpheus.features.lfo.HyperLfoPanel
-import org.balch.orpheus.features.midi.MidiPanel
-import org.balch.orpheus.features.presets.PresetsPanel
-import org.balch.orpheus.features.stereo.StereoPanel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
 import org.balch.orpheus.ui.panels.CenterControlPanel
+import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
-import org.balch.orpheus.ui.panels.VizPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.LearnModeProvider
@@ -58,40 +51,31 @@ fun SynthScreen(
 ) {
     val focusRequester = remember { FocusRequester() }
 
-    // Start engine and request focus on composition
     LaunchedEffect(Unit) {
         orchestrator.start()
         focusRequester.requestFocus()
         Logger.info { "Orpheus Ready \u2713" }
     }
 
-    // Collect peak level from orchestrator's flow
     val peak by orchestrator.peakFlow.collectAsState()
-
-    // Track if a dialog is active to suppress keyboard handling
     var isDialogActive by remember { mutableStateOf(false) }
 
     val voiceViewModel: VoiceViewModel = metroViewModel()
     val vizViewModel: VizViewModel = metroViewModel()
     val vizState by vizViewModel.uiState.collectAsState()
 
-    // Wrap everything in LearnModeProvider
     LearnModeProvider {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Audio-reactive visualization background layer (source for liquid blur)
-            // Only enabled when viz is not "off"
             VizBackground(
                 modifier = Modifier
                     .fillMaxSize()
                     .liquefiable(liquidState)
             )
 
-            // Provide LiquidState and LiquidEffects to all child panels via CompositionLocal
             CompositionLocalProvider(
                 LocalLiquidState provides liquidState,
                 LocalLiquidEffects provides vizState.liquidEffects
             ) {
-                // Main UI content layer
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -105,36 +89,20 @@ fun SynthScreen(
                                 isDialogActive = isDialogActive
                             )
                         }
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top
                 ) {
-                    // ═══════════════════════════════════════════════════════════
-                    // TOP ROW: Presets | MIDI | Hyper LFO | Mod Delay | Distortion
-                    // ═══════════════════════════════════════════════════════════
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(260.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        PresetsPanel(modifier = Modifier.fillMaxHeight())
-                        MidiPanel(modifier = Modifier.fillMaxHeight())
-                        StereoPanel(modifier = Modifier.fillMaxHeight())
-                        VizPanel(modifier = Modifier.fillMaxHeight())
-                        HyperLfoPanel(modifier = Modifier.fillMaxHeight())
-                        ModDelayPanel(modifier = Modifier.fillMaxHeight())
-                        DistortionPanel(modifier = Modifier.fillMaxHeight())
-                    }
+                    // Top panel row
+                    HeaderPanel(onDialogActiveChange = { isDialogActive = it })
 
-                    // ═══════════════════════════════════════════════════════════
-                    // MAIN SECTION: Left Group | Center | Right Group
-                    // ═══════════════════════════════════════════════════════════
+                    // Main section: Voice groups + center controls
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        // LEFT GROUP (Voices 1-4)
                         VoiceGroupSection(
                             quadLabel = "1-4",
                             quadColor = OrpheusColors.neonMagenta,
@@ -142,10 +110,8 @@ fun SynthScreen(
                             modifier = Modifier.weight(1f)
                         )
 
-                        // CENTER: Cross-mod + Global controls
-                        CenterControlPanel()
+                        CenterControlPanel(modifier = Modifier.fillMaxHeight())
 
-                        // RIGHT GROUP (Voices 5-8)
                         VoiceGroupSection(
                             quadLabel = "5-8",
                             quadColor = OrpheusColors.synthGreen,
@@ -154,7 +120,7 @@ fun SynthScreen(
                         )
                     }
                 }
-            } // CompositionLocalProvider
-        } // Box
-    } // LearnModeProvider
+            }
+        }
+    }
 }

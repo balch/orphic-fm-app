@@ -30,7 +30,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 @Composable
-fun CenterControlPanel() {
+fun CenterControlPanel(modifier: Modifier = Modifier) {
     val voiceViewModel: VoiceViewModel = metroViewModel()
     val voiceState by voiceViewModel.uiState.collectAsState()
     val effects = LocalLiquidEffects.current
@@ -42,6 +42,7 @@ fun CenterControlPanel() {
         onVoiceCouplingChange = voiceViewModel::onVoiceCouplingChange,
         onTotalFeedbackChange = voiceViewModel::onTotalFeedbackChange,
         onFmStructureChange = voiceViewModel::onFmStructureChange,
+        modifier = modifier
     )
 }
 
@@ -53,12 +54,13 @@ private fun CenterControlPanelLayout(
     onTotalFeedbackChange: (Float) -> Unit,
     onVibratoChange: (Float) -> Unit,
     onVoiceCouplingChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val liquidState = LocalLiquidState.current
     val shape = RoundedCornerShape(8.dp)
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .liquidVizEffects(
                 liquidState = liquidState,
                 scope = effects.bottom,

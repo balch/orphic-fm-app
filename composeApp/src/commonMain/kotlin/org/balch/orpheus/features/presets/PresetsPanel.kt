@@ -57,12 +57,16 @@ private val PatchesColor = Color(0xFFFFAB40)  // Light orange/amber
 fun PresetsPanel(
     modifier: Modifier = Modifier,
     presetsViewModel: PresetsViewModel = metroViewModel(),
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
     onDialogActiveChange: (Boolean) -> Unit = { } ,
 ) {
     val presetState by presetsViewModel.uiState.collectAsState()
 
     PresetsPanelLayout(
         modifier = modifier,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
         presetProps = PresetProps(
             presets = presetState.presets,
             selectedPreset = presetState.selectedPreset,
@@ -79,6 +83,8 @@ fun PresetsPanel(
 @Composable
 fun PresetsPanelLayout(
     modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
     presetProps: PresetProps
 ) {
     var showNewDialog by remember { mutableStateOf(false) }
@@ -89,6 +95,8 @@ fun PresetsPanelLayout(
         title = "PATCH",
         color = PatchesColor,
         expandedTitle = "Presets",
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
         initialExpanded = false,
         expandedWidth = 200.dp,
         modifier = modifier

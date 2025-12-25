@@ -46,7 +46,12 @@ enum class HyperLfoMode {
 
 /** Smart wrapper that connects LfoViewModel to the layout. */
 @Composable
-fun HyperLfoPanel(modifier: Modifier = Modifier, viewModel: LfoViewModel = metroViewModel()) {
+fun HyperLfoPanel(
+    modifier: Modifier = Modifier,
+    viewModel: LfoViewModel = metroViewModel(),
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
+) {
     val state by viewModel.uiState.collectAsState()
 
     HyperLfoPanelLayout(
@@ -58,7 +63,9 @@ fun HyperLfoPanel(modifier: Modifier = Modifier, viewModel: LfoViewModel = metro
         onModeChange = viewModel::onModeChange,
         linkEnabled = state.linkEnabled,
         onLinkChange = viewModel::onLinkChange,
-        modifier = modifier
+        modifier = modifier,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange
     )
 }
 
@@ -77,12 +84,16 @@ fun HyperLfoPanelLayout(
     onModeChange: (HyperLfoMode) -> Unit,
     linkEnabled: Boolean,
     onLinkChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     CollapsibleColumnPanel(
         title = "LFO",
         color = OrpheusColors.neonCyan,
         expandedTitle = "Hyper LFO",
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
         initialExpanded = true,
         expandedWidth = 280.dp,
         modifier = modifier

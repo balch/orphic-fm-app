@@ -45,11 +45,15 @@ data class MidiProps(
 fun MidiPanel(
     modifier: Modifier = Modifier,
     midiViewModel: MidiViewModel = metroViewModel(),
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val midiState by midiViewModel.uiState.collectAsState()
 
     MidiPanelLayout(
         modifier = modifier,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
         midiProps = MidiProps(
             deviceName = midiState.deviceName,
             isOpen = midiState.isConnected,
@@ -63,13 +67,17 @@ fun MidiPanel(
 
 @Composable
 private fun MidiPanelLayout(
-midiProps: MidiProps,
-modifier: Modifier = Modifier
+    midiProps: MidiProps,
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     CollapsibleColumnPanel(
         title = "MIDI",
         color = OrpheusColors.synthGreen,
         expandedTitle = "MIDI",
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
         initialExpanded = false,
         expandedWidth = 180.dp,
         modifier = modifier

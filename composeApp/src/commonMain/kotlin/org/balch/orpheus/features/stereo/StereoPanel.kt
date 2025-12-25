@@ -1,11 +1,8 @@
 package org.balch.orpheus.features.stereo
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,7 +25,9 @@ private val PanColor = Color(0xFF008B8B)  // Dark cyan
 @Composable
 fun StereoPanel(
     modifier: Modifier = Modifier,
-    viewModel: StereoViewModel = metroViewModel()
+    viewModel: StereoViewModel = metroViewModel(),
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -37,7 +36,9 @@ fun StereoPanel(
         onModeChange = viewModel::onModeChange,
         masterPan = state.masterPan,
         onMasterPanChange = viewModel::onMasterPanChange,
-        modifier = modifier
+        modifier = modifier,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange
     )
 }
 
@@ -55,52 +56,46 @@ fun StereoPanelLayout(
     onModeChange: (StereoMode) -> Unit,
     masterPan: Float,
     onMasterPanChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     CollapsibleColumnPanel(
         title = "PAN",
         color = PanColor,
         expandedTitle = "Stereo",
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
         initialExpanded = false,
         expandedWidth = 120.dp,
         modifier = modifier
     ) {
-        Column(
+        // Side-by-side layout: Mode toggle | Pan knob
+        Row(
             modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-
-            Spacer(modifier = Modifier.height(8.dp))
-
             // Mode toggle: Voice Pan / Stereo Delays
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(vertical = 4.dp)
-            ) {
-                VerticalToggle(
-                    topLabel = "VOICE",
-                    bottomLabel = "DELAY",
-                    isTop = mode == StereoMode.VOICE_PAN,
-                    onToggle = { isVoicePan ->
-                        onModeChange(
-                            if (isVoicePan) StereoMode.VOICE_PAN else StereoMode.STEREO_DELAYS
-                        )
-                    },
-                    color = PanColor,
-                    controlId = "stereo_mode",
-                    enabled = true  // Delay mode not yet implemented, but toggle enabled
-                )
-            }
+            VerticalToggle(
+                topLabel = "VOICE",
+                bottomLabel = "DELAY",
+                isTop = mode == StereoMode.VOICE_PAN,
+                onToggle = { isVoicePan ->
+                    onModeChange(
+                        if (isVoicePan) StereoMode.VOICE_PAN else StereoMode.STEREO_DELAYS
+                    )
+                },
+                color = PanColor,
+                controlId = "stereo_mode",
+                enabled = true
+            )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Large Master Pan knob
-            // Convert -1..1 range to 0..1 for RotaryKnob, display as pan position
+            // Master Pan knob
             RotaryKnob(
-                value = (masterPan + 1f) / 2f,  // -1..1 -> 0..1
+                value = (masterPan + 1f) / 2f,
                 onValueChange = { normalized ->
-                    onMasterPanChange((normalized * 2f) - 1f)  // 0..1 -> -1..1
+                    onMasterPanChange((normalized * 2f) - 1f)
                 },
                 label = "PAN",
                 controlId = "stereo_pan",

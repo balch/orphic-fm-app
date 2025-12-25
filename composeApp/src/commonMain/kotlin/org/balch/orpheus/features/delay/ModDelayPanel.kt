@@ -24,7 +24,12 @@ import org.balch.orpheus.ui.widgets.VerticalToggle
  * Smart wrapper that connects DelayViewModel to the layout. Collects state and dispatches events.
  */
 @Composable
-fun ModDelayPanel(modifier: Modifier = Modifier, viewModel: DelayViewModel = metroViewModel()) {
+fun ModDelayPanel(
+    modifier: Modifier = Modifier,
+    viewModel: DelayViewModel = metroViewModel(),
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
+) {
     val state by viewModel.uiState.collectAsState()
 
     ModDelayPanelLayout(
@@ -44,7 +49,9 @@ fun ModDelayPanel(modifier: Modifier = Modifier, viewModel: DelayViewModel = met
         onSourceChange = viewModel::onSourceChange,
         isTriangleWave = state.isTriangleWave,
         onWaveformChange = viewModel::onWaveformChange,
-        modifier = modifier
+        modifier = modifier,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange
     )
 }
 
@@ -70,12 +77,16 @@ fun ModDelayPanelLayout(
     onSourceChange: (Boolean) -> Unit,
     isTriangleWave: Boolean,
     onWaveformChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     CollapsibleColumnPanel(
         title = "DELAY",
         color = OrpheusColors.warmGlow,
         expandedTitle = "Mod Delay",
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
         initialExpanded = true,
         expandedWidth = 240.dp,
         modifier = modifier

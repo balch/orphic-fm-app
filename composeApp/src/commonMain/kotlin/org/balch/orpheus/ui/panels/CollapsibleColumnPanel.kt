@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,31 +65,36 @@ fun CollapsibleColumnPanel(
     modifier: Modifier = Modifier,
     title: String,
     color: Color,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
     initialExpanded: Boolean = false,
     expandedWidth: Dp = 140.dp,
     expandedTitle: String? = null,
     content: @Composable () -> Unit
 ) {
-    var isExpanded by remember { mutableStateOf(initialExpanded) }
-    val liquidState = LocalLiquidState.current
+    var internalExpanded by remember { mutableStateOf(initialExpanded) }
+    val effectiveExpanded = isExpanded ?: internalExpanded
+    
+    val toggleExpanded = {
+        val next = !effectiveExpanded
+        if (isExpanded == null) {
+            internalExpanded = next
+        }
+        onExpandedChange?.invoke(next)
+    }
 
+    val liquidState = LocalLiquidState.current
     val collapsedWidth = 28.dp
 
-    // Animate the content width
-    val contentWidth by animateDpAsState(
-        targetValue = if (isExpanded) expandedWidth else 0.dp,
-        animationSpec = tween(durationMillis = 300)
-    )
-
     val shape = RoundedCornerShape(8.dp)
-    
-    // Base modifier with liquid effect if available
+
+    // Base modifier - ensure minimum width for the header strip
     val baseModifier = modifier
-        .width(collapsedWidth + contentWidth)
+        .widthIn(min = collapsedWidth)
         .fillMaxHeight()
         .clip(shape)
 
-    // Apply liquid effect using shared helper
+    // Apply liquid effect
     val effects = LocalLiquidEffects.current
     val liquidModifier = baseModifier.liquidVizEffects(
         liquidState = liquidState,
@@ -102,57 +109,68 @@ fun CollapsibleColumnPanel(
         modifier = liquidModifier
             .border(
                 width = 1.dp,
-                color = if (isExpanded) color.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.15f),
+                color = if (effectiveExpanded) color.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.15f),
                 shape = shape
             )
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxHeight()
+                .let { if (effectiveExpanded) it.fillMaxWidth() else it }
+        ) {
             // [LEFT] Vertical Header Strip (Always visible)
             Box(
                 modifier = Modifier
                     .width(collapsedWidth)
                     .fillMaxHeight()
-                    .clickable { isExpanded = !isExpanded }
+                    .clickable { toggleExpanded() }
                     .background(color.copy(alpha = 0.1f)),
                 contentAlignment = Alignment.Center
             ) {
-                // Vertical Text - Letters stacked vertically for better readability
                 Text(
                     text = title.toList().joinToString("\n"),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isExpanded) color else color.copy(alpha = 0.7f),
+                    color = if (effectiveExpanded) color else color.copy(alpha = 0.7f),
                     lineHeight = 12.sp,
                     textAlign = TextAlign.Center
                 )
             }
 
-            // [RIGHT] Content Area (Visible only when expanded, animated width)
-            if (contentWidth > 0.dp) {
-                Column(
+            // [RIGHT] Content Area - Fills remaining space
+            // Only visible/taking space when expanded
+            if (effectiveExpanded) {
+                Box(
                     modifier = Modifier
-                        .width(contentWidth)
+                        .weight(1f) // Take all remaining space provided by parent
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp))
-                        .padding(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .clipToBounds(),
+                    contentAlignment = Alignment.TopCenter
                 ) {
-                    // Standardized expanded header at top
-                    if (expandedTitle != null) {
-                        Text(
-                            text = expandedTitle,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = color,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    
-                    // Panel content
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        content()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        if (expandedTitle != null) {
+                            Text(
+                                text = expandedTitle,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = color,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            content()
+                        }
                     }
                 }
             }

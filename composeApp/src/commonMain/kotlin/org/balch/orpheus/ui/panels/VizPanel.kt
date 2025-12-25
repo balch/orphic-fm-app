@@ -45,7 +45,9 @@ private val VizColor = Color(0xFF90EE90)  // Light green
 @Composable
 fun VizPanel(
     modifier: Modifier = Modifier,
-    viewModel: VizViewModel = metroViewModel()
+    viewModel: VizViewModel = metroViewModel(),
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -79,7 +81,9 @@ fun VizPanel(
         onSelectViz = viewModel::selectVisualization,
         onKnob1Change = viewModel::onKnob1Change,
         onKnob2Change = viewModel::onKnob2Change,
-        modifier = modifier
+        modifier = modifier,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange
     )
 }
 
@@ -91,12 +95,16 @@ fun VizPanelLayout(
     onSelectViz: (Visualization) -> Unit,
     onKnob1Change: (Float) -> Unit,
     onKnob2Change: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     CollapsibleColumnPanel(
         title = "VIZ",
         color = VizColor,
         expandedTitle = "Background",
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
         initialExpanded = false,
         expandedWidth = 140.dp,
         modifier = modifier

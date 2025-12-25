@@ -31,7 +31,9 @@ import kotlin.math.roundToInt
 @Composable
 fun DistortionPanel(
     modifier: Modifier = Modifier,
-    viewModel: DistortionViewModel = metroViewModel()
+    viewModel: DistortionViewModel = metroViewModel(),
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
 
@@ -43,7 +45,9 @@ fun DistortionPanel(
         mix = state.mix,
         onMixChange = viewModel::onMixChange,
         peak = state.peak,
-        modifier = modifier
+        modifier = modifier,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange
     )
 }
 
@@ -60,12 +64,16 @@ fun DistortionPanelLayout(
     mix: Float,
     onMixChange: (Float) -> Unit,
     peak: Float,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     CollapsibleColumnPanel(
         title = "VOL",
         color = OrpheusColors.neonMagenta,
         expandedTitle = "Distortion",
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
         initialExpanded = true,
         expandedWidth = 200.dp,
         modifier = modifier
