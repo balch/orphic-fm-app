@@ -1,4 +1,4 @@
-# Songe Audio Path Architecture
+# Orpheus Audio Path Architecture
 
 ## Signal Flow Overview
 
@@ -28,7 +28,7 @@ flowchart TD
         WET["Wet Gain"]
     end
 
-    subgraph Distortion["Parallel Distortion (Lyra MIX)"]
+    subgraph Distortion["Parallel Distortion (Stereo MIX)"]
         PRE["Pre-Distortion Summer"]
         CLEAN["Clean Path Gain"]
         DRIVE["Drive Gain"]
@@ -64,7 +64,7 @@ flowchart TD
 
 ### TanhLimiter (Soft Clipper)
 
-The limiter is the core of the distortion/dynamics system. Located at [TanhLimiter.kt](file:///Users/balch/Source/Songe/composeApp/src/jvmMain/kotlin/org/balch/songe/core/audio/TanhLimiter.kt).
+The limiter is the core of the distortion/dynamics system. Located at [TanhLimiter.kt](file:///Users/balch/Source/Orpheus/composeApp/src/jvmMain/kotlin/org/balch/orpheus/core/audio/TanhLimiter.kt).
 
 **Algorithm:**
 ```
@@ -91,7 +91,7 @@ The "metallic" quality you're hearing is **expected behavior** when:
 
 This is characteristic of tanh-based saturation and is musically valid for drone/ambient synthesis.
 
-## Signal Routing (DspSongeEngine)
+## Signal Routing (DspOrpheusEngine)
 
 ### Voice → Stereo Output Path
 
@@ -169,6 +169,6 @@ Each delay has dedicated L/R wet gains (`delay1WetLeft/Right`, `delay2WetLeft/Ri
 
 ## Related Documentation
 
-- [Distortion Test Plan](file:///Users/balch/Source/Songe/test_plans/distortion_test_plan.md) — Comprehensive test cases
-- [DspSongeEngine.kt](file:///Users/balch/Source/Songe/composeApp/src/commonMain/kotlin/org/balch/songe/core/audio/dsp/DspSongeEngine.kt) — Main audio routing
-- [DspVoice.kt](file:///Users/balch/Source/Songe/composeApp/src/commonMain/kotlin/org/balch/songe/core/audio/dsp/DspVoice.kt) — Voice implementation
+- [Distortion Test Plan](file:///Users/balch/Source/Orpheus/test_plans/distortion_test_plan.md) — Comprehensive test cases
+- [DspSynthEngine.kt](file:///Users/balch/Source/Orpheus/composeApp/src/commonMain/kotlin/org/balch/orpheus/core/audio/dsp/DspSynthEngine.kt) — Main audio routing
+- [DspVoice.kt](file:///Users/balch/Source/Orpheus/composeApp/src/commonMain/kotlin/org/balch/orpheus/core/audio/dsp/DspVoice.kt) — Voice implementation

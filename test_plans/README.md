@@ -1,6 +1,6 @@
-# Songe-8 Test Plans
+# Orpheus-8 Test Plans
 
-This directory contains comprehensive test plans for all major features of the Songe-8 synthesizer.
+This directory contains comprehensive test plans for all major features of the Orpheus-8 synthesizer.
 
 ## Test Plan Index
 

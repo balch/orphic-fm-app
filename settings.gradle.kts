@@ -1,4 +1,4 @@
-rootProject.name = "Songe"
+rootProject.name = "Orpheus"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {

@@ -1,12 +1,12 @@
-# Songe-8
+# Orpheus-8
 
 An 8-oscillator organismic synthesizer inspired by
-the [SOMA Lyra-8](https://somasynths.com/lyra-organismic-synthesizer/), built with Kotlin
+classic drone synthesizers, built with Kotlin
 Multiplatform targeting Desktop and Android.
 
 ## Overview
 
-Songe-8 features non-linear voice generators (similar to old electric organ tone generators) with a
+Orpheus-8 features non-linear voice generators (similar to old electric organ tone generators) with a
 hierarchical modulation structure:
 
 - **8 Voices**: Individual tone generators with tune, pulse, and hold controls
@@ -30,7 +30,7 @@ hierarchical modulation structure:
 ```
 composeApp/
 ├── src/
-│   ├── commonMain/kotlin/org/balch/songe/
+│   ├── commonMain/kotlin/org/balch/orpheus/
 │   │   ├── navigation/     # Nav3 routing
 │   │   ├── synth/          # Audio engine & state
 │   │   └── ui/
@@ -62,7 +62,7 @@ composeApp/
 ./gradlew build
 ```
 
-## Songe Audio Engine 🧬
+## Orpheus Audio Engine 🧬
 
 Authentic emulation of the organismic hardware design:
 

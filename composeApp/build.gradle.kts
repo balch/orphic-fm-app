@@ -24,7 +24,7 @@ kotlin {
     wasmJs {
         browser {
             commonWebpackConfig {
-                outputFileName = "songe.js"
+                outputFileName = "orpheus.js"
             }
         }
         binaries.executable()
@@ -76,11 +76,11 @@ configurations.matching { it.name.contains("test", ignoreCase = true) }.all {
 }
 
 android {
-    namespace = "org.balch.songe"
+    namespace = "org.balch.orpheus"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "org.balch.songe"
+        applicationId = "org.balch.orpheus"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
@@ -108,7 +108,7 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "org.balch.songe.MainKt"
+        mainClass = "org.balch.orpheus.MainKt"
 
         buildTypes.release.proguard {
             configurationFiles.from(project.file("compose-desktop.pro"))
@@ -116,7 +116,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "org.balch.songe"
+            packageName = "org.balch.orpheus"
             packageVersion = "1.0.0"
         }
     }

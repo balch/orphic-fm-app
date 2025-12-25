@@ -3,7 +3,7 @@
 ## Overview
 
 The distortion system features a tanh-based soft limiter with drive control and a parallel wet/dry
-mix architecture (Lyra MIX style).
+mix architecture (Stereo MIX style).
 
 ## Architecture
 
