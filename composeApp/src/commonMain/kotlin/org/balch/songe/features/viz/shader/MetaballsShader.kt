@@ -18,35 +18,16 @@ data class MetaballData(
  */
 data class MetaballsConfig(
     val maxBalls: Int = 16,           // Configurable max blobs
-    val threshold: Float = 1.0f,      // Surface threshold (classic metaballs use ~1.0)
+    val threshold: Float = 1.0f,      // Surface threshold
     val glowIntensity: Float = 0.4f,  // Glow effect strength
     val blendSoftness: Float = 0.5f   // Color blend smoothness
 )
 
 /**
- * SKSL shader source for metaballs rendering.
- * 
- * Classic metaballs algorithm:
- * - Each ball contributes influence = radius / distance
- * - Pixels are colored when total influence exceeds threshold
- * - Colors blend smoothly based on weighted influence
+ * SKSL shader source for metaballs rendering with 3D depth and optimized normals.
  */
 object MetaballsShaderSource {
     
-    /**
-     * SKSL shader that renders metaballs with smooth blending.
-     * 
-     * Uniforms:
-     * - resolution: Canvas size in pixels
-     * - time: Animation time for effects
-     * - ballCount: Number of active balls
-     * - threshold: Surface detection threshold
-     * - glowIntensity: Edge glow strength
-     * - lfoMod: LFO modulation value (-1 to 1)
-     * - masterEnergy: Overall brightness (0 to 1)
-     * - balls[]: Array of ball data (x, y, radius, energy)
-     * - colors[]: Array of RGBA colors for each ball
-     */
     const val SKSL_SOURCE = """
 uniform float2 resolution;
 uniform float time;
@@ -56,17 +37,8 @@ uniform float glowIntensity;
 uniform float lfoMod;
 uniform float masterEnergy;
 
-// Ball data: x, y, radius, energy
 uniform float4 balls[16];
-// Color data: r, g, b, a
 uniform float4 colors[16];
-
-// HSV to RGB conversion for color effects
-float3 hsv2rgb(float3 c) {
-    float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    float3 p = abs(fract(float3(c.x, c.x, c.x) + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
 
 // RGB to HSV conversion
 float3 rgb2hsv(float3 c) {
@@ -78,17 +50,23 @@ float3 rgb2hsv(float3 c) {
     return float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
 }
 
+// HSV to RGB conversion
+float3 hsv2rgb(float3 c) {
+    float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    float3 p = abs(fract(float3(c.x, c.x, c.x) + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 float4 main(float2 fragCoord) {
     float2 uv = fragCoord / resolution;
-    
-    // Flip Y coordinate (0 = bottom in our coordinate system)
     uv.y = 1.0 - uv.y;
     
     float totalInfluence = 0.0;
-    float3 blendedColor = float3(0.0);
-    float totalWeight = 0.0;
+    float3 colorSum = float3(0.0);
+    float weightSum = 0.0;
+    float2 gradient = float2(0.0); // Analytical gradient
     
-    // Calculate metaball field
+    // Single pass calculation of field AND gradient
     for (int i = 0; i < 16; i++) {
         if (i >= ballCount) break;
         
@@ -96,73 +74,80 @@ float4 main(float2 fragCoord) {
         float radius = balls[i].z;
         float energy = balls[i].w;
         
-        // Skip if no radius or very small
-        if (radius < 0.005) continue;
+        if (radius < 0.001 || energy < 0.001) continue;
         
-        // Distance from pixel to ball center
-        float dist = distance(uv, ballPos);
+        float2 dv = uv - ballPos;
+        float d2 = dot(dv, dv);
+        float r2 = radius * radius;
         
-        // Classic metaball influence: radius / distance
-        // This creates the characteristic "blobby" merging effect
-        float influence = radius / max(dist, 0.001);
-        influence *= energy;  // Scale by ball energy
-        
-        totalInfluence += influence;
-        
-        // Weight color contribution by influence squared for sharper color boundaries
-        float3 ballColor = colors[i].rgb;
-        float alpha = colors[i].a;
-        float weight = influence * influence * alpha;
-        
-        blendedColor += ballColor * weight;
-        totalWeight += weight;
+        // Influence curve: f(r) = (1 - (d/R)^2)^3
+        // Gradient: f'(r) = -6/R^2 * (1 - (d/R)^2)^2 * vector(uv - pos)
+        if (d2 < r2) {
+            float ratio2 = d2 / r2;
+            float g = 1.0 - ratio2;
+            float g2 = g * g;
+            float influence = g2 * g * energy;
+            
+            totalInfluence += influence;
+            
+            // Analytical gradient contribution
+            // The -6 factor is omitted here as we normalize the normal anyway
+            gradient += (g2 * energy / r2) * dv;
+            
+            float3 ballColor = colors[i].rgb;
+            float weight = influence * colors[i].a;
+            colorSum += ballColor * weight;
+            weightSum += weight;
+        }
     }
     
-    // No influence at all - transparent
-    if (totalInfluence < 0.01) {
-        return float4(0.0, 0.0, 0.0, 0.0);
+    // DARKNESS AT REST: Threshold check
+    if (totalInfluence < 0.005) {
+        return float4(0.0);
     }
     
-    // Normalize blended color
-    if (totalWeight > 0.001) {
-        blendedColor /= totalWeight;
-    } else {
-        return float4(0.0, 0.0, 0.0, 0.0);
-    }
+    // Normalize color
+    float3 baseColor = (weightSum > 0.001) ? colorSum / weightSum : float3(0.0);
     
-    // Apply LFO-driven hue shift
+    // Calculate normal from analytical gradient
+    // We add a Z component to create the "thickness" of the blob
+    // Higher Z scale = flatter blobs, Lower Z scale = rounder/bubblier
+    float3 normal = normalize(float3(gradient.x, gradient.y, 0.025));
+    
+    // Lighting
+    float3 lightDir = normalize(float3(0.4, 0.4, 1.0));
+    float3 viewDir = float3(0.0, 0.0, 1.0);
+    
+    float ambient = 0.2;
+    float diffuse = max(dot(normal, lightDir), 0.0) * 0.8;
+    float3 halfDir = normalize(lightDir + viewDir);
+    float specular = pow(max(dot(normal, halfDir), 0.0), 32.0) * 0.7;
+    float rim = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0) * 0.5;
+    
+    // Color effects
     if (abs(lfoMod) > 0.01) {
-        float3 hsv = rgb2hsv(blendedColor);
-        hsv.x = fract(hsv.x + lfoMod * 0.08);  // Subtle hue shift
-        hsv.y = clamp(hsv.y * (1.0 + lfoMod * 0.15), 0.0, 1.0);  // Saturation boost
-        blendedColor = hsv2rgb(hsv);
+        float3 hsv = rgb2hsv(baseColor);
+        hsv.x = fract(hsv.x + lfoMod * 0.1);
+        hsv.y = clamp(hsv.y * (1.2 + lfoMod * 0.3), 0.0, 1.0);
+        baseColor = hsv2rgb(hsv);
+    } else {
+        float3 hsv = rgb2hsv(baseColor);
+        hsv.y = clamp(hsv.y * 1.3, 0.0, 1.0); // Vivid saturate
+        baseColor = hsv2rgb(hsv);
     }
     
-    // Increase color saturation for more vivid blobs
-    float3 hsv = rgb2hsv(blendedColor);
-    hsv.y = min(hsv.y * 1.3, 1.0);  // Boost saturation by 30%
-    hsv.z = min(hsv.z * 1.1, 1.0);  // Slight brightness boost
-    blendedColor = hsv2rgb(hsv);
+    // Combine lighting
+    float3 finalColor = baseColor * (ambient + diffuse + rim) + float3(specular);
     
-    // Apply master energy as brightness multiplier
-    blendedColor *= (0.7 + masterEnergy * 0.4);
+    // Master energy boost - keep it higher for color retention
+    finalColor *= (0.8 + masterEnergy * 0.4);
     
-    // Calculate alpha with threshold
-    // Use sharp threshold for classic metaball look
-    float coreAlpha = smoothstep(threshold * 0.7, threshold, totalInfluence);
-    float glowAlpha = smoothstep(threshold * 0.3, threshold * 0.8, totalInfluence) * glowIntensity;
+    // Alpha blending
+    float alpha = smoothstep(threshold * 0.05, threshold * 0.4, totalInfluence);
+    float glow = smoothstep(0.0, threshold, totalInfluence) * glowIntensity * 0.5;
+    alpha = max(alpha, glow);
     
-    float finalAlpha = coreAlpha + glowAlpha * (1.0 - coreAlpha);
-    finalAlpha = clamp(finalAlpha, 0.0, 1.0);
-    
-    // Add glow around edges for depth
-    if (totalInfluence > threshold * 0.5 && totalInfluence < threshold * 1.3) {
-        float edgeFactor = smoothstep(threshold * 0.5, threshold * 0.9, totalInfluence) * 
-                          (1.0 - smoothstep(threshold * 0.9, threshold * 1.3, totalInfluence));
-        blendedColor += blendedColor * edgeFactor * glowIntensity * 0.8;
-    }
-    
-    return float4(blendedColor, finalAlpha);
+    return float4(clamp(finalColor, 0.0, 1.0), clamp(alpha, 0.0, 1.0));
 }
 """
 }

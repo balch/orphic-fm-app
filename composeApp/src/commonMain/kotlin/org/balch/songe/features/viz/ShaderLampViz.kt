@@ -31,9 +31,6 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-/**
- * UI state for the shader lamp background.
- */
 data class ShaderLampUiState(
     val blobs: List<Blob> = emptyList(),
     val lfoModulation: Float = 0f,
@@ -42,30 +39,26 @@ data class ShaderLampUiState(
 )
 
 /**
- * Extended blob data for wandering behavior.
+ * A blob that always exists but changes visibility based on audio.
  */
-data class WanderingBlob(
+data class LavaBlob(
     val id: Int,
-    var x: Float,              // 0-1 normalized position
+    var x: Float,
     var y: Float,
-    var radius: Float,         // 0-1 normalized radius
-    var velocityX: Float,      // Movement velocity
+    var radius: Float,
+    var velocityX: Float,
     var velocityY: Float,
-    var targetX: Float,        // Wander target
-    var targetY: Float,
     var color: Color,
     var voiceIndex: Int,
-    var energy: Float,
-    var alpha: Float = 1f,
-    var age: Float = 0f,
-    var wanderAngle: Float = 0f,
-    var wanderPhase: Float = 0f
+    var alpha: Float = 0.001f,
+    var targetRadius: Float = 0.04f,
+    var targetX: Float = 0.5f,
+    var targetY: Float = 0.5f,
+    var targetChangeTime: Long = 0
 )
 
-
 /**
- * Shader Lamp visualization - metaballs shader implementation.
- * Blobs spawn randomly and wander around, interacting with each other.
+ * Shader Lamp - High-performance lava lamp style visualization.
  */
 @Inject
 @ContributesIntoSet(AppScope::class)
@@ -85,15 +78,9 @@ class ShaderLampViz(
     private var _speedKnob = 0.5f
     private var _sizeKnob = 0.5f
 
-    override fun setKnob1(value: Float) {
-        _speedKnob = value.coerceIn(0f, 1f)
-    }
+    override fun setKnob1(value: Float) { _speedKnob = value.coerceIn(0f, 1f) }
+    override fun setKnob2(value: Float) { _sizeKnob = value.coerceIn(0f, 1f) }
 
-    override fun setKnob2(value: Float) {
-        _sizeKnob = value.coerceIn(0f, 1f)
-    }
-
-    // Colors for each voice pair
     private val voicePairColors = listOf(
         SongeColors.neonMagenta,
         SongeColors.electricBlue,
@@ -101,33 +88,24 @@ class ShaderLampViz(
         SongeColors.neonCyan
     )
 
-    private val blobs = mutableListOf<WanderingBlob>()
-    private var nextBlobId = 0
+    private val blobs = mutableListOf<LavaBlob>()
     private var animationTime = 0f
 
-    // More blobs for better effect
-    private var _maxBlobs = 16
-    val maxBlobs: Int get() = _maxBlobs
-    
-    // Shader config - moderate threshold
-    private val shaderConfig: MetaballsConfig
-        get() = MetaballsConfig(
-            maxBalls = _maxBlobs,
-            threshold = 1.2f,
-            glowIntensity = 0.35f,
-            blendSoftness = 0.5f
-        )
-    
-    // Physics - more active movement
-    private val baseWanderSpeed = 0.025f  // Faster base movement
-    private val baseSpawnThreshold = 0.08f
-    private val minRadius = 0.015f        // Starting size (very small)
-    private val baseRadius = 0.05f        // Default visible size
-    private val maxRadiusBase = 0.10f     // Max size with audio
+    private val blobCount = 8
+    private val baseRadius = 0.15f  // Slightly larger base
+    private val maxRadius = 0.30f   // Larger max
+    private val baseSpeed = 0.0004f // Slower force-based movement
     
     private val speedMultiplier: Float get() = 0.4f + (_speedKnob * 1.6f)
-    private val sizeMultiplier: Float get() = 0.6f + (_sizeKnob * 1.0f)
-    private val maxRadius: Float get() = maxRadiusBase * sizeMultiplier
+    private val sizeMultiplier: Float get() = 0.6f + (_sizeKnob * 1.4f)
+    
+    private val shaderConfig: MetaballsConfig
+        get() = MetaballsConfig(
+            maxBalls = blobCount,
+            threshold = 1.0f,
+            glowIntensity = 0.4f,
+            blendSoftness = 0.5f
+        )
 
     private val _uiState = MutableStateFlow(ShaderLampUiState())
     val uiState: StateFlow<ShaderLampUiState> = _uiState.asStateFlow()
@@ -138,16 +116,28 @@ class ShaderLampViz(
     override fun onActivate() {
         if (vizJob?.isActive == true) return
         animationTime = 0f
-        blobs.clear()
         
-        // Start with several small blobs scattered around
-        for (i in 0 until 6) {
-            spawnRandomBlob(voiceIndex = i % 8)
+        blobs.clear()
+        for (i in 0 until blobCount) {
+            blobs.add(LavaBlob(
+                id = i,
+                x = 0.2f + Random.nextFloat() * 0.6f,
+                y = 0.2f + Random.nextFloat() * 0.6f,
+                radius = baseRadius,
+                velocityX = (Random.nextFloat() - 0.5f) * 0.002f,
+                velocityY = (Random.nextFloat() - 0.5f) * 0.002f,
+                color = voicePairColors[i / 2],
+                voiceIndex = i,
+                alpha = 0.001f,
+                targetRadius = baseRadius,
+                targetX = Random.nextFloat(),
+                targetY = Random.nextFloat(),
+                targetChangeTime = currentTimeMillis() + Random.nextLong(1000, 5000)
+            ))
         }
         
         vizJob = scope.launch(dispatcherProvider.default) {
             var lastFrameTime = currentTimeMillis()
-            
             while (isActive) {
                 val currentTime = currentTimeMillis()
                 val deltaTime = (currentTime - lastFrameTime) / 1000f
@@ -166,8 +156,7 @@ class ShaderLampViz(
                     masterEnergy = masterLevel,
                     animationTime = animationTime
                 )
-
-                delay(33)
+                delay(30)
             }
         }
     }
@@ -183,7 +172,6 @@ class ShaderLampViz(
     @Composable
     override fun Content(modifier: Modifier) {
         val state by uiState.collectAsState()
-        
         MetaballsCanvas(
             modifier = modifier,
             blobs = state.blobs,
@@ -194,7 +182,7 @@ class ShaderLampViz(
         )
     }
     
-    private fun WanderingBlob.toBlob(): Blob = Blob(
+    private fun LavaBlob.toBlob(): Blob = Blob(
         id = id,
         x = x,
         y = y,
@@ -202,149 +190,93 @@ class ShaderLampViz(
         velocityY = velocityY,
         color = color,
         voiceIndex = voiceIndex,
-        energy = energy,
+        // Boost energy (color weight/influence) when active to retain color vibrancy
+        energy = if (alpha > 0.005f) 0.6f + alpha * 0.4f else alpha * 120f,
         alpha = alpha,
-        age = age
+        age = 0f
     )
 
     private fun updateBlobs(voiceLevels: FloatArray, masterLevel: Float, lfoValue: Float, deltaTime: Float) {
-        val wanderSpeed = baseWanderSpeed * speedMultiplier
+        val currentTime = currentTimeMillis()
+        val globalSpeed = baseSpeed * speedMultiplier
         
-        // Spawn new blobs based on audio - more aggressive spawning
-        for (voiceIndex in 0 until 8) {
-            val level = voiceLevels.getOrElse(voiceIndex) { 0f }
-            if (level > baseSpawnThreshold && blobs.size < _maxBlobs) {
-                val existingForVoice = blobs.count { it.voiceIndex == voiceIndex }
-                if (existingForVoice < 3 && Random.nextFloat() < level * 0.15f) {
-                    spawnRandomBlob(voiceIndex)
-                }
-            }
-        }
-
-        val blobsToRemove = mutableListOf<WanderingBlob>()
-
         for (blob in blobs) {
             val voiceLevel = voiceLevels.getOrElse(blob.voiceIndex) { 0f }
+            val totalEnergy = voiceLevel + masterLevel * 0.4f
             
-            // Energy drives visibility
-            blob.energy = (voiceLevel * 0.7f) + (masterLevel * 0.3f)
+            // ALPHA: Steeper quadratic curve - stays silent then pops in vibrantly
+            val audioPower = (voiceLevel * 2.5f + masterLevel * 0.5f).coerceIn(0f, 1f)
+            val targetAlpha = audioPower * audioPower
+            blob.alpha = (blob.alpha * 0.85f + targetAlpha * 0.15f).coerceIn(0.0001f, 1.0f)
             
-            // Pick new wander target periodically
-            blob.wanderPhase += deltaTime
-            if (blob.wanderPhase > 2f + Random.nextFloat() * 2f) {
-                blob.wanderPhase = 0f
-                // Keep targets well within bounds (0.15 to 0.85)
-                blob.targetX = 0.15f + Random.nextFloat() * 0.7f
-                blob.targetY = 0.15f + Random.nextFloat() * 0.7f
+            // SIZE: Grows with energy
+            val targetRad = (baseRadius + (totalEnergy * (maxRadius - baseRadius))) * sizeMultiplier
+            blob.radius = (blob.radius * 0.93f + targetRad * 0.07f)
+            
+            // TARGET WANDERING
+            if (currentTime > blob.targetChangeTime) {
+                blob.targetX = 0.1f + Random.nextFloat() * 0.8f
+                blob.targetY = 0.1f + Random.nextFloat() * 0.8f
+                blob.targetChangeTime = currentTime + 4000L + Random.nextLong(6000)
             }
             
-            // Wandering with Perlin-like noise
-            blob.wanderAngle += (Random.nextFloat() - 0.5f) * 0.4f
-            val noiseX = cos(blob.wanderAngle + animationTime * 0.8f) * 0.003f
-            val noiseY = sin(blob.wanderAngle * 1.3f + animationTime * 0.6f) * 0.003f
-            
-            // Move toward target
             val dx = blob.targetX - blob.x
             val dy = blob.targetY - blob.y
             val dist = sqrt(dx * dx + dy * dy)
             
             if (dist > 0.02f) {
-                val moveSpeed = wanderSpeed * (0.5f + blob.energy * 0.5f)
-                blob.velocityX = (dx / dist) * moveSpeed + noiseX
-                blob.velocityY = (dy / dist) * moveSpeed + noiseY
-            } else {
-                // Reached target, pick new one
-                blob.targetX = 0.15f + Random.nextFloat() * 0.7f
-                blob.targetY = 0.15f + Random.nextFloat() * 0.7f
+                val wanderForce = globalSpeed * (1.0f + totalEnergy * 2.0f)
+                blob.velocityX += (dx / dist) * wanderForce
+                blob.velocityY += (dy / dist) * wanderForce
             }
             
-            // LFO adds circular motion
-            val lfoStrength = lfoValue * 0.008f * speedMultiplier
-            blob.velocityX += lfoStrength * cos(animationTime * 1.5f + blob.id.toFloat())
-            blob.velocityY += lfoStrength * sin(animationTime * 1.5f + blob.id.toFloat())
+            // LFO Swirl
+            val lfoMag = lfoValue * 0.0008f * speedMultiplier
+            blob.velocityX += lfoMag * cos(animationTime * 0.7f + blob.id)
+            blob.velocityY += lfoMag * sin(animationTime * 0.7f + blob.id)
             
-            // Apply velocity
-            blob.x += blob.velocityX
-            blob.y += blob.velocityY
-            
-            // Hard bounds - keep well within screen (0.1 to 0.9)
-            if (blob.x < 0.1f) { blob.x = 0.1f; blob.velocityX = kotlin.math.abs(blob.velocityX) * 0.5f; blob.targetX = 0.4f + Random.nextFloat() * 0.3f }
-            if (blob.x > 0.9f) { blob.x = 0.9f; blob.velocityX = -kotlin.math.abs(blob.velocityX) * 0.5f; blob.targetX = 0.3f + Random.nextFloat() * 0.3f }
-            if (blob.y < 0.1f) { blob.y = 0.1f; blob.velocityY = kotlin.math.abs(blob.velocityY) * 0.5f; blob.targetY = 0.4f + Random.nextFloat() * 0.3f }
-            if (blob.y > 0.9f) { blob.y = 0.9f; blob.velocityY = -kotlin.math.abs(blob.velocityY) * 0.5f; blob.targetY = 0.3f + Random.nextFloat() * 0.3f }
-            
-            // Blob-blob soft repulsion
+            // LAVA LAMP ATTRACTION / REPULSION
             for (other in blobs) {
                 if (other.id == blob.id) continue
                 val ox = other.x - blob.x
                 val oy = other.y - blob.y
-                val distance = sqrt(ox * ox + oy * oy)
-                val minDist = (blob.radius + other.radius) * 1.2f
+                val odist = sqrt(ox * ox + oy * oy)
+                if (odist < 0.001f) continue
                 
-                if (distance < minDist && distance > 0.001f) {
-                    val push = (minDist - distance) * 0.03f
-                    blob.x -= (ox / distance) * push
-                    blob.y -= (oy / distance) * push
+                val combinedR = (blob.radius + other.radius) * 0.5f
+                if (odist < combinedR * 1.2f) {
+                    // Repel when too close
+                    val repel = 0.0002f * (combinedR * 1.2f - odist)
+                    blob.velocityX -= (ox / odist) * repel
+                    blob.velocityY -= (oy / odist) * repel
+                } else if (odist < 0.4f) {
+                    // Gentle attraction when in range
+                    val attract = 0.00005f * (totalEnergy + 0.1f)
+                    blob.velocityX += (ox / odist) * attract
+                    blob.velocityY += (oy / odist) * attract
                 }
             }
             
-            // Radius: grows from small spawn size to target size based on age and audio
-            val targetRadius = if (blob.age < 0.5f) {
-                // First 0.5 seconds: grow from min to base
-                minRadius + (baseRadius - minRadius) * (blob.age / 0.5f)
-            } else {
-                // After: base size + audio influence
-                baseRadius + (voiceLevel * (maxRadius - baseRadius))
-            }
-            blob.radius = blob.radius * 0.9f + targetRadius * 0.1f
-            blob.radius = blob.radius.coerceIn(minRadius, maxRadius) * sizeMultiplier
+            // MOMENTUM & DAMPING
+            // Higher friction at rest, less friction when energetic
+            val damping = 0.96f + (totalEnergy * 0.02f).coerceAtMost(0.035f)
+            blob.velocityX *= damping
+            blob.velocityY *= damping
             
-            // Alpha based on audio - subtle at rest, visible with sound
-            val audioLevel = voiceLevels.getOrElse(blob.voiceIndex) { 0f }
-            val targetAlpha = 0.08f + (audioLevel * 0.6f) + (masterLevel * 0.25f)
-            blob.alpha = (blob.alpha * 0.85f + targetAlpha * 0.15f).coerceIn(0.05f, 0.9f)
+            // APPLY PHYSICS
+            blob.x += blob.velocityX
+            blob.y += blob.velocityY
             
-            blob.age += deltaTime
+            // SOFT BOUNDARIES
+            val margin = 0.1f
+            if (blob.x < margin) { blob.velocityX += 0.001f; blob.targetX = 0.5f }
+            if (blob.x > 1.0f - margin) { blob.velocityX -= 0.001f; blob.targetX = 0.5f }
+            if (blob.y < margin) { blob.velocityY += 0.001f; blob.targetY = 0.5f }
+            if (blob.y > 1.0f - margin) { blob.velocityY -= 0.001f; blob.targetY = 0.5f }
             
-            // Remove very old low-energy blobs
-            if (blob.age > 15f && blob.energy < 0.2f && Random.nextFloat() < 0.02f) {
-                blobsToRemove.add(blob)
-            }
+            blob.x = blob.x.coerceIn(0.02f, 0.98f)
+            blob.y = blob.y.coerceIn(0.02f, 0.98f)
         }
-
-        blobs.removeAll(blobsToRemove.toSet())
-        
-        // Keep minimum blob count for visual presence
-        val minBlobs = 4 + (masterLevel * 4).toInt()  // 4-8 minimum based on audio
-        while (blobs.size < minBlobs && blobs.size < _maxBlobs) {
-            spawnRandomBlob(voiceIndex = Random.nextInt(8))
-        }
-    }
-    
-    private fun spawnRandomBlob(voiceIndex: Int) {
-        val pairIndex = voiceIndex / 2
-        val color = voicePairColors[pairIndex]
-        
-        // Spawn well within bounds
-        val x = 0.2f + Random.nextFloat() * 0.6f
-        val y = 0.2f + Random.nextFloat() * 0.6f
-        
-        blobs.add(WanderingBlob(
-            id = nextBlobId++,
-            x = x,
-            y = y,
-            radius = minRadius,  // Start at minimum size (no flash!)
-            velocityX = (Random.nextFloat() - 0.5f) * 0.01f,
-            velocityY = (Random.nextFloat() - 0.5f) * 0.01f,
-            targetX = 0.15f + Random.nextFloat() * 0.7f,
-            targetY = 0.15f + Random.nextFloat() * 0.7f,
-            color = color,
-            voiceIndex = voiceIndex,
-            energy = 0.1f,  // Start low
-            alpha = 0.05f,  // Start nearly invisible
-            wanderAngle = Random.nextFloat() * 6.28f,
-            wanderPhase = Random.nextFloat() * 2f
-        ))
     }
 
     companion object {
@@ -354,14 +286,16 @@ class ShaderLampViz(
             frostLarge = 9f,
             tintAlpha = 0.12f,
             top = VisualizationLiquidScope(
-                saturation = 0.40f,
-                contrast = 0.75f,
+                saturation = .75f,
                 dispersion = .8f,
+                curve = .15f,
+                refraction = 0.4f,
             ),
             bottom = VisualizationLiquidScope(
-                saturation = 0.50f,
-                contrast = 0.75f,
+                saturation = .75f,
                 dispersion = .4f,
+                curve = .15f,
+                refraction = 0.2f,
             ),
         )
     }
