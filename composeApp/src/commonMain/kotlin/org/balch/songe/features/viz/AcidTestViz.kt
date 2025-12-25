@@ -1,18 +1,13 @@
 package org.balch.songe.features.viz
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,34 +23,29 @@ import org.balch.songe.ui.theme.SongeColors
 import org.balch.songe.ui.viz.Visualization
 import org.balch.songe.ui.viz.VisualizationLiquidEffects
 import org.balch.songe.ui.viz.VisualizationLiquidScope
+import org.balch.songe.ui.widgets.VizBackground
 import org.balch.songe.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos
-import kotlin.math.pow
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
- * UI state for the Acid Test visualization.
+ * UI state for the Acid Test visualization - slow morphing plasma bubbles.
  */
 data class AcidTestUiState(
-    val blobs: List<AcidBlob> = emptyList(),
+    val blobs: List<Blob> = emptyList(),
+    val lfoModulation: Float = 0f,
+    val masterEnergy: Float = 0f
 )
 
-data class AcidBlob(
-    val id: Int,
-    var x: Float, // 0-1
-    var y: Float, // 0-1
-    var radius: Float, // 0-1+ (can be very large)
-    var color: Color,
-    var phase: Float = 0f, // For oscillating movement
-    var speed: Float = 0.5f,
-    var targetRadius: Float = 0.5f,
-    var currentAlpha: Float = 0f
-)
-
+/**
+ * Acid Test visualization - psychedelic plastic bubble morphing effect.
+ * Uses the same Blob structure as LavaLamp for compatibility with VizBackground.
+ */
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<Visualization>())
+@ContributesIntoSet(AppScope::class)
 class AcidTestViz(
     private val engine: SongeEngine,
     private val dispatcherProvider: DispatcherProvider,
@@ -64,69 +54,81 @@ class AcidTestViz(
     override val id = "acidTest"
     override val name = "Acid Test"
     override val color = SongeColors.softPurple
-    override val knob1Label = "Morph"
-    override val knob2Label = "Trip"
+    override val knob1Label = "Color"
+    override val knob2Label = "Morph"
 
-    // Low frost for crisper stars, high saturation for vibrant colors
     override val liquidEffects = Default
 
-    private var _spinKnob = 0.5f
-    private var _armsKnob = 0.5f
+    private var _colorKnob = 0.5f
+    private var _morphKnob = 0.5f
 
     override fun setKnob1(value: Float) {
-        _spinKnob = value.coerceIn(0f, 1f)
+        _colorKnob = value.coerceIn(0f, 1f)
     }
 
     override fun setKnob2(value: Float) {
-        _armsKnob = value.coerceIn(0f, 1f)
+        _morphKnob = value.coerceIn(0f, 1f)
     }
 
-    // Galaxy colors - warm core to cool rim
-    private val coreColor = Color(0xFFFF6030)      // Warm orange
-    private val midColor = Color(0xFFAA40AA)       // Purple transition
-    private val rimColor = Color(0xFF1B3984)       // Cool blue
+    // Psychedelic color palette - plastic bubble colors
+    private val plasmaColors = listOf(
+        Color(0xFFFF3399), // Hot pink
+        Color(0xFF00CCFF), // Cyan
+        Color(0xFFFF6600), // Orange
+        Color(0xFF33FF66), // Green
+        Color(0xFFCC33FF), // Purple
+        Color(0xFFFFCC00), // Gold
+        Color(0xFF3366FF), // Blue
+        Color(0xFFFF3333), // Red
+    )
 
-    private val _uiState = MutableStateFlow(GalaxyUiState())
-    val uiState: StateFlow<GalaxyUiState> = _uiState.asStateFlow()
+    // Uses LavaLamp's Blob class for VizBackground compatibility
+    private val blobs = mutableListOf<Blob>()
+    private var nextBlobId = 0
+    private var time = 0f
+
+    // Fewer, MUCH bigger blobs
+    private val numBlobs = 6
+    
+    // Target positions for slow drifting
+    private val targetX = FloatArray(numBlobs) { 0.5f }
+    private val targetY = FloatArray(numBlobs) { 0.5f }
+    private val phases = FloatArray(numBlobs) { 0f }
+
+    private val _uiState = MutableStateFlow(AcidTestUiState())
+    val uiState: StateFlow<AcidTestUiState> = _uiState.asStateFlow()
 
     private var vizJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default)
-    private var rotationAngle = 0f
     private var smoothedEnergy = 0f
-
-    // REDUCED star count for performance, PRE-COMPUTE colors
-    private val starCount = 800  // Reduced from 3000
-    private val stars: List<Star> = generateStars()
-
-    private fun generateStars(): List<Star> {
-        val random = Random(42) // Fixed seed for consistent galaxy
-        return List(starCount) {
-            val radiusFactor = random.nextFloat().pow(0.75f)
-            val brightness = 0.3f + random.nextFloat() * 0.7f
-
-            // Pre-compute color based on radius
-            val t = radiusFactor
-            val starColor = when {
-                t < 0.3f -> lerpColor(coreColor, midColor, t / 0.3f)
-                else -> lerpColor(midColor, rimColor, (t - 0.3f) / 0.7f)
-            }
-
-            Star(
-                radiusFactor = radiusFactor,
-                branchIndex = random.nextInt(4), // 4 spiral arms
-                angleOffset = (random.nextFloat() - 0.5f) * 0.8f,
-                radiusOffset = (random.nextFloat() - 0.5f) * 0.15f,
-                brightness = brightness,
-                size = 2f + random.nextFloat() * 8f,  // 2-6 base size
-                color = starColor
-            )
-        }
-    }
 
     override fun onActivate() {
         if (vizJob?.isActive == true) return
-        rotationAngle = 0f
         smoothedEnergy = 0f
+        time = 0f
+        blobs.clear()
+        
+        // Spawn fixed set of plasma blobs
+        repeat(numBlobs) { i ->
+            val angle = (i.toFloat() / numBlobs) * 2f * PI.toFloat()
+            val dist = 0.15f + Random.nextFloat() * 0.2f
+            
+            targetX[i] = 0.3f + Random.nextFloat() * 0.4f
+            targetY[i] = 0.3f + Random.nextFloat() * 0.4f
+            phases[i] = Random.nextFloat() * 2f * PI.toFloat()
+            
+            blobs.add(Blob(
+                id = nextBlobId++,
+                x = 0.5f + cos(angle) * dist,
+                y = 0.5f + sin(angle) * dist,
+                radius = 0.25f + Random.nextFloat() * 0.15f, // HUGE radius
+                velocityY = 0f,
+                color = plasmaColors[i % plasmaColors.size],
+                voiceIndex = i,
+                energy = 0.4f, // Lower brightness
+                alpha = 0.5f   // More translucent
+            ))
+        }
 
         vizJob = scope.launch(dispatcherProvider.default) {
             var lastFrameTime = currentTimeMillis()
@@ -140,21 +142,18 @@ class AcidTestViz(
                 val lfoValue = engine.lfoOutputFlow.value
                 val masterLevel = engine.masterLevelFlow.value
 
-                smoothedEnergy = smoothedEnergy * 0.92f + masterLevel * 0.08f
+                smoothedEnergy = smoothedEnergy * 0.95f + masterLevel * 0.05f
+                time += deltaTime
 
-                // Rotation - NEGATIVE for reverse direction
-                val baseSpeed = -(0.02f + _spinKnob * 0.08f)
-                val audioBoost = -smoothedEnergy * 0.1f
-                rotationAngle += deltaTime * (baseSpeed + audioBoost)
+                updateBlobs(voiceLevels, masterLevel, lfoValue, deltaTime)
 
-                _uiState.value = GalaxyUiState(
-                    rotationAngle = rotationAngle,
-                    masterEnergy = smoothedEnergy,
+                _uiState.value = AcidTestUiState(
+                    blobs = blobs.toList(),
                     lfoModulation = lfoValue,
-                    voiceLevels = voiceLevels
+                    masterEnergy = smoothedEnergy
                 )
 
-                delay(40) // ~25fps for less CPU usage
+                delay(50) // ~20fps for smoother, slower feel
             }
         }
     }
@@ -162,123 +161,89 @@ class AcidTestViz(
     override fun onDeactivate() {
         vizJob?.cancel()
         vizJob = null
-        rotationAngle = 0f
+        blobs.clear()
         smoothedEnergy = 0f
-        _uiState.value = GalaxyUiState()
+        time = 0f
+        _uiState.value = AcidTestUiState()
+    }
+
+    private fun updateBlobs(voiceLevels: FloatArray, masterLevel: Float, lfoValue: Float, deltaTime: Float) {
+        val morphSpeed = 0.3f + _morphKnob * 0.7f
+        
+        for ((index, blob) in blobs.withIndex()) {
+            val voiceLevel = voiceLevels.getOrElse(index % 8) { 0f }
+            
+            // Faster drift toward target for more visible movement
+            val driftSpeed = 0.012f
+            blob.x += (targetX[index] - blob.x) * driftSpeed
+            blob.y += (targetY[index] - blob.y) * driftSpeed
+            
+            // Add wobble motion
+            val wobble = 0.002f * sin(phases[index] * 2f)
+            blob.x += wobble * cos(phases[index])
+            blob.y += wobble * sin(phases[index])
+            
+            // When close to target, pick new target
+            val distToTarget = sqrt(
+                (targetX[index] - blob.x) * (targetX[index] - blob.x) + 
+                (targetY[index] - blob.y) * (targetY[index] - blob.y)
+            )
+            if (distToTarget < 0.05f) {
+                targetX[index] = 0.1f + Random.nextFloat() * 0.8f
+                targetY[index] = 0.1f + Random.nextFloat() * 0.8f
+            }
+            
+            // Plasma morphing - phase advances
+            phases[index] += deltaTime * morphSpeed
+            
+            // Radius oscillates for breathing/morphing effect
+            val baseRadius = 0.22f + _morphKnob * 0.12f
+            val breathe = sin(phases[index]) * 0.06f
+            val energyPulse = smoothedEnergy * 0.08f
+            blob.radius = baseRadius + breathe + energyPulse
+            
+            // Lower brightness - more translucent
+            blob.energy = 0.35f + voiceLevel * 0.15f + masterLevel * 0.1f
+            blob.alpha = 0.5f + voiceLevel * 0.15f // Subtler
+            
+            // Color shifts based on colorKnob and LFO
+            val colorShift = ((_colorKnob * 8f + lfoValue * 2f + phases[index] * 0.08f) % 8f).toInt()
+            blob.color = plasmaColors[(blob.id + colorShift) % plasmaColors.size]
+        }
     }
 
     @Composable
     override fun Content(modifier: Modifier) {
         val state by uiState.collectAsState()
-
-        Canvas(modifier = modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val cx = w / 2f
-            val cy = h / 2f
-            val maxRadius = minOf(w, h) * 0.7f
-
-            val rotation = state.rotationAngle
-            val energy = state.masterEnergy
-            val lfo = state.lfoModulation
-            val spinFactor = 1.0f + _armsKnob * 2.0f
-
-            // Doubled base intensity (2x brighter)
-            val baseIntensity = 0.8f + energy * 0.2f  // 0.8-1.0 range
-
-            // Deep space background
-            drawRect(Color(0xFF000008))
-
-            // Draw stars - SIMPLE CIRCLES, no gradients per star
-            for (star in stars) {
-                val baseAngle = (star.branchIndex.toFloat() / 4f) * 2f * PI.toFloat()
-                val spiralAngle = star.radiusFactor * spinFactor * 2f * PI.toFloat()
-                val angle = baseAngle + spiralAngle + star.angleOffset + rotation
-                val radius = star.radiusFactor * maxRadius * (1f + star.radiusOffset)
-
-                val x = cx + radius * cos(angle)
-                val y = cy + radius * sin(angle)
-
-                // Voice-based brightness AND size variation
-                val voiceIdx = star.branchIndex
-                val voiceEnergy = (state.voiceLevels.getOrElse(voiceIdx * 2) { 0f } +
-                        state.voiceLevels.getOrElse(voiceIdx * 2 + 1) { 0f }) / 2f
-
-                // More musical reactivity: voice affects alpha and size significantly
-                val alpha = (star.brightness * baseIntensity * (0.5f + voiceEnergy * 0.8f)).coerceIn(0f, 1f)
-
-                // Size varies with energy, LFO, AND individual voice level
-                val sizeMultiplier = 1f + energy * 0.6f + lfo * 0.3f + voiceEnergy * 0.8f
-                val starSize = star.size * sizeMultiplier
-
-                // LFO shifts the hue slightly - blend toward different color
-                val lfoColorShift = (lfo + 1f) / 2f  // 0-1 range
-                val shiftedColor = if (lfoColorShift > 0.5f) {
-                    // Shift toward cyan/white
-                    lerpColor(star.color, Color(0xFF80C0FF), (lfoColorShift - 0.5f) * 0.3f)
-                } else {
-                    // Shift toward magenta
-                    lerpColor(star.color, Color(0xFFFF80C0), (0.5f - lfoColorShift) * 0.3f)
-                }
-
-                // Use shifted color
-                drawCircle(
-                    color = shiftedColor.copy(alpha = alpha),
-                    radius = starSize,
-                    center = Offset(x, y),
-                    blendMode = BlendMode.Plus
-                )
-
-                // Optional soft halo for brighter stars only
-                if (star.brightness > 0.75f) {
-                    drawCircle(
-                        color = star.color.copy(alpha = alpha * 0.3f),
-                        radius = starSize * 2.5f,
-                        center = Offset(x, y),
-                        blendMode = BlendMode.Plus
-                    )
-                }
-            }
-
-            // Subtle center point
-            drawCircle(
-                color = Color.White.copy(alpha = 0.15f * baseIntensity),
-                radius = 2f + energy * 1f,
-                center = Offset(cx, cy),
-                blendMode = BlendMode.Plus
-            )
-        }
-    }
-
-    private fun lerpColor(c1: Color, c2: Color, t: Float): Color {
-        val ct = t.coerceIn(0f, 1f)
-        return Color(
-            red = c1.red + (c2.red - c1.red) * ct,
-            green = c1.green + (c2.green - c1.green) * ct,
-            blue = c1.blue + (c2.blue - c1.blue) * ct,
-            alpha = c1.alpha + (c2.alpha - c1.alpha) * ct
+        
+        // Use the same VizBackground as LavaLamp for consistent rendering
+        VizBackground(
+            modifier = modifier,
+            blobs = state.blobs,
+            lfoModulation = state.lfoModulation,
+            masterEnergy = state.masterEnergy
         )
     }
 
     companion object {
         val Default = VisualizationLiquidEffects(
-            frostSmall = 0f,
-            frostMedium = 0f,
-            frostLarge = 0f,
-            tintAlpha = 0.01f,
+            frostSmall = 6f,
+            frostMedium = 10f,
+            frostLarge = 14f,
+            tintAlpha = 0.03f,
             top = VisualizationLiquidScope(
-                saturation = 1.5f,
-                contrast = 0.8f,
-                refraction = 1f,
-                curve = .2f,
-                dispersion = 1f,
+                saturation = 1.2f,
+                contrast = 0.7f,
+                refraction = 2.5f,  // High refraction
+                curve = .25f,
+                dispersion = 2.0f,  // High dispersion
             ),
             bottom = VisualizationLiquidScope(
-                saturation = 2.5f,
-                contrast = .8f,
-                refraction = 2.5f,
-                curve = .1f,
-                dispersion = 2.0f,
+                saturation = 1.5f,
+                contrast = 0.75f,
+                refraction = 3.5f,  // Very high refraction
+                curve = .2f,
+                dispersion = 3.0f,  // Very high dispersion
             ),
         )
     }
