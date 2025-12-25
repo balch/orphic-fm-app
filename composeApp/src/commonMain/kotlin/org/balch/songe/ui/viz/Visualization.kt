@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidScope
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
+import kotlinx.coroutines.flow.Flow
 
 
 data class VisualizationLiquidScope(
@@ -74,6 +75,13 @@ interface Visualization {
     
     @Composable
     fun Content(modifier: Modifier)
+}
+
+/**
+ * Interface for visualizations that update their liquid effects dynamically.
+ */
+interface DynamicVisualization : Visualization {
+    val liquidEffectsFlow: Flow<VisualizationLiquidEffects>
 }
 
 /**

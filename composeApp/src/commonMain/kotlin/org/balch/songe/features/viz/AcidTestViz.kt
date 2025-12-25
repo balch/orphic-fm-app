@@ -1,0 +1,285 @@
+package org.balch.songe.features.viz
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import org.balch.songe.core.audio.SongeEngine
+import org.balch.songe.core.coroutines.DispatcherProvider
+import org.balch.songe.ui.theme.SongeColors
+import org.balch.songe.ui.viz.Visualization
+import org.balch.songe.ui.viz.VisualizationLiquidEffects
+import org.balch.songe.ui.viz.VisualizationLiquidScope
+import org.balch.songe.util.currentTimeMillis
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.random.Random
+
+/**
+ * UI state for the Acid Test visualization.
+ */
+data class AcidTestUiState(
+    val blobs: List<AcidBlob> = emptyList(),
+)
+
+data class AcidBlob(
+    val id: Int,
+    var x: Float, // 0-1
+    var y: Float, // 0-1
+    var radius: Float, // 0-1+ (can be very large)
+    var color: Color,
+    var phase: Float = 0f, // For oscillating movement
+    var speed: Float = 0.5f,
+    var targetRadius: Float = 0.5f,
+    var currentAlpha: Float = 0f
+)
+
+@Inject
+@ContributesIntoSet(AppScope::class, binding = binding<Visualization>())
+class AcidTestViz(
+    private val engine: SongeEngine,
+    private val dispatcherProvider: DispatcherProvider,
+) : Visualization {
+
+    override val id = "acidTest"
+    override val name = "Acid Test"
+    override val color = SongeColors.softPurple
+    override val knob1Label = "Morph"
+    override val knob2Label = "Trip"
+
+    // Low frost for crisper stars, high saturation for vibrant colors
+    override val liquidEffects = Default
+
+    private var _spinKnob = 0.5f
+    private var _armsKnob = 0.5f
+
+    override fun setKnob1(value: Float) {
+        _spinKnob = value.coerceIn(0f, 1f)
+    }
+
+    override fun setKnob2(value: Float) {
+        _armsKnob = value.coerceIn(0f, 1f)
+    }
+
+    // Galaxy colors - warm core to cool rim
+    private val coreColor = Color(0xFFFF6030)      // Warm orange
+    private val midColor = Color(0xFFAA40AA)       // Purple transition
+    private val rimColor = Color(0xFF1B3984)       // Cool blue
+
+    private val _uiState = MutableStateFlow(GalaxyUiState())
+    val uiState: StateFlow<GalaxyUiState> = _uiState.asStateFlow()
+
+    private var vizJob: Job? = null
+    private val scope = CoroutineScope(Dispatchers.Default)
+    private var rotationAngle = 0f
+    private var smoothedEnergy = 0f
+
+    // REDUCED star count for performance, PRE-COMPUTE colors
+    private val starCount = 800  // Reduced from 3000
+    private val stars: List<Star> = generateStars()
+
+    private fun generateStars(): List<Star> {
+        val random = Random(42) // Fixed seed for consistent galaxy
+        return List(starCount) {
+            val radiusFactor = random.nextFloat().pow(0.75f)
+            val brightness = 0.3f + random.nextFloat() * 0.7f
+
+            // Pre-compute color based on radius
+            val t = radiusFactor
+            val starColor = when {
+                t < 0.3f -> lerpColor(coreColor, midColor, t / 0.3f)
+                else -> lerpColor(midColor, rimColor, (t - 0.3f) / 0.7f)
+            }
+
+            Star(
+                radiusFactor = radiusFactor,
+                branchIndex = random.nextInt(4), // 4 spiral arms
+                angleOffset = (random.nextFloat() - 0.5f) * 0.8f,
+                radiusOffset = (random.nextFloat() - 0.5f) * 0.15f,
+                brightness = brightness,
+                size = 2f + random.nextFloat() * 8f,  // 2-6 base size
+                color = starColor
+            )
+        }
+    }
+
+    override fun onActivate() {
+        if (vizJob?.isActive == true) return
+        rotationAngle = 0f
+        smoothedEnergy = 0f
+
+        vizJob = scope.launch(dispatcherProvider.default) {
+            var lastFrameTime = currentTimeMillis()
+
+            while (isActive) {
+                val currentTime = currentTimeMillis()
+                val deltaTime = (currentTime - lastFrameTime) / 1000f
+                lastFrameTime = currentTime
+
+                val voiceLevels = engine.voiceLevelsFlow.value
+                val lfoValue = engine.lfoOutputFlow.value
+                val masterLevel = engine.masterLevelFlow.value
+
+                smoothedEnergy = smoothedEnergy * 0.92f + masterLevel * 0.08f
+
+                // Rotation - NEGATIVE for reverse direction
+                val baseSpeed = -(0.02f + _spinKnob * 0.08f)
+                val audioBoost = -smoothedEnergy * 0.1f
+                rotationAngle += deltaTime * (baseSpeed + audioBoost)
+
+                _uiState.value = GalaxyUiState(
+                    rotationAngle = rotationAngle,
+                    masterEnergy = smoothedEnergy,
+                    lfoModulation = lfoValue,
+                    voiceLevels = voiceLevels
+                )
+
+                delay(40) // ~25fps for less CPU usage
+            }
+        }
+    }
+
+    override fun onDeactivate() {
+        vizJob?.cancel()
+        vizJob = null
+        rotationAngle = 0f
+        smoothedEnergy = 0f
+        _uiState.value = GalaxyUiState()
+    }
+
+    @Composable
+    override fun Content(modifier: Modifier) {
+        val state by uiState.collectAsState()
+
+        Canvas(modifier = modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val cx = w / 2f
+            val cy = h / 2f
+            val maxRadius = minOf(w, h) * 0.7f
+
+            val rotation = state.rotationAngle
+            val energy = state.masterEnergy
+            val lfo = state.lfoModulation
+            val spinFactor = 1.0f + _armsKnob * 2.0f
+
+            // Doubled base intensity (2x brighter)
+            val baseIntensity = 0.8f + energy * 0.2f  // 0.8-1.0 range
+
+            // Deep space background
+            drawRect(Color(0xFF000008))
+
+            // Draw stars - SIMPLE CIRCLES, no gradients per star
+            for (star in stars) {
+                val baseAngle = (star.branchIndex.toFloat() / 4f) * 2f * PI.toFloat()
+                val spiralAngle = star.radiusFactor * spinFactor * 2f * PI.toFloat()
+                val angle = baseAngle + spiralAngle + star.angleOffset + rotation
+                val radius = star.radiusFactor * maxRadius * (1f + star.radiusOffset)
+
+                val x = cx + radius * cos(angle)
+                val y = cy + radius * sin(angle)
+
+                // Voice-based brightness AND size variation
+                val voiceIdx = star.branchIndex
+                val voiceEnergy = (state.voiceLevels.getOrElse(voiceIdx * 2) { 0f } +
+                        state.voiceLevels.getOrElse(voiceIdx * 2 + 1) { 0f }) / 2f
+
+                // More musical reactivity: voice affects alpha and size significantly
+                val alpha = (star.brightness * baseIntensity * (0.5f + voiceEnergy * 0.8f)).coerceIn(0f, 1f)
+
+                // Size varies with energy, LFO, AND individual voice level
+                val sizeMultiplier = 1f + energy * 0.6f + lfo * 0.3f + voiceEnergy * 0.8f
+                val starSize = star.size * sizeMultiplier
+
+                // LFO shifts the hue slightly - blend toward different color
+                val lfoColorShift = (lfo + 1f) / 2f  // 0-1 range
+                val shiftedColor = if (lfoColorShift > 0.5f) {
+                    // Shift toward cyan/white
+                    lerpColor(star.color, Color(0xFF80C0FF), (lfoColorShift - 0.5f) * 0.3f)
+                } else {
+                    // Shift toward magenta
+                    lerpColor(star.color, Color(0xFFFF80C0), (0.5f - lfoColorShift) * 0.3f)
+                }
+
+                // Use shifted color
+                drawCircle(
+                    color = shiftedColor.copy(alpha = alpha),
+                    radius = starSize,
+                    center = Offset(x, y),
+                    blendMode = BlendMode.Plus
+                )
+
+                // Optional soft halo for brighter stars only
+                if (star.brightness > 0.75f) {
+                    drawCircle(
+                        color = star.color.copy(alpha = alpha * 0.3f),
+                        radius = starSize * 2.5f,
+                        center = Offset(x, y),
+                        blendMode = BlendMode.Plus
+                    )
+                }
+            }
+
+            // Subtle center point
+            drawCircle(
+                color = Color.White.copy(alpha = 0.15f * baseIntensity),
+                radius = 2f + energy * 1f,
+                center = Offset(cx, cy),
+                blendMode = BlendMode.Plus
+            )
+        }
+    }
+
+    private fun lerpColor(c1: Color, c2: Color, t: Float): Color {
+        val ct = t.coerceIn(0f, 1f)
+        return Color(
+            red = c1.red + (c2.red - c1.red) * ct,
+            green = c1.green + (c2.green - c1.green) * ct,
+            blue = c1.blue + (c2.blue - c1.blue) * ct,
+            alpha = c1.alpha + (c2.alpha - c1.alpha) * ct
+        )
+    }
+
+    companion object {
+        val Default = VisualizationLiquidEffects(
+            frostSmall = 0f,
+            frostMedium = 0f,
+            frostLarge = 0f,
+            tintAlpha = 0.01f,
+            top = VisualizationLiquidScope(
+                saturation = 1.5f,
+                contrast = 0.8f,
+                refraction = 1f,
+                curve = .2f,
+                dispersion = 1f,
+            ),
+            bottom = VisualizationLiquidScope(
+                saturation = 2.5f,
+                contrast = .8f,
+                refraction = 2.5f,
+                curve = .1f,
+                dispersion = 2.0f,
+            ),
+        )
+    }
+}

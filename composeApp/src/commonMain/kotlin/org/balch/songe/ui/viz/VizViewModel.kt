@@ -71,15 +71,31 @@ class VizViewModel(
     /**
      * Select a new visualization by instance.
      */
+    private var dynamicEffectsJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Select a new visualization by instance.
+     */
     fun selectVisualization(viz: Visualization, save: Boolean = true) {
         if (_currentViz.value == viz) return
 
         // Deactivate old
         _currentViz.value.onDeactivate()
+        dynamicEffectsJob?.cancel()
+        dynamicEffectsJob = null
 
         // Activate new
         viz.onActivate()
         _currentViz.value = viz
+
+        // Handle dynamic effects
+        if (viz is DynamicVisualization) {
+            dynamicEffectsJob = viewModelScope.launch {
+                viz.liquidEffectsFlow.collect { effects ->
+                     _uiState.value = _uiState.value.copy(liquidEffects = effects)
+                }
+            }
+        }
 
         updateState()
 
@@ -114,5 +130,6 @@ class VizViewModel(
     override fun onCleared() {
         super.onCleared()
         _currentViz.value.onDeactivate()
+        dynamicEffectsJob?.cancel()
     }
 }
