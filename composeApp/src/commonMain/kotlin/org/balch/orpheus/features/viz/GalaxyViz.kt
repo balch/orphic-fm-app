@@ -9,13 +9,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +28,8 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.CenterPanelStyle
+import org.balch.orpheus.ui.viz.DynamicVisualization
 import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VisualizationLiquidScope
@@ -83,11 +89,11 @@ data class Star(
  * Knob2 (ARMS): Controls spiral arm tightness
  */
 @Inject
-@ContributesIntoSet(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding = binding<Visualization>())
 class GalaxyViz(
     private val engine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,
-) : Visualization {
+) : DynamicVisualization {
 
     override val id = "galaxy"
     override val name = "Galaxy"
@@ -151,6 +157,9 @@ class GalaxyViz(
         }
     }
 
+    private val _liquidEffects = MutableStateFlow(Default)
+    override val liquidEffectsFlow: Flow<VisualizationLiquidEffects> = _liquidEffects.asStateFlow()
+
     override fun onActivate() {
         if (vizJob?.isActive == true) return
         rotationAngle = 0f
@@ -181,6 +190,25 @@ class GalaxyViz(
                     lfoModulation = lfoValue,
                     voiceLevels = voiceLevels
                 )
+
+                // Dynamic Title Effects for Galaxy
+                // Pulse color between Rim (cool) and Core (warm) based on LFO
+                val lfoShift = (lfoValue + 1f) / 2f
+                val titleColor = lerpColor(rimColor, coreColor, lfoShift)
+                
+                // Pulse elevation with energy
+                val elevation = 6.dp + (smoothedEnergy * 10).dp
+
+                val currentEffects = Default.copy(
+                    title = Default.title.copy(
+                        titleColor = titleColor,
+                        titleElevation = elevation,
+                        // Subtle size pulse
+                        titleSize = (22 + smoothedEnergy * 4).sp,
+                        borderColor = titleColor.copy(alpha = 0.2f + smoothedEnergy * 0.3f)
+                    )
+                )
+                _liquidEffects.value = currentEffects
 
                 delay(40) // ~25fps for less CPU usage
             }
@@ -306,6 +334,12 @@ class GalaxyViz(
                 saturation = 2f,
                 dispersion = 2f,
             ),
+            title = CenterPanelStyle(
+                scope = VisualizationLiquidScope(contrast = 1.3f, saturation = 1.0f),
+                titleColor = Color(0xFF1B3984), // Cool blue default
+                borderColor = Color(0xFF1B3984).copy(alpha = 0.4f),
+                titleElevation = 6.dp
+            )
         )
     }
 }

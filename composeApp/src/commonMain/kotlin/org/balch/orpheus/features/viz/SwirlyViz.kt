@@ -12,13 +12,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +30,8 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.CenterPanelStyle
+import org.balch.orpheus.ui.viz.DynamicVisualization
 import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VisualizationLiquidScope
@@ -71,11 +76,11 @@ data class SwirlyUiState(
  * Knob2 (DEPTH): Controls spiral tightness
  */
 @Inject
-@ContributesIntoSet(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding = binding<Visualization>())
 class SwirlyViz(
     private val engine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,
-) : Visualization {
+) : DynamicVisualization {
 
     override val id = "swirly"
     override val name = "Swirly"
@@ -115,6 +120,9 @@ class SwirlyViz(
     private var animationTime = 0f
     private var smoothedEnergy = 0f
 
+    private val _liquidEffects = MutableStateFlow(Default)
+    override val liquidEffectsFlow: Flow<VisualizationLiquidEffects> = _liquidEffects.asStateFlow()
+
     override fun onActivate() {
         if (vizJob?.isActive == true) return
         animationTime = 0f
@@ -145,6 +153,24 @@ class SwirlyViz(
                     lfoModulation = lfoValue,
                     voiceLevels = voiceLevels
                 )
+
+                // Dynamic Title Effects
+                val lfoShift = (lfoValue + 1f) / 2f
+                val titleColor = if (lfoShift > 0.5f) {
+                    lerpColor(Color(0xFF6B4A8E), Color(0xFFAA5599), (lfoShift - 0.5f) * 2f)
+                } else {
+                    lerpColor(Color(0xFF6B4A8E), Color(0xFF5599AA), (0.5f - lfoShift) * 2f)
+                }
+
+                val currentEffects = Default.copy(
+                    title = Default.title.copy(
+                        titleColor = titleColor,
+                        titleElevation = (4.dp + (smoothedEnergy * 12).dp),
+                        borderWidth = (1.dp + (smoothedEnergy * 2).dp),
+                        borderColor = titleColor.copy(alpha = 0.3f + smoothedEnergy * 0.5f)
+                    )
+                )
+                _liquidEffects.value = currentEffects
 
                 delay(40) // ~25fps
             }
@@ -299,18 +325,35 @@ class SwirlyViz(
 
     companion object {
         val Default = VisualizationLiquidEffects(
-            frostSmall = 4f,
-            frostMedium = 6f,
-            frostLarge = 8f,
+            frostSmall = 2f,
+            frostMedium = 4f,
+            frostLarge = 6f,
             tintAlpha = 0.10f,
             top = VisualizationLiquidScope(
-                saturation = 0.75f,
-                contrast = 0.8f,
+                refraction = .25f,
+                curve = .15f,
+                saturation = 2f,
+                dispersion = .5f,
             ),
             bottom = VisualizationLiquidScope(
-                saturation = 0.75f,
-                contrast = 0.8f,
+                refraction = .25f,
+                curve = .15f,
+                saturation = 1.5f,
+                dispersion = .2f,
             ),
+            title = CenterPanelStyle(
+                // Swirly specific default
+                scope = VisualizationLiquidScope(
+                    contrast = 1.1f,
+                    saturation = 5f,
+                    dispersion = .3f,
+                    refraction = .25f,
+                    curve = .15f,
+                ),
+                titleColor = Color(0xFF6B4A8E), // Deep Purple base
+                borderColor = Color(0xFF6B4A8E).copy(alpha = 0.3f),
+                titleElevation = 4.dp
+            )
         )
     }
 }

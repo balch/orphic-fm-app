@@ -121,7 +121,7 @@ private fun CenterControlPanelLayout(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.weight(.5f))
         CrossModSelector(
             isCrossQuad = voiceState.fmStructureCrossQuad,
             onToggle = onFmStructureChange
