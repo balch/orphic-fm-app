@@ -116,8 +116,16 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "org.balch.orpheus"
+            packageName = "Orpheus-8"
             packageVersion = "1.0.0"
+
+            macOS {
+                iconFile.set(project.file("src/jvmMain/resources/icon.icns"))
+                dockName = "Orpheus-8"
+            }
+            linux {
+                iconFile.set(project.file("src/jvmMain/resources/icon.png"))
+            }
         }
     }
 }
