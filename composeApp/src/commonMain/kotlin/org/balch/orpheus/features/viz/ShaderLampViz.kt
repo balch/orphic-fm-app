@@ -5,6 +5,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -22,6 +23,7 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.features.viz.shader.MetaballsCanvas
 import org.balch.orpheus.features.viz.shader.MetaballsConfig
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.CenterPanelStyle
 import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VisualizationLiquidScope
@@ -296,6 +298,19 @@ class ShaderLampViz(
                 dispersion = .4f,
                 curve = .15f,
                 refraction = 0.2f,
+            ),
+            title = CenterPanelStyle(
+                scope = VisualizationLiquidScope(
+                    saturation = 4f,
+                    dispersion = 1.5f,
+                    curve = .3f,
+                    refraction = 1f,
+                    contrast = .75f,
+                ),
+                titleColor = OrpheusColors.neonMagenta,
+                borderColor = OrpheusColors.neonMagenta.copy(alpha = 0.4f),
+                borderWidth = 3.dp,
+                titleElevation = 12.dp,
             ),
         )
     }

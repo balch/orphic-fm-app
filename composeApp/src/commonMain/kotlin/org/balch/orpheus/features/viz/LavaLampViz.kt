@@ -5,6 +5,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.CenterPanelStyle
 import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VisualizationLiquidScope
@@ -158,18 +160,7 @@ class LavaLampViz(
     @Composable
     override fun Content(modifier: Modifier) {
         val state by uiState.collectAsState()
-        // Delegate to the composable that knows how to draw this state
-        // Reusing the existing VizBackground logic but moving logic here if needed.
-        // For now, we update VizBackground to take this state or we pass it here.
-        // Actually, better to keep the renderer separate or reuse the composable.
-        // But VizBackground was previously the renderer.
-        // Let's call the specific renderer for LavaLamp
-        
-        // We will need to expose the actual rendering composable.
-        // Since VizBackground currently imports LavaLampUiState, we can reuse pieces of it.
-        // But VizBackground.kt is currently the 'Panel Surface', wait.
-        // No, VizBackground.kt handles the drawing.
-        
+
         VizBackground(
             modifier = modifier,
             blobs = state.blobs,
@@ -322,6 +313,18 @@ class LavaLampViz(
                 dispersion = .4f,
                 curve = .15f,
                 refraction = 0.8f,
+            ),
+            title = CenterPanelStyle(
+                scope = VisualizationLiquidScope(
+                    saturation = 4f,
+                    dispersion = .2f,
+                    curve = .1f,
+                    refraction = 0.2f,
+                ),
+                titleColor = OrpheusColors.synthGreen,
+                borderColor = OrpheusColors.neonMagenta.copy(alpha = 0.4f),
+                borderWidth = 3.dp,
+                titleElevation = 12.dp,
             ),
         )
     }
