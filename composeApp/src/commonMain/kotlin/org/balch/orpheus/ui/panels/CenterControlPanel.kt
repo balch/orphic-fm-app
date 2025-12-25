@@ -1,20 +1,28 @@
 package org.balch.orpheus.ui.panels
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.features.voice.VoiceUiState
@@ -58,13 +66,27 @@ private fun CenterControlPanelLayout(
 ) {
     val liquidState = LocalLiquidState.current
     val shape = RoundedCornerShape(8.dp)
+    val density = LocalDensity.current
+
+    val textShadow = remember(effects.title.titleElevation, density) {
+        val blur = with(density) { effects.title.titleElevation.toPx() }
+        if (blur > 0f) {
+            Shadow(
+                color = Color.Black.copy(alpha = 0.5f),
+                offset = Offset(0f, blur / 2),
+                blurRadius = blur
+            )
+        } else {
+            Shadow.None
+        }
+    }
 
     Column(
         modifier = modifier
             .liquidVizEffects(
                 liquidState = liquidState,
                 scope = effects.bottom,
-                frostAmount = effects.frostLarge.dp,
+                frostAmount = effects.frostMedium.dp,
                 color = OrpheusColors.electricBlue,
                 tintAlpha = effects.tintAlpha,
                 shape = shape,
@@ -74,12 +96,32 @@ private fun CenterControlPanelLayout(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(
-            "ORPHEUS-8",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.6f)
-        )
+        Spacer(modifier = Modifier.weight(.5f))
+        Card(
+            modifier = Modifier
+                .liquidVizEffects(
+                    liquidState = liquidState,
+                    scope = effects.title.scope,
+                    frostAmount = effects.frostLarge.dp,
+                    color = OrpheusColors.softPurple,
+                    tintAlpha = 0.2f,
+                    shape = shape,
+                ),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+            elevation = CardDefaults.cardElevation(defaultElevation = effects.title.titleElevation),
+            shape = shape,
+            border = BorderStroke(effects.title.borderWidth, effects.title.borderColor)
+        ) {
+            Text(
+                text = "ORPHEUS-8",
+                fontSize = effects.title.titleSize,
+                fontWeight = FontWeight.Bold,
+                color = effects.title.titleColor,
+                style = TextStyle(shadow = textShadow),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
         CrossModSelector(
             isCrossQuad = voiceState.fmStructureCrossQuad,
             onToggle = onFmStructureChange
@@ -108,10 +150,11 @@ private fun CenterControlPanelLayout(
             size = 32.dp,
             progressColor = OrpheusColors.warmGlow
         )
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
-@Preview
+@Preview(heightDp = 360)
 @Composable
 fun CenterControlPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,

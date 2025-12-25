@@ -8,7 +8,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidScope
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
@@ -24,6 +26,15 @@ data class VisualizationLiquidScope(
     val contrast: Float = 1f,
 )
 
+data class CenterPanelStyle(
+    val scope: VisualizationLiquidScope = VisualizationLiquidScope(contrast = 1.3f, saturation = 0.9f),
+    val titleSize: TextUnit = 22.sp, // Prominent default
+    val titleColor: Color = Color(0xFF00E5FF), // Neon Cyan
+    val borderColor: Color = Color.White.copy(alpha = 0.3f),
+    val borderWidth: Dp = 1.dp,
+    val titleElevation: Dp = 8.dp
+)
+
 /**
  * Configuration for liquid glassmorphism effects per visualization.
  * Each visualization can define its own settings to adjust how UI panels look.
@@ -35,12 +46,25 @@ data class VisualizationLiquidEffects(
     val tintAlpha: Float = 0.12f,
     val top: VisualizationLiquidScope = VisualizationLiquidScope(),
     val bottom: VisualizationLiquidScope = VisualizationLiquidScope(),
+    val title: CenterPanelStyle = CenterPanelStyle(),
 ) {
     companion object {
         /** Default effects - moderate translucency */
         val Default = VisualizationLiquidEffects()
 
+        private val prominentCenterScope = VisualizationLiquidScope(
+            saturation = 0.8f, 
+            contrast = 1.2f,
+            edge = 0.5f,
+            refraction = 0.2f
+        )
+        
         private val offLiquidScope = VisualizationLiquidScope(saturation = 0.4f, contrast = 0.7f)
+        private val offCenterStyle = CenterPanelStyle(
+            scope = offLiquidScope,
+            titleColor = Color.White.copy(alpha = 0.3f), // Dim title for off
+            borderColor = Color.White.copy(alpha = 0.05f)
+        )
 
         /** Low effects for "Off" mode - less saturation, more frost */
         val Off = VisualizationLiquidEffects(
@@ -49,9 +73,12 @@ data class VisualizationLiquidEffects(
             frostLarge = 12f,
             top = offLiquidScope,
             bottom = offLiquidScope,
+            title = offCenterStyle
         )
     }
 }
+
+
 
 /**
  * Interface for pluggable background visualizations.
