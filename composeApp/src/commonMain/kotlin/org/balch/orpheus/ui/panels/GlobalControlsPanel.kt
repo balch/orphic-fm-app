@@ -162,21 +162,22 @@ fun GlobalControlsPanel(
 fun GlobalControlsPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
-    LiquidPreviewContainerWithGradient(effects = effects, modifier = Modifier.size(900.dp, 300.dp)) {
-        MaterialTheme {
-            GlobalControlsPanel(
-                vibrato = 0.2f,
-                onVibratoChange = {},
-                distortion = 0.4f,
-                onDistortionChange = {},
-                masterVolume = 0.8f,
-                onMasterVolumeChange = {},
-                pan = 0.5f,
-                onPanChange = {},
-                masterDrive = 0.3f,
-                onMasterDriveChange = {},
-                effects = effects
-            )
-        }
+    LiquidPreviewContainerWithGradient(
+        effects = effects,
+        modifier = Modifier.size(900.dp, 300.dp)
+    ) {
+        GlobalControlsPanel(
+            vibrato = 0.2f,
+            onVibratoChange = {},
+            distortion = 0.4f,
+            onDistortionChange = {},
+            masterVolume = 0.8f,
+            onMasterVolumeChange = {},
+            pan = 0.5f,
+            onPanChange = {},
+            masterDrive = 0.3f,
+            onMasterDriveChange = {},
+            effects = effects
+        )
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 
@@ -112,20 +113,22 @@ fun VerticalToggle(
 @Preview
 @Composable
 fun VerticalTogglePreview() {
-    Column {
-        VerticalToggle(
-            topLabel = "LFO",
-            bottomLabel = "OFF",
-            isTop = true,
-            onToggle = {},
-            color = OrpheusColors.warmGlow
-        )
-        VerticalToggle(
-            topLabel = "LFO",
-            bottomLabel = "OFF",
-            isTop = false,
-            onToggle = {},
-            color = OrpheusColors.neonCyan
-        )
+    OrpheusTheme {
+        Column {
+            VerticalToggle(
+                topLabel = "LFO",
+                bottomLabel = "OFF",
+                isTop = true,
+                onToggle = {},
+                color = OrpheusColors.warmGlow
+            )
+            VerticalToggle(
+                topLabel = "LFO",
+                bottomLabel = "OFF",
+                isTop = false,
+                onToggle = {},
+                color = OrpheusColors.neonCyan
+            )
+        }
     }
 }

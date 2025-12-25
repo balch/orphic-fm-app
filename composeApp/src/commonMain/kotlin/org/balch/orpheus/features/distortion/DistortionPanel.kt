@@ -81,12 +81,8 @@ fun DistortionPanelLayout(
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Spacer(modifier = Modifier.height(4.dp))
-
             // Top Row: Drive, Volume
             Row(
                 modifier = Modifier.fillMaxWidth(),

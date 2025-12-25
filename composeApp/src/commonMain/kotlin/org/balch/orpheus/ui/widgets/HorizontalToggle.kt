@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
@@ -95,20 +96,22 @@ fun HorizontalToggle(
 @Preview
 @Composable
 fun HorizontalTogglePreview() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        HorizontalToggle(
-            leftLabel = "F",
-            rightLabel = "S",
-            isLeft = true,
-            onToggle = {},
-            color = OrpheusColors.neonCyan
-        )
-        HorizontalToggle(
-            leftLabel = "LFO",
-            rightLabel = "OFF",
-            isLeft = false,
-            onToggle = {},
-            color = OrpheusColors.warmGlow
-        )
+    OrpheusTheme {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            HorizontalToggle(
+                leftLabel = "F",
+                rightLabel = "S",
+                isLeft = true,
+                onToggle = {},
+                color = OrpheusColors.neonCyan
+            )
+            HorizontalToggle(
+                leftLabel = "LFO",
+                rightLabel = "OFF",
+                isLeft = false,
+                onToggle = {},
+                color = OrpheusColors.warmGlow
+            )
+        }
     }
 }

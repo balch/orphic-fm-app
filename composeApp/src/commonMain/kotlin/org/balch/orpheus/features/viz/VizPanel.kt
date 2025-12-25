@@ -1,4 +1,4 @@
-package org.balch.orpheus.ui.panels
+package org.balch.orpheus.features.viz
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VizViewModel
@@ -50,29 +51,6 @@ fun VizPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
-
-    // Determine knob values (placeholder, as Visualization handles its own knobs)
-    // Actually, Visualization logic means current value isn't easily exposed unless we add getters.
-    // However, RotaryKnob is stateless regarding value IF it's controlled.
-    // For now, simpler: Pass 0.5f if we don't have persistence, OR update Visualization to expose flow.
-    // User requested knobs to be VISIBLE but DISABLED in Off state.
-    // Knobs should be enabled otherwise.
-    // We need to keep some local or exposed state for knob position if we want them to reflect real values.
-    // Visualization interface has setters but not getters in my definition.
-    // Let's assume for now knobs start at 0.5 or we just let them be "relative" controls if we don't track state.
-    // But RotaryKnob needs a value.
-    // I'll use a local state for knobs in UI for now, or just 0.5f base if Viz doesn't expose it.
-    // Ideally Viz exposes it. Let's fix Visualization interface later if needed, but for now 
-    // LavaLampViz has private vars.
-    // I will add getters to Visualization interface in a follow-up or just assume 0.5 default visual.
-    // Using 0.5 for now to unblock, or improved: local state that sends updates.
-    
-    // Actually, simple solution: VizPanel tracks knob state? No, should be in Viz.
-    // I'll add getters to Visualization in next step if I can, or cast for now.
-    // LavaLampViz has getters.
-    
-    // Let's assume we can get values or just use defaults.
-    // For the UI update, let's render the panel first.
 
     VizPanelLayout(
         currentViz = state.selectedViz,
@@ -112,7 +90,7 @@ fun VizPanelLayout(
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+            verticalArrangement = Arrangement.Center
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -154,11 +132,11 @@ fun VizPanelLayout(
                 ) {
                     visualizations.forEach { viz ->
                         DropdownMenuItem(
-                            text = { 
+                            text = {
                                 Text(
-                                    viz.name, 
+                                    viz.name,
                                     color = if (viz.id == currentViz.id) VizColor else Color.White
-                                ) 
+                                )
                             },
                             onClick = {
                                 onSelectViz(viz)
@@ -176,7 +154,7 @@ fun VizPanelLayout(
             // but functional updates work.
             // Ideally we'd cast or expose values.
             Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -186,7 +164,7 @@ fun VizPanelLayout(
                     label = if (showKnobs) currentViz.knob1Label else "-",
                     controlId = "viz_knob1", // Not persisted for now
                     size = 48.dp,
-                    progressColor = if (showKnobs) VizColor else Color.Gray.copy(alpha=0.3f),
+                    progressColor = if (showKnobs) VizColor else Color.Gray.copy(alpha = 0.3f),
                     enabled = showKnobs
                 )
                 RotaryKnob(
@@ -195,7 +173,7 @@ fun VizPanelLayout(
                     label = if (showKnobs) currentViz.knob2Label else "-",
                     controlId = "viz_knob2",
                     size = 48.dp,
-                    progressColor = if (showKnobs) VizColor else Color.Gray.copy(alpha=0.3f),
+                    progressColor = if (showKnobs) VizColor else Color.Gray.copy(alpha = 0.3f),
                     enabled = showKnobs
                 )
             }

@@ -3,10 +3,8 @@ package org.balch.orpheus.features.delay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -16,9 +14,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VerticalToggle
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 /**
  * Smart wrapper that connects DelayViewModel to the layout. Collects state and dispatches events.
@@ -94,10 +97,8 @@ fun ModDelayPanelLayout(
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+            verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
-
             // Row 1: MOD 1, MOD 2, LFO/SELF toggle, TRI/SQR toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -187,5 +188,32 @@ fun ModDelayPanelLayout(
                 )
             }
         }
+    }
+}
+
+@Preview(widthDp = 300, heightDp = 240)
+@Composable
+fun ModDelayPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        ModDelayPanelLayout(
+            time1 = 0.5f,
+            onTime1Change = {},
+            mod1 = 0.3f,
+            onMod1Change = {},
+            time2 = 0.6f,
+            onTime2Change = {},
+            mod2 = 0.4f,
+            onMod2Change = {},
+            feedback = 0.7f,
+            onFeedbackChange = {},
+            mix = 0.5f,
+            onMixChange = {},
+            isLfoSource = true,
+            onSourceChange = {},
+            isTriangleWave = true,
+            onWaveformChange = {}
+        )
     }
 }

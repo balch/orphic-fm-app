@@ -8,11 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,24 +22,15 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import io.github.fletchmckee.liquid.LiquidState
-import io.github.fletchmckee.liquid.liquefiable
-import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
 import org.balch.orpheus.ui.panels.CenterControlPanel
 import org.balch.orpheus.ui.panels.HeaderPanel
-import org.balch.orpheus.ui.panels.LocalLiquidEffects
-import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.LearnModeProvider
-import org.balch.orpheus.ui.widgets.VizBackground
 import org.balch.orpheus.util.Logger
-import org.jetbrains.compose.ui.tooling.preview.Preview
 
-@Preview(widthDp = 800, heightDp = 600)
 @Composable
 fun SynthScreen(
     orchestrator: SynthOrchestrator,

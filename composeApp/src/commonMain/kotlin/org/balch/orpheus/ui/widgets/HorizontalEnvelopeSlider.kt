@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.roundToInt
 
@@ -170,22 +171,24 @@ fun HorizontalEnvelopeSlider(
 @Preview
 @Composable
 fun HorizontalEnvelopeSliderPreview() {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        HorizontalEnvelopeSlider(
-            value = 0f,
-            onValueChange = {},
-            color = OrpheusColors.neonCyan
-        )
-        HorizontalEnvelopeSlider(
-            value = 0.5f,
-            onValueChange = {},
-            color = OrpheusColors.warmGlow
-        )
-        HorizontalEnvelopeSlider(
-            value = 1f,
-            onValueChange = {},
-            color = OrpheusColors.neonMagenta
-        )
+    OrpheusTheme {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            HorizontalEnvelopeSlider(
+                value = 0f,
+                onValueChange = {},
+                color = OrpheusColors.neonCyan
+            )
+            HorizontalEnvelopeSlider(
+                value = 0.5f,
+                onValueChange = {},
+                color = OrpheusColors.warmGlow
+            )
+            HorizontalEnvelopeSlider(
+                value = 1f,
+                onValueChange = {},
+                color = OrpheusColors.neonMagenta
+            )
+        }
     }
 }
 

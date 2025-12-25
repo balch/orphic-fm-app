@@ -89,10 +89,6 @@ private fun MidiPanelLayout(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Spacer(modifier = Modifier.height(4.dp))
-
             // Device status with connection dot
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -196,8 +192,6 @@ private fun MidiPanelLayout(
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }

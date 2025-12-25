@@ -18,6 +18,7 @@ import org.balch.orpheus.features.viz.SwirlyViz
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameterProvider
 
@@ -45,33 +46,35 @@ fun LiquidPreviewContainerWithGradient(
     modifier: Modifier = Modifier.size(400.dp, 300.dp),
     content: @Composable () -> Unit
 ) {
-    val liquidState: LiquidState = rememberLiquidState()
-    
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
-    ) {
-        // Colorful gradient background to see the liquid blur effect
+    OrpheusTheme {
+        val liquidState: LiquidState = rememberLiquidState()
+
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
-                        colors = listOf(
-                            OrpheusColors.neonMagenta.copy(alpha = 0.4f),
-                            OrpheusColors.electricBlue.copy(alpha = 0.3f),
-                            OrpheusColors.darkVoid
+            modifier = modifier,
+            contentAlignment = Alignment.Center
+        ) {
+            // Colorful gradient background to see the liquid blur effect
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                            colors = listOf(
+                                OrpheusColors.neonMagenta.copy(alpha = 0.4f),
+                                OrpheusColors.electricBlue.copy(alpha = 0.3f),
+                                OrpheusColors.darkVoid
+                            )
                         )
                     )
-                )
-                .liquefiable(liquidState)
-        )
-        
-        CompositionLocalProvider(
-            LocalLiquidState provides liquidState,
-            LocalLiquidEffects provides effects
-        ) {
-            content()
+                    .liquefiable(liquidState)
+            )
+
+            CompositionLocalProvider(
+                LocalLiquidState provides liquidState,
+                LocalLiquidEffects provides effects
+            ) {
+                content()
+            }
         }
     }
 }

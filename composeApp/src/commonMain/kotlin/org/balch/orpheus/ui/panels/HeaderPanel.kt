@@ -36,7 +36,7 @@ fun HeaderPanel(
     var presetExpanded by remember { mutableStateOf(false) }
     var midiExpanded by remember { mutableStateOf(false) }
     var stereoExpanded by remember { mutableStateOf(false) }
-    var vizExpanded by remember { mutableStateOf(false) }
+    var vizExpanded by remember { mutableStateOf(true) }
     var lfoExpanded by remember { mutableStateOf(true) }
     var delayExpanded by remember { mutableStateOf(true) }
     var distortionExpanded by remember { mutableStateOf(true) }
@@ -64,7 +64,7 @@ fun HeaderPanel(
             onExpandedChange = { stereoExpanded = it },
             modifier = panelModifier(stereoExpanded)
         )
-        VizPanel(
+        _root_ide_package_.org.balch.orpheus.features.viz.VizPanel(
             isExpanded = vizExpanded,
             onExpandedChange = { vizExpanded = it },
             modifier = panelModifier(vizExpanded)

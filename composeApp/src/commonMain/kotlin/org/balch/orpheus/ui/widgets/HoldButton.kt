@@ -22,12 +22,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 @Preview
 fun HoldButtonPreview() {
-    MaterialTheme {
+    OrpheusTheme {
         HoldButton(checked = true, onCheckedChange = {})
     }
 }

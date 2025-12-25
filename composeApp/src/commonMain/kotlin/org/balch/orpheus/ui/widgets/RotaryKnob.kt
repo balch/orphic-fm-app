@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.PI
 import kotlin.math.cos
@@ -37,7 +38,7 @@ import kotlin.math.sin
 @Composable
 @Preview
 fun RotaryKnobPreview() {
-    MaterialTheme {
+    OrpheusTheme {
         RotaryKnob(value = 0.5f, onValueChange = {})
     }
 }

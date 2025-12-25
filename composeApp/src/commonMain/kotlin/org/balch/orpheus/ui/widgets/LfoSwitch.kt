@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 enum class LfoWaveform {
@@ -32,7 +33,7 @@ enum class LfoWaveform {
 @Composable
 @Preview
 fun LfoSwitchPreview() {
-    MaterialTheme {
+    OrpheusTheme {
         LfoSwitch(
             enabled = true,
             onEnabledChange = {},

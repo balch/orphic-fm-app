@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
@@ -142,21 +143,23 @@ fun HorizontalSwitch3Way(
 @Preview
 @Composable
 fun HorizontalSwitch3WayPreview() {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        HorizontalSwitch3Way(
-            state = ModSource.OFF,
-            onStateChange = {},
-            color = OrpheusColors.neonMagenta
-        )
-        HorizontalSwitch3Way(
-            state = ModSource.VOICE_FM,
-            onStateChange = {},
-            color = OrpheusColors.neonMagenta
-        )
-        HorizontalSwitch3Way(
-            state = ModSource.LFO,
-            onStateChange = {},
-            color = OrpheusColors.neonMagenta
-        )
+    OrpheusTheme {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            HorizontalSwitch3Way(
+                state = ModSource.OFF,
+                onStateChange = {},
+                color = OrpheusColors.neonMagenta
+            )
+            HorizontalSwitch3Way(
+                state = ModSource.VOICE_FM,
+                onStateChange = {},
+                color = OrpheusColors.neonMagenta
+            )
+            HorizontalSwitch3Way(
+                state = ModSource.LFO,
+                onStateChange = {},
+                color = OrpheusColors.neonMagenta
+            )
+        }
     }
 }

@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,11 +31,15 @@ import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.learnable
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 enum class HyperLfoMode {
     AND,
@@ -379,8 +382,10 @@ private fun Vertical3WaySwitch(
 
 @Preview(widthDp = 320, heightDp = 240)
 @Composable
-fun HyperLfoPanelPreview() {
-    MaterialTheme {
+fun HyperLfoPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects) {
         HyperLfoPanelLayout(
             lfo1Rate = 0.5f,
             onLfo1RateChange = {},
