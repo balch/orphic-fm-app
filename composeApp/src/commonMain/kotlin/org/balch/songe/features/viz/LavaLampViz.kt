@@ -307,19 +307,21 @@ class LavaLampViz(
 
     companion object {
         val Default = VisualizationLiquidEffects(
-            frostSmall = 5f,
-            frostMedium = 7f,
-            frostLarge = 9f,
+            frostSmall = 2f,
+            frostMedium = 6f,
+            frostLarge = 8f,
             tintAlpha = 0.12f,
             top = VisualizationLiquidScope(
                 saturation = 0.40f,
-                contrast = 0.75f,
                 dispersion = .8f,
+                curve = .15f,
+                refraction = 0.4f,
             ),
             bottom = VisualizationLiquidScope(
-                saturation = 0.50f,
-                contrast = 0.75f,
+                saturation = 1f,
                 dispersion = .4f,
+                curve = .15f,
+                refraction = 0.8f,
             ),
         )
     }
