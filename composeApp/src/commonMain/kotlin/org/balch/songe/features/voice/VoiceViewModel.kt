@@ -337,7 +337,10 @@ class VoiceViewModel(
             is VoiceIntent.PulseStart -> engine.setVoiceGate(intent.index, true)
             is VoiceIntent.PulseEnd -> {
                 val voice = uiState.value.voiceStates[intent.index]
-                if (!voice.isHolding) engine.setVoiceGate(intent.index, false)
+                // Always close the gate to trigger envelope release
+                engine.setVoiceGate(intent.index, false)
+                // If holding, the hold level provides the floor that VCA won't go below
+                // (hold level was already set when Hold was activated)
             }
 
             is VoiceIntent.Hold -> {
