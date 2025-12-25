@@ -88,8 +88,7 @@ fun SynthScreen(
                                 voiceViewModel = voiceViewModel,
                                 isDialogActive = isDialogActive
                             )
-                        }
-                        .verticalScroll(rememberScrollState()),
+                        },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top
                 ) {
@@ -100,7 +99,7 @@ fun SynthScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(androidx.compose.foundation.layout.IntrinsicSize.Min),
+                            .weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         VoiceGroupSection(
