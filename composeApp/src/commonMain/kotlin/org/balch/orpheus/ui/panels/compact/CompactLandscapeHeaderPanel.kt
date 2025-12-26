@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DropdownMenuItem
@@ -13,9 +14,11 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.ui.viz.Visualization
@@ -40,7 +43,7 @@ fun CompactLandscapeHeaderPanel(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Patch dropdown
@@ -54,8 +57,13 @@ fun CompactLandscapeHeaderPanel(
                 readOnly = true,
                 singleLine = true,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = presetDropdownExpanded) },
-                modifier = Modifier.menuAnchor().width(140.dp),
-                textStyle = MaterialTheme.typography.bodySmall
+                modifier = Modifier.menuAnchor().width(140.dp).height(42.dp),
+                textStyle = MaterialTheme.typography.bodySmall,
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                )
             )
             ExposedDropdownMenu(
                 expanded = presetDropdownExpanded,
@@ -87,8 +95,13 @@ fun CompactLandscapeHeaderPanel(
                 readOnly = true,
                 singleLine = true,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = vizDropdownExpanded) },
-                modifier = Modifier.menuAnchor().width(140.dp),
-                textStyle = MaterialTheme.typography.bodySmall
+                modifier = Modifier.menuAnchor().width(140.dp).height(42.dp),
+                textStyle = MaterialTheme.typography.bodySmall,
+                colors = TextFieldDefaults.colors(
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                )
             )
             ExposedDropdownMenu(
                 expanded = vizDropdownExpanded,

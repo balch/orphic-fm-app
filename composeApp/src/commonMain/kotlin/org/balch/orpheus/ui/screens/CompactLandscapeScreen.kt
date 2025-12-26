@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
@@ -30,6 +29,9 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.timeline.TweakTimelineUiState
+import org.balch.orpheus.features.timeline.TweakTimelineViewModel
+import org.balch.orpheus.features.timeline.ui.CompactTweakTimelineView
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -63,10 +65,12 @@ fun CompactLandscapeScreen(
     voiceViewModel: VoiceViewModel = metroViewModel(),
     presetViewModel: PresetsViewModel = metroViewModel(),
     vizViewModel: VizViewModel = metroViewModel(),
+    timelineViewModel: TweakTimelineViewModel = metroViewModel(),
 ) {
     val voiceState by voiceViewModel.uiState.collectAsState()
     val presetState by presetViewModel.uiState.collectAsState()
     val vizState by vizViewModel.uiState.collectAsState()
+    val timelineState by timelineViewModel.uiState.collectAsState()
 
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
@@ -76,6 +80,7 @@ fun CompactLandscapeScreen(
         presetState = presetState,
         voiceState = voiceState,
         vizState = vizState,
+        timelineState = timelineState,
         liquidState = liquidState,
         effects = effects,
         onPresetSelect = { presetViewModel.applyPreset(it) },
@@ -87,6 +92,9 @@ fun CompactLandscapeScreen(
         onVoiceHoldChange = { i, h -> voiceViewModel.onHoldChange(i, h) },
         onQuadPitchChange = { i, v -> voiceViewModel.onQuadPitchChange(i, v) },
         onQuadHoldChange = { i, v -> voiceViewModel.onQuadHoldChange(i, v) },
+        onTimelinePlayPause = { timelineViewModel.togglePlayPause() },
+        onTimelineStop = { timelineViewModel.stop() },
+        onTimelineExpand = { timelineViewModel.expand() },
         onKeyEvent = { event, isDialogActive ->
             SynthKeyboardHandler.handleKeyEvent(
                 keyEvent = event,
@@ -104,6 +112,7 @@ private fun CompactLandscapeLayout(
     presetState: PresetUiState,
     voiceState: VoiceUiState,
     vizState: VizUiState,
+    timelineState: TweakTimelineUiState,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     onPresetSelect: (org.balch.orpheus.core.presets.DronePreset) -> Unit,
@@ -115,6 +124,9 @@ private fun CompactLandscapeLayout(
     onVoiceHoldChange: (Int, Boolean) -> Unit,
     onQuadPitchChange: (Int, Float) -> Unit,
     onQuadHoldChange: (Int, Float) -> Unit,
+    onTimelinePlayPause: () -> Unit,
+    onTimelineStop: () -> Unit,
+    onTimelineExpand: () -> Unit,
     onKeyEvent: (androidx.compose.ui.input.key.KeyEvent, Boolean) -> Boolean,
 ) {
     val shape = RoundedCornerShape(12.dp)
@@ -153,19 +165,17 @@ private fun CompactLandscapeLayout(
             onVizSelect = onVizSelect
         )
 
-        // Middle area: space for timeline widgets (future)
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Quad Dials Row (Pitch/Hold)
+        // Middle row: Quad Knobs at ends, 3 Timelines in center
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+                .weight(1f)
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Quad 1 Group Controls (1-4)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Quad 1 Knobs (Left End)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RotaryKnob(
                     value = voiceState.quadGroupPitches[0],
                     onValueChange = { onQuadPitchChange(0, it) },
@@ -182,10 +192,20 @@ private fun CompactLandscapeLayout(
                 )
             }
 
-            Spacer(modifier = Modifier.width(32.dp))
 
-            // Quad 2 Group Controls (5-8)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            CompactTweakTimelineView(
+                state = timelineState.timeline,
+                onPlayPause = onTimelinePlayPause,
+                onStop = onTimelineStop,
+                onExpand = onTimelineExpand,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(1f)
+                    .padding(horizontal = 8.dp)
+            )
+
+            // Quad 2 Knobs (Right End)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RotaryKnob(
                     value = voiceState.quadGroupPitches[1],
                     onValueChange = { onQuadPitchChange(1, it) },
@@ -303,6 +323,7 @@ private fun CompactLandscapeLayoutPreview(
                     visualizations = listOf(org.balch.orpheus.features.viz.OffViz()),
                     showKnobs = false
                 ),
+                timelineState = TweakTimelineUiState(),
                 liquidState = liquidState,
                 effects = effects,
                 onPresetSelect = {},
@@ -314,6 +335,9 @@ private fun CompactLandscapeLayoutPreview(
                 onVoiceHoldChange = { _, _ -> },
                 onQuadPitchChange = { _, _ -> },
                 onQuadHoldChange = { _, _ -> },
+                onTimelinePlayPause = {},
+                onTimelineStop = {},
+                onTimelineExpand = {},
                 onKeyEvent = { _, _ -> false }
             )
         }
