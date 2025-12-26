@@ -96,3 +96,16 @@ class JsynLimiter : Limiter {
     override val drive: AudioInput = JsynAudioInput(jsLimiter.drive)
     override val output: AudioOutput = JsynAudioOutput(jsLimiter.output)
 }
+
+actual interface LinearRamp : AudioUnit {
+    actual val input: AudioInput
+    actual val time: AudioInput
+}
+
+class JsynLinearRampWrapper : LinearRamp {
+    internal val jsRamp = com.jsyn.unitgen.LinearRamp()
+
+    override val input: AudioInput = JsynAudioInput(jsRamp.input)
+    override val time: AudioInput = JsynAudioInput(jsRamp.time)
+    override val output: AudioOutput = JsynAudioOutput(jsRamp.output)
+}

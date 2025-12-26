@@ -182,8 +182,9 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
                 updateOutput()
             }
 
-            1 -> { // OFF - mute output
+            1 -> { // OFF - output stable 0 (becomes 0.5 after unipolar conversion)
                 outputProxy.input.disconnectAll()
+                outputProxy.input.set(0.0) // Stable center position
             }
 
             2 -> { // OR

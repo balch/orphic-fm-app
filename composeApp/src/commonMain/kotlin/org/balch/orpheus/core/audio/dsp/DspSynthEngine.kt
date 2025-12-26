@@ -96,6 +96,12 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     private val lfoToUnipolar2 = audioEngine.createMultiplyAdd()
     private val delay1ModMixer = audioEngine.createMultiplyAdd() // (UnipolarLFO * Depth) + BaseTime
     private val delay2ModMixer = audioEngine.createMultiplyAdd()
+    
+    // LinearRamp units for smooth parameter transitions (prevents zipper noise)
+    private val delay1TimeRamp = audioEngine.createLinearRamp()
+    private val delay2TimeRamp = audioEngine.createLinearRamp()
+    private val delay1ModDepthRamp = audioEngine.createLinearRamp()
+    private val delay2ModDepthRamp = audioEngine.createLinearRamp()
 
     // Self-modulation attenuators
     private val selfMod1Attenuator = audioEngine.createMultiply()
@@ -243,6 +249,12 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         audioEngine.addUnit(postMixSummerLeft)
         audioEngine.addUnit(postMixSummerRight)
         
+        // LinearRamp units for smooth parameter transitions
+        audioEngine.addUnit(delay1TimeRamp)
+        audioEngine.addUnit(delay2TimeRamp)
+        audioEngine.addUnit(delay1ModDepthRamp)
+        audioEngine.addUnit(delay2ModDepthRamp)
+        
         audioEngine.addUnit(masterGainLeft)
         audioEngine.addUnit(masterGainRight)
         audioEngine.addUnit(stereoSumLeft)
@@ -313,11 +325,29 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         lfoToUnipolar2.inputB.set(0.5)
         lfoToUnipolar2.inputC.set(0.5)
 
+        // Configure LinearRamps for smooth parameter transitions (50ms ramp time)
+        delay1TimeRamp.time.set(0.05)
+        delay2TimeRamp.time.set(0.05)
+        delay1ModDepthRamp.time.set(0.05)
+        delay2ModDepthRamp.time.set(0.05)
+        
+        // Initialize ramps with default values
+        delay1TimeRamp.input.set(0.3)  // Default delay time
+        delay2TimeRamp.input.set(0.3)
+        delay1ModDepthRamp.input.set(0.0)  // Default mod depth
+        delay2ModDepthRamp.input.set(0.0)
+
         // Connect unipolar LFO to modulation mixers
+        // Mod mixer formula: (LFO * ModDepth) + BaseTime
         lfoToUnipolar1.output.connect(delay1ModMixer.inputA)
         lfoToUnipolar2.output.connect(delay2ModMixer.inputA)
-        delay1ModMixer.inputB.set(0.0) // Mod depth
-        delay2ModMixer.inputB.set(0.0)
+        
+        // Wire ramp outputs to mod mixer inputs for smooth parameter changes
+        delay1ModDepthRamp.output.connect(delay1ModMixer.inputB)  // Smoothed mod depth
+        delay2ModDepthRamp.output.connect(delay2ModMixer.inputB)
+        delay1TimeRamp.output.connect(delay1ModMixer.inputC)      // Smoothed base time
+        delay2TimeRamp.output.connect(delay2ModMixer.inputC)
+        
         delay1ModMixer.output.connect(delay1.delay)
         delay2ModMixer.output.connect(delay2.delay)
 
@@ -500,10 +530,11 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     override fun setDelayTime(index: Int, time: Float) {
         _delayTime[index] = time
         val delaySeconds = 0.01 + (time * 1.99)
+        // LinearRamp handles audio-rate smoothing automatically
         if (index == 0) {
-            delay1ModMixer.inputC.set(delaySeconds)
+            delay1TimeRamp.input.set(delaySeconds)
         } else {
-            delay2ModMixer.inputC.set(delaySeconds)
+            delay2TimeRamp.input.set(delaySeconds)
         }
     }
 
@@ -551,14 +582,14 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
 
     override fun setDelayModDepth(index: Int, amount: Float) {
         _delayModDepth[index] = amount
-        // Modulation depth: max 0.5 seconds
+        // Modulation depth: max 0.1 seconds (reduced from 0.5 for less aggressive modulation)
         // Since LFO is unipolar (0-1), delay time = baseTime + (unipolarLFO * depth)
-        // This ensures delay times are always >= baseTime (no negative values)
-        val depth = amount * 0.5
+        val depth = amount * 0.1  // Reduced from 0.5s to 0.1s
+        // LinearRamp handles audio-rate smoothing automatically
         if (index == 0) {
-            delay1ModMixer.inputB.set(depth)
+            delay1ModDepthRamp.input.set(depth)
         } else {
-            delay2ModMixer.inputB.set(depth)
+            delay2ModDepthRamp.input.set(depth)
         }
     }
 

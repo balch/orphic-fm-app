@@ -79,3 +79,15 @@ expect interface Limiter : AudioUnit {
     /** Drive amount input */
     val drive: AudioInput
 }
+
+/**
+ * Linear ramp for smooth parameter transitions.
+ * Prevents zipper noise by interpolating values over time.
+ */
+expect interface LinearRamp : AudioUnit {
+    /** Target value input */
+    val input: AudioInput
+    
+    /** Ramp time in seconds */
+    val time: AudioInput
+}
