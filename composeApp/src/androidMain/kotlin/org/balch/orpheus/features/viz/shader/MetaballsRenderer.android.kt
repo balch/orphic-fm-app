@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.viz.shader
 
+import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.compose.foundation.Canvas
@@ -22,6 +23,8 @@ import org.balch.orpheus.features.viz.Blob
  */
 actual class MetaballsRenderer {
     private var runtimeShader: RuntimeShader? = null
+    private val ballsData = FloatArray(16 * 4)
+    private val colorsData = FloatArray(16 * 4)
     
     init {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -60,10 +63,7 @@ actual class MetaballsRenderer {
             shader.setFloatUniform("lfoMod", lfoModulation)
             shader.setFloatUniform("masterEnergy", masterEnergy)
             
-            // Pack balls and colors data
-            val ballsData = FloatArray(16 * 4)
-            val colorsData = FloatArray(16 * 4)
-            
+            // Pack balls and colors data (reusing existing arrays)
             blobs.take(16).forEachIndexed { index, blob ->
                 val offset = index * 4
                 ballsData[offset] = blob.x
@@ -75,6 +75,19 @@ actual class MetaballsRenderer {
                 colorsData[offset + 1] = blob.color.green
                 colorsData[offset + 2] = blob.color.blue
                 colorsData[offset + 3] = blob.alpha
+            }
+            
+            // Clear remaining slots if fewer than 16 blobs
+            for (i in blobs.size until 16) {
+                val offset = i * 4
+                ballsData[offset] = 0f
+                ballsData[offset + 1] = 0f
+                ballsData[offset + 2] = 0f
+                ballsData[offset + 3] = 0f
+                colorsData[offset] = 0f
+                colorsData[offset + 1] = 0f
+                colorsData[offset + 2] = 0f
+                colorsData[offset + 3] = 0f
             }
             
             shader.setFloatUniform("balls", ballsData)
@@ -105,6 +118,18 @@ actual fun MetaballsCanvas(
     
     if (renderer.isSupported() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         // Shader-based rendering using graphicsLayer with RenderEffect
+        // We remember the RenderEffect to avoid recreating it every frame
+        val shader = renderer.getShader()
+        val renderEffect = remember(shader) {
+            if (shader != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                RenderEffect
+                    .createShaderEffect(shader)
+                    .asComposeRenderEffect()
+            } else {
+                null
+            }
+        }
+
         Canvas(
             modifier = modifier
                 .fillMaxSize()
@@ -118,11 +143,7 @@ actual fun MetaballsCanvas(
                         masterEnergy = masterEnergy,
                         time = time
                     )
-                    renderer.getShader()?.let { shader ->
-                        renderEffect = android.graphics.RenderEffect
-                            .createRuntimeShaderEffect(shader, "contents")
-                            .asComposeRenderEffect()
-                    }
+                    this.renderEffect = renderEffect
                 }
         ) {
             // The shader will process this content

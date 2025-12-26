@@ -57,6 +57,7 @@ private class AndroidAudioOutputStream(
     private var audioTrack: AudioTrack? = null
     private val bufferSizeInBytes: Int
     private val shortBuffer: ShortArray
+    private val singleSampleBuffer = DoubleArray(1)
     
     init {
         // Calculate buffer size
@@ -116,17 +117,30 @@ private class AndroidAudioOutputStream(
     override fun write(buffer: DoubleArray, start: Int, count: Int) {
         val track = audioTrack ?: return
         
-        // Convert double samples [-1.0, 1.0] to short samples [-32768, 32767]
-        val samplesToWrite = minOf(count, shortBuffer.size)
-        for (i in 0 until samplesToWrite) {
-            val sample = buffer[start + i]
-            // Clamp and convert to short
-            val clamped = sample.coerceIn(-1.0, 1.0)
-            shortBuffer[i] = (clamped * 32767.0).toInt().toShort()
-        }
+        var samplesRemaining = count
+        var currentStart = start
         
-        // Write to AudioTrack
-        track.write(shortBuffer, 0, samplesToWrite, AudioTrack.WRITE_BLOCKING)
+        while (samplesRemaining > 0) {
+            val samplesToWrite = minOf(samplesRemaining, shortBuffer.size)
+            for (i in 0 until samplesToWrite) {
+                val sample = buffer[currentStart + i]
+                // Clamp and convert to short
+                val clamped = sample.coerceIn(-1.0, 1.0)
+                shortBuffer[i] = (clamped * 32767.0).toInt().toShort()
+            }
+            
+            // Write to AudioTrack
+            val written = track.write(shortBuffer, 0, samplesToWrite, AudioTrack.WRITE_BLOCKING)
+            
+            if (written > 0) {
+                samplesRemaining -= written
+                currentStart += written
+            } else {
+                // Error occurred or 0 written (should not happen in WRITE_BLOCKING but safety first)
+                // Stop to avoid tight infinite loop
+                break
+            }
+        }
     }
 
     override fun getLatency(): Double {

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -188,6 +189,7 @@ class SwirlyViz(
     @Composable
     override fun Content(modifier: Modifier) {
         val state by uiState.collectAsState()
+        val path = remember { Path() }
 
         Canvas(modifier = modifier.fillMaxSize()) {
             val w = size.width
@@ -234,8 +236,8 @@ class SwirlyViz(
                 // Color for this arm
                 val armColor = spiralColors[arm % spiralColors.size]
                 
-                // Draw spiral path from outside to center
-                val path = Path()
+                // Draw spiral path from outside to center (reusing path object)
+                path.reset()
                 val segments = 60
                 
                 for (i in 0..segments) {

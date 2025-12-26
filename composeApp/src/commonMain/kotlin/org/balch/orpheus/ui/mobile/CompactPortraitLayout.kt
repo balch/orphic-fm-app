@@ -233,6 +233,7 @@ private fun StringsCanvas(
     var activeStrings by remember { mutableStateOf(setOf<Int>()) }
     // Track deflection amount for each string (for visual feedback)
     var stringDeflections by remember { mutableStateOf(listOf(0f, 0f, 0f, 0f)) }
+    val path = remember { Path() }
 
     Canvas(
         modifier = modifier
@@ -323,15 +324,14 @@ private fun StringsCanvas(
 
             // Draw string with deflection curve
             if (abs(deflection) > 0.01f) {
-                val path = Path().apply {
-                    moveTo(stringCenterX, 0f)
-                    val midY = stringHeight / 2f
-                    val deflectionX = deflection * stringWidth * 0.8f
-                    quadraticBezierTo(
-                        stringCenterX + deflectionX, midY,
-                        stringCenterX, stringHeight
-                    )
-                }
+                path.reset()
+                path.moveTo(stringCenterX, 0f)
+                val midY = stringHeight / 2f
+                val deflectionX = deflection * stringWidth * 0.8f
+                path.quadraticTo(
+                    stringCenterX + deflectionX, midY,
+                    stringCenterX, stringHeight
+                )
                 drawPath(
                     path = path,
                     color = color.copy(alpha = alpha),
