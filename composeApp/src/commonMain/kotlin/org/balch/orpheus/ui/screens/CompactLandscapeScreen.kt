@@ -170,14 +170,14 @@ private fun CompactLandscapeLayout(
                     value = voiceState.quadGroupPitches[0],
                     onValueChange = { onQuadPitchChange(0, it) },
                     label = "Pitch",
-                    size = 48.dp,
+                    size = 38.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
                 RotaryKnob(
                     value = voiceState.quadGroupHolds[0],
                     onValueChange = { onQuadHoldChange(0, it) },
                     label = "Hold",
-                    size = 48.dp,
+                    size = 38.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
             }
@@ -190,14 +190,14 @@ private fun CompactLandscapeLayout(
                     value = voiceState.quadGroupPitches[1],
                     onValueChange = { onQuadPitchChange(1, it) },
                     label = "Pitch",
-                    size = 48.dp,
+                    size = 38.dp,
                     progressColor = OrpheusColors.synthGreen
                 )
                 RotaryKnob(
                     value = voiceState.quadGroupHolds[1],
                     onValueChange = { onQuadHoldChange(1, it) },
                     label = "Hold",
-                    size = 48.dp,
+                    size = 38.dp,
                     progressColor = OrpheusColors.synthGreen
                 )
             }
@@ -209,10 +209,10 @@ private fun CompactLandscapeLayout(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(165.dp)
                 .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Bottom
         ) {
             // Duo 1-2: Magenta Border, Cyan Accents
             CompactDuoLiquidPanel(
@@ -225,7 +225,6 @@ private fun CompactLandscapeLayout(
                 onPulseEnd = onPulseEnd,
                 onVoiceHoldChange = onVoiceHoldChange,
                 borderColor = OrpheusColors.neonMagenta,
-                accentColor = OrpheusColors.neonCyan,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.weight(1f).fillMaxHeight()
@@ -242,7 +241,6 @@ private fun CompactLandscapeLayout(
                 onPulseEnd = onPulseEnd,
                 onVoiceHoldChange = onVoiceHoldChange,
                 borderColor = OrpheusColors.electricBlue,
-                accentColor = OrpheusColors.neonCyan,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.weight(1f).fillMaxHeight()
@@ -259,13 +257,12 @@ private fun CompactLandscapeLayout(
                 onPulseEnd = onPulseEnd,
                 onVoiceHoldChange = onVoiceHoldChange,
                 borderColor = OrpheusColors.synthGreen,
-                accentColor = OrpheusColors.warmGlow,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.weight(1f).fillMaxHeight()
             )
 
-            // Duo 7-8: Green Border, Orange Accents 
+            // Duo 7-8: Green Border, Orange Accents
             CompactDuoLiquidPanel(
                 pairIndex = 3,
                 voiceStates = voiceState.voiceStates,
@@ -276,7 +273,6 @@ private fun CompactLandscapeLayout(
                 onPulseEnd = onPulseEnd,
                 onVoiceHoldChange = onVoiceHoldChange,
                 borderColor = OrpheusColors.synthGreen,
-                accentColor = OrpheusColors.warmGlow,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.weight(1f).fillMaxHeight()

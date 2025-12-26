@@ -11,15 +11,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -46,14 +43,12 @@ fun CompactDuoLiquidPanel(
     onPulseEnd: (Int) -> Unit,
     onVoiceHoldChange: (Int, Boolean) -> Unit,
     borderColor: Color,
-    accentColor: Color,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(10.dp)
     val startIndex = pairIndex * 2
-    val pairLabel = "${startIndex + 1}-${startIndex + 2}"
 
     Box(
         modifier = modifier
@@ -74,18 +69,11 @@ fun CompactDuoLiquidPanel(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Pair label at top
-            Text(
-                text = pairLabel,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = borderColor
-            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 repeat(2) { i ->
                     val voiceIndex = startIndex + i
@@ -133,7 +121,6 @@ private fun CompactDuoLiquidPanelPreview() {
             onPulseEnd = {},
             onVoiceHoldChange = { _, _ -> },
             borderColor = OrpheusColors.neonMagenta,
-            accentColor = OrpheusColors.neonCyan,
             liquidState = null,
             effects = VisualizationLiquidEffects.Default,
             modifier = Modifier.width(140.dp).height(200.dp)
