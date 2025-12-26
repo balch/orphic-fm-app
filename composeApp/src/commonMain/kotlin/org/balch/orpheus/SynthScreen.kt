@@ -26,8 +26,8 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
-import org.balch.orpheus.ui.compact.CompactLandscapeLayout
-import org.balch.orpheus.ui.compact.CompactPortraitLayout
+import org.balch.orpheus.ui.compact.CompactLandscapeScreen
+import org.balch.orpheus.ui.compact.CompactPortraitScreen
 import org.balch.orpheus.ui.panels.CenterControlPanel
 import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -85,18 +85,18 @@ fun SynthScreen(
             
             when (layoutMode) {
                 LayoutMode.CompactLandscape -> {
-                    CompactLandscapeLayout(
+                    CompactLandscapeScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
                 LayoutMode.CompactPortrait -> {
-                    CompactPortraitLayout(
+                    CompactPortraitScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
                 LayoutMode.Desktop -> {
                     // Original desktop layout
-                    DesktopSynthLayout(
+                    DesktopSynthScreen(
                         voiceViewModel = voiceViewModel,
                         isDialogActive = isDialogActive,
                         onDialogActiveChange = { isDialogActive = it },
@@ -112,7 +112,7 @@ fun SynthScreen(
  * The original desktop layout, extracted for clarity.
  */
 @Composable
-private fun DesktopSynthLayout(
+private fun DesktopSynthScreen(
     voiceViewModel: VoiceViewModel,
     isDialogActive: Boolean,
     onDialogActiveChange: (Boolean) -> Unit,

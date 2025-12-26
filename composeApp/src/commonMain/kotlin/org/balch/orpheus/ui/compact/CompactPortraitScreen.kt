@@ -63,7 +63,7 @@ import kotlin.math.abs
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CompactPortraitLayout(
+fun CompactPortraitScreen(
     modifier: Modifier = Modifier,
     voiceViewModel: VoiceViewModel = metroViewModel(),
     presetViewModel: PresetsViewModel = metroViewModel(),
