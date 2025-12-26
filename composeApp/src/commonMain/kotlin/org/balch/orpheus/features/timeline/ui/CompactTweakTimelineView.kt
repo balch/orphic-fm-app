@@ -1,5 +1,20 @@
 package org.balch.orpheus.features.timeline.ui
 
+/**
+ * Compact inline view for multi-parameter timeline automation.
+ *
+ * Shows:
+ * - Play/Pause toggle button
+ * - Stop button
+ * - Time remaining display
+ * - Mini timeline preview with all paths (click to expand)
+ * - Clickable legend for parameter identification
+ *
+ * @param state Current timeline state with all paths
+ * @param onPlayPause Called when play/pause is toggled
+ * @param onStop Called when stop is pressed
+ * @param onExpand Called when mini preview is tapped
+ */
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,21 +23,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,12 +42,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.timeline.TimelinePath
 import org.balch.orpheus.features.timeline.TimelinePoint
 import org.balch.orpheus.features.timeline.TweakTimelineConfig
 import org.balch.orpheus.features.timeline.TweakTimelineParameter
 import org.balch.orpheus.features.timeline.TweakTimelineState
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
+import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -60,6 +71,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun CompactTweakTimelineView(
     state: TweakTimelineState,
+    liquidState: LiquidState?,
+    effects: VisualizationLiquidEffects,
     onPlayPause: () -> Unit,
     onStop: () -> Unit,
     onExpand: () -> Unit,
@@ -68,8 +81,6 @@ fun CompactTweakTimelineView(
     val shape = RoundedCornerShape(8.dp)
     val isActive = state.config.enabled
     val accentColor = OrpheusColors.neonCyan
-    var showLegend by remember { mutableStateOf(false) }
-
     Column(modifier = modifier) {
         Row(
             modifier = Modifier
@@ -78,105 +89,83 @@ fun CompactTweakTimelineView(
                 .background(Color(0xFF1A1A2A).copy(alpha = 0.8f))
                 .border(1.dp, accentColor.copy(alpha = if (isActive) 0.5f else 0.2f), shape)
                 .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Play/Pause button
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(if (isActive) accentColor.copy(alpha = 0.3f) else Color(0xFF2A2A3A))
-                    .border(1.dp, accentColor.copy(alpha = 0.5f), CircleShape)
-                    .clickable(enabled = isActive) { onPlayPause() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (state.isPlaying) "⏸" else "▶",
-                    fontSize = 14.sp,
-                    color = if (isActive) accentColor else accentColor.copy(alpha = 0.4f),
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // Stop button
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF2A2A3A))
-                    .border(1.dp, accentColor.copy(alpha = 0.3f), CircleShape)
-                    .clickable(enabled = isActive && (state.isPlaying || state.currentPosition > 0f)) { onStop() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "⏹",
-                    fontSize = 12.sp,
-                    color = if (isActive) accentColor.copy(alpha = 0.7f) else accentColor.copy(alpha = 0.3f),
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // Time display
+            // Controls Column: Buttons top, Time bottom
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.width(48.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(end = 8.dp)
             ) {
-                val remainingSeconds = ((1f - state.currentPosition) * state.config.durationSeconds).toInt()
-                val minutes = remainingSeconds / 60
-                val seconds = remainingSeconds % 60
+                // Transport Buttons
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Play/Pause button
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(if (isActive) accentColor.copy(alpha = 0.3f) else Color(0xFF2A2A3A))
+                            .border(1.dp, accentColor.copy(alpha = 0.5f), CircleShape)
+                            .clickable(enabled = isActive) { onPlayPause() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (state.isPlaying) "⏸" else "▶",
+                            fontSize = 14.sp,
+                            color = if (isActive) accentColor else accentColor.copy(alpha = 0.4f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
 
-                Text(
-                    text = "$minutes:${seconds.toString().padStart(2, '0')}",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isActive) Color.White else Color.White.copy(alpha = 0.5f)
-                )
-                Text(
-                    text = "${state.config.selectedParameters.size} params",
-                    fontSize = 8.sp,
-                    color = accentColor.copy(alpha = 0.7f)
-                )
+                    // Stop button
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2A2A3A))
+                            .border(1.dp, accentColor.copy(alpha = 0.3f), CircleShape)
+                            .clickable(enabled = isActive && (state.isPlaying || state.currentPosition > 0f)) { onStop() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "⏹",
+                            fontSize = 12.sp,
+                            color = if (isActive) accentColor.copy(alpha = 0.7f) else accentColor.copy(alpha = 0.3f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                // Time/Param display
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val remainingSeconds = ((1f - state.currentPosition) * state.config.durationSeconds).toInt()
+                    val minutes = remainingSeconds / 60
+                    val seconds = remainingSeconds % 60
+
+                    Text(
+                        text = "$minutes:${seconds.toString().padStart(2, '0')}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isActive) Color.White else Color.White.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = "${state.config.selectedParameters.size} params",
+                        fontSize = 8.sp,
+                        color = accentColor.copy(alpha = 0.7f)
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.width(4.dp))
 
             // Mini timeline preview (tap to expand)
             MultiPathTimelinePreview(
                 paths = state.paths,
                 currentPosition = state.currentPosition,
                 enabled = isActive,
+                liquidState = liquidState,
+                effects = effects,
                 onClick = onExpand,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(40.dp)
-            )
-
-            // Legend toggle button
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(if (showLegend) accentColor.copy(alpha = 0.3f) else Color(0xFF2A2A3A))
-                    .border(1.dp, accentColor.copy(alpha = 0.4f), CircleShape)
-                    .clickable { showLegend = !showLegend },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "?",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (showLegend) accentColor else accentColor.copy(alpha = 0.6f)
-                )
-            }
-        }
-
-        // Collapsible legend
-        if (showLegend && state.config.selectedParameters.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            ParameterLegend(
-                parameters = state.config.selectedParameters,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.weight(1f)
             )
         }
     }
@@ -190,6 +179,8 @@ private fun MultiPathTimelinePreview(
     paths: Map<TweakTimelineParameter, TimelinePath>,
     currentPosition: Float,
     enabled: Boolean,
+    liquidState: LiquidState?,
+    effects: VisualizationLiquidEffects,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -199,7 +190,17 @@ private fun MultiPathTimelinePreview(
         modifier = modifier
             .fillMaxSize()
             .clip(shape)
-            .background(Color(0xFF0A0A12))
+            .then(
+                if (liquidState != null) {
+                    Modifier.liquidVizEffects(
+                        liquidState = liquidState,
+                        scope = effects.bottom,
+                        frostAmount = 4.dp,
+                        color = Color(0xFF0A0A12),
+                        shape = shape
+                    )
+                } else Modifier.background(Color(0xFF0A0A12))
+            )
             .border(1.dp, OrpheusColors.neonCyan.copy(alpha = if (enabled) 0.3f else 0.1f), shape)
             .clickable(enabled = enabled) { onClick() }
     ) {
@@ -314,6 +315,8 @@ private fun CompactTweakTimelineViewPreview() {
             currentPosition = 0.4f,
             isPlaying = true
         ),
+        liquidState = null,
+        effects = VisualizationLiquidEffects(),
         onPlayPause = {},
         onStop = {},
         onExpand = {},
@@ -331,6 +334,8 @@ private fun CompactTweakTimelineViewDisabledPreview() {
             currentPosition = 0f,
             isPlaying = false
         ),
+        liquidState = null,
+        effects = VisualizationLiquidEffects(),
         onPlayPause = {},
         onStop = {},
         onExpand = {},

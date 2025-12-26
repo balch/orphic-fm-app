@@ -162,7 +162,9 @@ private fun CompactLandscapeLayout(
             visualizations = vizState.visualizations,
             vizDropdownExpanded = vizDropdownExpanded,
             onVizDropdownExpandedChange = { vizDropdownExpanded = it },
-            onVizSelect = onVizSelect
+            onVizSelect = onVizSelect,
+            liquidState = liquidState,
+            effects = effects
         )
 
         // Middle row: Quad Knobs at ends, 3 Timelines in center
@@ -172,7 +174,7 @@ private fun CompactLandscapeLayout(
                 .weight(1f)
                 .padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Bottom
         ) {
             // Quad 1 Knobs (Left End)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -198,6 +200,8 @@ private fun CompactLandscapeLayout(
                 onPlayPause = onTimelinePlayPause,
                 onStop = onTimelineStop,
                 onExpand = onTimelineExpand,
+                liquidState = liquidState,
+                effects = effects,
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(1f)
@@ -276,7 +280,7 @@ private fun CompactLandscapeLayout(
                 onPulseStart = onPulseStart,
                 onPulseEnd = onPulseEnd,
                 onVoiceHoldChange = onVoiceHoldChange,
-                borderColor = OrpheusColors.synthGreen,
+                borderColor = OrpheusColors.neonOrange,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.weight(1f).fillMaxHeight()

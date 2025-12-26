@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 // Synth-inspired color palette
 private val NeonCyan = Color(0xFF00F5FF)
 private val NeonMagenta = Color(0xFFFF00FF)
+private val NeonOrange = Color(0xFFFF9F00) // Added Neon Orange
 private val ElectricBlue = Color(0xFF0080FF)
 private val DeepPurple = Color(0xFF1A0A2E)
 private val DarkVoid = Color(0xFF0D0D1A)
@@ -79,6 +80,7 @@ fun OrpheusTheme(
 object OrpheusColors {
     val neonCyan = NeonCyan
     val neonMagenta = NeonMagenta
+    val neonOrange = NeonOrange // Added
     val electricBlue = ElectricBlue
     val deepPurple = DeepPurple
     val darkVoid = DarkVoid
