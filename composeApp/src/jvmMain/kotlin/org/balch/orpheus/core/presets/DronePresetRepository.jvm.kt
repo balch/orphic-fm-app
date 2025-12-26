@@ -2,7 +2,6 @@ package org.balch.orpheus.core.presets
 
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.util.Logger
-import orpheus.composeapp.generated.resources.Res
 import java.io.File
 
 /**
@@ -26,36 +25,8 @@ actual class DronePresetRepository actual constructor() {
         }
     }
 
-    private suspend fun ensurePresetsInitialized() {
-        // ALWAYS copy bundled presets to ensure updates are picked up during dev
-        // In prod we might want to be more careful, but for now this fixes the missing preset issue
-        copyBundledPresets(presetsDir)
-    }
-
-    private suspend fun copyBundledPresets(dir: File) {
-        val bundledPresets = listOf(
-            "F__Minor_Drift.json",
-            "Warm_Pad.json",
-            "Dark_Ambient.json",
-            "Swirly_Dreams.json"
-        )
-        bundledPresets.forEach { filename ->
-            try {
-                // Check if file exists in resources first to debug
-                Logger.debug { "Attempting to copy bundled preset: $filename" }
-                val path = "files/presets/$filename"
-                val bytes = Res.readBytes(path)
-                val targetFile = File(dir, filename)
-                
-                // Only overwrite if it doesn't exist or we want to force update
-                // For now, let's overwrite to ensure new presets appear
-                targetFile.writeBytes(bytes)
-                Logger.debug { "Successfully copied bundled preset: $filename to ${targetFile.absolutePath}" }
-            } catch (e: Exception) {
-                Logger.error { "Failed to copy bundled preset $filename: ${e.message}" }
-            }
-        }
-    }
+    // Factory presets are now handled via DI (SynthPatch interface)
+    // User presets are stored in this directory
 
 
     private fun fileForPreset(name: String): File {
@@ -65,7 +36,6 @@ actual class DronePresetRepository actual constructor() {
     }
 
     actual suspend fun save(preset: DronePreset) {
-        ensurePresetsInitialized()
         try {
             val file = fileForPreset(preset.name)
             val jsonString = json.encodeToString(preset)
@@ -77,7 +47,6 @@ actual class DronePresetRepository actual constructor() {
     }
 
     actual suspend fun load(name: String): DronePreset? {
-        ensurePresetsInitialized()
         return try {
             val file = fileForPreset(name)
             if (file.exists()) {
@@ -96,7 +65,6 @@ actual class DronePresetRepository actual constructor() {
     }
 
     actual suspend fun delete(name: String) {
-        ensurePresetsInitialized()
         try {
             val file = fileForPreset(name)
             if (file.exists()) {
@@ -109,7 +77,6 @@ actual class DronePresetRepository actual constructor() {
     }
 
     actual suspend fun list(): List<DronePreset> {
-        ensurePresetsInitialized()
         return try {
             presetsDir.listFiles()
                 ?.filter { it.extension == "json" }
