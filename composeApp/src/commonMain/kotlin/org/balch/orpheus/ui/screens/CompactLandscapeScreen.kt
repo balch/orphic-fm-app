@@ -2,6 +2,7 @@ package org.balch.orpheus.ui.screens
 
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +33,7 @@ import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.timeline.TweakTimelineUiState
 import org.balch.orpheus.features.timeline.TweakTimelineViewModel
 import org.balch.orpheus.features.timeline.ui.CompactTweakTimelineView
+import org.balch.orpheus.features.timeline.ui.ExpandedTweakTimelineScreen
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -75,36 +77,62 @@ fun CompactLandscapeScreen(
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
     
-    CompactLandscapeLayout(
-        modifier = modifier,
-        presetState = presetState,
-        voiceState = voiceState,
-        vizState = vizState,
-        timelineState = timelineState,
-        liquidState = liquidState,
-        effects = effects,
-        onPresetSelect = { presetViewModel.applyPreset(it) },
-        onVizSelect = { vizViewModel.selectVisualization(it) },
-        onVoiceTuneChange = { i, v -> voiceViewModel.onVoiceTuneChange(i, v) },
-        onEnvelopeSpeedChange = { i, v -> voiceViewModel.onVoiceEnvelopeSpeedChange(i, v) },
-        onPulseStart = { i -> voiceViewModel.onPulseStart(i) },
-        onPulseEnd = { i -> voiceViewModel.onPulseEnd(i) },
-        onVoiceHoldChange = { i, h -> voiceViewModel.onHoldChange(i, h) },
-        onQuadPitchChange = { i, v -> voiceViewModel.onQuadPitchChange(i, v) },
-        onQuadHoldChange = { i, v -> voiceViewModel.onQuadHoldChange(i, v) },
-        onMasterVolumeChange = { v -> voiceViewModel.onMasterVolumeChange(v) },
-        onTimelinePlayPause = { timelineViewModel.togglePlayPause() },
-        onTimelineStop = { timelineViewModel.stop() },
-        onTimelineExpand = { timelineViewModel.expand() },
-        onKeyEvent = { event, isDialogActive ->
-            SynthKeyboardHandler.handleKeyEvent(
-                keyEvent = event,
-                voiceState = voiceState,
-                voiceViewModel = voiceViewModel,
-                isDialogActive = isDialogActive
+    Box(modifier = modifier.fillMaxSize()) {
+        CompactLandscapeLayout(
+            modifier = Modifier.fillMaxSize(),
+            presetState = presetState,
+            voiceState = voiceState,
+            vizState = vizState,
+            timelineState = timelineState,
+            liquidState = liquidState,
+            effects = effects,
+            onPresetSelect = { presetViewModel.applyPreset(it) },
+            onVizSelect = { vizViewModel.selectVisualization(it) },
+            onVoiceTuneChange = { i, v -> voiceViewModel.onVoiceTuneChange(i, v) },
+            onEnvelopeSpeedChange = { i, v -> voiceViewModel.onVoiceEnvelopeSpeedChange(i, v) },
+            onPulseStart = { i -> voiceViewModel.onPulseStart(i) },
+            onPulseEnd = { i -> voiceViewModel.onPulseEnd(i) },
+            onVoiceHoldChange = { i, h -> voiceViewModel.onHoldChange(i, h) },
+            onQuadPitchChange = { i, v -> voiceViewModel.onQuadPitchChange(i, v) },
+            onQuadHoldChange = { i, v -> voiceViewModel.onQuadHoldChange(i, v) },
+            onMasterVolumeChange = { v -> voiceViewModel.onMasterVolumeChange(v) },
+            onTimelinePlayPause = { timelineViewModel.togglePlayPause() },
+            onTimelineStop = { timelineViewModel.stop() },
+            onTimelineExpand = { timelineViewModel.expand() },
+            onKeyEvent = { event, isDialogActive ->
+                SynthKeyboardHandler.handleKeyEvent(
+                    keyEvent = event,
+                    voiceState = voiceState,
+                    voiceViewModel = voiceViewModel,
+                    isDialogActive = isDialogActive
+                )
+            }
+        )
+        
+        // Expanded Timeline Screen Overlay
+        if (timelineState.isExpanded) {
+            ExpandedTweakTimelineScreen(
+                state = timelineState.timeline,
+                activeParameter = timelineState.activeParameter,
+                onDurationChange = { timelineViewModel.setDuration(it) },
+                onPlaybackModeChange = { timelineViewModel.setPlaybackMode(it) },
+                onEnabledChange = { timelineViewModel.setEnabled(it) },
+                onAddParameter = { timelineViewModel.addParameter(it) },
+                onRemoveParameter = { timelineViewModel.removeParameter(it) },
+                onSelectActiveParameter = { timelineViewModel.selectActiveParameter(it) },
+                onPathStarted = { param, point -> timelineViewModel.startPath(param, point) },
+                onPointAdded = { param, point -> timelineViewModel.addPoint(param, point) },
+                onPointsRemovedAfter = { param, time -> timelineViewModel.removePointsAfter(param, time) },
+                onPathCompleted = { param, value -> timelineViewModel.completePath(param, value) },
+                onClearPath = { timelineViewModel.clearPath(it) },
+                onSave = { timelineViewModel.save() },
+                onCancel = { timelineViewModel.cancel() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
             )
         }
-    )
+    }
 }
 
 @Composable

@@ -202,7 +202,7 @@ private fun MultiPathTimelinePreview(
                 } else Modifier.background(Color(0xFF0A0A12))
             )
             .border(1.dp, OrpheusColors.neonCyan.copy(alpha = if (enabled) 0.3f else 0.1f), shape)
-            .clickable(enabled = enabled) { onClick() }
+            .clickable { onClick() }  // Always clickable so user can expand to configure
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val width = size.width
