@@ -325,11 +325,11 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         lfoToUnipolar2.inputB.set(0.5)
         lfoToUnipolar2.inputC.set(0.5)
 
-        // Configure LinearRamps for smooth parameter transitions (50ms ramp time)
-        delay1TimeRamp.time.set(0.05)
-        delay2TimeRamp.time.set(0.05)
-        delay1ModDepthRamp.time.set(0.05)
-        delay2ModDepthRamp.time.set(0.05)
+        // Configure LinearRamps for smooth parameter transitions (20ms ramp time)
+        delay1TimeRamp.time.set(0.02)
+        delay2TimeRamp.time.set(0.02)
+        delay1ModDepthRamp.time.set(0.02)
+        delay2ModDepthRamp.time.set(0.02)
         
         // Initialize ramps with default values
         delay1TimeRamp.input.set(0.3)  // Default delay time
