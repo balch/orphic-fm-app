@@ -4,8 +4,15 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.balch.orpheus.features.timeline.TimelinePath
 import org.balch.orpheus.features.timeline.TimelinePoint
 import org.balch.orpheus.features.timeline.TweakTimelineParameter
@@ -59,18 +67,37 @@ fun TimelineDrawingCanvas(
     val shape = RoundedCornerShape(8.dp)
 
     var lastDrawnTime by remember { mutableStateOf(-1f) }
+    var lastDrawnValue by remember { mutableStateOf(0.5f) }
     var isDrawing by remember { mutableStateOf(false) }
     
     // Determine active path/color for interaction
     val activePath = if (activeParameter != null) paths[activeParameter] ?: TimelinePath() else TimelinePath()
     val activeColor = activeParameter?.color ?: Color.White
 
+    // Main Canvas Box with labels inside
     Box(
         modifier = modifier
             .clip(shape)
             .background(Color(0xFF0A0A12))
             .border(1.dp, activeColor.copy(alpha = 0.3f), shape)
     ) {
+        // Y-Axis Labels inside the box (Max at top, Min at bottom)
+        Text(
+            text = "Max",
+            fontSize = 8.sp,
+            color = Color.White.copy(alpha = 0.3f),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 4.dp, top = 2.dp)
+        )
+        Text(
+            text = "Min",
+            fontSize = 8.sp,
+            color = Color.White.copy(alpha = 0.3f),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 4.dp, bottom = 2.dp)
+        )
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -95,6 +122,7 @@ fun TimelineDrawingCanvas(
                                 onPointAdded(TimelinePoint(time, value))
                             }
                             lastDrawnTime = time
+                            lastDrawnValue = value
                         },
                         onDrag = { change, _ ->
                             val time = (change.position.x / size.width).coerceIn(0f, 1f)
@@ -106,13 +134,13 @@ fun TimelineDrawingCanvas(
                             }
                             onPointAdded(TimelinePoint(time, value))
                             lastDrawnTime = time
+                            lastDrawnValue = value
                             change.consume()
                         },
                         onDragEnd = {
                             isDrawing = false
-                            // Complete the path by extending to end
-                            val lastValue = activePath.points.lastOrNull()?.value ?: 0.5f
-                            onPathCompleted(lastValue)
+                            // Complete the path by extending to end with the LAST drawn value
+                            onPathCompleted(lastDrawnValue)
                             lastDrawnTime = -1f
                         },
                         onDragCancel = {

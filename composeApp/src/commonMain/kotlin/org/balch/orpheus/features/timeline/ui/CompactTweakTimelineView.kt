@@ -137,6 +137,41 @@ fun CompactTweakTimelineView(
                     }
                 }
 
+                // Playback mode selector (tap to cycle) - directly under transport buttons
+                val (modeIcon, modeLabel) = when (state.config.tweakPlaybackMode) {
+                    TweakPlaybackMode.ONCE -> "→|" to "Once"
+                    TweakPlaybackMode.LOOP -> "↻" to "Loop"
+                    TweakPlaybackMode.PING_PONG -> "↔" to "P-P"
+                }
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                        .clickable {
+                            val nextMode = when (state.config.tweakPlaybackMode) {
+                                TweakPlaybackMode.ONCE -> TweakPlaybackMode.LOOP
+                                TweakPlaybackMode.LOOP -> TweakPlaybackMode.PING_PONG
+                                TweakPlaybackMode.PING_PONG -> TweakPlaybackMode.ONCE
+                            }
+                            onPlaybackModeChange(nextMode)
+                        }
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = modeIcon,
+                        fontSize = 10.sp,
+                        color = accentColor
+                    )
+                    Text(
+                        text = modeLabel,
+                        fontSize = 8.sp,
+                        color = accentColor.copy(alpha = 0.8f)
+                    )
+                }
+
                 // Time/Param display
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -156,36 +191,6 @@ fun CompactTweakTimelineView(
                         fontSize = 8.sp,
                         color = accentColor.copy(alpha = 0.7f)
                     )
-                    
-                    // Playback mode selector (tap to cycle)
-                    val modeLabel = when (state.config.tweakPlaybackMode) {
-                        TweakPlaybackMode.ONCE -> "→|"
-                        TweakPlaybackMode.LOOP -> "↻"
-                        TweakPlaybackMode.PING_PONG -> "↔"
-                    }
-                    Box(
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(accentColor.copy(alpha = 0.2f))
-                            .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
-                            .clickable {
-                                val nextMode = when (state.config.tweakPlaybackMode) {
-                                    TweakPlaybackMode.ONCE -> TweakPlaybackMode.LOOP
-                                    TweakPlaybackMode.LOOP -> TweakPlaybackMode.PING_PONG
-                                    TweakPlaybackMode.PING_PONG -> TweakPlaybackMode.ONCE
-                                }
-                                onPlaybackModeChange(nextMode)
-                            }
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = modeLabel,
-                            fontSize = 10.sp,
-                            color = accentColor
-                        )
-                    }
                 }
             }
 
