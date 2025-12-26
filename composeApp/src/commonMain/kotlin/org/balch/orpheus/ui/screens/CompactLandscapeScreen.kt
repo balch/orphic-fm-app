@@ -112,21 +112,8 @@ fun CompactLandscapeScreen(
         // Expanded Timeline Screen Overlay
         if (timelineState.isExpanded) {
             ExpandedTweakTimelineScreen(
-                state = timelineState.timeline,
-                activeParameter = timelineState.activeParameter,
-                onDurationChange = { timelineViewModel.setDuration(it) },
-                onPlaybackModeChange = { timelineViewModel.setPlaybackMode(it) },
-                onEnabledChange = { timelineViewModel.setEnabled(it) },
-                onAddParameter = { timelineViewModel.addParameter(it) },
-                onRemoveParameter = { timelineViewModel.removeParameter(it) },
-                onSelectActiveParameter = { timelineViewModel.selectActiveParameter(it) },
-                onPathStarted = { param, point -> timelineViewModel.startPath(param, point) },
-                onPointAdded = { param, point -> timelineViewModel.addPoint(param, point) },
-                onPointsRemovedAfter = { param, time -> timelineViewModel.removePointsAfter(param, time) },
-                onPathCompleted = { param, value -> timelineViewModel.completePath(param, value) },
-                onClearPath = { timelineViewModel.clearPath(it) },
-                onSave = { timelineViewModel.save() },
-                onCancel = { timelineViewModel.cancel() },
+                onDismiss = { },
+                viewModel = timelineViewModel,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp)

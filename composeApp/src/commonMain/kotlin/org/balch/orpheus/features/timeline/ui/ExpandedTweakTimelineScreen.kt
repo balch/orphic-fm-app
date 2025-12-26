@@ -10,9 +10,9 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +22,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,12 +32,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.features.timeline.TimelinePath
 import org.balch.orpheus.features.timeline.TimelinePoint
 import org.balch.orpheus.features.timeline.TweakPlaybackMode
 import org.balch.orpheus.features.timeline.TweakTimelineConfig
 import org.balch.orpheus.features.timeline.TweakTimelineParameter
 import org.balch.orpheus.features.timeline.TweakTimelineState
+import org.balch.orpheus.features.timeline.TweakTimelineViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -51,6 +55,40 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun ExpandedTweakTimelineScreen(
+    onDismiss: (Boolean) -> Unit,
+    viewModel: TweakTimelineViewModel = metroViewModel(),
+    modifier: Modifier = Modifier
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    ExpandedTweakTimelineLayout(
+        state = uiState.timeline,
+        activeParameter = uiState.activeParameter,
+        onDurationChange = { viewModel.setDuration(it) },
+        onPlaybackModeChange = { viewModel.setPlaybackMode(it) },
+        onEnabledChange = { viewModel.setEnabled(it) },
+        onAddParameter = { viewModel.addParameter(it) },
+        onRemoveParameter = { viewModel.removeParameter(it) },
+        onSelectActiveParameter = { viewModel.selectActiveParameter(it) },
+        onPathStarted = { param, point -> viewModel.startPath(param, point) },
+        onPointAdded = { param, point -> viewModel.addPoint(param, point) },
+        onPointsRemovedAfter = { param, time -> viewModel.removePointsAfter(param, time) },
+        onPathCompleted = { param, value -> viewModel.completePath(param, value) },
+        onClearPath = { viewModel.clearPath(it) },
+        onSave = {
+            viewModel.save()
+            onDismiss(true)
+        },
+        onCancel = {
+            viewModel.cancel()
+            onDismiss(false)
+        },
+        modifier = modifier
+    )
+}
+
+@Composable
+fun ExpandedTweakTimelineLayout(
     state: TweakTimelineState,
     activeParameter: TweakTimelineParameter?,
     onDurationChange: (Float) -> Unit,
@@ -78,218 +116,252 @@ fun ExpandedTweakTimelineScreen(
             .border(2.dp, accentColor.copy(alpha = 0.4f), shape)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // ═══════════════════════════════════════════════════════════
-        // HEADER
+        // HEADER: Title Left | X and Check Right
         // ═══════════════════════════════════════════════════════════
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Cancel button
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF3A2A2A))
-                    .border(1.dp, Color(0xFFFF6B6B).copy(alpha = 0.5f), CircleShape)
-                    .clickable { onCancel() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "✕",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFF6B6B),
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // Title + Enable toggle
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Parameter Timeline",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = accentColor
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                EnableToggle(
-                    enabled = state.config.enabled,
-                    onEnabledChange = onEnabledChange,
-                    color = accentColor
-                )
-            }
-
-            // Save button
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF2A3A2A))
-                    .border(1.dp, Color(0xFF6BFF6B).copy(alpha = 0.5f), CircleShape)
-                    .clickable { onSave() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "✓",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF6BFF6B),
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════
-        // PARAMETER PICKER
-        // ═══════════════════════════════════════════════════════════
-        ParameterPicker(
-            selectedParameters = state.config.selectedParameters,
-            onAddParameter = onAddParameter,
-            onRemoveParameter = onRemoveParameter
-        )
-
-        // ═══════════════════════════════════════════════════════════
-        // CONTROLS
-        // ═══════════════════════════════════════════════════════════
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Duration slider
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Duration: ${state.config.durationSeconds.toInt()}s",
-                    fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.7f)
-                )
-                Slider(
-                    value = state.config.durationSeconds,
-                    onValueChange = onDurationChange,
-                    valueRange = TweakTimelineConfig.MIN_DURATION..TweakTimelineConfig.MAX_DURATION,
-                    colors = SliderDefaults.colors(
-                        thumbColor = accentColor,
-                        activeTrackColor = accentColor,
-                        inactiveTrackColor = accentColor.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Playback mode toggles
-            PlaybackModeSelector(
-                mode = state.config.tweakPlaybackMode,
-                onModeChange = onPlaybackModeChange,
+            // Title (Left)
+            Text(
+                text = "Tweak Timeline",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
                 color = accentColor
             )
-        }
 
-        // ═══════════════════════════════════════════════════════════
-        // ACTIVE PARAMETER SELECTOR
-        // ═══════════════════════════════════════════════════════════
-        if (state.config.selectedParameters.isNotEmpty()) {
-            ActiveParameterSelector(
-                selectedParameters = state.config.selectedParameters,
-                activeParameter = activeParameter,
-                onSelect = onSelectActiveParameter
-            )
-        }
-
-        // ═══════════════════════════════════════════════════════════
-        // DRAWING CANVAS
-        // ═══════════════════════════════════════════════════════════
-        if (activeParameter != null) {
-            val currentPath = state.paths[activeParameter] ?: TimelinePath()
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+            // Buttons (Right)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Canvas header with label and clear button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // Cancel button (X)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF3A2A2A))
+                        .border(1.dp, Color(0xFFFF6B6B).copy(alpha = 0.5f), CircleShape)
+                        .clickable { onCancel() },
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "${activeParameter.category}: ${activeParameter.label}",
-                        fontSize = 12.sp,
+                        text = "✕",
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = activeParameter.color
+                        color = Color(0xFFFF6B6B),
+                        textAlign = TextAlign.Center
                     )
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF2A2A3A))
-                            .border(1.dp, activeParameter.color.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
-                            .clickable(enabled = currentPath.points.isNotEmpty()) {
-                                onClearPath(activeParameter)
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "⌫",
-                                fontSize = 12.sp,
-                                color = if (currentPath.points.isNotEmpty()) activeParameter.color else activeParameter.color.copy(alpha = 0.4f)
-                            )
-                            Text(
-                                text = "Clear",
-                                fontSize = 10.sp,
-                                color = if (currentPath.points.isNotEmpty()) activeParameter.color else activeParameter.color.copy(alpha = 0.4f)
-                            )
-                        }
-                    }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                // Save button (Check)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF2A3A2A))
+                        .border(1.dp, Color(0xFF6BFF6B).copy(alpha = 0.5f), CircleShape)
+                        .clickable { onSave() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "✓",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF6BFF6B),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
 
-                // Drawing canvas
-                TimelineDrawingCanvas(
-                    path = currentPath,
-                    currentPosition = state.currentPosition,
-                    color = activeParameter.color,
-                    onPathStarted = { onPathStarted(activeParameter, it) },
-                    onPointAdded = { onPointAdded(activeParameter, it) },
-                    onPointsRemovedAfter = { onPointsRemovedAfter(activeParameter, it) },
-                    onPathCompleted = { onPathCompleted(activeParameter, it) },
-                    enabled = state.config.enabled && !currentPath.isComplete,
+        // ═══════════════════════════════════════════════════════════
+        // MAIN CONTENT: Controls Left | Canvas Right
+        // ═══════════════════════════════════════════════════════════
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // ─── LEFT COLUMN: Controls ───
+            Column(
+                modifier = Modifier
+                    .width(220.dp)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 1. Clear Button (Top)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF2A2A3A))
+                        .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .clickable(enabled = activeParameter != null) {
+                            if (activeParameter != null) onClearPath(activeParameter)
+                        }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "CLEAR LINE",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (activeParameter != null) accentColor else accentColor.copy(alpha = 0.4f)
+                    )
+                }
+
+                // 2. Duration Slider (10s - 120s)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Duration",
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = "${state.config.durationSeconds.toInt()}s",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor
+                        )
+                    }
+                    Slider(
+                        value = state.config.durationSeconds,
+                        onValueChange = onDurationChange,
+                        valueRange = 10f..120f, // updated range 10-120s
+                        colors = SliderDefaults.colors(
+                            thumbColor = accentColor,
+                            activeTrackColor = accentColor,
+                            inactiveTrackColor = accentColor.copy(alpha = 0.3f),
+                            activeTickColor = Color.Transparent,
+                            inactiveTickColor = Color.Transparent
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // 3. Parameter List
+                Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                )
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF0A0A12))
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = "Parameters",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                     Column(
+                         verticalArrangement = Arrangement.spacedBy(2.dp)
+                     ) {
+                         TweakTimelineParameter.entries.forEach { param ->
+                             val isIncluded = param in state.config.selectedParameters
+                             val isSelected = activeParameter == param
+                             
+                             Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(if (isSelected) param.color.copy(alpha = 0.2f) else Color.Transparent)
+                                    .clickable {
+                                        if (isIncluded) {
+                                            onSelectActiveParameter(param)
+                                        } else {
+                                            if (state.config.selectedParameters.size < TweakTimelineParameter.MAX_SELECTED) {
+                                                onAddParameter(param)
+                                                onSelectActiveParameter(param)
+                                            }
+                                        }
+                                    }
+                                    .padding(vertical = 4.dp, horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                             ) {
+                                  // Checkbox
+                                  Box(
+                                      modifier = Modifier
+                                          .size(16.dp)
+                                          .clip(RoundedCornerShape(3.dp))
+                                          .background(if (isIncluded) param.color else Color.Transparent)
+                                          .border(1.dp, param.color, RoundedCornerShape(3.dp))
+                                          .clickable {
+                                              if (isIncluded) onRemoveParameter(param)
+                                              else if (state.config.selectedParameters.size < TweakTimelineParameter.MAX_SELECTED) onAddParameter(param)
+                                          },
+                                      contentAlignment = Alignment.Center
+                                  ) {
+                                      if (isIncluded) {
+                                          Text("✓", fontSize = 10.sp, color = Color.Black)
+                                      }
+                                  }
+                                  
+                                  Spacer(modifier = Modifier.width(8.dp))
+                                  
+                                  Text(
+                                      text = param.label,
+                                      fontSize = 12.sp,
+                                      color = if (isIncluded) Color.White else Color.White.copy(alpha = 0.4f),
+                                      fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                  )
+                             }
+                         }
+                     }
+                }
             }
-        } else {
-            // Placeholder when no parameter is selected
+
+            // ─── RIGHT COLUMN: Canvas ───
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxHeight()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF0A0A12))
-                    .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
+                    .background(Color.Black)
+                    .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
             ) {
-                Text(
-                    text = "Select a parameter above to draw automation",
-                    fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.5f)
-                )
+                if (activeParameter != null) {
+                    val currentPath = state.paths[activeParameter] ?: TimelinePath()
+                     TimelineDrawingCanvas(
+                        path = currentPath,
+                        currentPosition = state.currentPosition,
+                        color = activeParameter.color,
+                        onPathStarted = { onPathStarted(activeParameter, it) },
+                        onPointAdded = { onPointAdded(activeParameter, it) },
+                        onPointsRemovedAfter = { onPointsRemovedAfter(activeParameter, it) },
+                        onPathCompleted = { onPathCompleted(activeParameter, it) },
+                        enabled = true,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    
+                    Text(
+                        text = "Editing: ${activeParameter.label}",
+                        color = activeParameter.color.copy(alpha = 0.5f),
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(12.dp)
+                    )
+                } else {
+                    Text(
+                        text = "Select a parameter to draw",
+                        color = Color.White.copy(alpha = 0.3f),
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
         }
     }
@@ -468,7 +540,7 @@ private fun PlaybackModeSelector(
     }
 }
 
-@Preview
+@Preview(widthDp = 800, heightDp = 600)
 @Composable
 private fun ExpandedTweakTimelineScreenPreview() {
     val samplePath = TimelinePath(
@@ -481,7 +553,7 @@ private fun ExpandedTweakTimelineScreenPreview() {
         isComplete = true
     )
 
-    ExpandedTweakTimelineScreen(
+    ExpandedTweakTimelineLayout(
         state = TweakTimelineState(
             config = TweakTimelineConfig(
                 enabled = true,
