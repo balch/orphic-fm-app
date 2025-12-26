@@ -5,6 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.features.lfo.HyperLfoMode
 
 /**
  * F# Minor Drift - Clean, drifting pad with gentle frequency modulation.
@@ -23,7 +24,7 @@ class FMinorDriftPatch : SynthPatch {
         duoModSources = listOf("OFF", "OFF", "OFF", "OFF"),
         hyperLfoA = 0.15f,
         hyperLfoB = 0.12f,
-        hyperLfoMode = "FREQ",
+        hyperLfoMode = HyperLfoMode.OR,
         hyperLfoLink = false,
         delayTime1 = 0.35f,
         delayTime2 = 0.45f,

@@ -81,12 +81,7 @@ class LfoViewModel(
                         LfoUiState(
                             lfoA = preset.hyperLfoA,
                             lfoB = preset.hyperLfoB,
-                            mode =
-                                try {
-                                    HyperLfoMode.valueOf(preset.hyperLfoMode)
-                                } catch (e: Exception) {
-                                    HyperLfoMode.OFF
-                                },
+                            mode =preset.hyperLfoMode,
                             linkEnabled = preset.hyperLfoLink
                         )
                     intents.tryEmit(LfoIntent.Restore(lfoState))

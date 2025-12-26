@@ -5,6 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.features.lfo.HyperLfoMode
 
 /**
  * Default Patch - A neutral starting point with all parameters at sensible defaults.
@@ -23,10 +24,10 @@ class DefaultPatch : SynthPatch {
         duoModSources = List(4) { "OFF" },
         hyperLfoA = 0.0f,
         hyperLfoB = 0.0f,
-        hyperLfoMode = "OFF",
+        hyperLfoMode = HyperLfoMode.OFF,
         hyperLfoLink = false,
-        delayTime1 = 0.3f,
-        delayTime2 = 0.3f,
+        delayTime1 = 0.0f,
+        delayTime2 = 0.0f,
         delayMod1 = 0.0f,
         delayMod2 = 0.0f,
         delayFeedback = 0.5f,

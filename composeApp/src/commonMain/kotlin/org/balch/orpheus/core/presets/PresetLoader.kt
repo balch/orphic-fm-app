@@ -53,12 +53,11 @@ class PresetLoader(
             duoModSources = List(4) { i -> engine.getDuoModSource(i).name },
             hyperLfoA = engine.getHyperLfoFreq(0),
             hyperLfoB = engine.getHyperLfoFreq(1),
-            // Map int mode back to string name. Assumes safe enum mapping.
             hyperLfoMode =
                 try {
-                    HyperLfoMode.entries[engine.getHyperLfoMode()].name
+                    HyperLfoMode.entries[engine.getHyperLfoMode()]
                 } catch (e: Exception) {
-                    HyperLfoMode.OFF.name
+                    HyperLfoMode.OFF
                 },
             hyperLfoLink = engine.getHyperLfoLink(),
             delayTime1 = engine.getDelayTime(0),

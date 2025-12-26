@@ -5,6 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.features.lfo.HyperLfoMode
 
 /**
  * Warm Pad - Gentle, warm pad with subtle modulation.
@@ -23,7 +24,7 @@ class WarmPadPatch : SynthPatch {
         duoModSources = listOf("LFO", "LFO", "LFO", "LFO"),
         hyperLfoA = 0.25f,
         hyperLfoB = 0.18f,
-        hyperLfoMode = "FREQ",
+        hyperLfoMode = HyperLfoMode.OR,
         hyperLfoLink = true,
         delayTime1 = 0.4f,
         delayTime2 = 0.5f,

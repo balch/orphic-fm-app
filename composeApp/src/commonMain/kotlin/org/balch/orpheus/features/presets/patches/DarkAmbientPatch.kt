@@ -5,6 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.features.lfo.HyperLfoMode
 
 /**
  * Dark Ambient - Deep, evolving soundscape with FM and delay modulation.
@@ -23,7 +24,7 @@ class DarkAmbientPatch : SynthPatch {
         duoModSources = listOf("ENV", "ENV", "ENV", "ENV"),
         hyperLfoA = 0.08f,
         hyperLfoB = 0.05f,
-        hyperLfoMode = "DELAY",
+        hyperLfoMode = HyperLfoMode.AND,
         hyperLfoLink = false,
         delayTime1 = 0.55f,
         delayTime2 = 0.75f,

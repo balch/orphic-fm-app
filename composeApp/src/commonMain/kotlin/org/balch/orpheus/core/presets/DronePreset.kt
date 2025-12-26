@@ -1,6 +1,7 @@
 package org.balch.orpheus.core.presets
 
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.features.lfo.HyperLfoMode
 import org.balch.orpheus.util.currentTimeMillis
 
 /**
@@ -22,7 +23,7 @@ data class DronePreset(
     // Hyper LFO
     val hyperLfoA: Float = 0.0f,
     val hyperLfoB: Float = 0.0f,
-    val hyperLfoMode: String = "OFF", // HyperLfoMode enum as string
+    val hyperLfoMode: HyperLfoMode = HyperLfoMode.OFF,
     val hyperLfoLink: Boolean = false,
 
     // Delay

@@ -5,6 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.features.lfo.HyperLfoMode
 
 /**
  * Swirly Dreams - Psychedelic FM modulation with LFO-driven delay.
@@ -23,7 +24,7 @@ class SwirlyDreamsPatch : SynthPatch {
         duoModSources = listOf("LFO", "LFO", "LFO", "LFO"),
         hyperLfoA = 0.15f,
         hyperLfoB = 0.12f,
-        hyperLfoMode = "AND",
+        hyperLfoMode = HyperLfoMode.AND,
         hyperLfoLink = true,
         delayTime1 = 0.45f,
         delayTime2 = 0.65f,
