@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.timeline.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,8 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -25,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -213,7 +217,8 @@ fun ExpandedTweakTimelineLayout(
                     )
 
                      Column(
-                         verticalArrangement = Arrangement.spacedBy(2.dp)
+                         verticalArrangement = Arrangement.spacedBy(2.dp),
+                         modifier = Modifier.verticalScroll(rememberScrollState())
                      ) {
                          TweakTimelineParameter.entries.forEach { param ->
                              val isIncluded = param in state.config.selectedParameters
@@ -235,7 +240,7 @@ fun ExpandedTweakTimelineLayout(
                                             }
                                         }
                                     }
-                                    .padding(vertical = 4.dp, horizontal = 4.dp),
+                                    .padding(vertical = 6.dp, horizontal = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                              ) {
@@ -250,7 +255,6 @@ fun ExpandedTweakTimelineLayout(
                                               .clickable {
                                                   if (isIncluded) {
                                                       onRemoveParameter(param)
-                                                      // Also clear path when unchecking
                                                       onClearPath(param)
                                                   }
                                                   else if (state.config.selectedParameters.size < TweakTimelineParameter.MAX_SELECTED) {
@@ -267,13 +271,22 @@ fun ExpandedTweakTimelineLayout(
                                       
                                       Spacer(modifier = Modifier.width(8.dp))
                                       
-                                      Text(
-                                          text = param.label,
-                                          fontSize = 12.sp,
-                                          color = if (isIncluded) Color.White else Color.White.copy(alpha = 0.4f),
-                                          fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                          maxLines = 1
-                                      )
+                                      Column {
+                                          Text(
+                                              text = param.label,
+                                              fontSize = 12.sp,
+                                              color = if (isIncluded) Color.White else Color.White.copy(alpha = 0.4f),
+                                              fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                              maxLines = 1
+                                          )
+                                          // Small Category Label
+                                          Text(
+                                              text = param.category,
+                                              fontSize = 9.sp,
+                                              color = if (isIncluded) param.color.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.2f),
+                                              lineHeight = 10.sp
+                                          )
+                                      }
                                   }
 
                                   // Clear button inside item
@@ -286,11 +299,22 @@ fun ExpandedTweakTimelineLayout(
                                               .clickable { onClearPath(param) },
                                           contentAlignment = Alignment.Center
                                       ) {
-                                          Text(
-                                              text = "✕",
-                                              fontSize = 10.sp,
-                                              color = Color.White.copy(alpha = 0.7f)
-                                          )
+                                          Canvas(modifier = Modifier.size(8.dp)) {
+                                              val strokeWidth = 1.dp.toPx()
+                                              val color = Color.White.copy(alpha = 0.7f)
+                                              drawLine(
+                                                  color = color,
+                                                  start = Offset(0f, 0f),
+                                                  end = Offset(size.width, size.height),
+                                                  strokeWidth = strokeWidth
+                                              )
+                                              drawLine(
+                                                  color = color,
+                                                  start = Offset(size.width, 0f),
+                                                  end = Offset(0f, size.height),
+                                                  strokeWidth = strokeWidth
+                                              )
+                                          }
                                       }
                                   }
                              }
@@ -335,11 +359,10 @@ fun ExpandedTweakTimelineLayout(
                     .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
             ) {
                 if (activeParameter != null) {
-                    val currentPath = state.paths[activeParameter] ?: TimelinePath()
                      TimelineDrawingCanvas(
-                        path = currentPath,
+                        paths = state.paths,
+                        activeParameter = activeParameter,
                         currentPosition = state.currentPosition,
-                        color = activeParameter.color,
                         onPathStarted = { onPathStarted(activeParameter, it) },
                         onPointAdded = { onPointAdded(activeParameter, it) },
                         onPointsRemovedAfter = { onPointsRemovedAfter(activeParameter, it) },

@@ -106,4 +106,33 @@ data class TimelinePath(
             isComplete = false
         )
     }
+
+    /**
+     * Applies a simple smoothing algorithm to the path to reduce jaggedness
+     * while retaining the overall shape.
+     */
+    fun smoothed(): TimelinePath {
+        if (points.size < 3) return this
+
+        val newPoints = ArrayList<TimelinePoint>(points.size)
+        newPoints.add(points.first()) // Keep start anchor
+
+        // 3-point moving average for inner points
+        // We iterate from 1 to size-2
+        for (i in 1 until points.size - 1) {
+            val prev = points[i - 1]
+            val curr = points[i]
+            val next = points[i + 1]
+
+            // Average the values, but keep the time of the current point
+            // This assumes points are relatively evenly spaced in time or close enough
+            // that time-shifting isn't desired.
+            val smoothedValue = (prev.value + curr.value + next.value) / 3f
+            newPoints.add(curr.copy(value = smoothedValue))
+        }
+
+        newPoints.add(points.last()) // Keep end anchor
+
+        return copy(points = newPoints)
+    }
 }

@@ -155,7 +155,8 @@ class TweakTimelineViewModel(
 
             is TweakTimelineIntent.CompletePath -> state.updateTimeline {
                 val path = it.paths[intent.param] ?: TimelinePath()
-                val newPath = path.completed(intent.endValue)
+                // Apply smoothing when the path is completed to reduce jitter
+                val newPath = path.completed(intent.endValue).smoothed()
                 it.copy(paths = it.paths + (intent.param to newPath))
             }
 

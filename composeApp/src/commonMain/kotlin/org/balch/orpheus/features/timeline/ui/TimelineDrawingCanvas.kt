@@ -6,8 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,8 +24,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.features.timeline.TimelinePath
 import org.balch.orpheus.features.timeline.TimelinePoint
-import org.balch.orpheus.ui.theme.OrpheusColors
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.balch.orpheus.features.timeline.TweakTimelineParameter
 
 /**
  * Canvas for drawing timeline automation paths.
@@ -49,9 +46,9 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun TimelineDrawingCanvas(
-    path: TimelinePath,
+    paths: Map<TweakTimelineParameter, TimelinePath>,
+    activeParameter: TweakTimelineParameter?,
     currentPosition: Float,
-    color: Color,
     onPathStarted: (TimelinePoint) -> Unit,
     onPointAdded: (TimelinePoint) -> Unit,
     onPointsRemovedAfter: (Float) -> Unit,
@@ -63,18 +60,22 @@ fun TimelineDrawingCanvas(
 
     var lastDrawnTime by remember { mutableStateOf(-1f) }
     var isDrawing by remember { mutableStateOf(false) }
+    
+    // Determine active path/color for interaction
+    val activePath = if (activeParameter != null) paths[activeParameter] ?: TimelinePath() else TimelinePath()
+    val activeColor = activeParameter?.color ?: Color.White
 
     Box(
         modifier = modifier
             .clip(shape)
             .background(Color(0xFF0A0A12))
-            .border(1.dp, color.copy(alpha = 0.3f), shape)
+            .border(1.dp, activeColor.copy(alpha = 0.3f), shape)
     ) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(enabled, path.isComplete) {
-                    if (!enabled || path.isComplete) return@pointerInput
+                .pointerInput(enabled, activeParameter, activePath.isComplete) {
+                    if (!enabled || activeParameter == null || activePath.isComplete) return@pointerInput
 
                     detectDragGestures(
                         onDragStart = { offset ->
@@ -82,12 +83,12 @@ fun TimelineDrawingCanvas(
                             val time = (offset.x / size.width).coerceIn(0f, 1f)
                             val value = 1f - (offset.y / size.height).coerceIn(0f, 1f)
 
-                            if (path.points.isEmpty()) {
+                            if (activePath.points.isEmpty()) {
                                 // Starting fresh - draw line from start to touch
                                 onPathStarted(TimelinePoint(time, value))
                             } else {
                                 // Already have points - add or remove based on position
-                                val lastTime = path.points.lastOrNull()?.time ?: 0f
+                                val lastTime = activePath.points.lastOrNull()?.time ?: 0f
                                 if (time < lastTime) {
                                     onPointsRemovedAfter(time)
                                 }
@@ -110,7 +111,7 @@ fun TimelineDrawingCanvas(
                         onDragEnd = {
                             isDrawing = false
                             // Complete the path by extending to end
-                            val lastValue = path.points.lastOrNull()?.value ?: 0.5f
+                            val lastValue = activePath.points.lastOrNull()?.value ?: 0.5f
                             onPathCompleted(lastValue)
                             lastDrawnTime = -1f
                         },
@@ -135,17 +136,19 @@ fun TimelineDrawingCanvas(
                 drawLine(gridColor, Offset(x, 0f), Offset(x, height))
             }
 
-            // Draw the path
-            if (path.points.isNotEmpty()) {
+            // Helper to draw a path
+            fun drawTimelinePath(timelinePath: TimelinePath, color: Color, isActive: Boolean) {
+                if (timelinePath.points.isEmpty()) return
+                
                 val pathDraw = Path()
                 
-                if (path.points.size > 1) {
-                    val firstPoint = path.points.first()
+                if (timelinePath.points.size > 1) {
+                    val firstPoint = timelinePath.points.first()
                     pathDraw.moveTo(firstPoint.time * width, (1f - firstPoint.value) * height)
                     
-                    for (i in 0 until path.points.size - 1) {
-                        val p0 = path.points[i]
-                        val p1 = path.points[i + 1]
+                    for (i in 0 until timelinePath.points.size - 1) {
+                        val p0 = timelinePath.points[i]
+                        val p1 = timelinePath.points[i + 1]
                         
                         val x0 = p0.time * width
                         val y0 = (1f - p0.value) * height
@@ -153,7 +156,6 @@ fun TimelineDrawingCanvas(
                         val y1 = (1f - p1.value) * height
                         
                         // Cubic curve control points for smoothing
-                        // Use a fraction of the distance for control point offsets
                         val controlDist = (x1 - x0) / 2f
                         
                         pathDraw.cubicTo(
@@ -163,31 +165,45 @@ fun TimelineDrawingCanvas(
                         )
                     }
                 } else {
-                    val p = path.points.first()
+                    val p = timelinePath.points.first()
                     pathDraw.moveTo(p.time * width, (1f - p.value) * height)
                     pathDraw.lineTo(p.time * width, (1f - p.value) * height) // Just a dot
                 }
 
                 drawPath(
                     path = pathDraw,
-                    color = color,
+                    color = color.copy(alpha = if (isActive) 1f else 0.5f), // Dim inactive
                     style = Stroke(
-                        width = 3.dp.toPx(),
+                        width = if (isActive) 3.dp.toPx() else 1.5.dp.toPx(),
                         cap = StrokeCap.Round,
                         join = StrokeJoin.Round
                     )
                 )
 
-                // Draw points as small circles
-                for (point in path.points) {
-                    val x = point.time * width
-                    val y = (1f - point.value) * height
-                    drawCircle(
-                        color = color,
-                        radius = 4.dp.toPx(),
-                        center = Offset(x, y)
-                    )
+                // Draw points only for active path
+                if (isActive) {
+                    for (point in timelinePath.points) {
+                        val x = point.time * width
+                        val y = (1f - point.value) * height
+                        drawCircle(
+                            color = color,
+                            radius = 3.dp.toPx(), // Slightly smaller dots
+                            center = Offset(x, y)
+                        )
+                    }
                 }
+            }
+
+            // 1. Draw Inactive Paths first
+            paths.forEach { (param, path) ->
+                if (param != activeParameter) {
+                    drawTimelinePath(path, param.color, isActive = false)
+                }
+            }
+
+            // 2. Draw Active Path last (on top)
+            if (activeParameter != null) {
+                drawTimelinePath(activePath, activeColor, isActive = true)
             }
 
             // Draw playhead (vertical line at current position)
@@ -200,57 +216,19 @@ fun TimelineDrawingCanvas(
             )
 
             // Draw playhead position indicator
-            drawCircle(
-                color = Color.White,
-                radius = 6.dp.toPx(),
-                center = Offset(playheadX, height / 2)
-            )
+            if (activeParameter != null && activePath.points.isNotEmpty()) {
+                // Find interpolated value at current playhead position for active param
+                // Simple linear check for finding closest segment
+                // In a real implementation this would likely be more robust
+                // For now just draw on the line
+                drawCircle(
+                     color = Color.White,
+                     radius = 5.dp.toPx(),
+                     center = Offset(playheadX, height / 2) // Just vertically centered for now
+                )
+            }
         }
     }
 }
 
-@Preview
-@Composable
-private fun TimelineDrawingCanvasEmptyPreview() {
-    TimelineDrawingCanvas(
-        path = TimelinePath(),
-        currentPosition = 0.3f,
-        color = OrpheusColors.neonCyan,
-        onPathStarted = {},
-        onPointAdded = {},
-        onPointsRemovedAfter = {},
-        onPathCompleted = {},
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp)
-    )
-}
 
-@Preview
-@Composable
-private fun TimelineDrawingCanvasWithPathPreview() {
-    val samplePath = TimelinePath(
-        points = listOf(
-            TimelinePoint(0f, 0.5f),
-            TimelinePoint(0.2f, 0.7f),
-            TimelinePoint(0.4f, 0.3f),
-            TimelinePoint(0.6f, 0.8f),
-            TimelinePoint(0.8f, 0.4f),
-            TimelinePoint(1f, 0.6f)
-        ),
-        isComplete = true
-    )
-
-    TimelineDrawingCanvas(
-        path = samplePath,
-        currentPosition = 0.5f,
-        color = OrpheusColors.neonMagenta,
-        onPathStarted = {},
-        onPointAdded = {},
-        onPointsRemovedAfter = {},
-        onPathCompleted = {},
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp)
-    )
-}
