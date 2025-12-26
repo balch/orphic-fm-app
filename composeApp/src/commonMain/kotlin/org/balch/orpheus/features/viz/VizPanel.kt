@@ -61,6 +61,8 @@ fun VizPanel(
         currentViz = state.selectedViz,
         visualizations = state.visualizations,
         showKnobs = state.showKnobs,
+        knob1Value = state.knob1Value,
+        knob2Value = state.knob2Value,
         onSelectViz = viewModel::selectVisualization,
         onKnob1Change = viewModel::onKnob1Change,
         onKnob2Change = viewModel::onKnob2Change,
@@ -75,6 +77,8 @@ fun VizPanelLayout(
     currentViz: Visualization,
     visualizations: List<Visualization>,
     showKnobs: Boolean,
+    knob1Value: Float = 0.5f,
+    knob2Value: Float = 0.5f,
     onSelectViz: (Visualization) -> Unit,
     onKnob1Change: (Float) -> Unit,
     onKnob2Change: (Float) -> Unit,
@@ -164,16 +168,16 @@ fun VizPanelLayout(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 RotaryKnob(
-                    value = 0.5f, // Placeholder visual value
+                    value = knob1Value,
                     onValueChange = onKnob1Change,
                     label = if (showKnobs) currentViz.knob1Label else "-",
-                    controlId = "viz_knob1", // Not persisted for now
+                    controlId = "viz_knob1",
                     size = 48.dp,
                     progressColor = if (showKnobs) VizColor else Color.Gray.copy(alpha = 0.3f),
                     enabled = showKnobs
                 )
                 RotaryKnob(
-                    value = 0.5f, // Placeholder visual value
+                    value = knob2Value,
                     onValueChange = onKnob2Change,
                     label = if (showKnobs) currentViz.knob2Label else "-",
                     controlId = "viz_knob2",

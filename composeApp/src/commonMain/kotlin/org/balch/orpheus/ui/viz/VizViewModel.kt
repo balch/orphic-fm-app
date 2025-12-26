@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 
 /**
@@ -20,6 +22,8 @@ data class VizUiState(
     val selectedViz: Visualization,
     val visualizations: List<Visualization>,
     val showKnobs: Boolean,
+    val knob1Value: Float = 0.5f,
+    val knob2Value: Float = 0.5f,
     val liquidEffects: VisualizationLiquidEffects = selectedViz.liquidEffects
 )
 
@@ -32,7 +36,8 @@ data class VizUiState(
 @ContributesIntoMap(AppScope::class)
 class VizViewModel(
     visualizations: Set<Visualization>,
-    private val appPreferencesRepository: AppPreferencesRepository
+    private val appPreferencesRepository: AppPreferencesRepository,
+    private val midiRouter: Lazy<MidiRouter>
 ) : ViewModel() {
 
     // Sorted list: Off first, then alphabetical by name
@@ -64,6 +69,16 @@ class VizViewModel(
             prefs.lastVizId?.let { id ->
                 sortedVisualizations.find { it.id == id }?.let { viz ->
                     selectVisualization(viz, save = false)
+                }
+            }
+        }
+        
+        // Subscribe to MIDI/Timeline control changes for viz knobs
+        viewModelScope.launch {
+            midiRouter.value.onControlChange.collect { event ->
+                when (event.controlId) {
+                    ControlIds.VIZ_KNOB_1 -> onKnob1Change(event.value)
+                    ControlIds.VIZ_KNOB_2 -> onKnob2Change(event.value)
                 }
             }
         }
@@ -114,10 +129,12 @@ class VizViewModel(
 
     fun onKnob1Change(value: Float) {
         _currentViz.value.setKnob1(value)
+        _uiState.value = _uiState.value.copy(knob1Value = value)
     }
 
     fun onKnob2Change(value: Float) {
         _currentViz.value.setKnob2(value)
+        _uiState.value = _uiState.value.copy(knob2Value = value)
     }
 
     private fun updateState() {

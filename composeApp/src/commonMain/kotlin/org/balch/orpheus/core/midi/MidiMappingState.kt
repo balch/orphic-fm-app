@@ -92,6 +92,10 @@ data class MidiMappingState(
             // Stereo controls
             const val STEREO_PAN = "stereo_pan"
             const val STEREO_MODE = "stereo_mode"
+            
+            // Viz controls
+            const val VIZ_KNOB_1 = "viz_knob_1"
+            const val VIZ_KNOB_2 = "viz_knob_2"
         }
     }
 

@@ -319,8 +319,8 @@ class TweakTimelineViewModel(
                 TweakTimelineParameter.DELAY_MIX -> ControlIds.DELAY_MIX
                 TweakTimelineParameter.DIST_DRIVE -> ControlIds.DRIVE
                 TweakTimelineParameter.DIST_MIX -> ControlIds.DISTORTION_MIX
-                TweakTimelineParameter.VIZ_KNOB_1 -> null // TODO: Add viz control IDs
-                TweakTimelineParameter.VIZ_KNOB_2 -> null
+                TweakTimelineParameter.VIZ_KNOB_1 -> ControlIds.VIZ_KNOB_1
+                TweakTimelineParameter.VIZ_KNOB_2 -> ControlIds.VIZ_KNOB_2
                 TweakTimelineParameter.GLOB_VIBRATO -> ControlIds.VIBRATO
             }
             
