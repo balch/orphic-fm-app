@@ -52,8 +52,14 @@ composeApp/
 
 ### Android
 
+Build the debug APK:
 ```bash
 ./gradlew :composeApp:assembleDebug
+```
+
+Install and run on a connected device or emulator:
+```bash
+./gradlew :composeApp:installDebug
 ```
 
 ### Build All
