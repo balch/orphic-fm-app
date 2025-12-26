@@ -2,6 +2,7 @@ package org.balch.orpheus.ui.panels.compact
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -116,6 +117,7 @@ fun CompactLandscapeHeaderPanel(
                             } else Modifier.background(Color(0xFF2A2A3A))
                         )
                         .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .clickable { onPresetDropdownExpandedChange(!presetDropdownExpanded) }
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -182,6 +184,7 @@ fun CompactLandscapeHeaderPanel(
                             } else Modifier.background(Color(0xFF2A2A3A))
                         )
                         .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .clickable { onVizDropdownExpandedChange(!vizDropdownExpanded) }
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {

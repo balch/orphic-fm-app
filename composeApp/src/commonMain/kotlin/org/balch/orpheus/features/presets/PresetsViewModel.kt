@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.DronePresetRepository
 import org.balch.orpheus.core.presets.PresetLoader
@@ -48,6 +49,7 @@ class PresetsViewModel(
     private val repository: DronePresetRepository,
     private val presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider,
+    private val appPreferencesRepository: AppPreferencesRepository,
     factoryPatches: Set<SynthPatch>
 ) : ViewModel() {
 
@@ -108,6 +110,18 @@ class PresetsViewModel(
             intents.tryEmit(PresetIntent.SetPresets(allPresets, factoryPresetNames))
             intents.tryEmit(PresetIntent.SetLoading(false))
             Logger.info { "Loaded ${factoryPresets.size} factory + ${userPresets.size} user presets" }
+            
+            // Load last selected preset from preferences, fallback to Default
+            val prefs = appPreferencesRepository.load()
+            val lastPresetName = prefs.lastPresetName ?: "Default"
+            val presetToApply = allPresets.find { it.name == lastPresetName }
+                ?: allPresets.find { it.name == "Default" }
+            
+            if (presetToApply != null) {
+                intents.tryEmit(PresetIntent.Select(presetToApply))
+                presetLoader.applyPreset(presetToApply)
+                Logger.info { "Applied preset on startup: ${presetToApply.name}" }
+            }
         }
     }
 
@@ -122,6 +136,12 @@ class PresetsViewModel(
         selectPreset(preset)
         presetLoader.applyPreset(preset)
         Logger.info { "Applied preset: ${preset.name}" }
+        
+        // Save last selected preset to preferences
+        viewModelScope.launch(dispatcherProvider.io) {
+            val prefs = appPreferencesRepository.load().copy(lastPresetName = preset.name)
+            appPreferencesRepository.save(prefs)
+        }
     }
 
     fun saveNewPreset(name: String) {

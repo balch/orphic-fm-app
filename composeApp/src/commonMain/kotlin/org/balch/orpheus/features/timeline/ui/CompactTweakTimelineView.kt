@@ -48,6 +48,7 @@ import org.balch.orpheus.features.timeline.TimelinePoint
 import org.balch.orpheus.features.timeline.TweakTimelineConfig
 import org.balch.orpheus.features.timeline.TweakTimelineParameter
 import org.balch.orpheus.features.timeline.TweakTimelineState
+import org.balch.orpheus.features.timeline.TweakPlaybackMode
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
@@ -75,6 +76,7 @@ fun CompactTweakTimelineView(
     effects: VisualizationLiquidEffects,
     onPlayPause: () -> Unit,
     onStop: () -> Unit,
+    onPlaybackModeChange: (TweakPlaybackMode) -> Unit,
     onExpand: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -154,6 +156,36 @@ fun CompactTweakTimelineView(
                         fontSize = 8.sp,
                         color = accentColor.copy(alpha = 0.7f)
                     )
+                    
+                    // Playback mode selector (tap to cycle)
+                    val modeLabel = when (state.config.tweakPlaybackMode) {
+                        TweakPlaybackMode.ONCE -> "→|"
+                        TweakPlaybackMode.LOOP -> "↻"
+                        TweakPlaybackMode.PING_PONG -> "↔"
+                    }
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(accentColor.copy(alpha = 0.2f))
+                            .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                            .clickable {
+                                val nextMode = when (state.config.tweakPlaybackMode) {
+                                    TweakPlaybackMode.ONCE -> TweakPlaybackMode.LOOP
+                                    TweakPlaybackMode.LOOP -> TweakPlaybackMode.PING_PONG
+                                    TweakPlaybackMode.PING_PONG -> TweakPlaybackMode.ONCE
+                                }
+                                onPlaybackModeChange(nextMode)
+                            }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = modeLabel,
+                            fontSize = 10.sp,
+                            color = accentColor
+                        )
+                    }
                 }
             }
 
@@ -319,6 +351,7 @@ private fun CompactTweakTimelineViewPreview() {
         effects = VisualizationLiquidEffects(),
         onPlayPause = {},
         onStop = {},
+        onPlaybackModeChange = {},
         onExpand = {},
         modifier = Modifier.fillMaxWidth()
     )
@@ -338,6 +371,7 @@ private fun CompactTweakTimelineViewDisabledPreview() {
         effects = VisualizationLiquidEffects(),
         onPlayPause = {},
         onStop = {},
+        onPlaybackModeChange = {},
         onExpand = {},
         modifier = Modifier.fillMaxWidth()
     )

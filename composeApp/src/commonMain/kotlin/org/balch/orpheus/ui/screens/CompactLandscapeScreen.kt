@@ -34,6 +34,7 @@ import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.timeline.TweakTimelineUiState
 import org.balch.orpheus.features.timeline.TweakTimelineViewModel
+import org.balch.orpheus.features.timeline.TweakPlaybackMode
 import org.balch.orpheus.features.timeline.ui.CompactTweakTimelineView
 import org.balch.orpheus.features.timeline.ui.ExpandedTweakTimelineScreen
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
@@ -100,6 +101,7 @@ fun CompactLandscapeScreen(
             onMasterVolumeChange = { v -> voiceViewModel.onMasterVolumeChange(v) },
             onTimelinePlayPause = { timelineViewModel.togglePlayPause() },
             onTimelineStop = { timelineViewModel.stop() },
+            onTimelinePlaybackModeChange = { timelineViewModel.setPlaybackMode(it) },
             onTimelineExpand = { timelineViewModel.expand() },
             onKeyEvent = { event, isDialogActive ->
                 SynthKeyboardHandler.handleKeyEvent(
@@ -152,6 +154,7 @@ private fun CompactLandscapeLayout(
     onMasterVolumeChange: (Float) -> Unit,
     onTimelinePlayPause: () -> Unit,
     onTimelineStop: () -> Unit,
+    onTimelinePlaybackModeChange: (TweakPlaybackMode) -> Unit,
     onTimelineExpand: () -> Unit,
     onKeyEvent: (androidx.compose.ui.input.key.KeyEvent, Boolean) -> Boolean,
 ) {
@@ -227,6 +230,7 @@ private fun CompactLandscapeLayout(
                 state = timelineState.timeline,
                 onPlayPause = onTimelinePlayPause,
                 onStop = onTimelineStop,
+                onPlaybackModeChange = onTimelinePlaybackModeChange,
                 onExpand = onTimelineExpand,
                 liquidState = liquidState,
                 effects = effects,
@@ -370,6 +374,7 @@ private fun CompactLandscapeLayoutPreview(
                 onMasterVolumeChange = { _ -> },
                 onTimelinePlayPause = {},
                 onTimelineStop = {},
+                onTimelinePlaybackModeChange = {},
                 onTimelineExpand = {},
                 onKeyEvent = { _, _ -> false }
             )

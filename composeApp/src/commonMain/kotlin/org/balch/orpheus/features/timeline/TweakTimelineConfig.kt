@@ -69,7 +69,7 @@ enum class TweakPlaybackMode {
  */
 data class TweakTimelineConfig(
     val durationSeconds: Float = 30f,
-    val tweakPlaybackMode: TweakPlaybackMode = TweakPlaybackMode.ONCE,
+    val tweakPlaybackMode: TweakPlaybackMode = TweakPlaybackMode.LOOP,
     val enabled: Boolean = false,
     val selectedParameters: List<TweakTimelineParameter> = emptyList()
 ) {
