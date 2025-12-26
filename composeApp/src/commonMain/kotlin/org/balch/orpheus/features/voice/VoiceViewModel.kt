@@ -37,7 +37,9 @@ data class VoiceUiState(
     val fmStructureCrossQuad: Boolean = false,
     val totalFeedback: Float = 0.0f,
     val vibrato: Float = 0.0f,
-    val voiceCoupling: Float = 0.0f
+    val voiceCoupling: Float = 0.0f,
+    val masterVolume: Float = 1.0f,
+    val peakLevel: Float = 0.0f
 ) {
     companion object {
         val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f)
@@ -67,6 +69,8 @@ private sealed interface VoiceIntent {
     data class TotalFeedback(val value: Float) : VoiceIntent
     data class Vibrato(val value: Float) : VoiceIntent
     data class VoiceCoupling(val value: Float) : VoiceIntent
+    data class MasterVolume(val value: Float) : VoiceIntent
+    data class PeakLevel(val value: Float) : VoiceIntent
 
     // Restore
     data class Restore(val state: VoiceUiState) : VoiceIntent
@@ -157,6 +161,13 @@ class VoiceViewModel(
             launch {
                 midiRouter.value.onControlChange.collect { event ->
                     handleMidiControlChange(event.controlId, event.value)
+                }
+            }
+
+            // Subscribe to peak flow
+            launch {
+                engine.peakFlow.collect { peak ->
+                    intents.tryEmit(VoiceIntent.PeakLevel(peak))
                 }
             }
         }
@@ -292,6 +303,12 @@ class VoiceViewModel(
             is VoiceIntent.VoiceCoupling ->
                 state.copy(voiceCoupling = intent.value)
 
+            is VoiceIntent.MasterVolume ->
+                state.copy(masterVolume = intent.value)
+
+            is VoiceIntent.PeakLevel ->
+                state.copy(peakLevel = intent.value)
+
             is VoiceIntent.Restore -> intent.state
         }
 
@@ -378,6 +395,8 @@ class VoiceViewModel(
             is VoiceIntent.TotalFeedback -> engine.setTotalFeedback(intent.value)
             is VoiceIntent.Vibrato -> engine.setVibrato(intent.value)
             is VoiceIntent.VoiceCoupling -> engine.setVoiceCoupling(intent.value)
+            is VoiceIntent.MasterVolume -> engine.setMasterVolume(intent.value)
+            is VoiceIntent.PeakLevel -> { /* No side effect, strictly monitoring */ }
             is VoiceIntent.Restore -> applyFullState(intent.state)
         }
     }
@@ -396,6 +415,7 @@ class VoiceViewModel(
         engine.setTotalFeedback(state.totalFeedback)
         engine.setVibrato(state.vibrato)
         engine.setVoiceCoupling(state.voiceCoupling)
+        engine.setMasterVolume(state.masterVolume)
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -461,6 +481,10 @@ class VoiceViewModel(
 
     fun onVoiceCouplingChange(value: Float) {
         intents.tryEmit(VoiceIntent.VoiceCoupling(value))
+    }
+
+    fun onMasterVolumeChange(value: Float) {
+        intents.tryEmit(VoiceIntent.MasterVolume(value))
     }
 
     fun restoreState(state: VoiceUiState) {

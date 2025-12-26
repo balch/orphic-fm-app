@@ -92,6 +92,7 @@ fun CompactLandscapeScreen(
         onVoiceHoldChange = { i, h -> voiceViewModel.onHoldChange(i, h) },
         onQuadPitchChange = { i, v -> voiceViewModel.onQuadPitchChange(i, v) },
         onQuadHoldChange = { i, v -> voiceViewModel.onQuadHoldChange(i, v) },
+        onMasterVolumeChange = { v -> voiceViewModel.onMasterVolumeChange(v) },
         onTimelinePlayPause = { timelineViewModel.togglePlayPause() },
         onTimelineStop = { timelineViewModel.stop() },
         onTimelineExpand = { timelineViewModel.expand() },
@@ -124,6 +125,7 @@ private fun CompactLandscapeLayout(
     onVoiceHoldChange: (Int, Boolean) -> Unit,
     onQuadPitchChange: (Int, Float) -> Unit,
     onQuadHoldChange: (Int, Float) -> Unit,
+    onMasterVolumeChange: (Float) -> Unit,
     onTimelinePlayPause: () -> Unit,
     onTimelineStop: () -> Unit,
     onTimelineExpand: () -> Unit,
@@ -152,22 +154,24 @@ private fun CompactLandscapeLayout(
             .padding(4.dp)
     ) {
         // Top bar: Patch and Viz dropdowns
-        CompactLandscapeHeaderPanel(
-            selectedPresetName = presetState.selectedPreset?.name ?: "Patch",
-            presets = presetState.presets,
-            presetDropdownExpanded = presetDropdownExpanded,
-            onPresetDropdownExpandedChange = { presetDropdownExpanded = it },
-            onPresetSelect = onPresetSelect,
-            selectedVizName = vizState.selectedViz.name,
-            visualizations = vizState.visualizations,
-            vizDropdownExpanded = vizDropdownExpanded,
-            onVizDropdownExpandedChange = { vizDropdownExpanded = it },
-            onVizSelect = onVizSelect,
-            liquidState = liquidState,
-            effects = effects
-        )
-
-        // Middle row: Quad Knobs at ends, 3 Timelines in center
+            CompactLandscapeHeaderPanel(
+                selectedPresetName = presetState.selectedPreset?.name ?: "Init Patch",
+                presets = presetState.presets,
+                presetDropdownExpanded = presetDropdownExpanded,
+                onPresetDropdownExpandedChange = { presetDropdownExpanded = it },
+                onPresetSelect = onPresetSelect,
+                selectedVizName = vizState.selectedViz.name,
+                visualizations = vizState.visualizations,
+                vizDropdownExpanded = vizDropdownExpanded,
+                onVizDropdownExpandedChange = { vizDropdownExpanded = it },
+                onVizSelect = onVizSelect,
+                masterVolume = voiceState.masterVolume,
+                peakLevel = voiceState.peakLevel,
+                onMasterVolumeChange = onMasterVolumeChange,
+                liquidState = liquidState,
+                effects = effects,
+                modifier = Modifier.fillMaxWidth()
+            )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -339,6 +343,7 @@ private fun CompactLandscapeLayoutPreview(
                 onVoiceHoldChange = { _, _ -> },
                 onQuadPitchChange = { _, _ -> },
                 onQuadHoldChange = { _, _ -> },
+                onMasterVolumeChange = { _ -> },
                 onTimelinePlayPause = {},
                 onTimelineStop = {},
                 onTimelineExpand = {},

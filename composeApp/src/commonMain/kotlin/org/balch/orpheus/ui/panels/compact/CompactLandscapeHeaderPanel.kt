@@ -5,10 +5,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenuItem
@@ -23,8 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.core.presets.DronePreset
+import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
@@ -43,6 +45,9 @@ fun CompactLandscapeHeaderPanel(
     vizDropdownExpanded: Boolean,
     onVizDropdownExpandedChange: (Boolean) -> Unit,
     onVizSelect: (Visualization) -> Unit,
+    masterVolume: Float,
+    peakLevel: Float,
+    onMasterVolumeChange: (Float) -> Unit,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     modifier: Modifier = Modifier
@@ -51,147 +56,216 @@ fun CompactLandscapeHeaderPanel(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.Start,
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Patch dropdown
-        ExposedDropdownMenuBox(
-            expanded = presetDropdownExpanded,
-            onExpandedChange = onPresetDropdownExpandedChange
+        // Left: Title
+        Box(
+            modifier = Modifier
+                .height(36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .then(
+                    if (liquidState != null) {
+                        Modifier.liquidVizEffects(
+                            liquidState = liquidState,
+                            scope = effects.top,
+                            frostAmount = 4.dp,
+                            color = Color(0xFF2A2A3A),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    } else Modifier.background(Color(0xFF2A2A3A))
+                )
+                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 16.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .menuAnchor()
-                    .width(140.dp)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .then(
-                        if (liquidState != null) {
-                            Modifier.liquidVizEffects(
-                                liquidState = liquidState,
-                                scope = effects.top,
-                                frostAmount = 4.dp,
-                                color = Color(0xFF2A2A3A),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                        } else Modifier.background(Color(0xFF2A2A3A))
-                    )
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = selectedPresetName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.9f),
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f)
-                    )
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = presetDropdownExpanded)
-                }
-            }
-            ExposedDropdownMenu(
-                expanded = presetDropdownExpanded,
-                onDismissRequest = { onPresetDropdownExpandedChange(false) },
-                modifier = if (liquidState != null) {
-                    Modifier.liquidVizEffects(
-                        liquidState = liquidState,
-                        scope = effects.top,
-                        frostAmount = 8.dp,
-                        color = Color(0xFF2A2A3A),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                } else Modifier.background(Color(0xFF2A2A3A))
-            ) {
-                presets.forEach { preset ->
-                    DropdownMenuItem(
-                        text = { Text(preset.name, style = MaterialTheme.typography.bodySmall) },
-                        onClick = {
-                            onPresetSelect(preset)
-                            onPresetDropdownExpandedChange(false)
-                        }
-                    )
-                }
-            }
+            Text(
+                text = "ORPHEUS-8",
+                style = MaterialTheme.typography.titleMedium,
+                color = OrpheusColors.neonCyan,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
         }
 
-        // Spacer
-        Spacer(Modifier.width(16.dp))
-
-        // Viz dropdown
-        ExposedDropdownMenuBox(
-            expanded = vizDropdownExpanded,
-            onExpandedChange = onVizDropdownExpandedChange
+        // Center: Dropdowns
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .menuAnchor()
-                    .width(140.dp)
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .then(
-                        if (liquidState != null) {
-                            Modifier.liquidVizEffects(
-                                liquidState = liquidState,
-                                scope = effects.top,
-                                frostAmount = 4.dp,
-                                color = Color(0xFF2A2A3A),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                        } else Modifier.background(Color(0xFF2A2A3A))
-                    )
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp),
-                contentAlignment = Alignment.CenterStart
+            // Patch dropdown
+            ExposedDropdownMenuBox(
+                expanded = presetDropdownExpanded,
+                onExpandedChange = onPresetDropdownExpandedChange
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .menuAnchor()
+                        .width(140.dp)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(
+                            if (liquidState != null) {
+                                Modifier.liquidVizEffects(
+                                    liquidState = liquidState,
+                                    scope = effects.top,
+                                    frostAmount = 4.dp,
+                                    color = Color(0xFF2A2A3A),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            } else Modifier.background(Color(0xFF2A2A3A))
+                        )
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
-                    Text(
-                        text = selectedVizName,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.9f),
-                        maxLines = 1,
-                        modifier = Modifier.weight(1f)
-                    )
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = vizDropdownExpanded)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = selectedPresetName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.9f),
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f)
+                        )
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = presetDropdownExpanded)
+                    }
+                }
+                ExposedDropdownMenu(
+                    expanded = presetDropdownExpanded,
+                    onDismissRequest = { onPresetDropdownExpandedChange(false) },
+                    modifier = if (liquidState != null) {
+                        Modifier.liquidVizEffects(
+                            liquidState = liquidState,
+                            scope = effects.top,
+                            frostAmount = 8.dp,
+                            color = Color(0xFF2A2A3A),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    } else Modifier.background(Color(0xFF2A2A3A))
+                ) {
+                    presets.forEach { preset ->
+                        DropdownMenuItem(
+                            text = { Text(preset.name, style = MaterialTheme.typography.bodySmall) },
+                            onClick = {
+                                onPresetSelect(preset)
+                                onPresetDropdownExpandedChange(false)
+                            }
+                        )
+                    }
                 }
             }
-            ExposedDropdownMenu(
+
+            // Viz dropdown
+            ExposedDropdownMenuBox(
                 expanded = vizDropdownExpanded,
-                onDismissRequest = { onVizDropdownExpandedChange(false) },
-                modifier = if (liquidState != null) {
-                    Modifier.liquidVizEffects(
-                        liquidState = liquidState,
-                        scope = effects.top,
-                        frostAmount = 8.dp,
-                        color = Color(0xFF2A2A3A),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                } else Modifier.background(Color(0xFF2A2A3A))
+                onExpandedChange = onVizDropdownExpandedChange
             ) {
-                visualizations.forEach { viz ->
-                    DropdownMenuItem(
-                        text = { Text(viz.name, style = MaterialTheme.typography.bodySmall) },
-                        onClick = {
-                            onVizSelect(viz)
-                            onVizDropdownExpandedChange(false)
-                        }
-                    )
+                Box(
+                    modifier = Modifier
+                        .menuAnchor()
+                        .width(140.dp)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(
+                            if (liquidState != null) {
+                                Modifier.liquidVizEffects(
+                                    liquidState = liquidState,
+                                    scope = effects.top,
+                                    frostAmount = 4.dp,
+                                    color = Color(0xFF2A2A3A),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                            } else Modifier.background(Color(0xFF2A2A3A))
+                        )
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = selectedVizName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.9f),
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f)
+                        )
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = vizDropdownExpanded)
+                    }
                 }
+                ExposedDropdownMenu(
+                    expanded = vizDropdownExpanded,
+                    onDismissRequest = { onVizDropdownExpandedChange(false) },
+                    modifier = if (liquidState != null) {
+                        Modifier.liquidVizEffects(
+                            liquidState = liquidState,
+                            scope = effects.top,
+                            frostAmount = 8.dp,
+                            color = Color(0xFF2A2A3A),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    } else Modifier.background(Color(0xFF2A2A3A))
+                ) {
+                    visualizations.forEach { viz ->
+                        DropdownMenuItem(
+                            text = { Text(viz.name, style = MaterialTheme.typography.bodySmall) },
+                            onClick = {
+                                onVizSelect(viz)
+                                onVizDropdownExpandedChange(false)
+                            }
+                        )
+                    }
+                }
+            }
+
+            PeakLed(level = peakLevel)
+            
+            Box(modifier = Modifier.size(36.dp)) {
+                org.balch.orpheus.ui.widgets.RotaryKnob(
+                    value = masterVolume,
+                    onValueChange = onMasterVolumeChange,
+                    range = 0f..1f,
+                    size = 36.dp,
+                    progressColor = OrpheusColors.neonCyan
+                )
             }
         }
     }
 }
 
-@Preview
+@Composable
+private fun PeakLed(level: Float) {
+    val size = 8.dp
+    val active = level > 0.01f
+    val clipping = level > 0.95f
+    
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(
+                when {
+                    clipping -> Color.Red
+                    active -> OrpheusColors.neonCyan.copy(alpha = 0.5f + (level * 0.5f))
+                    else -> Color(0xFF1A1A2A)
+                }
+            )
+            .border(
+                1.dp, 
+                if (clipping) Color.Red else OrpheusColors.neonCyan.copy(alpha = 0.3f),
+                androidx.compose.foundation.shape.CircleShape
+            )
+    )
+}
+
+@Preview(widthDp = 600)
 @Composable
 private fun CompactLandscapeHeaderPanelPreview() {
     CompactLandscapeHeaderPanel(
@@ -205,6 +279,9 @@ private fun CompactLandscapeHeaderPanelPreview() {
         vizDropdownExpanded = false,
         onVizDropdownExpandedChange = {},
         onVizSelect = {},
+        masterVolume = 0.8f,
+        peakLevel = 0.5f,
+        onMasterVolumeChange = {},
         liquidState = null,
         effects = VisualizationLiquidEffects()
     )
