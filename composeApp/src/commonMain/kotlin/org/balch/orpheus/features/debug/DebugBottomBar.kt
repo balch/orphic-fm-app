@@ -54,7 +54,6 @@ fun DebugBottomBar(engine: SynthEngine, modifier: Modifier = Modifier) {
     var isExpanded by remember { mutableStateOf(false) }
 
     // Toggles
-    var showVisualizer by remember { mutableStateOf(false) }
     var logAudioEvents by remember { mutableStateOf(true) }
 
     // Collect logs from StateFlow
@@ -169,12 +168,8 @@ fun DebugBottomBar(engine: SynthEngine, modifier: Modifier = Modifier) {
                     checked = logAudioEvents,
                     onCheckedChange = { logAudioEvents = it }
                 )
-                DebugToggle(
-                    label = "Visuals (Stub)",
-                    checked = showVisualizer,
-                    onCheckedChange = { showVisualizer = it }
-                )
 
+/*
                 // Audio Test (Quick Action)
                 var isTestTonePlaying by remember { mutableStateOf(false) }
                 Box(
@@ -202,6 +197,7 @@ fun DebugBottomBar(engine: SynthEngine, modifier: Modifier = Modifier) {
                     )
                 }
 
+ */
                 // Expand Button
                 Box(modifier = Modifier.clickable { isExpanded = !isExpanded }.padding(4.dp)) {
                     Text(text = if (isExpanded) "▼" else "▲", color = Color.Gray, fontSize = 12.sp)
