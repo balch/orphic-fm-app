@@ -129,13 +129,6 @@ class VoiceViewModel(
                             voiceEnvelopeSpeeds = preset.voiceEnvelopeSpeeds.take(8).padEnd(8, 0f),
                             duoModSources =
                                 preset.duoModSources
-                                    .mapNotNull {
-                                        try {
-                                            ModSource.valueOf(it)
-                                        } catch (e: Exception) {
-                                            ModSource.OFF
-                                        }
-                                    }
                                     .take(4)
                                     .padEnd(4, ModSource.OFF),
                             fmStructureCrossQuad = preset.fmStructureCrossQuad,

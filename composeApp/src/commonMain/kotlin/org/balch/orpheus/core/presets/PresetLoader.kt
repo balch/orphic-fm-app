@@ -50,7 +50,7 @@ class PresetLoader(
             voiceModDepths = List(8) { i -> engine.getVoiceFmDepth(i) },
             voiceEnvelopeSpeeds = List(8) { i -> engine.getVoiceEnvelopeSpeed(i) },
             pairSharpness = List(4) { i -> engine.getPairSharpness(i) },
-            duoModSources = List(4) { i -> engine.getDuoModSource(i).name },
+            duoModSources = List(4) { i -> engine.getDuoModSource(i) },
             hyperLfoA = engine.getHyperLfoFreq(0),
             hyperLfoB = engine.getHyperLfoFreq(1),
             hyperLfoMode =

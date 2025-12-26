@@ -3,6 +3,7 @@ package org.balch.orpheus.features.presets.patches
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
 import org.balch.orpheus.features.lfo.HyperLfoMode
@@ -21,7 +22,7 @@ class DarkAmbientPatch : SynthPatch {
         voiceModDepths = listOf(0.35f, 0.0f, 0.4f, 0.0f, 0.3f, 0.0f, 0.35f, 0.0f),
         voiceEnvelopeSpeeds = listOf(0.7f, 0.7f, 0.8f, 0.8f, 0.7f, 0.7f, 0.8f, 0.8f),
         pairSharpness = listOf(0.5f, 0.6f, 0.5f, 0.6f),
-        duoModSources = listOf("ENV", "ENV", "ENV", "ENV"),
+        duoModSources = List(4) { ModSource.VOICE_FM },
         hyperLfoA = 0.08f,
         hyperLfoB = 0.05f,
         hyperLfoMode = HyperLfoMode.AND,

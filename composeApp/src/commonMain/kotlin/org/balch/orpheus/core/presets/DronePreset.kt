@@ -1,6 +1,7 @@
 package org.balch.orpheus.core.presets
 
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.features.lfo.HyperLfoMode
 import org.balch.orpheus.util.currentTimeMillis
 
@@ -18,7 +19,7 @@ data class DronePreset(
 
     // Pair parameters (4 pairs)
     val pairSharpness: List<Float> = List(4) { 0.0f },
-    val duoModSources: List<String> = List(4) { "OFF" }, // ModSource enum as string
+    val duoModSources: List<ModSource> = List(4) { ModSource.OFF },
 
     // Hyper LFO
     val hyperLfoA: Float = 0.0f,

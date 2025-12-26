@@ -3,6 +3,7 @@ package org.balch.orpheus.features.presets.patches
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
 import org.balch.orpheus.features.lfo.HyperLfoMode
@@ -21,7 +22,7 @@ class SwirlyDreamsPatch : SynthPatch {
         voiceModDepths = listOf(0.6f, 0.5f, 0.6f, 0.5f, 0.6f, 0.5f, 0.6f, 0.5f),
         voiceEnvelopeSpeeds = listOf(0.4f, 0.4f, 0.5f, 0.5f, 0.6f, 0.6f, 0.7f, 0.7f),
         pairSharpness = listOf(0.4f, 0.5f, 0.4f, 0.5f),
-        duoModSources = listOf("LFO", "LFO", "LFO", "LFO"),
+        duoModSources = List(4) { ModSource.LFO},
         hyperLfoA = 0.15f,
         hyperLfoB = 0.12f,
         hyperLfoMode = HyperLfoMode.AND,
