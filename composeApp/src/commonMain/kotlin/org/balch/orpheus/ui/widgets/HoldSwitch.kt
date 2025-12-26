@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -25,7 +26,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Preview
 fun HoldButtonPreview() {
     OrpheusTheme {
-        HoldButton(checked = true, onCheckedChange = {})
+        HoldSwitch(checked = true, onCheckedChange = {})
     }
 }
 
@@ -33,16 +34,17 @@ fun HoldButtonPreview() {
  * A toggle switch with a custom 3D skeuomorphic design.
  */
 @Composable
-fun HoldButton(
+fun HoldSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    activeColor: Color = OrpheusColors.synthGreen
+    activeColor: Color = OrpheusColors.synthGreen,
+    size: DpSize = DpSize(48.dp, 24.dp)
 ) {
     // Custom 3D Switch Container
     Box(
         modifier = modifier
-            .size(width = 48.dp, height = 28.dp)
+            .size(size)
             .clip(RoundedCornerShape(14.dp))
             .background(
                 Brush.verticalGradient(

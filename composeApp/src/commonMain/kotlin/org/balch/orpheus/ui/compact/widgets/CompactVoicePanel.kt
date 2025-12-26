@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.widgets.HoldButton
+import org.balch.orpheus.ui.widgets.HoldSwitch
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -60,6 +60,12 @@ fun CompactVoicePanel(
                 style = MaterialTheme.typography.labelSmall,
                 color = color
             )
+            // Hold toggle button
+            HoldSwitch(
+                checked = isHolding,
+                onCheckedChange = { onHoldChange(it) },
+                activeColor = color
+            )
             // Pulse button (smaller)
             PulseButton(
                 size = 42.dp,
@@ -70,12 +76,6 @@ fun CompactVoicePanel(
                 isLearnMode = false,
                 isLearning = false,
                 onLearnSelect = {}
-            )
-            // Hold toggle button
-            HoldButton(
-                checked = isHolding,
-                onCheckedChange = { onHoldChange(it) },
-                activeColor = color
             )
         }
 
