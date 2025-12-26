@@ -1,10 +1,11 @@
-package org.balch.orpheus.ui.mobile
+package org.balch.orpheus.ui.compact
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -36,19 +37,16 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.ui.compact.widgets.CompactVoicePanel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.viz.liquidVizEffects
-import org.balch.orpheus.ui.widgets.HoldButton
-import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.balch.orpheus.ui.widgets.VerticalMiniSlider
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
@@ -149,7 +147,7 @@ fun CompactLandscapeLayout(
             }
 
             // Spacer
-            androidx.compose.foundation.layout.Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(16.dp))
 
             // Viz dropdown
             ExposedDropdownMenuBox(
@@ -206,7 +204,7 @@ fun CompactLandscapeLayout(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CompactVoiceButton(
+                        CompactVoicePanel(
                             voiceIndex = 0,
                             tune = voiceState.voiceStates[0].tune,
                             envelopeSpeed = voiceState.voiceEnvelopeSpeeds[0],
@@ -219,7 +217,7 @@ fun CompactLandscapeLayout(
                             onHoldChange = { voiceViewModel.onHoldChange(0, it) },
                             color = OrpheusColors.neonMagenta
                         )
-                        CompactVoiceButton(
+                        CompactVoicePanel(
                             voiceIndex = 1,
                             tune = voiceState.voiceStates[1].tune,
                             envelopeSpeed = voiceState.voiceEnvelopeSpeeds[1],
@@ -238,7 +236,7 @@ fun CompactLandscapeLayout(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CompactVoiceButton(
+                        CompactVoicePanel(
                             voiceIndex = 2,
                             tune = voiceState.voiceStates[2].tune,
                             envelopeSpeed = voiceState.voiceEnvelopeSpeeds[2],
@@ -251,7 +249,7 @@ fun CompactLandscapeLayout(
                             onHoldChange = { voiceViewModel.onHoldChange(2, it) },
                             color = OrpheusColors.neonMagenta
                         )
-                        CompactVoiceButton(
+                        CompactVoicePanel(
                             voiceIndex = 3,
                             tune = voiceState.voiceStates[3].tune,
                             envelopeSpeed = voiceState.voiceEnvelopeSpeeds[3],
@@ -329,7 +327,7 @@ fun CompactLandscapeLayout(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CompactVoiceButton(
+                    CompactVoicePanel(
                         voiceIndex = 4,
                         tune = voiceState.voiceStates[4].tune,
                         envelopeSpeed = voiceState.voiceEnvelopeSpeeds[4],
@@ -342,7 +340,7 @@ fun CompactLandscapeLayout(
                         onHoldChange = { voiceViewModel.onHoldChange(4, it) },
                         color = OrpheusColors.synthGreen
                     )
-                    CompactVoiceButton(
+                    CompactVoicePanel(
                         voiceIndex = 5,
                         tune = voiceState.voiceStates[5].tune,
                         envelopeSpeed = voiceState.voiceEnvelopeSpeeds[5],
@@ -361,7 +359,7 @@ fun CompactLandscapeLayout(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CompactVoiceButton(
+                    CompactVoicePanel(
                         voiceIndex = 6,
                         tune = voiceState.voiceStates[6].tune,
                         envelopeSpeed = voiceState.voiceEnvelopeSpeeds[6],
@@ -374,7 +372,7 @@ fun CompactLandscapeLayout(
                         onHoldChange = { voiceViewModel.onHoldChange(6, it) },
                         color = OrpheusColors.synthGreen
                     )
-                    CompactVoiceButton(
+                    CompactVoicePanel(
                         voiceIndex = 7,
                         tune = voiceState.voiceStates[7].tune,
                         envelopeSpeed = voiceState.voiceEnvelopeSpeeds[7],
@@ -394,197 +392,8 @@ fun CompactLandscapeLayout(
     }
 }
 
-/**
- * A compact voice button with tune slider (left), pulse button, envelope speed slider (right), and hold toggle.
- */
-@Composable
-private fun CompactVoiceButton(
-    voiceIndex: Int,
-    tune: Float,
-    envelopeSpeed: Float,
-    isActive: Boolean,
-    isHolding: Boolean,
-    onTuneChange: (Float) -> Unit,
-    onEnvelopeSpeedChange: (Float) -> Unit,
-    onPulseStart: () -> Unit,
-    onPulseEnd: () -> Unit,
-    onHoldChange: (Boolean) -> Unit,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Tune slider (left)
-        VerticalMiniSlider(
-            value = tune,
-            onValueChange = onTuneChange,
-            topLabel = "+",
-            bottomLabel = "-",
-            color = color,
-            trackHeight = 36
-        )
-
-        // Center: Voice number, pulse button, hold toggle
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(1.dp)
-        ) {
-            // Voice number label
-            Text(
-                text = "${voiceIndex + 1}",
-                style = MaterialTheme.typography.labelSmall,
-                color = color
-            )
-            // Pulse button (smaller)
-            PulseButton(
-                size = 36.dp,
-                label = "",
-                isActive = isActive,
-                onPulseStart = onPulseStart,
-                onPulseEnd = onPulseEnd,
-                isLearnMode = false,
-                isLearning = false,
-                onLearnSelect = {}
-            )
-            // Hold toggle button
-            HoldButton(
-                checked = isHolding,
-                onCheckedChange = { onHoldChange(it) },
-                activeColor = color
-            )
-        }
-
-        // Envelope speed slider (right) with S on top, F on bottom
-        VerticalMiniSlider(
-            value = envelopeSpeed,
-            onValueChange = onEnvelopeSpeedChange,
-            topLabel = "S",
-            bottomLabel = "F",
-            color = color,
-            trackHeight = 36
-        )
-    }
-}
 
 // ==================== PREVIEWS ====================
-
-@Preview
-@Composable
-private fun CompactVoiceButtonPreview_Inactive() {
-    OrpheusTheme {
-        CompactVoiceButton(
-            voiceIndex = 0,
-            tune = 0.5f,
-            envelopeSpeed = 0.5f,
-            isActive = false,
-            isHolding = false,
-            onTuneChange = {},
-            onEnvelopeSpeedChange = {},
-            onPulseStart = {},
-            onPulseEnd = {},
-            onHoldChange = {},
-            color = OrpheusColors.neonMagenta
-        )
-    }
-}
-
-@Preview
-@Composable
-private fun CompactVoiceButtonPreview_Active() {
-    OrpheusTheme {
-        CompactVoiceButton(
-            voiceIndex = 4,
-            tune = 0.8f,
-            envelopeSpeed = 0.2f,
-            isActive = true,
-            isHolding = false,
-            onTuneChange = {},
-            onEnvelopeSpeedChange = {},
-            onPulseStart = {},
-            onPulseEnd = {},
-            onHoldChange = {},
-            color = OrpheusColors.synthGreen
-        )
-    }
-}
-
-@Preview
-@Composable
-private fun CompactVoiceButtonPreview_Holding() {
-    OrpheusTheme {
-        CompactVoiceButton(
-            voiceIndex = 2,
-            tune = 0.3f,
-            envelopeSpeed = 0.9f,
-            isActive = false,
-            isHolding = true,
-            onTuneChange = {},
-            onEnvelopeSpeedChange = {},
-            onPulseStart = {},
-            onPulseEnd = {},
-            onHoldChange = {},
-            color = OrpheusColors.neonMagenta
-        )
-    }
-}
-
-@Preview
-@Composable
-private fun CompactVoiceButtonPreview_ActiveAndHolding() {
-    OrpheusTheme {
-        CompactVoiceButton(
-            voiceIndex = 7,
-            tune = 1.0f,
-            envelopeSpeed = 0.0f,
-            isActive = true,
-            isHolding = true,
-            onTuneChange = {},
-            onEnvelopeSpeedChange = {},
-            onPulseStart = {},
-            onPulseEnd = {},
-            onHoldChange = {},
-            color = OrpheusColors.synthGreen
-        )
-    }
-}
-
-@Preview
-@Composable
-private fun CompactVoiceButtonPreview_AllColors() {
-    OrpheusTheme {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CompactVoiceButton(
-                voiceIndex = 0,
-                tune = 0.5f,
-                envelopeSpeed = 0.5f,
-                isActive = true,
-                isHolding = true,
-                onTuneChange = {},
-                onEnvelopeSpeedChange = {},
-                onPulseStart = {},
-                onPulseEnd = {},
-                onHoldChange = {},
-                color = OrpheusColors.neonMagenta
-            )
-            CompactVoiceButton(
-                voiceIndex = 4,
-                tune = 0.5f,
-                envelopeSpeed = 0.5f,
-                isActive = true,
-                isHolding = true,
-                onTuneChange = {},
-                onEnvelopeSpeedChange = {},
-                onPulseStart = {},
-                onPulseEnd = {},
-                onHoldChange = {},
-                color = OrpheusColors.synthGreen
-            )
-        }
-    }
-}
 
 @Preview(widthDp = 800, heightDp = 400)
 @Composable
@@ -595,65 +404,5 @@ private fun CompactLandscapeLayoutPreview(
         effects = effects,
         modifier = Modifier.fillMaxSize()
     ) {
-        // Preview with mock data - layout structure only
-        // Note: Full preview requires ViewModels which aren't available in preview
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                .padding(4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top bar mock
-            Row(
-                modifier = Modifier.padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text("Patch ▼", color = Color.White)
-                Text("Viz ▼", color = Color.White)
-            }
-
-            Row(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left Quad
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            CompactVoiceButton(0, 0.5f, 0.5f, false, false, {}, {}, {}, {}, {}, OrpheusColors.neonMagenta)
-                            CompactVoiceButton(1, 0.5f, 0.5f, true, false, {}, {}, {}, {}, {}, OrpheusColors.neonMagenta)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            CompactVoiceButton(2, 0.5f, 0.5f, false, true, {}, {}, {}, {}, {}, OrpheusColors.neonMagenta)
-                            CompactVoiceButton(3, 0.5f, 0.5f, true, true, {}, {}, {}, {}, {}, OrpheusColors.neonMagenta)
-                        }
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        RotaryKnob(value = 0.5f, onValueChange = {}, label = "P1-4", size = 40.dp, progressColor = OrpheusColors.neonMagenta)
-                        RotaryKnob(value = 0.3f, onValueChange = {}, label = "H1-4", size = 40.dp, progressColor = OrpheusColors.warmGlow)
-                    }
-                }
-
-                // Right Quad
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        RotaryKnob(value = 0.5f, onValueChange = {}, label = "P5-8", size = 40.dp, progressColor = OrpheusColors.synthGreen)
-                        RotaryKnob(value = 0.7f, onValueChange = {}, label = "H5-8", size = 40.dp, progressColor = OrpheusColors.warmGlow)
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            CompactVoiceButton(4, 0.5f, 0.5f, false, false, {}, {}, {}, {}, {}, OrpheusColors.synthGreen)
-                            CompactVoiceButton(5, 0.5f, 0.5f, true, false, {}, {}, {}, {}, {}, OrpheusColors.synthGreen)
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            CompactVoiceButton(6, 0.5f, 0.5f, false, true, {}, {}, {}, {}, {}, OrpheusColors.synthGreen)
-                            CompactVoiceButton(7, 0.5f, 0.5f, true, true, {}, {}, {}, {}, {}, OrpheusColors.synthGreen)
-                        }
-                    }
-                }
-            }
-        }
     }
 }

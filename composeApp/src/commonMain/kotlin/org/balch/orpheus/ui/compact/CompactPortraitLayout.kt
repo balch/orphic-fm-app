@@ -1,4 +1,4 @@
-package org.balch.orpheus.ui.mobile
+package org.balch.orpheus.ui.compact
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border

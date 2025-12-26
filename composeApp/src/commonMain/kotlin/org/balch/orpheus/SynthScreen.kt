@@ -26,8 +26,8 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
-import org.balch.orpheus.ui.mobile.CompactLandscapeLayout
-import org.balch.orpheus.ui.mobile.CompactPortraitLayout
+import org.balch.orpheus.ui.compact.CompactLandscapeLayout
+import org.balch.orpheus.ui.compact.CompactPortraitLayout
 import org.balch.orpheus.ui.panels.CenterControlPanel
 import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.theme.OrpheusColors

@@ -1,4 +1,4 @@
-package org.balch.orpheus.ui.widgets
+package org.balch.orpheus.ui.compact.widgets
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.widgets.LocalLearnModeState
+import org.balch.orpheus.ui.widgets.learnable
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.roundToInt
 
@@ -102,7 +104,7 @@ fun VerticalMiniSlider(
         // Track with thumb
         Box(
             modifier = Modifier
-                .width(12.dp)
+                .width(16.dp)
                 .height(trackHeight.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(
@@ -142,7 +144,7 @@ fun VerticalMiniSlider(
                     .offset { IntOffset(0, offsetY.roundToInt()) }
                     .align(Alignment.TopCenter)
                     .padding(horizontal = 1.dp)
-                    .size(10.dp, thumbSize.dp)
+                    .size(20.dp, thumbSize.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.verticalGradient(

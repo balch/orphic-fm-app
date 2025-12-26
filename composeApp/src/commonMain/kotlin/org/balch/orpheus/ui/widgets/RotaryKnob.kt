@@ -251,12 +251,12 @@ fun RotaryKnob(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-            Text(
-                text = ((internalValue * 100).roundToInt() / 100.0).toString(),
-                style = MaterialTheme.typography.labelMedium,
-                color = progressColor,
-                textAlign = TextAlign.Center
-            )
         }
+        Text(
+            text = ((internalValue * 100).roundToInt() / 100.0).toString(),
+            style = MaterialTheme.typography.labelMedium,
+            color = progressColor,
+            textAlign = TextAlign.Center
+        )
     }
 }
