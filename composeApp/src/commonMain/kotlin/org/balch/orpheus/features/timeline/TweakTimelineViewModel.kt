@@ -18,8 +18,10 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.midi.MidiControlEvent
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.util.currentTimeMillis
 
 /**
@@ -86,8 +88,8 @@ sealed interface TweakTimelineIntent {
 @ViewModelKey(TweakTimelineViewModel::class)
 @ContributesIntoMap(AppScope::class)
 class TweakTimelineViewModel(
-    private val engine: SynthEngine,
-    private val dispatcherProvider: DispatcherProvider
+    private val dispatcherProvider: DispatcherProvider,
+    private val midiRouter: MidiRouter
 ) : ViewModel() {
 
     private val intents = MutableSharedFlow<TweakTimelineIntent>(
@@ -305,20 +307,26 @@ class TweakTimelineViewModel(
         state.paths.forEach { (param, path) ->
             val value = path.valueAt(state.currentPosition) ?: return@forEach
 
-            when (param) {
-                TweakTimelineParameter.LFO_FREQ_A -> engine.setHyperLfoFreq(0, value)
-                TweakTimelineParameter.LFO_FREQ_B -> engine.setHyperLfoFreq(1, value)
-                TweakTimelineParameter.DELAY_TIME_1 -> engine.setDelayTime(0, value)
-                TweakTimelineParameter.DELAY_TIME_2 -> engine.setDelayTime(1, value)
-                TweakTimelineParameter.DELAY_MOD_1 -> engine.setDelayModDepth(0, value)
-                TweakTimelineParameter.DELAY_MOD_2 -> engine.setDelayModDepth(1, value)
-                TweakTimelineParameter.DELAY_FEEDBACK -> engine.setDelayFeedback(value)
-                TweakTimelineParameter.DELAY_MIX -> engine.setDelayMix(value)
-                TweakTimelineParameter.DIST_DRIVE -> engine.setDrive(value)
-                TweakTimelineParameter.DIST_MIX -> engine.setDistortionMix(value)
-                TweakTimelineParameter.VIZ_KNOB_1 -> { /* TODO: Hook to viz controls */ }
-                TweakTimelineParameter.VIZ_KNOB_2 -> { /* TODO: Hook to viz controls */ }
-                TweakTimelineParameter.GLOB_VIBRATO -> engine.setVibrato(value)
+            // Map timeline parameter to MIDI control ID
+            val controlId = when (param) {
+                TweakTimelineParameter.LFO_FREQ_A -> ControlIds.HYPER_LFO_A
+                TweakTimelineParameter.LFO_FREQ_B -> ControlIds.HYPER_LFO_B
+                TweakTimelineParameter.DELAY_TIME_1 -> ControlIds.DELAY_TIME_1
+                TweakTimelineParameter.DELAY_TIME_2 -> ControlIds.DELAY_TIME_2
+                TweakTimelineParameter.DELAY_MOD_1 -> ControlIds.DELAY_MOD_1
+                TweakTimelineParameter.DELAY_MOD_2 -> ControlIds.DELAY_MOD_2
+                TweakTimelineParameter.DELAY_FEEDBACK -> ControlIds.DELAY_FEEDBACK
+                TweakTimelineParameter.DELAY_MIX -> ControlIds.DELAY_MIX
+                TweakTimelineParameter.DIST_DRIVE -> ControlIds.DRIVE
+                TweakTimelineParameter.DIST_MIX -> ControlIds.DISTORTION_MIX
+                TweakTimelineParameter.VIZ_KNOB_1 -> null // TODO: Add viz control IDs
+                TweakTimelineParameter.VIZ_KNOB_2 -> null
+                TweakTimelineParameter.GLOB_VIBRATO -> ControlIds.VIBRATO
+            }
+            
+            // Emit through MidiRouter - ViewModels will update UI AND apply to engine
+            controlId?.let { id ->
+                midiRouter.emitControlChange(id, value)
             }
         }
     }

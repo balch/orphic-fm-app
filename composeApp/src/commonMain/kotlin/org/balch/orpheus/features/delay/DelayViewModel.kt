@@ -100,7 +100,8 @@ class DelayViewModel(
                 }
             }
 
-            // Subscribe to MIDI control changes for Delay controls
+            // Subscribe to MIDI/Timeline control changes for Delay controls
+            // Uses FromTimeline intents to skip engine call (source already applied)
             launch {
                 midiRouter.value.onControlChange.collect { event ->
                     when (event.controlId) {
@@ -167,7 +168,6 @@ class DelayViewModel(
                 engine.setDelayModSource(0, intent.isLfo)
                 engine.setDelayModSource(1, intent.isLfo)
             }
-
             is DelayIntent.Waveform -> engine.setDelayLfoWaveform(intent.isTriangle)
             is DelayIntent.Restore -> applyFullState(intent.state)
         }

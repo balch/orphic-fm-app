@@ -93,7 +93,8 @@ class DistortionViewModel(
                 }
             }
 
-            // Subscribe to MIDI control changes for Distortion controls
+            // Subscribe to MIDI/Timeline control changes for Distortion controls
+            // Uses FromTimeline intents to skip engine call (source already applied)
             launch {
                 midiRouter.value.onControlChange.collect { event ->
                     when (event.controlId) {

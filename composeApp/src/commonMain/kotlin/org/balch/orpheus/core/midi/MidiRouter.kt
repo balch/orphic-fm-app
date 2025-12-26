@@ -160,4 +160,12 @@ class MidiRouter(
     private fun dispatchControlChange(controlId: String, value: Float) {
         _onControlChange.tryEmit(MidiControlEvent(controlId, value))
     }
+    
+    /**
+     * Public method to emit control changes from non-MIDI sources (e.g., timeline automation).
+     * This allows unified handling of parameter updates across MIDI and timeline.
+     */
+    fun emitControlChange(controlId: String, value: Float) {
+        _onControlChange.tryEmit(MidiControlEvent(controlId, value))
+    }
 }

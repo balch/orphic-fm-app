@@ -45,10 +45,10 @@ import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.timeline.TimelinePath
 import org.balch.orpheus.features.timeline.TimelinePoint
+import org.balch.orpheus.features.timeline.TweakPlaybackMode
 import org.balch.orpheus.features.timeline.TweakTimelineConfig
 import org.balch.orpheus.features.timeline.TweakTimelineParameter
 import org.balch.orpheus.features.timeline.TweakTimelineState
-import org.balch.orpheus.features.timeline.TweakPlaybackMode
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
@@ -156,7 +156,7 @@ fun CompactTweakTimelineView(
                             }
                             onPlaybackModeChange(nextMode)
                         }
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
