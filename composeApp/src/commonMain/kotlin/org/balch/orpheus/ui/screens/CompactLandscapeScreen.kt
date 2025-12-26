@@ -26,6 +26,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.presets.PresetUiState
@@ -111,13 +113,20 @@ fun CompactLandscapeScreen(
         
         // Expanded Timeline Screen Overlay
         if (timelineState.isExpanded) {
-            ExpandedTweakTimelineScreen(
-                onDismiss = { },
-                viewModel = timelineViewModel,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-            )
+            Dialog(
+                onDismissRequest = { timelineViewModel.cancel() },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = true
+                )
+            ) {
+                ExpandedTweakTimelineScreen(
+                    onDismiss = { },
+                    viewModel = timelineViewModel,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }

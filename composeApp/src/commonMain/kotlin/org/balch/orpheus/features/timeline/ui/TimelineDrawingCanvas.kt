@@ -138,18 +138,34 @@ fun TimelineDrawingCanvas(
             // Draw the path
             if (path.points.isNotEmpty()) {
                 val pathDraw = Path()
-                var first = true
-
-                for (point in path.points) {
-                    val x = point.time * width
-                    val y = (1f - point.value) * height
-
-                    if (first) {
-                        pathDraw.moveTo(x, y)
-                        first = false
-                    } else {
-                        pathDraw.lineTo(x, y)
+                
+                if (path.points.size > 1) {
+                    val firstPoint = path.points.first()
+                    pathDraw.moveTo(firstPoint.time * width, (1f - firstPoint.value) * height)
+                    
+                    for (i in 0 until path.points.size - 1) {
+                        val p0 = path.points[i]
+                        val p1 = path.points[i + 1]
+                        
+                        val x0 = p0.time * width
+                        val y0 = (1f - p0.value) * height
+                        val x1 = p1.time * width
+                        val y1 = (1f - p1.value) * height
+                        
+                        // Cubic curve control points for smoothing
+                        // Use a fraction of the distance for control point offsets
+                        val controlDist = (x1 - x0) / 2f
+                        
+                        pathDraw.cubicTo(
+                            x0 + controlDist, y0,
+                            x1 - controlDist, y1,
+                            x1, y1
+                        )
                     }
+                } else {
+                    val p = path.points.first()
+                    pathDraw.moveTo(p.time * width, (1f - p.value) * height)
+                    pathDraw.lineTo(p.time * width, (1f - p.value) * height) // Just a dot
                 }
 
                 drawPath(

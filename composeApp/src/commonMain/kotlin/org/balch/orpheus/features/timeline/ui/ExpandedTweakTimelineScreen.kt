@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -41,6 +39,7 @@ import org.balch.orpheus.features.timeline.TweakTimelineParameter
 import org.balch.orpheus.features.timeline.TweakTimelineState
 import org.balch.orpheus.features.timeline.TweakTimelineViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.widgets.CompactSecondsSlider
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -195,61 +194,7 @@ fun ExpandedTweakTimelineLayout(
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Clear Button (Top)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF2A2A3A))
-                        .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                        .clickable(enabled = activeParameter != null) {
-                            if (activeParameter != null) onClearPath(activeParameter)
-                        }
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "CLEAR LINE",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (activeParameter != null) accentColor else accentColor.copy(alpha = 0.4f)
-                    )
-                }
-
-                // 2. Duration Slider (10s - 120s)
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Duration",
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                        Text(
-                            text = "${state.config.durationSeconds.toInt()}s",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = accentColor
-                        )
-                    }
-                    Slider(
-                        value = state.config.durationSeconds,
-                        onValueChange = onDurationChange,
-                        valueRange = 10f..120f, // updated range 10-120s
-                        colors = SliderDefaults.colors(
-                            thumbColor = accentColor,
-                            activeTrackColor = accentColor,
-                            inactiveTrackColor = accentColor.copy(alpha = 0.3f),
-                            activeTickColor = Color.Transparent,
-                            inactiveTickColor = Color.Transparent
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                // 3. Parameter List
+                // 1. Parameter List
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -273,6 +218,7 @@ fun ExpandedTweakTimelineLayout(
                          TweakTimelineParameter.entries.forEach { param ->
                              val isIncluded = param in state.config.selectedParameters
                              val isSelected = activeParameter == param
+                             val hasPath = state.paths[param]?.points?.isNotEmpty() == true
                              
                              Row(
                                 modifier = Modifier
@@ -290,37 +236,92 @@ fun ExpandedTweakTimelineLayout(
                                         }
                                     }
                                     .padding(vertical = 4.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                              ) {
-                                  // Checkbox
-                                  Box(
-                                      modifier = Modifier
-                                          .size(16.dp)
-                                          .clip(RoundedCornerShape(3.dp))
-                                          .background(if (isIncluded) param.color else Color.Transparent)
-                                          .border(1.dp, param.color, RoundedCornerShape(3.dp))
-                                          .clickable {
-                                              if (isIncluded) onRemoveParameter(param)
-                                              else if (state.config.selectedParameters.size < TweakTimelineParameter.MAX_SELECTED) onAddParameter(param)
-                                          },
-                                      contentAlignment = Alignment.Center
-                                  ) {
-                                      if (isIncluded) {
-                                          Text("✓", fontSize = 10.sp, color = Color.Black)
+                                  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                      // Checkbox
+                                      Box(
+                                          modifier = Modifier
+                                              .size(16.dp)
+                                              .clip(RoundedCornerShape(3.dp))
+                                              .background(if (isIncluded) param.color else Color.Transparent)
+                                              .border(1.dp, param.color, RoundedCornerShape(3.dp))
+                                              .clickable {
+                                                  if (isIncluded) {
+                                                      onRemoveParameter(param)
+                                                      // Also clear path when unchecking
+                                                      onClearPath(param)
+                                                  }
+                                                  else if (state.config.selectedParameters.size < TweakTimelineParameter.MAX_SELECTED) {
+                                                       onAddParameter(param)
+                                                       onSelectActiveParameter(param)
+                                                  }
+                                              },
+                                          contentAlignment = Alignment.Center
+                                      ) {
+                                          if (isIncluded) {
+                                              Text("✓", fontSize = 10.sp, color = Color.Black)
+                                          }
+                                      }
+                                      
+                                      Spacer(modifier = Modifier.width(8.dp))
+                                      
+                                      Text(
+                                          text = param.label,
+                                          fontSize = 12.sp,
+                                          color = if (isIncluded) Color.White else Color.White.copy(alpha = 0.4f),
+                                          fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                          maxLines = 1
+                                      )
+                                  }
+
+                                  // Clear button inside item
+                                  if (isIncluded && hasPath) {
+                                      Box(
+                                          modifier = Modifier
+                                              .size(16.dp)
+                                              .clip(CircleShape)
+                                              .background(Color.White.copy(alpha = 0.1f))
+                                              .clickable { onClearPath(param) },
+                                          contentAlignment = Alignment.Center
+                                      ) {
+                                          Text(
+                                              text = "✕",
+                                              fontSize = 10.sp,
+                                              color = Color.White.copy(alpha = 0.7f)
+                                          )
                                       }
                                   }
-                                  
-                                  Spacer(modifier = Modifier.width(8.dp))
-                                  
-                                  Text(
-                                      text = param.label,
-                                      fontSize = 12.sp,
-                                      color = if (isIncluded) Color.White else Color.White.copy(alpha = 0.4f),
-                                      fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                  )
                              }
                          }
                      }
+                }
+
+                // 2. Compact Duration Slider (Bottom)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Duration",
+                            fontSize = 10.sp,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = "${state.config.durationSeconds.toInt()}s",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor
+                        )
+                    }
+                    CompactSecondsSlider(
+                        valueSeconds = state.config.durationSeconds,
+                        onValueChange = onDurationChange,
+                        color = accentColor,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
