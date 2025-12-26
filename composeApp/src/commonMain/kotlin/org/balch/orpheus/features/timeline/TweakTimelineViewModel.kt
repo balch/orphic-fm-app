@@ -204,6 +204,21 @@ class TweakTimelineViewModel(
             is TweakTimelineIntent.Collapse -> state.copy(isExpanded = false)
             is TweakTimelineIntent.Save -> state.copy(isExpanded = false)
             is TweakTimelineIntent.Cancel -> state.copy(isExpanded = false)
+        }.autoUpdateEnabled()
+    }
+
+    /**
+     * Auto-enable/disable based on whether there are any paths with points.
+     * No manual toggle needed - having paths = enabled.
+     */
+    private fun TweakTimelineUiState.autoUpdateEnabled(): TweakTimelineUiState {
+        val hasAnyPath = timeline.paths.values.any { it.points.isNotEmpty() }
+        return if (timeline.config.enabled != hasAnyPath) {
+            copy(timeline = timeline.copy(
+                config = timeline.config.copy(enabled = hasAnyPath)
+            ))
+        } else {
+            this
         }
     }
 
