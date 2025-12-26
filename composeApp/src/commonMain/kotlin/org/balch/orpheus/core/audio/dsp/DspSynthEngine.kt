@@ -36,16 +36,14 @@ import kotlin.math.sin
  *             (sharpness)    (envelope + hold)
  * ```
  *
- * ### Main Signal Flow:
+ * ### Main Signal Flow (STEREO):
  * ```
- * Voices ──┬──> dryGain ──> preDistortionSummer ──> cleanPathGain ──┬──> postMixSummer
- *          │                      │                                  │        │
- *          │                      └──> driveGain ──> limiter ──> distortedPathGain
- *          │                                                                  │
- *          ├──> delay1/delay2 ──> stereo wet gains ─────────────────────> stereoSum
- *          │                                                                  │
- *          └──> voicePanL/R ─────────────────────────────────────────────> stereoSum
- *                                                      postMixSummer ────────┘
+ * Voices ──┬──> voicePanL/R ──> drySumL/R ──> dryGainL/R ──┬──> cleanPathL/R ──┬──> postMixL/R
+ *          │                                               │                    │
+ *          │                                               └──> driveL/R ──> limiterL/R ──> distPathL/R
+ *          │                                                                                      │
+ *          └──> delay1/delay2 ──> wetGainsL/R ──────────────────────────────────────────> stereoSumL/R
+ *                                                                          postMixL/R ────────────┘
  * ```
  *
  * ### Stereo Output:
@@ -61,8 +59,9 @@ import kotlin.math.sin
  * ### CRITICAL ROUTING RULES:
  * 1. Wet signal goes ONLY through stereo wet gains (delay1WetLeft, etc.)
  * 2. NO duplicate paths - each signal should reach stereoSum once
- * 3. Dry path goes through distortion chain; wet path bypasses it
- * 4. Voice pan gains provide per-voice stereo positioning
+ * 3. Dry path: voicePan → drySum → distortion chain → stereoSum (STEREO all the way)
+ * 4. Wet path bypasses distortion, goes directly to stereoSum
+ * 5. Voice pan gains provide per-voice stereo positioning BEFORE distortion
  */
 class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
 
@@ -105,10 +104,24 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     // TOTAL FB: Output -> LFO Frequency Modulation
     private val totalFbGain = audioEngine.createMultiply()
 
-    // Monitoring & FX
+    // Monitoring
     private val peakFollower = audioEngine.createPeakFollower()
-    private val limiter = audioEngine.createLimiter()
-    private val driveGain = audioEngine.createMultiply()
+    
+    // Stereo Distortion Chain (FIX: prevents signal doubling by processing panned voices)
+    private val drySumLeft = audioEngine.createPassThrough()   // Collects panned dry voices L
+    private val drySumRight = audioEngine.createPassThrough()  // Collects panned dry voices R
+    private val dryGainLeft = audioEngine.createMultiply()     // Dry level L
+    private val dryGainRight = audioEngine.createMultiply()    // Dry level R
+    private val driveGainLeft = audioEngine.createMultiply()   // Drive amount L
+    private val driveGainRight = audioEngine.createMultiply()  // Drive amount R
+    private val limiterLeft = audioEngine.createLimiter()      // Saturation L
+    private val limiterRight = audioEngine.createLimiter()     // Saturation R
+    private val cleanPathGainLeft = audioEngine.createMultiply()    // Clean mix L
+    private val cleanPathGainRight = audioEngine.createMultiply()   // Clean mix R
+    private val distortedPathGainLeft = audioEngine.createMultiply()  // Distorted mix L
+    private val distortedPathGainRight = audioEngine.createMultiply() // Distorted mix R
+    private val postMixSummerLeft = audioEngine.createAdd()    // Clean + Distorted L
+    private val postMixSummerRight = audioEngine.createAdd()   // Clean + Distorted R
     
     // Stereo Output Bus
     private val masterGainLeft = audioEngine.createMultiply()
@@ -121,15 +134,6 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     // Per-voice stereo panning (equal-power pan law)
     private val voicePanLeft = List(8) { audioEngine.createMultiply() }
     private val voicePanRight = List(8) { audioEngine.createMultiply() }
-
-    // Parallel Clean/Distorted Paths (Stereo MIX)
-    private val preDistortionSummer = audioEngine.createAdd()
-    private val cleanPathGain = audioEngine.createMultiply()
-    private val distortedPathGain = audioEngine.createMultiply()
-    private val postMixSummer = audioEngine.createAdd()
-
-    // Dry/Wet Mix for Delays
-    private val dryGain = audioEngine.createMultiply()
     
     // Stereo Delays: Per-delay L/R wet gains for stereo routing
     private val delay1WetLeft = audioEngine.createMultiply()
@@ -222,8 +226,23 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         audioEngine.addUnit(selfMod2Attenuator)
         audioEngine.addUnit(totalFbGain)
         audioEngine.addUnit(peakFollower)
-        audioEngine.addUnit(limiter)
-        audioEngine.addUnit(driveGain)
+        
+        // Stereo distortion chain units
+        audioEngine.addUnit(drySumLeft)
+        audioEngine.addUnit(drySumRight)
+        audioEngine.addUnit(dryGainLeft)
+        audioEngine.addUnit(dryGainRight)
+        audioEngine.addUnit(driveGainLeft)
+        audioEngine.addUnit(driveGainRight)
+        audioEngine.addUnit(limiterLeft)
+        audioEngine.addUnit(limiterRight)
+        audioEngine.addUnit(cleanPathGainLeft)
+        audioEngine.addUnit(cleanPathGainRight)
+        audioEngine.addUnit(distortedPathGainLeft)
+        audioEngine.addUnit(distortedPathGainRight)
+        audioEngine.addUnit(postMixSummerLeft)
+        audioEngine.addUnit(postMixSummerRight)
+        
         audioEngine.addUnit(masterGainLeft)
         audioEngine.addUnit(masterGainRight)
         audioEngine.addUnit(stereoSumLeft)
@@ -232,11 +251,6 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         audioEngine.addUnit(masterPanRight)
         voicePanLeft.forEach { audioEngine.addUnit(it) }
         voicePanRight.forEach { audioEngine.addUnit(it) }
-        audioEngine.addUnit(preDistortionSummer)
-        audioEngine.addUnit(cleanPathGain)
-        audioEngine.addUnit(distortedPathGain)
-        audioEngine.addUnit(postMixSummer)
-        audioEngine.addUnit(dryGain)
         audioEngine.addUnit(delay1WetLeft)
         audioEngine.addUnit(delay1WetRight)
         audioEngine.addUnit(delay2WetLeft)
@@ -252,16 +266,23 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         totalFbGain.inputB.set(0.0) // Default: no feedback
         totalFbGain.output.connect(hyperLfo.feedbackInput)
 
-        // Drive/Master defaults
-        driveGain.inputB.set(1.0)
+        // Stereo Drive/Master defaults
+        driveGainLeft.inputB.set(1.0)
+        driveGainRight.inputB.set(1.0)
         masterGainLeft.inputB.set(0.7)
         masterGainRight.inputB.set(0.7)
         masterPanLeft.inputB.set(1.0)  // Default: center (equal L/R)
         masterPanRight.inputB.set(1.0)
 
-        // Clean/Distorted Mix defaults (50/50)
-        cleanPathGain.inputB.set(0.5)
-        distortedPathGain.inputB.set(0.5)
+        // Stereo Clean/Distorted Mix defaults (50/50)
+        cleanPathGainLeft.inputB.set(0.5)
+        cleanPathGainRight.inputB.set(0.5)
+        distortedPathGainLeft.inputB.set(0.5)
+        distortedPathGainRight.inputB.set(0.5)
+        
+        // Dry level defaults (full dry)
+        dryGainLeft.inputB.set(1.0)
+        dryGainRight.inputB.set(1.0)
 
         // Dry/Wet defaults (50/50 mix)
         setDelayMix(0.5f)
@@ -300,9 +321,19 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         delay1ModMixer.output.connect(delay1.delay)
         delay2ModMixer.output.connect(delay2.delay)
 
-        // ROUTING
+        // ═══════════════════════════════════════════════════════════
+        // STEREO SIGNAL ROUTING (FIX: eliminates signal doubling)
+        // ═══════════════════════════════════════════════════════════
+        // 
+        // Voice → Pan L/R → DrySumL/R → DryGain → Distortion → StereoSum
+        // Voice → Delays → WetGains → StereoSum
+        // StereoSum → MasterPan → MasterGain → LineOut
+        //
+        // This ensures voices are NOT doubled by sending panned audio
+        // through the distortion chain instead of bypassing it.
+        // ═══════════════════════════════════════════════════════════
+
         // Delays -> Stereo Wet Gains -> Stereo Sum
-        // NOTE: Removed duplicate mono wet path (wetGain->preDistortion) which was doubling signal
         delay1.output.connect(delay1WetLeft.inputA)
         delay1.output.connect(delay1WetRight.inputA)
         delay2.output.connect(delay2WetLeft.inputA)
@@ -312,22 +343,30 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         delay2WetLeft.output.connect(stereoSumLeft.input)
         delay2WetRight.output.connect(stereoSumRight.input)
 
-        // DryGain -> PreDistortionSummer
-        dryGain.output.connect(preDistortionSummer.inputB)
+        // DrySumL/R -> DryGainL/R -> Split into Clean and Distorted stereo paths
+        // LEFT CHANNEL
+        drySumLeft.output.connect(dryGainLeft.inputA)
+        dryGainLeft.output.connect(cleanPathGainLeft.inputA)
+        cleanPathGainLeft.output.connect(postMixSummerLeft.inputA)
+        
+        dryGainLeft.output.connect(driveGainLeft.inputA)
+        driveGainLeft.output.connect(limiterLeft.input)
+        limiterLeft.output.connect(distortedPathGainLeft.inputA)
+        distortedPathGainLeft.output.connect(postMixSummerLeft.inputB)
+        
+        // RIGHT CHANNEL
+        drySumRight.output.connect(dryGainRight.inputA)
+        dryGainRight.output.connect(cleanPathGainRight.inputA)
+        cleanPathGainRight.output.connect(postMixSummerRight.inputA)
+        
+        dryGainRight.output.connect(driveGainRight.inputA)
+        driveGainRight.output.connect(limiterRight.input)
+        limiterRight.output.connect(distortedPathGainRight.inputA)
+        distortedPathGainRight.output.connect(postMixSummerRight.inputB)
 
-        // Split into Clean and Distorted paths
-        preDistortionSummer.output.connect(cleanPathGain.inputA)
-        cleanPathGain.output.connect(postMixSummer.inputA)
-
-        preDistortionSummer.output.connect(driveGain.inputA)
-        driveGain.output.connect(limiter.input)
-        limiter.output.connect(distortedPathGain.inputA)
-        distortedPathGain.output.connect(postMixSummer.inputB)
-
-        // PostMixSummer (Dry + Distortion) -> Stereo Sum
-        // This is a mono signal, goes to both channels equally
-        postMixSummer.output.connect(stereoSumLeft.input)
-        postMixSummer.output.connect(stereoSumRight.input)
+        // PostMixSummer (Clean + Distorted) -> Stereo Sum
+        postMixSummerLeft.output.connect(stereoSumLeft.input)
+        postMixSummerRight.output.connect(stereoSumRight.input)
         
         // Stereo Sum -> Master Pan -> Master Gain -> LineOut
         stereoSumLeft.output.connect(masterPanLeft.inputA)
@@ -352,8 +391,8 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
             voice.output.connect(delay1.input)
             voice.output.connect(delay2.input)
 
-            // VOICES -> DRY GAIN (dry path)
-            voice.output.connect(dryGain.inputA)
+            // NOTE: Removed direct voice->dryGain connection (was causing doubling)
+            // Voices now reach dry path via panning -> drySumL/R
 
             // VIBRATO -> Voice frequency modulation
             vibratoDepthGain.output.connect(voice.vibratoInput)
@@ -371,13 +410,13 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
             voiceB.envelopeOutput.connect(voiceA.couplingInput)
         }
         
-        // Wire per-voice pan gains to stereo bus
-        // Voice -> PanL/PanR -> StereoSumL/StereoSumR  
+        // Wire per-voice pan gains to DRY SUM buses (NOT stereoSum directly!)
+        // Voice -> PanL/PanR -> DrySumL/DrySumR -> Distortion chain -> StereoSum
         voices.forEachIndexed { index, voice ->
             voice.output.connect(voicePanLeft[index].inputA)
             voice.output.connect(voicePanRight[index].inputA)
-            voicePanLeft[index].output.connect(stereoSumLeft.input)
-            voicePanRight[index].output.connect(stereoSumRight.input)
+            voicePanLeft[index].output.connect(drySumLeft.input)
+            voicePanRight[index].output.connect(drySumRight.input)
         }
         
         // Apply default voice pan positions
@@ -438,15 +477,18 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     override fun setDrive(amount: Float) {
         _drive = amount
         val driveVal = 1.0 + (amount * 14.0) // Reduced from 49 for warmer saturation
-        limiter.drive.set(driveVal)
+        limiterLeft.drive.set(driveVal)
+        limiterRight.drive.set(driveVal)
     }
 
     override fun setDistortionMix(amount: Float) {
         _distortionMix = amount
         val distortedLevel = amount
         val cleanLevel = 1.0f - amount
-        cleanPathGain.inputB.set(cleanLevel.toDouble())
-        distortedPathGain.inputB.set(distortedLevel.toDouble())
+        cleanPathGainLeft.inputB.set(cleanLevel.toDouble())
+        cleanPathGainRight.inputB.set(cleanLevel.toDouble())
+        distortedPathGainLeft.inputB.set(distortedLevel.toDouble())
+        distortedPathGainRight.inputB.set(distortedLevel.toDouble())
     }
 
     override fun setMasterVolume(amount: Float) {
@@ -478,7 +520,8 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         _delayMix = amount
         _delayWetLevel = amount
         val dryLevel = 1.0f - amount
-        dryGain.inputB.set(dryLevel.toDouble())
+        dryGainLeft.inputB.set(dryLevel.toDouble())
+        dryGainRight.inputB.set(dryLevel.toDouble())
         
         // Update stereo wet gains (handles both mono and stereo modes)
         updateStereoDelayGains()

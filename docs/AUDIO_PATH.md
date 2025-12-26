@@ -11,11 +11,22 @@ flowchart TD
         V4["Voice 7-8 (High)"]
     end
 
+    subgraph Panning["Per-Voice Stereo Panning"]
+        PAN["voicePanL/R (8 pairs)"]
+    end
+
+    subgraph DryBus["Dry Signal Bus"]
+        DRYL["drySumL"]
+        DRYR["drySumR"]
+    end
+
     subgraph Delays["Dual Delay System"]
         D1["Delay 1"]
         D2["Delay 2"]
         FB1["Feedback Gain 1"]
         FB2["Feedback Gain 2"]
+        WETL["wetGainsL"]
+        WETR["wetGainsR"]
     end
 
     subgraph LFO["Hyper LFO"]
@@ -23,48 +34,90 @@ flowchart TD
         LMOD["Delay Modulation"]
     end
 
-    subgraph Mix["Dry/Wet Mix"]
-        DRY["Dry Gain"]
-        WET["Wet Gain"]
+    subgraph Distortion["Stereo Distortion Chain"]
+        DRYGAINL["dryGainL"]
+        DRYGAINR["dryGainR"]
+        CLEANL["cleanPathL"]
+        CLEANR["cleanPathR"]
+        DRIVEL["driveGainL"]
+        DRIVER["driveGainR"]
+        LIML["limiterL"]
+        LIMR["limiterR"]
+        DISTL["distPathL"]
+        DISTR["distPathR"]
+        POSTL["postMixL"]
+        POSTR["postMixR"]
     end
 
-    subgraph Distortion["Parallel Distortion (Stereo MIX)"]
-        PRE["Pre-Distortion Summer"]
-        CLEAN["Clean Path Gain"]
-        DRIVE["Drive Gain"]
-        LIM["TanhLimiter"]
-        DIST["Distorted Path Gain"]
-        POST["Post-Mix Summer"]
+    subgraph Output["Stereo Output"]
+        SUML["stereoSumL"]
+        SUMR["stereoSumR"]
+        MASTERL["masterGainL"]
+        MASTERR["masterGainR"]
+        OUTL["Line Out L"]
+        OUTR["Line Out R"]
     end
 
-    MASTER["Master Gain"]
     PEAK["Peak Follower"]
-    OUT["Line Out L/R"]
 
+    %% Voice routing
+    Voices --> PAN
     Voices --> D1 & D2
-    Voices --> DRY
     
+    %% Panning to dry bus
+    PAN --> DRYL & DRYR
+    
+    %% Delay feedback loops
     D1 --> FB1 --> D1
     D2 --> FB2 --> D2
-    D1 & D2 --> WET
+    D1 & D2 --> WETL & WETR
     
+    %% LFO modulation
     HLFO --> LMOD --> D1 & D2
     
-    DRY --> PRE
-    WET --> PRE
+    %% Stereo dry path through distortion
+    DRYL --> DRYGAINL --> CLEANL --> POSTL
+    DRYGAINL --> DRIVEL --> LIML --> DISTL --> POSTL
     
-    PRE --> CLEAN --> POST
-    PRE --> DRIVE --> LIM --> DIST --> POST
+    DRYR --> DRYGAINR --> CLEANR --> POSTR
+    DRYGAINR --> DRIVER --> LIMR --> DISTR --> POSTR
     
-    POST --> MASTER --> PEAK --> OUT
-    PEAK -.-> HLFO
+    %% Wet path bypasses distortion
+    WETL --> SUML
+    WETR --> SUMR
+    
+    %% Post-distortion to stereo sum
+    POSTL --> SUML
+    POSTR --> SUMR
+    
+    %% Final output
+    SUML --> MASTERL --> OUTL
+    SUMR --> MASTERR --> OUTR
+    MASTERL --> PEAK -.- HLFO
+```
+
+## Key Changes (Dec 2024)
+
+> [!IMPORTANT]
+> The signal path was refactored to eliminate **signal doubling** that was causing muddiness in low frequencies. The previous architecture sent voices to both the dry path AND the stereo bus via panning, effectively doubling the signal.
+
+**Old (Broken) Path:**
+```
+Voice → dryGain (mono) → distortion → stereoSum
+Voice → voicePan → stereoSum  ← DUPLICATE!
+```
+
+**New (Fixed) Path:**
+```
+Voice → voicePan → drySumL/R → dryGain (stereo) → distortion (stereo) → stereoSum
+Voice → delays → wetGains → stereoSum
 ```
 
 ## Key Components
 
 ### TanhLimiter (Soft Clipper)
 
-The limiter is the core of the distortion/dynamics system. Located at [TanhLimiter.kt](file:///Users/balch/Source/Orpheus/composeApp/src/jvmMain/kotlin/org/balch/orpheus/core/audio/TanhLimiter.kt).
+The limiter is the core of the distortion/dynamics system. Now implemented in **stereo** with `limiterLeft` and `limiterRight`. Located at [TanhLimiter.kt](file:///Users/balch/Source/Orpheus/composeApp/src/jvmMain/kotlin/org/balch/orpheus/core/audio/TanhLimiter.kt).
 
 **Algorithm:**
 ```
@@ -82,35 +135,52 @@ final = saturated × min(compensation, 1.5)
 > [!NOTE]
 > The tanh function provides **soft clipping** that naturally rolls off peaks without hard digital clipping. This creates odd harmonics similar to tube saturation.
 
-### Metallic Quality Explanation
+### Stereo Distortion Chain
 
-The "metallic" quality you're hearing is **expected behavior** when:
-- **High drive values (>50%)** — More aggressive harmonic generation
-- **Fast transients** — tanh saturation compresses peaks quickly
-- **Combined with delay feedback** — Harmonics can accumulate
+The distortion chain is now fully stereo to preserve per-voice panning:
 
-This is characteristic of tanh-based saturation and is musically valid for drone/ambient synthesis.
+| Component | Left | Right |
+|-----------|------|-------|
+| Dry Sum | `drySumLeft` | `drySumRight` |
+| Dry Gain | `dryGainLeft` | `dryGainRight` |
+| Drive | `driveGainLeft` | `driveGainRight` |
+| Limiter | `limiterLeft` | `limiterRight` |
+| Clean Path | `cleanPathGainLeft` | `cleanPathGainRight` |
+| Dist Path | `distortedPathGainLeft` | `distortedPathGainRight` |
+| Post Mix | `postMixSummerLeft` | `postMixSummerRight` |
 
-## Signal Routing (DspOrpheusEngine)
+## Signal Routing (DspSynthEngine)
 
 ### Voice → Stereo Output Path
 
 1. **8 Voices** → Each outputs to:
    - Both delay lines (wet path)
-   - Dry path
-   - **Per-voice pan gains (L/R)** → Stereo sum buses
-2. **Dual Delays** → Independent feedback loops with LFO modulation
-3. **Dry/Wet Mix** → Blends direct voice signal with delayed signal
-4. **Pre-Distortion Summer** → Combines dry and wet paths
-5. **Parallel Split:**
-   - Clean Path: Direct passthrough with gain control
-   - Distorted Path: Drive → TanhLimiter → Output gain
-6. **Post-Mix Summer** → Blends clean and distorted paths → feeds **stereo bus**
-7. **Stereo Sum L/R** → Collects panned voice signals
-8. **Master Pan L/R** → Final stereo balance control
-9. **Master Gain L/R** → Final stereo volume control
-10. **Peak Follower** → Monitors left channel for feedback routing
-11. **Line Out L/R** → True stereo output
+   - Per-voice pan gains (L/R) → **drySumL/R** (NOT stereoSum directly!)
+2. **Per-Voice Panning** → voicePanL/R with equal-power pan law
+3. **Dry Sum Buses** → Collect all panned voice signals (stereo)
+4. **Stereo Dry Gain** → Controls dry level for both channels
+5. **Parallel Split (Stereo):**
+   - Clean Path L/R: Direct passthrough with gain control
+   - Distorted Path L/R: Drive → TanhLimiter → Output gain
+6. **Post-Mix Summer L/R** → Blends clean and distorted paths per channel
+7. **Dual Delays** → Independent feedback loops with LFO modulation
+8. **Stereo Wet Gains** → delay1WetL/R, delay2WetL/R → stereoSumL/R
+9. **Stereo Sum L/R** → Combines dry path output + wet path
+10. **Master Pan L/R** → Final stereo balance control
+11. **Master Gain L/R** → Final stereo volume control
+12. **Peak Follower** → Monitors left channel for feedback routing
+13. **Line Out L/R** → True stereo output
+
+### Critical Routing Rules
+
+> [!CAUTION]
+> These rules prevent signal doubling and phase issues:
+
+1. **Wet signal** goes ONLY through stereo wet gains (`delay1WetLeft`, etc.)
+2. **NO duplicate paths** - each signal should reach stereoSum exactly once
+3. **Dry path**: Voice → voicePan → drySum → distortion → stereoSum (stereo all the way)
+4. **Wet path** bypasses distortion, goes directly to stereoSum
+5. **Voice pan gains** provide per-voice stereo positioning **BEFORE** distortion
 
 ### Per-Voice Panning (Equal-Power Law)
 
@@ -138,8 +208,8 @@ The stereo mode switch controls delay routing:
 | **Stereo Delays** | Left only | Right only | Ping-pong stereo effect |
 
 Each delay has dedicated L/R wet gains (`delay1WetLeft/Right`, `delay2WetLeft/Right`) that are set by `setStereoMode()`:
-- VOICE_PAN: All gains = 1.0 (delays to both channels)
-- STEREO_DELAYS: D1→L=1.0, D1→R=0.0, D2→L=0.0, D2→R=1.0
+- VOICE_PAN: All gains = wetLevel (delays to both channels)
+- STEREO_DELAYS: D1→L=wetLevel, D1→R=0.0, D2→L=0.0, D2→R=wetLevel
 
 ### Modulation Routing
 
@@ -152,7 +222,7 @@ Each delay has dedicated L/R wet gains (`delay1WetLeft/Right`, `delay2WetLeft/Ri
 
 | Platform | AudioEngine    | Limiter           | Status     |
 |----------|----------------|-------------------|------------|
-| JVM      | JSyn           | TanhLimiter       | ✅ Full    |
+| JVM      | JSyn           | TanhLimiter (×2)  | ✅ Full    |
 | Android  | Stub           | StubLimiter       | ⚠️ Stub    |
 | wasmJs   | Not configured | N/A               | ❌ Disabled |
 
