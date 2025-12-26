@@ -1,4 +1,4 @@
-package org.balch.orpheus.ui.compact.widgets
+package org.balch.orpheus.ui.panels.compact
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row

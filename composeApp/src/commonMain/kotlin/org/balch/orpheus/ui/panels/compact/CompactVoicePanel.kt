@@ -1,20 +1,26 @@
-package org.balch.orpheus.ui.compact.widgets
+package org.balch.orpheus.ui.panels.compact
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.HoldSwitch
+import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.balch.orpheus.ui.widgets.SwitchOrientation
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -35,58 +41,57 @@ fun CompactVoicePanel(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
+
+    Column(
+        modifier = modifier.padding(2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Tune slider (left)
-        RotaryKnob(
-            value = tune,
-            onValueChange = onTuneChange,
-            size = 28.dp,
-            progressColor = color,
+        // Voice number label
+        Text(
+            text = "${voiceIndex + 1}",
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Bold
         )
 
-
-        // Center: Voice number, pulse button, hold toggle
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Voice number label
-            Text(
-                text = "${voiceIndex + 1}",
-                style = MaterialTheme.typography.labelSmall,
-                color = color
+            RotaryKnob(
+                value = tune,
+                onValueChange = onTuneChange,
+                size = 32.dp,
+                progressColor = color,
             )
-            // Hold toggle button
+
             HoldSwitch(
                 checked = isHolding,
                 onCheckedChange = { onHoldChange(it) },
-                activeColor = color
-            )
-            // Pulse button (smaller)
-            PulseButton(
-                size = 42.dp,
-                label = "",
-                isActive = isActive,
-                onPulseStart = onPulseStart,
-                onPulseEnd = onPulseEnd,
-                isLearnMode = false,
-                isLearning = false,
-                onLearnSelect = {}
+                activeColor = color,
+                orientation = SwitchOrientation.Vertical
             )
         }
 
-        // Envelope speed slider (right) with S on top, F on bottom
-        VerticalMiniSlider(
+        Spacer(modifier = Modifier.height(4.dp))
+
+        HorizontalMiniSlider(
             value = envelopeSpeed,
             onValueChange = onEnvelopeSpeedChange,
-            topLabel = "S",
-            bottomLabel = "F",
+            leftLabel = "S",
+            rightLabel = "F",
             color = color,
-            trackHeight = 36
+            trackWidth = 36
+        )
+
+        PulseButton(
+            size = 36.dp,
+            label = "",
+            isActive = isActive,
+            onPulseStart = onPulseStart,
+            onPulseEnd = onPulseEnd,
+            activeColor = color
         )
     }
 }
@@ -171,7 +176,7 @@ private fun CompactVoicePanelPreview_ActiveAndHolding() {
     }
 }
 
-@Preview
+@Preview(widthDp = 200, heightDp = 120)
 @Composable
 private fun CompactVoicePanelPreview_AllColors() {
     OrpheusTheme {

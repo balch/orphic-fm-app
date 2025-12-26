@@ -1,13 +1,16 @@
-package org.balch.orpheus.ui.compact
+package org.balch.orpheus.ui.screens
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
@@ -21,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -31,17 +33,17 @@ import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
-import org.balch.orpheus.ui.compact.widgets.CompactLandscapeHeaderPanel
-import org.balch.orpheus.ui.compact.widgets.CompactQuadPanel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
+import org.balch.orpheus.ui.panels.compact.CompactDuoLiquidPanel
+import org.balch.orpheus.ui.panels.compact.CompactLandscapeHeaderPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VizUiState
 import org.balch.orpheus.ui.viz.VizViewModel
-import org.balch.orpheus.ui.viz.liquidVizEffects
+import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
@@ -115,10 +117,8 @@ private fun CompactLandscapeLayout(
     onQuadHoldChange: (Int, Float) -> Unit,
     onKeyEvent: (androidx.compose.ui.input.key.KeyEvent, Boolean) -> Boolean,
 ) {
-    
     val shape = RoundedCornerShape(12.dp)
 
-    
     // Focus handling for keyboard input
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -137,15 +137,6 @@ private fun CompactLandscapeLayout(
             .onPreviewKeyEvent { event ->
                 onKeyEvent(event, presetDropdownExpanded || vizDropdownExpanded)
             }
-            .liquidVizEffects(
-                liquidState = liquidState,
-                scope = effects.bottom,
-                frostAmount = effects.frostMedium.dp,
-                color = OrpheusColors.softPurple,
-                tintAlpha = effects.tintAlpha,
-                shape = shape,
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
             .padding(4.dp)
     ) {
         // Top bar: Patch and Viz dropdowns
@@ -162,49 +153,133 @@ private fun CompactLandscapeLayout(
             onVizSelect = onVizSelect
         )
 
-        // Main content: Left Quad with Knobs | Right Quad with Knobs
+        // Middle area: space for timeline widgets (future)
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Quad Dials Row (Pitch/Hold)
         Row(
             modifier = Modifier
-                .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp),
+                .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left side: Quad 1 (voices 1-4 + knobs)
-            CompactQuadPanel(
-                quadIndex = 0,
+            // Quad 1 Group Controls (1-4)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                RotaryKnob(
+                    value = voiceState.quadGroupPitches[0],
+                    onValueChange = { onQuadPitchChange(0, it) },
+                    label = "Pitch",
+                    size = 48.dp,
+                    progressColor = OrpheusColors.neonMagenta
+                )
+                RotaryKnob(
+                    value = voiceState.quadGroupHolds[0],
+                    onValueChange = { onQuadHoldChange(0, it) },
+                    label = "Hold",
+                    size = 48.dp,
+                    progressColor = OrpheusColors.neonMagenta
+                )
+            }
+
+            Spacer(modifier = Modifier.width(32.dp))
+
+            // Quad 2 Group Controls (5-8)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                RotaryKnob(
+                    value = voiceState.quadGroupPitches[1],
+                    onValueChange = { onQuadPitchChange(1, it) },
+                    label = "Pitch",
+                    size = 48.dp,
+                    progressColor = OrpheusColors.synthGreen
+                )
+                RotaryKnob(
+                    value = voiceState.quadGroupHolds[1],
+                    onValueChange = { onQuadHoldChange(1, it) },
+                    label = "Hold",
+                    size = 48.dp,
+                    progressColor = OrpheusColors.synthGreen
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Bottom row: Four Duo panels in a row
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Duo 1-2: Magenta Border, Cyan Accents
+            CompactDuoLiquidPanel(
+                pairIndex = 0,
                 voiceStates = voiceState.voiceStates,
                 voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                quadPitch = voiceState.quadGroupPitches[0],
-                quadHold = voiceState.quadGroupHolds[0],
                 onVoiceTuneChange = onVoiceTuneChange,
                 onEnvelopeSpeedChange = onEnvelopeSpeedChange,
                 onPulseStart = onPulseStart,
                 onPulseEnd = onPulseEnd,
                 onVoiceHoldChange = onVoiceHoldChange,
-                onQuadPitchChange = { onQuadPitchChange(0, it) },
-                onQuadHoldChange = { onQuadHoldChange(0, it) },
-                color = OrpheusColors.neonMagenta,
-                knobsOnLeft = false
+                borderColor = OrpheusColors.neonMagenta,
+                accentColor = OrpheusColors.neonCyan,
+                liquidState = liquidState,
+                effects = effects,
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
 
-            // Right side: Quad 2 (knobs + voices 5-8)
-            CompactQuadPanel(
-                quadIndex = 1,
+            // Duo 3-4: Electric Blue Border, Cyan Accents
+            CompactDuoLiquidPanel(
+                pairIndex = 1,
                 voiceStates = voiceState.voiceStates,
                 voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                quadPitch = voiceState.quadGroupPitches[1],
-                quadHold = voiceState.quadGroupHolds[1],
                 onVoiceTuneChange = onVoiceTuneChange,
                 onEnvelopeSpeedChange = onEnvelopeSpeedChange,
                 onPulseStart = onPulseStart,
                 onPulseEnd = onPulseEnd,
                 onVoiceHoldChange = onVoiceHoldChange,
-                onQuadPitchChange = { onQuadPitchChange(1, it) },
-                onQuadHoldChange = { onQuadHoldChange(1, it) },
-                color = OrpheusColors.synthGreen,
-                knobsOnLeft = true
+                borderColor = OrpheusColors.electricBlue,
+                accentColor = OrpheusColors.neonCyan,
+                liquidState = liquidState,
+                effects = effects,
+                modifier = Modifier.weight(1f).fillMaxHeight()
+            )
+
+            // Duo 5-6: Green Border, Orange Accents (matching uploaded_image_1766749385773.png)
+            CompactDuoLiquidPanel(
+                pairIndex = 2,
+                voiceStates = voiceState.voiceStates,
+                voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
+                onVoiceTuneChange = onVoiceTuneChange,
+                onEnvelopeSpeedChange = onEnvelopeSpeedChange,
+                onPulseStart = onPulseStart,
+                onPulseEnd = onPulseEnd,
+                onVoiceHoldChange = onVoiceHoldChange,
+                borderColor = OrpheusColors.synthGreen,
+                accentColor = OrpheusColors.warmGlow,
+                liquidState = liquidState,
+                effects = effects,
+                modifier = Modifier.weight(1f).fillMaxHeight()
+            )
+
+            // Duo 7-8: Green Border, Orange Accents 
+            CompactDuoLiquidPanel(
+                pairIndex = 3,
+                voiceStates = voiceState.voiceStates,
+                voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
+                onVoiceTuneChange = onVoiceTuneChange,
+                onEnvelopeSpeedChange = onEnvelopeSpeedChange,
+                onPulseStart = onPulseStart,
+                onPulseEnd = onPulseEnd,
+                onVoiceHoldChange = onVoiceHoldChange,
+                borderColor = OrpheusColors.synthGreen,
+                accentColor = OrpheusColors.warmGlow,
+                liquidState = liquidState,
+                effects = effects,
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
         }
     }

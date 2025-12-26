@@ -1,11 +1,11 @@
-package org.balch.orpheus.ui.compact.widgets
+package org.balch.orpheus.ui.widgets
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -35,38 +35,33 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.widgets.LocalLearnModeState
-import org.balch.orpheus.ui.widgets.learnable
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.roundToInt
 
 /**
- * Vertical mini slider for compact mobile layouts.
+ * Horizontal mini slider for compact mobile layouts.
  * 
- * For envelope speed: topLabel = "S" (slow), bottomLabel = "F" (fast)
- * For tune: topLabel = "+" (higher), bottomLabel = "-" (lower)
- * 
- * Top = 1.0, Bottom = 0.0
+ * Left = 0.0, Right = 1.0
  */
 @Composable
-fun VerticalMiniSlider(
+fun HorizontalMiniSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
     color: Color = OrpheusColors.neonCyan,
-    topLabel: String = "",
-    bottomLabel: String = "",
-    trackHeight: Int = 50,
+    leftLabel: String = "",
+    rightLabel: String = "",
+    trackWidth: Int = 50,
     thumbSize: Int = 10,
     controlId: String? = null
 ) {
     val density = LocalDensity.current
-    val trackHeightPx = with(density) { trackHeight.dp.toPx() }
+    val trackWidthPx = with(density) { trackWidth.dp.toPx() }
     val thumbSizePx = with(density) { thumbSize.dp.toPx() }
-    val usableRange = trackHeightPx - thumbSizePx
+    val usableRange = trackWidthPx - thumbSizePx
 
-    // Invert value for visual: top = 1, bottom = 0
-    var offsetY by remember(value) { mutableFloatStateOf((1f - value) * usableRange) }
+    // visual: left = 0, right = 1
+    var offsetX by remember(value) { mutableFloatStateOf(value * usableRange) }
 
     val finalModifier = if (controlId != null) {
         modifier.learnable(controlId, LocalLearnModeState.current)
@@ -74,28 +69,28 @@ fun VerticalMiniSlider(
         modifier
     }
 
-    Column(
+    Row(
         modifier = finalModifier
             .clip(RoundedCornerShape(4.dp))
             .background(Color(0xFF1A1A2A))
             .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
             .padding(horizontal = 3.dp, vertical = 3.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        // Top label - clickable to snap to 1
-        if (topLabel.isNotEmpty()) {
+        // Left label - clickable to snap to 0
+        if (leftLabel.isNotEmpty()) {
             Text(
-                topLabel,
+                leftLabel,
                 fontSize = 6.sp,
-                color = if (value > 0.7f) color else color.copy(alpha = 0.5f),
-                fontWeight = if (value > 0.7f) FontWeight.Bold else FontWeight.Normal,
+                color = if (value < 0.3f) color else color.copy(alpha = 0.5f),
+                fontWeight = if (value < 0.3f) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = 8.sp,
                 modifier = Modifier
                     .clip(RoundedCornerShape(2.dp))
                     .clickable {
-                        offsetY = 0f
-                        onValueChange(1f)
+                        offsetX = 0f
+                        onValueChange(0f)
                     }
                     .padding(horizontal = 2.dp, vertical = 1.dp)
             )
@@ -104,14 +99,14 @@ fun VerticalMiniSlider(
         // Track with thumb
         Box(
             modifier = Modifier
-                .width(16.dp)
-                .height(trackHeight.dp)
+                .width(trackWidth.dp)
+                .height(16.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(
-                    Brush.verticalGradient(
+                    Brush.horizontalGradient(
                         colors = listOf(
-                            color.copy(alpha = 0.3f),
-                            color.copy(alpha = 0.1f)
+                            color.copy(alpha = 0.1f),
+                            color.copy(alpha = 0.3f)
                         )
                     )
                 )
@@ -126,10 +121,9 @@ fun VerticalMiniSlider(
                                 PointerEventType.Press, PointerEventType.Move -> {
                                     if (event.changes.any { it.pressed }) {
                                         val newOffset =
-                                            (position.y - thumbSizePx / 2).coerceIn(0f, usableRange)
-                                        offsetY = newOffset
-                                        // Invert for value: top = 1, bottom = 0
-                                        onValueChange(1f - (newOffset / usableRange))
+                                            (position.x - thumbSizePx / 2).coerceIn(0f, usableRange)
+                                        offsetX = newOffset
+                                        onValueChange(newOffset / usableRange)
                                         event.changes.forEach { it.consume() }
                                     }
                                 }
@@ -141,16 +135,16 @@ fun VerticalMiniSlider(
             // Thumb
             Box(
                 modifier = Modifier
-                    .offset { IntOffset(0, offsetY.roundToInt()) }
-                    .align(Alignment.TopCenter)
-                    .padding(horizontal = 1.dp)
-                    .size(20.dp, thumbSize.dp)
+                    .offset { IntOffset(offsetX.roundToInt(), 0) }
+                    .align(Alignment.CenterStart)
+                    .padding(vertical = 1.dp)
+                    .size(thumbSize.dp, 20.dp)
                     .clip(CircleShape)
                     .background(
-                        Brush.verticalGradient(
+                        Brush.horizontalGradient(
                             colors = listOf(
-                                color,
-                                color.copy(alpha = 0.7f)
+                                color.copy(alpha = 0.7f),
+                                color
                             )
                         )
                     )
@@ -158,19 +152,19 @@ fun VerticalMiniSlider(
             )
         }
 
-        // Bottom label - clickable to snap to 0
-        if (bottomLabel.isNotEmpty()) {
+        // Right label - clickable to snap to 1
+        if (rightLabel.isNotEmpty()) {
             Text(
-                bottomLabel,
+                rightLabel,
                 fontSize = 6.sp,
-                color = if (value < 0.3f) color else color.copy(alpha = 0.5f),
-                fontWeight = if (value < 0.3f) FontWeight.Bold else FontWeight.Normal,
+                color = if (value > 0.7f) color else color.copy(alpha = 0.5f),
+                fontWeight = if (value > 0.7f) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = 8.sp,
                 modifier = Modifier
                     .clip(RoundedCornerShape(2.dp))
                     .clickable {
-                        offsetY = usableRange
-                        onValueChange(0f)
+                        offsetX = usableRange
+                        onValueChange(1f)
                     }
                     .padding(horizontal = 2.dp, vertical = 1.dp)
             )
@@ -180,21 +174,21 @@ fun VerticalMiniSlider(
 
 @Preview
 @Composable
-fun VerticalMiniSliderPreview() {
+fun HorizontalMiniSliderPreview() {
     OrpheusTheme {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            VerticalMiniSlider(
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HorizontalMiniSlider(
                 value = 0.5f,
                 onValueChange = {},
-                topLabel = "S",
-                bottomLabel = "F",
+                leftLabel = "0",
+                rightLabel = "1",
                 color = OrpheusColors.neonCyan
             )
-            VerticalMiniSlider(
+            HorizontalMiniSlider(
                 value = 0.8f,
                 onValueChange = {},
-                topLabel = "+",
-                bottomLabel = "-",
+                leftLabel = "-",
+                rightLabel = "+",
                 color = OrpheusColors.warmGlow
             )
         }

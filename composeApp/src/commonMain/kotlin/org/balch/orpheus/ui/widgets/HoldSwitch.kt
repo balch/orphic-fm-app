@@ -30,6 +30,11 @@ fun HoldButtonPreview() {
     }
 }
 
+enum class SwitchOrientation {
+    Horizontal,
+    Vertical
+}
+
 /**
  * A toggle switch with a custom 3D skeuomorphic design.
  */
@@ -39,12 +44,21 @@ fun HoldSwitch(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     activeColor: Color = OrpheusColors.synthGreen,
-    size: DpSize = DpSize(48.dp, 24.dp)
+    orientation: SwitchOrientation = SwitchOrientation.Horizontal,
+    size: DpSize? = null
 ) {
+    val defaultSize = if (orientation == SwitchOrientation.Horizontal) {
+        DpSize(48.dp, 24.dp)
+    } else {
+        DpSize(24.dp, 48.dp)
+    }
+    
+    val actualSize = size ?: defaultSize
+
     // Custom 3D Switch Container
     Box(
         modifier = modifier
-            .size(size)
+            .size(actualSize)
             .clip(RoundedCornerShape(14.dp))
             .background(
                 Brush.verticalGradient(
@@ -64,7 +78,13 @@ fun HoldSwitch(
         // Thumb (The moving part)
         Box(
             modifier = Modifier
-                .align(if (checked) Alignment.CenterEnd else Alignment.CenterStart)
+                .align(
+                    if (orientation == SwitchOrientation.Horizontal) {
+                        if (checked) Alignment.CenterEnd else Alignment.CenterStart
+                    } else {
+                        if (checked) Alignment.TopCenter else Alignment.BottomCenter
+                    }
+                )
                 .padding(2.dp)
                 .size(24.dp)
                 .shadow(4.dp, CircleShape)
