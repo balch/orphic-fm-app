@@ -244,7 +244,7 @@ fun RotaryKnob(
         }
 
         if (label != null) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,

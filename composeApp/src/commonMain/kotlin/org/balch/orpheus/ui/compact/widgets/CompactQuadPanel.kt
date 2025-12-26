@@ -170,6 +170,7 @@ private fun QuadKnobs(
         RotaryKnob(
             value = quadPitch,
             onValueChange = onQuadPitchChange,
+            label = "Pitch",
             controlId = controlIdPitch,
             size = 38.dp,
             progressColor = color
@@ -177,9 +178,10 @@ private fun QuadKnobs(
         RotaryKnob(
             value = quadHold,
             onValueChange = onQuadHoldChange,
+            label = "Hold",
             controlId = controlIdHold,
             size = 38.dp,
-            progressColor = color
+            progressColor = OrpheusColors.warmGlow
         )
     }
 }
