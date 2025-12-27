@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.VoiceState
+import org.balch.orpheus.core.audio.wobble.VoiceWobbleController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
@@ -89,6 +90,7 @@ class VoiceViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
     private val synthController: SynthController,
+    private val wobbleController: VoiceWobbleController,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
@@ -484,6 +486,39 @@ class VoiceViewModel(
 
     fun restoreState(state: VoiceUiState) {
         intents.tryEmit(VoiceIntent.Restore(state))
+    }
+    
+    // ═══════════════════════════════════════════════════════════
+    // WOBBLE METHODS
+    // ═══════════════════════════════════════════════════════════
+    
+    /**
+     * Called when a pulse starts with initial pointer position for wobble tracking.
+     */
+    fun onWobblePulseStart(index: Int, x: Float, y: Float) {
+        wobbleController.onPulseStart(index, x, y)
+        // Reset wobble multiplier to 1.0 at start
+        engine.setVoiceWobble(index, 0f, wobbleController.config.value.range)
+    }
+    
+    /**
+     * Called continuously as finger moves during pulse.
+     * Updates the wobble modulation in real-time.
+     */
+    fun onWobbleMove(index: Int, x: Float, y: Float) {
+        val wobbleOffset = wobbleController.onPointerMove(index, x, y)
+        val range = wobbleController.config.value.range
+        engine.setVoiceWobble(index, wobbleOffset, range)
+    }
+    
+    /**
+     * Called when pulse ends.
+     * Captures final wobble state and resets modulation.
+     */
+    fun onWobblePulseEnd(index: Int) {
+        wobbleController.onPulseEnd(index)
+        // Reset to unity gain on release
+        engine.setVoiceWobble(index, 0f, 0f)
     }
 }
 

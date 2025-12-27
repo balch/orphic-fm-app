@@ -26,6 +26,9 @@ class DspVoice(
 
     // VCA: Multiply mixed oscillator by envelope
     private val vca = audioEngine.createMultiply()
+    
+    // Wobble: Real-time volume modulation from finger movement
+    private val wobbleGain = audioEngine.createMultiply()
 
     // Envelope Follower for voice coupling
     private val envelopeFollower = audioEngine.createPeakFollower()
@@ -63,8 +66,8 @@ class DspVoice(
     val couplingDepth: AudioInput get() = couplingScaler.inputB    // Coupling depth (Hz range)
     val holdLevel: AudioInput get() = vcaControlMixer.inputB       // Hold/drone level
 
-    // Outputs
-    val output: AudioOutput get() = vca.output
+    // Outputs - wobbleGain is the final output stage
+    val output: AudioOutput get() = wobbleGain.output
     val envelopeOutput: AudioOutput get() = envelopeFollower.output
 
     /**
@@ -72,6 +75,15 @@ class DspVoice(
      * This is the smoothed output level of the voice.
      */
     fun getCurrentLevel(): Float = envelopeFollower.getCurrent().toFloat().coerceIn(0f, 1f)
+    
+    /**
+     * Set wobble multiplier for real-time volume modulation.
+     * Called continuously during pulse button drag.
+     * @param multiplier Value around 1.0 (0.7-1.3 typical range for ±30%)
+     */
+    fun setWobbleMultiplier(multiplier: Double) {
+        wobbleGain.inputB.set(multiplier)
+    }
 
     init {
         // Register all units with audio engine
@@ -84,6 +96,7 @@ class DspVoice(
         audioEngine.addUnit(sharpnessInverter)
         audioEngine.addUnit(ampEnv)
         audioEngine.addUnit(vca)
+        audioEngine.addUnit(wobbleGain)
         audioEngine.addUnit(envelopeFollower)
         audioEngine.addUnit(couplingScaler)
         audioEngine.addUnit(couplingMixer)
@@ -172,8 +185,12 @@ class DspVoice(
         vcaControlMixer.inputB.set(0.0) // Default hold = 0
         vcaControlMixer.output.connect(vca.inputB)
 
-        // Wire VCA output to envelope follower for coupling
-        vca.output.connect(envelopeFollower.input)
+        // Wire VCA output through wobbleGain for finger modulation
+        vca.output.connect(wobbleGain.inputA)
+        wobbleGain.inputB.set(1.0) // Default: no wobble (1.0 = unity gain)
+        
+        // Wire wobbleGain output to envelope follower for coupling
+        wobbleGain.output.connect(envelopeFollower.input)
 
         // Default frequency
         frequency.set(220.0)

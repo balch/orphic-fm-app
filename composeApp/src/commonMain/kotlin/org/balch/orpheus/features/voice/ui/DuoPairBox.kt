@@ -60,6 +60,9 @@ fun DuoPairBox(
         override fun onVibratoChange(value: Float) = voiceViewModel.onVibratoChange(value)
         override fun onVoiceCouplingChange(value: Float) = voiceViewModel.onVoiceCouplingChange(value)
         override fun onDialogActiveChange(active: Boolean) { /* Not used here */ }
+        override fun onWobblePulseStart(index: Int, x: Float, y: Float) = voiceViewModel.onWobblePulseStart(index, x, y)
+        override fun onWobbleMove(index: Int, x: Float, y: Float) = voiceViewModel.onWobbleMove(index, x, y)
+        override fun onWobblePulseEnd(index: Int) = voiceViewModel.onWobblePulseEnd(index)
     }
 
     val midiActions = object : MidiActions {
@@ -199,6 +202,7 @@ fun DuoPairBoxLayout(
                         },
                         onPulseEnd = {
                             voiceActions.onPulseEnd(voiceA)
+                            voiceActions.onWobblePulseEnd(voiceA)
                         },
                         size = 28.dp,
                         label = "",
@@ -211,6 +215,12 @@ fun DuoPairBoxLayout(
                         onLearnSelect = {
                             midiActions
                                 .selectVoiceForLearning(voiceA)
+                        },
+                        onPulseStartWithPosition = { x, y ->
+                            voiceActions.onWobblePulseStart(voiceA, x, y)
+                        },
+                        onWobbleMove = { x, y ->
+                            voiceActions.onWobbleMove(voiceA, x, y)
                         }
                     )
                 }
@@ -279,6 +289,7 @@ fun DuoPairBoxLayout(
                         },
                         onPulseEnd = {
                             voiceActions.onPulseEnd(voiceB)
+                            voiceActions.onWobblePulseEnd(voiceB)
                         },
                         size = 28.dp,
                         label = "",
@@ -291,6 +302,12 @@ fun DuoPairBoxLayout(
                         onLearnSelect = {
                             midiActions
                                 .selectVoiceForLearning(voiceB)
+                        },
+                        onPulseStartWithPosition = { x, y ->
+                            voiceActions.onWobblePulseStart(voiceB, x, y)
+                        },
+                        onWobbleMove = { x, y ->
+                            voiceActions.onWobbleMove(voiceB, x, y)
                         }
                     )
                 }

@@ -33,6 +33,9 @@ class PreviewSynthEngine() : SynthEngine {
 
     override fun setVoiceHold(index: Int, amount: Float) {
     }
+    
+    override fun setVoiceWobble(index: Int, wobbleOffset: Float, range: Float) {
+    }
 
     override fun setDrive(amount: Float) {}
     override fun setDistortionMix(amount: Float) {}

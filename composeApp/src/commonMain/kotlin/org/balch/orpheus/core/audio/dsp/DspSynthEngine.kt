@@ -435,6 +435,16 @@ class DspSynthEngine(
         voices[index].setHoldLevel(amount.toDouble())
     }
 
+    override fun setVoiceWobble(index: Int, wobbleOffset: Float, range: Float) {
+        // Apply wobble as a real-time VCA modulation
+        // wobbleOffset is in [-1, 1], range determines max modulation depth
+        // At wobbleOffset=0: multiplier=1.0 (no change)
+        // At wobbleOffset=1 with range=0.3: multiplier=1.3 (30% boost)
+        // At wobbleOffset=-1 with range=0.3: multiplier=0.7 (30% cut)
+        val multiplier = 1.0 + (wobbleOffset * range)
+        voices[index].setWobbleMultiplier(multiplier.coerceIn(0.0, 2.0))
+    }
+
     override fun setDuoModSource(duoIndex: Int, source: ModSource) {
         _duoModSource[duoIndex] = source
         val voiceA = duoIndex * 2

@@ -18,6 +18,11 @@ interface VoiceActions {
     fun onVibratoChange(value: Float)
     fun onVoiceCouplingChange(value: Float)
     fun onDialogActiveChange(active: Boolean)
+    
+    // Wobble tracking for finger movement modulation
+    fun onWobblePulseStart(index: Int, x: Float, y: Float)
+    fun onWobbleMove(index: Int, x: Float, y: Float)
+    fun onWobblePulseEnd(index: Int)
 }
 
 interface MidiActions {

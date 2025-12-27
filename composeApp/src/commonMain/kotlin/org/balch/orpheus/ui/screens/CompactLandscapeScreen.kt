@@ -99,6 +99,9 @@ fun CompactLandscapeScreen(
             onQuadPitchChange = { i, v -> voiceViewModel.onQuadPitchChange(i, v) },
             onQuadHoldChange = { i, v -> voiceViewModel.onQuadHoldChange(i, v) },
             onMasterVolumeChange = { v -> voiceViewModel.onMasterVolumeChange(v) },
+            onWobblePulseStart = { i, x, y -> voiceViewModel.onWobblePulseStart(i, x, y) },
+            onWobbleMove = { i, x, y -> voiceViewModel.onWobbleMove(i, x, y) },
+            onWobblePulseEnd = { i -> voiceViewModel.onWobblePulseEnd(i) },
             onSequencerPlayPause = { sequencerViewModel.togglePlayPause() },
             onSequencerStop = { sequencerViewModel.stop() },
             onSequencerPlaybackModeChange = { sequencerViewModel.setPlaybackMode(it) },
@@ -152,6 +155,9 @@ private fun CompactLandscapeLayout(
     onQuadPitchChange: (Int, Float) -> Unit,
     onQuadHoldChange: (Int, Float) -> Unit,
     onMasterVolumeChange: (Float) -> Unit,
+    onWobblePulseStart: ((Int, Float, Float) -> Unit)? = null,
+    onWobbleMove: ((Int, Float, Float) -> Unit)? = null,
+    onWobblePulseEnd: ((Int) -> Unit)? = null,
     onSequencerPlayPause: () -> Unit,
     onSequencerStop: () -> Unit,
     onSequencerPlaybackModeChange: (TweakPlaybackMode) -> Unit,
@@ -283,7 +289,10 @@ private fun CompactLandscapeLayout(
                 borderColor = OrpheusColors.neonMagenta,
                 liquidState = liquidState,
                 effects = effects,
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                onWobblePulseStart = onWobblePulseStart,
+                onWobbleMove = onWobbleMove,
+                onWobblePulseEnd = onWobblePulseEnd
             )
 
             // Duo 3-4: Electric Blue Border, Cyan Accents
@@ -299,7 +308,10 @@ private fun CompactLandscapeLayout(
                 borderColor = OrpheusColors.electricBlue,
                 liquidState = liquidState,
                 effects = effects,
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                onWobblePulseStart = onWobblePulseStart,
+                onWobbleMove = onWobbleMove,
+                onWobblePulseEnd = onWobblePulseEnd
             )
 
             // Duo 5-6: Green Border, Orange Accents (matching uploaded_image_1766749385773.png)
@@ -315,7 +327,10 @@ private fun CompactLandscapeLayout(
                 borderColor = OrpheusColors.neonOrange,
                 liquidState = liquidState,
                 effects = effects,
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                onWobblePulseStart = onWobblePulseStart,
+                onWobbleMove = onWobbleMove,
+                onWobblePulseEnd = onWobblePulseEnd
             )
 
             // Duo 7-8: Green Border, Orange Accents
@@ -331,7 +346,10 @@ private fun CompactLandscapeLayout(
                 borderColor = OrpheusColors.synthGreen,
                 liquidState = liquidState,
                 effects = effects,
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                onWobblePulseStart = onWobblePulseStart,
+                onWobbleMove = onWobbleMove,
+                onWobblePulseEnd = onWobblePulseEnd
             )
         }
     }

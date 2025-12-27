@@ -84,6 +84,9 @@ fun DesktopSynthScreen(
         override fun onVibratoChange(value: Float) = voiceViewModel.onVibratoChange(value)
         override fun onVoiceCouplingChange(value: Float) = voiceViewModel.onVoiceCouplingChange(value)
         override fun onDialogActiveChange(active: Boolean) { /* handled by parent */ }
+        override fun onWobblePulseStart(index: Int, x: Float, y: Float) = voiceViewModel.onWobblePulseStart(index, x, y)
+        override fun onWobbleMove(index: Int, x: Float, y: Float) = voiceViewModel.onWobbleMove(index, x, y)
+        override fun onWobblePulseEnd(index: Int) = voiceViewModel.onWobblePulseEnd(index)
     }
 
     val midiActions = object : MidiActions {
@@ -254,6 +257,9 @@ fun DesktopSynthScreenPreview() {
         override fun onVibratoChange(value: Float) {}
         override fun onVoiceCouplingChange(value: Float) {}
         override fun onDialogActiveChange(active: Boolean) {}
+        override fun onWobblePulseStart(index: Int, x: Float, y: Float) {}
+        override fun onWobbleMove(index: Int, x: Float, y: Float) {}
+        override fun onWobblePulseEnd(index: Int) {}
     }
 
     val midiActions = object : MidiActions {

@@ -39,7 +39,11 @@ fun CompactVoicePanel(
     onPulseEnd: () -> Unit,
     onHoldChange: (Boolean) -> Unit,
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Wobble callbacks (optional for backwards compatibility)
+    onWobblePulseStart: ((Float, Float) -> Unit)? = null,
+    onWobbleMove: ((Float, Float) -> Unit)? = null,
+    onWobblePulseEnd: (() -> Unit)? = null
 ) {
 
     Column(
@@ -90,8 +94,13 @@ fun CompactVoicePanel(
             label = "",
             isActive = isActive,
             onPulseStart = onPulseStart,
-            onPulseEnd = onPulseEnd,
-            activeColor = color
+            onPulseEnd = {
+                onPulseEnd()
+                onWobblePulseEnd?.invoke()
+            },
+            activeColor = color,
+            onPulseStartWithPosition = onWobblePulseStart,
+            onWobbleMove = onWobbleMove
         )
     }
 }

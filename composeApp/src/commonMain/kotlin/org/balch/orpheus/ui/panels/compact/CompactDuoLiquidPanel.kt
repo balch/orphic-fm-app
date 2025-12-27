@@ -45,7 +45,11 @@ fun CompactDuoLiquidPanel(
     borderColor: Color,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Wobble callbacks (optional)
+    onWobblePulseStart: ((Int, Float, Float) -> Unit)? = null,
+    onWobbleMove: ((Int, Float, Float) -> Unit)? = null,
+    onWobblePulseEnd: ((Int) -> Unit)? = null
 ) {
     val shape = RoundedCornerShape(10.dp)
     val startIndex = pairIndex * 2
@@ -91,7 +95,16 @@ fun CompactDuoLiquidPanel(
                             onPulseEnd = { onPulseEnd(voiceIndex) },
                             onHoldChange = { onVoiceHoldChange(voiceIndex, it) },
                             color = borderColor,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            onWobblePulseStart = onWobblePulseStart?.let { callback ->
+                                { x, y -> callback(voiceIndex, x, y) }
+                            },
+                            onWobbleMove = onWobbleMove?.let { callback ->
+                                { x, y -> callback(voiceIndex, x, y) }
+                            },
+                            onWobblePulseEnd = onWobblePulseEnd?.let { callback ->
+                                { callback(voiceIndex) }
+                            }
                         )
                     }
                 }

@@ -61,6 +61,9 @@ fun VoiceGroupSection(
         override fun onVibratoChange(value: Float) = voiceViewModel.onVibratoChange(value)
         override fun onVoiceCouplingChange(value: Float) = voiceViewModel.onVoiceCouplingChange(value)
         override fun onDialogActiveChange(active: Boolean) { /* Not used here */ }
+        override fun onWobblePulseStart(index: Int, x: Float, y: Float) = voiceViewModel.onWobblePulseStart(index, x, y)
+        override fun onWobbleMove(index: Int, x: Float, y: Float) = voiceViewModel.onWobbleMove(index, x, y)
+        override fun onWobblePulseEnd(index: Int) = voiceViewModel.onWobblePulseEnd(index)
     }
 
     val midiActions = object : MidiActions {

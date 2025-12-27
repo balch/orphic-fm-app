@@ -19,6 +19,16 @@ interface SynthEngine {
     fun setQuadPitch(quadIndex: Int, pitch: Float) // 0-1, 0.5=Unity
     fun setQuadHold(quadIndex: Int, amount: Float) // 0-1, VCA bias
     fun setVoiceHold(index: Int, amount: Float) // 0-1, per-voice VCA bias
+    
+    /**
+     * Apply wobble modulation to a voice's volume.
+     * This is a real-time modulation applied on top of the envelope output.
+     * 
+     * @param index Voice index (0-7)
+     * @param wobbleOffset Modulation offset in range [-1, 1], where 0 = no modulation
+     * @param range Maximum modulation depth (0-1), e.g., 0.3 = ±30% modulation
+     */
+    fun setVoiceWobble(index: Int, wobbleOffset: Float, range: Float = 0.3f)
 
     // Global
     fun setDrive(amount: Float)
