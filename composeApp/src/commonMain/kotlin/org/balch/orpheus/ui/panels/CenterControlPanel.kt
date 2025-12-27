@@ -96,7 +96,7 @@ private fun CenterControlPanelLayout(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Spacer(modifier = Modifier.weight(.5f))
+        Spacer(modifier = Modifier.weight(.2f))
         Card(
             modifier = Modifier
                 .liquidVizEffects(
@@ -121,11 +121,12 @@ private fun CenterControlPanelLayout(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
-        Spacer(modifier = Modifier.weight(.5f))
+        Spacer(modifier = Modifier.weight(.2f))
         CrossModSelector(
             isCrossQuad = voiceState.fmStructureCrossQuad,
             onToggle = onFmStructureChange
         )
+        Spacer(modifier = Modifier.weight(.1f))
         RotaryKnob(
             value = voiceState.totalFeedback,
             onValueChange = onTotalFeedbackChange,
@@ -134,6 +135,7 @@ private fun CenterControlPanelLayout(
             size = 32.dp,
             progressColor = OrpheusColors.neonCyan
         )
+        Spacer(modifier = Modifier.weight(.1f))
         RotaryKnob(
             value = voiceState.vibrato,
             onValueChange = onVibratoChange,
@@ -142,6 +144,7 @@ private fun CenterControlPanelLayout(
             size = 32.dp,
             progressColor = OrpheusColors.neonMagenta
         )
+        Spacer(modifier = Modifier.weight(.1f))
         RotaryKnob(
             value = voiceState.voiceCoupling,
             onValueChange = onVoiceCouplingChange,
@@ -150,7 +153,7 @@ private fun CenterControlPanelLayout(
             size = 32.dp,
             progressColor = OrpheusColors.warmGlow
         )
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.weight(.2f))
     }
 }
 

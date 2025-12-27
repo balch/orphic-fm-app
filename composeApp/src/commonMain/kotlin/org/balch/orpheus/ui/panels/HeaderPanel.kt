@@ -30,13 +30,14 @@ import org.balch.orpheus.features.stereo.StereoPanel
 fun HeaderPanel(
     modifier: Modifier = Modifier,
     height: Dp = 260.dp,
+    isVizInitiallyExpanded: Boolean = true,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
     // Track expansion state for each panel
     var presetExpanded by remember { mutableStateOf(false) }
     var midiExpanded by remember { mutableStateOf(false) }
     var stereoExpanded by remember { mutableStateOf(false) }
-    var vizExpanded by remember { mutableStateOf(true) }
+    var vizExpanded by remember(isVizInitiallyExpanded) { mutableStateOf(isVizInitiallyExpanded) }
     var lfoExpanded by remember { mutableStateOf(true) }
     var delayExpanded by remember { mutableStateOf(true) }
     var distortionExpanded by remember { mutableStateOf(true) }

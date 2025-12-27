@@ -63,7 +63,7 @@ fun VoiceGroupSection(
             .border(1.dp, quadColor.copy(alpha = 0.3f), shape)
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.SpaceEvenly
     ) {
         // Centered Quad Header
         Text(quadLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = quadColor)
@@ -84,7 +84,7 @@ fun VoiceGroupSection(
                 },
                 label = "PITCH",
                 controlId = ControlIds.quadPitch(quadIndex),
-                size = 28.dp,
+                size = 32.dp,
                 progressColor = quadColor
             )
             RotaryKnob(
@@ -94,27 +94,27 @@ fun VoiceGroupSection(
                 },
                 label = "HOLD",
                 controlId = ControlIds.quadHold(quadIndex),
-                size = 28.dp,
+                size = 32.dp,
                 progressColor = OrpheusColors.warmGlow
             )
         }
 
         // Two Duo groups side by side
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             DuoPairBox(
                 voiceA = voiceStartIndex,
                 voiceB = voiceStartIndex + 1,
                 color = duoColors[0],
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
             DuoPairBox(
                 voiceA = voiceStartIndex + 2,
                 voiceB = voiceStartIndex + 3,
                 color = duoColors[1],
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
         }
     }

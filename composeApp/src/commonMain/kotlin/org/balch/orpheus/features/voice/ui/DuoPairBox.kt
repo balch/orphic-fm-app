@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -43,12 +44,13 @@ fun DuoPairBox(
     Column(
         modifier =
             modifier.widthIn(min = 100.dp)
+                .fillMaxHeight()
                 .clip(RoundedCornerShape(8.dp))
                 // Removed hardcoded background - let liquid effect from parent show through
                 .border(2.dp, color.copy(alpha = 0.7f), RoundedCornerShape(8.dp))  // Brighter border
                 .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp)
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
         // Full-width header bar with Duo label and LFO toggle
         Row(
@@ -83,17 +85,19 @@ fun DuoPairBox(
 
         // Main Content: Two Voice Columns side-by-side
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(bottom = 0.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             // VOICE A COLUMN
             Column(
+                modifier = Modifier.fillMaxHeight(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.SpaceEvenly
             ) {
                 val pairIndex = voiceA / 2
                 // Knobs
                 VoiceColumnMod(
+                    modifier = Modifier.weight(1f),
                     num = voiceA + 1,
                     voiceIndex = voiceA,
                     pairIndex = pairIndex,
@@ -164,14 +168,16 @@ fun DuoPairBox(
 
             // VOICE B COLUMN
             Column(
+                modifier = Modifier.fillMaxHeight(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.SpaceEvenly
             ) {
                 // Calculate pair index (0-3) from voice A (0,2,4,6)
                 val pairIndex = voiceA / 2
 
                 // Knobs
                 VoiceColumnSharp(
+                    modifier = Modifier.weight(1f),
                     num = voiceB + 1,
                     voiceIndex = voiceB,
                     pairIndex = pairIndex,

@@ -19,6 +19,7 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 
 @Composable
 fun VoiceColumnMod(
+    modifier: Modifier = Modifier,
     num: Int,
     voiceIndex: Int,
     pairIndex: Int, // Kept for API compatibility, though not used directly in this implementation
@@ -31,11 +32,11 @@ fun VoiceColumnMod(
 ) {
     Column(
         modifier =
-            Modifier.clip(RoundedCornerShape(4.dp))
+            modifier.clip(RoundedCornerShape(4.dp))
                 .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
                 .padding(3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.SpaceEvenly
     ) {
         Text("$num", fontSize = 8.sp, color = OrpheusColors.electricBlue.copy(alpha = 0.6f))
         RotaryKnob(
@@ -43,7 +44,7 @@ fun VoiceColumnMod(
             onValueChange = onModDepthChange,
             label = "MOD",
             controlId = ControlIds.voiceFmDepth(voiceIndex),
-            size = 24.dp,
+            size = 28.dp,
             progressColor = OrpheusColors.neonMagenta
         )
         RotaryKnob(
@@ -51,7 +52,7 @@ fun VoiceColumnMod(
             onValueChange = onTuneChange,
             label = "TUNE",
             controlId = ControlIds.voiceTune(voiceIndex),
-            size = 28.dp,
+            size = 32.dp,
             progressColor = OrpheusColors.neonCyan
         )
         // Envelope Speed Slider
@@ -66,6 +67,7 @@ fun VoiceColumnMod(
 
 @Composable
 fun VoiceColumnSharp(
+    modifier: Modifier = Modifier,
     num: Int,
     voiceIndex: Int,
     pairIndex: Int,
@@ -78,11 +80,11 @@ fun VoiceColumnSharp(
 ) {
     Column(
         modifier =
-            Modifier.clip(RoundedCornerShape(4.dp))
+            modifier.clip(RoundedCornerShape(4.dp))
                 .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
                 .padding(3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.SpaceEvenly
     ) {
         Text("$num", fontSize = 8.sp, color = OrpheusColors.electricBlue.copy(alpha = 0.6f))
         RotaryKnob(
@@ -90,7 +92,7 @@ fun VoiceColumnSharp(
             onValueChange = onSharpnessChange,
             label = "SHARP",
             controlId = ControlIds.pairSharpness(pairIndex),
-            size = 24.dp,
+            size = 28.dp,
             progressColor = OrpheusColors.synthGreen
         )
         RotaryKnob(
@@ -98,7 +100,7 @@ fun VoiceColumnSharp(
             onValueChange = onTuneChange,
             label = "TUNE",
             controlId = ControlIds.voiceTune(voiceIndex),
-            size = 28.dp,
+            size = 32.dp,
             progressColor = OrpheusColors.neonCyan
         )
         // Envelope Speed Slider

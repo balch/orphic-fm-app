@@ -30,7 +30,8 @@ fun DesktopSynthScreen(
     voiceViewModel: VoiceViewModel,
     isDialogActive: Boolean,
     onDialogActiveChange: (Boolean) -> Unit,
-    focusRequester: FocusRequester
+    focusRequester: FocusRequester,
+    isVizInitiallyExpanded: Boolean = true
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -50,7 +51,10 @@ fun DesktopSynthScreen(
             verticalArrangement = Arrangement.Top
         ) {
             // Top panel row
-            HeaderPanel(onDialogActiveChange = onDialogActiveChange)
+            HeaderPanel(
+                onDialogActiveChange = onDialogActiveChange,
+                isVizInitiallyExpanded = isVizInitiallyExpanded
+            )
 
             // Main section: Voice groups + center controls
             Row(
@@ -66,7 +70,11 @@ fun DesktopSynthScreen(
                     modifier = Modifier.weight(1f)
                 )
 
-                CenterControlPanel(modifier = Modifier.fillMaxHeight())
+                CenterControlPanel(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .weight(0.4f)
+                )
 
                 VoiceGroupSection(
                     quadLabel = "5-8",
