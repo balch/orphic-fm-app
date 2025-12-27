@@ -10,10 +10,23 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlin.math.roundToInt
 
 /**
+ * Origin of a MIDI control event.
+ */
+enum class MidiEventOrigin {
+    MIDI,      // External MIDI controller or Keyboard
+    UI,        // Manual UI interaction (Knobs/Sliders)
+    SEQUENCER  // Internal Automation/Sequencer
+}
+
+/**
  * MIDI event data classes for flow-based routing.
  */
 data class MidiPulseEvent(val voiceIndex: Int)
-data class MidiControlEvent(val controlId: String, val value: Float)
+data class MidiControlEvent(
+    val controlId: String, 
+    val value: Float,
+    val origin: MidiEventOrigin = MidiEventOrigin.MIDI
+)
 
 /**
  * Routes MIDI events to the appropriate feature ViewModels.
@@ -158,14 +171,14 @@ class MidiRouter(
     }
 
     private fun dispatchControlChange(controlId: String, value: Float) {
-        _onControlChange.tryEmit(MidiControlEvent(controlId, value))
+        _onControlChange.tryEmit(MidiControlEvent(controlId, value, MidiEventOrigin.MIDI))
     }
     
     /**
      * Public method to emit control changes from non-MIDI sources (e.g., sequencer automation).
      * This allows unified handling of parameter updates across MIDI and sequencer.
      */
-    fun emitControlChange(controlId: String, value: Float) {
-        _onControlChange.tryEmit(MidiControlEvent(controlId, value))
+    fun emitControlChange(controlId: String, value: Float, origin: MidiEventOrigin = MidiEventOrigin.UI) {
+        _onControlChange.tryEmit(MidiControlEvent(controlId, value, origin))
     }
 }

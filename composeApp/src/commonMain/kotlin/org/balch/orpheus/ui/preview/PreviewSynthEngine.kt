@@ -102,4 +102,14 @@ class PreviewSynthEngine() : SynthEngine {
     override fun getMasterPan(): Float = 0f
     override fun setStereoMode(mode: StereoMode) {}
     override fun getStereoMode(): StereoMode = StereoMode.VOICE_PAN
+    override fun setParameterAutomation(
+        controlId: String,
+        times: FloatArray,
+        values: FloatArray,
+        count: Int,
+        duration: Float,
+        mode: Int
+    ) { }
+
+    override fun clearParameterAutomation(controlId: String) { }
 }

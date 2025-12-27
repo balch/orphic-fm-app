@@ -174,6 +174,9 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
 
     private val _masterLevelFlow = MutableStateFlow(0f)
     override val masterLevelFlow: StateFlow<Float> = _masterLevelFlow.asStateFlow()
+    
+    // Automation Players - currently unused, see TODO in setParameterAutomation
+    // private val automationPlayers = mutableMapOf<String, AutomationPlayer>()
 
     // State Caches (Backing fields for getters)
     // Voices
@@ -453,6 +456,26 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         defaultVoicePans.forEachIndexed { index, pan ->
             setVoicePan(index, pan)
         }
+        
+        // ═══════════════════════════════════════════════════════════
+        // Automation Setup - DISABLED
+        // ═══════════════════════════════════════════════════════════
+        // 
+        // NOTE: The previous implementation permanently connected AutomationPlayer
+        // outputs to parameter inputs (LFO freq, delay time, etc.). This caused bugs:
+        // - When automation is NOT playing, players output 0 (or stale values)
+        // - These outputs override manual .set() calls on the same inputs
+        // - Result: Manual knob control was completely broken
+        //
+        // PROPER FIX NEEDED: Automation should use one of these architectures:
+        // 1. Connect/disconnect automation dynamically on play()/stop()
+        // 2. Use a crossfader to blend manual vs automation sources
+        // 3. Gate automation output and sum with manual value
+        //
+        // For now, automation is disabled to restore manual control.
+        // The TweakSequencer will continue to work via the ViewModel layer
+        // (MidiRouter events), just not at audio-rate precision.
+        // ═══════════════════════════════════════════════════════════
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -823,6 +846,16 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     override fun stopTestTone() {
         Logger.info { "Stopping test tone" }
         testGain?.inputB?.set(0.0)
+    }
+
+    override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) {
+        // TODO: Implement audio-rate automation - see .agent/tasks/audio_automation_redesign.md
+        // Currently disabled because permanent AudioInput connections override manual control.
+        // The TweakSequencer still works via ViewModel layer (MidiRouter events).
+    }
+
+    override fun clearParameterAutomation(controlId: String) {
+        // TODO: Implement audio-rate automation - see .agent/tasks/audio_automation_redesign.md
     }
 
     override fun getPeak(): Float {

@@ -26,6 +26,8 @@ external class AudioContext {
     fun createChannelSplitter(numberOfOutputs: Int = definedExternally): ChannelSplitterNode
     fun createChannelMerger(numberOfInputs: Int = definedExternally): ChannelMergerNode
     fun createConstantSource(): ConstantSourceNode
+    fun createBuffer(numberOfChannels: Int, length: Int, sampleRate: Float): AudioBuffer
+    fun createBufferSource(): AudioBufferSourceNode
     
     fun resume(): JsAny  // Returns Promise
     fun suspend(): JsAny // Returns Promise
@@ -102,6 +104,25 @@ external interface ChannelMergerNode : AudioNode
 external interface ConstantSourceNode : AudioNode {
     val offset: AudioParam
     fun start(time: Double = definedExternally)
+    fun stop(time: Double = definedExternally)
+}
+
+external interface AudioBuffer : JsAny {
+    val sampleRate: Float
+    val length: Int
+    val duration: Double
+    val numberOfChannels: Int
+    fun getChannelData(channel: Int): Float32Array
+}
+
+external interface AudioBufferSourceNode : AudioNode {
+    var buffer: AudioBuffer?
+    val playbackRate: AudioParam
+    val detune: AudioParam
+    var loop: Boolean
+    var loopStart: Double
+    var loopEnd: Double
+    fun start(time: Double = definedExternally, offset: Double = definedExternally, duration: Double = definedExternally)
     fun stop(time: Double = definedExternally)
 }
 

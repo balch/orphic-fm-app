@@ -104,6 +104,10 @@ interface SynthEngine {
     fun getMasterPan(): Float
     fun setStereoMode(mode: StereoMode)
     fun getStereoMode(): StereoMode
+
+    // Automation
+    fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int)
+    fun clearParameterAutomation(controlId: String)
 }
 
 enum class ModSource {

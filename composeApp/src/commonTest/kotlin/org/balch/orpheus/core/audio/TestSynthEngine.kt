@@ -114,6 +114,10 @@ open class TestSynthEngine : SynthEngine {
     override fun setMasterPan(pan: Float) { _masterPan = pan }
     override fun setStereoMode(mode: StereoMode) { _stereoMode = mode }
 
+    // Automation (Test hooks)
+    override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) {}
+    override fun clearParameterAutomation(controlId: String) {}
+
     // Test tone
     override fun playTestTone(frequency: Float) {}
     override fun stopTestTone() {}

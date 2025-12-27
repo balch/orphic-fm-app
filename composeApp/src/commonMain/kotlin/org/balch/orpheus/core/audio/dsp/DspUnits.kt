@@ -91,3 +91,34 @@ expect interface LinearRamp : AudioUnit {
     /** Ramp time in seconds */
     val time: AudioInput
 }
+
+/**
+ * Player for automation curves.
+ */
+expect interface AutomationPlayer : AudioUnit {
+    /** Output signal (control voltage) */
+    override val output: AudioOutput
+
+    /** 
+     * Upload a path.
+     * @param times Normalized time points (0.0 to 1.0)
+     * @param values Normalized values (0.0 to 1.0)
+     * @param count Number of points
+     */
+    fun setPath(times: FloatArray, values: FloatArray, count: Int)
+
+    /** Set duration of the sequence in seconds */
+    fun setDuration(seconds: Float)
+
+    /** Set playback mode: 0=Once, 1=Loop, 2=PingPong */
+    fun setMode(mode: Int)
+    
+    /** Start/Resume playback */
+    fun play()
+    
+    /** Stop/Pause playback */
+    fun stop()
+    
+    /** Reset to start */
+    fun reset()
+}

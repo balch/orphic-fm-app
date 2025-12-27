@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.midi.MidiRouter
@@ -88,7 +89,8 @@ sealed interface TweakSequencerIntent {
 @ContributesIntoMap(AppScope::class)
 class TweakSequencerViewModel(
     private val dispatcherProvider: DispatcherProvider,
-    private val midiRouter: MidiRouter
+    private val midiRouter: MidiRouter,
+    private val engine: SynthEngine
 ) : ViewModel() {
 
     private val intents = MutableSharedFlow<TweakSequencerIntent>(
@@ -237,22 +239,67 @@ class TweakSequencerViewModel(
             is TweakSequencerIntent.Pause -> stopPlayback()
             is TweakSequencerIntent.Stop -> stopPlayback()
             is TweakSequencerIntent.UpdatePosition -> applyParameterValues()
+            is TweakSequencerIntent.SetDuration, is TweakSequencerIntent.SetPlaybackMode -> restartIfPlaying()
             else -> { /* No side effects */ }
+        }
+    }
+    
+    private fun restartIfPlaying() {
+        if (uiState.value.sequencer.isPlaying) {
+            startPlayback()
         }
     }
 
     private fun startPlayback() {
         playbackJob?.cancel()
+        
+        val state = uiState.value.sequencer
+        if (!state.config.enabled) return
+        
+        // NOTE: Audio-rate automation is currently disabled in DspSynthEngine.
+        // The sequencer drives parameters via MidiRouter events at ~30fps.
+        // See .agent/tasks/audio_automation_redesign.md for future audio-rate implementation.
 
+        // Start UI synchronization loop
         playbackJob = viewModelScope.launch(dispatcherProvider.io) {
-            val tickMs = 16L  // ~60fps
+            val tickMs = 32L  // ~30fps for UI
             var lastTime = currentTimeMillis()
-
+            
+            // If resuming from pause, we need to handle position
+            // But engine automation usually restarts? 
+            // My engine impl calls play() which restarts envelope.
+            // So we should effectively restart UI position too?
+            // Yes, simplistic sync.
+            // If we wanted resume, we'd need seek().
+            
+            // To keep simple: Always restart from current position or 0?
+            // Ideally 0 if stop was pressed.
+            // But if Play/Pause, current position matters.
+            // Engine automation does NOT support seeking yet (seek was unimplemented).
+            // So if I pause/play, engine restarts from 0.
+            // So UI should restart from 0.
+            // BUT: intent.Play doesn't reset position. intent.Stop does.
+            // If I press Pause then Play, position is > 0.
+            // Engine restarts from 0. Desync!
+            // I should reset position to 0 on Play if it's not 0?
+            // Or implement seek in Engine.
+            // Since seek is hard, I will enforce restart from 0 on Play for now.
+            // `TweakSequencerIntent.Play` -> `reduce` keeps position.
+            // I will force it to 0 in startPlayback if we want sync.
+            // Or just accept the desync for now (UI shows resuming, Audio restarts).
+            // Actually, `AutomationPlayer` usually restarts.
+            // Let's reset UI position to 0 in startPlayback logic if starting fresh?
+            // No, the user might want resume.
+            // Given the constraint, I will assume Restart behavior for now.
+            
+            // Reset position to match engine start
+            // intents.tryEmit(TweakSequencerIntent.UpdatePosition(0f, 1)) 
+            // Actually, let's just run loop from current position, but careful.
+            
             while (isActive) {
                 val currentState = uiState.value.sequencer
                 if (!currentState.isPlaying || !currentState.config.enabled) {
-                    delay(tickMs)
-                    continue
+                    break // Job cancelled anyway
                 }
 
                 val now = currentTimeMillis()
@@ -263,6 +310,7 @@ class TweakSequencerViewModel(
                 var newPosition = currentState.currentPosition + deltaNormalized * currentState.playDirection
                 var newDirection = currentState.playDirection
 
+                // Logic matches Engine loop behavior approximately
                 when (currentState.config.tweakPlaybackMode) {
                     TweakPlaybackMode.ONCE -> {
                         if (newPosition >= 1f) {
@@ -270,21 +318,12 @@ class TweakSequencerViewModel(
                             intents.tryEmit(TweakSequencerIntent.Stop)
                         }
                     }
-
                     TweakPlaybackMode.LOOP -> {
-                        if (newPosition >= 1f) {
-                            newPosition = 0f
-                        }
+                        if (newPosition >= 1f) newPosition = 0f
                     }
-
                     TweakPlaybackMode.PING_PONG -> {
-                        if (newPosition >= 1f) {
-                            newPosition = 1f
-                            newDirection = -1
-                        } else if (newPosition <= 0f) {
-                            newPosition = 0f
-                            newDirection = 1
-                        }
+                        if (newPosition >= 1f) { newPosition = 1f; newDirection = -1 }
+                        else if (newPosition <= 0f) { newPosition = 0f; newDirection = 1 }
                     }
                 }
 
@@ -297,6 +336,8 @@ class TweakSequencerViewModel(
     private fun stopPlayback() {
         playbackJob?.cancel()
         playbackJob = null
+        // NOTE: No engine automation to clear since it's currently disabled.
+        // When audio-rate automation is implemented, call engine.clearParameterAutomation here.
     }
 
     private fun applyParameterValues() {
@@ -305,28 +346,33 @@ class TweakSequencerViewModel(
 
         state.paths.forEach { (param, path) ->
             val value = path.valueAt(state.currentPosition) ?: return@forEach
-
-            // Map sequencer parameter to MIDI control ID
-            val controlId = when (param) {
-                TweakSequencerParameter.LFO_FREQ_A -> ControlIds.HYPER_LFO_A
-                TweakSequencerParameter.LFO_FREQ_B -> ControlIds.HYPER_LFO_B
-                TweakSequencerParameter.DELAY_TIME_1 -> ControlIds.DELAY_TIME_1
-                TweakSequencerParameter.DELAY_TIME_2 -> ControlIds.DELAY_TIME_2
-                TweakSequencerParameter.DELAY_MOD_1 -> ControlIds.DELAY_MOD_1
-                TweakSequencerParameter.DELAY_MOD_2 -> ControlIds.DELAY_MOD_2
-                TweakSequencerParameter.DELAY_FEEDBACK -> ControlIds.DELAY_FEEDBACK
-                TweakSequencerParameter.DELAY_MIX -> ControlIds.DELAY_MIX
-                TweakSequencerParameter.DIST_DRIVE -> ControlIds.DRIVE
-                TweakSequencerParameter.DIST_MIX -> ControlIds.DISTORTION_MIX
-                TweakSequencerParameter.VIZ_KNOB_1 -> ControlIds.VIZ_KNOB_1
-                TweakSequencerParameter.VIZ_KNOB_2 -> ControlIds.VIZ_KNOB_2
-                TweakSequencerParameter.GLOB_VIBRATO -> ControlIds.VIBRATO
-            }
-            
-            // Emit through MidiRouter - ViewModels will update UI AND apply to engine
-            controlId?.let { id ->
+            getControlId(param)?.let { id ->
+                // Emit as UI origin so downstream ViewModels apply to engine normally.
+                // With audio-rate automation disabled, this is the only way params get applied.
                 midiRouter.emitControlChange(id, value)
             }
+        }
+    }
+    
+    private fun isDspParam(param: TweakSequencerParameter): Boolean {
+        return param != TweakSequencerParameter.VIZ_KNOB_1 && param != TweakSequencerParameter.VIZ_KNOB_2
+    }
+    
+    private fun getControlId(param: TweakSequencerParameter): String? {
+        return when (param) {
+            TweakSequencerParameter.LFO_FREQ_A -> ControlIds.HYPER_LFO_A
+            TweakSequencerParameter.LFO_FREQ_B -> ControlIds.HYPER_LFO_B
+            TweakSequencerParameter.DELAY_TIME_1 -> ControlIds.DELAY_TIME_1
+            TweakSequencerParameter.DELAY_TIME_2 -> ControlIds.DELAY_TIME_2
+            TweakSequencerParameter.DELAY_MOD_1 -> ControlIds.DELAY_MOD_1
+            TweakSequencerParameter.DELAY_MOD_2 -> ControlIds.DELAY_MOD_2
+            TweakSequencerParameter.DELAY_FEEDBACK -> ControlIds.DELAY_FEEDBACK
+            TweakSequencerParameter.DELAY_MIX -> ControlIds.DELAY_MIX
+            TweakSequencerParameter.DIST_DRIVE -> ControlIds.DRIVE
+            TweakSequencerParameter.DIST_MIX -> ControlIds.DISTORTION_MIX
+            TweakSequencerParameter.VIZ_KNOB_1 -> ControlIds.VIZ_KNOB_1
+            TweakSequencerParameter.VIZ_KNOB_2 -> ControlIds.VIZ_KNOB_2
+            TweakSequencerParameter.GLOB_VIBRATO -> ControlIds.VIBRATO
         }
     }
 

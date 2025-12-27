@@ -260,3 +260,139 @@ class WebAudioLimiter(private val context: AudioContext) : Limiter {
     
     override val output: AudioOutput = WebAudioNodeOutput(shaper)
 }
+
+actual interface LinearRamp : AudioUnit {
+    actual val input: AudioInput
+    actual val time: AudioInput
+}
+
+class WebAudioLinearRamp(private val context: AudioContext) : LinearRamp {
+    private val source = context.createConstantSource().also {
+        it.offset.value = 0f
+        it.start()
+    }
+    
+    private var rampTime = 0.02
+
+    override val input: AudioInput = object : AudioInput {
+        override fun set(value: Double) {
+             val now = context.currentTime
+             source.offset.cancelScheduledValues(now)
+             source.offset.setValueAtTime(source.offset.value, now)
+             source.offset.linearRampToValueAtTime(value.toFloat(), now + rampTime)
+        }
+        override fun disconnectAll() {}
+    }
+    
+    override val time: AudioInput = object : AudioInput {
+        override fun set(value: Double) {
+            rampTime = value.coerceAtLeast(0.001)
+        }
+        override fun disconnectAll() {}
+    }
+    
+    override val output: AudioOutput = WebAudioNodeOutput(source)
+}
+
+actual interface AutomationPlayer : AudioUnit {
+    actual override val output: AudioOutput
+    actual fun setPath(times: FloatArray, values: FloatArray, count: Int)
+    actual fun setDuration(seconds: Float)
+    actual fun setMode(mode: Int)
+    actual fun play()
+    actual fun stop()
+    actual fun reset()
+}
+
+class WebAudioAutomationPlayer(private val context: AudioContext) : AutomationPlayer {
+    private val outputGain = context.createGain()
+    private var sourceNode: AudioBufferSourceNode? = null
+    private var buffer: AudioBuffer? = null
+    
+    private val BUFFER_SIZE = 1024
+    private var durationSeconds = 1.0f
+    private var mode = 0
+    
+    override val output: AudioOutput = WebAudioNodeOutput(outputGain)
+    
+    override fun setPath(times: FloatArray, values: FloatArray, count: Int) {
+         if (count < 2) return
+         
+         val newBuffer = context.createBuffer(1, BUFFER_SIZE, context.sampleRate.toFloat())
+         val channelData = newBuffer.getChannelData(0)
+         
+        fun getValueAt(t: Float): Float {
+            if (t <= times[0]) return values[0]
+            if (t >= times[count - 1]) return values[count - 1]
+            
+            for (i in 0 until count - 1) {
+                if (t >= times[i] && t <= times[i+1]) {
+                    val t1 = times[i]
+                    val t2 = times[i+1]
+                    val v1 = values[i]
+                    val v2 = values[i+1]
+                    if (t2 == t1) return v1
+                    val fraction = (t - t1) / (t2 - t1)
+                    return v1 + fraction * (v2 - v1)
+                }
+            }
+            return values[count - 1]
+        }
+         
+         for (i in 0 until BUFFER_SIZE) {
+             val t = i.toFloat() / (BUFFER_SIZE - 1)
+             channelData[i] = getValueAt(t)
+         }
+         
+         this.buffer = newBuffer
+    }
+    
+    override fun setDuration(seconds: Float) {
+        this.durationSeconds = seconds
+        updateRate()
+    }
+    
+    private fun updateRate() {
+        sourceNode?.let { node ->
+             val bufferDuration = BUFFER_SIZE.toFloat() / context.sampleRate
+             val rate = if (durationSeconds > 0) bufferDuration / durationSeconds else 1f
+             node.playbackRate.value = rate
+        }
+    }
+    
+    override fun setMode(mode: Int) {
+        this.mode = mode
+        sourceNode?.loop = (mode != 0)
+    }
+    
+    override fun play() {
+        stop() // Stop existing
+        
+        val buf = buffer ?: return
+        val source = context.createBufferSource()
+        source.buffer = buf
+        source.loop = (mode != 0)
+        
+        val bufferDuration = BUFFER_SIZE.toFloat() / context.sampleRate
+        val rate = if (durationSeconds > 0) bufferDuration / durationSeconds else 1f
+        source.playbackRate.value = rate
+        
+        source.connect(outputGain)
+        source.start()
+        this.sourceNode = source
+    }
+    
+    override fun stop() {
+        try {
+            sourceNode?.stop()
+            sourceNode?.disconnect()
+        } catch (e: Throwable) {
+            // Ignore
+        }
+        sourceNode = null
+    }
+    
+    override fun reset() {
+        stop()
+    }
+}
