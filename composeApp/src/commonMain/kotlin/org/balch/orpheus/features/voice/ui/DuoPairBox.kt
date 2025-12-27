@@ -29,6 +29,9 @@ import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
 import org.balch.orpheus.ui.widgets.PulseButton
 
+import org.balch.orpheus.features.midi.MidiUiState
+import org.balch.orpheus.features.voice.VoiceUiState
+
 @Composable
 fun DuoPairBox(
     modifier: Modifier = Modifier,
@@ -41,6 +44,53 @@ fun DuoPairBox(
     val voiceState by voiceViewModel.uiState.collectAsState()
     val midiState by midiViewModel.uiState.collectAsState()
 
+    val voiceActions = object : VoiceActions {
+        override fun onDuoModSourceChange(pairIndex: Int, source: org.balch.orpheus.core.audio.ModSource) = voiceViewModel.onDuoModSourceChange(pairIndex, source)
+        override fun onVoiceTuneChange(index: Int, value: Float) = voiceViewModel.onVoiceTuneChange(index, value)
+        override fun onDuoModDepthChange(pairIndex: Int, value: Float) = voiceViewModel.onDuoModDepthChange(pairIndex, value)
+        override fun onVoiceEnvelopeSpeedChange(index: Int, value: Float) = voiceViewModel.onVoiceEnvelopeSpeedChange(index, value)
+        override fun onHoldChange(index: Int, holding: Boolean) = voiceViewModel.onHoldChange(index, holding)
+        override fun onPulseStart(index: Int) = voiceViewModel.onPulseStart(index)
+        override fun onPulseEnd(index: Int) = voiceViewModel.onPulseEnd(index)
+        override fun onPairSharpnessChange(pairIndex: Int, value: Float) = voiceViewModel.onPairSharpnessChange(pairIndex, value)
+        override fun onQuadPitchChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadPitchChange(quadIndex, value)
+        override fun onQuadHoldChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadHoldChange(quadIndex, value)
+        override fun onFmStructureChange(crossQuad: Boolean) = voiceViewModel.onFmStructureChange(crossQuad)
+        override fun onTotalFeedbackChange(value: Float) = voiceViewModel.onTotalFeedbackChange(value)
+        override fun onVibratoChange(value: Float) = voiceViewModel.onVibratoChange(value)
+        override fun onVoiceCouplingChange(value: Float) = voiceViewModel.onVoiceCouplingChange(value)
+        override fun onDialogActiveChange(active: Boolean) { /* Not used here */ }
+    }
+
+    val midiActions = object : MidiActions {
+        override fun selectVoiceForLearning(voiceIndex: Int) = midiViewModel.selectVoiceForLearning(voiceIndex)
+    }
+
+    DuoPairBoxLayout(
+        modifier = modifier,
+        voiceA = voiceA,
+        voiceB = voiceB,
+        color = color,
+        voiceState = voiceState,
+        midiState = midiState,
+        voiceActions = voiceActions,
+        midiActions = midiActions,
+        isVoiceBeingLearned = midiViewModel::isVoiceBeingLearned
+    )
+}
+
+@Composable
+fun DuoPairBoxLayout(
+    modifier: Modifier = Modifier,
+    voiceA: Int,
+    voiceB: Int,
+    color: Color,
+    voiceState: VoiceUiState,
+    midiState: MidiUiState,
+    voiceActions: VoiceActions,
+    midiActions: MidiActions,
+    isVoiceBeingLearned: (Int) -> Boolean
+) {
     Column(
         modifier =
             modifier.widthIn(min = 100.dp)
@@ -76,7 +126,7 @@ fun DuoPairBox(
             HorizontalSwitch3Way(
                 state = voiceState.duoModSources[pairIndex],
                 onStateChange = {
-                    voiceViewModel.onDuoModSourceChange(pairIndex, it)
+                    voiceActions.onDuoModSourceChange(pairIndex, it)
                 },
                 color = color,
                 controlId = ControlIds.duoModSource(pairIndex)
@@ -103,21 +153,21 @@ fun DuoPairBox(
                     pairIndex = pairIndex,
                     tune = voiceState.voiceStates[voiceA].tune,
                     onTuneChange = {
-                        voiceViewModel.onVoiceTuneChange(
+                        voiceActions.onVoiceTuneChange(
                             voiceA,
                             it
                         )
                     },
                     modDepth = voiceState.voiceModDepths[voiceA],
                     onModDepthChange = {
-                        voiceViewModel.onDuoModDepthChange(
+                        voiceActions.onDuoModDepthChange(
                             pairIndex,
                             it
                         )
                     }, // Apply to both voices
                     envSpeed = voiceState.voiceEnvelopeSpeeds[voiceA],
                     onEnvSpeedChange = {
-                        voiceViewModel.onVoiceEnvelopeSpeedChange(
+                        voiceActions.onVoiceEnvelopeSpeedChange(
                             voiceA,
                             it
                         )
@@ -133,7 +183,7 @@ fun DuoPairBox(
                         voiceA + 1,
                         voiceState.voiceStates[voiceA].isHolding,
                         {
-                            voiceViewModel.onHoldChange(
+                            voiceActions.onHoldChange(
                                 voiceA,
                                 it
                             )
@@ -143,23 +193,23 @@ fun DuoPairBox(
                     PulseButton(
                         modifier = Modifier.offset(y = (-2).dp),
                         onPulseStart = {
-                            voiceViewModel.onPulseStart(
+                            voiceActions.onPulseStart(
                                 voiceA
                             )
                         },
                         onPulseEnd = {
-                            voiceViewModel.onPulseEnd(voiceA)
+                            voiceActions.onPulseEnd(voiceA)
                         },
                         size = 28.dp,
                         label = "",
                         isActive = voiceState.voiceStates[voiceA].pulse,
                         isLearnMode = midiState.isLearnModeActive,
                         isLearning =
-                            midiViewModel.isVoiceBeingLearned(
+                            isVoiceBeingLearned(
                                 voiceA
                             ),
                         onLearnSelect = {
-                            midiViewModel
+                            midiActions
                                 .selectVoiceForLearning(voiceA)
                         }
                     )
@@ -183,21 +233,21 @@ fun DuoPairBox(
                     pairIndex = pairIndex,
                     tune = voiceState.voiceStates[voiceB].tune,
                     onTuneChange = {
-                        voiceViewModel.onVoiceTuneChange(
+                        voiceActions.onVoiceTuneChange(
                             voiceB,
                             it
                         )
                     },
                     sharpness = voiceState.pairSharpness[pairIndex],
                     onSharpnessChange = {
-                        voiceViewModel.onPairSharpnessChange(
+                        voiceActions.onPairSharpnessChange(
                             pairIndex,
                             it
                         )
                     },
                     envSpeed = voiceState.voiceEnvelopeSpeeds[voiceB],
                     onEnvSpeedChange = {
-                        voiceViewModel.onVoiceEnvelopeSpeedChange(
+                        voiceActions.onVoiceEnvelopeSpeedChange(
                             voiceB,
                             it
                         )
@@ -213,8 +263,8 @@ fun DuoPairBox(
                         voiceB + 1,
                         voiceState.voiceStates[voiceB].isHolding,
                         {
-                            voiceViewModel.onHoldChange(
-                                voiceB,
+                            voiceActions.onHoldChange(
+                            voiceB,
                                 it
                             )
                         },
@@ -223,23 +273,23 @@ fun DuoPairBox(
                     PulseButton(
                         modifier = Modifier.offset(y = (-2).dp),
                         onPulseStart = {
-                            voiceViewModel.onPulseStart(
+                            voiceActions.onPulseStart(
                                 voiceB
                             )
                         },
                         onPulseEnd = {
-                            voiceViewModel.onPulseEnd(voiceB)
+                            voiceActions.onPulseEnd(voiceB)
                         },
                         size = 28.dp,
                         label = "",
                         isActive = voiceState.voiceStates[voiceB].pulse,
                         isLearnMode = midiState.isLearnModeActive,
                         isLearning =
-                            midiViewModel.isVoiceBeingLearned(
+                            isVoiceBeingLearned(
                                 voiceB
                             ),
                         onLearnSelect = {
-                            midiViewModel
+                            midiActions
                                 .selectVoiceForLearning(voiceB)
                         }
                     )

@@ -20,10 +20,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.features.midi.MidiUiState
+import org.balch.orpheus.features.midi.MidiViewModel
+import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
@@ -34,10 +38,63 @@ fun VoiceGroupSection(
     quadColor: Color,
     voiceStartIndex: Int,
     voiceViewModel: VoiceViewModel = metroViewModel(),
+    midiViewModel: MidiViewModel = metroViewModel(),
 ) {
     val voiceState by voiceViewModel.uiState.collectAsState()
+    val midiState by midiViewModel.uiState.collectAsState()
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
+
+    val voiceActions = object : VoiceActions {
+        override fun onDuoModSourceChange(pairIndex: Int, source: org.balch.orpheus.core.audio.ModSource) = voiceViewModel.onDuoModSourceChange(pairIndex, source)
+        override fun onVoiceTuneChange(index: Int, value: Float) = voiceViewModel.onVoiceTuneChange(index, value)
+        override fun onDuoModDepthChange(pairIndex: Int, value: Float) = voiceViewModel.onDuoModDepthChange(pairIndex, value)
+        override fun onVoiceEnvelopeSpeedChange(index: Int, value: Float) = voiceViewModel.onVoiceEnvelopeSpeedChange(index, value)
+        override fun onHoldChange(index: Int, holding: Boolean) = voiceViewModel.onHoldChange(index, holding)
+        override fun onPulseStart(index: Int) = voiceViewModel.onPulseStart(index)
+        override fun onPulseEnd(index: Int) = voiceViewModel.onPulseEnd(index)
+        override fun onPairSharpnessChange(pairIndex: Int, value: Float) = voiceViewModel.onPairSharpnessChange(pairIndex, value)
+        override fun onQuadPitchChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadPitchChange(quadIndex, value)
+        override fun onQuadHoldChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadHoldChange(quadIndex, value)
+        override fun onFmStructureChange(crossQuad: Boolean) = voiceViewModel.onFmStructureChange(crossQuad)
+        override fun onTotalFeedbackChange(value: Float) = voiceViewModel.onTotalFeedbackChange(value)
+        override fun onVibratoChange(value: Float) = voiceViewModel.onVibratoChange(value)
+        override fun onVoiceCouplingChange(value: Float) = voiceViewModel.onVoiceCouplingChange(value)
+        override fun onDialogActiveChange(active: Boolean) { /* Not used here */ }
+    }
+
+    val midiActions = object : MidiActions {
+        override fun selectVoiceForLearning(voiceIndex: Int) = midiViewModel.selectVoiceForLearning(voiceIndex)
+    }
+
+    VoiceGroupSectionLayout(
+        modifier = modifier,
+        quadLabel = quadLabel,
+        quadColor = quadColor,
+        voiceStartIndex = voiceStartIndex,
+        voiceState = voiceState,
+        midiState = midiState,
+        voiceActions = voiceActions,
+        midiActions = midiActions,
+        isVoiceBeingLearned = midiViewModel::isVoiceBeingLearned,
+        effects = effects
+    )
+}
+
+@Composable
+fun VoiceGroupSectionLayout(
+    modifier: Modifier = Modifier,
+    quadLabel: String,
+    quadColor: Color,
+    voiceStartIndex: Int,
+    voiceState: VoiceUiState,
+    midiState: MidiUiState,
+    voiceActions: VoiceActions,
+    midiActions: MidiActions,
+    isVoiceBeingLearned: (Int) -> Boolean,
+    effects: VisualizationLiquidEffects
+) {
+    val liquidState = LocalLiquidState.current
 
     // More varied duo colors for visual interest
     val duoColors =
@@ -80,7 +137,7 @@ fun VoiceGroupSection(
             RotaryKnob(
                 value = voiceState.quadGroupPitches[quadIndex],
                 onValueChange = {
-                    voiceViewModel.onQuadPitchChange(quadIndex, it)
+                    voiceActions.onQuadPitchChange(quadIndex, it)
                 },
                 label = "PITCH",
                 controlId = ControlIds.quadPitch(quadIndex),
@@ -90,7 +147,7 @@ fun VoiceGroupSection(
             RotaryKnob(
                 value = voiceState.quadGroupHolds[quadIndex],
                 onValueChange = {
-                    voiceViewModel.onQuadHoldChange(quadIndex, it)
+                    voiceActions.onQuadHoldChange(quadIndex, it)
                 },
                 label = "HOLD",
                 controlId = ControlIds.quadHold(quadIndex),
@@ -104,17 +161,27 @@ fun VoiceGroupSection(
             modifier = Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            DuoPairBox(
+            DuoPairBoxLayout(
                 voiceA = voiceStartIndex,
                 voiceB = voiceStartIndex + 1,
                 color = duoColors[0],
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                voiceState = voiceState,
+                midiState = midiState,
+                voiceActions = voiceActions,
+                midiActions = midiActions,
+                isVoiceBeingLearned = isVoiceBeingLearned
             )
-            DuoPairBox(
+            DuoPairBoxLayout(
                 voiceA = voiceStartIndex + 2,
                 voiceB = voiceStartIndex + 3,
                 color = duoColors[1],
-                modifier = Modifier.weight(1f).fillMaxHeight()
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                voiceState = voiceState,
+                midiState = midiState,
+                voiceActions = voiceActions,
+                midiActions = midiActions,
+                isVoiceBeingLearned = isVoiceBeingLearned
             )
         }
     }
