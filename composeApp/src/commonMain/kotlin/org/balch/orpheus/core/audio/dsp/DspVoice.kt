@@ -28,6 +28,7 @@ class DspVoice(
     private val vca = audioEngine.createMultiply()
     
     // Wobble: Real-time volume modulation from finger movement
+    private val wobbleRamp = audioEngine.createLinearRamp()  // Smooth parameter changes
     private val wobbleGain = audioEngine.createMultiply()
 
     // Envelope Follower for voice coupling
@@ -79,10 +80,11 @@ class DspVoice(
     /**
      * Set wobble multiplier for real-time volume modulation.
      * Called continuously during pulse button drag.
+     * Uses LinearRamp for click-free transitions.
      * @param multiplier Value around 1.0 (0.7-1.3 typical range for ±30%)
      */
     fun setWobbleMultiplier(multiplier: Double) {
-        wobbleGain.inputB.set(multiplier)
+        wobbleRamp.input.set(multiplier)
     }
 
     init {
@@ -96,6 +98,7 @@ class DspVoice(
         audioEngine.addUnit(sharpnessInverter)
         audioEngine.addUnit(ampEnv)
         audioEngine.addUnit(vca)
+        audioEngine.addUnit(wobbleRamp)
         audioEngine.addUnit(wobbleGain)
         audioEngine.addUnit(envelopeFollower)
         audioEngine.addUnit(couplingScaler)
@@ -187,7 +190,11 @@ class DspVoice(
 
         // Wire VCA output through wobbleGain for finger modulation
         vca.output.connect(wobbleGain.inputA)
-        wobbleGain.inputB.set(1.0) // Default: no wobble (1.0 = unity gain)
+        
+        // Configure wobble ramp (10ms for responsive but click-free transitions)
+        wobbleRamp.time.set(0.01)
+        wobbleRamp.input.set(1.0)  // Start at unity gain
+        wobbleRamp.output.connect(wobbleGain.inputB)
         
         // Wire wobbleGain output to envelope follower for coupling
         wobbleGain.output.connect(envelopeFollower.input)
