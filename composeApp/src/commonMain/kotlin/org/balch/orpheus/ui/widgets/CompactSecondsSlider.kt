@@ -41,7 +41,7 @@ import kotlin.math.roundToInt
 
 /**
  * Compact seconds slider derived from HorizontalEnvelopeSlider.
- * Used for timeline duration selection (10s to 120s).
+ * Used for sequencer duration selection (10s to 120s).
  */
 @Composable
 fun CompactSecondsSlider(

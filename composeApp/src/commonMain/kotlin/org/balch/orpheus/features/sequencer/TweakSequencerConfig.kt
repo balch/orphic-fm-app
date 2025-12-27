@@ -1,13 +1,13 @@
-package org.balch.orpheus.features.timeline
+package org.balch.orpheus.features.sequencer
 
 import androidx.compose.ui.graphics.Color
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 /**
- * All automatable parameters for the timeline system.
+ * All automatable parameters for the sequencer system.
  * Each parameter has a display label, category, and unique color with alpha.
  */
-enum class TweakTimelineParameter(
+enum class TweakSequencerParameter(
     val label: String,
     val category: String,
     val color: Color
@@ -40,16 +40,16 @@ enum class TweakTimelineParameter(
         const val MAX_SELECTED = 5
 
         /** Get all parameters grouped by category */
-        fun byCategory(): Map<String, List<TweakTimelineParameter>> =
+        fun byCategory(): Map<String, List<TweakSequencerParameter>> =
             entries.groupBy { it.category }
     }
 }
 
 /**
- * Playback mode for timeline automation.
+ * Playback mode for sequencer automation.
  */
 enum class TweakPlaybackMode {
-    /** Play timeline once from start to end, then stop */
+    /** Play sequencer once from start to end, then stop */
     ONCE,
 
     /** Repeat from start when reaching end */
@@ -60,18 +60,18 @@ enum class TweakPlaybackMode {
 }
 
 /**
- * Configuration for the parameter timeline automation.
+ * Configuration for the parameter sequencer automation.
  *
  * @param durationSeconds Total duration in seconds (10-120 range)
- * @param tweakPlaybackMode How the timeline loops/repeats
- * @param enabled Whether timeline automation is active
+ * @param tweakPlaybackMode How the sequencer loops/repeats
+ * @param enabled Whether sequencer automation is active
  * @param selectedParameters List of up to 5 parameters to automate
  */
-data class TweakTimelineConfig(
+data class TweakSequencerConfig(
     val durationSeconds: Float = 30f,
     val tweakPlaybackMode: TweakPlaybackMode = TweakPlaybackMode.LOOP,
     val enabled: Boolean = false,
-    val selectedParameters: List<TweakTimelineParameter> = emptyList()
+    val selectedParameters: List<TweakSequencerParameter> = emptyList()
 ) {
     companion object Companion {
         const val MIN_DURATION = 10f

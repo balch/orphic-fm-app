@@ -73,7 +73,7 @@ class VizViewModel(
             }
         }
         
-        // Subscribe to MIDI/Timeline control changes for viz knobs
+        // Subscribe to MIDI/Sequencer control changes for viz knobs
         viewModelScope.launch {
             midiRouter.value.onControlChange.collect { event ->
                 when (event.controlId) {

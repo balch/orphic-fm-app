@@ -88,8 +88,8 @@ class LfoViewModel(
                 }
             }
 
-            // Subscribe to MIDI/Timeline control changes for LFO controls
-            // Uses FromTimeline intents to skip engine call (source already applied)
+            // Subscribe to MIDI/Sequencer control changes for LFO controls
+            // Uses intents from sequencer to skip engine call (source already applied)
             launch {
                 midiRouter.value.onControlChange.collect { event ->
                     when (event.controlId) {

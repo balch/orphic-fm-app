@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.timeline.ui
+package org.balch.orpheus.features.sequencer.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -7,8 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -35,19 +33,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import org.balch.orpheus.features.timeline.TimelinePath
-import org.balch.orpheus.features.timeline.TimelinePoint
-import org.balch.orpheus.features.timeline.TweakPlaybackMode
-import org.balch.orpheus.features.timeline.TweakTimelineConfig
-import org.balch.orpheus.features.timeline.TweakTimelineParameter
-import org.balch.orpheus.features.timeline.TweakTimelineState
-import org.balch.orpheus.features.timeline.TweakTimelineViewModel
+import org.balch.orpheus.features.sequencer.SequencerPath
+import org.balch.orpheus.features.sequencer.SequencerPoint
+import org.balch.orpheus.features.sequencer.TweakSequencerConfig
+import org.balch.orpheus.features.sequencer.TweakSequencerParameter
+import org.balch.orpheus.features.sequencer.TweakSequencerState
+import org.balch.orpheus.features.sequencer.TweakSequencerViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.CompactSecondsSlider
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
- * Full-screen expanded editor for multi-parameter timeline automation.
+ * Full-screen expanded editor for multi-parameter sequencer automation.
  *
  * Layout:
  * - Header: Enable toggle, cancel/save buttons
@@ -57,19 +54,17 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * - Drawing Canvas: Draw/edit the selected parameter's path
  */
 @Composable
-fun ExpandedTweakTimelineScreen(
+fun ExpandedTweakSequencerScreen(
     onDismiss: (Boolean) -> Unit,
-    viewModel: TweakTimelineViewModel = metroViewModel(),
+    viewModel: TweakSequencerViewModel = metroViewModel(),
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    ExpandedTweakTimelineLayout(
-        state = uiState.timeline,
+    ExpandedTweakSequencerLayout(
+        state = uiState.sequencer,
         activeParameter = uiState.activeParameter,
         onDurationChange = { viewModel.setDuration(it) },
-        onPlaybackModeChange = { viewModel.setPlaybackMode(it) },
-        onEnabledChange = { viewModel.setEnabled(it) },
         onAddParameter = { viewModel.addParameter(it) },
         onRemoveParameter = { viewModel.removeParameter(it) },
         onSelectActiveParameter = { viewModel.selectActiveParameter(it) },
@@ -91,20 +86,18 @@ fun ExpandedTweakTimelineScreen(
 }
 
 @Composable
-fun ExpandedTweakTimelineLayout(
-    state: TweakTimelineState,
-    activeParameter: TweakTimelineParameter?,
+fun ExpandedTweakSequencerLayout(
+    state: TweakSequencerState,
+    activeParameter: TweakSequencerParameter?,
     onDurationChange: (Float) -> Unit,
-    onPlaybackModeChange: (TweakPlaybackMode) -> Unit,
-    onEnabledChange: (Boolean) -> Unit,
-    onAddParameter: (TweakTimelineParameter) -> Unit,
-    onRemoveParameter: (TweakTimelineParameter) -> Unit,
-    onSelectActiveParameter: (TweakTimelineParameter?) -> Unit,
-    onPathStarted: (TweakTimelineParameter, TimelinePoint) -> Unit,
-    onPointAdded: (TweakTimelineParameter, TimelinePoint) -> Unit,
-    onPointsRemovedAfter: (TweakTimelineParameter, Float) -> Unit,
-    onPathCompleted: (TweakTimelineParameter, Float) -> Unit,
-    onClearPath: (TweakTimelineParameter) -> Unit,
+    onAddParameter: (TweakSequencerParameter) -> Unit,
+    onRemoveParameter: (TweakSequencerParameter) -> Unit,
+    onSelectActiveParameter: (TweakSequencerParameter?) -> Unit,
+    onPathStarted: (TweakSequencerParameter, SequencerPoint) -> Unit,
+    onPointAdded: (TweakSequencerParameter, SequencerPoint) -> Unit,
+    onPointsRemovedAfter: (TweakSequencerParameter, Float) -> Unit,
+    onPathCompleted: (TweakSequencerParameter, Float) -> Unit,
+    onClearPath: (TweakSequencerParameter) -> Unit,
     onSave: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
@@ -131,7 +124,7 @@ fun ExpandedTweakTimelineLayout(
         ) {
             // Title (Left)
             Text(
-                text = "Tweak Timeline",
+                text = "Tweak Seq",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = accentColor
@@ -220,7 +213,7 @@ fun ExpandedTweakTimelineLayout(
                          verticalArrangement = Arrangement.spacedBy(2.dp),
                          modifier = Modifier.verticalScroll(rememberScrollState())
                      ) {
-                         TweakTimelineParameter.entries.forEach { param ->
+                         TweakSequencerParameter.entries.forEach { param ->
                              val isIncluded = param in state.config.selectedParameters
                              val isSelected = activeParameter == param
                              val hasPath = state.paths[param]?.points?.isNotEmpty() == true
@@ -234,7 +227,7 @@ fun ExpandedTweakTimelineLayout(
                                         if (isIncluded) {
                                             onSelectActiveParameter(param)
                                         } else {
-                                            if (state.config.selectedParameters.size < TweakTimelineParameter.MAX_SELECTED) {
+                                            if (state.config.selectedParameters.size < TweakSequencerParameter.MAX_SELECTED) {
                                                 onAddParameter(param)
                                                 onSelectActiveParameter(param)
                                             }
@@ -257,7 +250,7 @@ fun ExpandedTweakTimelineLayout(
                                                       onRemoveParameter(param)
                                                       onClearPath(param)
                                                   }
-                                                  else if (state.config.selectedParameters.size < TweakTimelineParameter.MAX_SELECTED) {
+                                                  else if (state.config.selectedParameters.size < TweakSequencerParameter.MAX_SELECTED) {
                                                        onAddParameter(param)
                                                        onSelectActiveParameter(param)
                                                   }
@@ -359,7 +352,7 @@ fun ExpandedTweakTimelineLayout(
                     .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
             ) {
                 if (activeParameter != null) {
-                     TimelineDrawingCanvas(
+                     SequencerDrawingCanvas(
                         paths = state.paths,
                         activeParameter = activeParameter,
                         currentPosition = state.currentPosition,
@@ -391,214 +384,39 @@ fun ExpandedTweakTimelineLayout(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ParameterPicker(
-    selectedParameters: List<TweakTimelineParameter>,
-    onAddParameter: (TweakTimelineParameter) -> Unit,
-    onRemoveParameter: (TweakTimelineParameter) -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = "Parameters (${selectedParameters.size}/${TweakTimelineParameter.MAX_SELECTED})",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.7f)
-        )
-
-        // Group by category
-        TweakTimelineParameter.byCategory().forEach { (category, params) ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "$category:",
-                    fontSize = 10.sp,
-                    color = Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier.width(40.dp)
-                )
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    params.forEach { param ->
-                        val isSelected = param in selectedParameters
-                        val canAdd = selectedParameters.size < TweakTimelineParameter.MAX_SELECTED
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(if (isSelected) param.color.copy(alpha = 0.3f) else Color(0xFF2A2A3A))
-                                .border(1.dp, param.color.copy(alpha = if (isSelected) 0.6f else 0.3f), RoundedCornerShape(4.dp))
-                                .clickable(enabled = isSelected || canAdd) {
-                                    if (isSelected) onRemoveParameter(param)
-                                    else onAddParameter(param)
-                                }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = param.label,
-                                fontSize = 9.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected || canAdd) param.color else param.color.copy(alpha = 0.4f)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActiveParameterSelector(
-    selectedParameters: List<TweakTimelineParameter>,
-    activeParameter: TweakTimelineParameter?,
-    onSelect: (TweakTimelineParameter?) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A2A))
-            .border(1.dp, OrpheusColors.neonCyan.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        selectedParameters.forEach { param ->
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(if (activeParameter == param) param.color.copy(alpha = 0.3f) else Color.Transparent)
-                    .clickable { onSelect(param) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = param.label,
-                    fontSize = 11.sp,
-                    fontWeight = if (activeParameter == param) FontWeight.Bold else FontWeight.Normal,
-                    color = if (activeParameter == param) param.color else param.color.copy(alpha = 0.6f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EnableToggle(
-    enabled: Boolean,
-    onEnabledChange: (Boolean) -> Unit,
-    color: Color
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A2A))
-            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        listOf("OFF" to false, "ON" to true).forEach { (label, value) ->
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(if (enabled == value) color.copy(alpha = 0.3f) else Color.Transparent)
-                    .clickable { onEnabledChange(value) }
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    fontSize = 10.sp,
-                    fontWeight = if (enabled == value) FontWeight.Bold else FontWeight.Normal,
-                    color = if (enabled == value) color else color.copy(alpha = 0.5f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlaybackModeSelector(
-    mode: TweakPlaybackMode,
-    onModeChange: (TweakPlaybackMode) -> Unit,
-    color: Color
-) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A2A))
-            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        TweakPlaybackMode.entries.forEach { m ->
-            val label = when (m) {
-                TweakPlaybackMode.ONCE -> "→"
-                TweakPlaybackMode.LOOP -> "⟳"
-                TweakPlaybackMode.PING_PONG -> "↔"
-            }
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(if (mode == m) color.copy(alpha = 0.3f) else Color.Transparent)
-                    .clickable { onModeChange(m) }
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = label,
-                    fontSize = 14.sp,
-                    fontWeight = if (mode == m) FontWeight.Bold else FontWeight.Normal,
-                    color = if (mode == m) color else color.copy(alpha = 0.5f)
-                )
-            }
-        }
-    }
-}
-
 @Preview(widthDp = 800, heightDp = 600)
 @Composable
-private fun ExpandedTweakTimelineScreenPreview() {
-    val samplePath = TimelinePath(
+private fun ExpandedTweakSequencerScreenPreview() {
+    val samplePath = SequencerPath(
         points = listOf(
-            TimelinePoint(0f, 0.5f),
-            TimelinePoint(0.3f, 0.8f),
-            TimelinePoint(0.6f, 0.2f),
-            TimelinePoint(1f, 0.6f)
+            SequencerPoint(0f, 0.5f),
+            SequencerPoint(0.3f, 0.8f),
+            SequencerPoint(0.6f, 0.2f),
+            SequencerPoint(1f, 0.6f)
         ),
         isComplete = true
     )
 
-    ExpandedTweakTimelineLayout(
-        state = TweakTimelineState(
-            config = TweakTimelineConfig(
+    ExpandedTweakSequencerLayout(
+        state = TweakSequencerState(
+            config = TweakSequencerConfig(
                 enabled = true,
                 durationSeconds = 45f,
                 selectedParameters = listOf(
-                    TweakTimelineParameter.LFO_FREQ_A,
-                    TweakTimelineParameter.DELAY_TIME_1,
-                    TweakTimelineParameter.DIST_DRIVE
+                    TweakSequencerParameter.LFO_FREQ_A,
+                    TweakSequencerParameter.DELAY_TIME_1,
+                    TweakSequencerParameter.DIST_DRIVE
                 )
             ),
             paths = mapOf(
-                TweakTimelineParameter.LFO_FREQ_A to samplePath,
-                TweakTimelineParameter.DELAY_TIME_1 to TimelinePath(),
-                TweakTimelineParameter.DIST_DRIVE to TimelinePath()
+                TweakSequencerParameter.LFO_FREQ_A to samplePath,
+                TweakSequencerParameter.DELAY_TIME_1 to SequencerPath(),
+                TweakSequencerParameter.DIST_DRIVE to SequencerPath()
             ),
             currentPosition = 0.4f
         ),
-        activeParameter = TweakTimelineParameter.LFO_FREQ_A,
+        activeParameter = TweakSequencerParameter.LFO_FREQ_A,
         onDurationChange = {},
-        onPlaybackModeChange = {},
-        onEnabledChange = {},
         onAddParameter = {},
         onRemoveParameter = {},
         onSelectActiveParameter = {},

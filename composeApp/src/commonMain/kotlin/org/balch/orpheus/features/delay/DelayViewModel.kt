@@ -100,8 +100,8 @@ class DelayViewModel(
                 }
             }
 
-            // Subscribe to MIDI/Timeline control changes for Delay controls
-            // Uses FromTimeline intents to skip engine call (source already applied)
+            // Subscribe to MIDI/Sequencer control changes for Delay controls
+            // Uses intents from sequencer to skip engine call (source already applied)
             launch {
                 midiRouter.value.onControlChange.collect { event ->
                     when (event.controlId) {

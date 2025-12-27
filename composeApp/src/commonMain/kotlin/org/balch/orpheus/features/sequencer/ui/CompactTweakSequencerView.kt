@@ -1,16 +1,16 @@
-package org.balch.orpheus.features.timeline.ui
+package org.balch.orpheus.features.sequencer.ui
 
 /**
- * Compact inline view for multi-parameter timeline automation.
+ * Compact inline view for multi-parameter sequencer automation.
  *
  * Shows:
  * - Play/Pause toggle button
  * - Stop button
  * - Time remaining display
- * - Mini timeline preview with all paths (click to expand)
+ * - Mini sequencer preview with all paths (click to expand)
  * - Clickable legend for parameter identification
  *
- * @param state Current timeline state with all paths
+ * @param state Current sequencer state with all paths
  * @param onPlayPause Called when play/pause is toggled
  * @param onStop Called when stop is pressed
  * @param onExpand Called when mini preview is tapped
@@ -43,35 +43,35 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.features.timeline.TimelinePath
-import org.balch.orpheus.features.timeline.TimelinePoint
-import org.balch.orpheus.features.timeline.TweakPlaybackMode
-import org.balch.orpheus.features.timeline.TweakTimelineConfig
-import org.balch.orpheus.features.timeline.TweakTimelineParameter
-import org.balch.orpheus.features.timeline.TweakTimelineState
+import org.balch.orpheus.features.sequencer.SequencerPath
+import org.balch.orpheus.features.sequencer.SequencerPoint
+import org.balch.orpheus.features.sequencer.TweakPlaybackMode
+import org.balch.orpheus.features.sequencer.TweakSequencerConfig
+import org.balch.orpheus.features.sequencer.TweakSequencerParameter
+import org.balch.orpheus.features.sequencer.TweakSequencerState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
- * Compact inline view for multi-parameter timeline automation.
+ * Compact inline view for multi-parameter sequencer automation.
  *
  * Shows:
  * - Play/Pause toggle button
  * - Stop button
  * - Time remaining display
- * - Mini timeline preview with all paths (click to expand)
+ * - Mini sequencer preview with all paths (click to expand)
  * - Clickable legend for parameter identification
  *
- * @param state Current timeline state with all paths
+ * @param state Current sequencer state with all paths
  * @param onPlayPause Called when play/pause is toggled
  * @param onStop Called when stop is pressed
  * @param onExpand Called when mini preview is tapped
  */
 @Composable
-fun CompactTweakTimelineView(
-    state: TweakTimelineState,
+fun CompactTweakSequencerView(
+    state: TweakSequencerState,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     onPlayPause: () -> Unit,
@@ -194,8 +194,8 @@ fun CompactTweakTimelineView(
                 }
             }
 
-            // Mini timeline preview (tap to expand)
-            MultiPathTimelinePreview(
+            // Mini sequencer preview (tap to expand)
+            MultiPathSequencerPreview(
                 paths = state.paths,
                 currentPosition = state.currentPosition,
                 enabled = isActive,
@@ -209,11 +209,11 @@ fun CompactTweakTimelineView(
 }
 
 /**
- * Miniature timeline preview showing all paths with their colors.
+ * Miniature sequencer preview showing all paths with their colors.
  */
 @Composable
-private fun MultiPathTimelinePreview(
-    paths: Map<TweakTimelineParameter, TimelinePath>,
+private fun MultiPathSequencerPreview(
+    paths: Map<TweakSequencerParameter, SequencerPath>,
     currentPosition: Float,
     enabled: Boolean,
     liquidState: LiquidState?,
@@ -285,7 +285,7 @@ private fun MultiPathTimelinePreview(
  */
 @Composable
 private fun ParameterLegend(
-    parameters: List<TweakTimelineParameter>,
+    parameters: List<TweakSequencerParameter>,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -320,34 +320,34 @@ private fun ParameterLegend(
 
 @Preview(heightDp = 240)
 @Composable
-private fun CompactTweakTimelineViewPreview() {
-    val samplePath = TimelinePath(
+private fun CompactTweakSequencerViewPreview() {
+    val samplePath = SequencerPath(
         points = listOf(
-            TimelinePoint(0f, 0.5f),
-            TimelinePoint(0.3f, 0.8f),
-            TimelinePoint(0.6f, 0.2f),
-            TimelinePoint(1f, 0.6f)
+            SequencerPoint(0f, 0.5f),
+            SequencerPoint(0.3f, 0.8f),
+            SequencerPoint(0.6f, 0.2f),
+            SequencerPoint(1f, 0.6f)
         ),
         isComplete = true
     )
 
-    CompactTweakTimelineView(
-        state = TweakTimelineState(
-            config = TweakTimelineConfig(
+    CompactTweakSequencerView(
+        state = TweakSequencerState(
+            config = TweakSequencerConfig(
                 enabled = true,
                 selectedParameters = listOf(
-                    TweakTimelineParameter.LFO_FREQ_A,
-                    TweakTimelineParameter.DELAY_TIME_1,
-                    TweakTimelineParameter.DIST_DRIVE
+                    TweakSequencerParameter.LFO_FREQ_A,
+                    TweakSequencerParameter.DELAY_TIME_1,
+                    TweakSequencerParameter.DIST_DRIVE
                 )
             ),
             paths = mapOf(
-                TweakTimelineParameter.LFO_FREQ_A to samplePath,
-                TweakTimelineParameter.DELAY_TIME_1 to TimelinePath(
-                    points = listOf(TimelinePoint(0f, 0.2f), TimelinePoint(1f, 0.9f)),
+                TweakSequencerParameter.LFO_FREQ_A to samplePath,
+                TweakSequencerParameter.DELAY_TIME_1 to SequencerPath(
+                    points = listOf(SequencerPoint(0f, 0.2f), SequencerPoint(1f, 0.9f)),
                     isComplete = true
                 ),
-                TweakTimelineParameter.DIST_DRIVE to TimelinePath()
+                TweakSequencerParameter.DIST_DRIVE to SequencerPath()
             ),
             currentPosition = 0.4f,
             isPlaying = true
@@ -364,10 +364,10 @@ private fun CompactTweakTimelineViewPreview() {
 
 @Preview(heightDp = 240)
 @Composable
-private fun CompactTweakTimelineViewDisabledPreview() {
-    CompactTweakTimelineView(
-        state = TweakTimelineState(
-            config = TweakTimelineConfig(enabled = false),
+private fun CompactTweakSequencerViewDisabledPreview() {
+    CompactTweakSequencerView(
+        state = TweakSequencerState(
+            config = TweakSequencerConfig(enabled = false),
             paths = emptyMap(),
             currentPosition = 0f,
             isPlaying = false

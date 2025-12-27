@@ -32,11 +32,11 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.timeline.TweakTimelineUiState
-import org.balch.orpheus.features.timeline.TweakTimelineViewModel
-import org.balch.orpheus.features.timeline.TweakPlaybackMode
-import org.balch.orpheus.features.timeline.ui.CompactTweakTimelineView
-import org.balch.orpheus.features.timeline.ui.ExpandedTweakTimelineScreen
+import org.balch.orpheus.features.sequencer.TweakPlaybackMode
+import org.balch.orpheus.features.sequencer.TweakSequencerUiState
+import org.balch.orpheus.features.sequencer.TweakSequencerViewModel
+import org.balch.orpheus.features.sequencer.ui.CompactTweakSequencerView
+import org.balch.orpheus.features.sequencer.ui.ExpandedTweakSequencerScreen
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -70,12 +70,12 @@ fun CompactLandscapeScreen(
     voiceViewModel: VoiceViewModel = metroViewModel(),
     presetViewModel: PresetsViewModel = metroViewModel(),
     vizViewModel: VizViewModel = metroViewModel(),
-    timelineViewModel: TweakTimelineViewModel = metroViewModel(),
+    sequencerViewModel: TweakSequencerViewModel = metroViewModel(),
 ) {
     val voiceState by voiceViewModel.uiState.collectAsState()
     val presetState by presetViewModel.uiState.collectAsState()
     val vizState by vizViewModel.uiState.collectAsState()
-    val timelineState by timelineViewModel.uiState.collectAsState()
+    val sequencerState by sequencerViewModel.uiState.collectAsState()
 
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
@@ -86,7 +86,7 @@ fun CompactLandscapeScreen(
             presetState = presetState,
             voiceState = voiceState,
             vizState = vizState,
-            timelineState = timelineState,
+            sequencerState = sequencerState,
             liquidState = liquidState,
             effects = effects,
             onPresetSelect = { presetViewModel.applyPreset(it) },
@@ -99,10 +99,10 @@ fun CompactLandscapeScreen(
             onQuadPitchChange = { i, v -> voiceViewModel.onQuadPitchChange(i, v) },
             onQuadHoldChange = { i, v -> voiceViewModel.onQuadHoldChange(i, v) },
             onMasterVolumeChange = { v -> voiceViewModel.onMasterVolumeChange(v) },
-            onTimelinePlayPause = { timelineViewModel.togglePlayPause() },
-            onTimelineStop = { timelineViewModel.stop() },
-            onTimelinePlaybackModeChange = { timelineViewModel.setPlaybackMode(it) },
-            onTimelineExpand = { timelineViewModel.expand() },
+            onSequencerPlayPause = { sequencerViewModel.togglePlayPause() },
+            onSequencerStop = { sequencerViewModel.stop() },
+            onSequencerPlaybackModeChange = { sequencerViewModel.setPlaybackMode(it) },
+            onSequencerExpand = { sequencerViewModel.expand() },
             onKeyEvent = { event, isDialogActive ->
                 SynthKeyboardHandler.handleKeyEvent(
                     keyEvent = event,
@@ -113,19 +113,19 @@ fun CompactLandscapeScreen(
             }
         )
         
-        // Expanded Timeline Screen Overlay
-        if (timelineState.isExpanded) {
+        // Expanded Sequencer Screen Overlay
+        if (sequencerState.isExpanded) {
             Dialog(
-                onDismissRequest = { timelineViewModel.cancel() },
+                onDismissRequest = { sequencerViewModel.cancel() },
                 properties = DialogProperties(
                     usePlatformDefaultWidth = false,
                     dismissOnBackPress = true,
                     dismissOnClickOutside = true
                 )
             ) {
-                ExpandedTweakTimelineScreen(
+                ExpandedTweakSequencerScreen(
                     onDismiss = { },
-                    viewModel = timelineViewModel,
+                    viewModel = sequencerViewModel,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -139,7 +139,7 @@ private fun CompactLandscapeLayout(
     presetState: PresetUiState,
     voiceState: VoiceUiState,
     vizState: VizUiState,
-    timelineState: TweakTimelineUiState,
+    sequencerState: TweakSequencerUiState,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     onPresetSelect: (org.balch.orpheus.core.presets.DronePreset) -> Unit,
@@ -152,10 +152,10 @@ private fun CompactLandscapeLayout(
     onQuadPitchChange: (Int, Float) -> Unit,
     onQuadHoldChange: (Int, Float) -> Unit,
     onMasterVolumeChange: (Float) -> Unit,
-    onTimelinePlayPause: () -> Unit,
-    onTimelineStop: () -> Unit,
-    onTimelinePlaybackModeChange: (TweakPlaybackMode) -> Unit,
-    onTimelineExpand: () -> Unit,
+    onSequencerPlayPause: () -> Unit,
+    onSequencerStop: () -> Unit,
+    onSequencerPlaybackModeChange: (TweakPlaybackMode) -> Unit,
+    onSequencerExpand: () -> Unit,
     onKeyEvent: (androidx.compose.ui.input.key.KeyEvent, Boolean) -> Boolean,
 ) {
     val shape = RoundedCornerShape(12.dp)
@@ -226,12 +226,12 @@ private fun CompactLandscapeLayout(
             }
 
 
-            CompactTweakTimelineView(
-                state = timelineState.timeline,
-                onPlayPause = onTimelinePlayPause,
-                onStop = onTimelineStop,
-                onPlaybackModeChange = onTimelinePlaybackModeChange,
-                onExpand = onTimelineExpand,
+            CompactTweakSequencerView(
+                state = sequencerState.sequencer,
+                onPlayPause = onSequencerPlayPause,
+                onStop = onSequencerStop,
+                onPlaybackModeChange = onSequencerPlaybackModeChange,
+                onExpand = onSequencerExpand,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier
@@ -359,7 +359,7 @@ private fun CompactLandscapeLayoutPreview(
                     visualizations = listOf(org.balch.orpheus.features.viz.OffViz()),
                     showKnobs = false
                 ),
-                timelineState = TweakTimelineUiState(),
+                sequencerState = TweakSequencerUiState(),
                 liquidState = liquidState,
                 effects = effects,
                 onPresetSelect = {},
@@ -372,10 +372,10 @@ private fun CompactLandscapeLayoutPreview(
                 onQuadPitchChange = { _, _ -> },
                 onQuadHoldChange = { _, _ -> },
                 onMasterVolumeChange = { _ -> },
-                onTimelinePlayPause = {},
-                onTimelineStop = {},
-                onTimelinePlaybackModeChange = {},
-                onTimelineExpand = {},
+                onSequencerPlayPause = {},
+                onSequencerStop = {},
+                onSequencerPlaybackModeChange = {},
+                onSequencerExpand = {},
                 onKeyEvent = { _, _ -> false }
             )
         }

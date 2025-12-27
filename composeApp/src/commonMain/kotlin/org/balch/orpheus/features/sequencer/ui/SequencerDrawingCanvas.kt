@@ -1,24 +1,20 @@
-package org.balch.orpheus.features.timeline.ui
+package org.balch.orpheus.features.sequencer.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -30,12 +26,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.features.timeline.TimelinePath
-import org.balch.orpheus.features.timeline.TimelinePoint
-import org.balch.orpheus.features.timeline.TweakTimelineParameter
+import org.balch.orpheus.features.sequencer.SequencerPath
+import org.balch.orpheus.features.sequencer.SequencerPoint
+import org.balch.orpheus.features.sequencer.TweakSequencerParameter
 
 /**
- * Canvas for drawing timeline automation paths.
+ * Canvas for drawing sequencer automation paths.
  *
  * Touch gestures:
  * - When first touching an empty path: draws horizontal line from start to touch point
@@ -43,9 +39,9 @@ import org.balch.orpheus.features.timeline.TweakTimelineParameter
  * - Moving backward (right to left): removes points after the touch position
  * - Lifting finger: draws horizontal line from last point to end (completes path)
  *
- * @param path The current timeline path to display
+ * @param paths Map of all sequencer paths to display
+ * @param activeParameter The currently selected parameter for drawing
  * @param currentPosition Current playhead position (0.0 to 1.0)
- * @param color Color for the path line
  * @param onPathStarted Called when drawing starts on an empty path
  * @param onPointAdded Called when a new point is added
  * @param onPointsRemovedAfter Called when points after a position should be removed
@@ -53,12 +49,12 @@ import org.balch.orpheus.features.timeline.TweakTimelineParameter
  * @param enabled Whether drawing is enabled
  */
 @Composable
-fun TimelineDrawingCanvas(
-    paths: Map<TweakTimelineParameter, TimelinePath>,
-    activeParameter: TweakTimelineParameter?,
+fun SequencerDrawingCanvas(
+    paths: Map<TweakSequencerParameter, SequencerPath>,
+    activeParameter: TweakSequencerParameter?,
     currentPosition: Float,
-    onPathStarted: (TimelinePoint) -> Unit,
-    onPointAdded: (TimelinePoint) -> Unit,
+    onPathStarted: (SequencerPoint) -> Unit,
+    onPointAdded: (SequencerPoint) -> Unit,
     onPointsRemovedAfter: (Float) -> Unit,
     onPathCompleted: (Float) -> Unit,
     enabled: Boolean = true,
@@ -71,7 +67,7 @@ fun TimelineDrawingCanvas(
     var isDrawing by remember { mutableStateOf(false) }
     
     // Determine active path/color for interaction
-    val activePath = if (activeParameter != null) paths[activeParameter] ?: TimelinePath() else TimelinePath()
+    val activePath = if (activeParameter != null) paths[activeParameter] ?: SequencerPath() else SequencerPath()
     val activeColor = activeParameter?.color ?: Color.White
 
     // Main Canvas Box with labels inside
@@ -112,14 +108,14 @@ fun TimelineDrawingCanvas(
 
                             if (activePath.points.isEmpty()) {
                                 // Starting fresh - draw line from start to touch
-                                onPathStarted(TimelinePoint(time, value))
+                                onPathStarted(SequencerPoint(time, value))
                             } else {
                                 // Already have points - add or remove based on position
                                 val lastTime = activePath.points.lastOrNull()?.time ?: 0f
                                 if (time < lastTime) {
                                     onPointsRemovedAfter(time)
                                 }
-                                onPointAdded(TimelinePoint(time, value))
+                                onPointAdded(SequencerPoint(time, value))
                             }
                             lastDrawnTime = time
                             lastDrawnValue = value
@@ -132,7 +128,7 @@ fun TimelineDrawingCanvas(
                                 // Moving backward - remove points
                                 onPointsRemovedAfter(time)
                             }
-                            onPointAdded(TimelinePoint(time, value))
+                            onPointAdded(SequencerPoint(time, value))
                             lastDrawnTime = time
                             lastDrawnValue = value
                             change.consume()
@@ -165,18 +161,18 @@ fun TimelineDrawingCanvas(
             }
 
             // Helper to draw a path
-            fun drawTimelinePath(timelinePath: TimelinePath, color: Color, isActive: Boolean) {
-                if (timelinePath.points.isEmpty()) return
+            fun drawSequencerPath(sequencerPath: SequencerPath, color: Color, isActive: Boolean) {
+                if (sequencerPath.points.isEmpty()) return
                 
                 val pathDraw = Path()
                 
-                if (timelinePath.points.size > 1) {
-                    val firstPoint = timelinePath.points.first()
+                if (sequencerPath.points.size > 1) {
+                    val firstPoint = sequencerPath.points.first()
                     pathDraw.moveTo(firstPoint.time * width, (1f - firstPoint.value) * height)
                     
-                    for (i in 0 until timelinePath.points.size - 1) {
-                        val p0 = timelinePath.points[i]
-                        val p1 = timelinePath.points[i + 1]
+                    for (i in 0 until sequencerPath.points.size - 1) {
+                        val p0 = sequencerPath.points[i]
+                        val p1 = sequencerPath.points[i + 1]
                         
                         val x0 = p0.time * width
                         val y0 = (1f - p0.value) * height
@@ -193,7 +189,7 @@ fun TimelineDrawingCanvas(
                         )
                     }
                 } else {
-                    val p = timelinePath.points.first()
+                    val p = sequencerPath.points.first()
                     pathDraw.moveTo(p.time * width, (1f - p.value) * height)
                     pathDraw.lineTo(p.time * width, (1f - p.value) * height) // Just a dot
                 }
@@ -210,7 +206,7 @@ fun TimelineDrawingCanvas(
 
                 // Draw points only for active path
                 if (isActive) {
-                    for (point in timelinePath.points) {
+                    for (point in sequencerPath.points) {
                         val x = point.time * width
                         val y = (1f - point.value) * height
                         drawCircle(
@@ -225,13 +221,13 @@ fun TimelineDrawingCanvas(
             // 1. Draw Inactive Paths first
             paths.forEach { (param, path) ->
                 if (param != activeParameter) {
-                    drawTimelinePath(path, param.color, isActive = false)
+                    drawSequencerPath(path, param.color, isActive = false)
                 }
             }
 
             // 2. Draw Active Path last (on top)
             if (activeParameter != null) {
-                drawTimelinePath(activePath, activeColor, isActive = true)
+                drawSequencerPath(activePath, activeColor, isActive = true)
             }
 
             // Draw playhead (vertical line at current position)

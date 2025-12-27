@@ -1,12 +1,12 @@
-package org.balch.orpheus.features.timeline
+package org.balch.orpheus.features.sequencer
 
 /**
- * A single point on a timeline automation path.
+ * A single point on a sequencer automation path.
  *
- * @param time Normalized position on timeline (0.0 = start, 1.0 = end)
+ * @param time Normalized position on sequencer (0.0 = start, 1.0 = end)
  * @param value Normalized parameter value (0.0 to 1.0)
  */
-data class TimelinePoint(
+data class SequencerPoint(
     val time: Float,
     val value: Float
 )
@@ -17,8 +17,8 @@ data class TimelinePoint(
  * @param points Ordered list of points from start to end
  * @param isComplete True if path has been finalized (connected to end)
  */
-data class TimelinePath(
-    val points: List<TimelinePoint> = emptyList(),
+data class SequencerPath(
+    val points: List<SequencerPoint> = emptyList(),
     val isComplete: Boolean = false
 ) {
     /**
@@ -56,7 +56,7 @@ data class TimelinePath(
      * Create a new path with a point added at the correct position.
      * If the point's time is before existing points, those points are removed.
      */
-    fun withPointAdded(point: TimelinePoint): TimelinePath {
+    fun withPointAdded(point: SequencerPoint): SequencerPath {
         // Remove any points at or after this time
         val filtered = points.filter { it.time < point.time }
         return copy(
@@ -68,7 +68,7 @@ data class TimelinePath(
     /**
      * Remove all points after the given time.
      */
-    fun withPointsRemovedAfter(time: Float): TimelinePath {
+    fun withPointsRemovedAfter(time: Float): SequencerPath {
         return copy(
             points = points.filter { it.time <= time },
             isComplete = false
@@ -78,7 +78,7 @@ data class TimelinePath(
     /**
      * Complete the path by extending to the end with the last value.
      */
-    fun completed(endValue: Float? = null): TimelinePath {
+    fun completed(endValue: Float? = null): SequencerPath {
         if (points.isEmpty()) return this
 
         val lastPoint = points.last()
@@ -91,7 +91,7 @@ data class TimelinePath(
 
         // Add end point
         return copy(
-            points = points + TimelinePoint(time = 1.0f, value = finalValue),
+            points = points + SequencerPoint(time = 1.0f, value = finalValue),
             isComplete = true
         )
     }
@@ -99,8 +99,8 @@ data class TimelinePath(
     /**
      * Start a new path from the beginning, connecting to the touch point.
      */
-    fun startedAt(point: TimelinePoint): TimelinePath {
-        val startPoint = TimelinePoint(time = 0f, value = point.value)
+    fun startedAt(point: SequencerPoint): SequencerPath {
+        val startPoint = SequencerPoint(time = 0f, value = point.value)
         return copy(
             points = listOf(startPoint, point),
             isComplete = false
@@ -111,10 +111,10 @@ data class TimelinePath(
      * Applies a simple smoothing algorithm to the path to reduce jaggedness
      * while retaining the overall shape.
      */
-    fun smoothed(): TimelinePath {
+    fun smoothed(): SequencerPath {
         if (points.size < 3) return this
 
-        val newPoints = ArrayList<TimelinePoint>(points.size)
+        val newPoints = ArrayList<SequencerPoint>(points.size)
         newPoints.add(points.first()) // Keep start anchor
 
         // 3-point moving average for inner points
