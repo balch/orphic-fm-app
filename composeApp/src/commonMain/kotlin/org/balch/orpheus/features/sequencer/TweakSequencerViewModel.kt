@@ -20,6 +20,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.midi.MidiEventOrigin
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.util.currentTimeMillis
@@ -256,9 +257,33 @@ class TweakSequencerViewModel(
         val state = uiState.value.sequencer
         if (!state.config.enabled) return
         
-        // NOTE: Audio-rate automation is currently disabled in DspSynthEngine.
-        // The sequencer drives parameters via MidiRouter events at ~30fps.
-        // See .agent/tasks/audio_automation_redesign.md for future audio-rate implementation.
+        // Push DSP automation to engine for audio-rate precision
+        val mode = when (state.config.tweakPlaybackMode) {
+            TweakPlaybackMode.ONCE -> 0
+            TweakPlaybackMode.LOOP -> 1
+            TweakPlaybackMode.PING_PONG -> 2
+        }
+        
+        state.paths.forEach { (param, path) ->
+            if (isDspParam(param) && path.points.isNotEmpty()) {
+                getControlId(param)?.let { id ->
+                    val times = FloatArray(path.points.size)
+                    val values = FloatArray(path.points.size)
+                    path.points.forEachIndexed { i, p ->
+                        times[i] = p.time
+                        values[i] = p.value
+                    }
+                    engine.setParameterAutomation(
+                        id, 
+                        times, 
+                        values, 
+                        path.points.size, 
+                        state.config.durationSeconds, 
+                        mode
+                    )
+                }
+            }
+        }
 
         // Start UI synchronization loop
         playbackJob = viewModelScope.launch(dispatcherProvider.io) {
@@ -336,8 +361,15 @@ class TweakSequencerViewModel(
     private fun stopPlayback() {
         playbackJob?.cancel()
         playbackJob = null
-        // NOTE: No engine automation to clear since it's currently disabled.
-        // When audio-rate automation is implemented, call engine.clearParameterAutomation here.
+        
+        // Clear engine automation for DSP parameters
+        uiState.value.sequencer.paths.keys.forEach { param ->
+            if (isDspParam(param)) {
+                getControlId(param)?.let { id ->
+                    engine.clearParameterAutomation(id)
+                }
+            }
+        }
     }
 
     private fun applyParameterValues() {
@@ -347,9 +379,10 @@ class TweakSequencerViewModel(
         state.paths.forEach { (param, path) ->
             val value = path.valueAt(state.currentPosition) ?: return@forEach
             getControlId(param)?.let { id ->
-                // Emit as UI origin so downstream ViewModels apply to engine normally.
-                // With audio-rate automation disabled, this is the only way params get applied.
-                midiRouter.emitControlChange(id, value)
+                // Emit for ALL parameters with SEQUENCER origin for UI synchronization.
+                // DSP params are driven by engine automation at audio-rate - the ViewModel
+                // will receive this event for UI update but skip the engine call.
+                midiRouter.emitControlChange(id, value, MidiEventOrigin.SEQUENCER)
             }
         }
     }

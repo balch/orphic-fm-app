@@ -19,6 +19,7 @@ import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.midi.MidiEventOrigin
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.core.presets.PresetLoader
@@ -67,7 +68,7 @@ private sealed interface VoiceIntent {
     // Global intents
     data class FmStructure(val crossQuad: Boolean) : VoiceIntent
     data class TotalFeedback(val value: Float) : VoiceIntent
-    data class Vibrato(val value: Float) : VoiceIntent
+    data class Vibrato(val value: Float, val fromSequencer: Boolean = false) : VoiceIntent
     data class VoiceCoupling(val value: Float) : VoiceIntent
     data class MasterVolume(val value: Float) : VoiceIntent
     data class PeakLevel(val value: Float) : VoiceIntent
@@ -153,7 +154,7 @@ class VoiceViewModel(
             // Subscribe to MIDI control changes for voice-related controls
             launch {
                 midiRouter.value.onControlChange.collect { event ->
-                    handleMidiControlChange(event.controlId, event.value)
+                    handleMidiControlChange(event.controlId, event.value, event.origin)
                 }
             }
 
@@ -169,7 +170,8 @@ class VoiceViewModel(
     /**
      * Routes MIDI control changes to the appropriate voice intents.
      */
-    private fun handleMidiControlChange(controlId: String, value: Float) {
+    private fun handleMidiControlChange(controlId: String, value: Float, origin: MidiEventOrigin = MidiEventOrigin.UI) {
+        val fromSequencer = origin == MidiEventOrigin.SEQUENCER
         when (controlId) {
             // Voice tunes
             ControlIds.voiceTune(0) -> intents.tryEmit(VoiceIntent.Tune(0, value))
@@ -197,8 +199,8 @@ class VoiceViewModel(
             ControlIds.pairSharpness(2) -> intents.tryEmit(VoiceIntent.PairSharpness(2, value))
             ControlIds.pairSharpness(3) -> intents.tryEmit(VoiceIntent.PairSharpness(3, value))
 
-            // Advanced FM
-            ControlIds.VIBRATO -> intents.tryEmit(VoiceIntent.Vibrato(value))
+            // Advanced FM - Vibrato may be sequenced
+            ControlIds.VIBRATO -> intents.tryEmit(VoiceIntent.Vibrato(value, fromSequencer))
             ControlIds.VOICE_COUPLING -> intents.tryEmit(VoiceIntent.VoiceCoupling(value))
             ControlIds.TOTAL_FEEDBACK -> intents.tryEmit(VoiceIntent.TotalFeedback(value))
 
@@ -386,7 +388,8 @@ class VoiceViewModel(
             }
 
             is VoiceIntent.TotalFeedback -> engine.setTotalFeedback(intent.value)
-            is VoiceIntent.Vibrato -> engine.setVibrato(intent.value)
+            // Skip engine call for SEQUENCER events - engine is driven by audio-rate automation
+            is VoiceIntent.Vibrato -> if (!intent.fromSequencer) engine.setVibrato(intent.value)
             is VoiceIntent.VoiceCoupling -> engine.setVoiceCoupling(intent.value)
             is VoiceIntent.MasterVolume -> engine.setMasterVolume(intent.value)
             is VoiceIntent.PeakLevel -> { /* No side effect, strictly monitoring */ }

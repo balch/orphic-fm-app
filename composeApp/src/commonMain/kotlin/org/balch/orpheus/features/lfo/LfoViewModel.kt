@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.midi.MidiEventOrigin
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.core.presets.PresetLoader
@@ -31,8 +32,8 @@ data class LfoUiState(
 
 /** User intents for the LFO panel. */
 private sealed interface LfoIntent {
-    data class LfoA(val value: Float) : LfoIntent
-    data class LfoB(val value: Float) : LfoIntent
+    data class LfoA(val value: Float, val fromSequencer: Boolean = false) : LfoIntent
+    data class LfoB(val value: Float, val fromSequencer: Boolean = false) : LfoIntent
     data class Mode(val mode: HyperLfoMode) : LfoIntent
     data class Link(val enabled: Boolean) : LfoIntent
     data class Restore(val state: LfoUiState) : LfoIntent
@@ -89,12 +90,12 @@ class LfoViewModel(
             }
 
             // Subscribe to MIDI/Sequencer control changes for LFO controls
-            // Uses intents from sequencer to skip engine call (source already applied)
             launch {
                 midiRouter.value.onControlChange.collect { event ->
+                    val fromSequencer = event.origin == MidiEventOrigin.SEQUENCER
                     when (event.controlId) {
-                        ControlIds.HYPER_LFO_A -> intents.tryEmit(LfoIntent.LfoA(event.value))
-                        ControlIds.HYPER_LFO_B -> intents.tryEmit(LfoIntent.LfoB(event.value))
+                        ControlIds.HYPER_LFO_A -> intents.tryEmit(LfoIntent.LfoA(event.value, fromSequencer))
+                        ControlIds.HYPER_LFO_B -> intents.tryEmit(LfoIntent.LfoB(event.value, fromSequencer))
                         ControlIds.HYPER_LFO_MODE -> {
                             val modes = HyperLfoMode.values()
                             val index = (event.value * (modes.size - 1)).toInt().coerceIn(0, modes.size - 1)
@@ -132,8 +133,9 @@ class LfoViewModel(
 
     private fun applyToEngine(intent: LfoIntent) {
         when (intent) {
-            is LfoIntent.LfoA -> engine.setHyperLfoFreq(0, intent.value)
-            is LfoIntent.LfoB -> engine.setHyperLfoFreq(1, intent.value)
+            // Skip engine calls for SEQUENCER events - engine is driven by audio-rate automation
+            is LfoIntent.LfoA -> if (!intent.fromSequencer) engine.setHyperLfoFreq(0, intent.value)
+            is LfoIntent.LfoB -> if (!intent.fromSequencer) engine.setHyperLfoFreq(1, intent.value)
             is LfoIntent.Mode -> engine.setHyperLfoMode(intent.mode.ordinal)
             is LfoIntent.Link -> engine.setHyperLfoLink(intent.enabled)
             is LfoIntent.Restore -> applyFullState(intent.state)

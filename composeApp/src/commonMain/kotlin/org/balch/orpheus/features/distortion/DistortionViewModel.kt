@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.midi.MidiEventOrigin
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.core.presets.PresetLoader
@@ -31,9 +32,9 @@ data class DistortionUiState(
 
 /** User intents for the Distortion panel. */
 private sealed interface DistortionIntent {
-    data class Drive(val value: Float) : DistortionIntent
+    data class Drive(val value: Float, val fromSequencer: Boolean = false) : DistortionIntent
     data class Volume(val value: Float) : DistortionIntent
-    data class Mix(val value: Float) : DistortionIntent
+    data class Mix(val value: Float, val fromSequencer: Boolean = false) : DistortionIntent
     data class Peak(val value: Float) : DistortionIntent
     data class Restore(val state: DistortionUiState) : DistortionIntent
 }
@@ -94,13 +95,13 @@ class DistortionViewModel(
             }
 
             // Subscribe to MIDI/Sequencer control changes for Distortion controls
-            // Uses intents from sequencer to skip engine call (source already applied)
             launch {
                 midiRouter.value.onControlChange.collect { event ->
+                    val fromSequencer = event.origin == MidiEventOrigin.SEQUENCER
                     when (event.controlId) {
                         ControlIds.MASTER_VOLUME -> intents.tryEmit(DistortionIntent.Volume(event.value))
-                        ControlIds.DRIVE -> intents.tryEmit(DistortionIntent.Drive(event.value))
-                        ControlIds.DISTORTION_MIX -> intents.tryEmit(DistortionIntent.Mix(event.value))
+                        ControlIds.DRIVE -> intents.tryEmit(DistortionIntent.Drive(event.value, fromSequencer))
+                        ControlIds.DISTORTION_MIX -> intents.tryEmit(DistortionIntent.Mix(event.value, fromSequencer))
                     }
                 }
             }
@@ -134,9 +135,10 @@ class DistortionViewModel(
 
     private fun applyToEngine(intent: DistortionIntent) {
         when (intent) {
-            is DistortionIntent.Drive -> engine.setDrive(intent.value)
+            // Skip engine calls for SEQUENCER events - engine is driven by audio-rate automation
+            is DistortionIntent.Drive -> if (!intent.fromSequencer) engine.setDrive(intent.value)
             is DistortionIntent.Volume -> engine.setMasterVolume(intent.value)
-            is DistortionIntent.Mix -> engine.setDistortionMix(intent.value)
+            is DistortionIntent.Mix -> if (!intent.fromSequencer) engine.setDistortionMix(intent.value)
             is DistortionIntent.Peak -> {
                 /* Peak is read-only from engine */
             }

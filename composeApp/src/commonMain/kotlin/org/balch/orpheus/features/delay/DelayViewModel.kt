@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.midi.MidiEventOrigin
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.core.presets.PresetLoader
@@ -35,12 +36,12 @@ data class DelayUiState(
 
 /** User intents for the Delay panel. */
 private sealed interface DelayIntent {
-    data class Time1(val value: Float) : DelayIntent
-    data class Time2(val value: Float) : DelayIntent
-    data class Mod1(val value: Float) : DelayIntent
-    data class Mod2(val value: Float) : DelayIntent
-    data class Feedback(val value: Float) : DelayIntent
-    data class Mix(val value: Float) : DelayIntent
+    data class Time1(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
+    data class Time2(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
+    data class Mod1(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
+    data class Mod2(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
+    data class Feedback(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
+    data class Mix(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
     data class Source(val isLfo: Boolean) : DelayIntent
     data class Waveform(val isTriangle: Boolean) : DelayIntent
     data class Restore(val state: DelayUiState) : DelayIntent
@@ -101,16 +102,16 @@ class DelayViewModel(
             }
 
             // Subscribe to MIDI/Sequencer control changes for Delay controls
-            // Uses intents from sequencer to skip engine call (source already applied)
             launch {
                 midiRouter.value.onControlChange.collect { event ->
+                    val fromSequencer = event.origin == MidiEventOrigin.SEQUENCER
                     when (event.controlId) {
-                        ControlIds.DELAY_TIME_1 -> intents.tryEmit(DelayIntent.Time1(event.value))
-                        ControlIds.DELAY_TIME_2 -> intents.tryEmit(DelayIntent.Time2(event.value))
-                        ControlIds.DELAY_MOD_1 -> intents.tryEmit(DelayIntent.Mod1(event.value))
-                        ControlIds.DELAY_MOD_2 -> intents.tryEmit(DelayIntent.Mod2(event.value))
-                        ControlIds.DELAY_FEEDBACK -> intents.tryEmit(DelayIntent.Feedback(event.value))
-                        ControlIds.DELAY_MIX -> intents.tryEmit(DelayIntent.Mix(event.value))
+                        ControlIds.DELAY_TIME_1 -> intents.tryEmit(DelayIntent.Time1(event.value, fromSequencer))
+                        ControlIds.DELAY_TIME_2 -> intents.tryEmit(DelayIntent.Time2(event.value, fromSequencer))
+                        ControlIds.DELAY_MOD_1 -> intents.tryEmit(DelayIntent.Mod1(event.value, fromSequencer))
+                        ControlIds.DELAY_MOD_2 -> intents.tryEmit(DelayIntent.Mod2(event.value, fromSequencer))
+                        ControlIds.DELAY_FEEDBACK -> intents.tryEmit(DelayIntent.Feedback(event.value, fromSequencer))
+                        ControlIds.DELAY_MIX -> intents.tryEmit(DelayIntent.Mix(event.value, fromSequencer))
                         ControlIds.DELAY_MOD_SOURCE -> intents.tryEmit(DelayIntent.Source(event.value >= 0.5f))
                         ControlIds.DELAY_LFO_WAVEFORM -> intents.tryEmit(DelayIntent.Waveform(event.value >= 0.5f))
                     }
@@ -158,12 +159,13 @@ class DelayViewModel(
 
     private fun applyToEngine(intent: DelayIntent) {
         when (intent) {
-            is DelayIntent.Time1 -> engine.setDelayTime(0, intent.value)
-            is DelayIntent.Time2 -> engine.setDelayTime(1, intent.value)
-            is DelayIntent.Mod1 -> engine.setDelayModDepth(0, intent.value)
-            is DelayIntent.Mod2 -> engine.setDelayModDepth(1, intent.value)
-            is DelayIntent.Feedback -> engine.setDelayFeedback(intent.value)
-            is DelayIntent.Mix -> engine.setDelayMix(intent.value)
+            // Skip engine calls for SEQUENCER events - engine is driven by audio-rate automation
+            is DelayIntent.Time1 -> if (!intent.fromSequencer) engine.setDelayTime(0, intent.value)
+            is DelayIntent.Time2 -> if (!intent.fromSequencer) engine.setDelayTime(1, intent.value)
+            is DelayIntent.Mod1 -> if (!intent.fromSequencer) engine.setDelayModDepth(0, intent.value)
+            is DelayIntent.Mod2 -> if (!intent.fromSequencer) engine.setDelayModDepth(1, intent.value)
+            is DelayIntent.Feedback -> if (!intent.fromSequencer) engine.setDelayFeedback(intent.value)
+            is DelayIntent.Mix -> if (!intent.fromSequencer) engine.setDelayMix(intent.value)
             is DelayIntent.Source -> {
                 engine.setDelayModSource(0, intent.isLfo)
                 engine.setDelayModSource(1, intent.isLfo)

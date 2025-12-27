@@ -175,8 +175,34 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     private val _masterLevelFlow = MutableStateFlow(0f)
     override val masterLevelFlow: StateFlow<Float> = _masterLevelFlow.asStateFlow()
     
-    // Automation Players - currently unused, see TODO in setParameterAutomation
-    // private val automationPlayers = mutableMapOf<String, AutomationPlayer>()
+    // ═══════════════════════════════════════════════════════════
+    // Audio-Rate Automation System
+    // ═══════════════════════════════════════════════════════════
+    // 
+    // Uses DYNAMIC CONNECT/DISCONNECT architecture:
+    // - AutomationPlayer and scaler units are created at init (not connected)
+    // - On play: Connect scaler output to target AudioInput
+    // - On stop: Disconnect scaler, restore manual value via .set()
+    // 
+    // This ensures manual control always works when automation is off.
+    // ═══════════════════════════════════════════════════════════
+    
+    /**
+     * Holds the setup for a single automatable parameter.
+     * @param player The automation curve player
+     * @param scaler MultiplyAdd to scale 0..1 output to parameter range
+     * @param targets List of AudioInputs to drive (some params have multiple targets)
+     * @param restoreManualValue Lambda to re-apply the cached manual value on stop
+     */
+    private data class AutomationSetup(
+        val player: AutomationPlayer,
+        val scaler: MultiplyAdd,
+        val targets: List<AudioInput>,
+        val restoreManualValue: () -> Unit
+    )
+    
+    private val automationSetups = mutableMapOf<String, AutomationSetup>()
+    private val activeAutomations = mutableSetOf<String>()
 
     // State Caches (Backing fields for getters)
     // Voices
@@ -458,24 +484,178 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         }
         
         // ═══════════════════════════════════════════════════════════
-        // Automation Setup - DISABLED
+        // Automation Setup (Dynamic Connect/Disconnect)
         // ═══════════════════════════════════════════════════════════
-        // 
-        // NOTE: The previous implementation permanently connected AutomationPlayer
-        // outputs to parameter inputs (LFO freq, delay time, etc.). This caused bugs:
-        // - When automation is NOT playing, players output 0 (or stale values)
-        // - These outputs override manual .set() calls on the same inputs
-        // - Result: Manual knob control was completely broken
-        //
-        // PROPER FIX NEEDED: Automation should use one of these architectures:
-        // 1. Connect/disconnect automation dynamically on play()/stop()
-        // 2. Use a crossfader to blend manual vs automation sources
-        // 3. Gate automation output and sum with manual value
-        //
-        // For now, automation is disabled to restore manual control.
-        // The TweakSequencer will continue to work via the ViewModel layer
-        // (MidiRouter events), just not at audio-rate precision.
-        // ═══════════════════════════════════════════════════════════
+        // Create AutomationPlayer and scaler for each automatable parameter.
+        // They are NOT connected at init - connection happens on setParameterAutomation().
+        
+        fun setupAutomation(
+            id: String,
+            targets: List<AudioInput>,
+            scale: Double,
+            offset: Double,
+            restoreManualValue: () -> Unit
+        ) {
+            val player = audioEngine.createAutomationPlayer()
+            val scaler = audioEngine.createMultiplyAdd()
+            scaler.inputB.set(scale)
+            scaler.inputC.set(offset)
+            // Connect player -> scaler (internal), but NOT scaler -> targets yet
+            player.output.connect(scaler.inputA)
+            
+            automationSetups[id] = AutomationSetup(player, scaler, targets, restoreManualValue)
+            audioEngine.addUnit(player)
+            audioEngine.addUnit(scaler)
+        }
+        
+        // LFO Frequencies (0..1 -> 0.01..10.01 Hz)
+        setupAutomation(
+            id = "hyper_lfo_a",
+            targets = listOf(hyperLfo.frequencyA),
+            scale = 10.0, offset = 0.01,
+            restoreManualValue = { setHyperLfoFreq(0, _hyperLfoFreq[0]) }
+        )
+        setupAutomation(
+            id = "hyper_lfo_b",
+            targets = listOf(hyperLfo.frequencyB),
+            scale = 10.0, offset = 0.01,
+            restoreManualValue = { setHyperLfoFreq(1, _hyperLfoFreq[1]) }
+        )
+        
+        // Delay Times (0..1 -> 0.01..2.0 seconds) - via ramp input for smooth changes
+        setupAutomation(
+            id = "delay_time_1",
+            targets = listOf(delay1TimeRamp.input),
+            scale = 1.99, offset = 0.01,
+            restoreManualValue = { setDelayTime(0, _delayTime[0]) }
+        )
+        setupAutomation(
+            id = "delay_time_2",
+            targets = listOf(delay2TimeRamp.input),
+            scale = 1.99, offset = 0.01,
+            restoreManualValue = { setDelayTime(1, _delayTime[1]) }
+        )
+        
+        // Delay Mod Depths (0..1 -> 0..0.1 seconds)
+        setupAutomation(
+            id = "delay_mod_1",
+            targets = listOf(delay1ModDepthRamp.input),
+            scale = 0.1, offset = 0.0,
+            restoreManualValue = { setDelayModDepth(0, _delayModDepth[0]) }
+        )
+        setupAutomation(
+            id = "delay_mod_2",
+            targets = listOf(delay2ModDepthRamp.input),
+            scale = 0.1, offset = 0.0,
+            restoreManualValue = { setDelayModDepth(1, _delayModDepth[1]) }
+        )
+        
+        // Delay Feedback (0..1 -> 0..0.95) - drives both delays
+        setupAutomation(
+            id = "delay_feedback",
+            targets = listOf(delay1FeedbackGain.inputB, delay2FeedbackGain.inputB),
+            scale = 0.95, offset = 0.0,
+            restoreManualValue = { setDelayFeedback(_delayFeedback) }
+        )
+        
+        // Vibrato depth (0..1 -> 0..20 Hz)
+        setupAutomation(
+            id = "vibrato",
+            targets = listOf(vibratoDepthGain.inputB),
+            scale = 20.0, offset = 0.0,
+            restoreManualValue = { setVibrato(_vibrato) }
+        )
+        
+        // Drive (0..1 -> 1..15) - drives both limiters
+        setupAutomation(
+            id = "drive",
+            targets = listOf(limiterLeft.drive, limiterRight.drive),
+            scale = 14.0, offset = 1.0,
+            restoreManualValue = { setDrive(_drive) }
+        )
+        
+        // Delay Mix (0..1) - complex: affects dry and wet gains inversely
+        // We use two scalers: wet(x) and dry(1-x)
+        run {
+            val player = audioEngine.createAutomationPlayer()
+            val wetScaler = audioEngine.createMultiplyAdd()
+            val dryScaler = audioEngine.createMultiplyAdd()
+            
+            // Wet: out = input * 1.0 + 0.0 = input
+            wetScaler.inputB.set(1.0)
+            wetScaler.inputC.set(0.0)
+            
+            // Dry: out = input * -1.0 + 1.0 = (1 - input)
+            dryScaler.inputB.set(-1.0)
+            dryScaler.inputC.set(1.0)
+            
+            player.output.connect(wetScaler.inputA)
+            player.output.connect(dryScaler.inputA)
+            
+            // Targets: wet gains and dry gains
+            val wetTargets = listOf(
+                delay1WetLeft.inputB, delay1WetRight.inputB,
+                delay2WetLeft.inputB, delay2WetRight.inputB
+            )
+            val dryTargets = listOf(dryGainLeft.inputB, dryGainRight.inputB)
+            
+            // Store as a special setup that needs custom handling
+            automationSetups["delay_mix"] = AutomationSetup(
+                player = player,
+                scaler = wetScaler,  // Primary scaler for reference
+                targets = wetTargets + dryTargets,
+                restoreManualValue = { setDelayMix(_delayMix) }
+            )
+            // Store the extra scaler for connection
+            automationSetups["delay_mix_dry"] = AutomationSetup(
+                player = player,  // Same player
+                scaler = dryScaler,
+                targets = dryTargets,
+                restoreManualValue = {}  // Handled by main entry
+            )
+            
+            audioEngine.addUnit(player)
+            audioEngine.addUnit(wetScaler)
+            audioEngine.addUnit(dryScaler)
+        }
+        
+        // Distortion Mix (0..1) - complex: affects clean and distorted paths inversely
+        run {
+            val player = audioEngine.createAutomationPlayer()
+            val distScaler = audioEngine.createMultiplyAdd()
+            val cleanScaler = audioEngine.createMultiplyAdd()
+            
+            // Distorted: out = input * 1.0
+            distScaler.inputB.set(1.0)
+            distScaler.inputC.set(0.0)
+            
+            // Clean: out = (1 - input)
+            cleanScaler.inputB.set(-1.0)
+            cleanScaler.inputC.set(1.0)
+            
+            player.output.connect(distScaler.inputA)
+            player.output.connect(cleanScaler.inputA)
+            
+            val distTargets = listOf(distortedPathGainLeft.inputB, distortedPathGainRight.inputB)
+            val cleanTargets = listOf(cleanPathGainLeft.inputB, cleanPathGainRight.inputB)
+            
+            automationSetups["distortion_mix"] = AutomationSetup(
+                player = player,
+                scaler = distScaler,
+                targets = distTargets + cleanTargets,
+                restoreManualValue = { setDistortionMix(_distortionMix) }
+            )
+            automationSetups["distortion_mix_clean"] = AutomationSetup(
+                player = player,
+                scaler = cleanScaler,
+                targets = cleanTargets,
+                restoreManualValue = {}
+            )
+            
+            audioEngine.addUnit(player)
+            audioEngine.addUnit(distScaler)
+            audioEngine.addUnit(cleanScaler)
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -849,13 +1029,85 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     }
 
     override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) {
-        // TODO: Implement audio-rate automation - see .agent/tasks/audio_automation_redesign.md
-        // Currently disabled because permanent AudioInput connections override manual control.
-        // The TweakSequencer still works via ViewModel layer (MidiRouter events).
+        val setup = automationSetups[controlId] ?: return
+        
+        // For mix parameters, also connect the secondary scaler
+        val secondarySetup = when (controlId) {
+            "delay_mix" -> automationSetups["delay_mix_dry"]
+            "distortion_mix" -> automationSetups["distortion_mix_clean"]
+            else -> null
+        }
+        
+        // Disconnect any existing connections to targets and connect automation
+        setup.targets.forEach { target ->
+            target.disconnectAll()
+        }
+        
+        // Connect primary scaler to its targets (simple params) or wet targets (mix params)
+        when (controlId) {
+            "delay_mix" -> {
+                // Wet scaler -> wet gains only
+                listOf(delay1WetLeft.inputB, delay1WetRight.inputB, delay2WetLeft.inputB, delay2WetRight.inputB).forEach {
+                    setup.scaler.output.connect(it)
+                }
+                // Dry scaler -> dry gains
+                secondarySetup?.let { secondary ->
+                    listOf(dryGainLeft.inputB, dryGainRight.inputB).forEach {
+                        secondary.scaler.output.connect(it)
+                    }
+                }
+            }
+            "distortion_mix" -> {
+                // Dist scaler -> distorted gains only
+                listOf(distortedPathGainLeft.inputB, distortedPathGainRight.inputB).forEach {
+                    setup.scaler.output.connect(it)
+                }
+                // Clean scaler -> clean gains
+                secondarySetup?.let { secondary ->
+                    listOf(cleanPathGainLeft.inputB, cleanPathGainRight.inputB).forEach {
+                        secondary.scaler.output.connect(it)
+                    }
+                }
+            }
+            else -> {
+                // Simple parameter - connect scaler to all targets
+                setup.targets.forEach { target ->
+                    setup.scaler.output.connect(target)
+                }
+            }
+        }
+        
+        // Configure and play
+        setup.player.setPath(times, values, count)
+        setup.player.setDuration(duration)
+        setup.player.setMode(mode)
+        setup.player.play()
+        
+        activeAutomations.add(controlId)
     }
 
     override fun clearParameterAutomation(controlId: String) {
-        // TODO: Implement audio-rate automation - see .agent/tasks/audio_automation_redesign.md
+        val setup = automationSetups[controlId] ?: return
+        
+        // Stop the player
+        setup.player.stop()
+        
+        // Disconnect automation from targets
+        setup.targets.forEach { target ->
+            target.disconnectAll()
+        }
+        
+        // Also disconnect secondary scaler for mix params
+        when (controlId) {
+            "delay_mix" -> automationSetups["delay_mix_dry"]?.targets?.forEach { it.disconnectAll() }
+            "distortion_mix" -> automationSetups["distortion_mix_clean"]?.targets?.forEach { it.disconnectAll() }
+            else -> {}
+        }
+        
+        // Restore the cached manual value
+        setup.restoreManualValue()
+        
+        activeAutomations.remove(controlId)
     }
 
     override fun getPeak(): Float {
