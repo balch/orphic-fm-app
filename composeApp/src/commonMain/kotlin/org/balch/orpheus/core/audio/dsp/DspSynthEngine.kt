@@ -529,7 +529,9 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
 
     override fun setDelayTime(index: Int, time: Float) {
         _delayTime[index] = time
-        val delaySeconds = 0.01 + (time * 1.99)
+        // Coerce input for safety - minimum 5ms delay prevents 0-length feedback blowout
+        val safeTime = time.coerceAtLeast(0.005f) 
+        val delaySeconds = 0.01 + (safeTime * 1.99)
         // LinearRamp handles audio-rate smoothing automatically
         if (index == 0) {
             delay1TimeRamp.input.set(delaySeconds)
