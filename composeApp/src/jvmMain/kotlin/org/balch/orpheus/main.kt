@@ -8,11 +8,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import dev.zacsweers.metro.createGraph
+import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.di.OrpheusGraph
 
 fun main() = application {
-    val graph = remember { createGraph<OrpheusGraph>() }
+    val graph = remember { createGraphFactory<OrpheusGraph.Factory>().create() }
 
     Window(
         onCloseRequest = ::exitApplication,

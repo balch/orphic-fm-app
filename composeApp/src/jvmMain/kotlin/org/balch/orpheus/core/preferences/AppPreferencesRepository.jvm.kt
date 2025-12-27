@@ -1,10 +1,16 @@
 package org.balch.orpheus.core.preferences
 
+import dev.zacsweers.metro.Inject
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.util.Logger
 import java.io.File
 
-actual class AppPreferencesRepository actual constructor() {
+/**
+ * JVM implementation of AppPreferencesRepository using JSON files.
+ * Stores settings in ~/.config/orpheus/settings.json
+ */
+@Inject
+class JvmAppPreferencesRepository : AppPreferencesRepository {
 
     private val json = Json {
         prettyPrint = true
@@ -21,7 +27,7 @@ actual class AppPreferencesRepository actual constructor() {
         }
     }
 
-    actual suspend fun load(): AppPreferences {
+    override suspend fun load(): AppPreferences {
         return try {
             if (settingsFile.exists()) {
                 val jsonString = settingsFile.readText()
@@ -35,7 +41,7 @@ actual class AppPreferencesRepository actual constructor() {
         }
     }
 
-    actual suspend fun save(preferences: AppPreferences) {
+    override suspend fun save(preferences: AppPreferences) {
         try {
             val jsonString = json.encodeToString(preferences)
             settingsFile.writeText(jsonString)

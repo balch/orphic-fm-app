@@ -2,13 +2,13 @@ package org.balch.orpheus
 
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
-import dev.zacsweers.metro.createGraph
+import dev.zacsweers.metro.createGraphFactory
 import kotlinx.browser.document
 import org.balch.orpheus.di.OrpheusGraph
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
-    val graph = createGraph<OrpheusGraph>()
+    val graph = createGraphFactory<OrpheusGraph.Factory>().create()
 
     // Ensure AudioContext is resumed on first user interaction
     val resumeAudio = { 

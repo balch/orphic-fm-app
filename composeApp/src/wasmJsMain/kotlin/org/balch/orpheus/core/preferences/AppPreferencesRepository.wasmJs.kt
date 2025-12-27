@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.preferences
 
+import dev.zacsweers.metro.Inject
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.util.Logger
@@ -9,7 +10,8 @@ import org.w3c.dom.set
 /**
  * WASM implementation of AppPreferencesRepository using browser localStorage.
  */
-actual class AppPreferencesRepository actual constructor() {
+@Inject
+class WasmAppPreferencesRepository : AppPreferencesRepository {
 
     private val json = Json {
         prettyPrint = false
@@ -19,7 +21,7 @@ actual class AppPreferencesRepository actual constructor() {
 
     private val settingsKey = "orpheus_app_preferences"
 
-    actual suspend fun load(): AppPreferences {
+    override suspend fun load(): AppPreferences {
         return try {
             val jsonString = localStorage[settingsKey]
             if (jsonString != null) {
@@ -33,7 +35,7 @@ actual class AppPreferencesRepository actual constructor() {
         }
     }
 
-    actual suspend fun save(preferences: AppPreferences) {
+    override suspend fun save(preferences: AppPreferences) {
         try {
             val jsonString = json.encodeToString(preferences)
             localStorage[settingsKey] = jsonString

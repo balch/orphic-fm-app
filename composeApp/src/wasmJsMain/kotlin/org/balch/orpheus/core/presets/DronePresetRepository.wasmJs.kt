@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.presets
 
+import dev.zacsweers.metro.Inject
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.util.Logger
@@ -10,7 +11,8 @@ import orpheus.composeapp.generated.resources.Res
 /**
  * WASM implementation of DronePresetRepository using browser localStorage.
  */
-actual class DronePresetRepository actual constructor() {
+@Inject
+class WasmDronePresetRepository : DronePresetRepository {
 
     private val json = Json {
         prettyPrint = false
@@ -23,8 +25,6 @@ actual class DronePresetRepository actual constructor() {
     private suspend fun ensurePresetsInitialized() {
         if (initialized) return
         initialized = true
-
-        // Copy bundled presets to localStorage if they don't exist
         copyBundledPresets()
     }
 
@@ -40,7 +40,6 @@ actual class DronePresetRepository actual constructor() {
                 val presetName = filename.removeSuffix(".json")
                 val key = keyForPreset(presetName)
                 
-                // Only copy if not already in localStorage
                 if (localStorage[key] == null) {
                     val path = "files/presets/$filename"
                     val bytes = Res.readBytes(path)
@@ -55,12 +54,11 @@ actual class DronePresetRepository actual constructor() {
     }
 
     private fun keyForPreset(name: String): String {
-        // Sanitize name for use as localStorage key
         val safeName = name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         return "$keyPrefix$safeName"
     }
 
-    actual suspend fun save(preset: DronePreset) {
+    override suspend fun save(preset: DronePreset) {
         ensurePresetsInitialized()
         try {
             val key = keyForPreset(preset.name)
@@ -72,7 +70,7 @@ actual class DronePresetRepository actual constructor() {
         }
     }
 
-    actual suspend fun load(name: String): DronePreset? {
+    override suspend fun load(name: String): DronePreset? {
         ensurePresetsInitialized()
         return try {
             val key = keyForPreset(name)
@@ -91,7 +89,7 @@ actual class DronePresetRepository actual constructor() {
         }
     }
 
-    actual suspend fun delete(name: String) {
+    override suspend fun delete(name: String) {
         ensurePresetsInitialized()
         try {
             val key = keyForPreset(name)
@@ -102,7 +100,7 @@ actual class DronePresetRepository actual constructor() {
         }
     }
 
-    actual suspend fun list(): List<DronePreset> {
+    override suspend fun list(): List<DronePreset> {
         ensurePresetsInitialized()
         return try {
             val presets = mutableListOf<DronePreset>()

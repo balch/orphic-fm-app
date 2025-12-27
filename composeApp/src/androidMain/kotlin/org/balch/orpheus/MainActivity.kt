@@ -11,10 +11,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import dev.zacsweers.metro.createGraph
-import org.balch.orpheus.core.preferences.AppPreferencesRepository
-import org.balch.orpheus.core.presets.DronePresetRepository
-import org.balch.orpheus.di.OrpheusGraph
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,12 +27,8 @@ class MainActivity : ComponentActivity() {
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
 
-        // Initialize repositories context
-        DronePresetRepository.appContext = applicationContext
-        AppPreferencesRepository.appContext = applicationContext
-        
-        // Create the dependency graph - SynthEngine is now fully DI-wired
-        val graph = createGraph<OrpheusGraph>()
+        // Get the DI graph from Application (survives configuration changes)
+        val graph = (application as OrpheusApplication).graph
 
         setContent {
             App(graph)
@@ -47,7 +39,5 @@ class MainActivity : ComponentActivity() {
 @Preview(device = Devices.DESKTOP)
 @Composable
 fun AppAndroidPreview() {
-    // Note: Preview may not work due to platform-specific DI
-    val graph = createGraph<OrpheusGraph>()
-    App(graph)
+    // Note: Preview won't work - needs Application context
 }

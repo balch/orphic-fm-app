@@ -9,12 +9,13 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiController
 import org.balch.orpheus.core.midi.MidiMappingRepository
 import org.balch.orpheus.core.midi.createMidiAccess
-import org.balch.orpheus.core.preferences.AppPreferencesRepository
-import org.balch.orpheus.core.presets.DronePresetRepository
 
 /**
  * Module providing core dependencies for the Orpheus application. Used by Metro DI to provide
- * singleton instances of repositories and infrastructure.
+ * singleton instances of infrastructure components.
+ * 
+ * Note: DronePresetRepository and AppPreferencesRepository are now provided via
+ * @ContributesBinding from platform-specific implementations.
  */
 @ContributesTo(AppScope::class)
 interface OrpheusModule {
@@ -30,13 +31,5 @@ interface OrpheusModule {
         @Provides
         @SingleIn(AppScope::class)
         fun provideMidiMappingRepository(): MidiMappingRepository = MidiMappingRepository()
-
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideDronePresetRepository(): DronePresetRepository = DronePresetRepository()
-
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideAppPreferencesRepository(): AppPreferencesRepository = AppPreferencesRepository()
     }
 }

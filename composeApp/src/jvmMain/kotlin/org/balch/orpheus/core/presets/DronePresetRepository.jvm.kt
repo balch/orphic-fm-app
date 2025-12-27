@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.presets
 
+import dev.zacsweers.metro.Inject
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.util.Logger
 import java.io.File
@@ -8,7 +9,8 @@ import java.io.File
  * JVM implementation of DronePresetRepository using JSON files.
  * Stores presets in ~/.config/orpheus/presets/
  */
-actual class DronePresetRepository actual constructor() {
+@Inject
+class JvmDronePresetRepository : DronePresetRepository {
 
     private val json = Json {
         prettyPrint = true
@@ -25,17 +27,12 @@ actual class DronePresetRepository actual constructor() {
         }
     }
 
-    // Factory presets are now handled via DI (SynthPatch interface)
-    // User presets are stored in this directory
-
-
     private fun fileForPreset(name: String): File {
-        // Sanitize name for use as filename
         val safeName = name.replace(Regex("[^a-zA-Z0-9_-]"), "_")
         return File(presetsDir, "$safeName.json")
     }
 
-    actual suspend fun save(preset: DronePreset) {
+    override suspend fun save(preset: DronePreset) {
         try {
             val file = fileForPreset(preset.name)
             val jsonString = json.encodeToString(preset)
@@ -46,7 +43,7 @@ actual class DronePresetRepository actual constructor() {
         }
     }
 
-    actual suspend fun load(name: String): DronePreset? {
+    override suspend fun load(name: String): DronePreset? {
         return try {
             val file = fileForPreset(name)
             if (file.exists()) {
@@ -64,7 +61,7 @@ actual class DronePresetRepository actual constructor() {
         }
     }
 
-    actual suspend fun delete(name: String) {
+    override suspend fun delete(name: String) {
         try {
             val file = fileForPreset(name)
             if (file.exists()) {
@@ -76,7 +73,7 @@ actual class DronePresetRepository actual constructor() {
         }
     }
 
-    actual suspend fun list(): List<DronePreset> {
+    override suspend fun list(): List<DronePreset> {
         return try {
             presetsDir.listFiles()
                 ?.filter { it.extension == "json" }

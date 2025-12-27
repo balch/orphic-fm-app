@@ -1,11 +1,20 @@
 package org.balch.orpheus.core.preferences
 
 import android.content.Context
+import dev.zacsweers.metro.Inject
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.util.Logger
 import java.io.File
 
-actual class AppPreferencesRepository actual constructor() {
+/**
+ * Android implementation of AppPreferencesRepository.
+ * Stores preferences as JSON in the app's files directory.
+ * Context is injected via DI.
+ */
+@Inject
+class AndroidAppPreferencesRepository(
+    private val context: Context
+) : AppPreferencesRepository {
 
     private val json = Json {
         prettyPrint = true
@@ -13,38 +22,28 @@ actual class AppPreferencesRepository actual constructor() {
         encodeDefaults = true
     }
 
-    companion object {
-        var appContext: Context? = null
+    private val settingsFile: File by lazy {
+        File(context.filesDir, "settings.json")
     }
 
-    private val settingsFile: File? by lazy {
-        appContext?.filesDir?.let { filesDir ->
-            File(filesDir, "settings.json")
-        }
-    }
-
-    actual suspend fun load(): AppPreferences {
+    override suspend fun load(): AppPreferences {
         return try {
-            settingsFile?.let { file ->
-                if (file.exists()) {
-                    val jsonString = file.readText()
-                    json.decodeFromString<AppPreferences>(jsonString)
-                } else {
-                    AppPreferences()
-                }
-            } ?: AppPreferences()
+            if (settingsFile.exists()) {
+                val jsonString = settingsFile.readText()
+                json.decodeFromString<AppPreferences>(jsonString)
+            } else {
+                AppPreferences()
+            }
         } catch (e: Exception) {
             Logger.error { "Failed to load preferences: ${e.message}" }
             AppPreferences()
         }
     }
 
-    actual suspend fun save(preferences: AppPreferences) {
+    override suspend fun save(preferences: AppPreferences) {
         try {
-            settingsFile?.let { file ->
-                val jsonString = json.encodeToString(preferences)
-                file.writeText(jsonString)
-            }
+            val jsonString = json.encodeToString(preferences)
+            settingsFile.writeText(jsonString)
         } catch (e: Exception) {
             Logger.error { "Failed to save preferences: ${e.message}" }
         }

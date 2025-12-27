@@ -1,9 +1,10 @@
 package org.balch.orpheus.core.presets
 
 /**
- * Platform-specific repository for persisting Drone presets.
+ * Repository for persisting Drone presets.
+ * Platform-specific implementations are provided via DI.
  */
-expect class DronePresetRepository() {
+interface DronePresetRepository {
     /**
      * Save a preset. If a preset with the same name exists, it will be overwritten.
      */
