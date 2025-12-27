@@ -50,8 +50,8 @@ private sealed interface LfoIntent {
 class LfoViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
-    private val synthController: Lazy<SynthController>,
-    private val dispatcherProvider: DispatcherProvider
+    private val synthController: SynthController,
+    dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
     private val intents =
@@ -91,13 +91,13 @@ class LfoViewModel(
 
             // Subscribe to control changes for LFO controls
             launch {
-                synthController.value.onControlChange.collect { event ->
+                synthController.onControlChange.collect { event ->
                     val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
                     when (event.controlId) {
                         ControlIds.HYPER_LFO_A -> intents.tryEmit(LfoIntent.LfoA(event.value, fromSequencer))
                         ControlIds.HYPER_LFO_B -> intents.tryEmit(LfoIntent.LfoB(event.value, fromSequencer))
                         ControlIds.HYPER_LFO_MODE -> {
-                            val modes = HyperLfoMode.values()
+                            val modes = HyperLfoMode.entries.toTypedArray()
                             val index = (event.value * (modes.size - 1)).toInt().coerceIn(0, modes.size - 1)
                             intents.tryEmit(LfoIntent.Mode(modes[index]))
                         }

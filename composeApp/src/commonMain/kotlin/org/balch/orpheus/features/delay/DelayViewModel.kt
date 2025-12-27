@@ -58,8 +58,8 @@ private sealed interface DelayIntent {
 class DelayViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
-    private val synthController: Lazy<SynthController>,
-    private val dispatcherProvider: DispatcherProvider
+    private val synthController: SynthController,
+    dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
     private val intents =
@@ -103,7 +103,7 @@ class DelayViewModel(
 
             // Subscribe to control changes for Delay controls
             launch {
-                synthController.value.onControlChange.collect { event ->
+                synthController.onControlChange.collect { event ->
                     val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
                     when (event.controlId) {
                         ControlIds.DELAY_TIME_1 -> intents.tryEmit(DelayIntent.Time1(event.value, fromSequencer))

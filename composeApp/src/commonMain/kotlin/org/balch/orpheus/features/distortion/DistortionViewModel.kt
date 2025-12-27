@@ -50,8 +50,8 @@ private sealed interface DistortionIntent {
 class DistortionViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
-    private val synthController: Lazy<SynthController>,
-    private val dispatcherProvider: DispatcherProvider
+    private val synthController: SynthController,
+    dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
     private val intents =
@@ -96,7 +96,7 @@ class DistortionViewModel(
 
             // Subscribe to control changes for Distortion controls
             launch {
-                synthController.value.onControlChange.collect { event ->
+                synthController.onControlChange.collect { event ->
                     val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
                     when (event.controlId) {
                         ControlIds.MASTER_VOLUME -> intents.tryEmit(DistortionIntent.Volume(event.value))

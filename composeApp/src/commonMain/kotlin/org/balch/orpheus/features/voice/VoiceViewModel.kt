@@ -88,8 +88,8 @@ private sealed interface VoiceIntent {
 class VoiceViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
-    private val synthController: Lazy<SynthController>,
-    private val dispatcherProvider: DispatcherProvider
+    private val synthController: SynthController,
+    dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
     private val intents =
@@ -140,19 +140,19 @@ class VoiceViewModel(
             }
 
             launch {
-                synthController.value.onPulseStart.collect { voiceIndex ->
+                synthController.onPulseStart.collect { voiceIndex ->
                     intents.tryEmit(VoiceIntent.PulseStart(voiceIndex))
                 }
             }
             launch {
-                synthController.value.onPulseEnd.collect { voiceIndex ->
+                synthController.onPulseEnd.collect { voiceIndex ->
                     intents.tryEmit(VoiceIntent.PulseEnd(voiceIndex))
                 }
             }
 
             // Subscribe to control changes for voice-related controls
             launch {
-                synthController.value.onControlChange.collect { event ->
+                synthController.onControlChange.collect { event ->
                     handleControlChange(event.controlId, event.value, event.origin)
                 }
             }

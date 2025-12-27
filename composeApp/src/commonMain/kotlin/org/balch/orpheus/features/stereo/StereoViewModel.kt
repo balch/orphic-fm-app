@@ -45,8 +45,8 @@ private sealed interface StereoIntent {
 @ContributesIntoMap(AppScope::class)
 class StereoViewModel(
     private val engine: SynthEngine,
-    private val synthController: Lazy<SynthController>,
-    private val dispatcherProvider: DispatcherProvider
+    private val synthController: SynthController,
+    dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
     private val intents = MutableSharedFlow<StereoIntent>(
@@ -73,7 +73,7 @@ class StereoViewModel(
 
             // Subscribe to control changes for Stereo controls
             launch {
-                synthController.value.onControlChange.collect { event ->
+                synthController.onControlChange.collect { event ->
                     when (event.controlId) {
                         ControlIds.STEREO_PAN -> {
                             // Convert 0-1 to -1..1 for pan
