@@ -11,8 +11,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import dev.zacsweers.metro.createGraphFactory
-import org.balch.orpheus.core.audio.AndroidSynthEngine
+import dev.zacsweers.metro.createGraph
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.DronePresetRepository
 import org.balch.orpheus.di.OrpheusGraph
@@ -36,12 +35,11 @@ class MainActivity : ComponentActivity() {
         DronePresetRepository.appContext = applicationContext
         AppPreferencesRepository.appContext = applicationContext
         
-        val engine = AndroidSynthEngine()
-        // Create the dependency graph
-        val graph = createGraphFactory<OrpheusGraph.Factory>().create(engine)
+        // Create the dependency graph - SynthEngine is now fully DI-wired
+        val graph = createGraph<OrpheusGraph>()
 
         setContent {
-            App(engine, graph)
+            App(graph)
         }
     }
 }
@@ -49,8 +47,7 @@ class MainActivity : ComponentActivity() {
 @Preview(device = Devices.DESKTOP)
 @Composable
 fun AppAndroidPreview() {
-    val engine = AndroidSynthEngine()
-    // Note: This might fail in interactive preview if DI generation isn't complete
-    val graph = createGraphFactory<OrpheusGraph.Factory>().create(engine)
-    App(engine, graph)
+    // Note: Preview may not work due to platform-specific DI
+    val graph = createGraph<OrpheusGraph>()
+    App(graph)
 }

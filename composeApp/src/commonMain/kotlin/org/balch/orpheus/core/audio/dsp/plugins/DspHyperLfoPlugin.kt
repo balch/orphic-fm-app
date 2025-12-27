@@ -1,4 +1,12 @@
-package org.balch.orpheus.core.audio.dsp
+package org.balch.orpheus.core.audio.dsp.plugins
+
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import org.balch.orpheus.core.audio.dsp.AudioEngine
+import org.balch.orpheus.core.audio.dsp.AudioInput
+import org.balch.orpheus.core.audio.dsp.AudioOutput
+import org.balch.orpheus.core.audio.dsp.AudioUnit
 
 /**
  * Shared HyperLFO implementation using DSP primitive interfaces.
@@ -15,7 +23,11 @@ package org.balch.orpheus.core.audio.dsp
  * - OR = MAX(A, B) - output follows the higher of the two
  */
 // Rename to DspHyperLfo
-class DspHyperLfo(private val audioEngine: AudioEngine) {
+@Inject
+@ContributesIntoSet(AppScope::class)
+class DspHyperLfoPlugin(
+    private val audioEngine: AudioEngine
+): DspPlugin {
     // Interface Units (Proxies)
     private val inputA = audioEngine.createPassThrough()
     private val inputB = audioEngine.createPassThrough()
@@ -68,31 +80,35 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
     // Internal State
     private var isAndMode = true
     private var isTriangleMode = true // Default to triangle for delay mod
+    
+    private var _hyperLfoFreqA = 0.0f
+    private var _hyperLfoFreqB = 0.0f
+    private var _hyperLfoMode = 1
+    private var _hyperLfoLink = false
 
-    init {
-        // Add Units to engine
-        audioEngine.addUnit(inputA)
-        audioEngine.addUnit(inputB)
-        audioEngine.addUnit(outputProxy)
-        audioEngine.addUnit(feedbackProxy)
-        audioEngine.addUnit(freqAModMixer)
-        audioEngine.addUnit(freqBModMixer)
-        audioEngine.addUnit(lfoASquare)
-        audioEngine.addUnit(lfoBSquare)
-        audioEngine.addUnit(lfoATriangle)
-        audioEngine.addUnit(lfoBTriangle)
-        audioEngine.addUnit(toUnipolarA)
-        audioEngine.addUnit(toUnipolarB)
-        audioEngine.addUnit(logicAnd)
-        audioEngine.addUnit(orProduct)
-        audioEngine.addUnit(orSum)
-        audioEngine.addUnit(orResult)
-        audioEngine.addUnit(toBipolarAnd)
-        audioEngine.addUnit(toBipolarOr)
-        audioEngine.addUnit(triangleMin)
-        audioEngine.addUnit(triangleMax)
-        audioEngine.addUnit(fmGain)
-        audioEngine.addUnit(lfoMonitor)
+    override val audioUnits: List<AudioUnit> = listOf(
+        inputA, inputB, outputProxy, feedbackProxy,
+        freqAModMixer, freqBModMixer,
+        lfoASquare, lfoBSquare, lfoATriangle, lfoBTriangle,
+        toUnipolarA, toUnipolarB, logicAnd,
+        orProduct, orSum, orResult,
+        toBipolarAnd, toBipolarOr,
+        triangleMin, triangleMax, fmGain, lfoMonitor
+    )
+
+    override val inputs: Map<String, AudioInput>
+        get() = mapOf(
+            "frequencyA" to inputA.input,
+            "frequencyB" to inputB.input,
+            "feedback" to feedbackProxy.input
+        )
+
+    override val outputs: Map<String, AudioOutput>
+        get() = mapOf(
+            "output" to outputProxy.output
+        )
+
+    override fun initialize() {
 
         // Monitor the LFO output for visualization
         outputProxy.output.connect(lfoMonitor.input)
@@ -176,6 +192,7 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
      * Set LFO mode: 0=AND, 1=OFF, 2=OR
      */
     fun setMode(mode: Int) {
+        _hyperLfoMode = mode
         when (mode) {
             0 -> { // AND
                 isAndMode = true
@@ -221,9 +238,29 @@ class DspHyperLfo(private val audioEngine: AudioEngine) {
     }
 
     fun setLink(enabled: Boolean) {
+        _hyperLfoLink = enabled
         // Simple FM depth switch
         fmGain.inputB.set(if (enabled) 10.0 else 0.0)
     }
+
+    fun setFreq(index: Int, frequency: Float) {
+        if (index == 0) {
+            _hyperLfoFreqA = frequency
+        } else {
+            _hyperLfoFreqB = frequency
+        }
+        val freqHz = 0.01 + (frequency * 10.0)
+        if (index == 0) {
+            inputA.input.set(freqHz)
+        } else {
+            inputB.input.set(freqHz)
+        }
+    }
+
+    // Getters for state saving
+    fun getFreq(index: Int): Float = if (index == 0) _hyperLfoFreqA else _hyperLfoFreqB
+    fun getMode(): Int = _hyperLfoMode
+    fun getLink(): Boolean = _hyperLfoLink
 
     /**
      * Get the current LFO output value (-1 to 1 range) for visualization.

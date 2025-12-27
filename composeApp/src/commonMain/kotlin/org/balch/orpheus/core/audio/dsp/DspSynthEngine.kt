@@ -13,150 +13,51 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.dsp.plugins.DspDelayPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspDistortionPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspHyperLfoPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspStereoPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspVibratoPlugin
 import org.balch.orpheus.util.Logger
-import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.pow
-import kotlin.math.sin
 
 /**
  * Shared implementation of SynthEngine using DSP primitive interfaces.
  * All audio routing logic is platform-independent.
- *
- * ## AUDIO SIGNAL PATH ARCHITECTURE
- *
- * This is the authoritative reference for signal routing. Any changes to
- * routing logic should be reflected here and validated by tests.
- *
- * ### Voice Path (per voice 0-7):
- * ```
- * TriangleOsc ─┬─> oscMixer ──> VCA ──> voiceOutput
- * SquareOsc  ─┘     ↑            ↑
- *                   │            │
- *             (sharpness)    (envelope + hold)
- * ```
- *
- * ### Main Signal Flow (STEREO):
- * ```
- * Voices ──┬──> voicePanL/R ──> drySumL/R ──> dryGainL/R ──┬──> cleanPathL/R ──┬──> postMixL/R
- *          │                                               │                    │
- *          │                                               └──> driveL/R ──> limiterL/R ──> distPathL/R
- *          │                                                                                      │
- *          └──> delay1/delay2 ──> wetGainsL/R ──────────────────────────────────────────> stereoSumL/R
- *                                                                          postMixL/R ────────────┘
- * ```
- *
- * ### Stereo Output:
- * ```
- * stereoSumL/R ──> masterPanL/R ──> masterGainL/R ──> lineOut
- * ```
- *
- * ### Delay Routing:
- * - Wet signal: delay1/2 → delay*WetLeft/Right (4 gain units) → stereoSum
- * - Feedback: delay*.output → delay*FeedbackGain → delay*.input
- * - Modulation: hyperLfo → lfoToUnipolar → delayModMixer → delay*.delay
- *
- * ### CRITICAL ROUTING RULES:
- * 1. Wet signal goes ONLY through stereo wet gains (delay1WetLeft, etc.)
- * 2. NO duplicate paths - each signal should reach stereoSum once
- * 3. Dry path: voicePan → drySum → distortion chain → stereoSum (STEREO all the way)
- * 4. Wet path bypasses distortion, goes directly to stereoSum
- * 5. Voice pan gains provide per-voice stereo positioning BEFORE distortion
+ * 
+ * Uses a plugin architecture where processing modules are injected and wired together.
  */
-class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
+class DspSynthEngine(
+    private val audioEngine: AudioEngine,
+    plugins: Set<DspPlugin>,
+) : SynthEngine {
+
+    // Extract plugins by type
+    private val hyperLfo = plugins.filterIsInstance<DspHyperLfoPlugin>().first()
+    private val delayPlugin = plugins.filterIsInstance<DspDelayPlugin>().first()
+    private val distortionPlugin = plugins.filterIsInstance<DspDistortionPlugin>().first()
+    private val stereoPlugin = plugins.filterIsInstance<DspStereoPlugin>().first()
+    private val vibratoPlugin = plugins.filterIsInstance<DspVibratoPlugin>().first()
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
-        // Pair 1-2: Bass range
         DspVoice(audioEngine, pitchMultiplier = 0.5),
         DspVoice(audioEngine, pitchMultiplier = 0.5),
-        // Pair 3-4: Mid range
         DspVoice(audioEngine, pitchMultiplier = 1.0),
         DspVoice(audioEngine, pitchMultiplier = 1.0),
-        // Pair 5-6: Mid range
         DspVoice(audioEngine, pitchMultiplier = 1.0),
         DspVoice(audioEngine, pitchMultiplier = 1.0),
-        // Pair 7-8: High range (octave up)
         DspVoice(audioEngine, pitchMultiplier = 2.0),
         DspVoice(audioEngine, pitchMultiplier = 2.0)
     )
 
-    // Dual Delay & Modulation
-    private val delay1 = audioEngine.createDelayLine()
-    private val delay2 = audioEngine.createDelayLine()
-    private val delay1FeedbackGain = audioEngine.createMultiply()
-    private val delay2FeedbackGain = audioEngine.createMultiply()
-
-    // Delay Modulation
-    private val hyperLfo = DspHyperLfo(audioEngine)
-
-    // Convert bipolar LFO (-1 to +1) to unipolar (0 to 1) to prevent negative delay times
-    // Formula: unipolar = (bipolar * 0.5) + 0.5
-    private val lfoToUnipolar1 = audioEngine.createMultiplyAdd()
-    private val lfoToUnipolar2 = audioEngine.createMultiplyAdd()
-    private val delay1ModMixer = audioEngine.createMultiplyAdd() // (UnipolarLFO * Depth) + BaseTime
-    private val delay2ModMixer = audioEngine.createMultiplyAdd()
-    
-    // LinearRamp units for smooth parameter transitions (prevents zipper noise)
-    private val delay1TimeRamp = audioEngine.createLinearRamp()
-    private val delay2TimeRamp = audioEngine.createLinearRamp()
-    private val delay1ModDepthRamp = audioEngine.createLinearRamp()
-    private val delay2ModDepthRamp = audioEngine.createLinearRamp()
-
-    // Self-modulation attenuators
-    private val selfMod1Attenuator = audioEngine.createMultiply()
-    private val selfMod2Attenuator = audioEngine.createMultiply()
-
-    // TOTAL FB: Output -> LFO Frequency Modulation
+    // TOTAL FB: Output → LFO Frequency Modulation
     private val totalFbGain = audioEngine.createMultiply()
 
-    // Monitoring
-    private val peakFollower = audioEngine.createPeakFollower()
-    
-    // Stereo Distortion Chain (FIX: prevents signal doubling by processing panned voices)
-    private val drySumLeft = audioEngine.createPassThrough()   // Collects panned dry voices L
-    private val drySumRight = audioEngine.createPassThrough()  // Collects panned dry voices R
-    private val dryGainLeft = audioEngine.createMultiply()     // Dry level L
-    private val dryGainRight = audioEngine.createMultiply()    // Dry level R
-    private val driveGainLeft = audioEngine.createMultiply()   // Drive amount L
-    private val driveGainRight = audioEngine.createMultiply()  // Drive amount R
-    private val limiterLeft = audioEngine.createLimiter()      // Saturation L
-    private val limiterRight = audioEngine.createLimiter()     // Saturation R
-    private val cleanPathGainLeft = audioEngine.createMultiply()    // Clean mix L
-    private val cleanPathGainRight = audioEngine.createMultiply()   // Clean mix R
-    private val distortedPathGainLeft = audioEngine.createMultiply()  // Distorted mix L
-    private val distortedPathGainRight = audioEngine.createMultiply() // Distorted mix R
-    private val postMixSummerLeft = audioEngine.createAdd()    // Clean + Distorted L
-    private val postMixSummerRight = audioEngine.createAdd()   // Clean + Distorted R
-    
-    // Stereo Output Bus
-    private val masterGainLeft = audioEngine.createMultiply()
-    private val masterGainRight = audioEngine.createMultiply()
-    private val stereoSumLeft = audioEngine.createPassThrough()  // Sum all L channels
-    private val stereoSumRight = audioEngine.createPassThrough() // Sum all R channels
-    private val masterPanLeft = audioEngine.createMultiply()
-    private val masterPanRight = audioEngine.createMultiply()
-    
-    // Per-voice stereo panning (equal-power pan law)
-    private val voicePanLeft = List(8) { audioEngine.createMultiply() }
-    private val voicePanRight = List(8) { audioEngine.createMultiply() }
-    
-    // Stereo Delays: Per-delay L/R wet gains for stereo routing
-    private val delay1WetLeft = audioEngine.createMultiply()
-    private val delay1WetRight = audioEngine.createMultiply()
-    private val delay2WetLeft = audioEngine.createMultiply()
-    private val delay2WetRight = audioEngine.createMultiply()
-
-    // Vibrato (Global pitch wobble)
-    private val vibratoLfo = audioEngine.createSineOscillator()
-    private val vibratoDepthGain = audioEngine.createMultiply()
-
-    // State caches (Optimized specifically for dsp calculation reuse if any)
+    // State caches
     private val quadPitchOffsets = DoubleArray(2) { 0.5 }
-    // voiceTuneCache merged into _voiceTune below, keeping distinct for now to avoid breaking existing internal logic immediately, but ideally should merge.
-    // Existing logic uses voiceTuneCache[index] as Double. _voiceTune is Float.
     private val voiceTuneCache = DoubleArray(8) { 0.5 }
-    // fmStructureCrossQuad removed in favor of _fmStructureCrossQuad
 
     // Reactive monitoring flows
     private val _peakFlow = MutableStateFlow(0f)
@@ -165,7 +66,6 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     private val _cpuLoadFlow = MutableStateFlow(0f)
     override val cpuLoadFlow: StateFlow<Float> = _cpuLoadFlow.asStateFlow()
 
-    // Visualization flows (for plasma background)
     private val _voiceLevelsFlow = MutableStateFlow(FloatArray(8))
     override val voiceLevelsFlow: StateFlow<FloatArray> = _voiceLevelsFlow.asStateFlow()
 
@@ -174,26 +74,10 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
 
     private val _masterLevelFlow = MutableStateFlow(0f)
     override val masterLevelFlow: StateFlow<Float> = _masterLevelFlow.asStateFlow()
-    
+
     // ═══════════════════════════════════════════════════════════
     // Audio-Rate Automation System
     // ═══════════════════════════════════════════════════════════
-    // 
-    // Uses DYNAMIC CONNECT/DISCONNECT architecture:
-    // - AutomationPlayer and scaler units are created at init (not connected)
-    // - On play: Connect scaler output to target AudioInput
-    // - On stop: Disconnect scaler, restore manual value via .set()
-    // 
-    // This ensures manual control always works when automation is off.
-    // ═══════════════════════════════════════════════════════════
-    
-    /**
-     * Holds the setup for a single automatable parameter.
-     * @param player The automation curve player
-     * @param scaler MultiplyAdd to scale 0..1 output to parameter range
-     * @param targets List of AudioInputs to drive (some params have multiple targets)
-     * @param restoreManualValue Lambda to re-apply the cached manual value on stop
-     */
     private data class AutomationSetup(
         val player: AutomationPlayer,
         val scaler: MultiplyAdd,
@@ -204,9 +88,8 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     private val automationSetups = mutableMapOf<String, AutomationSetup>()
     private val activeAutomations = mutableSetOf<String>()
 
-    // State Caches (Backing fields for getters)
-    // Voices
-    private val _voiceTune = FloatArray(8) { 0.5f } // Default from VoiceUiState
+    // State Caches
+    private val _voiceTune = FloatArray(8) { 0.5f }
     private val _voiceFmDepth = FloatArray(8) { 0.0f }
     private val _voiceEnvelopeSpeed = FloatArray(8) { 0.0f }
     private val _pairSharpness = FloatArray(4) { 0.0f }
@@ -215,279 +98,86 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     private val _quadHold = FloatArray(2) { 0.0f }
     private var _fmStructureCrossQuad = false
     private var _totalFeedback = 0.0f
-    private var _vibrato = 0.0f
     private var _voiceCoupling = 0.0f
-
-    // Delay
-    private val _delayTime = FloatArray(2) { 0.3f }
-    private var _delayFeedback = 0.5f
-    private var _delayMix = 0.5f
-    private val _delayModDepth = FloatArray(2) { 0.0f }
-    private val _delayModSourceIsLfo = BooleanArray(2) { true }
-    private var _delayLfoWaveformIsTriangle = true
-
-    // LFO
-    private val _hyperLfoFreq = FloatArray(2) { 0.0f }
-    private var _hyperLfoMode = 1 // OFF (from HyperLfoMode.OFF.ordinal which is typically 1 if OFF is middle, checking enum... actually OFF is usually 0 or 1 depending on list. In UI State default is OFF. Logic below will confirm)
-    private var _hyperLfoLink = false
-
-    // Distortion
-    private var _drive = 0.0f
-    private var _distortionMix = 0.5f
-    private var _masterVolume = 0.7f
-
-    // Stereo
-    private val _voicePan = FloatArray(8) { 0f }  // -1=L, 0=Center, 1=R
-    private var _masterPan = 0f
     private var _stereoMode = StereoMode.VOICE_PAN
-    
-    // Default voice pan positions (bass center, mids slight L/R, highs wide)
-    private val defaultVoicePans = floatArrayOf(0f, 0f, -0.3f, -0.3f, 0.3f, 0.3f, -0.7f, 0.7f)
 
-    // Monitoring coroutine scope
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     init {
-        // Add all units to audio engine
-        audioEngine.addUnit(delay1)
-        audioEngine.addUnit(delay2)
-        audioEngine.addUnit(delay1FeedbackGain)
-        audioEngine.addUnit(delay2FeedbackGain)
-        audioEngine.addUnit(lfoToUnipolar1)
-        audioEngine.addUnit(lfoToUnipolar2)
-        audioEngine.addUnit(delay1ModMixer)
-        audioEngine.addUnit(delay2ModMixer)
-        audioEngine.addUnit(selfMod1Attenuator)
-        audioEngine.addUnit(selfMod2Attenuator)
+        // Register all plugin audio units
+        plugins.forEach { plugin ->
+            plugin.audioUnits.forEach { unit ->
+                audioEngine.addUnit(unit)
+            }
+        }
+        
+        // Register local units
         audioEngine.addUnit(totalFbGain)
-        audioEngine.addUnit(peakFollower)
         
-        // Stereo distortion chain units
-        audioEngine.addUnit(drySumLeft)
-        audioEngine.addUnit(drySumRight)
-        audioEngine.addUnit(dryGainLeft)
-        audioEngine.addUnit(dryGainRight)
-        audioEngine.addUnit(driveGainLeft)
-        audioEngine.addUnit(driveGainRight)
-        audioEngine.addUnit(limiterLeft)
-        audioEngine.addUnit(limiterRight)
-        audioEngine.addUnit(cleanPathGainLeft)
-        audioEngine.addUnit(cleanPathGainRight)
-        audioEngine.addUnit(distortedPathGainLeft)
-        audioEngine.addUnit(distortedPathGainRight)
-        audioEngine.addUnit(postMixSummerLeft)
-        audioEngine.addUnit(postMixSummerRight)
-        
-        // LinearRamp units for smooth parameter transitions
-        audioEngine.addUnit(delay1TimeRamp)
-        audioEngine.addUnit(delay2TimeRamp)
-        audioEngine.addUnit(delay1ModDepthRamp)
-        audioEngine.addUnit(delay2ModDepthRamp)
-        
-        audioEngine.addUnit(masterGainLeft)
-        audioEngine.addUnit(masterGainRight)
-        audioEngine.addUnit(stereoSumLeft)
-        audioEngine.addUnit(stereoSumRight)
-        audioEngine.addUnit(masterPanLeft)
-        audioEngine.addUnit(masterPanRight)
-        voicePanLeft.forEach { audioEngine.addUnit(it) }
-        voicePanRight.forEach { audioEngine.addUnit(it) }
-        audioEngine.addUnit(delay1WetLeft)
-        audioEngine.addUnit(delay1WetRight)
-        audioEngine.addUnit(delay2WetLeft)
-        audioEngine.addUnit(delay2WetRight)
-        audioEngine.addUnit(vibratoLfo)
-        audioEngine.addUnit(vibratoDepthGain)
+        // Initialize all plugins (sets up internal wiring)
+        plugins.forEach { it.initialize() }
 
-        // Setup peak follower
-        peakFollower.setHalfLife(0.1)
-
-        // TOTAL FB: PeakFollower -> scaled -> HyperLfo.feedbackInput
-        peakFollower.output.connect(totalFbGain.inputA)
+        // TOTAL FB: StereoPlugin.peak → scaled → HyperLfo.feedbackInput
+        stereoPlugin.outputs["peakOutput"]?.connect(totalFbGain.inputA)
         totalFbGain.inputB.set(0.0) // Default: no feedback
         totalFbGain.output.connect(hyperLfo.feedbackInput)
 
-        // Stereo Drive/Master defaults
-        driveGainLeft.inputB.set(1.0)
-        driveGainRight.inputB.set(1.0)
-        masterGainLeft.inputB.set(0.7)
-        masterGainRight.inputB.set(0.7)
-        masterPanLeft.inputB.set(1.0)  // Default: center (equal L/R)
-        masterPanRight.inputB.set(1.0)
-
-        // Stereo Clean/Distorted Mix defaults (50/50)
-        cleanPathGainLeft.inputB.set(0.5)
-        cleanPathGainRight.inputB.set(0.5)
-        distortedPathGainLeft.inputB.set(0.5)
-        distortedPathGainRight.inputB.set(0.5)
-        
-        // Dry level defaults (full dry)
-        dryGainLeft.inputB.set(1.0)
-        dryGainRight.inputB.set(1.0)
-
-        // Dry/Wet defaults (50/50 mix)
-        setDelayMix(0.5f)
-
-        // Vibrato LFO setup
-        vibratoLfo.frequency.set(5.0) // 5Hz wobble rate
-        vibratoLfo.amplitude.set(1.0)
-        vibratoLfo.output.connect(vibratoDepthGain.inputA)
-        vibratoDepthGain.inputB.set(0.0) // Default: no vibrato
-
-        // Self-modulation attenuator (0.02 = only 2% of audio signal reaches mod input)
-        selfMod1Attenuator.inputB.set(0.02)
-        selfMod2Attenuator.inputB.set(0.02)
-        delay1.output.connect(selfMod1Attenuator.inputA)
-        delay2.output.connect(selfMod2Attenuator.inputA)
-
-        // Delay Defaults
-        delay1.allocate(110250) // 2.5 seconds max buffer at 44.1kHz
-        delay2.allocate(110250)
-
-        // Delay Modulation Wiring
-        // Convert bipolar LFO (-1 to +1) to unipolar (0 to 1): u = (x * 0.5) + 0.5
-        hyperLfo.output.connect(lfoToUnipolar1.inputA)
-        lfoToUnipolar1.inputB.set(0.5)
-        lfoToUnipolar1.inputC.set(0.5)
-
-        hyperLfo.output.connect(lfoToUnipolar2.inputA)
-        lfoToUnipolar2.inputB.set(0.5)
-        lfoToUnipolar2.inputC.set(0.5)
-
-        // Configure LinearRamps for smooth parameter transitions (20ms ramp time)
-        delay1TimeRamp.time.set(0.02)
-        delay2TimeRamp.time.set(0.02)
-        delay1ModDepthRamp.time.set(0.02)
-        delay2ModDepthRamp.time.set(0.02)
-        
-        // Initialize ramps with default values
-        delay1TimeRamp.input.set(0.3)  // Default delay time
-        delay2TimeRamp.input.set(0.3)
-        delay1ModDepthRamp.input.set(0.0)  // Default mod depth
-        delay2ModDepthRamp.input.set(0.0)
-
-        // Connect unipolar LFO to modulation mixers
-        // Mod mixer formula: (LFO * ModDepth) + BaseTime
-        lfoToUnipolar1.output.connect(delay1ModMixer.inputA)
-        lfoToUnipolar2.output.connect(delay2ModMixer.inputA)
-        
-        // Wire ramp outputs to mod mixer inputs for smooth parameter changes
-        delay1ModDepthRamp.output.connect(delay1ModMixer.inputB)  // Smoothed mod depth
-        delay2ModDepthRamp.output.connect(delay2ModMixer.inputB)
-        delay1TimeRamp.output.connect(delay1ModMixer.inputC)      // Smoothed base time
-        delay2TimeRamp.output.connect(delay2ModMixer.inputC)
-        
-        delay1ModMixer.output.connect(delay1.delay)
-        delay2ModMixer.output.connect(delay2.delay)
-
         // ═══════════════════════════════════════════════════════════
-        // STEREO SIGNAL ROUTING (FIX: eliminates signal doubling)
-        // ═══════════════════════════════════════════════════════════
-        // 
-        // Voice → Pan L/R → DrySumL/R → DryGain → Distortion → StereoSum
-        // Voice → Delays → WetGains → StereoSum
-        // StereoSum → MasterPan → MasterGain → LineOut
-        //
-        // This ensures voices are NOT doubled by sending panned audio
-        // through the distortion chain instead of bypassing it.
+        // INTER-PLUGIN WIRING
         // ═══════════════════════════════════════════════════════════
 
-        // Delays -> Stereo Wet Gains -> Stereo Sum
-        delay1.output.connect(delay1WetLeft.inputA)
-        delay1.output.connect(delay1WetRight.inputA)
-        delay2.output.connect(delay2WetLeft.inputA)
-        delay2.output.connect(delay2WetRight.inputA)
-        delay1WetLeft.output.connect(stereoSumLeft.input)
-        delay1WetRight.output.connect(stereoSumRight.input)
-        delay2WetLeft.output.connect(stereoSumLeft.input)
-        delay2WetRight.output.connect(stereoSumRight.input)
+        // HyperLFO → Delay (modulation)
+        hyperLfo.output.connect(delayPlugin.inputs["lfoInput"]!!)
 
-        // DrySumL/R -> DryGainL/R -> Split into Clean and Distorted stereo paths
-        // LEFT CHANNEL
-        drySumLeft.output.connect(dryGainLeft.inputA)
-        dryGainLeft.output.connect(cleanPathGainLeft.inputA)
-        cleanPathGainLeft.output.connect(postMixSummerLeft.inputA)
-        
-        dryGainLeft.output.connect(driveGainLeft.inputA)
-        driveGainLeft.output.connect(limiterLeft.input)
-        limiterLeft.output.connect(distortedPathGainLeft.inputA)
-        distortedPathGainLeft.output.connect(postMixSummerLeft.inputB)
-        
-        // RIGHT CHANNEL
-        drySumRight.output.connect(dryGainRight.inputA)
-        dryGainRight.output.connect(cleanPathGainRight.inputA)
-        cleanPathGainRight.output.connect(postMixSummerRight.inputA)
-        
-        dryGainRight.output.connect(driveGainRight.inputA)
-        driveGainRight.output.connect(limiterRight.input)
-        limiterRight.output.connect(distortedPathGainRight.inputA)
-        distortedPathGainRight.output.connect(postMixSummerRight.inputB)
+        // Distortion outputs → Stereo sum
+        distortionPlugin.outputs["outputLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        distortionPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
 
-        // PostMixSummer (Clean + Distorted) -> Stereo Sum
-        postMixSummerLeft.output.connect(stereoSumLeft.input)
-        postMixSummerRight.output.connect(stereoSumRight.input)
-        
-        // Stereo Sum -> Master Pan -> Master Gain -> LineOut
-        stereoSumLeft.output.connect(masterPanLeft.inputA)
-        stereoSumRight.output.connect(masterPanRight.inputA)
-        masterPanLeft.output.connect(masterGainLeft.inputA)
-        masterPanRight.output.connect(masterGainRight.inputA)
-        masterGainLeft.output.connect(audioEngine.lineOutLeft)
-        masterGainRight.output.connect(audioEngine.lineOutRight)
-        
-        // Peak follower monitors left channel (representative of output)
-        masterGainLeft.output.connect(peakFollower.input)
+        // Delay wet outputs → Stereo sum
+        delayPlugin.outputs["wetLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        delayPlugin.outputs["wetRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        delayPlugin.outputs["wet2Left"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        delayPlugin.outputs["wet2Right"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
 
-        // Independent Feedback Loops per Delay
-        delay1.output.connect(delay1FeedbackGain.inputA)
-        delay1FeedbackGain.output.connect(delay1.input)
-        delay2.output.connect(delay2FeedbackGain.inputA)
-        delay2FeedbackGain.output.connect(delay2.input)
+        // Stereo outputs → LineOut
+        stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
+        stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
 
         // Wire voices to audio paths
         voices.forEach { voice ->
-            // VOICES -> DELAYS (wet path)
-            voice.output.connect(delay1.input)
-            voice.output.connect(delay2.input)
+            // VOICES → DELAYS (wet path)
+            voice.output.connect(delayPlugin.inputs["input"]!!)
 
-            // NOTE: Removed direct voice->dryGain connection (was causing doubling)
-            // Voices now reach dry path via panning -> drySumL/R
-
-            // VIBRATO -> Voice frequency modulation
-            vibratoDepthGain.output.connect(voice.vibratoInput)
-            voice.vibratoDepth.set(1.0) // Pass through engine-scaled vibrato
+            // VIBRATO → Voice frequency modulation
+            vibratoPlugin.outputs["output"]?.connect(voice.vibratoInput)
+            voice.vibratoDepth.set(1.0)
 
             // COUPLING default depth
             voice.couplingDepth.set(0.0)
         }
 
-        // Wire voice coupling: Each voice's envelope -> partner's coupling input
+        // Wire voice coupling
         for (pairIndex in 0 until 4) {
             val voiceA = voices[pairIndex * 2]
             val voiceB = voices[pairIndex * 2 + 1]
             voiceA.envelopeOutput.connect(voiceB.couplingInput)
             voiceB.envelopeOutput.connect(voiceA.couplingInput)
         }
-        
-        // Wire per-voice pan gains to DRY SUM buses (NOT stereoSum directly!)
-        // Voice -> PanL/PanR -> DrySumL/DrySumR -> Distortion chain -> StereoSum
+
+        // Wire per-voice panning: Voice → PanL/R → Distortion inputs
         voices.forEachIndexed { index, voice ->
-            voice.output.connect(voicePanLeft[index].inputA)
-            voice.output.connect(voicePanRight[index].inputA)
-            voicePanLeft[index].output.connect(drySumLeft.input)
-            voicePanRight[index].output.connect(drySumRight.input)
+            // Voice audio goes to pan gain inputs
+            voice.output.connect(stereoPlugin.getVoicePanInputLeft(index))
+            voice.output.connect(stereoPlugin.getVoicePanInputRight(index))
+            
+            // Panned audio goes to distortion (DRY path)
+            stereoPlugin.getVoicePanOutputLeft(index).connect(distortionPlugin.inputs["inputLeft"]!!)
+            stereoPlugin.getVoicePanOutputRight(index).connect(distortionPlugin.inputs["inputRight"]!!)
         }
-        
-        // Apply default voice pan positions
-        defaultVoicePans.forEachIndexed { index, pan ->
-            setVoicePan(index, pan)
-        }
-        
+
         // ═══════════════════════════════════════════════════════════
-        // Automation Setup (Dynamic Connect/Disconnect)
+        // Automation Setup
         // ═══════════════════════════════════════════════════════════
-        // Create AutomationPlayer and scaler for each automatable parameter.
-        // They are NOT connected at init - connection happens on setParameterAutomation().
         
         fun setupAutomation(
             id: String,
@@ -500,162 +190,89 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
             val scaler = audioEngine.createMultiplyAdd()
             scaler.inputB.set(scale)
             scaler.inputC.set(offset)
-            // Connect player -> scaler (internal), but NOT scaler -> targets yet
             player.output.connect(scaler.inputA)
             
             automationSetups[id] = AutomationSetup(player, scaler, targets, restoreManualValue)
             audioEngine.addUnit(player)
             audioEngine.addUnit(scaler)
         }
-        
-        // LFO Frequencies (0..1 -> 0.01..10.01 Hz)
-        setupAutomation(
-            id = "hyper_lfo_a",
-            targets = listOf(hyperLfo.frequencyA),
-            scale = 10.0, offset = 0.01,
-            restoreManualValue = { setHyperLfoFreq(0, _hyperLfoFreq[0]) }
-        )
-        setupAutomation(
-            id = "hyper_lfo_b",
-            targets = listOf(hyperLfo.frequencyB),
-            scale = 10.0, offset = 0.01,
-            restoreManualValue = { setHyperLfoFreq(1, _hyperLfoFreq[1]) }
-        )
-        
-        // Delay Times (0..1 -> 0.01..2.0 seconds) - via ramp input for smooth changes
-        setupAutomation(
-            id = "delay_time_1",
-            targets = listOf(delay1TimeRamp.input),
-            scale = 1.99, offset = 0.01,
-            restoreManualValue = { setDelayTime(0, _delayTime[0]) }
-        )
-        setupAutomation(
-            id = "delay_time_2",
-            targets = listOf(delay2TimeRamp.input),
-            scale = 1.99, offset = 0.01,
-            restoreManualValue = { setDelayTime(1, _delayTime[1]) }
-        )
-        
-        // Delay Mod Depths (0..1 -> 0..0.1 seconds)
-        setupAutomation(
-            id = "delay_mod_1",
-            targets = listOf(delay1ModDepthRamp.input),
-            scale = 0.1, offset = 0.0,
-            restoreManualValue = { setDelayModDepth(0, _delayModDepth[0]) }
-        )
-        setupAutomation(
-            id = "delay_mod_2",
-            targets = listOf(delay2ModDepthRamp.input),
-            scale = 0.1, offset = 0.0,
-            restoreManualValue = { setDelayModDepth(1, _delayModDepth[1]) }
-        )
-        
-        // Delay Feedback (0..1 -> 0..0.95) - drives both delays
-        setupAutomation(
-            id = "delay_feedback",
-            targets = listOf(delay1FeedbackGain.inputB, delay2FeedbackGain.inputB),
-            scale = 0.95, offset = 0.0,
-            restoreManualValue = { setDelayFeedback(_delayFeedback) }
-        )
-        
-        // Vibrato depth (0..1 -> 0..20 Hz)
-        setupAutomation(
-            id = "vibrato",
-            targets = listOf(vibratoDepthGain.inputB),
-            scale = 20.0, offset = 0.0,
-            restoreManualValue = { setVibrato(_vibrato) }
-        )
-        
-        // Drive (0..1 -> 1..15) - drives both limiters
-        setupAutomation(
-            id = "drive",
-            targets = listOf(limiterLeft.drive, limiterRight.drive),
-            scale = 14.0, offset = 1.0,
-            restoreManualValue = { setDrive(_drive) }
-        )
-        
-        // Delay Mix (0..1) - complex: affects dry and wet gains inversely
-        // We use two scalers: wet(x) and dry(1-x)
+
+        // LFO Frequencies
+        setupAutomation("hyper_lfo_a", listOf(hyperLfo.frequencyA), 10.0, 0.01) { setHyperLfoFreq(0, getHyperLfoFreq(0)) }
+        setupAutomation("hyper_lfo_b", listOf(hyperLfo.frequencyB), 10.0, 0.01) { setHyperLfoFreq(1, getHyperLfoFreq(1)) }
+
+        // Delay Times
+        setupAutomation("delay_time_1", listOf(delayPlugin.delay1TimeRampInput), 1.99, 0.01) { setDelayTime(0, getDelayTime(0)) }
+        setupAutomation("delay_time_2", listOf(delayPlugin.delay2TimeRampInput), 1.99, 0.01) { setDelayTime(1, getDelayTime(1)) }
+
+        // Delay Mod Depths
+        setupAutomation("delay_mod_1", listOf(delayPlugin.delay1ModDepthRampInput), 0.1, 0.0) { setDelayModDepth(0, getDelayModDepth(0)) }
+        setupAutomation("delay_mod_2", listOf(delayPlugin.delay2ModDepthRampInput), 0.1, 0.0) { setDelayModDepth(1, getDelayModDepth(1)) }
+
+        // Delay Feedback
+        setupAutomation("delay_feedback", listOf(delayPlugin.delay1FeedbackInput, delayPlugin.delay2FeedbackInput), 0.95, 0.0) { setDelayFeedback(getDelayFeedback()) }
+
+        // Vibrato
+        setupAutomation("vibrato", listOf(), 20.0, 0.0) { setVibrato(getVibrato()) }
+
+        // Drive
+        setupAutomation("drive", listOf(distortionPlugin.limiterLeftDrive, distortionPlugin.limiterRightDrive), 14.0, 1.0) { setDrive(getDrive()) }
+
+        // Delay Mix - complex with wet and dry scalers
         run {
             val player = audioEngine.createAutomationPlayer()
             val wetScaler = audioEngine.createMultiplyAdd()
             val dryScaler = audioEngine.createMultiplyAdd()
             
-            // Wet: out = input * 1.0 + 0.0 = input
             wetScaler.inputB.set(1.0)
             wetScaler.inputC.set(0.0)
-            
-            // Dry: out = input * -1.0 + 1.0 = (1 - input)
             dryScaler.inputB.set(-1.0)
             dryScaler.inputC.set(1.0)
             
             player.output.connect(wetScaler.inputA)
             player.output.connect(dryScaler.inputA)
             
-            // Targets: wet gains and dry gains
             val wetTargets = listOf(
-                delay1WetLeft.inputB, delay1WetRight.inputB,
-                delay2WetLeft.inputB, delay2WetRight.inputB
+                delayPlugin.delay1WetLeftGain, delayPlugin.delay1WetRightGain,
+                delayPlugin.delay2WetLeftGain, delayPlugin.delay2WetRightGain
             )
-            val dryTargets = listOf(dryGainLeft.inputB, dryGainRight.inputB)
+            val dryTargets = listOf(distortionPlugin.dryGainLeftInput, distortionPlugin.dryGainRightInput)
             
-            // Store as a special setup that needs custom handling
-            automationSetups["delay_mix"] = AutomationSetup(
-                player = player,
-                scaler = wetScaler,  // Primary scaler for reference
-                targets = wetTargets + dryTargets,
-                restoreManualValue = { setDelayMix(_delayMix) }
-            )
-            // Store the extra scaler for connection
-            automationSetups["delay_mix_dry"] = AutomationSetup(
-                player = player,  // Same player
-                scaler = dryScaler,
-                targets = dryTargets,
-                restoreManualValue = {}  // Handled by main entry
-            )
+            automationSetups["delay_mix"] = AutomationSetup(player, wetScaler, wetTargets + dryTargets) { setDelayMix(getDelayMix()) }
+            automationSetups["delay_mix_dry"] = AutomationSetup(player, dryScaler, dryTargets) {}
             
             audioEngine.addUnit(player)
             audioEngine.addUnit(wetScaler)
             audioEngine.addUnit(dryScaler)
         }
-        
-        // Distortion Mix (0..1) - complex: affects clean and distorted paths inversely
+
+        // Distortion Mix
         run {
             val player = audioEngine.createAutomationPlayer()
             val distScaler = audioEngine.createMultiplyAdd()
             val cleanScaler = audioEngine.createMultiplyAdd()
             
-            // Distorted: out = input * 1.0
             distScaler.inputB.set(1.0)
             distScaler.inputC.set(0.0)
-            
-            // Clean: out = (1 - input)
             cleanScaler.inputB.set(-1.0)
             cleanScaler.inputC.set(1.0)
             
             player.output.connect(distScaler.inputA)
             player.output.connect(cleanScaler.inputA)
             
-            val distTargets = listOf(distortedPathGainLeft.inputB, distortedPathGainRight.inputB)
-            val cleanTargets = listOf(cleanPathGainLeft.inputB, cleanPathGainRight.inputB)
+            val distTargets = listOf(distortionPlugin.distortedPathLeftGain, distortionPlugin.distortedPathRightGain)
+            val cleanTargets = listOf(distortionPlugin.cleanPathLeftGain, distortionPlugin.cleanPathRightGain)
             
-            automationSetups["distortion_mix"] = AutomationSetup(
-                player = player,
-                scaler = distScaler,
-                targets = distTargets + cleanTargets,
-                restoreManualValue = { setDistortionMix(_distortionMix) }
-            )
-            automationSetups["distortion_mix_clean"] = AutomationSetup(
-                player = player,
-                scaler = cleanScaler,
-                targets = cleanTargets,
-                restoreManualValue = {}
-            )
+            automationSetups["distortion_mix"] = AutomationSetup(player, distScaler, distTargets + cleanTargets) { setDistortionMix(getDistortionMix()) }
+            automationSetups["distortion_mix_clean"] = AutomationSetup(player, cleanScaler, cleanTargets) {}
             
             audioEngine.addUnit(player)
             audioEngine.addUnit(distScaler)
             audioEngine.addUnit(cleanScaler)
         }
+
+        // Set defaults
+        setDelayMix(0.5f)
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -669,16 +286,13 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         Logger.info { "Starting Shared Audio Engine..." }
         audioEngine.start()
 
-        // Start monitoring flow updates
         monitoringJob = monitoringScope.launch {
             val voiceLevels = FloatArray(8)
             while (isActive) {
-                // Update peak and CPU at 30fps
-                val currentPeak = peakFollower.getCurrent().toFloat()
+                val currentPeak = stereoPlugin.getPeak()
                 _peakFlow.value = currentPeak
                 _cpuLoadFlow.value = audioEngine.getCpuLoad()
 
-                // Update visualization at 30fps (every ~33ms)
                 var voiceSum = 0f
                 for (i in 0 until 8) {
                     val level = voices[i].getCurrentLevel()
@@ -688,12 +302,10 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
                 _voiceLevelsFlow.value = voiceLevels.copyOf()
                 _lfoOutputFlow.value = hyperLfo.getCurrentValue()
                 
-                // Use max of peakFollower and voice sum for master level
-                // This ensures hold/delay effects are captured even if peakFollower position differs
                 val computedMaster = (voiceSum / 8f).coerceIn(0f, 1f)
                 _masterLevelFlow.value = maxOf(currentPeak.coerceIn(0f, 1f), computedMaster)
 
-                delay(33) // ~30fps for smooth visualization
+                delay(33) // ~30fps
             }
         }
         Logger.info { "Audio Engine Started" }
@@ -707,149 +319,61 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         Logger.info { "Audio Engine Stopped" }
     }
 
-    override fun setDrive(amount: Float) {
-        _drive = amount
-        val driveVal = 1.0 + (amount * 14.0) // Reduced from 49 for warmer saturation
-        limiterLeft.drive.set(driveVal)
-        limiterRight.drive.set(driveVal)
-    }
-
-    override fun setDistortionMix(amount: Float) {
-        _distortionMix = amount
-        val distortedLevel = amount
-        val cleanLevel = 1.0f - amount
-        cleanPathGainLeft.inputB.set(cleanLevel.toDouble())
-        cleanPathGainRight.inputB.set(cleanLevel.toDouble())
-        distortedPathGainLeft.inputB.set(distortedLevel.toDouble())
-        distortedPathGainRight.inputB.set(distortedLevel.toDouble())
-    }
-
-    override fun setMasterVolume(amount: Float) {
-        _masterVolume = amount
-        masterGainLeft.inputB.set(amount.toDouble())
-        masterGainRight.inputB.set(amount.toDouble())
-    }
-
-    override fun setDelayTime(index: Int, time: Float) {
-        _delayTime[index] = time
-        // Coerce input for safety - minimum 5ms delay prevents 0-length feedback blowout
-        val safeTime = time.coerceAtLeast(0.005f) 
-        val delaySeconds = 0.01 + (safeTime * 1.99)
-        // LinearRamp handles audio-rate smoothing automatically
-        if (index == 0) {
-            delay1TimeRamp.input.set(delaySeconds)
-        } else {
-            delay2TimeRamp.input.set(delaySeconds)
-        }
-    }
-
-    override fun setDelayFeedback(amount: Float) {
-        _delayFeedback = amount
-        val fb = amount * 0.95
-        delay1FeedbackGain.inputB.set(fb)
-        delay2FeedbackGain.inputB.set(fb)
-    }
-
-    private var _delayWetLevel = 0.5f
-
+    // Delay delegations
+    override fun setDelayTime(index: Int, time: Float) = delayPlugin.setTime(index, time)
+    override fun setDelayFeedback(amount: Float) = delayPlugin.setFeedback(amount)
     override fun setDelayMix(amount: Float) {
-        _delayMix = amount
-        _delayWetLevel = amount
-        val dryLevel = 1.0f - amount
-        dryGainLeft.inputB.set(dryLevel.toDouble())
-        dryGainRight.inputB.set(dryLevel.toDouble())
-        
-        // Update stereo wet gains (handles both mono and stereo modes)
-        updateStereoDelayGains()
+        delayPlugin.setMix(amount)
+        distortionPlugin.setDryLevel(1.0f - amount)
     }
-    
-    private fun updateStereoDelayGains() {
-        // Apply stereo logic AND wet level
-        when (_stereoMode) {
-            StereoMode.VOICE_PAN -> {
-                // Mono wet mix distributed to both channels
-                val gain = _delayWetLevel.toDouble()
-                delay1WetLeft.inputB.set(gain)
-                delay1WetRight.inputB.set(gain)
-                delay2WetLeft.inputB.set(gain)
-                delay2WetRight.inputB.set(gain)
-            }
-            StereoMode.STEREO_DELAYS -> {
-                // Ping Pong / Discrete routing
-                val gain = _delayWetLevel.toDouble()
-                delay1WetLeft.inputB.set(gain)
-                delay1WetRight.inputB.set(0.0)
-                delay2WetLeft.inputB.set(0.0)
-                delay2WetRight.inputB.set(gain)
-            }
-        }
-    }
-
-    override fun setDelayModDepth(index: Int, amount: Float) {
-        _delayModDepth[index] = amount
-        // Modulation depth: max 0.1 seconds (reduced from 0.5 for less aggressive modulation)
-        // Since LFO is unipolar (0-1), delay time = baseTime + (unipolarLFO * depth)
-        val depth = amount * 0.1  // Reduced from 0.5s to 0.1s
-        // LinearRamp handles audio-rate smoothing automatically
-        if (index == 0) {
-            delay1ModDepthRamp.input.set(depth)
-        } else {
-            delay2ModDepthRamp.input.set(depth)
-        }
-    }
-
-    override fun setDelayModSource(index: Int, isLfo: Boolean) {
-        _delayModSourceIsLfo[index] = isLfo
-        val targetConverter = if (index == 0) lfoToUnipolar1 else lfoToUnipolar2
-        val targetMixer = if (index == 0) delay1ModMixer else delay2ModMixer
-
-        // Disconnect the converter's input
-        targetConverter.inputA.disconnectAll()
-
-        if (isLfo) {
-            // Connect LFO -> Unipolar Converter -> Mixer (already wired at init)
-            hyperLfo.output.connect(targetConverter.inputA)
-        } else {
-            // Connect Self-Modulation -> Unipolar Converter
-            // Self-mod is already bipolar audio signal, so needs conversion too
-            val attenuatedSelf =
-                if (index == 0) selfMod1Attenuator.output else selfMod2Attenuator.output
-            attenuatedSelf.connect(targetConverter.inputA)
-        }
-    }
-
-    override fun setDelayLfoWaveform(isTriangle: Boolean) {
-        _delayLfoWaveformIsTriangle = isTriangle
-        hyperLfo.setTriangleMode(isTriangle)
-    }
-
+    override fun setDelayModDepth(index: Int, amount: Float) = delayPlugin.setModDepth(index, amount)
+    override fun setDelayModSource(index: Int, isLfo: Boolean) = delayPlugin.setModSource(index, isLfo)
+    override fun setDelayLfoWaveform(isTriangle: Boolean) = hyperLfo.setTriangleMode(isTriangle)
     @Deprecated("Use granular setDelayTime/Feedback instead")
     override fun setDelay(time: Float, feedback: Float) {
         setDelayTime(0, time)
         setDelayTime(1, time)
         setDelayFeedback(feedback)
     }
+    override fun getDelayTime(index: Int): Float = delayPlugin.getTime(index)
+    override fun getDelayFeedback(): Float = delayPlugin.getFeedback()
+    override fun getDelayMix(): Float = delayPlugin.getMix()
+    override fun getDelayModDepth(index: Int): Float = delayPlugin.getModDepth(index)
+    override fun getDelayModSourceIsLfo(index: Int): Boolean = delayPlugin.getModSourceIsLfo(index)
+    override fun getDelayLfoWaveformIsTriangle(): Boolean = true // Default to triangle
 
-    override fun setHyperLfoFreq(index: Int, frequency: Float) {
-        _hyperLfoFreq[index] = frequency
-        val freqHz = 0.01 + (frequency * 10.0)
-        if (index == 0) {
-            hyperLfo.frequencyA.set(freqHz)
-        } else {
-            hyperLfo.frequencyB.set(freqHz)
-        }
+    // HyperLFO delegations
+    override fun setHyperLfoFreq(index: Int, frequency: Float) = hyperLfo.setFreq(index, frequency)
+    override fun setHyperLfoMode(mode: Int) = hyperLfo.setMode(mode)
+    override fun setHyperLfoLink(active: Boolean) = hyperLfo.setLink(active)
+    override fun getHyperLfoFreq(index: Int): Float = hyperLfo.getFreq(index)
+    override fun getHyperLfoMode(): Int = hyperLfo.getMode()
+    override fun getHyperLfoLink(): Boolean = hyperLfo.getLink()
+
+    // Distortion delegations
+    override fun setDrive(amount: Float) = distortionPlugin.setDrive(amount)
+    override fun setDistortionMix(amount: Float) = distortionPlugin.setMix(amount)
+    override fun getDrive(): Float = distortionPlugin.getDrive()
+    override fun getDistortionMix(): Float = distortionPlugin.getMix()
+
+    // Stereo delegations
+    override fun setMasterVolume(amount: Float) = stereoPlugin.setMasterVolume(amount)
+    override fun getMasterVolume(): Float = stereoPlugin.getMasterVolume()
+    override fun setVoicePan(index: Int, pan: Float) = stereoPlugin.setVoicePan(index, pan)
+    override fun getVoicePan(index: Int): Float = stereoPlugin.getVoicePan(index)
+    override fun setMasterPan(pan: Float) = stereoPlugin.setMasterPan(pan)
+    override fun getMasterPan(): Float = stereoPlugin.getMasterPan()
+    override fun setStereoMode(mode: StereoMode) {
+        _stereoMode = mode
+        delayPlugin.setStereoMode(mode == StereoMode.STEREO_DELAYS)
     }
+    override fun getStereoMode(): StereoMode = _stereoMode
 
-    override fun setHyperLfoMode(mode: Int) {
-        _hyperLfoMode = mode
-        hyperLfo.setMode(mode)
-    }
+    // Vibrato delegation
+    override fun setVibrato(amount: Float) = vibratoPlugin.setDepth(amount)
+    override fun getVibrato(): Float = vibratoPlugin.getDepth()
 
-    override fun setHyperLfoLink(active: Boolean) {
-        _hyperLfoLink = active
-        hyperLfo.setLink(active)
-    }
-
+    // Voice controls (still managed locally)
     override fun setVoiceTune(index: Int, tune: Float) {
         _voiceTune[index] = tune
         voiceTuneCache[index] = tune.toDouble()
@@ -860,14 +384,9 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         val tune = voiceTuneCache[index]
         val quadIndex = index / 4
         val quadPitch = quadPitchOffsets[quadIndex]
-
-        // Base frequency range: 55Hz - 880Hz (4 octaves)
         val baseFreq = 55.0 * 2.0.pow(tune * 4.0)
-
-        // Apply quad pitch offset (-1 to +1 octave)
         val pitchMultiplier = 2.0.pow((quadPitch - 0.5) * 2.0)
         val finalFreq = baseFreq * pitchMultiplier
-
         voices[index].frequency.set(finalFreq)
     }
 
@@ -875,9 +394,7 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         voices[index].gate.set(if (active) 1.0 else 0.0)
     }
 
-    override fun setVoiceFeedback(index: Int, amount: Float) {
-        // Not implemented in shared engine yet
-    }
+    override fun setVoiceFeedback(index: Int, amount: Float) { /* Not implemented */ }
 
     override fun setVoiceFmDepth(index: Int, amount: Float) {
         _voiceFmDepth[index] = amount
@@ -927,40 +444,32 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         voices[voiceB].modInput.disconnectAll()
 
         when (source) {
-            ModSource.OFF -> { /* Already disconnected */
-            }
-
+            ModSource.OFF -> { }
             ModSource.LFO -> {
                 hyperLfo.output.connect(voices[voiceA].modInput)
                 hyperLfo.output.connect(voices[voiceB].modInput)
             }
-
             ModSource.VOICE_FM -> {
                 if (_fmStructureCrossQuad) {
-                    // Cross-quad routing
                     when (duoIndex) {
-                        0 -> { // Duo 0 (voices 0-1) receives from Duo 3 (voices 6-7)
+                        0 -> {
                             voices[6].output.connect(voices[voiceA].modInput)
                             voices[7].output.connect(voices[voiceB].modInput)
                         }
-
-                        1 -> { // Duo 1 (voices 2-3): Within-pair
+                        1 -> {
                             voices[voiceA].output.connect(voices[voiceB].modInput)
                             voices[voiceB].output.connect(voices[voiceA].modInput)
                         }
-
-                        2 -> { // Duo 2 (voices 4-5) receives from Duo 1 (voices 2-3)
+                        2 -> {
                             voices[2].output.connect(voices[voiceA].modInput)
                             voices[3].output.connect(voices[voiceB].modInput)
                         }
-
-                        3 -> { // Duo 3 (voices 6-7): Within-pair
+                        3 -> {
                             voices[voiceA].output.connect(voices[voiceB].modInput)
                             voices[voiceB].output.connect(voices[voiceA].modInput)
                         }
                     }
                 } else {
-                    // Within-Pair Routing (default)
                     voices[voiceA].output.connect(voices[voiceB].modInput)
                     voices[voiceB].output.connect(voices[voiceA].modInput)
                 }
@@ -978,12 +487,6 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         totalFbGain.inputB.set(scaledAmount)
     }
 
-    override fun setVibrato(amount: Float) {
-        _vibrato = amount
-        val depthHz = amount * 20.0
-        vibratoDepthGain.inputB.set(depthHz)
-    }
-
     override fun setVoiceCoupling(amount: Float) {
         _voiceCoupling = amount
         val depthHz = amount * 30.0
@@ -992,26 +495,21 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         }
     }
 
-    // Test tone oscillator (bypasses complex DSP chain for debugging)
+    // Test tone
     private var testOsc: SineOscillator? = null
     private var testGain: Multiply? = null
     
     override fun playTestTone(frequency: Float) {
         Logger.info { "Playing test tone at ${frequency}Hz" }
-        // Ensure audio is started  
         if (!audioEngine.isRunning) {
-            Logger.info { "Starting audio engine for test tone" }
             audioEngine.start()
         }
         
-        // Create test oscillator if not exists
         if (testOsc == null) {
             testOsc = audioEngine.createSineOscillator()
             testGain = audioEngine.createMultiply()
             audioEngine.addUnit(testOsc!!)
             audioEngine.addUnit(testGain!!)
-            
-            // Wire: Osc -> Gain -> Output
             testOsc!!.output.connect(testGain!!.inputA)
             testGain!!.output.connect(audioEngine.lineOutLeft)
             testGain!!.output.connect(audioEngine.lineOutRight)
@@ -1019,109 +517,75 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
         
         testOsc!!.frequency.set(frequency.toDouble())
         testOsc!!.amplitude.set(1.0)
-        testGain!!.inputB.set(0.3) // 30% volume
-        Logger.info { "Test tone started" }
+        testGain!!.inputB.set(0.3)
     }
 
     override fun stopTestTone() {
-        Logger.info { "Stopping test tone" }
         testGain?.inputB?.set(0.0)
     }
 
     override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) {
         val setup = automationSetups[controlId] ?: return
         
-        // For mix parameters, also connect the secondary scaler
         val secondarySetup = when (controlId) {
             "delay_mix" -> automationSetups["delay_mix_dry"]
             "distortion_mix" -> automationSetups["distortion_mix_clean"]
             else -> null
         }
         
-        // Disconnect any existing connections to targets and connect automation
-        setup.targets.forEach { target ->
-            target.disconnectAll()
-        }
+        setup.targets.forEach { it.disconnectAll() }
         
-        // Connect primary scaler to its targets (simple params) or wet targets (mix params)
         when (controlId) {
             "delay_mix" -> {
-                // Wet scaler -> wet gains only
-                listOf(delay1WetLeft.inputB, delay1WetRight.inputB, delay2WetLeft.inputB, delay2WetRight.inputB).forEach {
+                listOf(delayPlugin.delay1WetLeftGain, delayPlugin.delay1WetRightGain, 
+                       delayPlugin.delay2WetLeftGain, delayPlugin.delay2WetRightGain).forEach {
                     setup.scaler.output.connect(it)
                 }
-                // Dry scaler -> dry gains
                 secondarySetup?.let { secondary ->
-                    listOf(dryGainLeft.inputB, dryGainRight.inputB).forEach {
+                    listOf(distortionPlugin.dryGainLeftInput, distortionPlugin.dryGainRightInput).forEach {
                         secondary.scaler.output.connect(it)
                     }
                 }
             }
             "distortion_mix" -> {
-                // Dist scaler -> distorted gains only
-                listOf(distortedPathGainLeft.inputB, distortedPathGainRight.inputB).forEach {
+                listOf(distortionPlugin.distortedPathLeftGain, distortionPlugin.distortedPathRightGain).forEach {
                     setup.scaler.output.connect(it)
                 }
-                // Clean scaler -> clean gains
                 secondarySetup?.let { secondary ->
-                    listOf(cleanPathGainLeft.inputB, cleanPathGainRight.inputB).forEach {
+                    listOf(distortionPlugin.cleanPathLeftGain, distortionPlugin.cleanPathRightGain).forEach {
                         secondary.scaler.output.connect(it)
                     }
                 }
             }
-            else -> {
-                // Simple parameter - connect scaler to all targets
-                setup.targets.forEach { target ->
-                    setup.scaler.output.connect(target)
-                }
-            }
+            else -> setup.targets.forEach { setup.scaler.output.connect(it) }
         }
         
-        // Configure and play
         setup.player.setPath(times, values, count)
         setup.player.setDuration(duration)
         setup.player.setMode(mode)
         setup.player.play()
-        
         activeAutomations.add(controlId)
     }
 
     override fun clearParameterAutomation(controlId: String) {
         val setup = automationSetups[controlId] ?: return
-        
-        // Stop the player
         setup.player.stop()
+        setup.targets.forEach { it.disconnectAll() }
         
-        // Disconnect automation from targets
-        setup.targets.forEach { target ->
-            target.disconnectAll()
-        }
-        
-        // Also disconnect secondary scaler for mix params
         when (controlId) {
             "delay_mix" -> automationSetups["delay_mix_dry"]?.targets?.forEach { it.disconnectAll() }
             "distortion_mix" -> automationSetups["distortion_mix_clean"]?.targets?.forEach { it.disconnectAll() }
             else -> {}
         }
         
-        // Restore the cached manual value
         setup.restoreManualValue()
-        
         activeAutomations.remove(controlId)
     }
 
-    override fun getPeak(): Float {
-        return peakFollower.getCurrent().toFloat()
-    }
+    override fun getPeak(): Float = stereoPlugin.getPeak()
+    override fun getCpuLoad(): Float = audioEngine.getCpuLoad()
 
-    override fun getCpuLoad(): Float {
-        return audioEngine.getCpuLoad()
-    }
-
-    // ═══════════════════════════════════════════════════════════
     // Getters for State Saving
-    // ═══════════════════════════════════════════════════════════
-
     override fun getVoiceTune(index: Int): Float = _voiceTune[index]
     override fun getVoiceFmDepth(index: Int): Float = _voiceFmDepth[index]
     override fun getVoiceEnvelopeSpeed(index: Int): Float = _voiceEnvelopeSpeed[index]
@@ -1131,58 +595,5 @@ class DspSynthEngine(private val audioEngine: AudioEngine) : SynthEngine {
     override fun getQuadHold(quadIndex: Int): Float = _quadHold[quadIndex]
     override fun getFmStructureCrossQuad(): Boolean = _fmStructureCrossQuad
     override fun getTotalFeedback(): Float = _totalFeedback
-    override fun getVibrato(): Float = _vibrato
     override fun getVoiceCoupling(): Float = _voiceCoupling
-
-    override fun getDelayTime(index: Int): Float = _delayTime[index]
-    override fun getDelayFeedback(): Float = _delayFeedback
-    override fun getDelayMix(): Float = _delayMix
-    override fun getDelayModDepth(index: Int): Float = _delayModDepth[index]
-    override fun getDelayModSourceIsLfo(index: Int): Boolean = _delayModSourceIsLfo[index]
-    override fun getDelayLfoWaveformIsTriangle(): Boolean = _delayLfoWaveformIsTriangle
-
-    override fun getHyperLfoFreq(index: Int): Float = _hyperLfoFreq[index]
-    override fun getHyperLfoMode(): Int = _hyperLfoMode
-    override fun getHyperLfoLink(): Boolean = _hyperLfoLink
-
-    override fun getDrive(): Float = _drive
-    override fun getDistortionMix(): Float = _distortionMix
-    override fun getMasterVolume(): Float = _masterVolume
-
-    // ═══════════════════════════════════════════════════════════
-    // Stereo Control
-    // ═══════════════════════════════════════════════════════════
-
-    override fun setVoicePan(index: Int, pan: Float) {
-        _voicePan[index] = pan.coerceIn(-1f, 1f)
-        // Equal-power pan law: L = cos(angle), R = sin(angle)
-        // angle: 0 = hard left (L=1, R=0), π/2 = hard right (L=0, R=1)
-        // Map pan (-1 to +1) to angle (0 to π/2)
-        val angle = ((pan + 1f) / 2f) * (PI / 2).toFloat()
-        val leftGain = cos(angle.toDouble())
-        val rightGain = sin(angle.toDouble())
-        voicePanLeft[index].inputB.set(leftGain)
-        voicePanRight[index].inputB.set(rightGain)
-    }
-
-    override fun getVoicePan(index: Int): Float = _voicePan[index]
-
-    override fun setMasterPan(pan: Float) {
-        _masterPan = pan.coerceIn(-1f, 1f)
-        // Equal-power pan for master
-        val angle = ((pan + 1f) / 2f) * (PI / 2).toFloat()
-        val leftGain = cos(angle.toDouble())
-        val rightGain = sin(angle.toDouble())
-        masterPanLeft.inputB.set(leftGain)
-        masterPanRight.inputB.set(rightGain)
-    }
-
-    override fun getMasterPan(): Float = _masterPan
-
-    override fun setStereoMode(mode: StereoMode) {
-        _stereoMode = mode
-        updateStereoDelayGains()
-    }
-
-    override fun getStereoMode(): StereoMode = _stereoMode
 }
