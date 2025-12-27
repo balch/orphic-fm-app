@@ -17,10 +17,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.midi.MidiEventOrigin
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.routing.ControlEventOrigin
+import org.balch.orpheus.core.routing.SynthController
 
 /** UI state for the Hyper LFO panel. */
 data class LfoUiState(
@@ -50,7 +50,7 @@ private sealed interface LfoIntent {
 class LfoViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
-    private val midiRouter: Lazy<MidiRouter>,
+    private val synthController: Lazy<SynthController>,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
@@ -89,10 +89,10 @@ class LfoViewModel(
                 }
             }
 
-            // Subscribe to MIDI/Sequencer control changes for LFO controls
+            // Subscribe to control changes for LFO controls
             launch {
-                midiRouter.value.onControlChange.collect { event ->
-                    val fromSequencer = event.origin == MidiEventOrigin.SEQUENCER
+                synthController.value.onControlChange.collect { event ->
+                    val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
                     when (event.controlId) {
                         ControlIds.HYPER_LFO_A -> intents.tryEmit(LfoIntent.LfoA(event.value, fromSequencer))
                         ControlIds.HYPER_LFO_B -> intents.tryEmit(LfoIntent.LfoB(event.value, fromSequencer))

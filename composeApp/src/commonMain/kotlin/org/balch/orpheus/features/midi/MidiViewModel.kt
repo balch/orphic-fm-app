@@ -16,11 +16,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiController
-import org.balch.orpheus.core.midi.MidiEventListener
+import org.balch.orpheus.core.midi.MidiInputHandler
 import org.balch.orpheus.core.midi.MidiMappingRepository
 import org.balch.orpheus.core.midi.MidiMappingState
 import org.balch.orpheus.core.midi.MidiMappingStateHolder
-import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.util.Logger
 
 /** UI state for the MIDI panel. */
@@ -35,7 +34,7 @@ data class MidiUiState(
  * ViewModel for the MIDI panel.
  *
  * Delegates mapping state to MidiMappingStateHolder (a singleton) so that 
- * MidiRouter and all MidiViewModel instances share the same state.
+ * SynthController and all MidiViewModel instances share the same state.
  */
 @Inject
 @ViewModelKey(MidiViewModel::class)
@@ -44,7 +43,7 @@ class MidiViewModel(
     val midiController: MidiController,
     private val midiRepository: MidiMappingRepository,
     private val stateHolder: MidiMappingStateHolder,
-    private val midiRouter: Lazy<MidiRouter>,
+    private val midiInputHandler: MidiInputHandler,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
@@ -80,10 +79,7 @@ class MidiViewModel(
     // Last known device name for reconnection
     private var lastDeviceName: String? = null
 
-    // External listener (lazy to break circular dependency)
-    private val externalListener: MidiEventListener by lazy {
-        midiRouter.value.createMidiEventListener()
-    }
+    // MidiInputHandler is injected directly - no lazy creation needed
 
     init {
         viewModelScope.launch(dispatcherProvider.io) {
@@ -171,7 +167,7 @@ class MidiViewModel(
                 }
 
             if (midiController.openDevice(deviceName)) {
-                midiController.start(externalListener)
+                midiController.start(midiInputHandler)
                 lastDeviceName = deviceName
 
                 _deviceName.value = deviceName

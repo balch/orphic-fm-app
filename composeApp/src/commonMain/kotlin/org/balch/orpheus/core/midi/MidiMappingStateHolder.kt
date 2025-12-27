@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.update
  * Shared holder for MIDI mapping state that can be injected anywhere.
  * 
  * This is a singleton that holds the current mapping state, allowing both
- * MidiRouter (for event routing) and MidiViewModel (for UI) to share the same state.
+ * SynthController (for event routing) and MidiViewModel (for UI) to share the same state.
  * 
  * This follows the proper DI pattern where shared state lives in a repository/holder,
  * not in a ViewModel that may have multiple instances.
@@ -46,7 +46,7 @@ class MidiMappingStateHolder {
     }
     
     // ═══════════════════════════════════════════════════════════
-    // MAPPING LOOKUPS (used by MidiRouter)
+    // MAPPING LOOKUPS (used by MidiInputHandler)
     // ═══════════════════════════════════════════════════════════
     
     fun getControlForCC(cc: Int): String? = _state.value.getControlForCC(cc)

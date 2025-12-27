@@ -19,10 +19,10 @@ import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.midi.MidiEventOrigin
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.routing.ControlEventOrigin
+import org.balch.orpheus.core.routing.SynthController
 import kotlin.math.roundToInt
 
 /** UI state for voice management. */
@@ -88,7 +88,7 @@ private sealed interface VoiceIntent {
 class VoiceViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
-    private val midiRouter: Lazy<MidiRouter>,
+    private val synthController: Lazy<SynthController>,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
@@ -139,22 +139,21 @@ class VoiceViewModel(
                 }
             }
 
-            // Subscribe to MIDI pulse events
             launch {
-                midiRouter.value.onPulseStart.collect { voiceIndex ->
+                synthController.value.onPulseStart.collect { voiceIndex ->
                     intents.tryEmit(VoiceIntent.PulseStart(voiceIndex))
                 }
             }
             launch {
-                midiRouter.value.onPulseEnd.collect { voiceIndex ->
+                synthController.value.onPulseEnd.collect { voiceIndex ->
                     intents.tryEmit(VoiceIntent.PulseEnd(voiceIndex))
                 }
             }
 
-            // Subscribe to MIDI control changes for voice-related controls
+            // Subscribe to control changes for voice-related controls
             launch {
-                midiRouter.value.onControlChange.collect { event ->
-                    handleMidiControlChange(event.controlId, event.value, event.origin)
+                synthController.value.onControlChange.collect { event ->
+                    handleControlChange(event.controlId, event.value, event.origin)
                 }
             }
 
@@ -170,8 +169,8 @@ class VoiceViewModel(
     /**
      * Routes MIDI control changes to the appropriate voice intents.
      */
-    private fun handleMidiControlChange(controlId: String, value: Float, origin: MidiEventOrigin = MidiEventOrigin.UI) {
-        val fromSequencer = origin == MidiEventOrigin.SEQUENCER
+    private fun handleControlChange(controlId: String, value: Float, origin: ControlEventOrigin = ControlEventOrigin.UI) {
+        val fromSequencer = origin == ControlEventOrigin.SEQUENCER
         when (controlId) {
             // Voice tunes
             ControlIds.voiceTune(0) -> intents.tryEmit(VoiceIntent.Tune(0, value))

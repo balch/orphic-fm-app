@@ -19,7 +19,7 @@ import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.midi.MidiRouter
+import org.balch.orpheus.core.routing.SynthController
 
 /** UI state for the Stereo panel. */
 data class StereoUiState(
@@ -45,7 +45,7 @@ private sealed interface StereoIntent {
 @ContributesIntoMap(AppScope::class)
 class StereoViewModel(
     private val engine: SynthEngine,
-    private val midiRouter: Lazy<MidiRouter>,
+    private val synthController: Lazy<SynthController>,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
 
@@ -71,9 +71,9 @@ class StereoViewModel(
             // Apply initial state to engine
             applyFullState(uiState.value)
 
-            // Subscribe to MIDI control changes for Stereo controls
+            // Subscribe to control changes for Stereo controls
             launch {
-                midiRouter.value.onControlChange.collect { event ->
+                synthController.value.onControlChange.collect { event ->
                     when (event.controlId) {
                         ControlIds.STEREO_PAN -> {
                             // Convert 0-1 to -1..1 for pan

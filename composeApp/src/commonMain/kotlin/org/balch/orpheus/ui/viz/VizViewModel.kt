@@ -12,8 +12,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.midi.MidiRouter
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
+import org.balch.orpheus.core.routing.SynthController
 
 /**
  * UI State for the VIZ panel.
@@ -37,7 +37,7 @@ data class VizUiState(
 class VizViewModel(
     visualizations: Set<Visualization>,
     private val appPreferencesRepository: AppPreferencesRepository,
-    private val midiRouter: Lazy<MidiRouter>
+    private val synthController: SynthController,
 ) : ViewModel() {
 
     // Sorted list: Off first, then alphabetical by name
@@ -73,9 +73,9 @@ class VizViewModel(
             }
         }
         
-        // Subscribe to MIDI/Sequencer control changes for viz knobs
+        // Subscribe to control changes for viz knobs
         viewModelScope.launch {
-            midiRouter.value.onControlChange.collect { event ->
+            synthController.onControlChange.collect { event ->
                 when (event.controlId) {
                     ControlIds.VIZ_KNOB_1 -> onKnob1Change(event.value)
                     ControlIds.VIZ_KNOB_2 -> onKnob2Change(event.value)

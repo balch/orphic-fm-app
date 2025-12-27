@@ -20,9 +20,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.midi.MidiEventOrigin
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.midi.MidiRouter
+import org.balch.orpheus.core.routing.ControlEventOrigin
+import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.util.currentTimeMillis
 
 /**
@@ -90,7 +90,7 @@ sealed interface TweakSequencerIntent {
 @ContributesIntoMap(AppScope::class)
 class TweakSequencerViewModel(
     private val dispatcherProvider: DispatcherProvider,
-    private val midiRouter: MidiRouter,
+    private val synthController: SynthController,
     private val engine: SynthEngine
 ) : ViewModel() {
 
@@ -382,7 +382,7 @@ class TweakSequencerViewModel(
                 // Emit for ALL parameters with SEQUENCER origin for UI synchronization.
                 // DSP params are driven by engine automation at audio-rate - the ViewModel
                 // will receive this event for UI update but skip the engine call.
-                midiRouter.emitControlChange(id, value, MidiEventOrigin.SEQUENCER)
+                synthController.emitControlChange(id, value, ControlEventOrigin.SEQUENCER)
             }
         }
     }
