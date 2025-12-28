@@ -49,15 +49,20 @@ class DspSynthEngine(
         DspVoice(audioEngine, pitchMultiplier = 1.0),
         DspVoice(audioEngine, pitchMultiplier = 1.0),
         DspVoice(audioEngine, pitchMultiplier = 2.0),
-        DspVoice(audioEngine, pitchMultiplier = 2.0)
+        DspVoice(audioEngine, pitchMultiplier = 2.0),
+        // REPL Voices (Quad 3)
+        DspVoice(audioEngine, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, pitchMultiplier = 1.0)
     )
 
     // TOTAL FB: Output → LFO Frequency Modulation
     private val totalFbGain = audioEngine.createMultiply()
 
     // State caches
-    private val quadPitchOffsets = DoubleArray(2) { 0.5 }
-    private val voiceTuneCache = DoubleArray(8) { 0.5 }
+    private val quadPitchOffsets = DoubleArray(3) { 0.5 }
+    private val voiceTuneCache = DoubleArray(12) { 0.5 }
 
     // Reactive monitoring flows
     private val _peakFlow = MutableStateFlow(0f)
@@ -66,7 +71,7 @@ class DspSynthEngine(
     private val _cpuLoadFlow = MutableStateFlow(0f)
     override val cpuLoadFlow: StateFlow<Float> = _cpuLoadFlow.asStateFlow()
 
-    private val _voiceLevelsFlow = MutableStateFlow(FloatArray(8))
+    private val _voiceLevelsFlow = MutableStateFlow(FloatArray(12))
     override val voiceLevelsFlow: StateFlow<FloatArray> = _voiceLevelsFlow.asStateFlow()
 
     private val _lfoOutputFlow = MutableStateFlow(0f)
@@ -89,13 +94,13 @@ class DspSynthEngine(
     private val activeAutomations = mutableSetOf<String>()
 
     // State Caches
-    private val _voiceTune = FloatArray(8) { 0.5f }
-    private val _voiceFmDepth = FloatArray(8) { 0.0f }
-    private val _voiceEnvelopeSpeed = FloatArray(8) { 0.0f }
-    private val _pairSharpness = FloatArray(4) { 0.0f }
-    private val _duoModSource = Array(4) { ModSource.OFF }
-    private val _quadPitch = FloatArray(2) { 0.5f }
-    private val _quadHold = FloatArray(2) { 0.0f }
+    private val _voiceTune = FloatArray(12) { 0.5f }
+    private val _voiceFmDepth = FloatArray(12) { 0.0f }
+    private val _voiceEnvelopeSpeed = FloatArray(12) { 0.0f }
+    private val _pairSharpness = FloatArray(6) { 0.0f }
+    private val _duoModSource = Array(6) { ModSource.OFF }
+    private val _quadPitch = FloatArray(3) { 0.5f }
+    private val _quadHold = FloatArray(3) { 0.0f }
     private var _fmStructureCrossQuad = false
     private var _totalFeedback = 0.0f
     private var _voiceCoupling = 0.0f
@@ -157,7 +162,7 @@ class DspSynthEngine(
         }
 
         // Wire voice coupling
-        for (pairIndex in 0 until 4) {
+        for (pairIndex in 0 until 6) {
             val voiceA = voices[pairIndex * 2]
             val voiceB = voices[pairIndex * 2 + 1]
             voiceA.envelopeOutput.connect(voiceB.couplingInput)
@@ -273,6 +278,30 @@ class DspSynthEngine(
 
         // Set defaults
         setDelayMix(0.5f)
+
+        // Voice Automation
+        for (i in 0 until 12) {
+            // Gate automation (0.0 to 1.0)
+            setupAutomation(
+                "voice_gate_$i",
+                listOf(voices[i].gate),
+                1.0,
+                0.0
+            ) { setVoiceGate(i, false) }
+
+            // Frequency automation (Hz) - uses directFrequency to bypass pitchScaler
+            // This ensures Notes play at exact Hz without pitch multiplier interference
+            setupAutomation(
+                "voice_freq_$i",
+                listOf(voices[i].directFrequency),  // Bypass pitchScaler!
+                1.0,
+                0.0
+            ) {
+                // Restore: clear direct frequency and let pitchScaler take over again
+                voices[i].directFrequency.disconnectAll()
+                voices[i].directFrequency.set(0.0)
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -287,14 +316,14 @@ class DspSynthEngine(
         audioEngine.start()
 
         monitoringJob = monitoringScope.launch {
-            val voiceLevels = FloatArray(8)
+            val voiceLevels = FloatArray(12)
             while (isActive) {
                 val currentPeak = stereoPlugin.getPeak()
                 _peakFlow.value = currentPeak
                 _cpuLoadFlow.value = audioEngine.getCpuLoad()
 
                 var voiceSum = 0f
-                for (i in 0 until 8) {
+                for (i in 0 until 12) {
                     val level = voices[i].getCurrentLevel()
                     voiceLevels[i] = level
                     voiceSum += level
@@ -302,7 +331,7 @@ class DspSynthEngine(
                 _voiceLevelsFlow.value = voiceLevels.copyOf()
                 _lfoOutputFlow.value = hyperLfo.getCurrentValue()
                 
-                val computedMaster = (voiceSum / 8f).coerceIn(0f, 1f)
+                val computedMaster = (voiceSum / 12f).coerceIn(0f, 1f)
                 _masterLevelFlow.value = maxOf(currentPeak.coerceIn(0f, 1f), computedMaster)
 
                 delay(33) // ~30fps
@@ -478,6 +507,11 @@ class DspSynthEngine(
                             voices[voiceA].output.connect(voices[voiceB].modInput)
                             voices[voiceB].output.connect(voices[voiceA].modInput)
                         }
+                        // Quad 3 (pairs 4, 5) default to simple peer connection
+                        else -> {
+                            voices[voiceA].output.connect(voices[voiceB].modInput)
+                            voices[voiceB].output.connect(voices[voiceA].modInput)
+                        }
                     }
                 } else {
                     voices[voiceA].output.connect(voices[voiceB].modInput)
@@ -535,12 +569,33 @@ class DspSynthEngine(
     }
 
     override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) {
-        val setup = automationSetups[controlId] ?: return
+        val setup = automationSetups[controlId]
+        if (setup == null) {
+            Logger.info { "Automation NOT FOUND: $controlId" }
+            return
+        }
+        if (controlId.startsWith("voice_freq")) {
+            Logger.info { "Automation: $controlId, first value=${values.firstOrNull()} Hz, targets=${setup.targets.size}" }
+        }
         
         val secondarySetup = when (controlId) {
             "delay_mix" -> automationSetups["delay_mix_dry"]
             "distortion_mix" -> automationSetups["distortion_mix_clean"]
             else -> null
+        }
+        
+        // Prepare voice automation by zeroing out the manual value
+        // This ensures the automation adds to 0, rather than the manual setting.
+        if (controlId.startsWith("voice_freq_")) {
+            val index = controlId.removePrefix("voice_freq_").toIntOrNull()
+            if (index != null && index in 0..11) {
+                voices[index].frequency.set(0.0)
+            }
+        } else if (controlId.startsWith("voice_gate_")) {
+            val index = controlId.removePrefix("voice_gate_").toIntOrNull()
+            if (index != null && index in 0..11) {
+                voices[index].gate.set(0.0)
+            }
         }
         
         setup.targets.forEach { it.disconnectAll() }
@@ -582,6 +637,7 @@ class DspSynthEngine(
         setup.player.stop()
         setup.targets.forEach { it.disconnectAll() }
         
+        // Disconnect secondary targets (mix/dry/clean)
         when (controlId) {
             "delay_mix" -> automationSetups["delay_mix_dry"]?.targets?.forEach { it.disconnectAll() }
             "distortion_mix" -> automationSetups["distortion_mix_clean"]?.targets?.forEach { it.disconnectAll() }

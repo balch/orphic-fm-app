@@ -43,6 +43,9 @@ class DspVoice(
     private val fmDepthControl = audioEngine.createMultiply()
     private val fmFreqMixer = audioEngine.createMultiplyAdd() // (FmSignal * 200Hz) + ActualFreq
     private val pitchScaler = audioEngine.createMultiply()    // BaseFreq * PitchMultiplier
+    
+    // Direct frequency: Bypasses pitchScaler for note automation (Hz value goes straight through)
+    private val directFreqMixer = audioEngine.createAdd()     // Adds direct freq to scaled freq
 
     // Vibrato: LFO input scaled and added to frequency
     private val vibratoScaler = audioEngine.createMultiply() // LFO * depth
@@ -56,7 +59,8 @@ class DspVoice(
     private var rawHoldLevel = 0.0
 
     // Exposed ports for external wiring
-    val frequency: AudioInput get() = pitchScaler.inputA           // Base frequency
+    val frequency: AudioInput get() = pitchScaler.inputA           // Base frequency (through pitchScaler)
+    val directFrequency: AudioInput get() = directFreqMixer.inputB // Direct Hz (bypasses pitchScaler)
     val gate: AudioInput get() = ampEnv.input                      // Gate trigger
     val modInput: AudioInput get() = fmDepthControl.inputA         // FM signal input
     val fmDepth: AudioInput get() = fmDepthControl.inputB          // FM depth (0-1)
@@ -106,6 +110,7 @@ class DspVoice(
         audioEngine.addUnit(fmDepthControl)
         audioEngine.addUnit(fmFreqMixer)
         audioEngine.addUnit(pitchScaler)
+        audioEngine.addUnit(directFreqMixer)
         audioEngine.addUnit(vibratoScaler)
         audioEngine.addUnit(vibratoMixer)
         audioEngine.addUnit(vcaControlMixer)
@@ -157,7 +162,12 @@ class DspVoice(
         // FmDepthControl -> FmFreqMixer.inputA (FM modulation)
         // FmFreqMixer.output -> Both Oscillators
 
-        pitchScaler.output.connect(vibratoMixer.inputA)
+        // Direct frequency mixer: pitchScaler.output + directFrequency -> vibratoMixer
+        // This allows note automation to bypass pitchScaler entirely
+        pitchScaler.output.connect(directFreqMixer.inputA)
+        directFreqMixer.inputB.set(0.0)  // Default: no direct frequency override
+        
+        directFreqMixer.output.connect(vibratoMixer.inputA)
         vibratoScaler.output.connect(vibratoMixer.inputB)
 
         vibratoMixer.output.connect(couplingMixer.inputA)

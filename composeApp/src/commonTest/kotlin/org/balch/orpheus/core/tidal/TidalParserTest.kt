@@ -1,0 +1,167 @@
+package org.balch.orpheus.core.tidal
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
+
+/**
+ * Unit tests for the Tidal mini-notation parser.
+ */
+class TidalParserTest {
+    
+    @Test
+    fun `parseGates parses single number`() {
+        val result = TidalParser.parseGates("0")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(1, events.size)
+        assertIs<TidalEvent.Gate>(events[0].value)
+        assertEquals(0, (events[0].value as TidalEvent.Gate).voiceIndex)
+    }
+    
+    @Test
+    fun `parseGates parses sequence`() {
+        val result = TidalParser.parseGates("0 1 2 3")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(4, events.size)
+        
+        val indices = events.sortedBy { it.part.start }
+            .map { (it.value as TidalEvent.Gate).voiceIndex }
+        assertEquals(listOf(0, 1, 2, 3), indices)
+    }
+    
+    @Test
+    fun `parseGates handles repetition`() {
+        val result = TidalParser.parseGates("0*4")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(4, events.size)
+        
+        // All should be voice 0
+        events.forEach { event ->
+            assertEquals(0, (event.value as TidalEvent.Gate).voiceIndex)
+        }
+    }
+    
+    @Test
+    fun `parseGates handles grouping`() {
+        val result = TidalParser.parseGates("[0 1] 2")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        // [0 1] in first half, 2 in second half = 3 events
+        assertEquals(3, events.size)
+    }
+    
+    @Test
+    fun `parseGates handles silence`() {
+        val result = TidalParser.parseGates("0 ~ 2")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        // 0 and 2, but not the silence
+        assertEquals(2, events.size)
+    }
+    
+    @Test
+    fun `parseGates handles alternation`() {
+        val result = TidalParser.parseGates("<0 1>")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        // Cycle 0 should have voice 0
+        val eventsC0 = result.pattern.query(Arc(0.0, 1.0))
+        assertEquals(1, eventsC0.size)
+        assertEquals(0, (eventsC0[0].value as TidalEvent.Gate).voiceIndex)
+        
+        // Cycle 1 should have voice 1
+        val eventsC1 = result.pattern.query(Arc(1.0, 2.0))
+        assertEquals(1, eventsC1.size)
+        assertEquals(1, (eventsC1[0].value as TidalEvent.Gate).voiceIndex)
+    }
+    
+    @Test
+    fun `parseGates rejects invalid voice index`() {
+        val result = TidalParser.parseGates("9")
+        assertIs<TidalParser.ParseResult.Failure<TidalEvent>>(result)
+        assertTrue(result.message.contains("0-7"))
+    }
+    
+    @Test
+    fun `parseFloats parses float sequence`() {
+        val result = TidalParser.parseFloats("0.1 0.2 0.3") { 
+            TidalEvent.VoiceTune(0, it) 
+        }
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(3, events.size)
+        
+        val tunes = events.sortedBy { it.part.start }
+            .map { (it.value as TidalEvent.VoiceTune).tune }
+        assertEquals(listOf(0.1f, 0.2f, 0.3f), tunes)
+    }
+    
+    @Test
+    fun `gates extension function works`() {
+        val pattern = "0 1 2 3".gates()
+        val events = pattern.query(Arc.UNIT)
+        assertEquals(4, events.size)
+    }
+
+    @Test
+    fun `parseGates handles comma stacking`() {
+        // "0 1, 2 3" should stack two patterns
+        val result = TidalParser.parseGates("0 1, 2 3")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        // 2 events from first pattern (0, 1) + 2 events from second pattern (2, 3) = 4 events total
+        assertEquals(4, events.size)
+        
+        // Check that we have synchronous events (at start of cycle)
+        val startEvents = events.filter { it.part.start == 0.0 }
+        // Should have voice 0 (from first pattern) and voice 2 (from second pattern) at start
+        assertEquals(2, startEvents.size)
+        val voices = startEvents.map { (it.value as TidalEvent.Gate).voiceIndex }.sorted()
+        assertEquals(listOf(0, 2), voices)
+    }
+
+    @Test
+    fun `parseSounds parses sample events`() {
+        val result = TidalParser.parseSounds("bd sn")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(2, events.size)
+        
+        val samples = events.sortedBy { it.part.start }
+            .map { (it.value as TidalEvent.Sample).name }
+        assertEquals(listOf("bd", "sn"), samples)
+    }
+
+    @Test
+    fun `parseGates handles euclid`() {
+        val result = TidalParser.parseGates("0(3,8)")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        val events = result.pattern.query(Arc.UNIT)
+        // 3 events from (3,8) distribution
+        assertEquals(3, events.size)
+    }
+
+    @Test
+    fun `parseGates handles modifiers`() {
+        val result = TidalParser.parseGates("0*2 1/2")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        // 0*2 -> 2 events in first half
+        // 1/2 -> 1 event in second half (spanning longer)
+        // Total query(0,1) -> 2 events for '0', plus '1' starts at 0.5.
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(3, events.size)
+    }
+}

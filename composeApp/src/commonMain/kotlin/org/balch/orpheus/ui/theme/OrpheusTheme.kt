@@ -17,6 +17,7 @@ private val DarkVoid = Color(0xFF0D0D1A)
 private val SoftPurple = Color(0xFF2D1B4E)
 private val WarmGlow = Color(0xFFFF6B35)
 private val SynthGreen = Color(0xFF39FF14)
+private val SynthPink = Color(0xFFFF69B4)
 
 private val DarkColorScheme = darkColorScheme(
     primary = NeonCyan,
@@ -87,6 +88,7 @@ object OrpheusColors {
     val softPurple = SoftPurple
     val warmGlow = WarmGlow
     val synthGreen = SynthGreen
+    val synthPink = SynthPink // Added
 
     // Glow colors for knobs/buttons
     val knobGlow = NeonCyan.copy(alpha = 0.6f)

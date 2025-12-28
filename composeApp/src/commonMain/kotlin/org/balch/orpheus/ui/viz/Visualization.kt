@@ -147,7 +147,7 @@ fun Modifier.liquidVizEffects(
             block()
         }
     } else {
-        baseModifier.background(color.copy(alpha = 0.8f))
+        baseModifier.background(color.copy(alpha = tintAlpha))
     }
 }
 

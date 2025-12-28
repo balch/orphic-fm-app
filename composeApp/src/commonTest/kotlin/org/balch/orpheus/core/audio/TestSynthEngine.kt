@@ -15,13 +15,13 @@ open class TestSynthEngine : SynthEngine {
     var _masterVolume: Float = 0.7f
     var _drive: Float = 0f
     var _distortionMix: Float = 0.5f
-    val _voiceTunes = FloatArray(8) { 0.5f }
-    val _voiceFmDepths = FloatArray(8) { 0f }
-    val _voiceEnvelopeSpeeds = FloatArray(8) { 0f }
-    val _pairSharpness = FloatArray(4) { 0f }
-    val _duoModSources = Array(4) { ModSource.OFF }
-    val _quadPitch = FloatArray(2) { 0.5f }
-    val _quadHold = FloatArray(2) { 0f }
+    val _voiceTunes = FloatArray(12) { 0.5f }
+    val _voiceFmDepths = FloatArray(12) { 0f }
+    val _voiceEnvelopeSpeeds = FloatArray(12) { 0f }
+    val _pairSharpness = FloatArray(6) { 0f }
+    val _duoModSources = Array(6) { ModSource.OFF }
+    val _quadPitch = FloatArray(3) { 0.5f }
+    val _quadHold = FloatArray(3) { 0f }
     var _fmStructureCrossQuad = false
     var _totalFeedback = 0f
     var _vibrato = 0f
@@ -35,14 +35,14 @@ open class TestSynthEngine : SynthEngine {
     val _hyperLfoFreq = FloatArray(2) { 0f }
     var _hyperLfoMode = 1 // OFF
     var _hyperLfoLink = false
-    val _voicePan = FloatArray(8) { 0f }
+    val _voicePan = FloatArray(12) { 0f }
     var _masterPan = 0f
     var _stereoMode = StereoMode.VOICE_PAN
 
     // Mutable flows for reactive testing
     private val _peakFlow = MutableStateFlow(0f)
     private val _cpuLoadFlow = MutableStateFlow(0f)
-    private val _voiceLevelsFlow = MutableStateFlow(FloatArray(8))
+    private val _voiceLevelsFlow = MutableStateFlow(FloatArray(12))
     private val _lfoOutputFlow = MutableStateFlow(0f)
     private val _masterLevelFlow = MutableStateFlow(0f)
 

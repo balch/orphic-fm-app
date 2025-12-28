@@ -21,6 +21,7 @@ import org.balch.orpheus.features.lfo.HyperLfoPanel
 import org.balch.orpheus.features.midi.MidiPanel
 import org.balch.orpheus.features.presets.PresetsPanel
 import org.balch.orpheus.features.stereo.StereoPanel
+import org.balch.orpheus.features.tidal.ui.LiveCodePanel
 
 /**
  * A container for the top header panel row that manages expansion state
@@ -41,6 +42,7 @@ fun HeaderPanel(
     var lfoExpanded by remember { mutableStateOf(true) }
     var delayExpanded by remember { mutableStateOf(true) }
     var distortionExpanded by remember { mutableStateOf(true) }
+    var codeExpanded by remember { mutableStateOf(false) }  // Closed by default
 
     Row(
         modifier = modifier
@@ -84,6 +86,12 @@ fun HeaderPanel(
             isExpanded = distortionExpanded,
             onExpandedChange = { distortionExpanded = it },
             modifier = panelModifier(distortionExpanded)
+        )
+        // Live Coding panel - at the end, closed by default
+        LiveCodePanel(
+            isExpanded = codeExpanded,
+            onExpandedChange = { codeExpanded = it },
+            modifier = panelModifier(codeExpanded)
         )
     }
 }

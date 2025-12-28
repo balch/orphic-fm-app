@@ -36,20 +36,27 @@ class DspStereoPlugin(
     private val masterPanLeft = audioEngine.createMultiply()
     private val masterPanRight = audioEngine.createMultiply()
     
-    // Per-voice panning (8 voices)
-    private val voicePanLeft = List(8) { audioEngine.createMultiply() }
-    private val voicePanRight = List(8) { audioEngine.createMultiply() }
+    // Per-voice panning (12 voices)
+    private val voicePanLeft = List(12) { audioEngine.createMultiply() }
+    private val voicePanRight = List(12) { audioEngine.createMultiply() }
     
     // Peak monitoring
     private val peakFollower = audioEngine.createPeakFollower()
 
     // State caches
-    private val _voicePan = FloatArray(8) { 0f }
+    private val _voicePan = FloatArray(12) { 0f }
     private var _masterPan = 0f
     private var _masterVolume = 0.7f
     
-    // Default voice pan positions (bass center, mids slight L/R, highs wide)
-    private val defaultVoicePans = floatArrayOf(0f, 0f, -0.3f, -0.3f, 0.3f, 0.3f, -0.7f, 0.7f)
+    // Default voice pan positions (bass center, mids slight L/R, highs wide, REPL center)
+    private val defaultVoicePans = floatArrayOf(
+        0f, 0f,       // Quad 1 Pair 1 (Bass)
+        -0.3f, -0.3f, // Quad 1 Pair 2
+        0.3f, 0.3f,   // Quad 2 Pair 3
+        -0.7f, 0.7f,  // Quad 2 Pair 4
+        0f, 0f,       // Quad 3 Pair 5 (REPL)
+        0f, 0f        // Quad 3 Pair 6 (REPL)
+    )
 
     override val audioUnits: List<AudioUnit> = listOf(
         stereoSumLeft, stereoSumRight,
