@@ -207,11 +207,17 @@ class SynthControlAgent(
 
         agentJob = scope.launch {
             try {
+                val selectedMood = if (config.moods.isNotEmpty()) config.moods.random() else null
+
                 // Input Stream: Combine Timer Ticks and Synth Changes
                 val timerFlow = flow {
                     while (isActive) {
                         delay(config.evolutionIntervalMs)
-                        emit(config.initialMoodPrompts.random())
+                        if (selectedMood != null && selectedMood.evolutionPrompts.isNotEmpty()) {
+                            emit(selectedMood.evolutionPrompts.random())
+                        } else if (config.initialMoodPrompts.isNotEmpty()) {
+                            emit(config.initialMoodPrompts.random())
+                        }
                     }
                 }
 
@@ -286,7 +292,10 @@ class SynthControlAgent(
                             var initPrompt = synthConfig.initialPrompt
                             var userLogMessage = "Initializing ${synthConfig.name}..."
 
-                            if (synthConfig.initialMoodPrompts.isNotEmpty()) {
+                            if (selectedMood != null) {
+                                initPrompt += "\n\nSpecific Direction: ${selectedMood.name}\n${selectedMood.initialPrompt}"
+                                userLogMessage = "Mood: ${selectedMood.name}"
+                            } else if (synthConfig.initialMoodPrompts.isNotEmpty()) {
                                 val mood = synthConfig.initialMoodPrompts.random()
                                 initPrompt += "\n\nSpecific Direction:\n$mood"
                                 userLogMessage = mood
