@@ -11,10 +11,11 @@ import ai.koog.agents.core.dsl.extension.onMultipleToolCalls
 import ai.koog.agents.core.environment.ReceivedToolResult
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.ext.tool.ExitTool
-import ai.koog.prompt.executor.clients.google.GoogleModels
+import ai.koog.prompt.llm.LLModel
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.features.ai.tools.OrpheusTools
 import kotlin.time.ExperimentalTime
 
@@ -24,14 +25,15 @@ import kotlin.time.ExperimentalTime
 @SingleIn(AppScope::class)
 class OrpheusAgentConfig @Inject constructor(
     private val orpheusTools: OrpheusTools,
+    private val aiModelProvider: AiModelProvider,
 ) {
     @OptIn(ExperimentalTime::class)
     val toolRegistry = ToolRegistry {
         tools(orpheusTools.tools)
     }
 
-    /** Model to use for the agent */
-    val model = GoogleModels.Gemini2_5Flash
+    /** Model to use for the agent - uses user's selection */
+    val model: LLModel get() = aiModelProvider.currentKoogModel
 
     /** Maximum iterations before the agent stops */
     val maxAgentIterations = 100

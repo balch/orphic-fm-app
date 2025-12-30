@@ -1,18 +1,32 @@
 package org.balch.orpheus.features.ai
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.features.ai.widgets.AiButton
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryCompact
 import org.balch.orpheus.features.ai.widgets.UserKeyIndicator
@@ -48,6 +62,7 @@ fun AiOptionsPanel(
     val showChatDialog by viewModel.showChatDialog.collectAsState()
     val isApiKeySet by viewModel.apiKeyState.collectAsState()
     val isUserProvidedKey by viewModel.isUserProvidedKey.collectAsState()
+    val selectedModel by viewModel.selectedModel.collectAsState()
 
     AiOptionsLayout(
         isApiKeySet = isApiKeySet,
@@ -56,10 +71,13 @@ fun AiOptionsPanel(
         isSoloActive = isSoloActive,
         isReplActive = isReplActive,
         isChatActive = showChatDialog,
+        selectedModel = selectedModel,
+        availableModels = viewModel.availableModels,
         onToggleDrone = viewModel::toggleDrone,
         onToggleSolo = viewModel::toggleSolo,
         onToggleRepl = viewModel::toggleRepl,
         onToggleChat = viewModel::toggleChatDialog,
+        onSelectModel = viewModel::selectModel,
         onSaveApiKey = viewModel::saveApiKey,
         onClearApiKey = viewModel::clearApiKey,
         modifier = modifier,
@@ -79,10 +97,13 @@ fun AiOptionsLayout(
     isSoloActive: Boolean = false,
     isReplActive: Boolean = false,
     isChatActive: Boolean = false,
+    selectedModel: AiModel = AiModel.DEFAULT,
+    availableModels: List<AiModel> = AiModel.entries,
     onToggleDrone: () -> Unit = {},
     onToggleSolo: () -> Unit = {},
     onToggleRepl: () -> Unit = {},
     onToggleChat: () -> Unit = {},
+    onSelectModel: (AiModel) -> Unit = {},
     onSaveApiKey: (String) -> Unit = {},
     onClearApiKey: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -159,6 +180,14 @@ fun AiOptionsLayout(
                             onClick = onToggleChat
                         )
                     }
+                    
+                    // Model Selector
+                    ModelSelector(
+                        selectedModel = selectedModel,
+                        availableModels = availableModels,
+                        onSelectModel = onSelectModel,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
             }
         }
@@ -189,4 +218,58 @@ fun AiOptionsLayoutNoKeyPreview() {
     }
 }
 
-
+/**
+ * Compact model selector dropdown.
+ */
+@Composable
+fun ModelSelector(
+    selectedModel: AiModel,
+    availableModels: List<AiModel>,
+    onSelectModel: (AiModel) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    Box(modifier = modifier) {
+        // Current selection button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    OrpheusColors.midnightBlue.copy(alpha = 0.4f),
+                    shape = MaterialTheme.shapes.small
+                )
+                .clickable { expanded = true }
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = selectedModel.displayName,
+                color = OrpheusColors.sterlingSilver,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+        
+        // Dropdown menu
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            availableModels.forEach { model ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = model.displayName,
+                            fontSize = 12.sp
+                        )
+                    },
+                    onClick = {
+                        onSelectModel(model)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}

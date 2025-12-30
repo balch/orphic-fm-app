@@ -11,8 +11,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.balch.orpheus.BuildKonfig
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Provides the Gemini API key for AI functionality.
@@ -26,6 +29,7 @@ import org.balch.orpheus.core.preferences.AppPreferencesRepository
 @SingleIn(AppScope::class)
 class GeminiKeyProvider @Inject constructor(
     private val preferencesRepository: AppPreferencesRepository,
+    private val dispatcherProvider: DispatcherProvider,
 ) {
     private val log = logging("GeminiKeyProvider")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -55,17 +59,21 @@ class GeminiKeyProvider @Inject constructor(
     }
     
     private suspend fun loadUserKey() {
-        try {
-            val prefs = preferencesRepository.load()
-            val userKey = prefs.userApiKeys[AiProvider.GOOGLE.id]
-            
-            if (buildTimeKey.isNullOrEmpty() && !userKey.isNullOrEmpty()) {
-                log.info { "Loaded user-provided API key" }
-                _apiKeyState.value = userKey
-                _isUserProvidedKey.value = true
+        withContext(dispatcherProvider.io) {
+            try {
+                val prefs = preferencesRepository.load()
+                val userKey = prefs.userApiKeys[AiProvider.GOOGLE.id]
+
+                if (buildTimeKey.isNullOrEmpty() && !userKey.isNullOrEmpty()) {
+                    log.info { "Loaded user-provided API key" }
+                    _apiKeyState.value = userKey
+                    _isUserProvidedKey.value = true
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (e: Exception) {
+                log.error { "Failed to load user API key: ${e.message}" }
             }
-        } catch (e: Exception) {
-            log.error { "Failed to load user API key: ${e.message}" }
         }
     }
     
@@ -73,55 +81,60 @@ class GeminiKeyProvider @Inject constructor(
      * Save a user-provided API key.
      * Only has effect if no build-time key is configured.
      */
-    suspend fun saveApiKey(key: String): Boolean {
-        if (!buildTimeKey.isNullOrEmpty()) {
-            log.warn { "Cannot save user key - build-time key is configured" }
-            return false
-        }
-        
-        if (!AiProvider.GOOGLE.validateKeyFormat(key)) {
-            log.warn { "Invalid API key format" }
-            return false
-        }
-        
-        try {
-            val prefs = preferencesRepository.load()
-            val updatedKeys = prefs.userApiKeys.toMutableMap().apply {
-                put(AiProvider.GOOGLE.id, key)
+    suspend fun saveApiKey(key: String): Boolean =
+        withContext(dispatcherProvider.io) {
+            if (!buildTimeKey.isNullOrEmpty()) {
+                log.warn { "Cannot save user key - build-time key is configured" }
+                return@withContext false
             }
-            preferencesRepository.save(prefs.copy(userApiKeys = updatedKeys))
-            
-            _apiKeyState.value = key
-            _isUserProvidedKey.value = true
-            log.info { "Saved user-provided API key" }
-            return true
-        } catch (e: Exception) {
-            log.error { "Failed to save API key: ${e.message}" }
-            return false
+
+            if (!AiProvider.GOOGLE.validateKeyFormat(key)) {
+                log.warn { "Invalid API key format" }
+                return@withContext false
+            }
+
+            return@withContext try {
+                val prefs = preferencesRepository.load()
+                val updatedKeys = prefs.userApiKeys.toMutableMap().apply {
+                    put(AiProvider.GOOGLE.id, key)
+                }
+                preferencesRepository.save(prefs.copy(userApiKeys = updatedKeys))
+
+                _apiKeyState.value = key
+                _isUserProvidedKey.value = true
+                log.info { "Saved user-provided API key" }
+                true
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (e: Exception) {
+                log.error { "Failed to save API key: ${e.message}" }
+                false
+            }
         }
-    }
-    
+
     /**
      * Remove the user-provided API key.
      */
     suspend fun clearApiKey() {
-        if (!_isUserProvidedKey.value) {
-            log.debug { "No user key to clear" }
-            return
-        }
-        
-        try {
-            val prefs = preferencesRepository.load()
-            val updatedKeys = prefs.userApiKeys.toMutableMap().apply {
-                remove(AiProvider.GOOGLE.id)
+        withContext(dispatcherProvider.io) {
+            if (!_isUserProvidedKey.value) {
+                log.debug { "No user key to clear" }
+                return@withContext
             }
-            preferencesRepository.save(prefs.copy(userApiKeys = updatedKeys))
-            
-            _apiKeyState.value = null
-            _isUserProvidedKey.value = false
-            log.info { "Cleared user-provided API key" }
-        } catch (e: Exception) {
-            log.error { "Failed to clear API key: ${e.message}" }
+
+            try {
+                val prefs = preferencesRepository.load()
+                val updatedKeys = prefs.userApiKeys.toMutableMap().apply {
+                    remove(AiProvider.GOOGLE.id)
+                }
+                preferencesRepository.save(prefs.copy(userApiKeys = updatedKeys))
+
+                _apiKeyState.value = null
+                _isUserProvidedKey.value = false
+                log.info { "Cleared user-provided API key" }
+            } catch (e: Exception) {
+                log.error { "Failed to clear API key: ${e.message}" }
+            }
         }
     }
 }

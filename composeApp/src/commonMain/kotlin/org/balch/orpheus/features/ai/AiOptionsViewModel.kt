@@ -1,6 +1,5 @@
 package org.balch.orpheus.features.ai
 
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
@@ -8,6 +7,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import io.ktor.utils.io.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,16 +19,19 @@ import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import org.balch.orpheus.core.ai.AiModel
+import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.GeminiKeyProvider
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
-import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
 import org.balch.orpheus.features.ai.generative.DroneAgentConfig
 import org.balch.orpheus.features.ai.generative.SoloAgentConfig
 import org.balch.orpheus.features.ai.generative.SynthControlAgent
-import org.balch.orpheus.features.ai.session.SessionUsage
-import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.features.ai.tools.ReplExecuteTool
+import org.balch.orpheus.features.presets.PresetsViewModel
 import kotlin.random.Random
 
 /**
@@ -45,32 +48,20 @@ import kotlin.random.Random
 @ContributesIntoMap(AppScope::class)
 class AiOptionsViewModel(
     private val agent: OrpheusAgent,
-    private val synthAgentFactory: SynthControlAgent.Factory,
-    private val presetsViewModel: org.balch.orpheus.features.presets.PresetsViewModel,
-    private val replExecuteTool: org.balch.orpheus.features.ai.tools.ReplExecuteTool,
+    synthAgentFactory: SynthControlAgent.Factory,
+    private val presetsViewModel: PresetsViewModel,
+    private val replExecuteTool: ReplExecuteTool,
     private val panelExpansionEventBus: PanelExpansionEventBus,
-    private val synthEngine: org.balch.orpheus.core.audio.SynthEngine,
+    private val synthEngine: SynthEngine,
     private val geminiKeyProvider: GeminiKeyProvider,
+    private val aiModelProvider: AiModelProvider,
+    private val dispatcherProvider: DispatcherProvider,
 ) : ViewModel() {
 
     private val log = logging("AiOptionsViewModel")
 
     private val droneAgent = synthAgentFactory.create(DroneAgentConfig)
     private val soloAgent = synthAgentFactory.create(SoloAgentConfig)
-
-    // ============================================================
-    // Agent States
-    // ============================================================
-
-    /**
-     * Drone agent state flow.
-     */
-    val droneState = droneAgent.state
-
-    /**
-     * Solo agent state flow.
-     */
-    val soloState = soloAgent.state
 
     /**
      * Combined AI status messages from OrpheusAgent (REPL), DroneAgent, and SoloAgent.
@@ -158,11 +149,6 @@ class AiOptionsViewModel(
     val isUserProvidedKey: StateFlow<Boolean> = geminiKeyProvider.isUserProvidedKey
 
     /**
-     * Whether the API key is configured (for backward compat).
-     */
-    val isApiKeySet: Boolean get() = geminiKeyProvider.isApiKeySet
-
-    /**
      * Save a user-provided API key.
      */
     fun saveApiKey(key: String) {
@@ -187,13 +173,28 @@ class AiOptionsViewModel(
     }
 
     // ============================================================
-    // Existing Properties
+    // AI Model Selection
     // ============================================================
 
     /**
-     * The accent color for the panel.
+     * Currently selected AI model.
      */
-    val accentColor: Color = OrpheusColors.warmGlow
+    val selectedModel: StateFlow<AiModel> = aiModelProvider.selectedModel
+
+    /**
+     * List of available AI models for dropdown.
+     */
+    val availableModels: List<AiModel> = aiModelProvider.availableModels
+
+    /**
+     * Select a new AI model.
+     */
+    fun selectModel(model: AiModel) {
+        viewModelScope.launch {
+            aiModelProvider.selectModel(model)
+            log.info { "Model selected: ${model.displayName}" }
+        }
+    }
 
     /**
      * Chat messages flow.
@@ -205,22 +206,6 @@ class AiOptionsViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
-
-    /**
-     * Session usage stats (token count, etc.)
-     */
-    val sessionUsage: StateFlow<SessionUsage> = agent.sessionUsage
-
-    /**
-     * Whether the current message is from the AI agent.
-     */
-    val isAgent: StateFlow<Boolean> = agent.agentFlow.map { state ->
-        state.messages.lastOrNull()?.type == ChatMessageType.Agent
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = false
-    )
 
     // ============================================================
     // Drone Agent Actions
@@ -245,7 +230,7 @@ class AiOptionsViewModel(
             _showChatDialog.value = true // Ensure ChatDialog is visible
             
             // Generate and apply a unique random preset to jumpstart the creative process
-            viewModelScope.launch {
+            viewModelScope.launch(dispatcherProvider.io) {
                 val uniquePreset = generateRandomDronePreset()
                 
                 // Fade in: Set volume to 0, apply preset, then ramp up
@@ -342,7 +327,7 @@ class AiOptionsViewModel(
             _showChatDialog.value = true
             
             // Generate and apply a specialized solo/lead preset
-            viewModelScope.launch {
+            viewModelScope.launch(dispatcherProvider.io) {
                 val soloPreset = generateRandomSoloPreset()
                 
                 // Fade in: Set volume to 0, apply preset, then ramp up
@@ -572,7 +557,8 @@ class AiOptionsViewModel(
                     // Restore
                     synthEngine.clearParameterAutomation("master_volume")
                     synthEngine.setMasterVolume(currentVol)
-                    
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     log.warn { "Failed to hush REPL patterns gracefully: ${e.message}" }
                     // Fallback
@@ -603,17 +589,5 @@ class AiOptionsViewModel(
 
     fun updateDialogSize(width: Float, height: Float) {
         _dialogSize.value = width to height
-    }
-
-    // ============================================================
-    // Button Colors
-    // ============================================================
-
-    fun buttonColorForMode(isActive: Boolean): Color {
-        return if (isActive) {
-            OrpheusColors.warmGlow
-        } else {
-            OrpheusColors.warmGlow.copy(alpha = 0.3f)
-        }
     }
 }

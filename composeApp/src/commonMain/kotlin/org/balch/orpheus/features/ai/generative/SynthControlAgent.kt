@@ -7,7 +7,6 @@ import ai.koog.agents.core.dsl.builder.strategy
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.google.GoogleLLMClient
-import ai.koog.prompt.executor.clients.google.GoogleModels
 import ai.koog.prompt.executor.llms.SingleLLMPromptExecutor
 import ai.koog.prompt.streaming.StreamFrame
 import com.diamondedge.logging.logging
@@ -38,6 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.GeminiKeyProvider
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.routing.ControlEventOrigin
@@ -85,6 +85,7 @@ data class AiStatusMessage(
 class SynthControlAgent(
     private val config: SynthControlAgentConfig,
     private val geminiKeyProvider: GeminiKeyProvider,
+    private val aiModelProvider: AiModelProvider,
     private val synthControlTool: SynthControlTool,
     private val replExecuteTool: ReplExecuteTool,
     private val synthEngine: SynthEngine,
@@ -331,7 +332,7 @@ class SynthControlAgent(
                         prompt = prompt(config.name) {
                              system(config.systemPrompt + "\n\nIMPORTANT: You must rely on the structured output format provided. Do not use native tool calls.")
                         },
-                        model = GoogleModels.Gemini2_5Pro,
+                        model = aiModelProvider.currentKoogModel,
                         maxAgentIterations = 100
                     ),
                     toolRegistry = toolRegistry
@@ -396,6 +397,7 @@ class SynthControlAgent(
     @Inject
     class Factory(
         private val geminiKeyProvider: GeminiKeyProvider,
+        private val aiModelProvider: AiModelProvider,
         private val synthControlTool: SynthControlTool,
         private val replExecuteTool: ReplExecuteTool,
         private val synthEngine: SynthEngine,
@@ -405,6 +407,7 @@ class SynthControlAgent(
             return SynthControlAgent(
                 config = config,
                 geminiKeyProvider = geminiKeyProvider,
+                aiModelProvider = aiModelProvider,
                 synthControlTool = synthControlTool,
                 replExecuteTool = replExecuteTool,
                 synthEngine = synthEngine,
