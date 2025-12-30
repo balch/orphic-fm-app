@@ -6,7 +6,7 @@ package org.balch.orpheus.features.ai.generative
  */
 data object DroneAgentConfig : SynthControlAgentConfig {
     override val name = "DroneAgent"
-    override val evolutionIntervalMs = 30_000L
+    override val evolutionIntervalMs = 20_000L
     override val throttleIntervalMs = 10_000L
 
     override val systemPrompt = """

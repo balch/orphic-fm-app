@@ -7,7 +7,7 @@ package org.balch.orpheus.features.ai.generative
  */
 data object SoloAgentConfig : SynthControlAgentConfig {
     override val name = "SoloAgent"
-    override val evolutionIntervalMs = 15_000L  // Evolve every 15 seconds
+    override val evolutionIntervalMs = 20_000L  // Evolve every 15 seconds
     override val throttleIntervalMs = 5_000L   // Minimum 5 seconds between actions
 
     override val systemPrompt = """

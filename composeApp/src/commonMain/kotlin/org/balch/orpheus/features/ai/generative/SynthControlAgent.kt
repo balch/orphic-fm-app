@@ -211,10 +211,16 @@ class SynthControlAgent(
 
                 // Input Stream: Combine Timer Ticks and Synth Changes
                 val timerFlow = flow {
+                    var evolutionIndex = 0
                     while (isActive) {
                         delay(config.evolutionIntervalMs)
                         if (selectedMood != null && selectedMood.evolutionPrompts.isNotEmpty()) {
-                            emit(selectedMood.evolutionPrompts.random())
+                            // Emit evolution prompts sequentially, cycling through the list
+                            emit(selectedMood.evolutionPrompts[evolutionIndex++])
+                            if (evolutionIndex >= selectedMood.evolutionPrompts.size) {
+                                evolutionIndex = 0
+                            }
+
                         } else if (config.initialMoodPrompts.isNotEmpty()) {
                             emit(config.initialMoodPrompts.random())
                         }
