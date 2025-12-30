@@ -267,9 +267,11 @@ class TidalRepl(
                 } else {
                     // Check if this is a bare control command (immediate set, not cycled)
                     // Control commands are recognized by their prefix patterns
+                    // Supports both colon syntax (drive:0.4) and space syntax (drive 0.4)
+                    val controlNames = "drive|distortion|vibrato|feedback|delay|delaymix|distmix|volume|" +
+                        "hold|tune|pan|quadhold|quadpitch|duomod|sharp"
                     val isBareControlCommand = trimmed.matches(Regex(
-                        "^(drive|distortion|vibrato|feedback|delay|delaymix|distmix|volume|" +
-                        "hold|tune|pan|quadhold|quadpitch|duomod|sharp):[^$]+$"
+                        "^($controlNames)[:\\s][^$]+$"
                     ))
                     
                     if (isBareControlCommand) {
@@ -469,54 +471,61 @@ class TidalRepl(
             }
         }
         
-        // drive:<value> - Distortion drive amount (0.0-1.0)
+        // Helper to extract value from both "command:value" and "command value" syntax
+        fun extractValue(input: String, command: String): Float? {
+            val colonSyntax = input.startsWith("$command:")
+            val spaceSyntax = input.startsWith("$command ") && !input.startsWith("$command:")
+            if (!colonSyntax && !spaceSyntax) return null
+            val valueStr = if (colonSyntax) {
+                input.substringAfter("$command:").trim()
+            } else {
+                input.substringAfter("$command ").trim()
+            }
+            return valueStr.toFloatOrNull()
+        }
+        
+        // drive:<value> or drive <value> - Distortion drive amount (0.0-1.0)
         // Also accepts distortion: as an alias (common AI guess)
-        if (trimmed.startsWith("drive:") || trimmed.startsWith("distortion:")) {
-            val prefix = if (trimmed.startsWith("drive:")) "drive:" else "distortion:"
-            val value = trimmed.substringAfter(prefix).trim().toFloatOrNull()
-                ?: throw IllegalArgumentException("Line $lineNum: Invalid drive value")
+        extractValue(trimmed, "drive")?.let { value ->
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.Drive(value.coerceIn(0f, 1f), listOf(location)))
+        }
+        extractValue(trimmed, "distortion")?.let { value ->
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.Drive(value.coerceIn(0f, 1f), listOf(location)))
         }
         
-        // vibrato:<value> - Vibrato/LFO depth (0.0-1.0)
-        if (trimmed.startsWith("vibrato:")) {
-            val value = trimmed.substringAfter("vibrato:").trim().toFloatOrNull()
-                ?: throw IllegalArgumentException("Line $lineNum: Invalid vibrato value")
+        // vibrato:<value> or vibrato <value> - Vibrato/LFO depth (0.0-1.0)
+        extractValue(trimmed, "vibrato")?.let { value ->
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.Vibrato(value.coerceIn(0f, 1f), listOf(location)))
         }
         
-        // feedback:<value> - Delay feedback amount (0.0-1.0)
-        if (trimmed.startsWith("feedback:")) {
-            val value = trimmed.substringAfter("feedback:").trim().toFloatOrNull()
-                ?: throw IllegalArgumentException("Line $lineNum: Invalid feedback value")
+        // feedback:<value> or feedback <value> - Delay feedback amount (0.0-1.0)
+        extractValue(trimmed, "feedback")?.let { value ->
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.DelayFeedback(value.coerceIn(0f, 1f), listOf(location)))
         }
         
-        // delaymix:<value> - Delay wet/dry mix (0.0-1.0)
+        // delaymix:<value> or delaymix <value> - Delay wet/dry mix (0.0-1.0)
         // Also accepts delay: as an alias (common AI guess)
-        if (trimmed.startsWith("delaymix:") || trimmed.startsWith("delay:")) {
-            val prefix = if (trimmed.startsWith("delaymix:")) "delaymix:" else "delay:"
-            val value = trimmed.substringAfter(prefix).trim().toFloatOrNull()
-                ?: throw IllegalArgumentException("Line $lineNum: Invalid delay mix value")
+        extractValue(trimmed, "delaymix")?.let { value ->
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.DelayMix(value.coerceIn(0f, 1f), listOf(location)))
+        }
+        extractValue(trimmed, "delay")?.let { value ->
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.DelayMix(value.coerceIn(0f, 1f), listOf(location)))
         }
         
-        // distmix:<value> - Distortion mix (0.0-1.0)
-        if (trimmed.startsWith("distmix:")) {
-            val value = trimmed.substringAfter("distmix:").trim().toFloatOrNull()
-                ?: throw IllegalArgumentException("Line $lineNum: Invalid distortion mix value")
+        // distmix:<value> or distmix <value> - Distortion mix (0.0-1.0)
+        extractValue(trimmed, "distmix")?.let { value ->
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.DistortionMix(value.coerceIn(0f, 1f), listOf(location)))
         }
         
-        // volume:<value> - Master volume (0.0-1.0)
-        if (trimmed.startsWith("volume:")) {
-            val value = trimmed.substringAfter("volume:").trim().toFloatOrNull()
-                ?: throw IllegalArgumentException("Line $lineNum: Invalid volume value")
+        // volume:<value> or volume <value> - Master volume (0.0-1.0)
+        extractValue(trimmed, "volume")?.let { value ->
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.MasterVolume(value.coerceIn(0f, 1f), listOf(location)))
         }
