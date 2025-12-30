@@ -122,6 +122,41 @@ class OrpheusAgentConfig @Inject constructor(
         Mention one or two things you can help with.
     """.trimIndent()
 
+    fun getReplPrompt(
+        selectedMood: String,
+        selectedMode: String,
+        selectedKey: String,
+    ):String = """
+        Create a $selectedMood ambient drone soundscape in ${selectedKey.lowercase()} $selectedMode using repl_execute.
+        
+        Generate a SINGLE repl_execute call with MULTIPLE lines that include:
+       
+        Create an entertaining song using techniques from the below examples. 
+        ```
+            Example - Song setup parameters:
+            - once $ drive:0.3 to 0.6 - warm distortion
+            - once $ vibrato:0.3 to 0.5 - gentle LFO modulation
+            - once $ feedback:0.5 to 0.8 - lush delay echoes  
+            
+            Example - SOUND LAYERS:
+            - d1: Low drone notes based on $selectedKey $selectedMode (e.g., note "${selectedKey.lowercase()}2 ...") 
+            - d2: Mid-range harmony notes
+            - d3: Voice cycling (e.g., slow 2 voices:1 2 3 4)
+            
+            Example - SYNTH CONTROLS -  (use built in synth controls to provide more atmosphere):
+            - d4: hold:1 0.8 - sustain voice 1
+            
+            Example format:
+            once $ drive:0.4
+            once $ vibrato:0.35
+            once $ feedback:0.65
+            d1 $ slow 2 note "${selectedKey.lowercase()}2 ..."
+            d2 $ note "${selectedKey.lowercase()}3 ..."
+            d3 $ slow 4 voices:2 3 4
+        ```
+        Make it $selectedMood. After execution, describe the atmosphere in one or two sentences.
+    """.trimIndent()
+
     /**
      * Creates the agent graph strategy for conversation flow.
      */

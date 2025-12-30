@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,9 +28,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.ai.GeminiKeyProvider
@@ -115,14 +112,26 @@ class OrpheusAgent @Inject constructor(
         userIntent.tryEmit(prompt)
     }
 
+    fun sendReplPrompt(
+        displayText: String,
+        selectedMood: String,
+        selectedMode: String,
+        selectedKey: String,
+    ) {
+        sendPrompt(
+            PromptIntent(
+                prompt = config.getReplPrompt(selectedMood, selectedMode, selectedKey),
+                displayText = displayText
+            )
+        )
+    }
+
     /**
      * Send a simple text prompt.
      */
     fun sendPrompt(text: String) {
         sendPrompt(PromptIntent(text))
     }
-
-    private val externalUpdates = MutableSharedFlow<AgentState>(extraBufferCapacity = 10)
 
     // AI Status messages for UI carousel (similar to DroneAgent)
     private val _statusMessages = MutableSharedFlow<AiStatusMessage>(replay = 10, extraBufferCapacity = 10)
@@ -131,6 +140,25 @@ class OrpheusAgent @Inject constructor(
     private fun emitStatus(text: String, isLoading: Boolean = false, isError: Boolean = false) {
         _statusMessages.tryEmit(AiStatusMessage(text, isLoading, isError))
     }
+
+    private val initialMessage = ChatMessage(text = "Awakening...", type = ChatMessageType.Loading)
+    private val messages = mutableListOf(initialMessage)
+
+    /**
+     * Whether the API key is configured.
+     */
+    val isApiKeySet: Boolean get() = geminiKeyProvider.isApiKeySet
+
+    // Internal mutable state that backs agentFlow
+    private val _agentState = MutableStateFlow<AgentState>(AgentState.Loading(messages.toList()))
+    
+    // Track the current agent job for restart capability
+    private var currentAgentJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * The main agent state flow.
+     */
+    val agentFlow: StateFlow<AgentState> = _agentState.asStateFlow()
 
     init {
         // Subscribe to REPL code events to emit status messages
@@ -154,42 +182,65 @@ class OrpheusAgent @Inject constructor(
                 }
             }
         }
+        
+        // Start the agent if API key is configured
+        startAgentIfNeeded()
+    }
+    
+    private fun startAgentIfNeeded() {
+        if (!geminiKeyProvider.isApiKeySet) {
+            _agentState.value = AgentState.Error(
+                IllegalStateException("No API key"),
+                listOf(ChatMessage(
+                    text = "Orpheus awaits... but no API key is configured.\n\nAdd GEMINI_API_KEY to local.properties to awaken.",
+                    type = ChatMessageType.Error
+                ))
+            )
+            return
+        }
+        
+        currentAgentJob = applicationScope.launch {
+            runAgent(config.initialAgentPrompt())
+                .flowOn(Dispatchers.Default)
+                .catch { throwable ->
+                    logger.error(throwable) { "Unhandled exception in agent flow" }
+                    _agentState.value = errorMessageAsState(throwable, throwable.message ?: "An error occurred")
+                }
+                .collect { state ->
+                    _agentState.value = state
+                }
+        }
     }
 
-    private val initialMessage = ChatMessage(text = "Awakening...", type = ChatMessageType.Loading)
-    private val messages = mutableListOf(initialMessage)
-
     /**
-     * Whether the API key is configured.
+     * Restart the agent with the current model.
+     * Preserves conversation history and adds a system message about the model change.
      */
-    val isApiKeySet: Boolean get() = geminiKeyProvider.isApiKeySet
-
-    /**
-     * The main agent state flow. Starts lazily when first subscribed.
-     */
-    val agentFlow: StateFlow<AgentState> by lazy {
-        if (!geminiKeyProvider.isApiKeySet) {
-            MutableStateFlow(
-                AgentState.Error(
-                    IllegalStateException("No API key"),
-                    listOf(ChatMessage(
-                        text = "Orpheus awaits... but no API key is configured.\n\nAdd GEMINI_API_KEY to local.properties to awaken.",
-                        type = ChatMessageType.Error
-                    ))
-                )
-            )
-        } else {
-            // Merge main agent flow with external updates
-            merge(
-                runAgent(config.initialAgentPrompt()),
-                externalUpdates
-            )
+    fun restart() {
+        logger.info { "Restarting agent with model: ${config.model}" }
+        
+        // Cancel current agent
+        currentAgentJob?.cancel()
+        currentAgentJob = null
+        
+        // Add a system message about the restart
+        addOrReplaceMessage(ChatMessage(
+            text = "Switching to ${config.model}... Orpheus adapts.",
+            type = ChatMessageType.Agent
+        ))
+        _agentState.value = AgentState.Chatting(messages.toList())
+        
+        // Start new agent - it will wait for the next user prompt
+        currentAgentJob = applicationScope.launch {
+            runAgent("Continue the conversation. The user may send a new message.")
                 .flowOn(Dispatchers.Default)
-                .stateIn(
-                    scope = applicationScope,
-                    initialValue = AgentState.Loading(messages.toList()),
-                    started = SharingStarted.Lazily
-                )
+                .catch { throwable ->
+                    logger.error(throwable) { "Unhandled exception in agent flow after restart" }
+                    _agentState.value = errorMessageAsState(throwable, throwable.message ?: "An error occurred")
+                }
+                .collect { state ->
+                    _agentState.value = state
+                }
         }
     }
 
@@ -309,8 +360,8 @@ class OrpheusAgent @Inject constructor(
      * Add an external message to the chat stream.
      */
     fun addExternalMessage(text: String, type: ChatMessageType = ChatMessageType.Agent) {
-        // Append to messages list - primarily accessed from coroutine context
+        // Append to messages list and update state
         messages.add(ChatMessage(text = text, type = type))
-        externalUpdates.tryEmit(AgentState.Chatting(messages.toList()))
+        _agentState.value = AgentState.Chatting(messages.toList())
     }
 }

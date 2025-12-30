@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.shareIn
@@ -62,6 +63,18 @@ class AiOptionsViewModel(
 
     private val droneAgent = synthAgentFactory.create(DroneAgentConfig)
     private val soloAgent = synthAgentFactory.create(SoloAgentConfig)
+
+    init {
+        // Observe model changes and restart the OrpheusAgent (Chat) when model changes
+        viewModelScope.launch {
+            aiModelProvider.selectedModel
+                .drop(1) // Skip initial emission to avoid restart on startup
+                .collect { model ->
+                    log.info { "Model changed to ${model.displayName}, restarting chat agent" }
+                    agent.restart()
+                }
+        }
+    }
 
     /**
      * Combined AI status messages from OrpheusAgent (REPL), DroneAgent, and SoloAgent.
@@ -495,35 +508,12 @@ class AiOptionsViewModel(
             val selectedMode = modes.random()
             
             // Send a specialized prompt for ambient pattern generation with variety
-            agent.sendPrompt(PromptIntent(
-                prompt = """
-                    Create a $selectedMood ambient drone soundscape in ${selectedKey.lowercase()} $selectedMode using repl_execute.
-                    
-                    Generate a SINGLE repl_execute call with MULTIPLE lines that include:
-                    
-                    SOUND LAYERS:
-                    - d1: Low drone notes based on $selectedKey $selectedMode (e.g., note "${selectedKey.lowercase()}2 ...") 
-                    - d2: Mid-range harmony notes
-                    - d3: Voice cycling (e.g., slow 2 voices:0 1 2 3)
-                    
-                    SYNTH CONTROLS (use these Tidal commands in separate d-slots):
-                    - d4: drive:0.3 to 0.6 - warm distortion
-                    - d5: vibrato:0.3 to 0.5 - gentle LFO modulation
-                    - d6: feedback:0.5 to 0.8 - lush delay echoes  
-                    - d7: hold:0 0.8 - sustain voice 0
-                    
-                    Example format:
-                    d1 $ slow 2 note "${selectedKey.lowercase()}2 ..."
-                    d2 $ note "${selectedKey.lowercase()}3 ..."
-                    d3 $ slow 4 voices:0 1 2
-                    d4 $ drive:0.4
-                    d5 $ vibrato:0.35
-                    d6 $ feedback:0.65
-                    
-                    Make it $selectedMood. After execution, describe the atmosphere in one or two sentences.
-                """.trimIndent(),
-                displayText = "Generate ambient drone"
-            ))
+            agent.sendReplPrompt(
+                displayText = "Generating Tidal Code",
+                selectedMood = selectedMood,
+                selectedMode = selectedMode,
+                selectedKey = selectedKey
+            )
         } else {
             log.info { "REPL mode deactivated" }
             
