@@ -253,12 +253,14 @@ class AiOptionsViewModel(
             viewModelScope.launch(dispatcherProvider.io) {
                 val uniquePreset = generateRandomDronePreset()
                 
-                // Fade in: Set volume to 0, apply preset, then ramp up
+                // Fade in: Apply preset with volume=0, then ramp up to target
+                // We must set masterVolume=0 IN THE PRESET to prevent the reactive
+                // DistortionViewModel from immediately overriding our fade-in.
                 val targetVolume = uniquePreset.masterVolume
-                synthEngine.setMasterVolume(0f)
+                val presetWithZeroVolume = uniquePreset.copy(masterVolume = 0f)
                 
-                presetsViewModel.applyPreset(uniquePreset)
-                log.info { "Applied unique drone preset: ${uniquePreset.name}" }
+                presetsViewModel.applyPreset(presetWithZeroVolume)
+                log.info { "Applied drone preset: ${uniquePreset.name} (fading in)" }
                 
                 // Ramp volume from 0 to target over 1 second
                 synthEngine.setParameterAutomation(
@@ -358,12 +360,14 @@ class AiOptionsViewModel(
             viewModelScope.launch(dispatcherProvider.io) {
                 val soloPreset = generateRandomSoloPreset()
                 
-                // Fade in: Set volume to 0, apply preset, then ramp up
+                // Fade in: Apply preset with volume=0, then ramp up to target
+                // We must set masterVolume=0 IN THE PRESET to prevent the reactive
+                // DistortionViewModel from immediately overriding our fade-in.
                 val targetVolume = soloPreset.masterVolume
-                synthEngine.setMasterVolume(0f)
+                val presetWithZeroVolume = soloPreset.copy(masterVolume = 0f)
                 
-                presetsViewModel.applyPreset(soloPreset)
-                log.info { "Applied solo preset: ${soloPreset.name}" }
+                presetsViewModel.applyPreset(presetWithZeroVolume)
+                log.info { "Applied solo preset: ${soloPreset.name} (fading in)" }
                 
                 // Ramp volume from 0 to target over 1 second
                 synthEngine.setParameterAutomation(
