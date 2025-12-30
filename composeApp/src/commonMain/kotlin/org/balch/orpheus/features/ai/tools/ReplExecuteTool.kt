@@ -92,9 +92,6 @@ class ReplExecuteTool @Inject constructor(
             Combine: d1 $ note "c3" # hold:1 0.8
         """)
         val code: String,
-        
-        @property:LLMDescription("Show CODE panel. Default true.")
-        val showPanel: Boolean = true
     )
 
     @Serializable
@@ -106,22 +103,17 @@ class ReplExecuteTool @Inject constructor(
 
     override suspend fun execute(args: Args): Result {
         val code = args.code.trim()
-        log.info { "ReplExecuteTool: Executing code (showPanel=${args.showPanel}): ${code.take(80)}..." }
+        log.info { "ReplExecuteTool: Executing: ${code.take(80)}..." }
         
-        // Conditionally expand the CODE panel
-        if (args.showPanel) {
-            log.debug { "ReplExecuteTool: Expanding CODE panel" }
-            panelExpansionEventBus.expand(PanelId.CODE)
-            replCodeEventBus.emitGenerating()
-        }
-        
+        log.debug { "ReplExecuteTool: Expanding CODE panel" }
+        panelExpansionEventBus.expand(PanelId.CODE)
+        replCodeEventBus.emitGenerating()
+
         // Handle hush command specially
         if (code.equals("hush", ignoreCase = true)) {
             log.debug { "ReplExecuteTool: Executing hush" }
             tidalRepl.hush()
-            if (args.showPanel) {
-                replCodeEventBus.emitGenerated("hush", emptyList())
-            }
+            replCodeEventBus.emitGenerated("hush", emptyList())
             return Result(
                 success = true,
                 message = "All patterns silenced",
@@ -153,14 +145,10 @@ class ReplExecuteTool @Inject constructor(
         
         if (resultSuccess) {
             log.info { "ReplExecuteTool: Code executed successfully, slots=$slots" }
-            if (args.showPanel) {
-                replCodeEventBus.emitGenerated(code, slots.toList())
-            }
+            replCodeEventBus.emitGenerated(code, slots.toList())
         } else {
             log.warn { "ReplExecuteTool: Failed - $resultMessage" }
-            if (args.showPanel) {
-                replCodeEventBus.emitFailed(resultMessage)
-            }
+            replCodeEventBus.emitFailed(resultMessage)
         }
         
         return Result(

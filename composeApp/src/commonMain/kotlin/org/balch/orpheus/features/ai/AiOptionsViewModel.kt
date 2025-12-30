@@ -537,10 +537,7 @@ class AiOptionsViewModel(
                     delay(1200)
                     
                     replExecuteTool.execute(
-                        org.balch.orpheus.features.ai.tools.ReplExecuteTool.Args(
-                            code = "hush",
-                            showPanel = false
-                        )
+                        ReplExecuteTool.Args(code = "hush")
                     )
                     log.info { "Hushed REPL patterns" }
                     
@@ -553,10 +550,7 @@ class AiOptionsViewModel(
                     log.warn { "Failed to hush REPL patterns gracefully: ${e.message}" }
                     // Fallback
                     replExecuteTool.execute(
-                        org.balch.orpheus.features.ai.tools.ReplExecuteTool.Args(
-                            code = "hush",
-                            showPanel = false
-                        )
+                        ReplExecuteTool.Args(code = "hush")
                     )
                 }
             }

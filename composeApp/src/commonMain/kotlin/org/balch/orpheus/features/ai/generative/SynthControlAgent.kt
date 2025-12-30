@@ -168,10 +168,10 @@ class SynthControlAgent(
                     emitControl("(hush blocked - maintaining flow)", isError = false)
                     return
                 }
-                
+
                 log.info { "Executing REPL: $code" }
                 emitControl("Pattern: $code")
-                val result = replExecuteTool.execute(ReplExecuteTool.Args(code, showPanel = false))
+                val result = replExecuteTool.execute(ReplExecuteTool.Args(code))
                 if (!result.success) emitControl("Failed: ${result.message}", isError = true)
             }
             ActionType.STATUS -> {
@@ -376,7 +376,7 @@ class SynthControlAgent(
                 
                 delay(1700)
                 
-                replExecuteTool.execute(ReplExecuteTool.Args(code = "hush", showPanel = false))
+                replExecuteTool.execute(ReplExecuteTool.Args(code = "hush"))
                 
                 synthEngine.clearParameterAutomation("master_volume")
                 synthEngine.setMasterVolume(currentVol)
@@ -386,7 +386,7 @@ class SynthControlAgent(
                 throw e
             } catch (e: Exception) {
                 log.warn { "Failed to stop gracefully: ${e.message}" }
-                replExecuteTool.execute(ReplExecuteTool.Args(code = "hush", showPanel = false))
+                replExecuteTool.execute(ReplExecuteTool.Args(code = "hush"))
             } finally {
                 emitStatus("Stopped")
                 _state.value = SynthAgentState.Idle
