@@ -114,9 +114,9 @@ fun ChatInputField(
                 disabledBorderColor = OrpheusColors.slateSilver.copy(alpha = 0.2f),
                 
                 // Container colors - Midnight Blue glass effect
-                focusedContainerColor = OrpheusColors.midnightBlue.copy(alpha = 0.4f),
-                unfocusedContainerColor = OrpheusColors.midnightBlue.copy(alpha = 0.3f),
-                disabledContainerColor = OrpheusColors.midnightBlue.copy(alpha = 0.1f),
+                focusedContainerColor = OrpheusColors.midnightBlue.copy(alpha = 0.2f),
+                unfocusedContainerColor = OrpheusColors.midnightBlue.copy(alpha = 0.15f),
+                disabledContainerColor = OrpheusColors.midnightBlue.copy(alpha = 0.05f),
                 
                 // Text colors
                 focusedTextColor = OrpheusColors.sterlingSilver,

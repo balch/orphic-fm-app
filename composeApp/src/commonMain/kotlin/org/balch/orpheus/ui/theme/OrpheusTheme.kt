@@ -95,7 +95,7 @@ object OrpheusColors {
     val deepSpaceBlue = Color(0xFF0F172A) // Darker, for backgrounds
     val sterlingSilver = Color(0xFFE2E8F0) // Bright Silver/White
     val slateSilver = Color(0xFF94A3B8)   // Muted Silver/Grey
-    val metallicBlue = Color(0xFF3B82F6)  // Vibrant Blue Accent
+    val metallicBlue = Color(0xFF60A5FA)  // Brighter, more vibrant blue accent
 
     // Glow colors for knobs/buttons
     val knobGlow = NeonCyan.copy(alpha = 0.6f)

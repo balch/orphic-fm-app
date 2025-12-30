@@ -77,9 +77,9 @@ fun AiStatusCarousel(
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(
-                        OrpheusColors.midnightBlue.copy(alpha = 0.3f),
                         OrpheusColors.midnightBlue.copy(alpha = 0.15f),
-                        OrpheusColors.midnightBlue.copy(alpha = 0.3f),
+                        OrpheusColors.midnightBlue.copy(alpha = 0.05f),
+                        OrpheusColors.midnightBlue.copy(alpha = 0.15f),
                     )
                 )
             )
@@ -124,7 +124,7 @@ fun AiStatusCarousel(
                                 fontStyle = FontStyle.Italic,
                                 color = when {
                                     msg.isError -> MaterialTheme.colorScheme.error
-                                    msg.isLoading -> OrpheusColors.metallicBlue.copy(alpha = 0.7f)
+                                    msg.isLoading -> OrpheusColors.sterlingSilver.copy(alpha = 0.9f)
                                     else -> if (isPrimary) OrpheusColors.metallicBlue else OrpheusColors.sterlingSilver.copy(alpha = 0.5f)
                                 },
                                 maxLines = if (isPrimary) 2 else 1,

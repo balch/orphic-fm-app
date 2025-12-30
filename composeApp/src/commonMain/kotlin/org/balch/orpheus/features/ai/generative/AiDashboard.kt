@@ -78,7 +78,7 @@ fun AiDashboard(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    OrpheusColors.midnightBlue.copy(alpha = 0.2f),
+                    OrpheusColors.midnightBlue.copy(alpha = 0.1f),
                     shape = MaterialTheme.shapes.medium
                 )
                 .clip(MaterialTheme.shapes.medium)
@@ -206,7 +206,7 @@ fun LogPanel(
     Column(
         modifier = modifier
             .background(
-                OrpheusColors.midnightBlue.copy(alpha = 0.15f),
+                OrpheusColors.midnightBlue.copy(alpha = 0.1f),
                 shape = MaterialTheme.shapes.medium
             )
             .padding(4.dp)
@@ -224,8 +224,8 @@ fun LogPanel(
                 style = MaterialTheme.typography.labelMedium,
                 color = OrpheusColors.metallicBlue,
                 fontWeight = FontWeight.Black,
-                fontSize = 11.sp,
-                letterSpacing = 1.2.sp
+                fontSize = 12.sp,
+                letterSpacing = 1.5.sp
             )
         }
 
