@@ -83,8 +83,8 @@ fun CompactVoicePanel(
         HorizontalMiniSlider(
             value = envelopeSpeed,
             onValueChange = onEnvelopeSpeedChange,
-            leftLabel = "S",
-            rightLabel = "F",
+            leftLabel = "F",
+            rightLabel = "S",
             color = color,
             trackWidth = 36
         )
