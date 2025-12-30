@@ -8,15 +8,17 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import io.ktor.utils.io.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
@@ -49,7 +51,7 @@ import kotlin.random.Random
 @ContributesIntoMap(AppScope::class)
 class AiOptionsViewModel(
     private val agent: OrpheusAgent,
-    synthAgentFactory: SynthControlAgent.Factory,
+    private val synthAgentFactory: SynthControlAgent.Factory,
     private val presetsViewModel: PresetsViewModel,
     private val replExecuteTool: ReplExecuteTool,
     private val panelExpansionEventBus: PanelExpansionEventBus,
@@ -61,8 +63,9 @@ class AiOptionsViewModel(
 
     private val log = logging("AiOptionsViewModel")
 
-    private val droneAgent = synthAgentFactory.create(DroneAgentConfig)
-    private val soloAgent = synthAgentFactory.create(SoloAgentConfig)
+    // StateFlows to hold the current agent instances (recreated on each start to reset state)
+    private val _droneAgent = MutableStateFlow<SynthControlAgent?>(null)
+    private val _soloAgent = MutableStateFlow<SynthControlAgent?>(null)
 
     init {
         // Observe model changes and restart the OrpheusAgent (Chat) when model changes
@@ -76,41 +79,40 @@ class AiOptionsViewModel(
         }
     }
 
+    private val _sessionId = MutableStateFlow(0)
     /**
-     * Combined AI status messages from OrpheusAgent (REPL), DroneAgent, and SoloAgent.
+     * Session ID increments whenever a new agent session starts.
+     * Use this to clear UI logs.
      */
+    val sessionId: StateFlow<Int> = _sessionId.asStateFlow()
+
+    /**
+     * Combined AI status messages fro OrpheusAgent (REPL), DroneAgent, and SoloAgent.
+     * Uses flatMapLatest to ensure we subscribe to the *current* agent instance's logs.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
     val aiStatusMessages = merge(
         agent.statusMessages,
-        droneAgent.statusMessages,
-        soloAgent.statusMessages
-    ).shareIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        replay = 10
+        _droneAgent.flatMapLatest { it?.statusMessages ?: flow {} },
+        _soloAgent.flatMapLatest { it?.statusMessages ?: flow {} }
     )
 
     /**
      * Combined AI input logs (prompts sent).
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     val aiInputLog = merge(
-        droneAgent.inputLog,
-        soloAgent.inputLog
-    ).shareIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        replay = 50
+        _droneAgent.flatMapLatest { it?.inputLog ?: flow {} },
+        _soloAgent.flatMapLatest { it?.inputLog ?: flow {} }
     )
 
     /**
      * Combined AI control logs (actions executed).
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     val aiControlLog = merge(
-        droneAgent.controlLog,
-        soloAgent.controlLog
-    ).shareIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        replay = 50
+        _droneAgent.flatMapLatest { it?.controlLog ?: flow {} },
+        _soloAgent.flatMapLatest { it?.controlLog ?: flow {} }
     )
 
     // ============================================================
@@ -241,6 +243,11 @@ class AiOptionsViewModel(
         if (_isDroneActive.value) {
             log.info { "Starting Drone Agent" }
             _showChatDialog.value = true // Ensure ChatDialog is visible
+            _sessionId.value++ // Signal UI to clear logs
+            
+            // Create fresh agent instance
+            val newAgent = synthAgentFactory.create(DroneAgentConfig)
+            _droneAgent.value = newAgent
             
             // Generate and apply a unique random preset to jumpstart the creative process
             viewModelScope.launch(dispatcherProvider.io) {
@@ -268,11 +275,13 @@ class AiOptionsViewModel(
                 synthEngine.clearParameterAutomation("master_volume")
                 synthEngine.setMasterVolume(targetVolume)
                 
-                droneAgent.start()
+                newAgent.start()
             }
         } else {
             log.info { "Stopping Drone Agent" }
-            droneAgent.stop()
+            _droneAgent.value?.stop()
+            // Do NOT nullify _droneAgent immediately so "Stopped" message is preserved.
+            // It will be replaced next time we start.
         }
     }
     
@@ -327,6 +336,7 @@ class AiOptionsViewModel(
      */
     fun toggleSolo() {
         val wasActive = _isSoloActive.value
+        log.info { "toggleSolo called. Was active: $wasActive" }
 
         // Mutually exclusive with Drone
         if (_isDroneActive.value && !wasActive) {
@@ -338,6 +348,11 @@ class AiOptionsViewModel(
         if (_isSoloActive.value) {
             log.info { "Starting Solo Agent" }
             _showChatDialog.value = true
+            _sessionId.value++ // Signal UI to clear logs
+            
+            // Create fresh agent instance
+            val newAgent = synthAgentFactory.create(SoloAgentConfig)
+            _soloAgent.value = newAgent
             
             // Generate and apply a specialized solo/lead preset
             viewModelScope.launch(dispatcherProvider.io) {
@@ -365,11 +380,11 @@ class AiOptionsViewModel(
                 synthEngine.clearParameterAutomation("master_volume")
                 synthEngine.setMasterVolume(targetVolume)
                 
-                soloAgent.start()
+                newAgent.start()
             }
         } else {
             log.info { "Stopping Solo Agent" }
-            soloAgent.stop()
+            _soloAgent.value?.stop()
         }
     }
 
@@ -444,7 +459,7 @@ class AiOptionsViewModel(
      */
     fun sendSoloInfluence(text: String) {
         log.info { "Sending solo influence: $text" }
-        soloAgent.injectUserPrompt(text)
+        _soloAgent.value?.injectUserPrompt(text)
     }
 
     // ============================================================

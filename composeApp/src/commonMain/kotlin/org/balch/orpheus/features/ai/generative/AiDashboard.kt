@@ -38,16 +38,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import org.balch.orpheus.features.ai.chat.widgets.ChatInputField
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Composable
 fun AiDashboard(
-    inputLog: SharedFlow<AiStatusMessage>,
-    controlLog: SharedFlow<AiStatusMessage>,
-    statusMessages: SharedFlow<AiStatusMessage>,
+    inputLog: Flow<AiStatusMessage>,
+    controlLog: Flow<AiStatusMessage>,
+    statusMessages: Flow<AiStatusMessage>,
     isActive: Boolean,
+    sessionId: Int, // Add session ID to trigger clears
     isSoloMode: Boolean = false,
     onSendInfluence: (String) -> Unit = {},
     modifier: Modifier = Modifier
@@ -60,6 +62,7 @@ fun AiDashboard(
         LogPanel(
             title = "SENSORY INPUTS",
             flow = inputLog,
+            sessionId = sessionId,
             modifier = Modifier.fillMaxWidth().weight(1f)
         )
 
@@ -67,6 +70,7 @@ fun AiDashboard(
         LogPanel(
             title = "SYNTH CONTROLS",
             flow = controlLog,
+            sessionId = sessionId,
             modifier = Modifier.fillMaxWidth().weight(1f),
             showVisuals = true
         )
@@ -75,6 +79,7 @@ fun AiDashboard(
         AiStatusCarousel(
             statusMessages = statusMessages,
             isActive = isActive,
+            sessionId = sessionId,
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
@@ -188,13 +193,20 @@ fun SoloInfluenceInput(
 @Composable
 fun LogPanel(
     title: String,
-    flow: SharedFlow<AiStatusMessage>,
+    flow: Flow<AiStatusMessage>,
+    sessionId: Int, // Key to clear logs
     modifier: Modifier = Modifier,
     showVisuals: Boolean = false
 ) {
     val messages = remember { mutableStateListOf<AiStatusMessage>() }
 
-    LaunchedEffect(flow) {
+    // Logic: 
+    // 1. When sessionId changes, CLEAR valid messages.
+    // 2. Start collecting from flow (which should be fresh due to flatMapLatest in VM).
+    // Note: flow object itself might be stable but its content changes.
+    // Since we removed shareIn, collecting it connects to the current agent's flow.
+    LaunchedEffect(flow, sessionId) {
+        messages.clear()
         flow.collect { msg ->
             messages.add(0, msg)
             if (messages.size > 100) {

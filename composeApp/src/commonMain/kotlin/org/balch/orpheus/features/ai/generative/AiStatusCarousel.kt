@@ -29,7 +29,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.Flow
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 /**
@@ -43,8 +43,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
  */
 @Composable
 fun AiStatusCarousel(
-    statusMessages: SharedFlow<AiStatusMessage>,
+    statusMessages: Flow<AiStatusMessage>,
     isActive: Boolean,
+    sessionId: Int, // Add session ID to trigger clears
     modifier: Modifier = Modifier
 ) {
     // Collect messages into a list
@@ -52,7 +53,8 @@ fun AiStatusCarousel(
     var currentIndex by remember { mutableStateOf(0) }
     
     // Collect new messages
-    LaunchedEffect(statusMessages) {
+    LaunchedEffect(statusMessages, sessionId) {
+        messages.clear()
         statusMessages.collect { message ->
             // If new message is not loading, remove previous loading message
             if (!message.isLoading && messages.isNotEmpty() && messages[0].isLoading) {

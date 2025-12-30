@@ -342,12 +342,14 @@ class SynthControlAgent(
                              system(config.systemPrompt + "\n\nIMPORTANT: You must rely on the structured output format provided. Do not use native tool calls.")
                         },
                         model = aiModelProvider.currentKoogModel,
-                        maxAgentIterations = 100
+                        maxAgentIterations = Int.MAX_VALUE // Run indefinitely
                     ),
                     toolRegistry = toolRegistry
                 )
                 
+                log.info { "Running agent loop..." }
                 agent.run(Unit)
+                log.info { "Agent loop finished naturally." }
 
             } catch (e: CancellationException) {
                 log.info { "Agent job cancelled" }

@@ -86,6 +86,7 @@ fun ChatDialog(
                     statusMessages = aiViewModel.aiStatusMessages,
                     isActive = true,
                     isSoloMode = isSoloActive,
+                    sessionId = aiViewModel.sessionId.collectAsState().value,
                     onSendInfluence = { aiViewModel.sendSoloInfluence(it) },
                     // Give it full space but respect layout
                     modifier = Modifier
@@ -211,6 +212,7 @@ fun DashboardPreview() {
                 controlLog = mockFlow,
                 statusMessages = mockFlow,
                 isActive = true,
+                sessionId = 0,
                 modifier = Modifier.fillMaxWidth()
              )
         }

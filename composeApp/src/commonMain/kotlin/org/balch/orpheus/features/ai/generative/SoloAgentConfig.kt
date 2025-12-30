@@ -144,7 +144,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         ),
 
         Mood(
-            name = "Miss You",
+            name = "Urban Longing",
             initialPrompt = "Set a nocturnal, disco-blues mood. Establish a steady 'four-on-the-floor' rhythmic pulse (even without drums) using gated pads.",
             evolutionPrompts = listOf(
                 "Introduce a lonely, harmonica-like lead line using a breathy waveform.",
@@ -161,7 +161,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         ),
 
         Mood(
-            name = "Echoes",
+            name = "Submarine Resonances",
             initialPrompt = "Start with the 'Ping'. A single, high-pitched note with massive delay (DELAY_TIME=0.7, FEEDBACK=0.8). Silence in between.",
             evolutionPrompts = listOf(
                 "Begin to introduce a slow, C# minor swelling pad underneath the pings.",
@@ -178,7 +178,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         ),
 
         Mood(
-            name = "One Of These Days",
+            name = "Menacing Drive",
             initialPrompt = "Establish a driving, aggressive bass ostinato. Use a single repeated note with heavy tremolo or delay to create a galloping rhythm.",
             evolutionPrompts = listOf(
                 "Slowly open the filter/sharpness on the bass to make it bite harder.",
@@ -195,7 +195,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         ),
 
         Mood(
-            name = "Great Gig in the Sky",
+            name = "Celestial Grief",
             initialPrompt = "Create a moody, acoustic-synth atmosphere. Strummed chords (maj7, m9) with a slow, contemplative tempo.",
             evolutionPrompts = listOf(
                 "Introduce a twin-lead harmonized solo idea using two voices.",
