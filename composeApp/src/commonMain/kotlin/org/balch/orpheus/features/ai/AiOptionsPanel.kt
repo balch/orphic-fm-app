@@ -5,19 +5,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.features.ai.widgets.AiButton
+import org.balch.orpheus.features.ai.widgets.ApiKeyEntryCompact
+import org.balch.orpheus.features.ai.widgets.UserKeyIndicator
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -48,9 +46,12 @@ fun AiOptionsPanel(
     val isSoloActive by viewModel.isSoloActive.collectAsState()
     val isReplActive by viewModel.isReplActive.collectAsState()
     val showChatDialog by viewModel.showChatDialog.collectAsState()
+    val isApiKeySet by viewModel.apiKeyState.collectAsState()
+    val isUserProvidedKey by viewModel.isUserProvidedKey.collectAsState()
 
     AiOptionsLayout(
-        isApiKeySet = viewModel.isApiKeySet,
+        isApiKeySet = isApiKeySet,
+        isUserProvidedKey = isUserProvidedKey,
         isDroneActive = isDroneActive,
         isSoloActive = isSoloActive,
         isReplActive = isReplActive,
@@ -59,6 +60,8 @@ fun AiOptionsPanel(
         onToggleSolo = viewModel::toggleSolo,
         onToggleRepl = viewModel::toggleRepl,
         onToggleChat = viewModel::toggleChatDialog,
+        onSaveApiKey = viewModel::saveApiKey,
+        onClearApiKey = viewModel::clearApiKey,
         modifier = modifier,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange
@@ -71,6 +74,7 @@ fun AiOptionsPanel(
 @Composable
 fun AiOptionsLayout(
     isApiKeySet: Boolean,
+    isUserProvidedKey: Boolean = false,
     isDroneActive: Boolean = false,
     isSoloActive: Boolean = false,
     isReplActive: Boolean = false,
@@ -79,13 +83,15 @@ fun AiOptionsLayout(
     onToggleSolo: () -> Unit = {},
     onToggleRepl: () -> Unit = {},
     onToggleChat: () -> Unit = {},
+    onSaveApiKey: (String) -> Unit = {},
+    onClearApiKey: () -> Unit = {},
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     CollapsibleColumnPanel(
         title = "AI",
-        color = OrpheusColors.warmGlow,
+        color = OrpheusColors.metallicBlue,
         expandedTitle = "Orpheus",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
@@ -99,13 +105,10 @@ fun AiOptionsLayout(
             verticalArrangement = Arrangement.Center
         ) {
             if (!isApiKeySet) {
-                // No API key message
-                Text(
-                    text = "Add GEMINI_API_KEY\nto local.properties",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center,
-                    color = OrpheusColors.warmGlow.copy(alpha = 0.7f)
+                // Key entry UI
+                ApiKeyEntryCompact(
+                    onSubmit = onSaveApiKey,
+                    modifier = Modifier.fillMaxSize()
                 )
             } else {
                 // 2x2 Button Grid
@@ -113,6 +116,14 @@ fun AiOptionsLayout(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    // User key indicator (if applicable)
+                    if (isUserProvidedKey) {
+                        UserKeyIndicator(
+                            onRemove = onClearApiKey,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
+                    
                     // Top Row: Drone | Solo
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -136,7 +147,7 @@ fun AiOptionsLayout(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         AiButton(
-                            label = "REPL",
+                            label = "Tidal",
                             color = AiButtonColors.repl,
                             isActive = isReplActive,
                             onClick = onToggleRepl

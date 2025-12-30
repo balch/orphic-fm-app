@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import org.balch.orpheus.core.ai.GeminiKeyProvider
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
@@ -49,6 +50,7 @@ class AiOptionsViewModel(
     private val replExecuteTool: org.balch.orpheus.features.ai.tools.ReplExecuteTool,
     private val panelExpansionEventBus: PanelExpansionEventBus,
     private val synthEngine: org.balch.orpheus.core.audio.SynthEngine,
+    private val geminiKeyProvider: GeminiKeyProvider,
 ) : ViewModel() {
 
     private val log = logging("AiOptionsViewModel")
@@ -136,13 +138,57 @@ class AiOptionsViewModel(
     val showChatDialog: StateFlow<Boolean> = _showChatDialog.asStateFlow()
 
     // ============================================================
-    // Existing Properties
+    // API Key Management
     // ============================================================
 
     /**
-     * Whether the AP key is configured.
+     * Reactive API key state - true when any key is configured.
      */
-    val isApiKeySet: Boolean get() = agent.isApiKeySet
+    val apiKeyState: StateFlow<Boolean> = geminiKeyProvider.apiKeyState
+        .map { !it.isNullOrEmpty() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = geminiKeyProvider.isApiKeySet
+        )
+    
+    /**
+     * Whether the current key is user-provided (vs build-time).
+     */
+    val isUserProvidedKey: StateFlow<Boolean> = geminiKeyProvider.isUserProvidedKey
+
+    /**
+     * Whether the API key is configured (for backward compat).
+     */
+    val isApiKeySet: Boolean get() = geminiKeyProvider.isApiKeySet
+
+    /**
+     * Save a user-provided API key.
+     */
+    fun saveApiKey(key: String) {
+        viewModelScope.launch {
+            val success = geminiKeyProvider.saveApiKey(key)
+            if (success) {
+                log.info { "API key saved successfully" }
+            } else {
+                log.warn { "Failed to save API key" }
+            }
+        }
+    }
+
+    /**
+     * Clear the user-provided API key.
+     */
+    fun clearApiKey() {
+        viewModelScope.launch {
+            geminiKeyProvider.clearApiKey()
+            log.info { "API key cleared" }
+        }
+    }
+
+    // ============================================================
+    // Existing Properties
+    // ============================================================
 
     /**
      * The accent color for the panel.

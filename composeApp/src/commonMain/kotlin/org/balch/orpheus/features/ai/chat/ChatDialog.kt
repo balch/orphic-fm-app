@@ -9,17 +9,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -31,7 +27,7 @@ import org.balch.orpheus.features.ai.chat.widgets.ChatMessageBubble
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
 import org.balch.orpheus.features.ai.generative.AiDashboard
 import org.balch.orpheus.features.ai.generative.AiStatusMessage
-import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.features.ai.widgets.ApiKeyEntryScreen
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.DraggableDialog
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -101,11 +97,14 @@ fun ChatDialog(
             }
         } else {
             // Chat Mode: Standard chat UI
+            val isApiKeySet by aiViewModel.apiKeyState.collectAsState()
+            
             ChatDialogContent(
                 messages = messages,
                 isLoading = isLoading,
-                isApiKeySet = viewModel.isApiKeySet,
-                onSendMessage = viewModel::sendPrompt
+                isApiKeySet = isApiKeySet,
+                onSendMessage = viewModel::sendPrompt,
+                onSaveApiKey = aiViewModel::saveApiKey
             )
         }
     }
@@ -120,6 +119,7 @@ fun ChatDialogContent(
     isLoading: Boolean,
     isApiKeySet: Boolean,
     onSendMessage: (String) -> Unit,
+    onSaveApiKey: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()
@@ -136,17 +136,14 @@ fun ChatDialogContent(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (!isApiKeySet) {
-            // No API key message
+            // API Key entry screen
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "${AppConfig.CHAT_EMOJI}\n\n${AppConfig.CHAT_DISPLAY_NAME} awaits...\n\nAdd GEMINI_API_KEY\nto local.properties",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                    color = OrpheusColors.metallicBlue.copy(alpha = 0.7f)
+                ApiKeyEntryScreen(
+                    onSubmit = onSaveApiKey,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         } else {
