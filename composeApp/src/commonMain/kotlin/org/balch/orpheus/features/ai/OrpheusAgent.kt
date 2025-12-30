@@ -12,6 +12,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -217,22 +218,30 @@ class OrpheusAgent @Inject constructor(
      * Preserves conversation history and adds a system message about the model change.
      */
     fun restart() {
-        logger.info { "Restarting agent with model: ${config.model}" }
+        val modelName = config.model.toString()
+            .substringAfterLast(".")
+            .replace("_", " ")
+            .lowercase()
+            .replaceFirstChar { it.uppercase() }
+        
+        logger.info { "Restarting agent with model: $modelName" }
         
         // Cancel current agent
         currentAgentJob?.cancel()
         currentAgentJob = null
         
-        // Add a system message about the restart
-        addOrReplaceMessage(ChatMessage(
-            text = "Switching to ${config.model}... Orpheus adapts.",
-            type = ChatMessageType.Agent
+        // Add a loading message for model switch
+        messages.add(ChatMessage(
+            text = "Switching to $modelName...",
+            type = ChatMessageType.Loading
         ))
-        _agentState.value = AgentState.Chatting(messages.toList())
+        _agentState.value = AgentState.Loading(messages.toList())
         
-        // Start new agent - it will wait for the next user prompt
+        // Start new agent with instruction to acknowledge the model change
         currentAgentJob = applicationScope.launch {
-            runAgent("Continue the conversation. The user may send a new message.")
+            runAgent("You just switched to a new AI model ($modelName). " +
+                    "Briefly greet the user as Orpheus and mention you're now using $modelName. " +
+                    "Be concise - one sentence is enough. Then wait for the user's next message.")
                 .flowOn(Dispatchers.Default)
                 .catch { throwable ->
                     logger.error(throwable) { "Unhandled exception in agent flow after restart" }
@@ -267,8 +276,13 @@ class OrpheusAgent @Inject constructor(
                     logger.d { "Agent completed" }
                 }
                 onAgentExecutionFailed { ctx ->
-                    logger.error(ctx.throwable) { "Error running agent" }
-                    send(errorMessageAsState(ctx.throwable, "Something went wrong..."))
+                    if (ctx.throwable is CancellationException) {
+                        logger.debug { "Agent execution cancelled" }
+                        // Don't modify state on cancellation
+                    } else {
+                        logger.error(ctx.throwable) { "Error running agent" }
+                        send(errorMessageAsState(ctx.throwable, "Something went wrong..."))
+                    }
                 }
                 onToolCallFailed { _ ->
                     logger.e { "Tool call failed" }

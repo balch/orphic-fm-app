@@ -1,20 +1,32 @@
 package org.balch.orpheus.features.ai.chat.widgets
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme.typography
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.TextLinkStyles
@@ -89,7 +101,7 @@ fun ChatMessageBubble(
         ) {
             Box(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 when (message.type) {
-                    ChatMessageType.Loading -> LoadingIndicator()
+                    ChatMessageType.Loading -> LoadingIndicator(message.text)
                     else -> {
                         Column {
                             if (message.type != ChatMessageType.User) {
@@ -194,13 +206,85 @@ private fun ChatMessage.markdownTypography(): DefaultMarkdownTypography {
 }
 
 /**
- * Simple loading indicator for thinking state.
+ * Animated loading indicator for thinking/switching state.
+ * Shows pulsing dots with optional message text.
  */
 @Composable
-private fun LoadingIndicator() {
-    Text(
-        text = "🎵 ∿ ∿ ∿",
-        style = typography.bodyMedium,
-        color = OrpheusColors.metallicBlue
+private fun LoadingIndicator(text: String = "Thinking...") {
+    val infiniteTransition = rememberInfiniteTransition(label = "loading")
+    
+    // Staggered pulsing animation for each dot
+    val dot1Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dot1"
     )
+    val dot2Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, delayMillis = 200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dot2"
+    )
+    val dot3Alpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, delayMillis = 400, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dot3"
+    )
+    
+    Row(
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Orpheus label
+        Text(
+            text = "🎵",
+            style = typography.bodyMedium,
+            modifier = Modifier.padding(end = 6.dp)
+        )
+        
+        // Message text
+        Text(
+            text = text,
+            style = typography.bodyMedium,
+            fontSize = 13.sp,
+            color = OrpheusColors.sterlingSilver.copy(alpha = 0.9f)
+        )
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        // Animated dots
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .alpha(dot1Alpha)
+                .clip(CircleShape)
+                .background(OrpheusColors.metallicBlue)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .alpha(dot2Alpha)
+                .clip(CircleShape)
+                .background(OrpheusColors.metallicBlue)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .alpha(dot3Alpha)
+                .clip(CircleShape)
+                .background(OrpheusColors.metallicBlue)
+        )
+    }
 }
