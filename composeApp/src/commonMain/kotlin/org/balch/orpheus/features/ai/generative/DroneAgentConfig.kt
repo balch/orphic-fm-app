@@ -66,6 +66,44 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         "Morph the modulation: change DUO_MOD_SOURCE_5 slightly to vary the texture.",
         "Deepen the drone: lower QUAD_PITCH_3 slightly (around 0.2-0.4) for sub-bass weight.",
         "Create movement: shift VIBRATO and DELAY_TIME values. Make the drone breathe and pulse.",
-        "Simplify: reduce VOICE_COUPLING and TOTAL_FEEDBACK. Let the pure tones shine through."
+        "Simplify: reduce VOICE_COUPLING and TOTAL_FEEDBACK. Let the pure tones shine through.",
+        
+        // Atmospheric environments
+        "Subterranean cavern: deep, resonant tones with long delay trails. Emphasize low frequencies and subtle echoes.",
+        "Arctic wind: cold, shimmering high frequencies with slow modulation. Sparse and crystalline.",
+        "Rainforest canopy: layered textures with organic movement. Humid, dense, alive with subtle shifts.",
+        "Desert night: vast emptiness with distant, lonely tones. Minimal but profound.",
+        "Ocean floor: pressure and depth. Sub-bass weight with slow, whale-like movements.",
+        "Mountain summit: thin air, distant echoes, wind-swept harmonics. Isolated and pure.",
+        
+        // Industrial and mechanical
+        "Factory hum: mechanical drone with rhythmic undertones. Steady, industrial, hypnotic.",
+        "Power grid: electrical buzz and hum. Transformer harmonics with subtle fluctuations.",
+        "Engine room: low rumble with metallic overtones. Constant but alive with micro-variations.",
+        "Radio static: white noise textures bleeding through. Distant signals from nowhere.",
+        
+        // Organic and natural
+        "Beehive meditation: dense, buzzing harmonics that shift and swarm. Alive and collective.",
+        "Tidal breathing: slow swells that rise and fall like ocean waves. Rhythmic without rhythm.",
+        "Forest at dusk: settling sounds, cooling air, the hum of twilight creatures.",
+        "Volcanic earth: deep rumbles from below, heat and pressure, primordial energy.",
+        
+        // Cosmic and ethereal
+        "Solar wind: particles streaming through space. Bright, energetic, but impossibly distant.",
+        "Black hole horizon: time-stretched tones approaching the event horizon. Gravity bending sound.",
+        "Nebula birth: cosmic gases coalescing. Slow, majestic, impossibly vast.",
+        "Pulsar beacon: rhythmic pulses from deep space. Ancient light, steady signal.",
+        
+        // Emotional states
+        "Meditation bell aftermath: the long decay of a struck bell. Harmonics slowly fading.",
+        "Sleep paralysis: heavy, oppressive tones. Unable to move, suspended in sound.",
+        "Lucid dream: floating, weightless harmonics. Reality bending at the edges.",
+        "Memory fog: unclear, distant tones. Something familiar but unreachable.",
+        
+        // Technical explorations
+        "Harmonic series: explore the natural overtones. Let mathematics become music.",
+        "Beating frequencies: slight detuning creates pulsing interference patterns. Hypnotic waves.",
+        "Feedback loop: carefully controlled feedback creating self-sustaining tones.",
+        "Spectral freeze: hold a moment in time. Let it slowly decay and transform."
     )
 }

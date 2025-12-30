@@ -133,6 +133,42 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         "Deep space drift: Move QUAD_PITCH values in slow counterpoint. Glacial LFO sweeps, vast emptiness.",
         "Cathedral reverberations: Rich harmonics with long delay. Ramp QUAD_HOLD_1 up while QUAD_HOLD_2 fades.",
         "Tidal breathing: All three quads should swell and fade like ocean waves. Never static!",
-        "Showcase solo: Drop the drones lower, let a REPL melodic line ring out clearly over the quiet bed."
+        "Showcase solo: Drop the drones lower, let a REPL melodic line ring out clearly over the quiet bed.",
+        
+        "Echoes opening: Start with that iconic sonar ping - single high REPL notes with massive delay, emerging from silence. Let each note decay fully before the next.",
+        "Echoes whale calls: The middle section - strange, alien sounds. Use extreme pitch bends and FM modulation. Otherworldly and unsettling.",
+        "Echoes cathedral: Build towering walls of sound with all quads swelling together. Majestic, spiritual, overwhelming.",
+        "Echoes return: After chaos, return to the simple ping. One note, infinite space, coming home.",
+        
+        "One of These Days: Aggressive, pulsing bass. Low QUAD_PITCH values with rhythmic REPL patterns. Menacing and relentless.",
+        "One of These Days build: Start minimal, add layers of intensity. Each cycle more urgent than the last.",
+        "One of These Days storm: Full fury - high feedback, distortion, all voices screaming. Controlled chaos.",
+        
+        "Dogs: Long, mournful guitar-like REPL lines. Cynical, weary, but beautiful. Delay trails that go on forever.",
+        "Pigs: Aggressive, snorting bass patterns. Distorted, political, angry. Heavy and confrontational.",
+        "Sheep: Pastoral opening, then building dread. Start peaceful, let darkness creep in gradually.",
+        
+        "Great Gig in the Sky: Pure emotional release. Soaring REPL lines that cry out like a human voice. No words needed.",
+        "Great Gig crescendo: Build from whisper to scream. All the fear and beauty of mortality in sound.",
+        "Great Gig resolution: After the storm, acceptance. Gentle, fading, peaceful. Let go.",
+        
+        // Cinematic moments
+        "Film noir: Dark, smoky jazz undertones. Single REPL notes hanging in shadows. Mystery and danger.",
+        "Sunrise over mountains: Slow, golden swells. Each quad rising like light spreading across peaks.",
+        "Underwater ballet: Graceful, flowing movements. Everything slowed, weightless, dreamlike.",
+        "Storm approaching: Distant rumbles building. Tension without release. The calm before.",
+        "Ancient temple: Sacred geometry in sound. Mathematical intervals, spiritual resonance.",
+        
+        // Emotional journeys
+        "Grief and acceptance: Start heavy and dark, slowly transform to light. The journey through loss.",
+        "Joy emerging: Bubbling, effervescent patterns rising through the texture. Irrepressible happiness.",
+        "Nostalgia: Familiar patterns that feel like memories. Warm but tinged with sadness.",
+        "Transcendence: Leave the body behind. Pure frequency, pure light, pure being.",
+        
+        // Technical showcases
+        "Polyrhythmic meditation: Different REPL patterns at different speeds. Complexity resolving into unity.",
+        "Harmonic exploration: Walk through the overtone series. Let mathematics sing.",
+        "Call and response: REPL phrases answered by quad swells. Conversation in sound.",
+        "Minimalist pulse: One idea, infinite variations. Less is more, but never static."
     )
 }
