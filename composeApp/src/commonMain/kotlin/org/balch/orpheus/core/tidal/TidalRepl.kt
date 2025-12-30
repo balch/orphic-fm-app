@@ -269,7 +269,7 @@ class TidalRepl(
                     // Control commands are recognized by their prefix patterns
                     // Supports both colon syntax (drive:0.4) and space syntax (drive 0.4)
                     val controlNames = "drive|distortion|vibrato|feedback|delay|delaymix|distmix|volume|" +
-                        "hold|tune|pan|quadhold|quadpitch|duomod|sharp"
+                        "hold|tune|pan|quadhold|quadpitch|duomod|sharp|envspeed"
                     val isBareControlCommand = trimmed.matches(Regex(
                         "^($controlNames)[:\\s][^$]+$"
                     ))
@@ -468,6 +468,36 @@ class TidalRepl(
                 // hold "0.8" - just value, apply to voice 0
                 val value = parts[0].toFloatOrNull() ?: 0.8f
                 Pattern.pure(TidalEvent.VoiceHold(0, value.coerceIn(0f, 1f), listOf(location)))
+            }
+        }
+
+        // envspeed:<voiceIndex> <value> - Voice envelope speed (colon syntax)
+        if (trimmed.startsWith("envspeed:")) {
+            val parts = trimmed.substringAfter("envspeed:").trim().split(" ", limit = 2)
+            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: envspeed requires voice index and value")
+            val voiceIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid voice index")
+            // Accept 1-based input (1-8) and convert to 0-based (0-7)
+            if (voiceIndex !in 1..8) throw IllegalArgumentException("Line $lineNum: Voice index must be 1-8, got: $voiceIndex")
+            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid speed value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.VoiceEnvSpeed(voiceIndex - 1, value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // Tidal-style quoted envspeed: envspeed "0.8" or envspeed "1 0.8"
+        val quotedEnvSpeedMatch = Regex("^envspeed\\s*\"([^\"]+)\"$").find(trimmed)
+        if (quotedEnvSpeedMatch != null) {
+            val speedStr = quotedEnvSpeedMatch.groupValues[1].trim()
+            val parts = speedStr.split(Regex("\\s+"))
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return if (parts.size >= 2) {
+                // envspeed "1 0.8" - 1-based voice index and value
+                val voiceIndex = (parts[0].toIntOrNull() ?: 1) - 1
+                val value = parts[1].toFloatOrNull() ?: 0.5f
+                Pattern.pure(TidalEvent.VoiceEnvSpeed(voiceIndex, value.coerceIn(0f, 1f), listOf(location)))
+            } else {
+                // envspeed "0.5" - just value, apply to voice 0
+                val value = parts[0].toFloatOrNull() ?: 0.5f
+                Pattern.pure(TidalEvent.VoiceEnvSpeed(0, value.coerceIn(0f, 1f), listOf(location)))
             }
         }
         

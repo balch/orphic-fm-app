@@ -435,6 +435,12 @@ class TidalScheduler(
                  }
                  dispatchEvent(event)
              }
+             is TidalEvent.VoiceEnvSpeed -> {
+                 if (event.locations.isNotEmpty()) {
+                     _triggers.tryEmit(TriggerEvent(event.voiceIndex, event.locations))
+                 }
+                 dispatchEvent(event)
+             }
              // Quad-level events - use quad index * 4 as representative voice
              is TidalEvent.QuadHold -> {
                  if (event.locations.isNotEmpty()) {
@@ -600,6 +606,15 @@ class TidalScheduler(
             
             is TidalEvent.VoicePan -> {
                 synthEngine.setVoicePan(event.voiceIndex, event.pan)
+            }
+            
+            is TidalEvent.VoiceEnvSpeed -> {
+                synthController.emitControlChange(
+                    "voice_${event.voiceIndex}_env_speed",
+                    event.speed,
+                    ControlEventOrigin.TIDAL
+                )
+                synthEngine.setVoiceEnvelopeSpeed(event.voiceIndex, event.speed)
             }
             
             is TidalEvent.MasterVolume -> {

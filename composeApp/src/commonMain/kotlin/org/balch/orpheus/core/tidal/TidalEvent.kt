@@ -46,6 +46,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Melodic note event for playing specific pitches.
      * Uses the channel field for voice assignment, allowing melodic patterns
@@ -67,6 +69,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Sample playback event for drums and one-shots.
      * TODO: Implement sample player plugin for SynthEngine
@@ -85,6 +89,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Voice tuning control.
      * @param voiceIndex Voice index (0-7)
@@ -99,6 +105,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Voice hold/sustain level.
      * @param voiceIndex Voice index (0-7)
@@ -112,6 +120,22 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
+
+    /**
+     * Voice envelope speed control.
+     * @param voiceIndex Voice index (0-7)
+     * @param speed Envelope speed (0.0=fast, 1.0=slow)
+     */
+    data class VoiceEnvSpeed(
+        val voiceIndex: Int,
+        val speed: Float,
+        override val locations: List<SourceLocation> = emptyList()
+    ) : TidalEvent() {
+        override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
+        override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
+    }
+    
+
     
     /**
      * Quad pitch (groups of 4 voices).
@@ -127,6 +151,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Quad hold level.
      * @param quadIndex Quad index (0 or 1)
@@ -140,6 +166,8 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
+    
+
     
     /**
      * Delay time control.
@@ -155,6 +183,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Delay feedback control.
      * @param amount Feedback amount (0.0-1.0)
@@ -167,6 +197,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Delay mix control.
      * @param amount Wet/dry mix (0.0-1.0)
@@ -178,6 +210,8 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
+    
+
     
     /**
      * LFO frequency control.
@@ -193,6 +227,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Distortion drive control.
      * @param amount Drive amount (0.0-1.0)
@@ -204,6 +240,8 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
+    
+
     
     /**
      * Distortion mix control.
@@ -217,6 +255,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Vibrato depth control.
      * @param amount Vibrato depth (0.0-1.0)
@@ -228,6 +268,8 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
+    
+
     
     /**
      * Voice pan position.
@@ -243,6 +285,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Master volume control.
      * @param volume Master volume (0.0-1.0)
@@ -254,6 +298,8 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
+    
+
     
     /**
      * Duo modulation source control.
@@ -269,6 +315,8 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+
+    
     /**
      * Pair waveform sharpness control.
      * @param pairIndex Pair index (0-3, where pair 0 = voices 0-1, etc.)
@@ -282,6 +330,8 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
+    
+
 }
 
 /**
@@ -336,6 +386,9 @@ object Orpheus {
     
     fun voiceHold(voiceIndex: Int, amount: Float): Pattern<TidalEvent> =
         Pattern.pure(TidalEvent.VoiceHold(voiceIndex, amount))
+
+    fun voiceEnvSpeed(voiceIndex: Int, speed: Float): Pattern<TidalEvent> =
+        Pattern.pure(TidalEvent.VoiceEnvSpeed(voiceIndex, speed))
     
     // === Quad Controls ===
     
@@ -400,6 +453,9 @@ fun Pattern<TidalEvent>.withTune(voiceIndex: Int, tune: Float): Pattern<TidalEve
 
 fun Pattern<TidalEvent>.withHold(voiceIndex: Int, amount: Float): Pattern<TidalEvent> =
     Pattern.stack(this, Orpheus.voiceHold(voiceIndex, amount))
+
+fun Pattern<TidalEvent>.withEnvSpeed(voiceIndex: Int, speed: Float): Pattern<TidalEvent> =
+    Pattern.stack(this, Orpheus.voiceEnvSpeed(voiceIndex, speed))
 
 fun Pattern<TidalEvent>.withDelay(time: Float, feedback: Float = 0.5f): Pattern<TidalEvent> =
     Pattern.stack(

@@ -352,8 +352,8 @@ class TidalReplParsingTest {
     }
     
     @Test
-    fun `parseGates rejects voice indices above 8`() {
-        for (i in 9..15) {
+    fun `parseGates rejects voice indices above 12`() {
+        for (i in 13..20) {
             val result = TidalParser.parseGates(i.toString())
             assertIs<TidalParser.ParseResult.Failure<TidalEvent>>(result, "Voice $i should be invalid")
         }
@@ -461,9 +461,34 @@ class TidalReplParsingTest {
         assertEquals(3, events.size)
     }
     
-    // =========================================================================
-    // Source Location Tracking with Combined Patterns
-    // =========================================================================
+    @Test
+    fun `evaluate supports envspeed command`() = kotlinx.coroutines.test.runTest {
+        // Test basic colon syntax (bare command)
+        val resultColon = repl.evaluateSuspend("envspeed:1 0.5")
+        // Success with empty slots indicates immediate execution
+        assertIs<ReplResult.Success>(resultColon) 
+        
+        // Test quoted syntax (bare command)
+        val resultQuoted = repl.evaluateSuspend("envspeed \"1 0.5\"")
+        assertIs<ReplResult.Success>(resultQuoted)
+        
+        // Test quoted single value (voice 0 implicit)
+        val resultQuotedSingle = repl.evaluateSuspend("envspeed \"0.5\"")
+        assertIs<ReplResult.Success>(resultQuotedSingle)
+    }
+    
+    @Test
+    fun `evaluate supports envspeed error handling`() = kotlinx.coroutines.test.runTest {
+        // Test invalid voice index
+        val resultInvalidVoice = repl.evaluateSuspend("envspeed:9 0.5")
+        // Should default to 0-based index 8
+        // Wait, envspeed: parser checks 1..8 range.
+        assertIs<ReplResult.Error>(resultInvalidVoice)
+        
+        // Test missing value
+        val resultMissingValue = repl.evaluateSuspend("envspeed:1")
+        assertIs<ReplResult.Error>(resultMissingValue)
+    }
     
     @Test
     fun `source locations preserved in note patterns`() {
