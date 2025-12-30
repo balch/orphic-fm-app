@@ -583,4 +583,11 @@ class TidalReplParsingTest {
         // Currently this will likely fail with "Invalid index: pan"
         assertIs<ReplResult.Success>(result)
     }
+
+    @Test
+    fun `evaluate supports space-separated voices command`() = kotlinx.coroutines.test.runTest {
+        // voices 1 2 3 should work
+        val result = repl.evaluateSuspend("voices 1 2 3")
+        assertIs<ReplResult.Success>(result)
+    }
 }

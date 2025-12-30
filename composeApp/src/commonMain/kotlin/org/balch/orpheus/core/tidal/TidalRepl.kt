@@ -429,7 +429,21 @@ class TidalRepl(
             return parseVoicesPattern(voicesStr, voicesOffset)
         }
         
-        // Tidal-style quoted voices: voices "0 1 2 3"
+        // Handle unquoted "voices 1 2 3" or "gates 1 2 3"
+        // This must check for space after command to avoid matching things like "voices2"
+        if (trimmed.startsWith("voices ") || trimmed.startsWith("gates ")) {
+            val prefix = if (trimmed.startsWith("voices ")) "voices " else "gates "
+            val voicesStr = trimmed.substringAfter(prefix).trim()
+            val hasQuotes = voicesStr.startsWith("\"") && voicesStr.endsWith("\"")
+            
+            // If quoted "1 2 3", strip quotes
+            val cleanStr = if (hasQuotes) voicesStr.removeSurrounding("\"") else voicesStr
+            
+            val voicesOffset = trimOffset + prefix.length + (if (hasQuotes) 1 else 0)
+            return parseVoicesPattern(cleanStr, voicesOffset)
+        }
+        
+        // Tidal-style quoted voices: voices "0 1 2 3" (Legacy regex match - kept for robustness but redundant with above)
         val quotedVoicesMatch = Regex("^voices\\s*\"([^\"]+)\"$").find(trimmed)
         if (quotedVoicesMatch != null) {
             val voicesStr = quotedVoicesMatch.groupValues[1]
