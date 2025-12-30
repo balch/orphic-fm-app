@@ -254,6 +254,34 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
+    
+    /**
+     * Duo modulation source control.
+     * @param duoIndex Duo index (0-3, where duo 0 = voices 0-1, duo 1 = voices 2-3, etc.)
+     * @param source Modulation source: "fm" (voice FM), "off", or "lfo"
+     */
+    data class DuoMod(
+        val duoIndex: Int,
+        val source: String, // "fm", "off", "lfo"
+        override val locations: List<SourceLocation> = emptyList()
+    ) : TidalEvent() {
+        override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
+        override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
+    }
+    
+    /**
+     * Pair waveform sharpness control.
+     * @param pairIndex Pair index (0-3, where pair 0 = voices 0-1, etc.)
+     * @param sharpness Waveform sharpness (0.0 = triangle, 1.0 = square)
+     */
+    data class PairSharp(
+        val pairIndex: Int,
+        val sharpness: Float,
+        override val locations: List<SourceLocation> = emptyList()
+    ) : TidalEvent() {
+        override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
+        override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
+    }
 }
 
 /**

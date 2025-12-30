@@ -1,8 +1,8 @@
 package org.balch.orpheus.core.midi
 
+import com.diamondedge.logging.logging
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
-import org.balch.orpheus.util.Logger
 import org.w3c.dom.get
 import org.w3c.dom.set
 
@@ -10,6 +10,7 @@ import org.w3c.dom.set
  * WASM implementation of MidiMappingRepository using browser localStorage.
  */
 actual class MidiMappingRepository actual constructor() {
+    private val log = logging("MidiMappingRepository")
 
     private val json = Json {
         prettyPrint = false
@@ -29,9 +30,9 @@ actual class MidiMappingRepository actual constructor() {
             val key = keyForDevice(deviceName)
             val jsonString = json.encodeToString(mapping.forPersistence())
             localStorage[key] = jsonString
-            Logger.info { "Saved MIDI mappings for '$deviceName' to localStorage" }
+            log.info { "Saved MIDI mappings for '$deviceName' to localStorage" }
         } catch (e: Exception) {
-            Logger.error { "Failed to save MIDI mappings for '$deviceName': ${e.message}" }
+            log.error { "Failed to save MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
@@ -41,14 +42,14 @@ actual class MidiMappingRepository actual constructor() {
             val jsonString = localStorage[key]
             if (jsonString != null) {
                 val mapping = json.decodeFromString<MidiMappingState>(jsonString)
-                Logger.info { "Loaded MIDI mappings for '$deviceName' from localStorage" }
+                log.info { "Loaded MIDI mappings for '$deviceName' from localStorage" }
                 mapping
             } else {
-                Logger.debug { "No saved MIDI mappings for '$deviceName'" }
+                log.debug { "No saved MIDI mappings for '$deviceName'" }
                 null
             }
         } catch (e: Exception) {
-            Logger.error { "Failed to load MIDI mappings for '$deviceName': ${e.message}" }
+            log.error { "Failed to load MIDI mappings for '$deviceName': ${e.message}" }
             null
         }
     }
@@ -57,9 +58,9 @@ actual class MidiMappingRepository actual constructor() {
         try {
             val key = keyForDevice(deviceName)
             localStorage.removeItem(key)
-            Logger.info { "Deleted MIDI mappings for '$deviceName'" }
+            log.info { "Deleted MIDI mappings for '$deviceName'" }
         } catch (e: Exception) {
-            Logger.error { "Failed to delete MIDI mappings for '$deviceName': ${e.message}" }
+            log.error { "Failed to delete MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
@@ -74,7 +75,7 @@ actual class MidiMappingRepository actual constructor() {
             }
             devices
         } catch (e: Exception) {
-            Logger.error { "Failed to list MIDI mapping devices: ${e.message}" }
+            log.error { "Failed to list MIDI mapping devices: ${e.message}" }
             emptyList()
         }
     }

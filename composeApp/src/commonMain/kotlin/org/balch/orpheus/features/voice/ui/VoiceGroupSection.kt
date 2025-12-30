@@ -144,7 +144,7 @@ fun VoiceGroupSectionLayout(
                 },
                 label = "PITCH",
                 controlId = ControlIds.quadPitch(quadIndex),
-                size = 32.dp,
+                size = 36.dp,
                 progressColor = quadColor
             )
             RotaryKnob(
@@ -154,7 +154,7 @@ fun VoiceGroupSectionLayout(
                 },
                 label = "HOLD",
                 controlId = ControlIds.quadHold(quadIndex),
-                size = 32.dp,
+                size = 36.dp,
                 progressColor = OrpheusColors.warmGlow
             )
         }

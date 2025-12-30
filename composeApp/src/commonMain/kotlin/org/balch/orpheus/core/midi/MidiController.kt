@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.midi
 
+import com.diamondedge.logging.logging
 import dev.atsushieno.ktmidi.MidiAccess
 import dev.atsushieno.ktmidi.MidiInput
 import dev.atsushieno.ktmidi.MidiPortConnectionState
@@ -7,7 +8,6 @@ import dev.atsushieno.ktmidi.OnMidiReceivedEventListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.balch.orpheus.util.Logger
 
 /**
  * Callback interface for MIDI events.
@@ -48,6 +48,7 @@ interface MidiEventListener {
 class MidiController(
     private val midiAccessFactory: () -> MidiAccess
 ) {
+    private val log = logging("MidiController")
     private var midiAccess: MidiAccess = midiAccessFactory()
     private var currentInput: MidiInput? = null
     private var listener: MidiEventListener? = null
@@ -84,7 +85,7 @@ class MidiController(
 
         val port = midiAccess.inputs.find { it.name == deviceName }
         if (port == null) {
-            Logger.warn { "MIDI device not found: $deviceName" }
+            log.warn { "MIDI device not found: $deviceName" }
             return false
         }
 
@@ -98,9 +99,9 @@ class MidiController(
                     handleMidiMessage(data, start, length)
                 })
 
-                Logger.info { "Opened MIDI device: $deviceName" }
+                log.info { "Opened MIDI device: $deviceName" }
             } catch (e: Exception) {
-                Logger.error { "Failed to open MIDI device: ${e.message}" }
+                log.error { "Failed to open MIDI device: ${e.message}" }
             }
         }
 
@@ -114,7 +115,7 @@ class MidiController(
         try {
             currentInput?.close()
         } catch (e: Exception) {
-            Logger.warn { "Error closing MIDI device: ${e.message}" }
+            log.warn { "Error closing MIDI device: ${e.message}" }
         }
         currentInput = null
     }
@@ -124,7 +125,7 @@ class MidiController(
      */
     fun start(listener: MidiEventListener) {
         this.listener = listener
-        Logger.info { "Started listening for MIDI events" }
+        log.info { "Started listening for MIDI events" }
     }
 
     /**

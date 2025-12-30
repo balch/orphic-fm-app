@@ -1,7 +1,7 @@
 package org.balch.orpheus.core.midi
 
+import com.diamondedge.logging.logging
 import kotlinx.serialization.json.Json
-import org.balch.orpheus.util.Logger
 import java.io.File
 
 /**
@@ -9,6 +9,7 @@ import java.io.File
  * Stores mappings in ~/.config/orpheus/midi-mappings/
  */
 actual class MidiMappingRepository actual constructor() {
+    private val log = logging("MidiMappingRepository")
 
     private val json = Json {
         prettyPrint = true
@@ -20,7 +21,7 @@ actual class MidiMappingRepository actual constructor() {
         File(userHome, ".config/orpheus/midi-mappings").also { dir ->
             if (!dir.exists()) {
                 dir.mkdirs()
-                Logger.info { "Created MIDI mappings directory: ${dir.absolutePath}" }
+                log.info { "Created MIDI mappings directory: ${dir.absolutePath}" }
             }
         }
     }
@@ -36,9 +37,9 @@ actual class MidiMappingRepository actual constructor() {
             val file = fileForDevice(deviceName)
             val jsonString = json.encodeToString(mapping.forPersistence())
             file.writeText(jsonString)
-            Logger.info { "Saved MIDI mappings for '$deviceName' to ${file.name}" }
+            log.info { "Saved MIDI mappings for '$deviceName' to ${file.name}" }
         } catch (e: Exception) {
-            Logger.error { "Failed to save MIDI mappings for '$deviceName': ${e.message}" }
+            log.error { "Failed to save MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
@@ -48,14 +49,14 @@ actual class MidiMappingRepository actual constructor() {
             if (file.exists()) {
                 val jsonString = file.readText()
                 val mapping = json.decodeFromString<MidiMappingState>(jsonString)
-                Logger.info { "Loaded MIDI mappings for '$deviceName' from ${file.name}" }
+                log.info { "Loaded MIDI mappings for '$deviceName' from ${file.name}" }
                 mapping
             } else {
-                Logger.debug { "No saved MIDI mappings for '$deviceName'" }
+                log.debug { "No saved MIDI mappings for '$deviceName'" }
                 null
             }
         } catch (e: Exception) {
-            Logger.error { "Failed to load MIDI mappings for '$deviceName': ${e.message}" }
+            log.error { "Failed to load MIDI mappings for '$deviceName': ${e.message}" }
             null
         }
     }
@@ -65,10 +66,10 @@ actual class MidiMappingRepository actual constructor() {
             val file = fileForDevice(deviceName)
             if (file.exists()) {
                 file.delete()
-                Logger.info { "Deleted MIDI mappings for '$deviceName'" }
+                log.info { "Deleted MIDI mappings for '$deviceName'" }
             }
         } catch (e: Exception) {
-            Logger.error { "Failed to delete MIDI mappings for '$deviceName': ${e.message}" }
+            log.error { "Failed to delete MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
@@ -79,7 +80,7 @@ actual class MidiMappingRepository actual constructor() {
                 ?.map { it.nameWithoutExtension }
                 ?: emptyList()
         } catch (e: Exception) {
-            Logger.error { "Failed to list MIDI mapping devices: ${e.message}" }
+            log.error { "Failed to list MIDI mapping devices: ${e.message}" }
             emptyList()
         }
     }

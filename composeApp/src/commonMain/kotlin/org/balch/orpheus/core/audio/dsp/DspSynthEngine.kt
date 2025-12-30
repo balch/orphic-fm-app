@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.audio.dsp
 
+import com.diamondedge.logging.logging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -19,7 +20,6 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspHyperLfoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspStereoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspVibratoPlugin
-import org.balch.orpheus.util.Logger
 import kotlin.math.pow
 
 /**
@@ -32,6 +32,8 @@ class DspSynthEngine(
     private val audioEngine: AudioEngine,
     plugins: Set<DspPlugin>,
 ) : SynthEngine {
+
+    private val log = logging("DspSynthEngine")
 
     // Extract plugins by type
     private val hyperLfo = plugins.filterIsInstance<DspHyperLfoPlugin>().first()
@@ -80,6 +82,24 @@ class DspSynthEngine(
     private val _masterLevelFlow = MutableStateFlow(0f)
     override val masterLevelFlow: StateFlow<Float> = _masterLevelFlow.asStateFlow()
 
+    private val _driveFlow = MutableStateFlow(0f)
+    override val driveFlow: StateFlow<Float> = _driveFlow.asStateFlow()
+
+    private val _distortionMixFlow = MutableStateFlow(0f)
+    override val distortionMixFlow: StateFlow<Float> = _distortionMixFlow.asStateFlow()
+
+    private val _delayMixFlow = MutableStateFlow(0f)
+    override val delayMixFlow: StateFlow<Float> = _delayMixFlow.asStateFlow()
+
+    private val _delayFeedbackFlow = MutableStateFlow(0f)
+    override val delayFeedbackFlow: StateFlow<Float> = _delayFeedbackFlow.asStateFlow()
+
+    private val _quadPitchFlow = MutableStateFlow(FloatArray(3) { 0.5f })
+    override val quadPitchFlow: StateFlow<FloatArray> = _quadPitchFlow.asStateFlow()
+
+    private val _quadHoldFlow = MutableStateFlow(FloatArray(3))
+    override val quadHoldFlow: StateFlow<FloatArray> = _quadHoldFlow.asStateFlow()
+
     // ═══════════════════════════════════════════════════════════
     // Audio-Rate Automation System
     // ═══════════════════════════════════════════════════════════
@@ -95,12 +115,13 @@ class DspSynthEngine(
 
     // State Caches
     private val _voiceTune = FloatArray(12) { 0.5f }
-    private val _voiceFmDepth = FloatArray(12) { 0.0f }
-    private val _voiceEnvelopeSpeed = FloatArray(12) { 0.0f }
-    private val _pairSharpness = FloatArray(6) { 0.0f }
+    private val _voiceFmDepth = FloatArray(12)
+    private val _voiceEnvelopeSpeed = FloatArray(12)
+    private val _pairSharpness = FloatArray(6)
     private val _duoModSource = Array(6) { ModSource.OFF }
     private val _quadPitch = FloatArray(3) { 0.5f }
-    private val _quadHold = FloatArray(3) { 0.0f }
+    private val _quadHold = FloatArray(3)
+    private val _quadVolume = FloatArray(3) { 1.0f }  // Default to full volume
     private var _fmStructureCrossQuad = false
     private var _totalFeedback = 0.0f
     private var _voiceCoupling = 0.0f
@@ -220,6 +241,9 @@ class DspSynthEngine(
         // Vibrato
         setupAutomation("vibrato", listOf(), 20.0, 0.0) { setVibrato(getVibrato()) }
 
+        // Master Volume
+        setupAutomation("master_volume", listOf(stereoPlugin.masterGainLeftInput, stereoPlugin.masterGainRightInput), 1.0, 0.0) { setMasterVolume(getMasterVolume()) }
+
         // Drive
         setupAutomation("drive", listOf(distortionPlugin.limiterLeftDrive, distortionPlugin.limiterRightDrive), 14.0, 1.0) { setDrive(getDrive()) }
 
@@ -312,7 +336,7 @@ class DspSynthEngine(
 
     override fun start() {
         if (audioEngine.isRunning) return
-        Logger.info { "Starting Shared Audio Engine..." }
+        log.info { "Starting Shared Audio Engine..." }
         audioEngine.start()
 
         monitoringJob = monitoringScope.launch {
@@ -337,23 +361,27 @@ class DspSynthEngine(
                 delay(33) // ~30fps
             }
         }
-        Logger.info { "Audio Engine Started" }
+        log.info { "Audio Engine Started" }
     }
 
     override fun stop() {
-        Logger.info { "Stopping Audio Engine..." }
+        log.info { "Stopping Audio Engine..." }
         monitoringJob?.cancel()
         monitoringJob = null
         audioEngine.stop()
-        Logger.info { "Audio Engine Stopped" }
+        log.info { "Audio Engine Stopped" }
     }
 
     // Delay delegations
     override fun setDelayTime(index: Int, time: Float) = delayPlugin.setTime(index, time)
-    override fun setDelayFeedback(amount: Float) = delayPlugin.setFeedback(amount)
+    override fun setDelayFeedback(amount: Float) {
+        delayPlugin.setFeedback(amount)
+        _delayFeedbackFlow.value = amount
+    }
     override fun setDelayMix(amount: Float) {
         delayPlugin.setMix(amount)
         distortionPlugin.setDryLevel(1.0f - amount)
+        _delayMixFlow.value = amount
     }
     override fun setDelayModDepth(index: Int, amount: Float) = delayPlugin.setModDepth(index, amount)
     override fun setDelayModSource(index: Int, isLfo: Boolean) = delayPlugin.setModSource(index, isLfo)
@@ -380,8 +408,14 @@ class DspSynthEngine(
     override fun getHyperLfoLink(): Boolean = hyperLfo.getLink()
 
     // Distortion delegations
-    override fun setDrive(amount: Float) = distortionPlugin.setDrive(amount)
-    override fun setDistortionMix(amount: Float) = distortionPlugin.setMix(amount)
+    override fun setDrive(amount: Float) {
+        distortionPlugin.setDrive(amount)
+        _driveFlow.value = amount
+    }
+    override fun setDistortionMix(amount: Float) {
+        distortionPlugin.setMix(amount)
+        _distortionMixFlow.value = amount
+    }
     override fun getDrive(): Float = distortionPlugin.getDrive()
     override fun getDistortionMix(): Float = distortionPlugin.getMix()
 
@@ -445,6 +479,7 @@ class DspSynthEngine(
 
     override fun setQuadPitch(quadIndex: Int, pitch: Float) {
         _quadPitch[quadIndex] = pitch
+        _quadPitchFlow.value = _quadPitch.clone() // shallow copy is fine for primitive array
         quadPitchOffsets[quadIndex] = pitch.toDouble()
         val startVoice = quadIndex * 4
         for (i in startVoice until startVoice + 4) {
@@ -454,9 +489,18 @@ class DspSynthEngine(
 
     override fun setQuadHold(quadIndex: Int, amount: Float) {
         _quadHold[quadIndex] = amount
+        _quadHoldFlow.value = _quadHold.clone()
         val startVoice = quadIndex * 4
         for (i in startVoice until startVoice + 4) {
             voices[i].setHoldLevel(amount.toDouble())
+        }
+    }
+
+    override fun setQuadVolume(quadIndex: Int, volume: Float) {
+        _quadVolume[quadIndex] = volume
+        val startVoice = quadIndex * 4
+        for (i in startVoice until startVoice + 4) {
+            voices[i].setVolume(volume.toDouble())
         }
     }
 
@@ -544,7 +588,7 @@ class DspSynthEngine(
     private var testGain: Multiply? = null
     
     override fun playTestTone(frequency: Float) {
-        Logger.info { "Playing test tone at ${frequency}Hz" }
+        log.info { "Playing test tone at ${frequency}Hz" }
         if (!audioEngine.isRunning) {
             audioEngine.start()
         }
@@ -571,11 +615,11 @@ class DspSynthEngine(
     override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) {
         val setup = automationSetups[controlId]
         if (setup == null) {
-            Logger.info { "Automation NOT FOUND: $controlId" }
+            log.info { "Automation NOT FOUND: $controlId" }
             return
         }
         if (controlId.startsWith("voice_freq")) {
-            Logger.info { "Automation: $controlId, first value=${values.firstOrNull()} Hz, targets=${setup.targets.size}" }
+            log.info { "Automation: $controlId, first value=${values.firstOrNull()} Hz, targets=${setup.targets.size}" }
         }
         
         val secondarySetup = when (controlId) {
@@ -659,6 +703,7 @@ class DspSynthEngine(
     override fun getDuoModSource(duoIndex: Int): ModSource = _duoModSource[duoIndex]
     override fun getQuadPitch(quadIndex: Int): Float = _quadPitch[quadIndex]
     override fun getQuadHold(quadIndex: Int): Float = _quadHold[quadIndex]
+    override fun getQuadVolume(quadIndex: Int): Float = _quadVolume[quadIndex]
     override fun getFmStructureCrossQuad(): Boolean = _fmStructureCrossQuad
     override fun getTotalFeedback(): Float = _totalFeedback
     override fun getVoiceCoupling(): Float = _voiceCoupling

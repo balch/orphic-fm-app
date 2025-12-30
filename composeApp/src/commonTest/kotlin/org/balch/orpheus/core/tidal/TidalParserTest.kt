@@ -12,7 +12,7 @@ class TidalParserTest {
     
     @Test
     fun `parseGates parses single number`() {
-        val result = TidalParser.parseGates("0")
+        val result = TidalParser.parseGates("1")
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
         
         val events = result.pattern.query(Arc.UNIT)
@@ -23,7 +23,7 @@ class TidalParserTest {
     
     @Test
     fun `parseGates parses sequence`() {
-        val result = TidalParser.parseGates("0 1 2 3")
+        val result = TidalParser.parseGates("1 2 3 4")
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
         
         val events = result.pattern.query(Arc.UNIT)
@@ -36,7 +36,7 @@ class TidalParserTest {
     
     @Test
     fun `parseGates handles repetition`() {
-        val result = TidalParser.parseGates("0*4")
+        val result = TidalParser.parseGates("1*4")
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
         
         val events = result.pattern.query(Arc.UNIT)
@@ -50,27 +50,27 @@ class TidalParserTest {
     
     @Test
     fun `parseGates handles grouping`() {
-        val result = TidalParser.parseGates("[0 1] 2")
+        val result = TidalParser.parseGates("[1 2] 3")
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
         
         val events = result.pattern.query(Arc.UNIT)
-        // [0 1] in first half, 2 in second half = 3 events
+        // [1 2] in first half, 3 in second half = 3 events
         assertEquals(3, events.size)
     }
     
     @Test
     fun `parseGates handles silence`() {
-        val result = TidalParser.parseGates("0 ~ 2")
+        val result = TidalParser.parseGates("1 ~ 3")
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
         
         val events = result.pattern.query(Arc.UNIT)
-        // 0 and 2, but not the silence
+        // 1 and 3, but not the silence
         assertEquals(2, events.size)
     }
     
     @Test
     fun `parseGates handles alternation`() {
-        val result = TidalParser.parseGates("<0 1>")
+        val result = TidalParser.parseGates("<1 2>")
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
         
         // Cycle 0 should have voice 0
@@ -88,7 +88,7 @@ class TidalParserTest {
     fun `parseGates rejects invalid voice index`() {
         val result = TidalParser.parseGates("9")
         assertIs<TidalParser.ParseResult.Failure<TidalEvent>>(result)
-        assertTrue(result.message.contains("0-7"))
+        assertTrue(result.message.contains("1-8"))
     }
     
     @Test
@@ -108,15 +108,15 @@ class TidalParserTest {
     
     @Test
     fun `gates extension function works`() {
-        val pattern = "0 1 2 3".gates()
+        val pattern = "1 2 3 4".gates()
         val events = pattern.query(Arc.UNIT)
         assertEquals(4, events.size)
     }
 
     @Test
     fun `parseGates handles comma stacking`() {
-        // "0 1, 2 3" should stack two patterns
-        val result = TidalParser.parseGates("0 1, 2 3")
+        // "1 2, 3 4" should stack two patterns
+        val result = TidalParser.parseGates("1 2, 3 4")
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
         
         val events = result.pattern.query(Arc.UNIT)
@@ -146,7 +146,7 @@ class TidalParserTest {
 
     @Test
     fun `parseGates handles euclid`() {
-        val result = TidalParser.parseGates("0(3,8)")
+        val result = TidalParser.parseGates("1(3,8)")
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
         val events = result.pattern.query(Arc.UNIT)
         // 3 events from (3,8) distribution
@@ -155,10 +155,10 @@ class TidalParserTest {
 
     @Test
     fun `parseGates handles modifiers`() {
-        val result = TidalParser.parseGates("0*2 1/2")
+        val result = TidalParser.parseGates("1*2 2/2")
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
-        // 0*2 -> 2 events in first half
-        // 1/2 -> 1 event in second half (spanning longer)
+        // 1*2 -> 2 events in first half
+        // 2/2 -> 1 event in second half (spanning longer)
         // Total query(0,1) -> 2 events for '0', plus '1' starts at 0.5.
         
         val events = result.pattern.query(Arc.UNIT)

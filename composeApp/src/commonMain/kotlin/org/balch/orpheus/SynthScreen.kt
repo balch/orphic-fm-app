@@ -11,13 +11,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import com.diamondedge.logging.logging
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.screens.CompactLandscapeScreen
 import org.balch.orpheus.ui.screens.CompactPortraitScreen
 import org.balch.orpheus.ui.screens.DesktopSynthScreen
 import org.balch.orpheus.ui.widgets.LearnModeProvider
-import org.balch.orpheus.util.Logger
 
 /**
  * Layout mode for the synth screen based on window size.
@@ -54,9 +54,10 @@ fun SynthScreen(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
+        val log = logging("SynthScreen")
         orchestrator.start()
         focusRequester.requestFocus()
-        Logger.info { "Orpheus Ready \u2713" }
+        log.info { "Orpheus Ready \u2713" }
     }
 
     val peak by orchestrator.peakFlow.collectAsState()

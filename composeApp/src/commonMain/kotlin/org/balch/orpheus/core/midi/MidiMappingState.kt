@@ -88,10 +88,14 @@ data class MidiMappingState(
             // Quad controls
             fun quadPitch(index: Int) = "quad_${index}_pitch"
             fun quadHold(index: Int) = "quad_${index}_hold"
+            fun quadVolume(index: Int) = "quad_${index}_volume"
             
             // Stereo controls
             const val STEREO_PAN = "stereo_pan"
             const val STEREO_MODE = "stereo_mode"
+            
+            // Structure
+            const val FM_STRUCTURE = "fm_structure"
             
             // Viz controls
             const val VIZ_KNOB_1 = "viz_knob_1"

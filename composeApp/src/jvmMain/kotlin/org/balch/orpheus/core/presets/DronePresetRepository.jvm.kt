@@ -1,8 +1,8 @@
 package org.balch.orpheus.core.presets
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.serialization.json.Json
-import org.balch.orpheus.util.Logger
 import java.io.File
 
 /**
@@ -11,6 +11,8 @@ import java.io.File
  */
 @Inject
 class JvmDronePresetRepository : DronePresetRepository {
+    private val log = logging("JvmDronePresetRepository")
+
 
     private val json = Json {
         prettyPrint = true
@@ -22,7 +24,7 @@ class JvmDronePresetRepository : DronePresetRepository {
         File(userHome, ".config/orpheus/presets").also { dir ->
             if (!dir.exists()) {
                 dir.mkdirs()
-                Logger.info { "Created presets directory: ${dir.absolutePath}" }
+                log.info { "Created presets directory: ${dir.absolutePath}" }
             }
         }
     }
@@ -37,9 +39,9 @@ class JvmDronePresetRepository : DronePresetRepository {
             val file = fileForPreset(preset.name)
             val jsonString = json.encodeToString(preset)
             file.writeText(jsonString)
-            Logger.info { "Saved preset '${preset.name}' to ${file.name}" }
+            log.info { "Saved preset '${preset.name}' to ${file.name}" }
         } catch (e: Exception) {
-            Logger.error { "Failed to save preset '${preset.name}': ${e.message}" }
+            log.error { "Failed to save preset '${preset.name}': ${e.message}" }
         }
     }
 
@@ -49,14 +51,14 @@ class JvmDronePresetRepository : DronePresetRepository {
             if (file.exists()) {
                 val jsonString = file.readText()
                 val preset = json.decodeFromString<DronePreset>(jsonString)
-                Logger.info { "Loaded preset '${name}' from ${file.name}" }
+                log.info { "Loaded preset '${name}' from ${file.name}" }
                 preset
             } else {
-                Logger.debug { "No preset found: '$name'" }
+                log.debug { "No preset found: '$name'" }
                 null
             }
         } catch (e: Exception) {
-            Logger.error { "Failed to load preset '$name': ${e.message}" }
+            log.error { "Failed to load preset '$name': ${e.message}" }
             null
         }
     }
@@ -66,10 +68,10 @@ class JvmDronePresetRepository : DronePresetRepository {
             val file = fileForPreset(name)
             if (file.exists()) {
                 file.delete()
-                Logger.info { "Deleted preset '$name'" }
+                log.info { "Deleted preset '$name'" }
             }
         } catch (e: Exception) {
-            Logger.error { "Failed to delete preset '$name': ${e.message}" }
+            log.error { "Failed to delete preset '$name': ${e.message}" }
         }
     }
 
@@ -81,14 +83,14 @@ class JvmDronePresetRepository : DronePresetRepository {
                     try {
                         json.decodeFromString<DronePreset>(file.readText())
                     } catch (e: Exception) {
-                        Logger.warn { "Failed to parse preset file ${file.name}: ${e.message}" }
+                        log.warn { "Failed to parse preset file ${file.name}: ${e.message}" }
                         null
                     }
                 }
                 ?.sortedByDescending { it.createdAt }
                 ?: emptyList()
         } catch (e: Exception) {
-            Logger.error { "Failed to list presets: ${e.message}" }
+            log.error { "Failed to list presets: ${e.message}" }
             emptyList()
         }
     }

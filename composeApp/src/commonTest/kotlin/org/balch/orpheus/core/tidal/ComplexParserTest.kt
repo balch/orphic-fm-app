@@ -11,7 +11,7 @@ class ComplexParserTest {
 
     @Test
     fun `test complex voices syntax`() {
-        val input = "<0 2 4> [1 3]"
+        val input = "<1 3 5> [2 4]"
         val result = TidalParser.parseGates(input)
         
         if (result is TidalParser.ParseResult.Failure) {
@@ -23,21 +23,21 @@ class ComplexParserTest {
 
     @Test
     fun `test slowcat syntax`() {
-        val input = "<0 1>"
+        val input = "<1 2>"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
     }
 
     @Test
     fun `test nested structures`() {
-        val input = "[0 [1 2]*2] <3 4>"
+        val input = "[1 [2 3]*2] <4 5>"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
     }
     
     @Test
     fun `test replication and polymeters`() {
-        val input = "{0, 1 2} !3"
+        val input = "{1, 2 3} !3"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
     }
@@ -46,8 +46,8 @@ class ComplexParserTest {
     
     @Test
     fun `slowcat three elements cycles correctly over 6 cycles`() {
-        // Test that <0 2 4> produces voice 0, 2, 4, 0, 2, 4 over 6 cycles
-        val input = "<0 2 4>"
+        // Test that <1 3 5> produces voice 0, 2, 4, 0, 2, 4 over 6 cycles
+        val input = "<1 3 5>"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         
@@ -74,10 +74,10 @@ class ComplexParserTest {
     
     @Test
     fun `slowcat with sequence produces correct events per cycle`() {
-        // Test "<0 2 4> [1 3]" which has:
+        // Test "<1 3 5> [2 4]" which has:
         // - slowcat part: alternates 0, 2, 4 per cycle
-        // - sequence part: [1 3] plays both 1 and 3 every cycle
-        val input = "<0 2 4> [1 3]"
+        // - sequence part: [2 4] plays both 1 and 3 every cycle
+        val input = "<1 3 5> [2 4]"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         
@@ -111,7 +111,7 @@ class ComplexParserTest {
     fun `scheduler windowed query simulates real playback`() {
         // Simulate the scheduler's windowed query approach
         // The scheduler queries windows of ~250ms (e.g., 0.5 cycles at 120bpm)
-        val input = "<0 2 4>"
+        val input = "<1 3 5>"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         
@@ -163,9 +163,9 @@ class ComplexParserTest {
     
     @Test
     fun `voices pattern with colon syntax parses correctly`() {
-        // Test the actual REPL syntax: "d1 $ voices: <0 2 4> [1 3]"
+        // Test the actual REPL syntax: "d1 $ voices: <1 3 5> [2 4]"
         // For now, test just the pattern portion since the d1 $ is REPL syntax
-        val input = "<0 2 4> [1 3]"
+        val input = "<1 3 5> [2 4]"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         
@@ -198,7 +198,7 @@ class ComplexParserTest {
     
     @Test
     fun `range 0 to 3 expands to four events`() {
-        val input = "0..3"
+        val input = "1..4"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         
@@ -215,7 +215,7 @@ class ComplexParserTest {
     
     @Test
     fun `range 3 to 0 expands in reverse`() {
-        val input = "3..0"
+        val input = "4..1"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         
@@ -233,7 +233,7 @@ class ComplexParserTest {
     
     @Test
     fun `range in sequence works`() {
-        val input = "0..2 5"
+        val input = "1..3 6"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         
@@ -252,7 +252,7 @@ class ComplexParserTest {
     
     @Test
     fun `elongation gives proportional time`() {
-        val input = "0@2 1"
+        val input = "1@2 2"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         
@@ -279,7 +279,7 @@ class ComplexParserTest {
     
     @Test
     fun `multiple elongations work together`() {
-        val input = "0@2 1@3 2"
+        val input = "1@2 2@3 3"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         
@@ -303,7 +303,7 @@ class ComplexParserTest {
     
     @Test
     fun `elongation with nested groups works`() {
-        val input = "[0 1]@2 2"
+        val input = "[1 2]@2 3"
         val result = TidalParser.parseGates(input)
         assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result, "Should parse '$input'")
         

@@ -15,7 +15,8 @@ enum class ControlEventOrigin {
     MIDI,      // External MIDI controller or Keyboard
     UI,        // Manual UI interaction (Knobs/Sliders)
     SEQUENCER, // Internal Automation/Sequencer
-    TIDAL      // Tidal Cycles OSC input (future)
+    TIDAL,     // Tidal Cycles OSC input (future)
+    AI         // AI Agent Automation
 }
 
 /**

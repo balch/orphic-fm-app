@@ -1,8 +1,10 @@
 package org.balch.orpheus.core.midi
 
+import com.diamondedge.logging.logging
 import dev.atsushieno.ktmidi.EmptyMidiAccess
 import dev.atsushieno.ktmidi.MidiAccess
-import org.balch.orpheus.util.Logger
+
+private val log = logging("MidiAccessFactory")
 
 /**
  * WASM actual implementation - uses ktmidi's WebMidiAccess for browser MIDI support.
@@ -14,7 +16,7 @@ private val cachedMidiAccess by lazy {
         // It wraps navigator.requestMIDIAccess()
         dev.atsushieno.ktmidi.WebMidiAccess()
     } catch (e: Exception) {
-        Logger.warn { "Web MIDI API not available: ${e.message}" }
+        log.warn { "Web MIDI API not available: ${e.message}" }
         EmptyMidiAccess()
     }
 }

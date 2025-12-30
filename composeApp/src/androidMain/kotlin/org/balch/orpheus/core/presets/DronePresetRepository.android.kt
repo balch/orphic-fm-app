@@ -1,9 +1,9 @@
 package org.balch.orpheus.core.presets
 
 import android.content.Context
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.serialization.json.Json
-import org.balch.orpheus.util.Logger
 import java.io.File
 
 /**
@@ -15,6 +15,7 @@ import java.io.File
 class AndroidDronePresetRepository(
     private val context: Context
 ) : DronePresetRepository {
+    private val log = logging("AndroidDronePresetRepository")
 
     private val json = Json {
         prettyPrint = true
@@ -25,7 +26,7 @@ class AndroidDronePresetRepository(
         File(context.filesDir, "presets").also { dir ->
             if (!dir.exists()) {
                 dir.mkdirs()
-                Logger.info { "Created presets directory: ${dir.absolutePath}" }
+                log.info { "Created presets directory: ${dir.absolutePath}" }
             }
         }
     }
@@ -40,9 +41,9 @@ class AndroidDronePresetRepository(
             val file = fileForPreset(preset.name)
             val jsonString = json.encodeToString(preset)
             file.writeText(jsonString)
-            Logger.info { "Saved preset '${preset.name}'" }
+            log.info { "Saved preset '${preset.name}'" }
         } catch (e: Exception) {
-            Logger.error { "Failed to save preset '${preset.name}': ${e.message}" }
+            log.error { "Failed to save preset '${preset.name}': ${e.message}" }
         }
     }
 
@@ -54,7 +55,7 @@ class AndroidDronePresetRepository(
                 json.decodeFromString<DronePreset>(jsonString)
             } else null
         } catch (e: Exception) {
-            Logger.error { "Failed to load preset '$name': ${e.message}" }
+            log.error { "Failed to load preset '$name': ${e.message}" }
             null
         }
     }
@@ -64,10 +65,10 @@ class AndroidDronePresetRepository(
             val file = fileForPreset(name)
             if (file.exists()) {
                 file.delete()
-                Logger.info { "Deleted preset '$name'" }
+                log.info { "Deleted preset '$name'" }
             }
         } catch (e: Exception) {
-            Logger.error { "Failed to delete preset '$name': ${e.message}" }
+            log.error { "Failed to delete preset '$name': ${e.message}" }
         }
     }
 
@@ -85,7 +86,7 @@ class AndroidDronePresetRepository(
                 ?.sortedByDescending { it.createdAt }
                 ?: emptyList()
         } catch (e: Exception) {
-            Logger.error { "Failed to list presets: ${e.message}" }
+            log.error { "Failed to list presets: ${e.message}" }
             emptyList()
         }
     }

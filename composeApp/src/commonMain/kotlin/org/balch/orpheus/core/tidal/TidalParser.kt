@@ -425,8 +425,10 @@ object TidalParser {
             val node = MiniParser(input).parse()
             val pattern: Pattern<TidalEvent> = compile(node) { atom ->
                 val idx = atom.value.toIntOrNull() ?: throw IllegalArgumentException("Invalid index: ${atom.value}")
-                if (idx !in 0..7) throw IllegalArgumentException("Voice index must be 0-7, got: $idx")
-                var event: TidalEvent = TidalEvent.Gate(idx, true)
+                // Accept 1-based input (1-8) and convert to 0-based (0-7)
+                if (idx !in 1..8) throw IllegalArgumentException("Voice index must be 1-8, got: $idx")
+                val zeroBasedIdx = idx - 1
+                var event: TidalEvent = TidalEvent.Gate(zeroBasedIdx, true)
                 atom.location?.let { loc ->
                     event = event.withLocation(SourceLocation(loc.first, loc.last + 1))
                 }

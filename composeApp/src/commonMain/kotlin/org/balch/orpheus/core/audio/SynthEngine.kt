@@ -18,6 +18,7 @@ interface SynthEngine {
     // Group Control (Quad 1-4, 5-8, 9-12)
     fun setQuadPitch(quadIndex: Int, pitch: Float) // 0-1, 0.5=Unity
     fun setQuadHold(quadIndex: Int, amount: Float) // 0-1, VCA bias
+    fun setQuadVolume(quadIndex: Int, volume: Float) // 0-1, output volume multiplier
     fun setVoiceHold(index: Int, amount: Float) // 0-1, per-voice VCA bias
     
     /**
@@ -79,6 +80,20 @@ interface SynthEngine {
     val lfoOutputFlow: StateFlow<Float>         // -1 to 1 range
     val masterLevelFlow: StateFlow<Float>       // 0-1 range, overall output including delay
 
+    // Parameter Flows
+    val driveFlow: StateFlow<Float>
+    val distortionMixFlow: StateFlow<Float>
+    val delayMixFlow: StateFlow<Float>
+    val delayFeedbackFlow: StateFlow<Float>
+    val quadPitchFlow: StateFlow<FloatArray>    // 3 quads
+    val quadHoldFlow: StateFlow<FloatArray>     // 3 quads
+
+    /**
+     * AI TODO
+     * Create flows for Distortion, Mode Delay, Quad and Duo Controls
+     * See if there is a way to make it generic and let the plugins  handle the flows
+     */
+
     // Getters for State Saving
     fun getVoiceTune(index: Int): Float
     fun getVoiceFmDepth(index: Int): Float
@@ -87,6 +102,7 @@ interface SynthEngine {
     fun getDuoModSource(duoIndex: Int): ModSource
     fun getQuadPitch(quadIndex: Int): Float
     fun getQuadHold(quadIndex: Int): Float
+    fun getQuadVolume(quadIndex: Int): Float
     fun getFmStructureCrossQuad(): Boolean
     fun getTotalFeedback(): Float
     fun getVibrato(): Float

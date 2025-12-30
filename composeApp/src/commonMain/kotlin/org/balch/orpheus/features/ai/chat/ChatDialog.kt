@@ -1,0 +1,220 @@
+package org.balch.orpheus.features.ai.chat
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import org.balch.orpheus.core.config.AppConfig
+import org.balch.orpheus.features.ai.AiOptionsViewModel
+import org.balch.orpheus.features.ai.chat.widgets.ChatInputField
+import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
+import org.balch.orpheus.features.ai.chat.widgets.ChatMessageBubble
+import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
+import org.balch.orpheus.features.ai.generative.AiDashboard
+import org.balch.orpheus.features.ai.generative.AiStatusMessage
+import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.widgets.DraggableDialog
+import org.jetbrains.compose.ui.tooling.preview.Preview
+
+/**
+ * AI Chat dialog - a modeless, draggable dialog with liquid background.
+ *
+ * Features:
+ * - Draggable title bar
+ * - Liquid background effect
+ * - Two modes:
+ *    1. Chat Mode: Standard chat history + input
+ *    2. Dashboard Mode: Only AiDashboard (when Drone/Solo is active)
+ */
+@Composable
+fun ChatDialog(
+    modifier: Modifier = Modifier,
+    viewModel: ChatViewModel = metroViewModel(),
+    aiViewModel: AiOptionsViewModel? = null,
+    liquidState: io.github.fletchmckee.liquid.LiquidState? = null,
+    position: Pair<Float, Float>,
+    onPositionChange: (Float, Float) -> Unit,
+    size: Pair<Float, Float>,
+    onSizeChange: (Float, Float) -> Unit,
+    onClose: () -> Unit = {},
+) {
+    val messages by viewModel.messages.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+
+    // Determine mode based on AI agent status
+    val isDroneActive = aiViewModel?.isDroneActive?.collectAsState()?.value == true
+    val isSoloActive = aiViewModel?.isSoloActive?.collectAsState()?.value == true
+    val isDashboardMode = isDroneActive || isSoloActive
+
+    DraggableDialog(
+        title = if (isDashboardMode) "Dashboard" else AppConfig.CHAT_DISPLAY_NAME,
+        emoji = if (isDashboardMode) null else AppConfig.CHAT_EMOJI,
+        onClose = onClose,
+        liquidState = liquidState,
+        position = position,
+        onPositionChange = onPositionChange,
+        size = size,
+        onSizeChange = onSizeChange,
+        modifier = modifier
+    ) {
+        if (isDashboardMode && aiViewModel != null) {
+            // Dashboard Mode: Show only the AI Dashboard
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+            ) {
+                AiDashboard(
+                    inputLog = aiViewModel.aiInputLog,
+                    controlLog = aiViewModel.aiControlLog,
+                    statusMessages = aiViewModel.aiStatusMessages,
+                    isActive = true,
+                    isSoloMode = isSoloActive,
+                    onSendInfluence = { aiViewModel.sendSoloInfluence(it) },
+                    // Give it full space but respect layout
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        // Ensure it takes available space if needed, 
+                        // effectively pushing content to top but allowing expansion
+                        .weight(1f, fill = false) 
+                )
+            }
+        } else {
+            // Chat Mode: Standard chat UI
+            ChatDialogContent(
+                messages = messages,
+                isLoading = isLoading,
+                isApiKeySet = viewModel.isApiKeySet,
+                onSendMessage = viewModel::sendPrompt
+            )
+        }
+    }
+}
+
+/**
+ * Content layout for the standard chat view.
+ */
+@Composable
+fun ChatDialogContent(
+    messages: List<ChatMessage>,
+    isLoading: Boolean,
+    isApiKeySet: Boolean,
+    onSendMessage: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+
+    // Auto-scroll to bottom when new messages arrive or loading state changes
+    LaunchedEffect(isLoading, messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    Column(
+        modifier = modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (!isApiKeySet) {
+            // No API key message
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${AppConfig.CHAT_EMOJI}\n\n${AppConfig.CHAT_DISPLAY_NAME} awaits...\n\nAdd GEMINI_API_KEY\nto local.properties",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    color = OrpheusColors.brownsOrange.copy(alpha = 0.7f)
+                )
+            }
+        } else {
+            // Chat messages
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(messages, key = { it.id }) { message ->
+                    ChatMessageBubble(message = message)
+                }
+            }
+
+            // Input field
+            ChatInputField(
+                isEnabled = !isLoading,
+                onSendMessage = onSendMessage,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+@Preview
+fun ChatDialogContentPreview() {
+    val sampleMessages = listOf(
+        ChatMessage(
+            id = "1",
+            text = "Hello! Can you help me create a sound?",
+            type = ChatMessageType.User
+        ),
+        ChatMessage(
+            id = "2",
+            text = "Of course! I'd be happy to help you create a sound.",
+            type = ChatMessageType.Agent
+        )
+    )
+
+    OrpheusTheme {
+        ChatDialogContent(
+            messages = sampleMessages,
+            isLoading = false,
+            isApiKeySet = true,
+            onSendMessage = {}
+        )
+    }
+}
+
+@Composable
+@Preview
+fun DashboardPreview() {
+    // Fake data for preview
+    val mockFlow = MutableSharedFlow<AiStatusMessage>(replay = 1)
+    mockFlow.tryEmit(AiStatusMessage("Mock AI Message"))
+    
+    OrpheusTheme {
+        Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
+             AiDashboard(
+                inputLog = mockFlow,
+                controlLog = mockFlow,
+                statusMessages = mockFlow,
+                isActive = true,
+                modifier = Modifier.fillMaxWidth()
+             )
+        }
+    }
+}

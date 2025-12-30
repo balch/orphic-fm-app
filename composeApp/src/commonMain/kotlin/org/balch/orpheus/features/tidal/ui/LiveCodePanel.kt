@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -73,21 +74,29 @@ fun LiveCodePanel(
 ) {
     val state by viewModel.uiState.collectAsState()
     
-    // Track active highlight ranges for token highlighting
-    var activeHighlights by remember { mutableStateOf(listOf<IntRange>()) }
+    // Track active highlight ranges for token highlighting (Map of unique ID to range)
+    var activeHighlightMap by remember { mutableStateOf(mapOf<Long, IntRange>()) }
+    var highlightIdCounter by remember { mutableStateOf(0L) }
     val scope = rememberCoroutineScope()
+    
+    // Derive active highlights from the map for the transformer
+    val activeHighlights = activeHighlightMap.values.toList()
     
     // Subscribe to trigger events for token highlighting
     LaunchedEffect(Unit) {
         viewModel.triggers.collect { triggerEvent ->
-            // Launch each highlight lifecycle independently
-            val newRanges = triggerEvent.locations.map { loc -> loc.start until loc.end }
-            activeHighlights = activeHighlights + newRanges
+            // Create unique IDs for each new highlight
+            val newHighlights = triggerEvent.locations.associate { loc ->
+                val id = highlightIdCounter++
+                id to (loc.start until loc.end)
+            }
+            activeHighlightMap = activeHighlightMap + newHighlights
             
-            // Launch coroutine to clear this highlight after 250ms (doesn't block collect)
+            // Launch coroutine to clear these specific highlights after duration
+            val idsToRemove = newHighlights.keys
             scope.launch {
-                kotlinx.coroutines.delay(250)
-                activeHighlights = activeHighlights - newRanges.toSet()
+                kotlinx.coroutines.delay(triggerEvent.durationMs)
+                activeHighlightMap = activeHighlightMap - idsToRemove
             }
         }
     }
@@ -108,6 +117,7 @@ fun LiveCodePanel(
         selectedExample = state.selectedExample,
         activeHighlights = activeHighlights,
         error = state.error,
+        isAiGenerating = state.isAiGenerating,
         modifier = modifier,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange
@@ -134,6 +144,7 @@ fun LiveCodePanelLayout(
     selectedExample: String?,
     activeHighlights: List<IntRange> = emptyList(),
     error: String?,
+    isAiGenerating: Boolean = false,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -207,6 +218,12 @@ fun LiveCodePanelLayout(
                     }
                 }
 
+                Text(
+                    text = "C:$currentCycle",
+                    fontSize = 9.sp,
+                    color = if (isPlaying) OrpheusColors.neonCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 Spacer(modifier = Modifier.weight(1f))
 
                 ExamplesDropdown(
@@ -240,74 +257,99 @@ fun LiveCodePanelLayout(
                     text = "${bpm.toInt()}",
                     style = MaterialTheme.typography.labelSmall,
                     color = OrpheusColors.neonCyan,
-                    fontSize = 9.sp
-                )
-                Text(
-                    text = "C:$currentCycle",
                     fontSize = 9.sp,
-                    color = if (isPlaying) OrpheusColors.neonCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                    maxLines = 1,
                 )
-
-
             }
 
-            // Code editor
-            Surface(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                color = Color(0xFF1E1E2E), // Dark editor background
-                shape = RoundedCornerShape(8.dp)
+            // Code editor with AI loading overlay
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth()
             ) {
-                BasicTextField(
-                    value = code,
-                    onValueChange = { if (!isPlaying) onCodeChange(it) },
-                    readOnly = isPlaying,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(12.dp)
-                        .verticalScroll(rememberScrollState())
-                        .onKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyDown) {
-                                when {
-                                    (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Enter -> {
-                                        onExecuteBlock()
-                                        true
-                                    }
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color(0xFF1E1E2E), // Dark editor background
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    BasicTextField(
+                        value = code,
+                        onValueChange = { if (!isAiGenerating) onCodeChange(it) },
+                        readOnly = isAiGenerating, // Allow editing while playing for true live coding
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp)
+                            .verticalScroll(rememberScrollState())
+                            .onKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown) {
+                                    when {
+                                        (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Enter -> {
+                                            onExecuteBlock()
+                                            true
+                                        }
 
-                                    event.isShiftPressed && event.key == Key.Enter -> {
-                                        onExecuteLine()
-                                        true
-                                    }
+                                        event.isShiftPressed && event.key == Key.Enter -> {
+                                            onExecuteLine()
+                                            true
+                                        }
 
-                                    else -> false
-                                }
-                            } else false
-                        },
-                    textStyle = TextStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        color = OrpheusColors.neonCyan, // Default text color
-                        lineHeight = 15.sp
-                    ),
-                    visualTransformation = syntaxHighlighter,
-                    cursorBrush = SolidColor(OrpheusColors.neonCyan),
-                    decorationBox = { innerTextField ->
-                        Box {
-                            if (code.text.isEmpty()) {
-                                Text(
-                                    text = "# voices:0 1 2 3\n# fast 2 voices:0 1",
-                                    style = TextStyle(
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                            alpha = 0.4f
+                                        else -> false
+                                    }
+                                } else false
+                            },
+                        textStyle = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = OrpheusColors.neonCyan, // Default text color
+                            lineHeight = 15.sp
+                        ),
+                        visualTransformation = syntaxHighlighter,
+                        cursorBrush = SolidColor(OrpheusColors.neonCyan),
+                        decorationBox = { innerTextField ->
+                            Box {
+                                if (code.text.isEmpty() && !isAiGenerating) {
+                                    Text(
+                                        text = "# voices:0 1 2 3\n# fast 2 voices:0 1",
+                                        style = TextStyle(
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                                alpha = 0.4f
+                                            )
                                         )
                                     )
-                                )
+                                }
+                                innerTextField()
                             }
-                            innerTextField()
+                        }
+                    )
+                }
+                
+                // AI Loading Overlay
+                if (isAiGenerating) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xFF1E1E2E).copy(alpha = 0.85f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(32.dp),
+                                color = OrpheusColors.warmGlow,
+                                strokeWidth = 2.dp
+                            )
+                            Text(
+                                text = "AI generating...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = OrpheusColors.warmGlow,
+                                fontSize = 11.sp
+                            )
                         }
                     }
-                )
+                }
             }
 
             // Cycle position bar

@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.tidal
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -19,7 +20,6 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
-import org.balch.orpheus.util.Logger
 import org.balch.orpheus.util.currentTimeMillis
 import kotlin.math.pow
 
@@ -48,6 +48,7 @@ class TidalScheduler(
     private val synthController: SynthController,
     private val synthEngine: SynthEngine
 ) {
+    private val log = logging("TidalScheduler")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     
     private val _state = MutableStateFlow(TidalSchedulerState())
@@ -55,10 +56,14 @@ class TidalScheduler(
     
     /**
      * Trigger event for UI highlighting with source locations.
+     * @param voiceIndex The voice index for this trigger
+     * @param locations Source locations to highlight in the code
+     * @param durationMs How long to show the highlight (default 250ms, use longer for hold/sustain events)
      */
     data class TriggerEvent(
         val voiceIndex: Int,
-        val locations: List<SourceLocation>
+        val locations: List<SourceLocation>,
+        val durationMs: Long = 250L
     )
     
     // Emit trigger events for UI highlighting
@@ -75,13 +80,12 @@ class TidalScheduler(
     /**
      * Set the current pattern to play.
      */
+    /**
+     * Set the current pattern to play.
+     */
     fun setPattern(pattern: Pattern<TidalEvent>) {
         currentPattern = pattern
-        if (_state.value.isPlaying) {
-            // If already playing, restart with new pattern
-            // TODO: Hot-swap instead of restart to keep phase?
-            // For now restart is safer to clear automation
-            stop()
+        if (!_state.value.isPlaying) {
             play()
         }
     }
@@ -92,9 +96,7 @@ class TidalScheduler(
     fun play() {
         if (playbackJob?.isActive == true) return
         
-        val pattern = currentPattern ?: return
-        
-        Logger.info { "TidalScheduler: Starting playback" }
+        log.info { "TidalScheduler: Starting playback" }
         _state.value = _state.value.copy(isPlaying = true, currentCycle = 0, cyclePosition = 0.0)
         
         playbackJob = scope.launch {
@@ -132,30 +134,35 @@ class TidalScheduler(
                 )
 
                 // Query events for this upcoming window
-                val queryArc = Arc(
-                    windowStartSeconds * _state.value.cps,
-                    windowEndSeconds * _state.value.cps
-                )
-                
-                // Get all events in the window
-                val events = pattern.query(queryArc).filter { it.hasOnset() }
-                
-                // 1. Schedule Audio (Precise Automation)
-                scheduleAudioEvents(events, windowStartSeconds, windowEndSeconds, startTime)
-                
-                // 2. Schedule Visuals (Coroutines)
-                scheduleVisuals(events, startTime)
+                // Use currentPattern dynamically to allow hot-swapping
+                val activePattern = currentPattern
+                if (activePattern != null) {
+                    val queryArc = Arc(
+                        windowStartSeconds * _state.value.cps,
+                        windowEndSeconds * _state.value.cps
+                    )
+                    
+                    // Get all events in the window
+                    val events = activePattern.query(queryArc).filter { it.hasOnset() }
+                    
+                    // 1. Schedule Audio (Precise Automation)
+                    scheduleAudioEvents(events, windowStartSeconds, windowEndSeconds, startTime)
+                    
+                    // 2. Schedule Visuals (Coroutines)
+                    scheduleVisuals(events, startTime)
+                }
                 
                 lastScheduledSeconds = windowEndSeconds
             }
         }
     }
+
     
     /**
      * Stop pattern playback.
      */
     fun stop() {
-        Logger.info { "TidalScheduler: Stopping playback" }
+        log.info { "TidalScheduler: Stopping playback" }
         playbackJob?.cancel()
         playbackJob = null
         
@@ -165,6 +172,34 @@ class TidalScheduler(
             synthEngine.clearParameterAutomation("voice_freq_$i")
             synthEngine.setVoiceGate(i, false)
         }
+        
+        // Reset all holds to 0 for the 8 main voices
+        for (i in 0 until 8) {
+            synthEngine.setVoiceHold(i, 0f)
+            synthController.emitControlChange("voice_${i}_hold", 0f, ControlEventOrigin.TIDAL)
+        }
+        
+        // Reset quad holds
+        for (i in 0 until 3) {
+            synthEngine.setQuadHold(i, 0f)
+            synthController.emitControlChange("quad_${i}_hold", 0f, ControlEventOrigin.TIDAL)
+        }
+        
+        // Reset global effects to prevent "static tone"
+        synthEngine.setDrive(0f)
+        synthController.emitControlChange("drive", 0f, ControlEventOrigin.TIDAL)
+        
+        synthEngine.setDistortionMix(0f)
+        synthController.emitControlChange("distortion_mix", 0f, ControlEventOrigin.TIDAL)
+        
+        synthEngine.setVibrato(0f)
+        synthController.emitControlChange("vibrato", 0f, ControlEventOrigin.TIDAL)
+        
+        synthEngine.setDelayFeedback(0f)
+        synthController.emitControlChange("delay_feedback", 0f, ControlEventOrigin.TIDAL)
+        
+        synthEngine.setDelayMix(0f)
+        synthController.emitControlChange("delay_mix", 0f, ControlEventOrigin.TIDAL)
         
         _state.value = _state.value.copy(isPlaying = false)
     }
@@ -309,7 +344,7 @@ class TidalScheduler(
             
             // Send Freq Automation
             if (freqTimes.isNotEmpty()) {
-                org.balch.orpheus.util.Logger.info { 
+                log.info { 
                     "Note Freq: voice=$voiceIndex, times=${freqTimes.take(5)}, freqs=${freqValues.take(5)} Hz" 
                 }
                 synthEngine.setParameterAutomation(
@@ -379,15 +414,82 @@ class TidalScheduler(
                  
                  _triggers.tryEmit(TriggerEvent(idx, event.locations))
              }
-             // Handle other events as immediate dispatch or similar?
-             // Since we removed dispatchEvent loop, we need to handle non-scheduled params here too?
-             // Ideally Params like Filter/Pan should also be scheduled via automation.
-             // For now, let's just allow them to trigger "now" if they are in the window?
-             // But simpler to just fire them.
-             else -> dispatchEvent(event) // Legacy immediate dispatch for non-note params
+             // Voice-level synth control events - emit trigger for highlighting
+             is TidalEvent.VoiceHold -> {
+                 if (event.locations.isNotEmpty()) {
+                     // Hold events stay highlighted for the full cycle
+                     val cycleDurationMs = (1000.0 / _state.value.cps).toLong().coerceIn(500L, 5000L)
+                     _triggers.tryEmit(TriggerEvent(event.voiceIndex, event.locations, cycleDurationMs))
+                 }
+                 dispatchEvent(event)
+             }
+             is TidalEvent.VoiceTune -> {
+                 if (event.locations.isNotEmpty()) {
+                     _triggers.tryEmit(TriggerEvent(event.voiceIndex, event.locations))
+                 }
+                 dispatchEvent(event)
+             }
+             is TidalEvent.VoicePan -> {
+                 if (event.locations.isNotEmpty()) {
+                     _triggers.tryEmit(TriggerEvent(event.voiceIndex, event.locations))
+                 }
+                 dispatchEvent(event)
+             }
+             // Quad-level events - use quad index * 4 as representative voice
+             is TidalEvent.QuadHold -> {
+                 if (event.locations.isNotEmpty()) {
+                     // Hold events stay highlighted for the full cycle
+                     val cycleDurationMs = (1000.0 / _state.value.cps).toLong().coerceIn(500L, 5000L)
+                     _triggers.tryEmit(TriggerEvent(event.quadIndex * 4, event.locations, cycleDurationMs))
+                 }
+                 dispatchEvent(event)
+             }
+             is TidalEvent.QuadPitch -> {
+                 if (event.locations.isNotEmpty()) {
+                     _triggers.tryEmit(TriggerEvent(event.quadIndex * 4, event.locations))
+                 }
+                 dispatchEvent(event)
+             }
+             // Pair/Duo level events
+             is TidalEvent.PairSharp -> {
+                 if (event.locations.isNotEmpty()) {
+                     _triggers.tryEmit(TriggerEvent(event.pairIndex * 2, event.locations))
+                 }
+                 dispatchEvent(event)
+             }
+             is TidalEvent.DuoMod -> {
+                 if (event.locations.isNotEmpty()) {
+                     _triggers.tryEmit(TriggerEvent(event.duoIndex * 2, event.locations))
+                 }
+                 dispatchEvent(event)
+             }
+             // Global effects - use voice 0 as representative
+             is TidalEvent.Drive,
+             is TidalEvent.DistortionMix,
+             is TidalEvent.Vibrato,
+             is TidalEvent.DelayFeedback,
+             is TidalEvent.DelayMix,
+             is TidalEvent.MasterVolume -> {
+                 if (event.locations.isNotEmpty()) {
+                     _triggers.tryEmit(TriggerEvent(0, event.locations))
+                 }
+                 dispatchEvent(event)
+             }
+             // Other events - just dispatch without trigger
+             else -> dispatchEvent(event)
          }
     }
 
+    /**
+     * Dispatch a Tidal event immediately (public API for "once" commands).
+     * Use this for bare control commands that should be applied immediately
+     * without being scheduled as a cyclic pattern.
+     */
+    fun dispatchEventImmediate(event: TidalEvent) {
+        log.debug { "Dispatching immediate event: $event" }
+        dispatchEvent(event)
+    }
+    
     /**
      * Dispatch a Tidal event to the SynthController/Engine.
      */
@@ -407,6 +509,11 @@ class TidalScheduler(
             }
             
             is TidalEvent.VoiceHold -> {
+                synthController.emitControlChange(
+                    "voice_${event.voiceIndex}_hold",
+                    event.amount,
+                    ControlEventOrigin.TIDAL
+                )
                 synthEngine.setVoiceHold(event.voiceIndex, event.amount)
             }
             
@@ -420,6 +527,11 @@ class TidalScheduler(
             }
             
             is TidalEvent.QuadHold -> {
+                synthController.emitControlChange(
+                    "quad_${event.quadIndex}_hold",
+                    event.amount,
+                    ControlEventOrigin.TIDAL
+                )
                 synthEngine.setQuadHold(event.quadIndex, event.amount)
             }
             
@@ -497,6 +609,19 @@ class TidalScheduler(
                     ControlEventOrigin.TIDAL
                 )
                 synthEngine.setMasterVolume(event.volume)
+            }
+            
+            is TidalEvent.DuoMod -> {
+                val modSource = when (event.source.lowercase()) {
+                    "fm" -> org.balch.orpheus.core.audio.ModSource.VOICE_FM
+                    "lfo" -> org.balch.orpheus.core.audio.ModSource.LFO
+                    else -> org.balch.orpheus.core.audio.ModSource.OFF
+                }
+                synthEngine.setDuoModSource(event.duoIndex, modSource)
+            }
+            
+            is TidalEvent.PairSharp -> {
+                synthEngine.setPairSharpness(event.pairIndex, event.sharpness)
             }
         }
     }

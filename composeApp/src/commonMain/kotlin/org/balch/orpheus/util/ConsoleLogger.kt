@@ -1,5 +1,9 @@
 package org.balch.orpheus.util
 
+import com.diamondedge.logging.Logger
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,8 +25,8 @@ data class LogEntry(
  * Logger that outputs to console and UI debug panel. Uses inline lambdas to avoid string allocation
  * when logging is disabled.
  */
-object Logger {
-    private const val TAG = "Orpheus"
+@SingleIn(AppScope::class)
+class ConsoleLogger @Inject constructor() : Logger {
 
     @PublishedApi
     internal var enabled: Boolean = true
@@ -38,7 +42,6 @@ object Logger {
 
     @PublishedApi
     internal fun addToUi(message: String, level: LogLevel) {
-        println("[$TAG] ${level.name}: $message")
         val newLog = LogEntry(level, message)
         val current = _logs.value.toMutableList()
         current.add(0, newLog)
@@ -46,31 +49,32 @@ object Logger {
         _logs.value = current
     }
 
-    inline fun info(crossinline message: () -> String) {
-        if (enabled) {
-            addToUi(message(), LogLevel.INFO)
-        }
-    }
-
-    inline fun warn(crossinline message: () -> String) {
-        if (enabled) {
-            addToUi(message(), LogLevel.WARNING)
-        }
-    }
-
-    inline fun error(crossinline message: () -> String) {
-        if (enabled) {
-            addToUi(message(), LogLevel.ERROR)
-        }
-    }
-
-    inline fun debug(crossinline message: () -> String) {
-        if (enabled && debugEnabled) {
-            addToUi(message(), LogLevel.DEBUG)
-        }
-    }
-
     fun clear() {
         _logs.value = emptyList()
     }
+
+    override fun verbose(tag: String, msg: String) {
+    }
+
+    override fun debug(tag: String, msg: String) {
+        addToUi(msg, LogLevel.DEBUG)
+    }
+
+    override fun info(tag: String, msg: String) {
+        addToUi(msg, LogLevel.INFO)
+    }
+
+    override fun warn(tag: String, msg: String, t: Throwable?) {
+        addToUi(msg, LogLevel.WARNING)
+    }
+
+    override fun error(tag: String, msg: String, t: Throwable?) {
+        addToUi("$msg\n\n${t?.message?:""}", LogLevel.ERROR)
+    }
+
+    override fun isLoggingVerbose(): Boolean  = false
+    override fun isLoggingDebug(): Boolean = enabled && debugEnabled
+    override fun isLoggingInfo(): Boolean  = enabled
+    override fun isLoggingWarning(): Boolean = enabled
+    override fun isLoggingError(): Boolean = enabled
 }

@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.midi
 
+import com.diamondedge.logging.logging
 import dev.atsushieno.ktmidi.EmptyMidiAccess
 import dev.atsushieno.ktmidi.MidiAccess
 import dev.atsushieno.ktmidi.MidiInput
@@ -8,7 +9,6 @@ import dev.atsushieno.ktmidi.MidiPortConnectionState
 import dev.atsushieno.ktmidi.MidiPortDetails
 import dev.atsushieno.ktmidi.MidiTransportProtocol
 import dev.atsushieno.ktmidi.OnMidiReceivedEventListener
-import org.balch.orpheus.util.Logger
 import uk.co.xfactorylibrarians.coremidi4j.CoreMidiDeviceProvider
 import javax.sound.midi.MidiDevice
 import javax.sound.midi.MidiMessage
@@ -88,6 +88,8 @@ private class CoreMidiInputPort(
     private val portName: String
 ) : MidiInput {
 
+    private val log = logging("CoreMidiInputPort")
+
     override val details: MidiPortDetails = CoreMidiPortDetails(
         portName, portName, device.deviceInfo?.vendor, device.deviceInfo?.version
     )
@@ -106,7 +108,7 @@ private class CoreMidiInputPort(
             transmitter = device.transmitter
             _connectionState = MidiPortConnectionState.OPEN
         } catch (e: Exception) {
-            Logger.error { "Failed to open MIDI device: ${e.message}" }
+log.error { "Failed to open MIDI device: ${e.message}" }
             _connectionState = MidiPortConnectionState.CLOSED
         }
     }
@@ -135,7 +137,7 @@ private class CoreMidiInputPort(
             transmitter?.close()
             device.close()
         } catch (e: Exception) {
-            Logger.warn { "Error closing MIDI device: ${e.message}" }
+            log.warn { "Error closing MIDI device: ${e.message}" }
         }
         _connectionState = MidiPortConnectionState.CLOSED
     }
@@ -146,16 +148,17 @@ private class CoreMidiInputPort(
  * CoreMIDI4J is loaded to enable USB MIDI device detection on macOS.
  */
 actual fun createMidiAccess(): MidiAccess {
+    val log = logging("MidiAccessFactory")
     // CoreMIDI4J enhances javax.sound.midi to see CoreMIDI devices on macOS
     try {
         if (CoreMidiDeviceProvider.isLibraryLoaded()) {
             return CoreMidiJvmAccess()
         }
     } catch (e: Exception) {
-        Logger.debug { "CoreMIDI4J not available: ${e.message}" }
+        log.debug { "CoreMIDI4J not available: ${e.message}" }
     }
 
     // Fallback to empty access if CoreMIDI4J not available
-    Logger.warn { "No MIDI backend available" }
+    log.warn { "No MIDI backend available" }
     return EmptyMidiAccess()
 }

@@ -46,11 +46,11 @@ class PresetLoader(
     fun currentStateAsPreset(name: String): DronePreset {
         return DronePreset(
             name = name,
-            voiceTunes = List(8) { i -> engine.getVoiceTune(i) },
-            voiceModDepths = List(8) { i -> engine.getVoiceFmDepth(i) },
-            voiceEnvelopeSpeeds = List(8) { i -> engine.getVoiceEnvelopeSpeed(i) },
-            pairSharpness = List(4) { i -> engine.getPairSharpness(i) },
-            duoModSources = List(4) { i -> engine.getDuoModSource(i) },
+            voiceTunes = List(12) { i -> engine.getVoiceTune(i) },
+            voiceModDepths = List(12) { i -> engine.getVoiceFmDepth(i) },
+            voiceEnvelopeSpeeds = List(12) { i -> engine.getVoiceEnvelopeSpeed(i) },
+            pairSharpness = List(6) { i -> engine.getPairSharpness(i) },
+            duoModSources = List(6) { i -> engine.getDuoModSource(i) },
             hyperLfoA = engine.getHyperLfoFreq(0),
             hyperLfoB = engine.getHyperLfoFreq(1),
             hyperLfoMode =
@@ -72,7 +72,11 @@ class PresetLoader(
             drive = engine.getDrive(),
             distortionMix = engine.getDistortionMix(),
             fmStructureCrossQuad = engine.getFmStructureCrossQuad(),
-            totalFeedback = engine.getTotalFeedback()
+            totalFeedback = engine.getTotalFeedback(),
+            vibrato = engine.getVibrato(),
+            voiceCoupling = engine.getVoiceCoupling(),
+            quadGroupPitches = List(3) { i -> engine.getQuadPitch(i) },
+            quadGroupHolds = List(3) { i -> engine.getQuadHold(i) }
         )
     }
 }

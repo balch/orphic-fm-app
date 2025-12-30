@@ -1,9 +1,9 @@
 package org.balch.orpheus.core.preferences
 
 import android.content.Context
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.serialization.json.Json
-import org.balch.orpheus.util.Logger
 import java.io.File
 
 /**
@@ -15,6 +15,8 @@ import java.io.File
 class AndroidAppPreferencesRepository(
     private val context: Context
 ) : AppPreferencesRepository {
+
+    private val log = logging()
 
     private val json = Json {
         prettyPrint = true
@@ -35,7 +37,7 @@ class AndroidAppPreferencesRepository(
                 AppPreferences()
             }
         } catch (e: Exception) {
-            Logger.error { "Failed to load preferences: ${e.message}" }
+            log.error { "Failed to load preferences: ${e.message}" }
             AppPreferences()
         }
     }
@@ -45,7 +47,7 @@ class AndroidAppPreferencesRepository(
             val jsonString = json.encodeToString(preferences)
             settingsFile.writeText(jsonString)
         } catch (e: Exception) {
-            Logger.error { "Failed to save preferences: ${e.message}" }
+            log.error { "Failed to save preferences: ${e.message}" }
         }
     }
 }

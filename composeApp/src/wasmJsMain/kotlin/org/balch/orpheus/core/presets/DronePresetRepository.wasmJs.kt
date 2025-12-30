@@ -1,9 +1,9 @@
 package org.balch.orpheus.core.presets
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
-import org.balch.orpheus.util.Logger
 import org.w3c.dom.get
 import org.w3c.dom.set
 import orpheus.composeapp.generated.resources.Res
@@ -13,6 +13,8 @@ import orpheus.composeapp.generated.resources.Res
  */
 @Inject
 class WasmDronePresetRepository : DronePresetRepository {
+    private val log = logging("WasmDronePresetRepository")
+
 
     private val json = Json {
         prettyPrint = false
@@ -45,10 +47,10 @@ class WasmDronePresetRepository : DronePresetRepository {
                     val bytes = Res.readBytes(path)
                     val jsonString = bytes.decodeToString()
                     localStorage[key] = jsonString
-                    Logger.debug { "Copied bundled preset: $filename" }
+                    log.debug { "Copied bundled preset: $filename" }
                 }
             } catch (e: Exception) {
-                Logger.error { "Failed to copy bundled preset $filename: ${e.message}" }
+                log.error { "Failed to copy bundled preset $filename: ${e.message}" }
             }
         }
     }
@@ -64,9 +66,9 @@ class WasmDronePresetRepository : DronePresetRepository {
             val key = keyForPreset(preset.name)
             val jsonString = json.encodeToString(preset)
             localStorage[key] = jsonString
-            Logger.info { "Saved preset '${preset.name}'" }
+            log.info { "Saved preset '${preset.name}'" }
         } catch (e: Exception) {
-            Logger.error { "Failed to save preset '${preset.name}': ${e.message}" }
+            log.error { "Failed to save preset '${preset.name}': ${e.message}" }
         }
     }
 
@@ -77,14 +79,14 @@ class WasmDronePresetRepository : DronePresetRepository {
             val jsonString = localStorage[key]
             if (jsonString != null) {
                 val preset = json.decodeFromString<DronePreset>(jsonString)
-                Logger.info { "Loaded preset '$name'" }
+                log.info { "Loaded preset '$name'" }
                 preset
             } else {
-                Logger.debug { "No preset found: '$name'" }
+                log.debug { "No preset found: '$name'" }
                 null
             }
         } catch (e: Exception) {
-            Logger.error { "Failed to load preset '$name': ${e.message}" }
+            log.error { "Failed to load preset '$name': ${e.message}" }
             null
         }
     }
@@ -94,9 +96,9 @@ class WasmDronePresetRepository : DronePresetRepository {
         try {
             val key = keyForPreset(name)
             localStorage.removeItem(key)
-            Logger.info { "Deleted preset '$name'" }
+            log.info { "Deleted preset '$name'" }
         } catch (e: Exception) {
-            Logger.error { "Failed to delete preset '$name': ${e.message}" }
+            log.error { "Failed to delete preset '$name': ${e.message}" }
         }
     }
 
@@ -113,13 +115,13 @@ class WasmDronePresetRepository : DronePresetRepository {
                             presets.add(json.decodeFromString<DronePreset>(jsonString))
                         }
                     } catch (e: Exception) {
-                        Logger.warn { "Failed to parse preset at key $key: ${e.message}" }
+                        log.warn { "Failed to parse preset at key $key: ${e.message}" }
                     }
                 }
             }
             presets.sortedByDescending { it.createdAt }
         } catch (e: Exception) {
-            Logger.error { "Failed to list presets: ${e.message}" }
+            log.error { "Failed to list presets: ${e.message}" }
             emptyList()
         }
     }

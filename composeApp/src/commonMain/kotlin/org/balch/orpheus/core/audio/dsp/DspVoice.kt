@@ -30,6 +30,10 @@ class DspVoice(
     // Wobble: Real-time volume modulation from finger movement
     private val wobbleRamp = audioEngine.createLinearRamp()  // Smooth parameter changes
     private val wobbleGain = audioEngine.createMultiply()
+    
+    // Volume: Programmable volume control (per-voice or quad-level)
+    private val volumeRamp = audioEngine.createLinearRamp()  // Smooth volume changes
+    private val volumeGain = audioEngine.createMultiply()
 
     // Envelope Follower for voice coupling
     private val envelopeFollower = audioEngine.createPeakFollower()
@@ -71,8 +75,8 @@ class DspVoice(
     val couplingDepth: AudioInput get() = couplingScaler.inputB    // Coupling depth (Hz range)
     val holdLevel: AudioInput get() = vcaControlMixer.inputB       // Hold/drone level
 
-    // Outputs - wobbleGain is the final output stage
-    val output: AudioOutput get() = wobbleGain.output
+    // Outputs - volumeGain is the final output stage
+    val output: AudioOutput get() = volumeGain.output
     val envelopeOutput: AudioOutput get() = envelopeFollower.output
 
     /**
@@ -90,6 +94,14 @@ class DspVoice(
     fun setWobbleMultiplier(multiplier: Double) {
         wobbleRamp.input.set(multiplier)
     }
+    
+    /**
+     * Set voice volume using a smooth ramp to avoid clicks.
+     * @param volume 0.0 to 1.0 volume level
+     */
+    fun setVolume(volume: Double) {
+        volumeRamp.input.set(volume)
+    }
 
     init {
         // Register all units with audio engine
@@ -104,6 +116,8 @@ class DspVoice(
         audioEngine.addUnit(vca)
         audioEngine.addUnit(wobbleRamp)
         audioEngine.addUnit(wobbleGain)
+        audioEngine.addUnit(volumeRamp)
+        audioEngine.addUnit(volumeGain)
         audioEngine.addUnit(envelopeFollower)
         audioEngine.addUnit(couplingScaler)
         audioEngine.addUnit(couplingMixer)
@@ -206,8 +220,16 @@ class DspVoice(
         wobbleRamp.input.set(1.0)  // Start at unity gain
         wobbleRamp.output.connect(wobbleGain.inputB)
         
-        // Wire wobbleGain output to envelope follower for coupling
-        wobbleGain.output.connect(envelopeFollower.input)
+        // Wire wobbleGain through volumeGain for final volume control
+        wobbleGain.output.connect(volumeGain.inputA)
+        
+        // Configure volume ramp (50ms for smooth quad volume changes)
+        volumeRamp.time.set(0.05)
+        volumeRamp.input.set(1.0)  // Start at full volume
+        volumeRamp.output.connect(volumeGain.inputB)
+        
+        // Wire volumeGain output to envelope follower for coupling
+        volumeGain.output.connect(envelopeFollower.input)
 
         // Default frequency
         frequency.set(220.0)

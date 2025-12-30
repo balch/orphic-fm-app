@@ -31,6 +31,9 @@ class PreviewSynthEngine() : SynthEngine {
     override fun setQuadHold(quadIndex: Int, amount: Float) {
     }
 
+    override fun setQuadVolume(quadIndex: Int, volume: Float) {
+    }
+
     override fun setVoiceHold(index: Int, amount: Float) {
     }
     
@@ -74,6 +77,13 @@ class PreviewSynthEngine() : SynthEngine {
     override val lfoOutputFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
     override val masterLevelFlow: StateFlow<Float> = MutableStateFlow(0.4f).asStateFlow()
 
+    override val driveFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
+    override val distortionMixFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
+    override val delayMixFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
+    override val delayFeedbackFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
+    override val quadPitchFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(3)).asStateFlow()
+    override val quadHoldFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(3)).asStateFlow()
+
     override fun getVoiceTune(index: Int): Float = 0f
     override fun getVoiceFmDepth(index: Int): Float = 0f
     override fun getVoiceEnvelopeSpeed(index: Int): Float = 0f
@@ -81,6 +91,7 @@ class PreviewSynthEngine() : SynthEngine {
     override fun getDuoModSource(duoIndex: Int): ModSource = ModSource.OFF
     override fun getQuadPitch(quadIndex: Int): Float = 0.5f
     override fun getQuadHold(quadIndex: Int): Float = 0f
+    override fun getQuadVolume(quadIndex: Int): Float = 1f
     override fun getFmStructureCrossQuad(): Boolean = false
     override fun getTotalFeedback(): Float = 0f
     override fun getVibrato(): Float = 0f

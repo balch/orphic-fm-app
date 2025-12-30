@@ -3,6 +3,7 @@ package org.balch.orpheus.features.tidal
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -13,26 +14,30 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.tidal.ConsoleEntry
+import org.balch.orpheus.core.tidal.EvalMode
 import org.balch.orpheus.core.tidal.Pattern
 import org.balch.orpheus.core.tidal.TidalEvent
 import org.balch.orpheus.core.tidal.TidalParser
 import org.balch.orpheus.core.tidal.TidalRepl
 import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.core.tidal.TidalSchedulerState
+import org.balch.orpheus.features.ai.ReplCodeEvent
+import org.balch.orpheus.features.ai.ReplCodeEventBus
 
 /**
  * UI state for the Live Code editor.
  */
 data class LiveCodeUiState(
-    val code: TextFieldValue = TextFieldValue(requireNotNull(LiveCodeViewModel.EXAMPLES["repl"])),
-    val selectedExample: String? = "repl",
+    val code: TextFieldValue = TextFieldValue(requireNotNull(LiveCodeViewModel.EXAMPLES["simple"])),
+    val selectedExample: String? = "simple",
     val isPlaying: Boolean = false,
     val currentCycle: Int = 0,
     val cyclePosition: Double = 0.0,
     val bpm: Double = 120.0,
     val error: String? = null,
     val history: List<String> = emptyList(),
-    val activeSlots: Set<String> = emptySet()
+    val activeSlots: Set<String> = emptySet(),
+    val isAiGenerating: Boolean = false
 )
 
 /**
@@ -47,6 +52,7 @@ sealed class LiveCodeIntent {
     data object ExecuteLine : LiveCodeIntent()
     data class SetBpm(val bpm: Double) : LiveCodeIntent()
     data class LoadExample(val name: String) : LiveCodeIntent()
+    data class HandleAiCode(val code: String, val slots: List<String>) : LiveCodeIntent()
 }
 
 /**
@@ -61,8 +67,11 @@ sealed class LiveCodeIntent {
 @ContributesIntoMap(AppScope::class)
 class LiveCodeViewModel(
     private val scheduler: TidalScheduler,
-    private val repl: TidalRepl
+    private val repl: TidalRepl,
+    private val replCodeEventBus: ReplCodeEventBus
 ) : ViewModel() {
+    
+    private val logger = logging("LiveCodeViewModel")
     
     private val _intents = MutableStateFlow<LiveCodeIntent?>(null)
     
@@ -79,6 +88,8 @@ class LiveCodeViewModel(
     val triggers = scheduler.triggers
     
     init {
+        logger.i { "LiveCodeViewModel initialized, subscribing to ReplCodeEventBus" }
+        
         // Subscribe to intents using scan pattern
         viewModelScope.launch {
             _intents
@@ -101,6 +112,30 @@ class LiveCodeViewModel(
                 )
             }
         }
+        
+        // Subscribe to AI generated code events
+        viewModelScope.launch {
+            logger.d { "Starting ReplCodeEventBus subscription..." }
+            replCodeEventBus.events.collect { event ->
+                logger.i { "Received ReplCodeEvent: $event" }
+                when (event) {
+                    is ReplCodeEvent.Generated -> {
+                        logger.i { "AI generated code received, updating editor: ${event.code.take(50)}..." }
+                        _intents.value = LiveCodeIntent.HandleAiCode(event.code, event.slots)
+                    }
+                    is ReplCodeEvent.Generating -> {
+                        logger.d { "AI is generating code..." }
+                        // Set loading state
+                        _uiState.value = _uiState.value.copy(isAiGenerating = true)
+                    }
+                    is ReplCodeEvent.Failed -> {
+                        logger.w { "AI code generation failed: ${event.error}" }
+                        // Clear loading state
+                        _uiState.value = _uiState.value.copy(isAiGenerating = false, error = event.error)
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -112,18 +147,38 @@ class LiveCodeViewModel(
                 state.copy(code = intent.code, error = null)
             }
             
+            is LiveCodeIntent.HandleAiCode -> {
+                logger.d { "HandleAiCode: updating code to ${intent.code.take(50)}..." }
+                // Update code and set playing/slots state
+                // Set selectedExample to "AI" so dropdown shows "AI" instead of "Examples"
+                state.copy(
+                    code = TextFieldValue(intent.code),
+                    selectedExample = "AI",
+                    error = null,
+                    isPlaying = if (intent.code.equals("hush", true)) false else true,
+                    activeSlots = intent.slots.toSet(),
+                    history = (listOf(intent.code) + state.history).take(10),
+                    isAiGenerating = false
+                )
+            }
+            
+
+
             is LiveCodeIntent.Execute -> {
-                executeCode(state.code.text, state)
+                // Execute full code - Replace mode ensures deleted lines stop playing
+                executeCode(state.code.text, state, EvalMode.REPLACE)
             }
             
             is LiveCodeIntent.ExecuteBlock -> {
+                // Execute block - Merge mode modifies only the active block without stopping others
                 val block = findBlock(state.code)
-                executeCode(block, state)
+                executeCode(block, state, EvalMode.MERGE)
             }
             
             is LiveCodeIntent.ExecuteLine -> {
+                // Execute line - Merge mode modifies only the active line
                 val line = findLine(state.code)
-                executeCode(line, state)
+                executeCode(line, state, EvalMode.MERGE)
             }
             
             is LiveCodeIntent.Play -> {
@@ -132,8 +187,9 @@ class LiveCodeViewModel(
             }
             
             is LiveCodeIntent.Stop -> {
-                scheduler.stop()
-                state.copy(isPlaying = false)
+                // Hush all patterns and stop the scheduler for a clean stop
+                repl.hush()
+                state.copy(isPlaying = false, activeSlots = emptySet())
             }
             
             is LiveCodeIntent.SetBpm -> {
@@ -160,12 +216,16 @@ class LiveCodeViewModel(
      * Execute a chunk of code (block, line, or full text).
      * Delegates to TidalRepl for evaluation and pattern management.
      */
-    private fun executeCode(code: String, state: LiveCodeUiState): LiveCodeUiState {
+    private fun executeCode(
+        code: String, 
+        state: LiveCodeUiState, 
+        mode: EvalMode = EvalMode.REPLACE
+    ): LiveCodeUiState {
         if (code.isBlank()) return state.copy(error = "No code selected")
         
         var resultState = state
         
-        repl.evaluate(code) { result ->
+        repl.evaluate(code, mode) { result ->
             when (result) {
                 is org.balch.orpheus.core.tidal.ReplResult.Success -> {
                     viewModelScope.launch {
@@ -366,51 +426,36 @@ class LiveCodeViewModel(
          * Example patterns for users to learn from.
          */
         val EXAMPLES = mapOf(
-            "gadda" to """
-# In-A-Gadda-Da-Vida bass riff (~119 BPM, D minor)
-# D-D (8th 8th) F-E (8th 8th) C (quarter) D (8th) A-Ab-G (triplet @2) ~ (rest)
-d1 $ note "d2 d2 f2 e2 c2@2 d2 [a2 g#2 g2]@2"
-            """.trimIndent(),
-            
-            "repl" to """
-# REPL pattern slots (d1-d8)
-d1 $ voices:0 1 2 3
-d2 $ fast 2 voices:4 5
-
-# Use 'hush' to silence all
-            """.trimIndent(),
-            
-            "notes" to """
-# Play melodic notes (c4 = middle C)
-d1 $ note "c3 e3 g3 c4"
-
-# Try sharps and flats
-d2 $ note "c#3 d#3 f#3"
-            """.trimIndent(),
-            
-            "drums" to """
-# Drum sounds → voice indices
-# bd=0, sn=1, hh=2, cp=3
-d1 $ s "bd sn bd sn"
-d2 $ fast 2 s "hh hh hh hh"
-            """.trimIndent(),
-            
-            "drone" to """
-# Evolving Drone: layered voices
-slow 2 voices:<0 1> <2 3>
-tune:0 0.25 0.28 0.32 0.25
-tune:1 0.42 0.45 0.48 0.45
-            """.trimIndent(),
-            
             "simple" to """
-# Simple voice pattern
-voices:0 1 2 3
+d1 $ voices:1 2 3 4
             """.trimIndent(),
             
-            "polyrhythm" to """
-# Polyrhythm - different speeds
-d1 $ voices:0 1 2 3
-d2 $ fast 2 voices:4 5 6 7
+            "gadda" to """
+once $ drive:0.75
+once $ delay:0.3
+once $ tune:1 0.35
+once $ tune:2 0.70
+once $ tune:3 0.35
+once $ tune:4 0.70
+d1 $ note "d2 d2 f2 e2 c2@2 d2 a2 ab2 g2"
+d2 $ voices:1 2 3 4
+            """.trimIndent(),
+            
+            "euclidean" to """
+d1 $ note "c3(3,8) e3(5,8) g3(3,8)"
+d2 $ voices:1(3,8) 2(5,8) 3(3,8) 4(5,8)
+            """.trimIndent(),
+            
+            "layered" to """
+d1 $ slow 2 note "<c3 e3> <g3 c4>"
+d2 $ fast 2 voices:5 6 7 8
+d3 $ quadhold:1 0.8
+d4 $ quadpitch:1 0.3
+            """.trimIndent(),
+            
+            "evolving" to """
+d1 $ note "[c2 e2 g2]*2"
+d2 $ slow 4 voices:<1 2> <3 4> <5 6>
             """.trimIndent()
         )
     }

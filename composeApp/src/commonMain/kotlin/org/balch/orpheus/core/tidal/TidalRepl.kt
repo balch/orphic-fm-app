@@ -1,8 +1,10 @@
 package org.balch.orpheus.core.tidal
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -10,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.balch.orpheus.util.currentTimeMillis
 
 /**
@@ -46,24 +49,38 @@ private data class ReplSnapshot(
 )
 
 /**
+ * Evaluation mode for REPL code.
+ */
+enum class EvalMode {
+    /**
+     * Merge new patterns with existing ones. 
+     * Use this for executing partial code blocks/lines without stopping other patterns.
+     */
+    MERGE,
+    
+    /**
+     * Replace existing patterns with new ones.
+     * Use this for executing the full file or when you want to clear unmentioned slots.
+     */
+    REPLACE
+}
+
+/**
  * REPL orchestrator for Tidal live coding.
  * 
  * Manages pattern slots (d1-d16), evaluation lifecycle, and console output.
  * All heavy work is dispatched to a background thread via coroutines.
- * 
- * TODO: Future enhancements:
- * - Euclidean rhythms (bjorklund algorithm)
- * - Chord notation (c'maj, c'min7)
- * - Control parameters DSL (gain, cutoff, pan)
- * - Sample player plugin integration
  */
 @SingleIn(AppScope::class)
 @Inject
 class TidalRepl(
-    private val scheduler: TidalScheduler
+    private val scheduler: TidalScheduler,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
-    // Use Default dispatcher for CPU-bound parsing work
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val log = logging("TidalRepl")
+    
+    // Use injected dispatcher for parsng work (allows testing)
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     
     // Pattern slots (d0-d15)
     private val slots = mutableMapOf<String, Pattern<TidalEvent>>()
@@ -85,25 +102,85 @@ class TidalRepl(
     /**
      * Evaluate code and update patterns.
      * This is dispatched to a background thread for parsing.
+     * 
+     * @param code The Tidal code to evaluate
+     * @param mode Evaluation mode (MERGE or REPLACE)
+     * @param onResult Callback for the result
      */
-    fun evaluate(code: String, onResult: (ReplResult) -> Unit = {}) {
+    fun evaluate(
+        code: String, 
+        mode: EvalMode = EvalMode.REPLACE, 
+        onResult: (ReplResult) -> Unit = {}
+    ) {
         scope.launch {
-            val result = evaluateInternal(code)
+            val result = evaluateInternal(code, mode)
             onResult(result)
         }
     }
     
     /**
-     * Evaluate code synchronously (for internal use).
+     * Evaluate code and update patterns (suspend version).
+     * Use this from coroutines/suspend functions to await the result.
      */
-    private fun evaluateInternal(code: String): ReplResult {
-        if (code.isBlank()) {
+    suspend fun evaluateSuspend(
+        code: String, 
+        mode: EvalMode = EvalMode.REPLACE
+    ): ReplResult {
+        return withContext(dispatcher) {
+            evaluateInternal(code, mode)
+        }
+    }
+    
+    /**
+     * Sanitize AI-generated code to handle common artifacts.
+     * - Converts smart/curly quotes to straight quotes
+     * - Handles escaped quotes from JSON (\" → ")  
+     * - Removes zero-width characters
+     * - Normalizes line endings
+     */
+    private fun sanitizeCode(code: String): String {
+        return code
+            // Normalize line endings
+            .replace("\r\n", "\n")
+            .replace("\r", "\n")
+            // Convert smart/curly quotes to straight quotes (using Unicode escapes)
+            .replace('\u201C', '"')  // Left double quote "
+            .replace('\u201D', '"')  // Right double quote "
+            .replace('\u2018', '\'') // Left single quote '
+            .replace('\u2019', '\'') // Right single quote '
+            // Handle escaped quotes from JSON (common AI artifact)
+            .replace("\\\"", "\"")
+            .replace("\\'", "'")
+            // Remove zero-width characters that can sneak in
+            .replace("\u200B", "") // Zero-width space
+            .replace("\u200C", "") // Zero-width non-joiner
+            .replace("\u200D", "") // Zero-width joiner
+            .replace("\uFEFF", "") // BOM
+    }
+    
+    /**
+     * Evaluate code synchronously (for internal use).
+     * 
+     * Supports MERGE (partial update) and REPLACE (full update) modes.
+     * REPLACE mode enables removing patterns by deleting code.
+     */
+    private fun evaluateInternal(code: String, mode: EvalMode): ReplResult {
+        // Sanitize AI-generated code artifacts
+        val sanitizedCode = sanitizeCode(code)
+        
+        log.debug { "Evaluating REPL code (mode=$mode):\n$sanitizedCode" }
+        
+        if (sanitizedCode.isBlank()) {
+            log.warn { "Empty code after sanitization" }
             logConsole(ConsoleType.ERROR, "No code to evaluate")
             return ReplResult.Error("No code to evaluate")
         }
         
         // Save snapshot for undo
         saveSnapshot()
+        
+        // Remember which slots existed before this evaluation
+        val previousSlots = slots.keys.toSet()
         
         return try {
             // Use original code without trim to preserve character offsets matching the UI
@@ -112,14 +189,25 @@ class TidalRepl(
             // Track character offset as we process each line
             var currentOffset = 0
             
-            for ((lineNum, line) in code.lines().withIndex()) {
+            for ((lineNum, line) in sanitizedCode.lines().withIndex()) {
                 val lineOffset = currentOffset
                 currentOffset += line.length + 1 // +1 for newline
                 
-                val trimmed = line.trim()
+                var trimmed = line.trim()
                 
-                // Skip blank lines and comments
+                // Skip blank lines and full-line comments
                 if (trimmed.isBlank() || trimmed.startsWith("//") || trimmed.startsWith("#")) continue
+                
+                // Strip trailing comments (-- or // style) that AI sometimes adds
+                // Be careful not to strip quotes that might contain these characters
+                val dashDashIndex = trimmed.indexOf(" --")
+                if (dashDashIndex > 0 && !trimmed.substring(0, dashDashIndex).contains(Regex("\"[^\"]*$"))) {
+                    trimmed = trimmed.substring(0, dashDashIndex).trim()
+                }
+                val slashSlashIndex = trimmed.indexOf(" //")
+                if (slashSlashIndex > 0 && !trimmed.substring(0, slashSlashIndex).contains(Regex("\"[^\"]*$"))) {
+                    trimmed = trimmed.substring(0, slashSlashIndex).trim()
+                }
                 
                 // Handle commands
                 when {
@@ -145,6 +233,26 @@ class TidalRepl(
                         unmute(slot)
                         continue
                     }
+                    
+                    // "once $" prefix - execute pattern immediately without cycling
+                    trimmed.startsWith("once ") || trimmed.startsWith("once$") -> {
+                        val patternCode = if (trimmed.startsWith("once $")) {
+                            trimmed.substringAfter("once $").trim()
+                        } else if (trimmed.startsWith("once$")) {
+                            trimmed.substringAfter("once$").trim()
+                        } else {
+                            trimmed.substringAfter("once ").trim()
+                        }
+                        val patternOffset = lineOffset + line.indexOf(patternCode)
+                        val pattern = parsePattern(patternCode, lineNum + 1, patternOffset)
+                        // Execute immediately by dispatching all events at t=0
+                        val events = pattern.query(Arc(0.0, 1.0))
+                        events.forEach { event ->
+                            scheduler.dispatchEventImmediate(event.value)
+                        }
+                        logConsole(ConsoleType.INFO, "once: $patternCode")
+                        continue
+                    }
                 }
                 
                 // Pattern assignment: d1 $ pattern or d1 = pattern
@@ -157,11 +265,43 @@ class TidalRepl(
                     slots[slotName] = pattern
                     modifiedSlots.add(slotName)
                 } else {
-                    // Anonymous pattern - goes to d0
+                    // Check if this is a bare control command (immediate set, not cycled)
+                    // Control commands are recognized by their prefix patterns
+                    val isBareControlCommand = trimmed.matches(Regex(
+                        "^(drive|distortion|vibrato|feedback|delay|delaymix|distmix|volume|" +
+                        "hold|tune|pan|quadhold|quadpitch|duomod|sharp):[^$]+$"
+                    ))
+                    
+                    if (isBareControlCommand) {
+                        // Execute immediately - dispatch the control event directly
+                        val patternOffset = lineOffset + line.indexOf(trimmed)
+                        val pattern = parsePattern(trimmed, lineNum + 1, patternOffset)
+                        val events = pattern.query(Arc(0.0, 1.0))
+                        events.forEach { event ->
+                            scheduler.dispatchEventImmediate(event.value)
+                        }
+                        logConsole(ConsoleType.INFO, "set: $trimmed")
+                        continue
+                    }
+                    
+                    // Anonymous pattern - goes to d0 (cycled)
                     val patternOffset = lineOffset + line.indexOf(trimmed)
                     val pattern = parsePattern(trimmed, lineNum + 1, patternOffset)
                     slots["d0"] = pattern
                     modifiedSlots.add("d0")
+                }
+            }
+            
+            
+            // Clear slots that were previously active but are no longer in the code
+            // Only do this in REPLACE mode (e.g. running full file)
+            if (mode == EvalMode.REPLACE) {
+                val slotsToRemove = previousSlots - modifiedSlots
+                for (slotToRemove in slotsToRemove) {
+                    slots.remove(slotToRemove)
+                }
+                if (slotsToRemove.isNotEmpty()) {
+                    logConsole(ConsoleType.INFO, "Cleared: ${slotsToRemove.joinToString(", ")}")
                 }
             }
             
@@ -171,12 +311,13 @@ class TidalRepl(
             _activeSlots.value = slots.keys.toSet()
             
             val msg = "Evaluated: ${modifiedSlots.joinToString(", ")}"
-            logConsole(ConsoleType.SUCCESS, msg, code.take(50))
+            logConsole(ConsoleType.SUCCESS, msg, sanitizedCode.take(50))
             ReplResult.Success(modifiedSlots, msg)
             
         } catch (e: Exception) {
             val msg = e.message ?: "Parse error"
-            logConsole(ConsoleType.ERROR, msg, code.take(50))
+            log.error { "REPL parse error: $msg\nCode: ${sanitizedCode.take(200)}" }
+            logConsole(ConsoleType.ERROR, msg, sanitizedCode.take(50))
             ReplResult.Error(msg)
         }
     }
@@ -191,20 +332,87 @@ class TidalRepl(
         val trimmed = code.trim()
         val trimOffset = lineOffset + code.indexOf(trimmed) // offset where trimmed content starts
         
-        // Check for note patterns: note "c3 e3 g3" or note("c3 e3 g3")
-        val noteMatch = Regex("^note\\s*[\"(](.+)[\"')]$").find(trimmed)
+        // Check for TidalCycles `#` pattern combiner (split outside quotes)
+        // e.g. note "c3 e3" # hold:0 0.8 -> stack both patterns
+        val hashParts = splitByHashOutsideQuotes(trimmed)
+        if (hashParts.size > 1) {
+            log.debug { "Splitting pattern by #: ${hashParts.size} parts" }
+            val patterns = hashParts.mapIndexed { index, part ->
+                val partOffset = trimOffset + trimmed.indexOf(part.trim())
+                parsePatternSingle(part.trim(), lineNum, partOffset)
+            }
+            return Pattern.stack(patterns)
+        }
+        
+        return parsePatternSingle(trimmed, lineNum, trimOffset)
+    }
+    
+    /**
+     * Split a pattern string by `#` but only when `#` is outside of quotes.
+     */
+    private fun splitByHashOutsideQuotes(input: String): List<String> {
+        val parts = mutableListOf<String>()
+        var current = StringBuilder()
+        var inQuotes = false
+        var quoteChar = ' '
+        
+        for (char in input) {
+            when {
+                char == '"' || char == '\'' -> {
+                    if (!inQuotes) {
+                        inQuotes = true
+                        quoteChar = char
+                    } else if (char == quoteChar) {
+                        inQuotes = false
+                    }
+                    current.append(char)
+                }
+                char == '#' && !inQuotes -> {
+                    val part = current.toString().trim()
+                    if (part.isNotEmpty()) {
+                        parts.add(part)
+                    }
+                    current = StringBuilder()
+                }
+                else -> current.append(char)
+            }
+        }
+        
+        val lastPart = current.toString().trim()
+        if (lastPart.isNotEmpty()) {
+            parts.add(lastPart)
+        }
+        
+        return parts
+    }
+    
+    /**
+     * Parse a single pattern (no `#` combiner).
+     */
+    private fun parsePatternSingle(trimmed: String, lineNum: Int, trimOffset: Int): Pattern<TidalEvent> {
+        // Check for silence
+        if (trimmed == "silence") {
+             return Pattern.silence()
+        }
+
+        // Check for note patterns: note "c3 e3 g3", n "c3", note("..."), n("...")
+        // Use non-greedy .+? to avoid capturing trailing delimiters
+        val noteMatch = Regex("^(?:note|n)\\s*[\"(](.+?)[\"')]$").find(trimmed)
         if (noteMatch != null) {
-            val notePattern = noteMatch.groupValues[1]
+            // Strip any stray quotes from the captured content (handles nested quotes)
+            val notePattern = noteMatch.groupValues[1].replace("\"", "").replace("'", "")
             // Calculate offset: trimOffset + position of quote content in the match
-            val quoteContentOffset = trimOffset + trimmed.indexOf(notePattern)
+            val quoteContentOffset = trimOffset + trimmed.indexOf(noteMatch.groupValues[1])
             return parseNotePattern(notePattern, quoteContentOffset)
         }
         
         // Check for sound patterns: s "bd sn" or sound "bd sn"
-        val soundMatch = Regex("^(?:s|sound)\\s*[\"(](.+)[\"')]$").find(trimmed)
+        // Use non-greedy .+? to avoid capturing trailing delimiters
+        val soundMatch = Regex("^(?:s|sound)\\s*[\"(](.+?)[\"')]$").find(trimmed)
         if (soundMatch != null) {
-            val soundPattern = soundMatch.groupValues[1]
-            val quoteContentOffset = trimOffset + trimmed.indexOf(soundPattern)
+            // Strip any stray quotes from the captured content
+            val soundPattern = soundMatch.groupValues[1].replace("\"", "").replace("'", "")
+            val quoteContentOffset = trimOffset + trimmed.indexOf(soundMatch.groupValues[1])
             return parseSoundPattern(soundPattern, quoteContentOffset)
         }
         
@@ -219,16 +427,267 @@ class TidalRepl(
             return parseVoicesPattern(voicesStr, voicesOffset)
         }
         
+        // Tidal-style quoted voices: voices "0 1 2 3"
+        val quotedVoicesMatch = Regex("^voices\\s*\"([^\"]+)\"$").find(trimmed)
+        if (quotedVoicesMatch != null) {
+            val voicesStr = quotedVoicesMatch.groupValues[1]
+            val voicesOffset = trimOffset + trimmed.indexOf(voicesStr)
+            return parseVoicesPattern(voicesStr, voicesOffset)
+        }
+        
+        // ============================================================
+        // SYNTH CONTROL PATTERNS
+        // ============================================================
+        
+        // hold:<voiceIndex> <value> - Voice sustain/hold level (colon syntax)
+        if (trimmed.startsWith("hold:")) {
+            val parts = trimmed.substringAfter("hold:").trim().split(" ", limit = 2)
+            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: hold requires voice index and value")
+            val voiceIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid voice index")
+            // Accept 1-based input (1-8) and convert to 0-based (0-7)
+            if (voiceIndex !in 1..8) throw IllegalArgumentException("Line $lineNum: Voice index must be 1-8, got: $voiceIndex")
+            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid hold value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.VoiceHold(voiceIndex - 1, value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // Tidal-style quoted hold: hold "0.8" or hold "0 0.8" (voice value)
+        val quotedHoldMatch = Regex("^hold\\s*\"([^\"]+)\"$").find(trimmed)
+        if (quotedHoldMatch != null) {
+            val holdStr = quotedHoldMatch.groupValues[1].trim()
+            val parts = holdStr.split(Regex("\\s+"))
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return if (parts.size >= 2) {
+                // hold "1 0.8" - 1-based voice index and value, convert to 0-based  
+                val voiceIndex = (parts[0].toIntOrNull() ?: 1) - 1 // Convert 1-based to 0-based
+                val value = parts[1].toFloatOrNull() ?: 0.8f
+                Pattern.pure(TidalEvent.VoiceHold(voiceIndex, value.coerceIn(0f, 1f), listOf(location)))
+            } else {
+                // hold "0.8" - just value, apply to voice 0
+                val value = parts[0].toFloatOrNull() ?: 0.8f
+                Pattern.pure(TidalEvent.VoiceHold(0, value.coerceIn(0f, 1f), listOf(location)))
+            }
+        }
+        
+        // drive:<value> - Distortion drive amount (0.0-1.0)
+        // Also accepts distortion: as an alias (common AI guess)
+        if (trimmed.startsWith("drive:") || trimmed.startsWith("distortion:")) {
+            val prefix = if (trimmed.startsWith("drive:")) "drive:" else "distortion:"
+            val value = trimmed.substringAfter(prefix).trim().toFloatOrNull()
+                ?: throw IllegalArgumentException("Line $lineNum: Invalid drive value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.Drive(value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // vibrato:<value> - Vibrato/LFO depth (0.0-1.0)
+        if (trimmed.startsWith("vibrato:")) {
+            val value = trimmed.substringAfter("vibrato:").trim().toFloatOrNull()
+                ?: throw IllegalArgumentException("Line $lineNum: Invalid vibrato value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.Vibrato(value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // feedback:<value> - Delay feedback amount (0.0-1.0)
+        if (trimmed.startsWith("feedback:")) {
+            val value = trimmed.substringAfter("feedback:").trim().toFloatOrNull()
+                ?: throw IllegalArgumentException("Line $lineNum: Invalid feedback value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.DelayFeedback(value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // delaymix:<value> - Delay wet/dry mix (0.0-1.0)
+        // Also accepts delay: as an alias (common AI guess)
+        if (trimmed.startsWith("delaymix:") || trimmed.startsWith("delay:")) {
+            val prefix = if (trimmed.startsWith("delaymix:")) "delaymix:" else "delay:"
+            val value = trimmed.substringAfter(prefix).trim().toFloatOrNull()
+                ?: throw IllegalArgumentException("Line $lineNum: Invalid delay mix value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.DelayMix(value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // distmix:<value> - Distortion mix (0.0-1.0)
+        if (trimmed.startsWith("distmix:")) {
+            val value = trimmed.substringAfter("distmix:").trim().toFloatOrNull()
+                ?: throw IllegalArgumentException("Line $lineNum: Invalid distortion mix value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.DistortionMix(value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // volume:<value> - Master volume (0.0-1.0)
+        if (trimmed.startsWith("volume:")) {
+            val value = trimmed.substringAfter("volume:").trim().toFloatOrNull()
+                ?: throw IllegalArgumentException("Line $lineNum: Invalid volume value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.MasterVolume(value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // pan:<voiceIndex> <value> - Voice pan position (-1.0 to 1.0)
+        if (trimmed.startsWith("pan:")) {
+            val parts = trimmed.substringAfter("pan:").trim().split(" ", limit = 2)
+            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: pan requires voice index and value")
+            val voiceIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid voice index")
+            // Accept 1-based input (1-8) and convert to 0-based (0-7)
+            if (voiceIndex !in 1..8) throw IllegalArgumentException("Line $lineNum: Voice index must be 1-8, got: $voiceIndex")
+            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid pan value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.VoicePan(voiceIndex - 1, value.coerceIn(-1f, 1f), listOf(location)))
+        }
+        
+        // tune:<voiceIndex> <value> - Voice pitch/tune (0.0-1.0, 0.5 = unity)
+        if (trimmed.startsWith("tune:")) {
+            val parts = trimmed.substringAfter("tune:").trim().split(" ", limit = 2)
+            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: tune requires voice index and value")
+            val voiceIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid voice index")
+            // Accept 1-based input (1-8) and convert to 0-based (0-7)
+            if (voiceIndex !in 1..8) throw IllegalArgumentException("Line $lineNum: Voice index must be 1-8, got: $voiceIndex")
+            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid tune value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.VoiceTune(voiceIndex - 1, value.coerceIn(0f, 1f), listOf(location)))
+        }
+
+        // quadhold:<quadIndex> <value> - Quad hold level (0.0-1.0)
+        if (trimmed.startsWith("quadhold:")) {
+            val parts = trimmed.substringAfter("quadhold:").trim().split(" ", limit = 2)
+            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: quadhold requires quad index (1-3) and value")
+            val quadIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid quad index")
+            // Accept 1-based input (1-3) and convert to 0-based (0-2)
+            if (quadIndex !in 1..3) throw IllegalArgumentException("Line $lineNum: Quad index must be 1-3, got: $quadIndex")
+            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid hold value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.QuadHold((quadIndex - 1).coerceIn(0, 2), value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // quadpitch:<quadIndex> <value> - Quad pitch (0.0-1.0, 0.5 = unity)
+        if (trimmed.startsWith("quadpitch:")) {
+            val parts = trimmed.substringAfter("quadpitch:").trim().split(" ", limit = 2)
+            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: quadpitch requires quad index (1-3) and value")
+            val quadIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid quad index")
+            // Accept 1-based input (1-3) and convert to 0-based (0-2)
+            if (quadIndex !in 1..3) throw IllegalArgumentException("Line $lineNum: Quad index must be 1-3, got: $quadIndex")
+            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid pitch value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.QuadPitch((quadIndex - 1).coerceIn(0, 2), value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        // duomod:<duoIndex> <source> - Duo modulation source (fm/off/lfo)
+        if (trimmed.startsWith("duomod:")) {
+            val parts = trimmed.substringAfter("duomod:").trim().split(" ", limit = 2)
+            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: duomod requires duo index (1-4) and source (fm/off/lfo)")
+            val duoIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid duo index")
+            // Accept 1-based input (1-4) and convert to 0-based (0-3)
+            if (duoIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Duo index must be 1-4, got: $duoIndex")
+            val source = parts[1].lowercase()
+            if (source !in listOf("fm", "off", "lfo")) {
+                throw IllegalArgumentException("Line $lineNum: duomod source must be 'fm', 'off', or 'lfo'")
+            }
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.DuoMod((duoIndex - 1).coerceIn(0, 3), source, listOf(location)))
+        }
+        
+        // sharp:<pairIndex> <value> - Pair waveform sharpness (0.0 = tri, 1.0 = sq)
+        if (trimmed.startsWith("sharp:")) {
+            val parts = trimmed.substringAfter("sharp:").trim().split(" ", limit = 2)
+            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: sharp requires pair index (1-4) and value")
+            val pairIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid pair index")
+            // Accept 1-based input (1-4) and convert to 0-based (0-3)
+            if (pairIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Pair index must be 1-4, got: $pairIndex")
+            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid sharpness value")
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+            return Pattern.pure(TidalEvent.PairSharp((pairIndex - 1).coerceIn(0, 3), value.coerceIn(0f, 1f), listOf(location)))
+        }
+        
         // Check for transformations
         if (trimmed.startsWith("fast ") || trimmed.startsWith("slow ")) {
             return parseTransformation(trimmed, lineNum, trimOffset)
         }
         
+        // Check for stack function: stack [ ... ]
+        if (isFunctionCall(trimmed, "stack")) {
+            return parseListFunction("stack", trimmed, lineNum, trimOffset, Pattern.Companion::stack)
+        }
+        
+        // Check for fastcat function: fastcat [ ... ]
+        if (isFunctionCall(trimmed, "fastcat")) {
+            return parseListFunction("fastcat", trimmed, lineNum, trimOffset, Pattern.Companion::fastcat)
+        }
+
+        // Check for cat function: cat [ ... ]
+        if (isFunctionCall(trimmed, "cat")) {
+            return parseListFunction("cat", trimmed, lineNum, trimOffset, Pattern.Companion::fastcat)
+        }
+
+        // Check for slowcat function: slowcat [ ... ]
+        if (isFunctionCall(trimmed, "slowcat")) {
+            return parseListFunction("slowcat", trimmed, lineNum, trimOffset, Pattern.Companion::slowcat)
+        }
+        
         // Default: try as gate pattern (just numbers)
         return when (val result = TidalParser.parseGates(trimmed)) {
             is TidalParser.ParseResult.Success -> result.pattern
-            is TidalParser.ParseResult.Failure -> throw IllegalArgumentException("Line $lineNum: ${result.message}")
+            is TidalParser.ParseResult.Failure -> throw IllegalArgumentException("Line $lineNum: ${result.message}\nInput: '$trimmed'")
         }
+    }
+    
+    private fun isFunctionCall(code: String, funcName: String): Boolean {
+        return code.startsWith("$funcName ") || 
+               code.startsWith("$funcName[") || 
+               code.startsWith("$funcName$")
+    }
+
+    private fun parseListFunction(
+        funcName: String,
+        code: String,
+        lineNum: Int,
+        lineOffset: Int,
+        combiner: (List<Pattern<TidalEvent>>) -> Pattern<TidalEvent>
+    ): Pattern<TidalEvent> {
+        // Handle optional $ (e.g. stack $ [...])
+        val afterFunc = code.substringAfter(funcName).trimStart()
+        val content = if (afterFunc.startsWith("$")) afterFunc.substringAfter("$").trimStart() else afterFunc
+        
+        // Find start of list
+        val openIndex = code.indexOf('[', startIndex = funcName.length)
+        if (openIndex == -1) throw IllegalArgumentException("Line $lineNum: $funcName requires [...]")
+        
+        val closeIndex = code.lastIndexOf(']')
+        if (closeIndex == -1) throw IllegalArgumentException("Line $lineNum: $funcName missing closing ']'")
+        
+        val inner = code.substring(openIndex + 1, closeIndex)
+        val innerOffset = lineOffset + openIndex + 1
+        
+        val parts = splitArgs(inner, innerOffset)
+        val patterns = parts.mapNotNull { (partStr, partOffset) ->
+            if (partStr.isBlank()) null
+            else parsePattern(partStr, lineNum, partOffset)
+        }
+        
+        return combiner(patterns)
+    }
+
+    private fun splitArgs(input: String, startOffset: Int): List<Pair<String, Int>> {
+        val result = mutableListOf<Pair<String, Int>>()
+        var currentStart = 0
+        var nesting = 0
+        var insideQuote = false
+        
+        for (i in input.indices) {
+            val c = input[i]
+            when (c) {
+                '"' -> insideQuote = !insideQuote
+                '[', '(', '{' -> if (!insideQuote) nesting++
+                ']', ')', '}' -> if (!insideQuote) nesting--
+                ',' -> {
+                    if (nesting == 0 && !insideQuote) {
+                        result.add(input.substring(currentStart, i) to (startOffset + currentStart))
+                        currentStart = i + 1
+                    }
+                }
+            }
+        }
+        if (currentStart < input.length) {
+            result.add(input.substring(currentStart) to (startOffset + currentStart))
+        }
+        return result
     }
     
     /**
@@ -310,8 +769,20 @@ class TidalRepl(
             ?: throw IllegalArgumentException("Line $lineNum: Invalid number '${parts[1]}'")
         
         // Calculate offset to the inner pattern (after "fast 2 " or "slow 2 ")
-        val innerPatternOffset = lineOffset + code.indexOf(parts[2])
-        val innerPattern = parsePattern(parts[2], lineNum, innerPatternOffset)
+        var innerPatternStr = parts[2]
+        var innerPatternOffset = lineOffset + code.indexOf(parts[2])
+        
+        // Handle $ function application (e.g., "slow 2 $ note \"c3\"")
+        // The $ is just a separator in Tidal, similar to Haskell's function application
+        if (innerPatternStr.startsWith("$ ")) {
+            innerPatternStr = innerPatternStr.substringAfter("$ ")
+            innerPatternOffset += 2 // Skip "$ "
+        } else if (innerPatternStr.startsWith("$")) {
+            innerPatternStr = innerPatternStr.substringAfter("$").trimStart()
+            innerPatternOffset += 1 + (parts[2].substringAfter("$").length - innerPatternStr.length)
+        }
+        
+        val innerPattern = parsePattern(innerPatternStr, lineNum, innerPatternOffset)
         
         return when (op) {
             "fast" -> innerPattern.fast(factor)

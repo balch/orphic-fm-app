@@ -19,6 +19,12 @@ private val WarmGlow = Color(0xFFFF6B35)
 private val SynthGreen = Color(0xFF39FF14)
 private val SynthPink = Color(0xFFFF69B4)
 
+// Cleveland Cavaliers Palette (Wine & Gold)
+private val CavsWine = Color(0xFF860038)
+private val CavsGold = Color(0xFFFFBB30)
+private val CavsNavy = Color(0xFF041E42)
+private val CavsWhite = Color(0xFFFFFFFF)
+
 private val DarkColorScheme = darkColorScheme(
     primary = NeonCyan,
     onPrimary = DarkVoid,
@@ -89,6 +95,24 @@ object OrpheusColors {
     val warmGlow = WarmGlow
     val synthGreen = SynthGreen
     val synthPink = SynthPink // Added
+
+    // Midnight Blue & Silver Palette
+    val midnightBlue = Color(0xFF191970) // Deep Midnight Blue
+    val deepSpaceBlue = Color(0xFF0F172A) // Darker, for backgrounds
+    val sterlingSilver = Color(0xFFE2E8F0) // Bright Silver/White
+    val slateSilver = Color(0xFF94A3B8)   // Muted Silver/Grey
+    val metallicBlue = Color(0xFF3B82F6)  // Vibrant Blue Accent
+
+    // Cavaliers Palette (Kept for reference if needed, but unused)
+    val cavsWine = CavsWine
+    val cavsGold = CavsGold
+    val cavsNavy = CavsNavy
+    val cavsWhite = CavsWhite
+
+    // Backward-compatible aliases (map Browns to Midnight & Silver)
+    val brownsBrown = midnightBlue    // Base background color
+    val brownsOrange = metallicBlue   // Vibrant accent (was Orange/Gold, now Electric Blue)
+    val brownsWhite = sterlingSilver  // Text color
 
     // Glow colors for knobs/buttons
     val knobGlow = NeonCyan.copy(alpha = 0.6f)

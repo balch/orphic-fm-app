@@ -1,9 +1,9 @@
 package org.balch.orpheus.core.preferences
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
-import org.balch.orpheus.util.Logger
 import org.w3c.dom.get
 import org.w3c.dom.set
 
@@ -12,6 +12,7 @@ import org.w3c.dom.set
  */
 @Inject
 class WasmAppPreferencesRepository : AppPreferencesRepository {
+    private val log = logging("WasmAppPreferencesRepository")
 
     private val json = Json {
         prettyPrint = false
@@ -30,7 +31,7 @@ class WasmAppPreferencesRepository : AppPreferencesRepository {
                 AppPreferences()
             }
         } catch (e: Exception) {
-            Logger.error { "Failed to load preferences: ${e.message}" }
+            log.error { "Failed to load preferences: ${e.message}" }
             AppPreferences()
         }
     }
@@ -40,7 +41,7 @@ class WasmAppPreferencesRepository : AppPreferencesRepository {
             val jsonString = json.encodeToString(preferences)
             localStorage[settingsKey] = jsonString
         } catch (e: Exception) {
-            Logger.error { "Failed to save preferences: ${e.message}" }
+            log.error { "Failed to save preferences: ${e.message}" }
         }
     }
 }

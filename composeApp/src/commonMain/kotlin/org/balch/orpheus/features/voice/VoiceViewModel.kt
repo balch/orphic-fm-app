@@ -29,13 +29,14 @@ import kotlin.math.roundToInt
 /** UI state for voice management. */
 data class VoiceUiState(
     val voiceStates: List<VoiceState> =
-        List(8) { index -> VoiceState(index = index, tune = DEFAULT_TUNINGS[index]) },
-    val voiceModDepths: List<Float> = List(8) { 0.0f },
-    val pairSharpness: List<Float> = List(4) { 0.0f },
-    val voiceEnvelopeSpeeds: List<Float> = List(8) { 0.0f },
-    val duoModSources: List<ModSource> = List(4) { ModSource.OFF },
-    val quadGroupPitches: List<Float> = List(2) { 0.5f },
-    val quadGroupHolds: List<Float> = List(2) { 0.0f },
+        List(12) { index -> VoiceState(index = index, tune = DEFAULT_TUNINGS.getOrElse(index) { 0.5f }) },
+    val voiceModDepths: List<Float> = List(12) { 0.0f },
+    val pairSharpness: List<Float> = List(6) { 0.0f },
+    val voiceEnvelopeSpeeds: List<Float> = List(12) { 0.0f },
+    val duoModSources: List<ModSource> = List(6) { ModSource.OFF },
+    val quadGroupPitches: List<Float> = List(3) { 0.5f },
+    val quadGroupHolds: List<Float> = List(3) { 0.0f },
+    val quadGroupVolumes: List<Float> = List(3) { 1.0f },
     val fmStructureCrossQuad: Boolean = false,
     val totalFeedback: Float = 0.0f,
     val vibrato: Float = 0.0f,
@@ -44,7 +45,7 @@ data class VoiceUiState(
     val peakLevel: Float = 0.0f
 ) {
     companion object {
-        val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f)
+        val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
     }
 }
 
@@ -65,6 +66,7 @@ private sealed interface VoiceIntent {
     // Quad-level intents
     data class QuadPitch(val quadIndex: Int, val value: Float) : VoiceIntent
     data class QuadHold(val quadIndex: Int, val value: Float) : VoiceIntent
+    data class QuadVolume(val quadIndex: Int, val value: Float) : VoiceIntent
 
     // Global intents
     data class FmStructure(val crossQuad: Boolean) : VoiceIntent
@@ -127,15 +129,16 @@ class VoiceViewModel(
                                         tune = preset.voiceTunes.getOrElse(index) { state.tune }
                                     )
                                 },
-                            voiceModDepths = preset.voiceModDepths.take(8).padEnd(8, 0f),
-                            pairSharpness = preset.pairSharpness.take(4).padEnd(4, 0f),
-                            voiceEnvelopeSpeeds = preset.voiceEnvelopeSpeeds.take(8).padEnd(8, 0f),
-                            duoModSources =
-                                preset.duoModSources
-                                    .take(4)
-                                    .padEnd(4, ModSource.OFF),
+                            voiceModDepths = (preset.voiceModDepths + List(12) { 0f }).take(12),
+                            pairSharpness = (preset.pairSharpness + List(6) { 0f }).take(6),
+                            voiceEnvelopeSpeeds = (preset.voiceEnvelopeSpeeds + List(12) { 0f }).take(12),
+                            duoModSources = (preset.duoModSources + List(6) { ModSource.OFF }).take(6),
                             fmStructureCrossQuad = preset.fmStructureCrossQuad,
-                            totalFeedback = preset.totalFeedback
+                            totalFeedback = preset.totalFeedback,
+                            vibrato = preset.vibrato,
+                            voiceCoupling = preset.voiceCoupling,
+                            quadGroupPitches = (preset.quadGroupPitches + List(3) { 0.5f }).take(3),
+                            quadGroupHolds = (preset.quadGroupHolds + List(3) { 0.0f }).take(3)
                         )
                     intents.tryEmit(VoiceIntent.Restore(voiceState))
                 }
@@ -185,14 +188,22 @@ class VoiceViewModel(
             ControlIds.voiceTune(7) -> intents.tryEmit(VoiceIntent.Tune(7, value))
 
             // Voice FM depths (duo-level)
-            ControlIds.voiceFmDepth(0), ControlIds.voiceFmDepth(1) ->
-                onDuoModDepthChange(0, value)
-            ControlIds.voiceFmDepth(2), ControlIds.voiceFmDepth(3) ->
-                onDuoModDepthChange(1, value)
-            ControlIds.voiceFmDepth(4), ControlIds.voiceFmDepth(5) ->
-                onDuoModDepthChange(2, value)
-            ControlIds.voiceFmDepth(6), ControlIds.voiceFmDepth(7) ->
-                onDuoModDepthChange(3, value)
+            ControlIds.voiceFmDepth(0), ControlIds.voiceFmDepth(1) -> {
+                intents.tryEmit(VoiceIntent.ModDepth(0, value))
+                intents.tryEmit(VoiceIntent.ModDepth(1, value))
+            }
+            ControlIds.voiceFmDepth(2), ControlIds.voiceFmDepth(3) -> {
+                intents.tryEmit(VoiceIntent.ModDepth(2, value))
+                intents.tryEmit(VoiceIntent.ModDepth(3, value))
+            }
+            ControlIds.voiceFmDepth(4), ControlIds.voiceFmDepth(5) -> {
+                intents.tryEmit(VoiceIntent.ModDepth(4, value))
+                intents.tryEmit(VoiceIntent.ModDepth(5, value))
+            }
+            ControlIds.voiceFmDepth(6), ControlIds.voiceFmDepth(7) -> {
+                intents.tryEmit(VoiceIntent.ModDepth(6, value))
+                intents.tryEmit(VoiceIntent.ModDepth(7, value))
+            }
 
             // Pair sharpness
             ControlIds.pairSharpness(0) -> intents.tryEmit(VoiceIntent.PairSharpness(0, value))
@@ -210,6 +221,11 @@ class VoiceViewModel(
             ControlIds.quadPitch(1) -> intents.tryEmit(VoiceIntent.QuadPitch(1, value))
             ControlIds.quadHold(0) -> intents.tryEmit(VoiceIntent.QuadHold(0, value))
             ControlIds.quadHold(1) -> intents.tryEmit(VoiceIntent.QuadHold(1, value))
+            ControlIds.quadVolume(0) -> intents.tryEmit(VoiceIntent.QuadVolume(0, value))
+            ControlIds.quadVolume(1) -> intents.tryEmit(VoiceIntent.QuadVolume(1, value))
+            ControlIds.quadVolume(2) -> intents.tryEmit(VoiceIntent.QuadVolume(2, value))
+            
+            ControlIds.FM_STRUCTURE -> intents.tryEmit(VoiceIntent.FmStructure(value > 0.5f))
 
             else -> handleDynamicControlId(controlId, value)
         }
@@ -234,7 +250,8 @@ class VoiceViewModel(
 
             controlId.startsWith("voice_") && controlId.endsWith("_hold") -> {
                 val index = controlId.removePrefix("voice_").removeSuffix("_hold").toIntOrNull()
-                if (index != null) intents.tryEmit(VoiceIntent.Hold(index, value >= 0.5f))
+                // Treat as holding if value > 0.1f (allows continuous control from REPL)
+                if (index != null) intents.tryEmit(VoiceIntent.Hold(index, value > 0.1f))
             }
 
             controlId.startsWith("pair_") && controlId.endsWith("_sharpness") -> {
@@ -249,6 +266,24 @@ class VoiceViewModel(
                     val srcIndex = (value * (sources.size - 1)).roundToInt()
                     intents.tryEmit(VoiceIntent.DuoModSource(index, sources[srcIndex]))
                 }
+            }
+            
+            // Quad-level hold controls from REPL
+            controlId.startsWith("quad_") && controlId.endsWith("_hold") -> {
+                val index = controlId.removePrefix("quad_").removeSuffix("_hold").toIntOrNull()
+                if (index != null) intents.tryEmit(VoiceIntent.QuadHold(index, value))
+            }
+            
+            // Quad-level pitch controls from REPL
+            controlId.startsWith("quad_") && controlId.endsWith("_pitch") -> {
+                val index = controlId.removePrefix("quad_").removeSuffix("_pitch").toIntOrNull()
+                if (index != null) intents.tryEmit(VoiceIntent.QuadPitch(index, value))
+            }
+            
+            // Quad-level volume controls from AI/REPL
+            controlId.startsWith("quad_") && controlId.endsWith("_volume") -> {
+                val index = controlId.removePrefix("quad_").removeSuffix("_volume").toIntOrNull()
+                if (index != null) intents.tryEmit(VoiceIntent.QuadVolume(index, value))
             }
         }
     }
@@ -286,6 +321,9 @@ class VoiceViewModel(
 
             is VoiceIntent.QuadHold ->
                 state.withQuadHold(intent.quadIndex, intent.value)
+
+            is VoiceIntent.QuadVolume ->
+                state.withQuadVolume(intent.quadIndex, intent.value)
 
             is VoiceIntent.FmStructure ->
                 state.copy(fmStructureCrossQuad = intent.crossQuad)
@@ -330,6 +368,8 @@ class VoiceViewModel(
     private fun VoiceUiState.withQuadHold(quadIndex: Int, value: Float) =
         copy(quadGroupHolds = quadGroupHolds.mapIndexed { i, h -> if (i == quadIndex) value else h })
 
+    private fun VoiceUiState.withQuadVolume(quadIndex: Int, value: Float) =
+        copy(quadGroupVolumes = quadGroupVolumes.mapIndexed { i, v -> if (i == quadIndex) value else v })
 
 
     // ═══════════════════════════════════════════════════════════
@@ -380,6 +420,9 @@ class VoiceViewModel(
             is VoiceIntent.QuadHold ->
                 engine.setQuadHold(intent.quadIndex, intent.value)
 
+            is VoiceIntent.QuadVolume ->
+                engine.setQuadVolume(intent.quadIndex, intent.value)
+
             is VoiceIntent.FmStructure -> {
                 engine.setFmStructure(intent.crossQuad)
                 uiState.value.duoModSources.forEachIndexed { index, source ->
@@ -408,6 +451,7 @@ class VoiceViewModel(
         state.duoModSources.forEachIndexed { i, s -> engine.setDuoModSource(i, s) }
         state.quadGroupPitches.forEachIndexed { i, p -> engine.setQuadPitch(i, p) }
         state.quadGroupHolds.forEachIndexed { i, h -> engine.setQuadHold(i, h) }
+        state.quadGroupVolumes.forEachIndexed { i, v -> engine.setQuadVolume(i, v) }
         engine.setFmStructure(state.fmStructureCrossQuad)
         engine.setTotalFeedback(state.totalFeedback)
         engine.setVibrato(state.vibrato)
@@ -420,71 +464,85 @@ class VoiceViewModel(
     // ═══════════════════════════════════════════════════════════
 
     fun onVoiceTuneChange(index: Int, value: Float) {
-        intents.tryEmit(VoiceIntent.Tune(index, value))
+        synthController.emitControlChange(ControlIds.voiceTune(index), value, ControlEventOrigin.UI)
     }
 
     fun onVoiceModDepthChange(index: Int, value: Float) {
-        intents.tryEmit(VoiceIntent.ModDepth(index, value))
+        val duoIndex = index / 2
+        synthController.emitControlChange(ControlIds.voiceFmDepth(index), value, ControlEventOrigin.UI)
+        // Also update the pair?
+        // Actually onDuoModDepthChange updates both. 
+        // If we want individual control via UI, we emit individually.
+        // But UI usually calls onDuoModDepthChange.
     }
 
     fun onDuoModDepthChange(duoIndex: Int, value: Float) {
-        intents.tryEmit(VoiceIntent.ModDepth(duoIndex * 2, value))
-        intents.tryEmit(VoiceIntent.ModDepth(duoIndex * 2 + 1, value))
+        // Emit for both voices in the duo
+        synthController.emitControlChange(ControlIds.voiceFmDepth(duoIndex * 2), value, ControlEventOrigin.UI)
+        synthController.emitControlChange(ControlIds.voiceFmDepth(duoIndex * 2 + 1), value, ControlEventOrigin.UI)
     }
 
     fun onPairSharpnessChange(pairIndex: Int, value: Float) {
-        intents.tryEmit(VoiceIntent.PairSharpness(pairIndex, value))
+        synthController.emitControlChange(ControlIds.pairSharpness(pairIndex), value, ControlEventOrigin.UI)
     }
 
     fun onVoiceEnvelopeSpeedChange(index: Int, value: Float) {
-        intents.tryEmit(VoiceIntent.EnvelopeSpeed(index, value))
+        synthController.emitControlChange(ControlIds.voiceEnvelopeSpeed(index), value, ControlEventOrigin.UI)
     }
 
     fun onPulseStart(index: Int) {
-        intents.tryEmit(VoiceIntent.PulseStart(index))
+        synthController.emitPulseStart(index)
     }
 
     fun onPulseEnd(index: Int) {
-        intents.tryEmit(VoiceIntent.PulseEnd(index))
+        synthController.emitPulseEnd(index)
     }
 
     fun onHoldChange(index: Int, holding: Boolean) {
-        intents.tryEmit(VoiceIntent.Hold(index, holding))
+        val value = if (holding) 1.0f else 0.0f
+        synthController.emitControlChange(ControlIds.voiceHold(index), value, ControlEventOrigin.UI)
     }
 
     fun onDuoModSourceChange(index: Int, source: ModSource) {
-        intents.tryEmit(VoiceIntent.DuoModSource(index, source))
+        val sources = ModSource.values()
+        // Map ordinal to 0..1 range approximately to match handleDynamicControlId logic
+        // But handleDynamicControlId does: (value * (sources.size - 1)).roundToInt()
+        // So value should be index / (size - 1)
+        val value = if (sources.size > 1) source.ordinal.toFloat() / (sources.size - 1) else 0f
+        synthController.emitControlChange(ControlIds.duoModSource(index), value, ControlEventOrigin.UI)
     }
 
     fun onQuadPitchChange(index: Int, value: Float) {
-        intents.tryEmit(VoiceIntent.QuadPitch(index, value))
+        synthController.emitControlChange(ControlIds.quadPitch(index), value, ControlEventOrigin.UI)
     }
 
     fun onQuadHoldChange(index: Int, value: Float) {
-        intents.tryEmit(VoiceIntent.QuadHold(index, value))
+        synthController.emitControlChange(ControlIds.quadHold(index), value, ControlEventOrigin.UI)
     }
 
     fun onFmStructureChange(crossQuad: Boolean) {
-        intents.tryEmit(VoiceIntent.FmStructure(crossQuad))
+        val value = if (crossQuad) 1.0f else 0.0f
+        synthController.emitControlChange(ControlIds.FM_STRUCTURE, value, ControlEventOrigin.UI)
     }
 
     fun onTotalFeedbackChange(value: Float) {
-        intents.tryEmit(VoiceIntent.TotalFeedback(value))
+        synthController.emitControlChange(ControlIds.TOTAL_FEEDBACK, value, ControlEventOrigin.UI)
     }
 
     fun onVibratoChange(value: Float) {
-        intents.tryEmit(VoiceIntent.Vibrato(value))
+        synthController.emitControlChange(ControlIds.VIBRATO, value, ControlEventOrigin.UI)
     }
 
     fun onVoiceCouplingChange(value: Float) {
-        intents.tryEmit(VoiceIntent.VoiceCoupling(value))
+        synthController.emitControlChange(ControlIds.VOICE_COUPLING, value, ControlEventOrigin.UI)
     }
 
     fun onMasterVolumeChange(value: Float) {
-        intents.tryEmit(VoiceIntent.MasterVolume(value))
+        synthController.emitControlChange(ControlIds.MASTER_VOLUME, value, ControlEventOrigin.UI)
     }
 
     fun restoreState(state: VoiceUiState) {
+        // Restore assumes full state reset, bypass controller to avoid event storm
         intents.tryEmit(VoiceIntent.Restore(state))
     }
     

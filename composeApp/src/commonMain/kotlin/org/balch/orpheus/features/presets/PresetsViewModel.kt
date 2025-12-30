@@ -2,6 +2,7 @@ package org.balch.orpheus.features.presets
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -20,7 +21,6 @@ import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.DronePresetRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.SynthPatch
-import org.balch.orpheus.util.Logger
 
 /** UI state for the Presets panel. */
 data class PresetUiState(
@@ -52,6 +52,8 @@ class PresetsViewModel(
     private val appPreferencesRepository: AppPreferencesRepository,
     factoryPatches: Set<SynthPatch>
 ) : ViewModel() {
+
+    private val log = logging("PresetsViewModel")
 
     // Convert factory patches to DronePresets, sorted by name
     private val factoryPresets: List<DronePreset> = factoryPatches
@@ -109,7 +111,7 @@ class PresetsViewModel(
             val allPresets = factoryPresets + userPresets
             intents.tryEmit(PresetIntent.SetPresets(allPresets, factoryPresetNames))
             intents.tryEmit(PresetIntent.SetLoading(false))
-            Logger.info { "Loaded ${factoryPresets.size} factory + ${userPresets.size} user presets" }
+            log.info { "Loaded ${factoryPresets.size} factory + ${userPresets.size} user presets" }
             
             // Load last selected preset from preferences, fallback to Default
             val prefs = appPreferencesRepository.load()
@@ -120,7 +122,7 @@ class PresetsViewModel(
             if (presetToApply != null) {
                 intents.tryEmit(PresetIntent.Select(presetToApply))
                 presetLoader.applyPreset(presetToApply)
-                Logger.info { "Applied preset on startup: ${presetToApply.name}" }
+                log.info { "Applied preset on startup: ${presetToApply.name}" }
             }
         }
     }
@@ -135,7 +137,7 @@ class PresetsViewModel(
     fun applyPreset(preset: DronePreset) {
         selectPreset(preset)
         presetLoader.applyPreset(preset)
-        Logger.info { "Applied preset: ${preset.name}" }
+        log.info { "Applied preset: ${preset.name}" }
         
         // Save last selected preset to preferences
         viewModelScope.launch(dispatcherProvider.io) {
@@ -147,14 +149,14 @@ class PresetsViewModel(
     fun saveNewPreset(name: String) {
         // Prevent overwriting factory presets
         if (name in factoryPresetNames) {
-            Logger.warn { "Cannot overwrite factory preset: $name" }
+            log.warn { "Cannot overwrite factory preset: $name" }
             return
         }
         val preset = presetLoader.currentStateAsPreset(name)
         viewModelScope.launch(dispatcherProvider.io) {
             repository.save(preset)
             loadPresetsAfterChange(name)
-            Logger.info { "Saved new preset: $name" }
+            log.info { "Saved new preset: $name" }
         }
     }
 
@@ -162,14 +164,14 @@ class PresetsViewModel(
         val current = uiState.value.selectedPreset ?: return
         // Prevent overwriting factory presets
         if (current.name in factoryPresetNames) {
-            Logger.warn { "Cannot overwrite factory preset: ${current.name}" }
+            log.warn { "Cannot overwrite factory preset: ${current.name}" }
             return
         }
         val preset = presetLoader.currentStateAsPreset(current.name).copy(createdAt = current.createdAt)
         viewModelScope.launch(dispatcherProvider.io) {
             repository.save(preset)
             loadPresetsAfterChange(current.name)
-            Logger.info { "Overrode preset: ${current.name}" }
+            log.info { "Overrode preset: ${current.name}" }
         }
     }
 
@@ -177,7 +179,7 @@ class PresetsViewModel(
         val current = uiState.value.selectedPreset ?: return
         // Prevent deleting factory presets
         if (current.name in factoryPresetNames) {
-            Logger.warn { "Cannot delete factory preset: ${current.name}" }
+            log.warn { "Cannot delete factory preset: ${current.name}" }
             return
         }
         viewModelScope.launch(dispatcherProvider.io) {
@@ -186,7 +188,7 @@ class PresetsViewModel(
             val allPresets = factoryPresets + userPresets
             intents.tryEmit(PresetIntent.SetPresets(allPresets, factoryPresetNames))
             intents.tryEmit(PresetIntent.Select(null))
-            Logger.info { "Deleted preset: ${current.name}" }
+            log.info { "Deleted preset: ${current.name}" }
         }
     }
 

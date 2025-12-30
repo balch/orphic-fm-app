@@ -1,6 +1,7 @@
 package org.balch.orpheus
 
 import android.app.Application
+import com.diamondedge.logging.KmLogging
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.di.OrpheusGraph
 
@@ -23,5 +24,8 @@ class OrpheusApplication : Application() {
         // Create the DI graph ONCE at Application level with Context
         // This survives Activity recreation on configuration changes
         graph = createGraphFactory<OrpheusGraph.Factory>().create(applicationContext)
+        
+        // Wire up logging to UI
+        KmLogging.addLogger(graph.consoleLogger)
     }
 }

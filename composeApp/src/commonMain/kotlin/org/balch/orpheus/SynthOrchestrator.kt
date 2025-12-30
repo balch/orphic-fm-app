@@ -1,10 +1,10 @@
 package org.balch.orpheus
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.util.Logger
 
 /**
  * Orchestrates the lifecycle of the synthesizer engine.
@@ -17,13 +17,14 @@ import org.balch.orpheus.util.Logger
 class SynthOrchestrator(
     private val engine: SynthEngine
 ) {
+    private val log = logging("SynthOrchestrator")
     private var isStarted = false
 
     fun start() {
         if (!isStarted) {
             engine.start()
             isStarted = true
-            Logger.info { "SynthOrchestrator: Engine started" }
+            log.info { "SynthOrchestrator: Engine started" }
         }
     }
 
@@ -31,7 +32,7 @@ class SynthOrchestrator(
         if (isStarted) {
             engine.stop()
             isStarted = false
-            Logger.info { "SynthOrchestrator: Engine stopped" }
+            log.info { "SynthOrchestrator: Engine stopped" }
         }
     }
 

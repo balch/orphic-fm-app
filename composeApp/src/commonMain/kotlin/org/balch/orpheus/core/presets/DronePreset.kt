@@ -45,6 +45,10 @@ data class DronePreset(
     // Advanced
     val fmStructureCrossQuad: Boolean = false,
     val totalFeedback: Float = 0.0f,
+    val vibrato: Float = 0.0f,
+    val voiceCoupling: Float = 0.0f,
+    val quadGroupPitches: List<Float> = List(3) { 0.5f },
+    val quadGroupHolds: List<Float> = List(3) { 0.0f },
 
     // Metadata
     val createdAt: Long = currentTimeMillis()

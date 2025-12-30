@@ -1,5 +1,15 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.FileInputStream
+import java.util.Properties
+
+// Load local.properties for API keys
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(FileInputStream(localPropertiesFile))
+    }
+}
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -10,12 +20,13 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.metro)
+    alias(libs.plugins.buildkonfig)
 }
 
 kotlin {
     androidTarget {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
@@ -35,6 +46,7 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.jsyn)
+            implementation(libs.ktor.client.okhttp)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -51,6 +63,14 @@ kotlin {
             implementation(libs.kotlinx.datetime)
             implementation(libs.ktmidi)
             implementation(libs.metrox.viewmodel.compose)
+            // AI/koog
+            implementation(libs.koog.agents)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.serialization.json)
+            implementation(libs.ktor.client.content.negotiation)
+            // Markdown rendering (core + Material 3 theme)
+            implementation(libs.markdown)
+            implementation(libs.markdown.m3)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -62,6 +82,9 @@ kotlin {
             implementation(libs.jsyn)
             implementation(libs.ktmidi.jvm.desktop)
             implementation(libs.coremidi4j)
+            implementation(libs.ktor.client.okhttp)
+            implementation(libs.slf4j.api)
+            implementation(libs.logback.classic)
         }
         wasmJsMain.dependencies {
             // ktmidi provides WebMidiAccess for browser MIDI
@@ -89,6 +112,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
+            excludes += "META-INF/DEPENDENCIES"
         }
     }
     buildTypes {
@@ -102,8 +128,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
@@ -132,5 +158,15 @@ compose.desktop {
                 iconFile.set(project.file("src/jvmMain/resources/icon.png"))
             }
         }
+    }
+}
+
+// BuildKonfig configuration for cross-platform BuildConfig
+buildkonfig {
+    packageName = "org.balch.orpheus"
+
+    defaultConfigs {
+        val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
+        buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING, "GEMINI_API_KEY", geminiApiKey)
     }
 }

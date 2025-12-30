@@ -2,6 +2,7 @@ package org.balch.orpheus.features.midi
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -20,7 +21,6 @@ import org.balch.orpheus.core.midi.MidiInputHandler
 import org.balch.orpheus.core.midi.MidiMappingRepository
 import org.balch.orpheus.core.midi.MidiMappingState
 import org.balch.orpheus.core.midi.MidiMappingStateHolder
-import org.balch.orpheus.util.Logger
 
 /** UI state for the MIDI panel. */
 data class MidiUiState(
@@ -46,6 +46,8 @@ class MidiViewModel(
     private val midiInputHandler: MidiInputHandler,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel() {
+
+    private val log = logging("MidiViewModel")
 
     // Local device connection state
     private val _deviceName = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
@@ -157,7 +159,7 @@ class MidiViewModel(
     private fun tryConnectMidi(): Boolean {
         val devices = midiController.getAvailableDevices()
         if (devices.isNotEmpty()) {
-            Logger.info { "Available MIDI devices: $devices" }
+            log.info { "Available MIDI devices: $devices" }
 
             val deviceName =
                 if (lastDeviceName != null && devices.contains(lastDeviceName)) {
@@ -172,18 +174,18 @@ class MidiViewModel(
 
                 _deviceName.value = deviceName
                 _isConnected.value = true
-                Logger.info { "MIDI initialized and listening on: $deviceName" }
+                log.info { "MIDI initialized and listening on: $deviceName" }
 
                 viewModelScope.launch(dispatcherProvider.io) {
                     midiRepository.load(deviceName)?.let { savedMapping ->
                         stateHolder.updateState(savedMapping)
-                        Logger.info { "Loaded saved MIDI mappings for $deviceName" }
+                        log.info { "Loaded saved MIDI mappings for $deviceName" }
                     }
                 }
                 return true
             }
         } else {
-            Logger.info { "No MIDI devices found" }
+            log.info { "No MIDI devices found" }
         }
         return false
     }
@@ -200,14 +202,14 @@ class MidiViewModel(
 
                     if (wasOpen && !stillAvailable) {
                         val name = midiController.currentDeviceName
-                        Logger.info { "MIDI device disconnected: $name" }
+                        log.info { "MIDI device disconnected: $name" }
                         midiController.closeDevice()
                         _deviceName.value = null
                         _isConnected.value = false
                     } else if (!wasOpen) {
                         val devices = midiController.getAvailableDevices()
                         if (devices.isNotEmpty()) {
-                            Logger.info { "MIDI device(s) available, attempting to connect..." }
+                            log.info { "MIDI device(s) available, attempting to connect..." }
                             tryConnectMidi()
                         }
                     }

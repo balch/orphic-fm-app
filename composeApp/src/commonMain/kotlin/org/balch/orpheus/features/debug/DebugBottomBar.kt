@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -43,21 +44,28 @@ import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
+import org.balch.orpheus.ui.preview.PreviewSynthEngine
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
+import org.balch.orpheus.util.ConsoleLogger
 import org.balch.orpheus.util.LogLevel
-import org.balch.orpheus.util.Logger
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 import kotlin.math.log10
 
 @Composable
-fun DebugBottomBar(engine: SynthEngine, modifier: Modifier = Modifier) {
+fun DebugBottomBar(
+    engine: SynthEngine, 
+    consoleLogger: ConsoleLogger,
+    modifier: Modifier = Modifier
+) {
     var isExpanded by remember { mutableStateOf(false) }
 
-    // Toggles
-    var logAudioEvents by remember { mutableStateOf(true) }
-
     // Collect logs from StateFlow
-    val logs by Logger.logsFlow.collectAsState()
+    val logs by consoleLogger.logsFlow.collectAsState()
 
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
@@ -115,9 +123,14 @@ fun DebugBottomBar(engine: SynthEngine, modifier: Modifier = Modifier) {
                     modifier =
                         Modifier.weight(1f, fill = false) // Allow text to shrink if needed
                 )
+            }
 
+            // Right: Toggles & Expand
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 // MONITORING METRICS
-                Spacer(modifier = Modifier.width(16.dp))
 
                 // Collect from engine flows
                 val peak by engine.peakFlow.collectAsState()
@@ -155,19 +168,6 @@ fun DebugBottomBar(engine: SynthEngine, modifier: Modifier = Modifier) {
                             else if (peak > 0.8f) Color.Yellow else OrpheusColors.electricBlue
                     )
                 }
-            }
-
-            // Right: Toggles & Expand
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Toggles
-                DebugToggle(
-                    label = "Log Audio",
-                    checked = logAudioEvents,
-                    onCheckedChange = { logAudioEvents = it }
-                )
 
 /*
                 // Audio Test (Quick Action)
@@ -228,7 +228,7 @@ fun DebugBottomBar(engine: SynthEngine, modifier: Modifier = Modifier) {
                         fontSize = 10.sp,
                         color = OrpheusColors.neonMagenta,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { Logger.clear() }.padding(4.dp)
+                        modifier = Modifier.clickable { consoleLogger.clear() }.padding(4.dp)
                     )
                 }
 
@@ -285,3 +285,31 @@ private fun DebugToggle(label: String, checked: Boolean, onCheckedChange: (Boole
         )
     }
 }
+
+@Preview
+@Composable
+fun DebugBottomBarPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects
+) {
+    val logger = remember {
+        ConsoleLogger().apply {
+            info("Preview", "System initialized")
+            debug("Preview", "Loading voice patches...")
+            warn("Preview", "Low battery detected (simulated)")
+            error("Preview", "Failed to connect to external MIDI", RuntimeException("Connection timeout"))
+            info("Preview", "Ready for performance")
+        }
+    }
+
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            DebugBottomBar(
+                engine = PreviewSynthEngine(),
+                consoleLogger = logger,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+    }
+}
+
+

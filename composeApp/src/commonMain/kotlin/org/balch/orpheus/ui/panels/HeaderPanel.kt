@@ -6,15 +6,16 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.features.ai.AiOptionsPanel
 import org.balch.orpheus.features.delay.ModDelayPanel
 import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.lfo.HyperLfoPanel
@@ -22,6 +23,7 @@ import org.balch.orpheus.features.midi.MidiPanel
 import org.balch.orpheus.features.presets.PresetsPanel
 import org.balch.orpheus.features.stereo.StereoPanel
 import org.balch.orpheus.features.tidal.ui.LiveCodePanel
+import org.balch.orpheus.features.viz.VizPanel
 
 /**
  * A container for the top header panel row that manages expansion state
@@ -30,19 +32,21 @@ import org.balch.orpheus.features.tidal.ui.LiveCodePanel
 @Composable
 fun HeaderPanel(
     modifier: Modifier = Modifier,
+    viewModel: HeaderViewModel = metroViewModel(),
     height: Dp = 260.dp,
     isVizInitiallyExpanded: Boolean = true,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
-    // Track expansion state for each panel
-    var presetExpanded by remember { mutableStateOf(false) }
-    var midiExpanded by remember { mutableStateOf(false) }
-    var stereoExpanded by remember { mutableStateOf(false) }
-    var vizExpanded by remember(isVizInitiallyExpanded) { mutableStateOf(isVizInitiallyExpanded) }
-    var lfoExpanded by remember { mutableStateOf(true) }
-    var delayExpanded by remember { mutableStateOf(true) }
-    var distortionExpanded by remember { mutableStateOf(true) }
-    var codeExpanded by remember { mutableStateOf(false) }  // Closed by default
+    // Observe expansion state from ViewModel
+    val presetExpanded by viewModel.presetExpanded.collectAsState()
+    val midiExpanded by viewModel.midiExpanded.collectAsState()
+    val stereoExpanded by viewModel.stereoExpanded.collectAsState()
+    val vizExpanded by viewModel.vizExpanded.collectAsState()
+    val lfoExpanded by viewModel.lfoExpanded.collectAsState()
+    val delayExpanded by viewModel.delayExpanded.collectAsState()
+    val distortionExpanded by viewModel.distortionExpanded.collectAsState()
+    val codeExpanded by viewModel.codeExpanded.collectAsState()
+    val aiExpanded by viewModel.aiExpanded.collectAsState()
 
     Row(
         modifier = modifier
@@ -53,45 +57,51 @@ fun HeaderPanel(
     ) {
         PresetsPanel(
             isExpanded = presetExpanded,
-            onExpandedChange = { presetExpanded = it },
+            onExpandedChange = viewModel::setPresetExpanded,
             onDialogActiveChange = onDialogActiveChange,
             modifier = panelModifier(presetExpanded)
         )
         MidiPanel(
             isExpanded = midiExpanded,
-            onExpandedChange = { midiExpanded = it },
+            onExpandedChange = viewModel::setMidiExpanded,
             modifier = panelModifier(midiExpanded)
         )
         StereoPanel(
             isExpanded = stereoExpanded,
-            onExpandedChange = { stereoExpanded = it },
+            onExpandedChange = viewModel::setStereoExpanded,
             modifier = panelModifier(stereoExpanded)
         )
-        _root_ide_package_.org.balch.orpheus.features.viz.VizPanel(
+        VizPanel(
             isExpanded = vizExpanded,
-            onExpandedChange = { vizExpanded = it },
+            onExpandedChange = viewModel::setVizExpanded,
             modifier = panelModifier(vizExpanded)
         )
         HyperLfoPanel(
             isExpanded = lfoExpanded,
-            onExpandedChange = { lfoExpanded = it },
+            onExpandedChange = viewModel::setLfoExpanded,
             modifier = panelModifier(lfoExpanded)
         )
         ModDelayPanel(
             isExpanded = delayExpanded,
-            onExpandedChange = { delayExpanded = it },
+            onExpandedChange = viewModel::setDelayExpanded,
             modifier = panelModifier(delayExpanded)
         )
         DistortionPanel(
             isExpanded = distortionExpanded,
-            onExpandedChange = { distortionExpanded = it },
-            modifier = panelModifier(distortionExpanded)
+            onExpandedChange = viewModel::setDistortionExpanded,
+            modifier = panelModifier(distortionExpanded, maxWidth = 220.dp)
         )
         // Live Coding panel - at the end, closed by default
         LiveCodePanel(
             isExpanded = codeExpanded,
-            onExpandedChange = { codeExpanded = it },
+            onExpandedChange = viewModel::setCodeExpanded,
             modifier = panelModifier(codeExpanded)
+        )
+        // AI Chat panel - at the very end, closed by default
+        AiOptionsPanel(
+            isExpanded = aiExpanded,
+            onExpandedChange = viewModel::setAiExpanded,
+            modifier = panelModifier(aiExpanded, maxWidth = 200.dp)
         )
     }
 }
@@ -102,9 +112,10 @@ fun HeaderPanel(
  * Collapsed panels use their intrinsic width (just the header).
  */
 @Composable
-private fun RowScope.panelModifier(isExpanded: Boolean): Modifier {
+private fun RowScope.panelModifier(isExpanded: Boolean, maxWidth: Dp? = null): Modifier {
     return if (isExpanded) {
-        Modifier.weight(1f).fillMaxHeight()
+        val base = Modifier.weight(1f).fillMaxHeight()
+        if (maxWidth != null) base.widthIn(max = maxWidth) else base
     } else {
         Modifier.fillMaxHeight()
     }
