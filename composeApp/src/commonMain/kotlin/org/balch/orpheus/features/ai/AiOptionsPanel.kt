@@ -9,8 +9,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -232,7 +236,7 @@ fun ModelSelector(
     
     Box(modifier = modifier) {
         // Current selection button
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
@@ -241,13 +245,22 @@ fun ModelSelector(
                 )
                 .clickable { expanded = true }
                 .padding(horizontal = 12.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween // Text left, arrow right
         ) {
             Text(
                 text = selectedModel.displayName,
                 color = OrpheusColors.sterlingSilver,
                 fontSize = 11.sp,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Start,
+                modifier = Modifier.weight(1f)
+            )
+            
+            Icon(
+                imageVector = Icons.Rounded.ArrowDropDown,
+                contentDescription = "Select",
+                tint = OrpheusColors.sterlingSilver.copy(alpha = 0.7f),
+                modifier = Modifier.size(20.dp)
             )
         }
         
