@@ -1,8 +1,5 @@
 package org.balch.orpheus.features.ai.generative
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.SharedFlow
+import org.balch.orpheus.features.ai.chat.widgets.ChatInputField
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Composable
@@ -80,25 +78,19 @@ fun AiDashboard(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    OrpheusColors.brownsBrown.copy(alpha = 0.2f),
+                    OrpheusColors.midnightBlue.copy(alpha = 0.2f),
                     shape = MaterialTheme.shapes.medium
                 )
                 .clip(MaterialTheme.shapes.medium)
         )
-        
-        // Solo Mode: User Influence Input
-        AnimatedVisibility(
-            visible = isSoloMode,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            SoloInfluenceInput(
-                onSendInfluence = onSendInfluence,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp)
-            )
-        }
+
+        ChatInputField(
+            isEnabled = true,
+            onSendMessage = onSendInfluence,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp)
+        )
     }
 }
 
@@ -124,8 +116,8 @@ fun SoloInfluenceInput(
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        OrpheusColors.brownsBrown.copy(alpha = 0.4f),
-                        OrpheusColors.brownsBrown.copy(alpha = 0.2f)
+                        OrpheusColors.midnightBlue.copy(alpha = 0.4f),
+                        OrpheusColors.midnightBlue.copy(alpha = 0.2f)
                     )
                 ),
                 shape = MaterialTheme.shapes.medium
@@ -139,16 +131,16 @@ fun SoloInfluenceInput(
             value = text,
             onValueChange = { text = it },
             textStyle = TextStyle(
-                color = OrpheusColors.brownsWhite,
+                color = OrpheusColors.sterlingSilver,
                 fontSize = 12.sp,
                 letterSpacing = 0.5.sp
             ),
-            cursorBrush = SolidColor(OrpheusColors.brownsOrange),
+            cursorBrush = SolidColor(OrpheusColors.metallicBlue),
             singleLine = true,
             modifier = Modifier
                 .weight(1f)
                 .background(
-                    OrpheusColors.brownsBrown.copy(alpha = 0.3f),
+                    OrpheusColors.midnightBlue.copy(alpha = 0.3f),
                     shape = CircleShape
                 )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -159,7 +151,7 @@ fun SoloInfluenceInput(
                     Text(
                         text = "Influence: \"darker\", \"more rhythm\"...",
                         style = TextStyle(
-                            color = OrpheusColors.brownsWhite.copy(alpha = 0.4f),
+                            color = OrpheusColors.sterlingSilver.copy(alpha = 0.4f),
                             fontSize = 12.sp
                         )
                     )
@@ -177,15 +169,15 @@ fun SoloInfluenceInput(
                 .background(
                     Brush.radialGradient(
                         listOf(
-                            OrpheusColors.brownsOrange.copy(alpha = 0.8f),
-                            OrpheusColors.brownsOrange.copy(alpha = 0.4f)
+                            OrpheusColors.metallicBlue.copy(alpha = 0.8f),
+                            OrpheusColors.metallicBlue.copy(alpha = 0.4f)
                         )
                     )
                 )
         ) {
             Text(
                 text = "→",
-                color = OrpheusColors.brownsWhite,
+                color = OrpheusColors.sterlingSilver,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -214,7 +206,7 @@ fun LogPanel(
     Column(
         modifier = modifier
             .background(
-                OrpheusColors.brownsBrown.copy(alpha = 0.15f),
+                OrpheusColors.midnightBlue.copy(alpha = 0.15f),
                 shape = MaterialTheme.shapes.medium
             )
             .padding(4.dp)
@@ -230,7 +222,7 @@ fun LogPanel(
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelMedium,
-                color = OrpheusColors.brownsOrange,
+                color = OrpheusColors.metallicBlue,
                 fontWeight = FontWeight.Black,
                 fontSize = 11.sp,
                 letterSpacing = 1.2.sp
@@ -253,7 +245,7 @@ fun LogPanel(
                         text = msg.text,
                         style = MaterialTheme.typography.bodySmall,
                         color = if (msg.isError) MaterialTheme.colorScheme.error 
-                               else OrpheusColors.brownsWhite.copy(alpha = 0.85f),
+                               else OrpheusColors.sterlingSilver.copy(alpha = 0.85f),
                         fontSize = 11.sp,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis
@@ -272,7 +264,7 @@ fun LogPanel(
 fun ControlItem(text: String) {
     val parts = text.substringAfter("Set ").split(": ")
     if (parts.size < 2) {
-        Text(text, fontSize = 11.sp, color = OrpheusColors.brownsWhite)
+        Text(text, fontSize = 11.sp, color = OrpheusColors.sterlingSilver)
         return
     }
     
@@ -291,7 +283,7 @@ fun ControlItem(text: String) {
             text = name.replace("_", " "),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = OrpheusColors.brownsWhite.copy(alpha = 0.85f),
+            color = OrpheusColors.sterlingSilver.copy(alpha = 0.85f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
@@ -306,7 +298,7 @@ fun ControlItem(text: String) {
                 text = valueStr,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
-                color = OrpheusColors.brownsOrange,
+                color = OrpheusColors.metallicBlue,
                 modifier = Modifier.defaultMinSize(minWidth = 28.dp),
                 textAlign = TextAlign.End
             )
@@ -315,7 +307,7 @@ fun ControlItem(text: String) {
             Row(
                 modifier = Modifier
                     .size(width = 50.dp, height = 8.dp)
-                    .background(OrpheusColors.brownsBrown.copy(alpha = 0.4f), MaterialTheme.shapes.extraSmall)
+                    .background(OrpheusColors.midnightBlue.copy(alpha = 0.4f), MaterialTheme.shapes.extraSmall)
                     .padding(1.dp),
                 horizontalArrangement = Arrangement.spacedBy(1.dp)
             ) {
@@ -329,8 +321,8 @@ fun ControlItem(text: String) {
                             .weight(1f)
                             .fillMaxHeight()
                             .background(
-                                if (isOn) OrpheusColors.brownsOrange 
-                                else OrpheusColors.brownsOrange.copy(alpha = 0.1f)
+                                if (isOn) OrpheusColors.metallicBlue
+                                else OrpheusColors.metallicBlue.copy(alpha = 0.1f)
                             )
                     )
                 }

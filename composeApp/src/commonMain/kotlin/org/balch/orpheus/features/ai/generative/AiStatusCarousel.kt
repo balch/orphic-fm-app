@@ -77,9 +77,9 @@ fun AiStatusCarousel(
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(
-                        OrpheusColors.brownsBrown.copy(alpha = 0.3f),
-                        OrpheusColors.brownsBrown.copy(alpha = 0.15f),
-                        OrpheusColors.brownsBrown.copy(alpha = 0.3f),
+                        OrpheusColors.midnightBlue.copy(alpha = 0.3f),
+                        OrpheusColors.midnightBlue.copy(alpha = 0.15f),
+                        OrpheusColors.midnightBlue.copy(alpha = 0.3f),
                     )
                 )
             )
@@ -110,9 +110,9 @@ fun AiStatusCarousel(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     if (batch.isEmpty() && topMessage != null) {
-                         Text(topMessage.text, color = OrpheusColors.brownsOrange)
+                         Text(topMessage.text, color = OrpheusColors.metallicBlue)
                     } else if (batch.isEmpty()) {
-                         Text("AI ready", color = OrpheusColors.brownsWhite.copy(alpha=0.5f), fontSize=12.sp)
+                         Text("AI ready", color = OrpheusColors.sterlingSilver.copy(alpha=0.5f), fontSize=12.sp)
                     } else {
                         batch.forEachIndexed { i, msg ->
                             val isPrimary = i == 0
@@ -124,8 +124,8 @@ fun AiStatusCarousel(
                                 fontStyle = FontStyle.Italic,
                                 color = when {
                                     msg.isError -> MaterialTheme.colorScheme.error
-                                    msg.isLoading -> OrpheusColors.brownsOrange.copy(alpha = 0.7f)
-                                    else -> if (isPrimary) OrpheusColors.brownsOrange else OrpheusColors.brownsWhite.copy(alpha = 0.5f)
+                                    msg.isLoading -> OrpheusColors.metallicBlue.copy(alpha = 0.7f)
+                                    else -> if (isPrimary) OrpheusColors.metallicBlue else OrpheusColors.sterlingSilver.copy(alpha = 0.5f)
                                 },
                                 maxLines = if (isPrimary) 2 else 1,
                                 overflow = TextOverflow.Ellipsis
@@ -146,9 +146,9 @@ fun AiStatusCarousel(
                         text = "▲",
                         fontSize = 12.sp,
                         color = if (currentIndex > 0) 
-                            OrpheusColors.brownsOrange 
+                            OrpheusColors.metallicBlue
                         else 
-                            OrpheusColors.brownsOrange.copy(alpha = 0.3f),
+                            OrpheusColors.metallicBlue.copy(alpha = 0.3f),
                         modifier = Modifier
                             .clickable(enabled = currentIndex > 0) { 
                                 if (currentIndex > 0) currentIndex-- 
@@ -161,9 +161,9 @@ fun AiStatusCarousel(
                         text = "▼",
                         fontSize = 12.sp,
                         color = if (currentIndex < messages.lastIndex) 
-                            OrpheusColors.brownsOrange 
+                            OrpheusColors.metallicBlue
                         else 
-                            OrpheusColors.brownsOrange.copy(alpha = 0.3f),
+                            OrpheusColors.metallicBlue.copy(alpha = 0.3f),
                         modifier = Modifier
                             .clickable(enabled = currentIndex < messages.lastIndex) { 
                                 if (currentIndex < messages.lastIndex) currentIndex++ 

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import io.github.fletchmckee.liquid.LiquidState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.balch.orpheus.core.config.AppConfig
 import org.balch.orpheus.features.ai.AiOptionsViewModel
@@ -49,8 +50,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun ChatDialog(
     modifier: Modifier = Modifier,
     viewModel: ChatViewModel = metroViewModel(),
-    aiViewModel: AiOptionsViewModel? = null,
-    liquidState: io.github.fletchmckee.liquid.LiquidState? = null,
+    aiViewModel: AiOptionsViewModel = metroViewModel(),
+    liquidState: LiquidState,
     position: Pair<Float, Float>,
     onPositionChange: (Float, Float) -> Unit,
     size: Pair<Float, Float>,
@@ -61,8 +62,8 @@ fun ChatDialog(
     val isLoading by viewModel.isLoading.collectAsState()
 
     // Determine mode based on AI agent status
-    val isDroneActive = aiViewModel?.isDroneActive?.collectAsState()?.value == true
-    val isSoloActive = aiViewModel?.isSoloActive?.collectAsState()?.value == true
+    val isDroneActive = aiViewModel.isDroneActive.collectAsState().value
+    val isSoloActive = aiViewModel.isSoloActive.collectAsState().value
     val isDashboardMode = isDroneActive || isSoloActive
 
     DraggableDialog(
@@ -76,7 +77,7 @@ fun ChatDialog(
         onSizeChange = onSizeChange,
         modifier = modifier
     ) {
-        if (isDashboardMode && aiViewModel != null) {
+        if (isDashboardMode) {
             // Dashboard Mode: Show only the AI Dashboard
             Column(
                 modifier = Modifier
@@ -145,7 +146,7 @@ fun ChatDialogContent(
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center,
-                    color = OrpheusColors.brownsOrange.copy(alpha = 0.7f)
+                    color = OrpheusColors.metallicBlue.copy(alpha = 0.7f)
                 )
             }
         } else {

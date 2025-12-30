@@ -84,15 +84,15 @@ fun DraggableDialog(
             baseModifier.liquid(liquidState) {
                 frost = 16.dp
                 this.shape = shape
-                tint = OrpheusColors.brownsBrown.copy(alpha = 0.8f) // Deep brown glass effect
+                tint = OrpheusColors.midnightBlue.copy(alpha = 0.8f) // Deep brown glass effect
             }
         } else {
-            baseModifier.background(OrpheusColors.brownsBrown.copy(alpha = 0.95f))
+            baseModifier.background(OrpheusColors.midnightBlue.copy(alpha = 0.95f))
         }
         
         Box(
             modifier = backgroundModifier
-                .border(1.dp, OrpheusColors.brownsOrange.copy(alpha = 0.5f), shape)
+                .border(1.dp, OrpheusColors.metallicBlue.copy(alpha = 0.5f), shape)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Title bar - draggable
@@ -100,7 +100,7 @@ fun DraggableDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(36.dp)
-                        .background(OrpheusColors.brownsBrown.copy(alpha = 0.5f))
+                        .background(OrpheusColors.midnightBlue.copy(alpha = 0.5f))
                         .pointerHoverIcon(PointerIcon.Hand) // Indicate draggable
                         .pointerInput(Unit) {
                             detectDragGestures { change, dragAmount ->
@@ -128,7 +128,7 @@ fun DraggableDialog(
                     // Title
                     Text(
                         text = title,
-                        color = OrpheusColors.brownsOrange,
+                        color = OrpheusColors.metallicBlue,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )

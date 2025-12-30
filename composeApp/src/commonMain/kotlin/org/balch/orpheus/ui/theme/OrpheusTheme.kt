@@ -19,12 +19,6 @@ private val WarmGlow = Color(0xFFFF6B35)
 private val SynthGreen = Color(0xFF39FF14)
 private val SynthPink = Color(0xFFFF69B4)
 
-// Cleveland Cavaliers Palette (Wine & Gold)
-private val CavsWine = Color(0xFF860038)
-private val CavsGold = Color(0xFFFFBB30)
-private val CavsNavy = Color(0xFF041E42)
-private val CavsWhite = Color(0xFFFFFFFF)
-
 private val DarkColorScheme = darkColorScheme(
     primary = NeonCyan,
     onPrimary = DarkVoid,
@@ -103,44 +97,8 @@ object OrpheusColors {
     val slateSilver = Color(0xFF94A3B8)   // Muted Silver/Grey
     val metallicBlue = Color(0xFF3B82F6)  // Vibrant Blue Accent
 
-    // Cavaliers Palette (Kept for reference if needed, but unused)
-    val cavsWine = CavsWine
-    val cavsGold = CavsGold
-    val cavsNavy = CavsNavy
-    val cavsWhite = CavsWhite
-
-    // Backward-compatible aliases (map Browns to Midnight & Silver)
-    val brownsBrown = midnightBlue    // Base background color
-    val brownsOrange = metallicBlue   // Vibrant accent (was Orange/Gold, now Electric Blue)
-    val brownsWhite = sterlingSilver  // Text color
-
     // Glow colors for knobs/buttons
     val knobGlow = NeonCyan.copy(alpha = 0.6f)
     val pulseGlow = NeonMagenta.copy(alpha = 0.8f)
     val holdGlow = SynthGreen.copy(alpha = 0.7f)
-}
-
-/**
- * Liquid glassmorphism effect constants - tweak these for easy adjustments.
- * Adjusted to let visualization colors shine through better.
- */
-object LiquidEffects {
-    // Frost blur amount (in dp) - reduced to let colors through
-    const val FROST_SMALL = 5f      // For smaller panels
-    const val FROST_MEDIUM = 7f     // Default
-    const val FROST_LARGE = 9f      // For larger panels
-    
-    // Tint overlay alpha (0-1) - reduced for more transparency
-    const val TINT_ALPHA = 0.12f
-    
-    // Saturation adjustment (<1 = desaturate, >1 = saturate)
-    // Increased to let background colors pop more
-    const val SATURATION = 0.65f
-    
-    // Contrast adjustment (<1 = reduce contrast/brightness)
-    const val CONTRAST = 0.75f
-    
-    // Refraction and curve (0 = disabled for cleaner look)
-    const val REFRACTION = 0f
-    const val CURVE = 0f
 }
