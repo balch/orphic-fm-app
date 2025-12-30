@@ -441,64 +441,57 @@ class TidalRepl(
         // SYNTH CONTROL PATTERNS
         // ============================================================
         
-        // hold:<voiceIndex> <value> - Voice sustain/hold level (colon syntax)
-        if (trimmed.startsWith("hold:")) {
-            val parts = trimmed.substringAfter("hold:").trim().split(" ", limit = 2)
-            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: hold requires voice index and value")
-            val voiceIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid voice index")
-            // Accept 1-based input (1-8) and convert to 0-based (0-7)
+        // ============================================================
+        // SYNTH CONTROL PATTERNS
+        // ============================================================
+        
+        // Helper for voice commands (index + value)
+        // Supports: quoted "idx val", quoted "val" (implies voice 1), colon "idx val", space "idx val"
+        fun extractVoiceParam(input: String, command: String): Pair<Int, Float>? {
+            // 1. Quoted syntax
+            val quotedMatch = Regex("^$command\\s*\"([^\"]+)\"$").find(input)
+            if (quotedMatch != null) {
+                val content = quotedMatch.groupValues[1].trim()
+                val parts = content.split(Regex("\\s+"))
+                if (parts.size >= 2) {
+                     val v = parts[0].toIntOrNull()
+                     val valF = parts[1].toFloatOrNull()
+                     if (v != null && valF != null) return v to valF
+                } else if (parts.isNotEmpty()) {
+                     // Single value -> implicit voice 1
+                     val valF = parts[0].toFloatOrNull()
+                     if (valF != null) return 1 to valF
+                }
+                return null
+            }
+            
+            // 2. Colon/Space syntax
+            if (input.startsWith("$command:") || input.startsWith("$command ")) {
+                 val content = if (input.startsWith("$command:")) input.substringAfter("$command:") else input.substringAfter("$command ")
+                 val clean = content.trim()
+                 // Split by space
+                 val parts = clean.split(" ", limit = 2)
+                 if (parts.size >= 2) {
+                      val v = parts[0].replace("\"", "").replace("'", "").toIntOrNull()
+                      val valF = parts[1].replace("\"", "").replace("'", "").toFloatOrNull()
+                      if (v != null && valF != null) return v to valF
+                 }
+            }
+            return null
+        }
+
+        // hold:<voiceIndex> <value> or hold "..." - Voice sustain/hold level
+        extractVoiceParam(trimmed, "hold")?.let { (voiceIndex, value) ->
             if (voiceIndex !in 1..8) throw IllegalArgumentException("Line $lineNum: Voice index must be 1-8, got: $voiceIndex")
-            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid hold value")
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.VoiceHold(voiceIndex - 1, value.coerceIn(0f, 1f), listOf(location)))
         }
-        
-        // Tidal-style quoted hold: hold "0.8" or hold "0 0.8" (voice value)
-        val quotedHoldMatch = Regex("^hold\\s*\"([^\"]+)\"$").find(trimmed)
-        if (quotedHoldMatch != null) {
-            val holdStr = quotedHoldMatch.groupValues[1].trim()
-            val parts = holdStr.split(Regex("\\s+"))
-            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
-            return if (parts.size >= 2) {
-                // hold "1 0.8" - 1-based voice index and value, convert to 0-based  
-                val voiceIndex = (parts[0].toIntOrNull() ?: 1) - 1 // Convert 1-based to 0-based
-                val value = parts[1].toFloatOrNull() ?: 0.8f
-                Pattern.pure(TidalEvent.VoiceHold(voiceIndex, value.coerceIn(0f, 1f), listOf(location)))
-            } else {
-                // hold "0.8" - just value, apply to voice 0
-                val value = parts[0].toFloatOrNull() ?: 0.8f
-                Pattern.pure(TidalEvent.VoiceHold(0, value.coerceIn(0f, 1f), listOf(location)))
-            }
-        }
 
-        // envspeed:<voiceIndex> <value> - Voice envelope speed (colon syntax)
-        if (trimmed.startsWith("envspeed:")) {
-            val parts = trimmed.substringAfter("envspeed:").trim().split(" ", limit = 2)
-            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: envspeed requires voice index and value")
-            val voiceIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid voice index")
-            // Accept 1-based input (1-8) and convert to 0-based (0-7)
+        // envspeed:<voiceIndex> <value> or envspeed "..." - Voice envelope speed
+        extractVoiceParam(trimmed, "envspeed")?.let { (voiceIndex, value) ->
             if (voiceIndex !in 1..8) throw IllegalArgumentException("Line $lineNum: Voice index must be 1-8, got: $voiceIndex")
-            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid speed value")
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.VoiceEnvSpeed(voiceIndex - 1, value.coerceIn(0f, 1f), listOf(location)))
-        }
-        
-        // Tidal-style quoted envspeed: envspeed "0.8" or envspeed "1 0.8"
-        val quotedEnvSpeedMatch = Regex("^envspeed\\s*\"([^\"]+)\"$").find(trimmed)
-        if (quotedEnvSpeedMatch != null) {
-            val speedStr = quotedEnvSpeedMatch.groupValues[1].trim()
-            val parts = speedStr.split(Regex("\\s+"))
-            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
-            return if (parts.size >= 2) {
-                // envspeed "1 0.8" - 1-based voice index and value
-                val voiceIndex = (parts[0].toIntOrNull() ?: 1) - 1
-                val value = parts[1].toFloatOrNull() ?: 0.5f
-                Pattern.pure(TidalEvent.VoiceEnvSpeed(voiceIndex, value.coerceIn(0f, 1f), listOf(location)))
-            } else {
-                // envspeed "0.5" - just value, apply to voice 0
-                val value = parts[0].toFloatOrNull() ?: 0.5f
-                Pattern.pure(TidalEvent.VoiceEnvSpeed(0, value.coerceIn(0f, 1f), listOf(location)))
-            }
         }
         
         // Helper to extract value from both "command:value" and "command value" syntax
@@ -511,7 +504,7 @@ class TidalRepl(
             } else {
                 input.substringAfter("$command ").trim()
             }
-            return valueStr.toFloatOrNull()
+            return valueStr.replace("\"", "").replace("'", "").toFloatOrNull()
         }
         
         // drive:<value> or drive <value> - Distortion drive amount (0.0-1.0)
@@ -561,76 +554,73 @@ class TidalRepl(
         }
         
         // pan:<voiceIndex> <value> - Voice pan position (-1.0 to 1.0)
-        if (trimmed.startsWith("pan:")) {
-            val parts = trimmed.substringAfter("pan:").trim().split(" ", limit = 2)
-            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: pan requires voice index and value")
-            val voiceIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid voice index")
-            // Accept 1-based input (1-8) and convert to 0-based (0-7)
+        extractVoiceParam(trimmed, "pan")?.let { (voiceIndex, value) ->
             if (voiceIndex !in 1..8) throw IllegalArgumentException("Line $lineNum: Voice index must be 1-8, got: $voiceIndex")
-            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid pan value")
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.VoicePan(voiceIndex - 1, value.coerceIn(-1f, 1f), listOf(location)))
         }
         
         // tune:<voiceIndex> <value> - Voice pitch/tune (0.0-1.0, 0.5 = unity)
-        if (trimmed.startsWith("tune:")) {
-            val parts = trimmed.substringAfter("tune:").trim().split(" ", limit = 2)
-            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: tune requires voice index and value")
-            val voiceIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid voice index")
-            // Accept 1-based input (1-8) and convert to 0-based (0-7)
+        extractVoiceParam(trimmed, "tune")?.let { (voiceIndex, value) ->
             if (voiceIndex !in 1..8) throw IllegalArgumentException("Line $lineNum: Voice index must be 1-8, got: $voiceIndex")
-            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid tune value")
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.VoiceTune(voiceIndex - 1, value.coerceIn(0f, 1f), listOf(location)))
         }
 
         // quadhold:<quadIndex> <value> - Quad hold level (0.0-1.0)
-        if (trimmed.startsWith("quadhold:")) {
-            val parts = trimmed.substringAfter("quadhold:").trim().split(" ", limit = 2)
-            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: quadhold requires quad index (1-3) and value")
-            val quadIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid quad index")
-            // Accept 1-based input (1-3) and convert to 0-based (0-2)
+        extractVoiceParam(trimmed, "quadhold")?.let { (quadIndex, value) ->
             if (quadIndex !in 1..3) throw IllegalArgumentException("Line $lineNum: Quad index must be 1-3, got: $quadIndex")
-            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid hold value")
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.QuadHold((quadIndex - 1).coerceIn(0, 2), value.coerceIn(0f, 1f), listOf(location)))
         }
         
         // quadpitch:<quadIndex> <value> - Quad pitch (0.0-1.0, 0.5 = unity)
-        if (trimmed.startsWith("quadpitch:")) {
-            val parts = trimmed.substringAfter("quadpitch:").trim().split(" ", limit = 2)
-            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: quadpitch requires quad index (1-3) and value")
-            val quadIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid quad index")
-            // Accept 1-based input (1-3) and convert to 0-based (0-2)
+        extractVoiceParam(trimmed, "quadpitch")?.let { (quadIndex, value) ->
             if (quadIndex !in 1..3) throw IllegalArgumentException("Line $lineNum: Quad index must be 1-3, got: $quadIndex")
-            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid pitch value")
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.QuadPitch((quadIndex - 1).coerceIn(0, 2), value.coerceIn(0f, 1f), listOf(location)))
         }
         
         // duomod:<duoIndex> <source> - Duo modulation source (fm/off/lfo)
-        if (trimmed.startsWith("duomod:")) {
-            val parts = trimmed.substringAfter("duomod:").trim().split(" ", limit = 2)
-            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: duomod requires duo index (1-4) and source (fm/off/lfo)")
-            val duoIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid duo index")
-            // Accept 1-based input (1-4) and convert to 0-based (0-3)
-            if (duoIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Duo index must be 1-4, got: $duoIndex")
-            val source = parts[1].lowercase()
-            if (source !in listOf("fm", "off", "lfo")) {
-                throw IllegalArgumentException("Line $lineNum: duomod source must be 'fm', 'off', or 'lfo'")
+        if (trimmed.startsWith("duomod:") || trimmed.startsWith("duomod ")) {
+            val content = if (trimmed.startsWith("duomod:")) trimmed.substringAfter("duomod:") else trimmed.substringAfter("duomod ")
+            val clean = content.trim()
+            val parts = clean.split(" ", limit = 2)
+            if (parts.size >= 2) {
+                val duoIndex = parts[0].replace("\"", "").replace("'", "").toIntOrNull()
+                val source = parts[1].replace("\"", "").replace("'", "").lowercase()
+                
+                if (duoIndex != null) {
+                    if (duoIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Duo index must be 1-4, got: $duoIndex")
+                    if (source !in listOf("fm", "off", "lfo")) {
+                        throw IllegalArgumentException("Line $lineNum: duomod source must be 'fm', 'off', or 'lfo'")
+                    }
+                    val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+                    return Pattern.pure(TidalEvent.DuoMod((duoIndex - 1).coerceIn(0, 3), source, listOf(location)))
+                }
             }
-            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
-            return Pattern.pure(TidalEvent.DuoMod((duoIndex - 1).coerceIn(0, 3), source, listOf(location)))
+        }
+        // Handle quoted duomod "1 fm"
+        Regex("^duomod\\s*\"([^\"]+)\"$").find(trimmed)?.let { match ->
+            val content = match.groupValues[1].trim()
+            val parts = content.split(Regex("\\s+"))
+            if (parts.size >= 2) {
+                val duoIndex = parts[0].toIntOrNull()
+                val source = parts[1].lowercase()
+                if (duoIndex != null) {
+                    if (duoIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Duo index must be 1-4, got: $duoIndex")
+                    if (source !in listOf("fm", "off", "lfo")) {
+                         throw IllegalArgumentException("Line $lineNum: duomod source must be 'fm', 'off', or 'lfo'")
+                    }
+                    val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+                    return Pattern.pure(TidalEvent.DuoMod((duoIndex - 1).coerceIn(0, 3), source, listOf(location)))
+                }
+            }
         }
         
         // sharp:<pairIndex> <value> - Pair waveform sharpness (0.0 = tri, 1.0 = sq)
-        if (trimmed.startsWith("sharp:")) {
-            val parts = trimmed.substringAfter("sharp:").trim().split(" ", limit = 2)
-            if (parts.size < 2) throw IllegalArgumentException("Line $lineNum: sharp requires pair index (1-4) and value")
-            val pairIndex = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid pair index")
-            // Accept 1-based input (1-4) and convert to 0-based (0-3)
+        extractVoiceParam(trimmed, "sharp")?.let { (pairIndex, value) ->
             if (pairIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Pair index must be 1-4, got: $pairIndex")
-            val value = parts[1].toFloatOrNull() ?: throw IllegalArgumentException("Line $lineNum: Invalid sharpness value")
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.PairSharp((pairIndex - 1).coerceIn(0, 3), value.coerceIn(0f, 1f), listOf(location)))
         }

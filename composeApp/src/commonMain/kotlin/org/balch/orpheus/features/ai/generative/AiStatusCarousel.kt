@@ -49,8 +49,8 @@ fun AiStatusCarousel(
     modifier: Modifier = Modifier
 ) {
     // Collect messages into a list
-    val messages = remember { mutableStateListOf<AiStatusMessage>() }
-    var currentIndex by remember { mutableStateOf(0) }
+    val messages = remember(sessionId) { mutableStateListOf<AiStatusMessage>() }
+    var currentIndex by remember(sessionId) { mutableStateOf(0) }
     
     // Collect new messages
     LaunchedEffect(statusMessages, sessionId) {

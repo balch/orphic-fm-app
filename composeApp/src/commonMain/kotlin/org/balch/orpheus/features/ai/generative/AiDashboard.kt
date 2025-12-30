@@ -39,7 +39,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharedFlow
 import org.balch.orpheus.features.ai.chat.widgets.ChatInputField
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -198,7 +197,7 @@ fun LogPanel(
     modifier: Modifier = Modifier,
     showVisuals: Boolean = false
 ) {
-    val messages = remember { mutableStateListOf<AiStatusMessage>() }
+    val messages = remember(sessionId) { mutableStateListOf<AiStatusMessage>() }
 
     // Logic: 
     // 1. When sessionId changes, CLEAR valid messages.

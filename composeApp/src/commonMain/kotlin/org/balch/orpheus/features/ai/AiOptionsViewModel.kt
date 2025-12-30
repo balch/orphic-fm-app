@@ -232,10 +232,14 @@ class AiOptionsViewModel(
     fun toggleDrone() {
         val wasActive = _isDroneActive.value
         
-        // If Solo is active, turn it off first? Or allow both? 
-        // Let's mutually exclude them for now to avoid chaos, unless requested otherwise.
-        if (_isSoloActive.value && !wasActive) {
-            toggleSolo()
+        // If Solo is active, turn it off first
+        // We need to properly stop and clear the solo agent before starting drone
+        val wasSoloActive = _isSoloActive.value
+        if (wasSoloActive && !wasActive) {
+            // Stop solo synchronously (just the state, not the full coroutine stop)
+            _isSoloActive.value = false
+            _soloAgent.value?.stop()
+            _soloAgent.value = null  // Clear the reference so its flows stop
         }
 
         _isDroneActive.value = !wasActive
@@ -243,6 +247,9 @@ class AiOptionsViewModel(
         if (_isDroneActive.value) {
             log.info { "Starting Drone Agent" }
             _showChatDialog.value = true // Ensure ChatDialog is visible
+            
+            // Clear old drone agent reference (if any) before incrementing session
+            _droneAgent.value = null
             _sessionId.value++ // Signal UI to clear logs
             
             // Create fresh agent instance
@@ -251,6 +258,11 @@ class AiOptionsViewModel(
             
             // Generate and apply a unique random preset to jumpstart the creative process
             viewModelScope.launch(dispatcherProvider.io) {
+                // If we just stopped Solo, give it a moment to clean up
+                if (wasSoloActive) {
+                    delay(500)
+                }
+                
                 val uniquePreset = generateRandomDronePreset()
                 
                 // Fade in: Apply preset with volume=0, then ramp up to target
@@ -282,8 +294,7 @@ class AiOptionsViewModel(
         } else {
             log.info { "Stopping Drone Agent" }
             _droneAgent.value?.stop()
-            // Do NOT nullify _droneAgent immediately so "Stopped" message is preserved.
-            // It will be replaced next time we start.
+            _droneAgent.value = null  // Clear the reference
         }
     }
     
@@ -340,9 +351,14 @@ class AiOptionsViewModel(
         val wasActive = _isSoloActive.value
         log.info { "toggleSolo called. Was active: $wasActive" }
 
-        // Mutually exclusive with Drone
-        if (_isDroneActive.value && !wasActive) {
-            toggleDrone()
+        // If Drone is active, turn it off first
+        // We need to properly stop and clear the drone agent before starting solo
+        val wasDroneActive = _isDroneActive.value
+        if (wasDroneActive && !wasActive) {
+            // Stop drone synchronously (just the state, not the full coroutine stop)
+            _isDroneActive.value = false
+            _droneAgent.value?.stop()
+            _droneAgent.value = null  // Clear the reference so its flows stop
         }
 
         _isSoloActive.value = !wasActive
@@ -350,6 +366,9 @@ class AiOptionsViewModel(
         if (_isSoloActive.value) {
             log.info { "Starting Solo Agent" }
             _showChatDialog.value = true
+            
+            // Clear old solo agent reference (if any) before incrementing session
+            _soloAgent.value = null
             _sessionId.value++ // Signal UI to clear logs
             
             // Create fresh agent instance
@@ -358,6 +377,11 @@ class AiOptionsViewModel(
             
             // Generate and apply a specialized solo/lead preset
             viewModelScope.launch(dispatcherProvider.io) {
+                // If we just stopped Drone, give it a moment to clean up
+                if (wasDroneActive) {
+                    delay(500)
+                }
+                
                 val soloPreset = generateRandomSoloPreset()
                 
                 // Fade in: Apply preset with volume=0, then ramp up to target
@@ -389,6 +413,7 @@ class AiOptionsViewModel(
         } else {
             log.info { "Stopping Solo Agent" }
             _soloAgent.value?.stop()
+            _soloAgent.value = null  // Clear the reference
         }
     }
 

@@ -568,4 +568,19 @@ class TidalReplParsingTest {
             assertTrue(sample.locations.isNotEmpty(), "Sample should have source location")
         }
     }
+
+    @Test
+    fun `evaluate supports quoted drive command`() = kotlinx.coroutines.test.runTest {
+        // This is expected to fail currently if my hypothesis is correct
+        val result = repl.evaluateSuspend("drive \"0.4\"")
+        assertIs<ReplResult.Success>(result)
+    }
+    
+    @Test
+    fun `evaluate supports space-separated pan command`() = kotlinx.coroutines.test.runTest {
+        // pan 1 0.5 should work
+        val result = repl.evaluateSuspend("pan 1 0.5")
+        // Currently this will likely fail with "Invalid index: pan"
+        assertIs<ReplResult.Success>(result)
+    }
 }
