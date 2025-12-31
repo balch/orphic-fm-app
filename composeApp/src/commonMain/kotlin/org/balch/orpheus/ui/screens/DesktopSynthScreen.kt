@@ -1,6 +1,5 @@
 package org.balch.orpheus.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,9 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -23,13 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.audio.ModSource
@@ -47,12 +38,11 @@ import org.balch.orpheus.features.voice.ui.VoiceGroupSectionLayout
 import org.balch.orpheus.ui.panels.CenterControlPanelLayout
 import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
-import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 import org.balch.orpheus.ui.utils.rememberPanelState
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.liquidVizEffects
+import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -201,51 +191,12 @@ fun ColumnScope.DesktopSynthScreenLayout(
             )
         }
 
-        val liquidState = LocalLiquidState.current
-        val shape = RoundedCornerShape(8.dp)
-        val density = LocalDensity.current
-        val textShadow = remember(effects.title.titleElevation, density) {
-            val blur = with(density) { effects.title.titleElevation.toPx() }
-            if (blur > 0f) {
-                Shadow(
-                    color = Color.Black.copy(alpha = 0.5f),
-                    offset = Offset(0f, blur / 2),
-                    blurRadius = blur
-                )
-            } else {
-                Shadow.None
-            }
-        }
-
-        Card(
+        AppTitleTreatment(
             modifier = Modifier
                 .padding(top = 20.dp)
-                .align(Alignment.TopCenter)
-                .liquidVizEffects(
-                    liquidState = liquidState,
-                    scope = effects.title.scope,
-                    frostAmount = effects.frostLarge.dp,
-                    color = OrpheusColors.softPurple,
-                    tintAlpha = 0.2f,
-                    shape = shape,
-                ),
-            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-            elevation = CardDefaults.cardElevation(defaultElevation = effects.title.titleElevation),
-            shape = shape,
-            border = BorderStroke(effects.title.borderWidth, effects.title.borderColor)
-        ) {
-            Text(
-                text = "ORPHEUS-8",
-                fontSize = effects.title.titleSize,
-                fontWeight = FontWeight.Bold,
-                color = effects.title.titleColor,
-                style = TextStyle(shadow = textShadow),
-                modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-
-            )
-        }
-
+                .align(Alignment.TopCenter),
+            effects = effects,
+        )
     }
 }
 

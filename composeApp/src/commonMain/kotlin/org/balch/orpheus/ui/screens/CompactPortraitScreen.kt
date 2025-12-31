@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
@@ -211,6 +212,8 @@ private fun CompactPortraitScreenLayout(
         Column(modifier = Modifier.fillMaxSize()) {
             // 1. Header panel
             CompactPortraitHeaderPanel(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 peakLevel = distortionFeature.state.peak,
                 liquidState = liquidState,
                 effects = effects

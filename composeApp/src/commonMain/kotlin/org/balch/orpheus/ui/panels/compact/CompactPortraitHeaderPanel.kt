@@ -10,22 +10,19 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
+import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
+import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -42,42 +39,29 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun CompactPortraitHeaderPanel(
     peakLevel: Float,
-    liquidState: LiquidState?,
+    liquidState: LiquidState,
     effects: VisualizationLiquidEffects,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(12.dp)
-
     Row(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .heightIn(min = 56.dp)
             .padding(horizontal = 8.dp, vertical = 4.dp)
-            .clip(shape)
-            .then(
-                if (liquidState != null) {
-                    Modifier.liquidVizEffects(
-                        liquidState = liquidState,
-                        scope = effects.top,
-                        frostAmount = 6.dp,
-                        color = OrpheusColors.darkVoid,
-                        shape = shape
-                    )
-                } else Modifier.background(OrpheusColors.darkVoid.copy(alpha = 0.9f))
-            )
-            .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .liquidVizEffects(
+                liquidState = liquidState,
+                scope = effects.top,
+                frostAmount = 6.dp,
+                color = OrpheusColors.darkVoid,
+            ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Left: Title
-        Text(
-            text = "ORPHEUS-8",
-            style = MaterialTheme.typography.titleMedium,
-            color = OrpheusColors.neonCyan,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
+        AppTitleTreatment(
+            effects = effects,
+            showSizeEffects = false,
         )
 
         // Right: Peak LED
@@ -117,7 +101,7 @@ private fun PeakLed(level: Float) {
 private fun CompactPortraitHeaderPanelPreview() {
     CompactPortraitHeaderPanel(
         peakLevel = 0.5f,
-        liquidState = null,
+        liquidState = rememberLiquidState(),
         effects = VisualizationLiquidEffects()
     )
 }

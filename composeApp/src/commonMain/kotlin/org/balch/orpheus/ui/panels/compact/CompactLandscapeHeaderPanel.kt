@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
@@ -39,6 +38,7 @@ import org.balch.orpheus.ui.viz.VizPanelActions
 import org.balch.orpheus.ui.viz.VizUiState
 import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.viz.liquidVizEffects
+import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,33 +70,11 @@ fun CompactLandscapeHeaderPanel(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Left: Title
-        Box(
-            modifier = Modifier
-                .height(36.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .then(
-                    if (liquidState != null) {
-                        Modifier.liquidVizEffects(
-                            liquidState = liquidState,
-                            scope = effects.top,
-                            frostAmount = 4.dp,
-                            color = Color(0xFF2A2A3A),
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                    } else Modifier.background(Color(0xFF2A2A3A))
-                )
-                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "ORPHEUS-8",
-                style = MaterialTheme.typography.titleMedium,
-                color = OrpheusColors.neonCyan,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-        }
+        AppTitleTreatment(
+            modifier = Modifier.height(36.dp),
+            effects = effects,
+            showSizeEffects = false,
+        )
 
         // Center: Dropdowns
         Row(
