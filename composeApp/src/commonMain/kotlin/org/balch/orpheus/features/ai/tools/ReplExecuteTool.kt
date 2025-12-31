@@ -4,8 +4,9 @@ import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.tidal.ReplResult
 import org.balch.orpheus.core.tidal.TidalRepl
@@ -18,7 +19,7 @@ import org.balch.orpheus.features.ai.ReplCodeEventBus
  * 
  * This tool automatically expands the CODE panel and populates it with the executed code.
  */
-@SingleIn(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
 class ReplExecuteTool @Inject constructor(
     private val tidalRepl: TidalRepl,
     private val replCodeEventBus: ReplCodeEventBus,

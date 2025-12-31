@@ -3,8 +3,9 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.routing.ControlEventOrigin
@@ -14,7 +15,7 @@ import org.balch.orpheus.core.routing.SynthController
  * Tool for controlling synth parameters via the SynthController.
  * Uses linear ramping for smooth transitions when AI changes values.
  */
-@SingleIn(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
 class SynthControlTool @Inject constructor(
     private val synthController: SynthController
 ) : Tool<SynthControlTool.Args, SynthControlTool.Result>(
@@ -62,10 +63,10 @@ class SynthControlTool @Inject constructor(
             - DELAY_MOD_SOURCE: Mod source (0=self, 1=LFO)
             - DELAY_LFO_WAVEFORM: LFO shape (0=triangle, 1=square)
             
-            VOICES (1-8):
-            - VOICE_TUNE_1 through VOICE_TUNE_8: Voice pitch (0.5=unity)
-            - VOICE_FM_DEPTH_1 through VOICE_FM_DEPTH_8: FM modulation depth
-            - VOICE_ENV_SPEED_1 through VOICE_ENV_SPEED_8: Envelope speed (0=fast, 1=slow)
+            VOICES (1-12):
+            - VOICE_TUNE_1 through VOICE_TUNE_12: Voice pitch (0.5=unity)
+            - VOICE_FM_DEPTH_1 through VOICE_FM_DEPTH_12: FM modulation depth
+            - VOICE_ENV_SPEED_1 through VOICE_ENV_SPEED_12: Envelope speed (0=fast, 1=slow)
             
             QUADS:
             - QUAD_PITCH_1: Pitch for Quad 1 (Voices 1-4)
@@ -74,9 +75,9 @@ class SynthControlTool @Inject constructor(
             - QUAD_HOLD_1, QUAD_HOLD_2, QUAD_HOLD_3: Hold/Drone level for quad groups
             - QUAD_VOLUME_3: Volume for Quad 3 (drone voices 9-12)
             
-            PAIRS/DUOS (1-4):
-            - DUO_MOD_SOURCE_1..4: Modulation source (0=VoiceFM, 0.5=Off, 1=LFO)
-            - PAIR_SHARPNESS_1..4: Waveform sharpness (0=triangle, 1=square)
+            PAIRS/DUOS (1-6):
+            - DUO_MOD_SOURCE_1..6: Modulation source (0=VoiceFM, 0.5=Off, 1=LFO)
+            - PAIR_SHARPNESS_1..6: Waveform sharpness (0=triangle, 1=square)
         """)
         val controlId: String,
 
@@ -98,10 +99,13 @@ class SynthControlTool @Inject constructor(
             // Quad controls
             "QUAD_PITCH_1" -> "quad_0_pitch"
             "QUAD_PITCH_2" -> "quad_1_pitch"
+            "QUAD_PITCH_3" -> "quad_2_pitch"
             "QUAD_HOLD_1" -> "quad_0_hold"
             "QUAD_HOLD_2" -> "quad_1_hold"
-            "QUAD_PITCH_3" -> "quad_2_pitch"
             "QUAD_HOLD_3" -> "quad_2_hold"
+
+            "QUAD_VOLUME_1" -> "quad_0_volume"
+            "QUAD_VOLUME_2" -> "quad_1_volume"
             "QUAD_VOLUME_3" -> "quad_2_volume"
             
             // Duo mod sources
@@ -109,15 +113,17 @@ class SynthControlTool @Inject constructor(
             "DUO_MOD_SOURCE_2" -> "pair_1_mod_source"
             "DUO_MOD_SOURCE_3" -> "pair_2_mod_source"
             "DUO_MOD_SOURCE_4" -> "pair_3_mod_source"
-            "DUO_MOD_SOURCE_5", "DUO_MOD_SOURCE_9", "DUO_MOD_SOURCE_10" -> "pair_4_mod_source"
-            "DUO_MOD_SOURCE_6", "DUO_MOD_SOURCE_11", "DUO_MOD_SOURCE_12" -> "pair_5_mod_source"
+            "DUO_MOD_SOURCE_5" -> "pair_4_mod_source"
+            "DUO_MOD_SOURCE_6" -> "pair_5_mod_source"
             
             // Pair sharpness
             "PAIR_SHARPNESS_1" -> "pair_0_sharpness"
             "PAIR_SHARPNESS_2" -> "pair_1_sharpness"
             "PAIR_SHARPNESS_3" -> "pair_2_sharpness"
             "PAIR_SHARPNESS_4" -> "pair_3_sharpness"
-            
+            "PAIR_SHARPNESS_5" -> "pair_4_sharpness"
+            "PAIR_SHARPNESS_6" -> "pair_5_sharpness"
+
             // LFO controls - use ControlIds constants
             "HYPER_LFO_A", "LFO_A" -> "hyper_lfo_a"
             "HYPER_LFO_B", "LFO_B" -> "hyper_lfo_b"
@@ -132,7 +138,7 @@ class SynthControlTool @Inject constructor(
             "DELAY_MOD_SOURCE" -> "delay_mod_source"
             "DELAY_LFO_WAVEFORM" -> "delay_lfo_waveform"
             
-            // Per-voice controls (VOICE_TUNE_1 through VOICE_TUNE_8, etc.)
+            // Per-voice controls (VOICE_TUNE_1 through VOICE_TUNE_12, etc.)
             else -> {
                 val voiceTuneMatch = Regex("VOICE_TUNE_(\\d+)").find(id)
                 val voiceFmMatch = Regex("VOICE_FM_DEPTH_(\\d+)").find(id)

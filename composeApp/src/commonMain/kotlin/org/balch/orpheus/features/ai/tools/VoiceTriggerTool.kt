@@ -3,15 +3,16 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.routing.SynthController
 
 /**
  * Tool for triggering voice pulses (playing notes).
  */
-@SingleIn(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
 class VoiceTriggerTool @Inject constructor(
     private val synthController: SynthController
 ) : Tool<VoiceTriggerTool.Args, VoiceTriggerTool.Result>(

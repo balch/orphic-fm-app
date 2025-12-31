@@ -16,6 +16,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
@@ -154,7 +155,7 @@ class OrpheusAgent @Inject constructor(
     private val _agentState = MutableStateFlow<AgentState>(AgentState.Loading(messages.toList()))
     
     // Track the current agent job for restart capability
-    private var currentAgentJob: kotlinx.coroutines.Job? = null
+    private var currentAgentJob: Job? = null
 
     /**
      * The main agent state flow.
@@ -272,12 +273,8 @@ class OrpheusAgent @Inject constructor(
 
         createAgent(strategy) {
             handleEvents {
-                onAgentStarting { ctx ->
-                    logger.d { "Agent starting" }
-                }
-                onAgentCompleted { ctx ->
-                    logger.d { "Agent completed" }
-                }
+                onAgentStarting { _ -> logger.d { "Agent starting" } }
+                onAgentCompleted { _ -> logger.d { "Agent completed" } }
                 onAgentExecutionFailed { ctx ->
                     if (ctx.throwable is CancellationException) {
                         logger.debug { "Agent execution cancelled" }
@@ -287,12 +284,8 @@ class OrpheusAgent @Inject constructor(
                         send(errorMessageAsState(ctx.throwable, "Something went wrong..."))
                     }
                 }
-                onToolCallFailed { _ ->
-                    logger.e { "Tool call failed" }
-                }
-                onToolCallStarting { _ ->
-                    logger.d { "Tool call starting" }
-                }
+                onToolCallFailed { _ -> logger.e { "Tool call failed" } }
+                onToolCallStarting { _ -> logger.d { "Tool call starting" } }
                 onToolCallCompleted { _ ->
                     logger.d { "Tool call completed" }
                     trackToolCall()

@@ -4,8 +4,9 @@ import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
 import org.balch.orpheus.features.ai.PanelId
@@ -18,7 +19,7 @@ import org.balch.orpheus.features.ai.PanelId
  * - Show the VIZ panel to highlight visual effects
  * - Focus on specific panels during tutorials
  */
-@SingleIn(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
 class PanelExpandTool @Inject constructor(
     private val panelExpansionEventBus: PanelExpansionEventBus
 ) : Tool<PanelExpandTool.Args, PanelExpandTool.Result>(
