@@ -180,6 +180,9 @@ class OrpheusAgent @Inject constructor(
                     is ReplCodeEvent.Failed -> {
                         emitStatus("Code generation failed: ${event.error}", isError = true)
                     }
+                    is ReplCodeEvent.UserInteraction -> {
+                        // User took control, no status message needed
+                    }
                 }
             }
         }

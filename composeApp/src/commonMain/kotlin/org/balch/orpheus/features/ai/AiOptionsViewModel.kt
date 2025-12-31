@@ -118,6 +118,7 @@ class AiOptionsViewModel(
     private val synthAgentFactory: SynthControlAgent.Factory,
     private val presetsViewModel: PresetsViewModel,
     private val replExecuteTool: ReplExecuteTool,
+    private val replCodeEventBus: ReplCodeEventBus,
     private val panelExpansionEventBus: PanelExpansionEventBus,
     private val synthEngine: SynthEngine,
     private val geminiKeyProvider: GeminiKeyProvider,
@@ -140,6 +141,16 @@ class AiOptionsViewModel(
                     log.info { "Model changed to ${model.displayName}, restarting chat agent" }
                     agent.restart()
                 }
+        }
+        
+        // Subscribe to user interaction events to deactivate REPL mode
+        viewModelScope.launch {
+            replCodeEventBus.events.collect { event ->
+                if (event is ReplCodeEvent.UserInteraction && _isReplActive.value) {
+                    log.info { "User interaction detected, deactivating REPL mode" }
+                    _isReplActive.value = false
+                }
+            }
         }
     }
 
@@ -580,6 +591,11 @@ class AiOptionsViewModel(
                 panelExpansionEventBus.collapse(PanelId.LFO)
                 panelExpansionEventBus.collapse(PanelId.DELAY)
                 log.debug { "Expanded CODE, collapsed LFO and DELAY panels" }
+            }
+            
+            // Emit generating event immediately so UI shows loading state
+            viewModelScope.launch {
+                replCodeEventBus.emitGenerating()
             }
             
             // Reset to Default preset

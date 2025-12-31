@@ -168,8 +168,14 @@ class LiveCodeViewModel(
                     }
                     is ReplCodeEvent.Failed -> {
                         logger.w { "AI code generation failed: ${event.error}" }
-                        // Clear loading state
-                        _uiState.value = _uiState.value.copy(isAiGenerating = false, error = event.error)
+                        // Keep loading state - AI agent is still running and will retry
+                        // Just show the error without clearing isAiGenerating
+                        _uiState.value = _uiState.value.copy(error = event.error)
+                    }
+                    is ReplCodeEvent.UserInteraction -> {
+                        logger.d { "User took manual control" }
+                        // Clear loading state when user takes control
+                        _uiState.value = _uiState.value.copy(isAiGenerating = false)
                     }
                 }
             }
@@ -448,14 +454,17 @@ class LiveCodeViewModel(
     }
     
     fun execute() {
+        viewModelScope.launch { replCodeEventBus.emitUserInteraction() }
         _intents.value = LiveCodeIntent.Execute
     }
     
     fun executeBlock() {
+        viewModelScope.launch { replCodeEventBus.emitUserInteraction() }
         _intents.value = LiveCodeIntent.ExecuteBlock
     }
     
     fun executeLine() {
+        viewModelScope.launch { replCodeEventBus.emitUserInteraction() }
         _intents.value = LiveCodeIntent.ExecuteLine
     }
     
@@ -464,6 +473,7 @@ class LiveCodeViewModel(
     }
     
     fun stop() {
+        viewModelScope.launch { replCodeEventBus.emitUserInteraction() }
         _intents.value = LiveCodeIntent.Stop
     }
     

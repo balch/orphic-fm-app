@@ -123,7 +123,7 @@ class ReplExecuteTool @Inject constructor(
         if (code.equals("hush", ignoreCase = true)) {
             log.debug { "ReplExecuteTool: Executing hush" }
             tidalRepl.hush()
-            replCodeEventBus.emitGenerated("hush", emptyList())
+            // Don't emit Generated for hush - we don't want to update the UI with "hush" text
             return Result(
                 success = true,
                 message = "All patterns silenced",

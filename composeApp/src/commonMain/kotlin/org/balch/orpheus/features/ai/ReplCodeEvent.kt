@@ -29,6 +29,12 @@ sealed interface ReplCodeEvent {
      * AI failed to generate REPL code.
      */
     data class Failed(val error: String) : ReplCodeEvent
+    
+    /**
+     * User took manual control of the REPL (stop, execute, etc.)
+     * This signals that REPL mode should be deactivated.
+     */
+    data object UserInteraction : ReplCodeEvent
 }
 
 /**
@@ -75,5 +81,13 @@ class ReplCodeEventBus @Inject constructor() {
     suspend fun emitFailed(error: String) {
         log.warn { "ReplCodeEventBus: Failed - $error" }
         _events.emit(ReplCodeEvent.Failed(error))
+    }
+    
+    /**
+     * Emit that user took manual control of the REPL.
+     */
+    suspend fun emitUserInteraction() {
+        log.debug { "ReplCodeEventBus: UserInteraction" }
+        _events.emit(ReplCodeEvent.UserInteraction)
     }
 }
