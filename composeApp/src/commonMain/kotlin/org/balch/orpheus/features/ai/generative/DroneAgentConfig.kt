@@ -19,7 +19,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         In DRONE Mode you can only use Quad 3 and Voices 9..12
         
         ESSENTIAL CONTROLS for drones:
-        - QUAD_VOLUME_3: Volume of drone voices (IMPORTANT: keep at 0.5-0.7 to stay below main volume).
+        - QUAD_VOLUME_3: Volume of drone voices (IMPORTANT: keep at 0.5-0.7 to stay below main volume). Do NOT use MASTER_VOLUME.
         - QUAD_PITCH_3: Pitch of the drone layers (0.5 = unity).
         - QUAD_HOLD_3: Sustain level of drone layers.
         - VIBRATO: LFO modulation depth (0.2-0.7).
@@ -35,6 +35,15 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         Use REPL actions if you want to add note patterns.
         Example: "d5 $ quadhold:3 0.8" to sustain the drone voices (Quad 3 = Voices 9-12).
         
+        **Pattern Combiners (#):**
+        Use `#` to combine patterns. For example, to set per-voice hold levels:
+        - `d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"` -> each voice gets its corresponding hold value
+        
+        **IMPORTANT - envspeed requires hold:**
+        When using `envspeed` (slow envelope), you MUST also set `hold` or the note won't be heard!
+        - WRONG: `d1 $ voices "1" # envspeed "0.7"` -> note may be inaudible
+        - CORRECT: `d5 $ voices "9" # hold "0.8" # envspeed "0.7"` -> sustained with slow envelope
+        
         ## DRONE SOUND DESIGN TIPS
         1. Small changes to QUAD_PITCH_3 create detuned beating textures.
         2. Adjust DUO_MOD_SOURCE_5 or DUO_MOD_SOURCE_6 to morph between FM and LFO textures.
@@ -48,7 +57,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
     override val initialPrompt = """
         The system has initialized a unique preset. Now activate the drone.
         
-        1. Set the drone volume to a backing level (not too loud) (example: QUAD_VOLUME_3 to 0.6).
+        1. Ramp up the drone volume to a backing level (not too loud) (example: QUAD_VOLUME_3 to 0.6).
            
         2. Start the sustain engine algo (example: REPL code 'd5 $ quadhold:3 0.8').
            

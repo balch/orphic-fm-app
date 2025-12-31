@@ -6,6 +6,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,7 +39,7 @@ data class MidiUiState(
  */
 @Inject
 @ViewModelKey(MidiViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class MidiViewModel(
     val midiController: MidiController,
     private val midiRepository: MidiMappingRepository,

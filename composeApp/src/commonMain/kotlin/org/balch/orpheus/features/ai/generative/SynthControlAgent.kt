@@ -36,7 +36,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.Json
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.GeminiKeyProvider
 import org.balch.orpheus.core.audio.SynthEngine
@@ -130,9 +129,6 @@ class SynthControlAgent(
         log.info { "User influence: $text" }
         _userPrompts.tryEmit(text)
     }
-    
-    // JSON decoder for tool args
-    private val json = Json { ignoreUnknownKeys = true }
 
     private fun emitStatus(text: String, isLoading: Boolean = false, isError: Boolean = false) {
         _statusMessages.tryEmit(AiStatusMessage(text, isLoading, isError))
@@ -154,6 +150,12 @@ class SynthControlAgent(
                 val valueStr = action.details.getOrNull(1) ?: return
                 val value = valueStr.toFloatOrNull() ?: return
                 
+                // Block Master Volume changes from AI
+                if (id.lowercase() == "master_volume") {
+                    log.warn { "Blocked master_volume change from AI" }
+                    return
+                }
+
                 log.info { "Executing CONTROL: $id = $value" }
                 emitControl("Set $id: ${value.format(2)}")
                 val result = synthControlTool.execute(SynthControlTool.Args(id, value))
@@ -316,7 +318,6 @@ class SynthControlAgent(
                                 if (isActive && !isBusy) {
                                      log.info { "Event received: $inputPrompt" }
                                      _state.value = SynthAgentState.Processing
-                                     emitStatus("Evolving...", isLoading = true)
                                      emitInput(inputPrompt)
                                      
                                      appendPrompt { user(inputPrompt) }
@@ -379,25 +380,31 @@ class SynthControlAgent(
         // Silence with ramp down
         scope.launch {
             try {
-                val currentVol = synthEngine.getMasterVolume()
+                val vol0 = synthEngine.getQuadVolume(0)
+                val vol1 = synthEngine.getQuadVolume(1)
+                val vol2 = synthEngine.getQuadVolume(2)
                 
-                log.debug { "Ramping down master volume from $currentVol" }
-                synthEngine.setParameterAutomation(
-                    controlId = "master_volume",
-                    times = floatArrayOf(0f, 1.5f),
-                    values = floatArrayOf(currentVol, 0f),
-                    count = 2,
-                    duration = 2.0f,
-                    mode = 0
-                )
-                
-                delay(1700)
+                // Fade out Quad Volumes over ~1.5 seconds
+                // Use direct setQuadVolume calls - the voice's internal LinearRamp provides smoothing
+                log.debug { "Ramping down quad volumes" }
+                val steps = 30
+                val stepDelay = 50L  // 30 steps * 50ms = 1.5 seconds total
+                for (step in 1..steps) {
+                    val t = step.toFloat() / steps
+                    synthEngine.setQuadVolume(0, vol0 * (1f - t))
+                    synthEngine.setQuadVolume(1, vol1 * (1f - t))
+                    synthEngine.setQuadVolume(2, vol2 * (1f - t))
+                    delay(stepDelay)
+                }
                 
                 replExecuteTool.execute(ReplExecuteTool.Args(code = "hush"))
                 
-                synthEngine.clearParameterAutomation("master_volume")
-                synthEngine.setMasterVolume(currentVol)
-                log.debug { "Restored master volume to $currentVol" }
+                // Restore volumes after hush
+                synthEngine.setQuadVolume(0, vol0)
+                synthEngine.setQuadVolume(1, vol1)
+                synthEngine.setQuadVolume(2, vol2)
+                
+                log.debug { "Restored quad volumes" }
                 
             } catch (e: CancellationException) {
                 throw e

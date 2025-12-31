@@ -41,15 +41,11 @@ fun DistortionPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
+    val actions = viewModel.panelActions
 
     DistortionPanelLayout(
-        drive = state.drive,
-        onDriveChange = viewModel::onDriveChange,
-        volume = state.volume,
-        onVolumeChange = viewModel::onVolumeChange,
-        mix = state.mix,
-        onMixChange = viewModel::onMixChange,
-        peak = state.peak,
+        uiState = state,
+        actions = actions,
         modifier = modifier,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange
@@ -62,16 +58,12 @@ fun DistortionPanel(
  */
 @Composable
 fun DistortionPanelLayout(
-    drive: Float,
-    onDriveChange: (Float) -> Unit,
-    volume: Float,
-    onVolumeChange: (Float) -> Unit,
-    mix: Float,
-    onMixChange: (Float) -> Unit,
-    peak: Float,
     modifier: Modifier = Modifier,
+    uiState: DistortionUiState,
+    actions: DistortionPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
 ) {
     CollapsibleColumnPanel(
         title = "VOL",
@@ -81,7 +73,8 @@ fun DistortionPanelLayout(
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
         expandedWidth = 200.dp,
-        modifier = modifier
+        modifier = modifier,
+        showCollapsedHeader = showCollapsedHeader
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -94,16 +87,16 @@ fun DistortionPanelLayout(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 RotaryKnob(
-                    value = drive,
-                    onValueChange = onDriveChange,
+                    value = uiState.drive,
+                    onValueChange = actions.onDriveChange,
                     label = "DRIVE",
                     controlId = null,
                     size = 56.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
                 RotaryKnob(
-                    value = volume,
-                    onValueChange = onVolumeChange,
+                    value = uiState.volume,
+                    onValueChange = actions.onVolumeChange,
                     label = "VOL",
                     controlId = null,
                     size = 56.dp,
@@ -118,8 +111,8 @@ fun DistortionPanelLayout(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 RotaryKnob(
-                    value = mix,
-                    onValueChange = onMixChange,
+                    value = uiState.mix,
+                    onValueChange = actions.onMixChange,
                     label = "MIX",
                     controlId = null,
                     size = 56.dp,
@@ -127,7 +120,7 @@ fun DistortionPanelLayout(
                 )
 
                 // Peak LED indicator
-                PeakLed(peak = peak)
+                PeakLed(peak = uiState.peak)
             }
         }
     }
@@ -188,13 +181,17 @@ fun DistortionPanelPreview(
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
         DistortionPanelLayout(
-            drive = 0.5f,
-            onDriveChange = {},
-            volume = 0.7f,
-            onVolumeChange = {},
-            mix = 0.5f,
-            onMixChange = {},
-            peak = 0.2f
+            uiState = DistortionUiState(
+                drive = 0.5f,
+                volume = 0.7f,
+                mix = 0.5f,
+                peak = 0.2f
+            ),
+            actions = DistortionPanelActions(
+                onDriveChange = {},
+                onVolumeChange = {},
+                onMixChange = {}
+            )
         )
     }
 }

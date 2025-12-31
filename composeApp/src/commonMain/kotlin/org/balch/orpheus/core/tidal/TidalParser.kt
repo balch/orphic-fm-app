@@ -426,7 +426,7 @@ object TidalParser {
             val pattern: Pattern<TidalEvent> = compile(node) { atom ->
                 val idx = atom.value.toIntOrNull() ?: throw IllegalArgumentException("Invalid index: ${atom.value}")
                 // Accept 1-based input (1-12) and convert to 0-based (0-7)
-                if (idx !in 1..12) throw IllegalArgumentException("Voice index must be 1-8, got: $idx")
+                if (idx !in 1..12) throw IllegalArgumentException("Voice index must be 1-12, got: $idx")
                 val zeroBasedIdx = idx - 1
                 var event: TidalEvent = TidalEvent.Gate(zeroBasedIdx, true)
                 atom.location?.let { loc ->
@@ -509,8 +509,9 @@ object TidalParser {
             return rawMidi
         }
         
-        val match = Regex("^([a-gA-G])([#b]?)(\\d)$").find(note)
-            ?: throw IllegalArgumentException("Invalid note: $note (use format like c3, c#4, db5)")
+        // Support # for sharp, b or - for flat (e-3 = eb3 = E-flat)
+        val match = Regex("^([a-gA-G])([#b-]?)(\\d)$").find(note)
+            ?: throw IllegalArgumentException("Invalid note: $note (use format like c3, c#4, db5, e-3)")
         
         val (noteName, accidental, octaveStr) = match.destructured
         val octave = octaveStr.toInt()
@@ -528,7 +529,7 @@ object TidalParser {
         
         val modifier = when (accidental) {
             "#" -> 1
-            "b" -> -1
+            "b", "-" -> -1  // Both 'b' and '-' mean flat
             else -> 0
         }
         

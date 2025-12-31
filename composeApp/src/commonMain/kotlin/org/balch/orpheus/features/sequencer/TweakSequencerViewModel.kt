@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
@@ -87,7 +88,7 @@ sealed interface TweakSequencerIntent {
  */
 @Inject
 @ViewModelKey(TweakSequencerViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class TweakSequencerViewModel(
     private val dispatcherProvider: DispatcherProvider,
     private val synthController: SynthController,

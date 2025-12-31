@@ -6,15 +6,19 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import io.ktor.utils.io.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -30,12 +34,15 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
+import org.balch.orpheus.features.ai.generative.AiStatusMessage
 import org.balch.orpheus.features.ai.generative.DroneAgentConfig
 import org.balch.orpheus.features.ai.generative.SoloAgentConfig
 import org.balch.orpheus.features.ai.generative.SynthControlAgent
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
 import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.ui.utils.PanelViewModel
 import kotlin.random.Random
+
 
 /**
  *ViewModel for the AI Options panel.
@@ -46,9 +53,66 @@ import kotlin.random.Random
  * - REPL: Generate Tidal code patterns
  * - Chat: Open chat dialog
  */
+
+/**
+ * UI State for AI Options.
+ */
+data class AiOptionsUiState(
+    val isDroneActive: Boolean = false,
+    val isSoloActive: Boolean = false,
+    val isReplActive: Boolean = false,
+    val showChatDialog: Boolean = false,
+    val sessionId: Int = 0,
+    val isApiKeySet: Boolean = false,
+    val isUserProvidedKey: Boolean = false,
+    val selectedModel: AiModel? = null,
+    val availableModels: List<AiModel> = emptyList(),
+    // Flows for dashboard
+    val aiStatusMessages: Flow<AiStatusMessage> = emptyFlow(),
+    val aiInputLog: Flow<AiStatusMessage> = emptyFlow(),
+    val aiControlLog: Flow<AiStatusMessage> = emptyFlow()
+)
+
+data class AiOptionsPanelActions(
+    val onToggleDrone: (Boolean) -> Unit,
+    val onToggleSolo: (Boolean) -> Unit,
+    val onToggleRepl: (Boolean) -> Unit,
+    val onToggleChatDialog: () -> Unit,
+    val onSendSoloInfluence: (String) -> Unit,
+    val onSaveApiKey: (String) -> Unit,
+    val onClearApiKey: () -> Unit,
+    val onSelectModel: (AiModel) -> Unit
+) {
+    companion object {
+        val EMPTY = AiOptionsPanelActions(
+            onToggleDrone = {},
+            onToggleSolo = {},
+            onToggleRepl = {},
+            onToggleChatDialog = {},
+            onSendSoloInfluence = {},
+            onSaveApiKey = {},
+            onClearApiKey = {},
+            onSelectModel = {}
+        )
+    }
+}
+
+private data class AiOptionsFlags(
+    val isDroneActive: Boolean,
+    val isSoloActive: Boolean,
+    val isReplActive: Boolean,
+    val showChatDialog: Boolean
+)
+
+private data class AiOptionsSession(
+    val sessionId: Int,
+    val isApiKeySet: Boolean,
+    val isUserProvidedKey: Boolean
+)
+
 @Inject
 @ViewModelKey(AiOptionsViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class AiOptionsViewModel(
     private val agent: OrpheusAgent,
     private val synthAgentFactory: SynthControlAgent.Factory,
@@ -59,7 +123,7 @@ class AiOptionsViewModel(
     private val geminiKeyProvider: GeminiKeyProvider,
     private val aiModelProvider: AiModelProvider,
     private val dispatcherProvider: DispatcherProvider,
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<AiOptionsUiState, AiOptionsPanelActions> {
 
     private val log = logging("AiOptionsViewModel")
 
@@ -91,7 +155,7 @@ class AiOptionsViewModel(
      * Uses flatMapLatest to ensure we subscribe to the *current* agent instance's logs.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val aiStatusMessages = merge(
+    val aiStatusMessages: Flow<AiStatusMessage> = merge(
         agent.statusMessages,
         _droneAgent.flatMapLatest { it?.statusMessages ?: flow {} },
         _soloAgent.flatMapLatest { it?.statusMessages ?: flow {} }
@@ -101,7 +165,7 @@ class AiOptionsViewModel(
      * Combined AI input logs (prompts sent).
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val aiInputLog = merge(
+    val aiInputLog: Flow<AiStatusMessage> = merge(
         _droneAgent.flatMapLatest { it?.inputLog ?: flow {} },
         _soloAgent.flatMapLatest { it?.inputLog ?: flow {} }
     )
@@ -110,7 +174,7 @@ class AiOptionsViewModel(
      * Combined AI control logs (actions executed).
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val aiControlLog = merge(
+    val aiControlLog: Flow<AiStatusMessage> = merge(
         _droneAgent.flatMapLatest { it?.controlLog ?: flow {} },
         _soloAgent.flatMapLatest { it?.controlLog ?: flow {} }
     )
@@ -229,7 +293,7 @@ class AiOptionsViewModel(
     /**
      * Toggle the Drone AI on/off.
      */
-    fun toggleDrone() {
+    fun toggleDrone(showDialog: Boolean = true) {
         val wasActive = _isDroneActive.value
         
         // If Solo is active, turn it off first
@@ -246,7 +310,9 @@ class AiOptionsViewModel(
 
         if (_isDroneActive.value) {
             log.info { "Starting Drone Agent" }
-            _showChatDialog.value = true // Ensure ChatDialog is visible
+            if (showDialog) {
+                _showChatDialog.value = true // Ensure ChatDialog is visible
+            }
             
             // Clear old drone agent reference (if any) before incrementing session
             _droneAgent.value = null
@@ -265,29 +331,26 @@ class AiOptionsViewModel(
                 
                 val uniquePreset = generateRandomDronePreset()
                 
-                // Fade in: Apply preset with volume=0, then ramp up to target
-                // We must set masterVolume=0 IN THE PRESET to prevent the reactive
-                // DistortionViewModel from immediately overriding our fade-in.
-                val targetVolume = uniquePreset.masterVolume
-                val presetWithZeroVolume = uniquePreset.copy(masterVolume = 0f)
-                
-                presetsViewModel.applyPreset(presetWithZeroVolume)
-                log.info { "Applied drone preset: ${uniquePreset.name} (fading in)" }
-                
-                // Ramp volume from 0 to target over 1 second
-                synthEngine.setParameterAutomation(
-                    controlId = "master_volume",
-                    times = floatArrayOf(0f, 1.0f),
-                    values = floatArrayOf(0f, targetVolume),
-                    count = 2,
-                    duration = 1.0f,
-                    mode = 0
+                // Fade in: Apply preset with Quad Volumes = 0, then ramp up to 1.0
+                // Master Volume is not affected by presets (user control only)
+                val presetWithZeroQuadVol = uniquePreset.copy(
+                    quadGroupVolumes = listOf(0f, 0f, 0f)
                 )
                 
-                // Allow ramp to complete before starting agent
-                delay(1000)
-                synthEngine.clearParameterAutomation("master_volume")
-                synthEngine.setMasterVolume(targetVolume)
+                presetsViewModel.applyPreset(presetWithZeroQuadVol)
+                log.info { "Applied drone preset: ${uniquePreset.name} (fading in)" }
+                
+                // Fade in Quad Volumes from 0 to 1 over ~1 second
+                // Use direct setQuadVolume calls - the voice's internal LinearRamp provides smoothing
+                val steps = 20
+                val stepDelay = 50L  // 20 steps * 50ms = 1 second total
+                for (step in 1..steps) {
+                    val volume = step.toFloat() / steps
+                    synthEngine.setQuadVolume(0, volume)
+                    synthEngine.setQuadVolume(1, volume)
+                    synthEngine.setQuadVolume(2, volume)
+                    delay(stepDelay)
+                }
                 
                 newAgent.start()
             }
@@ -334,9 +397,8 @@ class AiOptionsViewModel(
             voiceCoupling = r.nextFloat() * 0.4f,
             
             // Quad setup (defaults)
-            fmStructureCrossQuad = r.nextBoolean(),
-            
-            masterVolume = 0.75f
+            fmStructureCrossQuad = r.nextBoolean()
+            // Note: masterVolume not set - it's user-controlled only
         )
     }
 
@@ -347,7 +409,7 @@ class AiOptionsViewModel(
     /**
      * Toggle the Solo AI on/off.
      */
-    fun toggleSolo() {
+    fun toggleSolo(showDialog: Boolean = true) {
         val wasActive = _isSoloActive.value
         log.info { "toggleSolo called. Was active: $wasActive" }
 
@@ -365,7 +427,9 @@ class AiOptionsViewModel(
         
         if (_isSoloActive.value) {
             log.info { "Starting Solo Agent" }
-            _showChatDialog.value = true
+            if (showDialog) {
+                _showChatDialog.value = true
+            }
             
             // Clear old solo agent reference (if any) before incrementing session
             _soloAgent.value = null
@@ -384,29 +448,26 @@ class AiOptionsViewModel(
                 
                 val soloPreset = generateRandomSoloPreset()
                 
-                // Fade in: Apply preset with volume=0, then ramp up to target
-                // We must set masterVolume=0 IN THE PRESET to prevent the reactive
-                // DistortionViewModel from immediately overriding our fade-in.
-                val targetVolume = soloPreset.masterVolume
-                val presetWithZeroVolume = soloPreset.copy(masterVolume = 0f)
-                
-                presetsViewModel.applyPreset(presetWithZeroVolume)
-                log.info { "Applied solo preset: ${soloPreset.name} (fading in)" }
-                
-                // Ramp volume from 0 to target over 1 second
-                synthEngine.setParameterAutomation(
-                    controlId = "master_volume",
-                    times = floatArrayOf(0f, 1.0f),
-                    values = floatArrayOf(0f, targetVolume),
-                    count = 2,
-                    duration = 1.0f,
-                    mode = 0
+                // Fade in: Apply preset with Quad Volumes = 0, then ramp up to 1.0
+                // Master Volume is not affected by presets (user control only)
+                val presetWithZeroQuadVol = soloPreset.copy(
+                    quadGroupVolumes = listOf(0f, 0f, 0f)
                 )
                 
-                // Allow ramp to complete before starting agent
-                delay(1000)
-                synthEngine.clearParameterAutomation("master_volume")
-                synthEngine.setMasterVolume(targetVolume)
+                presetsViewModel.applyPreset(presetWithZeroQuadVol)
+                log.info { "Applied solo preset: ${soloPreset.name} (fading in)" }
+                
+                // Fade in Quad Volumes from 0 to 1 over ~1 second
+                // Use direct setQuadVolume calls - the voice's internal LinearRamp provides smoothing
+                val steps = 20
+                val stepDelay = 50L  // 20 steps * 50ms = 1 second total
+                for (step in 1..steps) {
+                    val volume = step.toFloat() / steps
+                    synthEngine.setQuadVolume(0, volume)
+                    synthEngine.setQuadVolume(1, volume)
+                    synthEngine.setQuadVolume(2, volume)
+                    delay(stepDelay)
+                }
                 
                 newAgent.start()
             }
@@ -465,9 +526,8 @@ class AiOptionsViewModel(
             
             // Reset quads (no hold/drone by default)
             quadGroupPitches = List(3) { 0.5f },
-            quadGroupHolds = List(3) { 0.0f },
-            
-            masterVolume = 0.75f
+            quadGroupHolds = List(3) { 0.0f }
+            // Note: masterVolume not set - it's user-controlled only
         )
     }
 
@@ -500,13 +560,13 @@ class AiOptionsViewModel(
      * 
      * When turned ON:
      * - Resets to Default preset
-     * - Opens chat dialog
+     * - Opens chat dialog (optional)
      * - Generates an ambient REPL pattern
      * 
      * When turned OFF:
      * - Stops all REPL patterns with hush
      */
-    fun toggleRepl() {
+    fun toggleRepl(showDialog: Boolean = true) {
         val wasActive = _isReplActive.value
         _isReplActive.value = !wasActive
         
@@ -533,7 +593,9 @@ class AiOptionsViewModel(
             }
             
             // Open the chat dialog so user can see the AI working
-            _showChatDialog.value = true
+            if (showDialog) {
+                _showChatDialog.value = true
+            }
             
             // Generate varied prompts by randomizing style elements
             val moods = listOf(
@@ -564,30 +626,33 @@ class AiOptionsViewModel(
             // Stop all REPL patterns with ramp down
             viewModelScope.launch {
                 try {
-                    // Get current volume
-                    val currentVol = synthEngine.getMasterVolume()
+                    // Get current volumes
+                    val vol0 = synthEngine.getQuadVolume(0)
+                    val vol1 = synthEngine.getQuadVolume(1)
+                    val vol2 = synthEngine.getQuadVolume(2)
                     
-                    // Ramp down
-                    log.debug { "REPL stop: Ramping down volume from $currentVol" }
-                    synthEngine.setParameterAutomation(
-                        controlId = "master_volume",
-                        times = floatArrayOf(0f, 1.0f),
-                        values = floatArrayOf(currentVol, 0f),
-                        count = 2,
-                        duration = 1.0f,
-                        mode = 0
-                    )
-                    
-                    delay(1200)
+                    // Fade out Quad Volumes over ~1 second
+                    // Use direct setQuadVolume calls - the voice's internal LinearRamp provides smoothing
+                    log.debug { "REPL stop: Ramping down quad volumes" }
+                    val steps = 20
+                    val stepDelay = 50L  // 20 steps * 50ms = 1 second total
+                    for (step in 1..steps) {
+                        val t = step.toFloat() / steps  // 0.05 to 1.0
+                        synthEngine.setQuadVolume(0, vol0 * (1f - t))
+                        synthEngine.setQuadVolume(1, vol1 * (1f - t))
+                        synthEngine.setQuadVolume(2, vol2 * (1f - t))
+                        delay(stepDelay)
+                    }
                     
                     replExecuteTool.execute(
                         ReplExecuteTool.Args(code = "hush")
                     )
                     log.info { "Hushed REPL patterns" }
                     
-                    // Restore
-                    synthEngine.clearParameterAutomation("master_volume")
-                    synthEngine.setMasterVolume(currentVol)
+                    // Restore volumes after hush
+                    synthEngine.setQuadVolume(0, vol0)
+                    synthEngine.setQuadVolume(1, vol1)
+                    synthEngine.setQuadVolume(2, vol2)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -610,6 +675,58 @@ class AiOptionsViewModel(
 
     private val _dialogSize = MutableStateFlow(420f to 550f)
     val dialogSize: StateFlow<Pair<Float, Float>> = _dialogSize.asStateFlow()
+
+    override val panelActions = AiOptionsPanelActions(
+        onToggleDrone = { toggleDrone(it) },
+        onToggleSolo = { toggleSolo(it) },
+        onToggleRepl = { toggleRepl(it) },
+        onToggleChatDialog = ::toggleChatDialog,
+        onSendSoloInfluence = ::sendSoloInfluence,
+        onSaveApiKey = ::saveApiKey,
+        onClearApiKey = ::clearApiKey,
+        onSelectModel = ::selectModel
+    )
+
+    override val uiState: StateFlow<AiOptionsUiState> = combine(
+        combine(
+            _isDroneActive,
+            _isSoloActive,
+            _isReplActive,
+            _showChatDialog,
+            ::AiOptionsFlags
+        ),
+        combine(
+            _sessionId,
+            apiKeyState,
+            isUserProvidedKey,
+            ::AiOptionsSession
+        ),
+        selectedModel
+    ) { flags, session, model ->
+        AiOptionsUiState(
+            isDroneActive = flags.isDroneActive,
+            isSoloActive = flags.isSoloActive,
+            isReplActive = flags.isReplActive,
+            showChatDialog = flags.showChatDialog,
+            sessionId = session.sessionId,
+            isApiKeySet = session.isApiKeySet,
+            isUserProvidedKey = session.isUserProvidedKey,
+            selectedModel = model,
+            availableModels = availableModels,
+            aiStatusMessages = aiStatusMessages,
+            aiInputLog = aiInputLog,
+            aiControlLog = aiControlLog
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = AiOptionsUiState(
+            availableModels = availableModels,
+            aiStatusMessages = aiStatusMessages,
+            aiInputLog = aiInputLog,
+            aiControlLog = aiControlLog
+        )
+    )
 
     fun updateDialogPosition(x: Float, y: Float) {
         _dialogPosition.value = x to y

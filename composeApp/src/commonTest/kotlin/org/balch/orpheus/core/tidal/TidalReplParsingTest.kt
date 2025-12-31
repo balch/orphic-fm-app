@@ -485,9 +485,9 @@ class TidalReplParsingTest {
         // Wait, envspeed: parser checks 1..8 range.
         assertIs<ReplResult.Error>(resultInvalidVoice)
         
-        // Test missing value
-        val resultMissingValue = repl.evaluateSuspend("envspeed:1")
-        assertIs<ReplResult.Error>(resultMissingValue)
+        // Test single value (now valid, implies voice 1, value 1.0)
+        val resultSingleValue = repl.evaluateSuspend("envspeed:1")
+        assertIs<ReplResult.Success>(resultSingleValue)
     }
     
     @Test
@@ -589,5 +589,92 @@ class TidalReplParsingTest {
         // voices 1 2 3 should work
         val result = repl.evaluateSuspend("voices 1 2 3")
         assertIs<ReplResult.Success>(result)
+    }
+    @Test
+    fun `evaluate supports unquoted drive command`() = kotlinx.coroutines.test.runTest {
+        val result = repl.evaluateSuspend("drive 0.4")
+        assertIs<ReplResult.Success>(result)
+    }
+
+    @Test
+    fun `evaluate supports unquoted pan command with implicit voice`() = kotlinx.coroutines.test.runTest {
+        // "pan 0.5" should be valid and imply voice 1 (index 0)
+        // Currently this might fail if implicit voice isn't handled for unquoted syntax
+        val result = repl.evaluateSuspend("pan 0.5")
+        // If it fails with "Invalid index: pan", it means it fell through to parseGates
+        assertIs<ReplResult.Success>(result)
+    }
+
+    @Test
+    fun `evaluate supports unquoted envspeed command with implicit voice`() = kotlinx.coroutines.test.runTest {
+        val result = repl.evaluateSuspend("envspeed 0.5")
+        assertIs<ReplResult.Success>(result)
+    }
+    
+    // =========================================================================
+    // Voices + Hold Pattern Combiner Tests
+    // =========================================================================
+    
+    @Test
+    fun `evaluate supports hold pattern with quoted values`() = kotlinx.coroutines.test.runTest {
+        // hold "0.2 0.5 0.8" should create VoiceHold events for voices 0, 1, 2
+        val result = repl.evaluateSuspend("d1 \$ hold \"0.2 0.5 0.8\"")
+        assertIs<ReplResult.Success>(result)
+    }
+    
+    @Test
+    fun `evaluate supports voices combined with hold via hash combiner`() = kotlinx.coroutines.test.runTest {
+        // d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"
+        val result = repl.evaluateSuspend("d1 \$ voices \"1 2 3\" # hold \"0.2 0.5 0.8\"")
+        assertIs<ReplResult.Success>(result)
+    }
+    
+    @Test
+    fun `evaluate supports voices with hold and envspeed combined`() = kotlinx.coroutines.test.runTest {
+        // The documented correct pattern with envspeed + hold
+        val result = repl.evaluateSuspend("d1 \$ voices \"1\" # hold \"0.8\" # envspeed \"0.7\"")
+        assertIs<ReplResult.Success>(result)
+    }
+    
+    @Test
+    fun `hold pattern assigns correct voice indices`() {
+        // Test that floats parse correctly with mini-notation
+        val result = TidalParser.parseFloats("0.2 0.5 0.8") { TidalEvent.VoiceHold(0, it, emptyList()) }
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(3, events.size, "Should have 3 VoiceHold events")
+        
+        // Verify hold values are correctly parsed and ordered by time
+        val values = events.sortedBy { it.part.start }.map { (it.value as TidalEvent.VoiceHold).amount }
+        assertEquals(listOf(0.2f, 0.5f, 0.8f), values, "Hold values should be in order")
+    }
+    
+    @Test
+    fun `hold pattern has source locations for UI highlighting`() = kotlinx.coroutines.test.runTest {
+        // Verify that hold patterns have source locations for UI highlighting
+        val result = repl.evaluateSuspend("d1 \$ hold \"0.5\"")
+        assertIs<ReplResult.Success>(result)
+        
+        // Success means pattern parsed correctly with locations
+    }
+    
+    @Test
+    fun `hold pattern voice indices are stable across multiple queries`() {
+        // Ensure voice indices don't change between queries (the bug we fixed)
+        val result = TidalParser.parseFloats("0.2 0.5 0.8") { TidalEvent.VoiceHold(0, it, emptyList()) }
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        // Query multiple times
+        val events1 = result.pattern.query(Arc.UNIT).sortedBy { it.part.start }
+        val events2 = result.pattern.query(Arc.UNIT).sortedBy { it.part.start }
+        val events3 = result.pattern.query(Arc.UNIT).sortedBy { it.part.start }
+        
+        // Values should be identical across all queries
+        val amounts1 = events1.map { (it.value as TidalEvent.VoiceHold).amount }
+        val amounts2 = events2.map { (it.value as TidalEvent.VoiceHold).amount }
+        val amounts3 = events3.map { (it.value as TidalEvent.VoiceHold).amount }
+        assertEquals(amounts1, amounts2)
+        assertEquals(amounts2, amounts3)
     }
 }

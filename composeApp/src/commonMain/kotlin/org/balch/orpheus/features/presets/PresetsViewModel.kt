@@ -6,6 +6,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -21,6 +22,7 @@ import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.DronePresetRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.ui.utils.PanelViewModel
 
 /** UI state for the Presets panel. */
 data class PresetUiState(
@@ -28,6 +30,16 @@ data class PresetUiState(
     val selectedPreset: DronePreset? = null,
     val isLoading: Boolean = false,
     val factoryPresetNames: Set<String> = emptySet() // Track which presets are factory (read-only)
+)
+
+data class PresetPanelActions(
+    val onPresetSelect: (DronePreset) -> Unit,
+    val onSelect: (DronePreset) -> Unit,
+    val onNew: (String) -> Unit,
+    val onOverride: () -> Unit,
+    val onDelete: () -> Unit,
+    val onApply: (DronePreset) -> Unit,
+    val onDialogActiveChange: (Boolean) -> Unit = {} // Called when naming dialog opens/closes
 )
 
 /** User intents for the Presets panel. */
@@ -44,14 +56,23 @@ private sealed interface PresetIntent {
  */
 @Inject
 @ViewModelKey(PresetsViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class PresetsViewModel(
     private val repository: DronePresetRepository,
     private val presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider,
     private val appPreferencesRepository: AppPreferencesRepository,
     factoryPatches: Set<SynthPatch>
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<PresetUiState, PresetPanelActions> {
+
+    override val panelActions = PresetPanelActions(
+        onPresetSelect = ::selectPreset,
+        onSelect = ::applyPreset,
+        onNew = ::saveNewPreset,
+        onOverride = ::overridePreset,
+        onDelete = ::deletePreset,
+        onApply = ::applyPreset
+    )
 
     private val log = logging("PresetsViewModel")
 
@@ -69,7 +90,7 @@ class PresetsViewModel(
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
-    val uiState: StateFlow<PresetUiState> =
+    override val uiState: StateFlow<PresetUiState> =
         intents
             .scan(PresetUiState()) { state, intent -> reduce(state, intent) }
             .flowOn(dispatcherProvider.io)

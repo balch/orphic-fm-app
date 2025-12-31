@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.ui.utils.PanelViewModel
 
 /**
  * UI State for the VIZ panel.
@@ -27,18 +29,30 @@ data class VizUiState(
     val liquidEffects: VisualizationLiquidEffects = selectedViz.liquidEffects
 )
 
+data class VizPanelActions(
+    val onSelectViz: (Visualization) -> Unit,
+    val onKnob1Change: (Float) -> Unit,
+    val onKnob2Change: (Float) -> Unit
+)
+
 /**
  * ViewModel for managing visualizations.
  * Injects all available Visualization implementations.
  */
 @Inject
 @ViewModelKey(VizViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class VizViewModel(
     visualizations: Set<Visualization>,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val synthController: SynthController,
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<VizUiState, VizPanelActions> {
+
+    override val panelActions = VizPanelActions(
+        onSelectViz = { selectVisualization(it) },
+        onKnob1Change = ::onKnob1Change,
+        onKnob2Change = ::onKnob2Change
+    )
 
     // Sorted list: Off first, then alphabetical by name
     private val sortedVisualizations = visualizations.sortedWith(
@@ -56,7 +70,7 @@ class VizViewModel(
             liquidEffects = sortedVisualizations.first().liquidEffects
         )
     )
-    val uiState: StateFlow<VizUiState> = _uiState.asStateFlow()
+    override val uiState: StateFlow<VizUiState> = _uiState.asStateFlow()
 
     init {
         // Activate initial visualization if it's not off (likely is off initially)

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -20,12 +21,18 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.ui.utils.PanelViewModel
 
 /** UI state for the Stereo panel. */
 data class StereoUiState(
     val mode: StereoMode = StereoMode.VOICE_PAN,
     val masterPan: Float = 0f,  // -1=Left, 0=Center, 1=Right
     val voicePans: List<Float> = listOf(0f, 0f, -0.3f, -0.3f, 0.3f, 0.3f, -0.7f, 0.7f)
+)
+
+data class StereoPanelActions(
+    val onModeChange: (StereoMode) -> Unit,
+    val onMasterPanChange: (Float) -> Unit
 )
 
 /** User intents for the Stereo panel. */
@@ -42,12 +49,17 @@ private sealed interface StereoIntent {
  */
 @Inject
 @ViewModelKey(StereoViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class StereoViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<StereoUiState, StereoPanelActions> {
+
+    override val panelActions = StereoPanelActions(
+        onModeChange = ::onModeChange,
+        onMasterPanChange = ::onMasterPanChange
+    )
 
     private val intents = MutableSharedFlow<StereoIntent>(
         replay = 1,
@@ -55,7 +67,7 @@ class StereoViewModel(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    val uiState: StateFlow<StereoUiState> =
+    override val uiState: StateFlow<StereoUiState> =
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(StereoUiState()) { state, intent -> reduce(state, intent) }

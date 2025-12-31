@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import kotlinx.coroutines.launch
+import org.balch.orpheus.features.tidal.LiveCodePanelActions
+import org.balch.orpheus.features.tidal.LiveCodeUiState
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -73,6 +75,7 @@ fun LiveCodePanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
+    val actions = viewModel.panelActions
     
     // Track active highlight ranges for token highlighting (Map of unique ID to range)
     var activeHighlightMap by remember { mutableStateOf(mapOf<Long, IntRange>()) }
@@ -102,22 +105,9 @@ fun LiveCodePanel(
     }
     
     LiveCodePanelLayout(
-        code = state.code,
-        onCodeChange = viewModel::updateCode,
-        onExecuteBlock = viewModel::executeBlock,
-        onExecuteLine = viewModel::executeLine,
-        isPlaying = state.isPlaying,
-        currentCycle = state.currentCycle,
-        cyclePosition = state.cyclePosition,
-        bpm = state.bpm,
-        onBpmChange = viewModel::setBpm,
-        onExecute = viewModel::execute,
-        onStop = viewModel::stop,
-        onLoadExample = viewModel::loadExample,
-        selectedExample = state.selectedExample,
+        uiState = state,
+        actions = actions,
         activeHighlights = activeHighlights,
-        error = state.error,
-        isAiGenerating = state.isAiGenerating,
         modifier = modifier,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange
@@ -129,25 +119,13 @@ fun LiveCodePanel(
  */
 @Composable
 fun LiveCodePanelLayout(
-    code: TextFieldValue,
-    onCodeChange: (TextFieldValue) -> Unit,
-    onExecuteBlock: () -> Unit,
-    onExecuteLine: () -> Unit,
-    isPlaying: Boolean,
-    currentCycle: Int,
-    cyclePosition: Double,
-    bpm: Double,
-    onBpmChange: (Double) -> Unit,
-    onExecute: () -> Unit,
-    onStop: () -> Unit,
-    onLoadExample: (String) -> Unit,
-    selectedExample: String?,
-    activeHighlights: List<IntRange> = emptyList(),
-    error: String?,
-    isAiGenerating: Boolean = false,
     modifier: Modifier = Modifier,
+    uiState: LiveCodeUiState,
+    actions: LiveCodePanelActions,
+    activeHighlights: List<IntRange> = emptyList(),
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
 ) {
     // Key on activeHighlights to force recomposition when highlights change
     val syntaxHighlighter = remember(activeHighlights) { 
@@ -164,7 +142,8 @@ fun LiveCodePanelLayout(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,  // Closed by default
         expandedWidth = 280.dp,
-        modifier = modifier
+        modifier = modifier,
+        showCollapsedHeader = showCollapsedHeader
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -187,15 +166,15 @@ fun LiveCodePanelLayout(
                             .size(26.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isPlaying) OrpheusColors.synthGreen.copy(alpha = 0.3f)
+                                if (uiState.isPlaying) OrpheusColors.synthGreen.copy(alpha = 0.3f)
                                 else OrpheusColors.softPurple
                             )
-                            .clickable { onExecute() },
+                            .clickable { actions.onExecute() },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "▶",
-                            color = if (isPlaying) OrpheusColors.synthGreen else Color.White,
+                            color = if (uiState.isPlaying) OrpheusColors.synthGreen else Color.White,
                             fontSize = 12.sp
                         )
                     }
@@ -207,28 +186,28 @@ fun LiveCodePanelLayout(
                             .background(
                                 OrpheusColors.warmGlow.copy(alpha = 0.2f)
                             )
-                            .clickable(enabled = isPlaying) { onStop() },
+                            .clickable(enabled = uiState.isPlaying) { actions.onStop() },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "■",
                             fontSize = 12.sp,
-                            color = if (isPlaying) OrpheusColors.warmGlow else OrpheusColors.warmGlow.copy(alpha = 0.4f)
+                            color = if (uiState.isPlaying) OrpheusColors.warmGlow else OrpheusColors.warmGlow.copy(alpha = 0.4f)
                         )
                     }
                 }
 
                 Text(
-                    text = "C:$currentCycle",
+                    text = "C:${uiState.currentCycle}",
                     fontSize = 9.sp,
-                    color = if (isPlaying) OrpheusColors.neonCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (uiState.isPlaying) OrpheusColors.neonCyan else MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.weight(1f))
 
                 ExamplesDropdown(
-                    selectedExample = selectedExample,
-                    onLoadExample = onLoadExample
+                    selectedExample = uiState.selectedExample,
+                    onLoadExample = actions.onLoadExample
                 )
             }
 
@@ -247,14 +226,14 @@ fun LiveCodePanelLayout(
 
                 HorizontalMiniSlider(
                     trackWidth = 110,
-                    value = ((bpm - 40) / 200).toFloat().coerceIn(0f, 1f),
+                    value = ((uiState.bpm - 40) / 200).toFloat().coerceIn(0f, 1f),
                     onValueChange = { frac ->
-                        onBpmChange(40 + (frac * 200).toDouble())
+                        actions.onBpmChange(40 + (frac * 200).toDouble())
                     },
                     color = OrpheusColors.neonCyan
                 )
                 Text(
-                    text = "${bpm.toInt()}",
+                    text = "${uiState.bpm.toInt()}",
                     style = MaterialTheme.typography.labelSmall,
                     color = OrpheusColors.neonCyan,
                     fontSize = 9.sp,
@@ -272,9 +251,9 @@ fun LiveCodePanelLayout(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     BasicTextField(
-                        value = code,
-                        onValueChange = { if (!isAiGenerating) onCodeChange(it) },
-                        readOnly = isAiGenerating, // Allow editing while playing for true live coding
+                        value = uiState.code,
+                        onValueChange = { if (!uiState.isAiGenerating) actions.onCodeChange(it) },
+                        readOnly = uiState.isAiGenerating, // Allow editing while playing for true live coding
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(12.dp)
@@ -283,12 +262,18 @@ fun LiveCodePanelLayout(
                                 if (event.type == KeyEventType.KeyDown) {
                                     when {
                                         (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Enter -> {
-                                            onExecuteBlock()
+                                            actions.onExecuteBlock()
                                             true
                                         }
 
                                         event.isShiftPressed && event.key == Key.Enter -> {
-                                            onExecuteLine()
+                                            actions.onExecuteLine()
+                                            true
+                                        }
+
+                                        (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Backspace -> {
+                                            actions.onDeleteLine()
+                                            actions.onExecuteBlock()
                                             true
                                         }
 
@@ -306,7 +291,7 @@ fun LiveCodePanelLayout(
                         cursorBrush = SolidColor(OrpheusColors.neonCyan),
                         decorationBox = { innerTextField ->
                             Box {
-                                if (code.text.isEmpty() && !isAiGenerating) {
+                                if (uiState.code.text.isEmpty() && !uiState.isAiGenerating) {
                                     Text(
                                         text = "# voices:0 1 2 3\n# fast 2 voices:0 1",
                                         style = TextStyle(
@@ -325,7 +310,7 @@ fun LiveCodePanelLayout(
                 }
                 
                 // AI Loading Overlay
-                if (isAiGenerating) {
+                if (uiState.isAiGenerating) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -352,31 +337,10 @@ fun LiveCodePanelLayout(
                 }
             }
 
-            // Cycle position bar
-            if (isPlaying) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp),
-                    color = OrpheusColors.softPurple.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(1.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(fraction = cyclePosition.toFloat())
-                            .height(3.dp)
-                            .background(
-                                color = OrpheusColors.neonCyan,
-                                shape = RoundedCornerShape(1.dp)
-                            )
-                    )
-                }
-            }
-
             // Error display
-            if (error != null) {
+            if (uiState.error != null) {
                 Text(
-                    text = "⚠ $error",
+                    text = "⚠ ${uiState.error}",
                     style = MaterialTheme.typography.labelSmall,
                     color = OrpheusColors.warmGlow,
                     maxLines = 2,
@@ -454,20 +418,19 @@ private fun LiveCodePanelCollapsedPreview() {
             color = OrpheusColors.darkVoid
         ) {
             LiveCodePanelLayout(
-                code = TextFieldValue(""),
-                onCodeChange = {},
-                onExecuteBlock = {},
-                onExecuteLine = {},
-                isPlaying = false,
-                currentCycle = 0,
-                cyclePosition = 0.0,
-                bpm = 120.0,
-                onBpmChange = {},
-                onExecute = {},
-                onStop = {},
-                onLoadExample = {},
-                selectedExample = null,
-                error = null,
+                uiState = LiveCodeUiState(
+                    code = TextFieldValue("")
+                ),
+                actions = LiveCodePanelActions(
+                    onCodeChange = {},
+                    onExecuteBlock = {},
+                    onExecuteLine = {},
+                    onBpmChange = {},
+                    onExecute = {},
+                    onStop = {},
+                    onLoadExample = {},
+                    onDeleteLine = {}
+                ),
                 isExpanded = false
             )
         }
@@ -483,20 +446,20 @@ private fun LiveCodePanelExpandedPreview() {
             color = OrpheusColors.darkVoid
         ) {
             LiveCodePanelLayout(
-                code = TextFieldValue("d1 $ s \"bd sn\"\nd2 $ gates:4 5 6 7"),
-                onCodeChange = {},
-                onExecuteBlock = {},
-                onExecuteLine = {},
-                isPlaying = false,
-                currentCycle = 0,
-                cyclePosition = 0.0,
-                bpm = 128.0,
-                onBpmChange = {},
-                onExecute = {},
-                onStop = {},
-                onLoadExample = {},
-                selectedExample = null,
-                error = null,
+                uiState = LiveCodeUiState(
+                    code = TextFieldValue("d1 $ s \"bd sn\"\nd2 $ gates:4 5 6 7"),
+                    bpm = 128.0
+                ),
+                actions = LiveCodePanelActions(
+                    onCodeChange = {},
+                    onExecuteBlock = {},
+                    onExecuteLine = {},
+                    onBpmChange = {},
+                    onExecute = {},
+                    onStop = {},
+                    onLoadExample = {},
+                    onDeleteLine = {}
+                ),
                 isExpanded = true
             )
         }
@@ -512,20 +475,23 @@ private fun LiveCodePanelPlayingPreview() {
             color = OrpheusColors.darkVoid
         ) {
             LiveCodePanelLayout(
-                code = TextFieldValue("d1 $ s \"bd sn\"\n\n# Playing with progress"),
-                onCodeChange = {},
-                onExecuteBlock = {},
-                onExecuteLine = {},
-                isPlaying = true,
-                currentCycle = 42,
-                cyclePosition = 0.65,
-                bpm = 140.0,
-                onBpmChange = {},
-                onExecute = {},
-                onStop = {},
-                onLoadExample = {},
-                selectedExample = null,
-                error = null,
+                uiState = LiveCodeUiState(
+                    code = TextFieldValue("d1 $ s \"bd sn\"\n\n# Playing with progress"),
+                    isPlaying = true,
+                    currentCycle = 42,
+                    cyclePosition = 0.65,
+                    bpm = 140.0,
+                ),
+                actions = LiveCodePanelActions(
+                    onCodeChange = {},
+                    onExecuteBlock = {},
+                    onExecuteLine = {},
+                    onBpmChange = {},
+                    onExecute = {},
+                    onStop = {},
+                    onLoadExample = {},
+                    onDeleteLine = {}
+                ),
                 isExpanded = true
             )
         }
@@ -541,20 +507,20 @@ private fun LiveCodePanelErrorPreview() {
             color = OrpheusColors.darkVoid
         ) {
             LiveCodePanelLayout(
-                code = TextFieldValue("d1 $ s \"unknown\""),
-                onCodeChange = {},
-                onExecuteBlock = {},
-                onExecuteLine = {},
-                isPlaying = false,
-                currentCycle = 0,
-                cyclePosition = 0.0,
-                bpm = 120.0,
-                onBpmChange = {},
-                onExecute = {},
-                onStop = {},
-                onLoadExample = {},
-                selectedExample = null,
-                error = "Unknown sound: unknown",
+                uiState = LiveCodeUiState(
+                    code = TextFieldValue("d1 $ s \"unknown\""),
+                    error = "Unknown sound: unknown"
+                ),
+                actions = LiveCodePanelActions(
+                    onCodeChange = {},
+                    onExecuteBlock = {},
+                    onExecuteLine = {},
+                    onBpmChange = {},
+                    onExecute = {},
+                    onStop = {},
+                    onLoadExample = {},
+                    onDeleteLine = {}
+                ),
                 isExpanded = true
             )
         }

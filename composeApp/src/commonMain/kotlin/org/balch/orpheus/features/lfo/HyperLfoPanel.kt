@@ -56,16 +56,11 @@ fun HyperLfoPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
+    val actions = viewModel.panelActions
 
     HyperLfoPanelLayout(
-        lfo1Rate = state.lfoA,
-        onLfo1RateChange = viewModel::onLfoAChange,
-        lfo2Rate = state.lfoB,
-        onLfo2RateChange = viewModel::onLfoBChange,
-        mode = state.mode,
-        onModeChange = viewModel::onModeChange,
-        linkEnabled = state.linkEnabled,
-        onLinkChange = viewModel::onLinkChange,
+        uiState = state,
+        actions = actions,
         modifier = modifier,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange
@@ -79,17 +74,12 @@ fun HyperLfoPanel(
  */
 @Composable
 fun HyperLfoPanelLayout(
-    lfo1Rate: Float,
-    onLfo1RateChange: (Float) -> Unit,
-    lfo2Rate: Float,
-    onLfo2RateChange: (Float) -> Unit,
-    mode: HyperLfoMode,
-    onModeChange: (HyperLfoMode) -> Unit,
-    linkEnabled: Boolean,
-    onLinkChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    uiState: LfoUiState,
+    actions: LfoPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
 ) {
     CollapsibleColumnPanel(
         title = "LFO",
@@ -99,10 +89,11 @@ fun HyperLfoPanelLayout(
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
         expandedWidth = 280.dp,
-        modifier = modifier
+        modifier = modifier,
+        showCollapsedHeader = showCollapsedHeader
     ) {
         val learnState = LocalLearnModeState.current
-        val isActive = mode != HyperLfoMode.OFF
+        val isActive = uiState.mode != HyperLfoMode.OFF
 
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -125,13 +116,13 @@ fun HyperLfoPanelLayout(
                         topLabel = "AND",
                         bottomLabel = "OR",
                         position =
-                            when (mode) {
+                            when (uiState.mode) {
                                 HyperLfoMode.AND -> 0
                                 HyperLfoMode.OFF -> 1
                                 HyperLfoMode.OR -> 2
                             },
                         onPositionChange = { pos ->
-                            onModeChange(
+                            actions.onModeChange(
                                 when (pos) {
                                     0 -> HyperLfoMode.AND
                                     1 -> HyperLfoMode.OFF
@@ -146,8 +137,8 @@ fun HyperLfoPanelLayout(
 
                 // Knobs (Medium size - 56dp)
                 RotaryKnob(
-                    value = lfo1Rate,
-                    onValueChange = onLfo1RateChange,
+                    value = uiState.lfoA,
+                    onValueChange = actions.onLfoAChange,
                     label = "FREQ A",
                     controlId = ControlIds.HYPER_LFO_A,
                     size = 56.dp,
@@ -156,8 +147,8 @@ fun HyperLfoPanelLayout(
                         else OrpheusColors.neonCyan.copy(alpha = 0.4f)
                 )
                 RotaryKnob(
-                    value = lfo2Rate,
-                    onValueChange = onLfo2RateChange,
+                    value = uiState.lfoB,
+                    onValueChange = actions.onLfoBChange,
                     label = "FREQ B",
                     controlId = ControlIds.HYPER_LFO_B,
                     size = 56.dp,
@@ -171,8 +162,8 @@ fun HyperLfoPanelLayout(
                     VerticalToggle(
                         topLabel = "LINK",
                         bottomLabel = "OFF",
-                        isTop = linkEnabled,
-                        onToggle = { onLinkChange(it) },
+                        isTop = uiState.linkEnabled,
+                        onToggle = { actions.onLinkChange(it) },
                         color = OrpheusColors.neonCyan,
                         enabled = !learnState.isActive
                     )
@@ -387,14 +378,18 @@ fun HyperLfoPanelPreview(
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
         HyperLfoPanelLayout(
-            lfo1Rate = 0.5f,
-            onLfo1RateChange = {},
-            lfo2Rate = 0.2f,
-            onLfo2RateChange = {},
-            mode = HyperLfoMode.AND,
-            onModeChange = {},
-            linkEnabled = false,
-            onLinkChange = {}
+            uiState = LfoUiState(
+                lfoA = 0.5f,
+                lfoB = 0.2f,
+                mode = HyperLfoMode.AND,
+                linkEnabled = false
+            ),
+            actions = LfoPanelActions(
+                onLfoAChange = {},
+                onLfoBChange = {},
+                onModeChange = {},
+                onLinkChange = {}
+            )
         )
     }
 }

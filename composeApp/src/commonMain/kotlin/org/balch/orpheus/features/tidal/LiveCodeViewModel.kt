@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.tidal
 
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,6 +8,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +25,7 @@ import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.core.tidal.TidalSchedulerState
 import org.balch.orpheus.features.ai.ReplCodeEvent
 import org.balch.orpheus.features.ai.ReplCodeEventBus
+import org.balch.orpheus.ui.utils.PanelViewModel
 
 /**
  * UI state for the Live Code editor.
@@ -40,6 +43,29 @@ data class LiveCodeUiState(
     val isAiGenerating: Boolean = false
 )
 
+data class LiveCodePanelActions(
+    val onCodeChange: (TextFieldValue) -> Unit,
+    val onExecuteBlock: () -> Unit,
+    val onExecuteLine: () -> Unit,
+    val onBpmChange: (Double) -> Unit,
+    val onExecute: () -> Unit,
+    val onStop: () -> Unit,
+    val onLoadExample: (String) -> Unit,
+    val onDeleteLine: () -> Unit
+) {
+    companion object {
+        val EMPTY = LiveCodePanelActions(
+            onCodeChange = { },
+            onExecuteBlock = { },
+            onExecuteLine = { },
+            onBpmChange = { },
+            onExecute = { },
+            onStop = { },
+            onLoadExample = { },
+            onDeleteLine = { })
+    }
+}
+
 /**
  * User intents for the Live Code editor.
  */
@@ -53,6 +79,7 @@ sealed class LiveCodeIntent {
     data class SetBpm(val bpm: Double) : LiveCodeIntent()
     data class LoadExample(val name: String) : LiveCodeIntent()
     data class HandleAiCode(val code: String, val slots: List<String>) : LiveCodeIntent()
+    data object DeleteLine : LiveCodeIntent()
 }
 
 /**
@@ -64,19 +91,30 @@ sealed class LiveCodeIntent {
  */
 @Inject
 @ViewModelKey(LiveCodeViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class LiveCodeViewModel(
     private val scheduler: TidalScheduler,
     private val repl: TidalRepl,
     private val replCodeEventBus: ReplCodeEventBus
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<LiveCodeUiState, LiveCodePanelActions> {
+
+    override val panelActions = LiveCodePanelActions(
+        onCodeChange = ::updateCode,
+        onExecuteBlock = ::executeBlock,
+        onExecuteLine = ::executeLine,
+        onBpmChange = ::setBpm,
+        onExecute = ::execute,
+        onStop = ::stop,
+        onLoadExample = ::loadExample,
+        onDeleteLine = ::deleteLine
+    )
     
     private val logger = logging("LiveCodeViewModel")
     
     private val _intents = MutableStateFlow<LiveCodeIntent?>(null)
     
     private val _uiState = MutableStateFlow(LiveCodeUiState())
-    val uiState: StateFlow<LiveCodeUiState> = _uiState.asStateFlow()
+    override val uiState: StateFlow<LiveCodeUiState> = _uiState.asStateFlow()
     
     // Expose scheduler state for cycle position display
     val schedulerState: StateFlow<TidalSchedulerState> = scheduler.state
@@ -180,6 +218,10 @@ class LiveCodeViewModel(
                 val line = findLine(state.code)
                 executeCode(line, state, EvalMode.MERGE)
             }
+
+            is LiveCodeIntent.DeleteLine -> {
+                deleteCurrentLine(state)
+            }
             
             is LiveCodeIntent.Play -> {
                 scheduler.play()
@@ -274,6 +316,31 @@ class LiveCodeViewModel(
         val end = text.indexOf('\n', cursor).takeIf { it != -1 } ?: text.length
         
         return text.substring(start, end).trim()
+    }
+
+    private fun deleteCurrentLine(state: LiveCodeUiState): LiveCodeUiState {
+        val text = state.code.text
+        if (text.isEmpty()) return state
+        
+        val cursor = state.code.selection.start.coerceIn(0, text.length)
+        // Find line bounds
+        val start = text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)) + 1
+        val end = text.indexOf('\n', cursor)
+        
+        var deleteStart = start
+        var deleteEnd = if (end == -1) text.length else end + 1
+        
+        // If it's the last line (no newline at end), and there's a previous line, delete the preceding newline
+        if (end == -1 && start > 0) {
+             deleteStart = start - 1 
+        }
+        
+        val newText = text.removeRange(deleteStart, deleteEnd)
+        val newCursor = deleteStart.coerceAtMost(newText.length)
+        
+        return state.copy(
+            code = TextFieldValue(newText, TextRange(newCursor))
+        )
     }
     
     /**
@@ -406,6 +473,10 @@ class LiveCodeViewModel(
     
     fun loadExample(name: String) {
         _intents.value = LiveCodeIntent.LoadExample(name)
+    }
+
+    fun deleteLine() {
+        _intents.value = LiveCodeIntent.DeleteLine
     }
     
     /**

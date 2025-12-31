@@ -24,13 +24,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.features.midi.MidiUiState
 import org.balch.orpheus.features.midi.MidiViewModel
+import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
 import org.balch.orpheus.ui.widgets.PulseButton
-
-import org.balch.orpheus.features.midi.MidiUiState
-import org.balch.orpheus.features.voice.VoiceUiState
 
 @Composable
 fun DuoPairBox(
@@ -57,7 +56,7 @@ fun DuoPairBox(
         override fun onQuadHoldChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadHoldChange(quadIndex, value)
         override fun onFmStructureChange(crossQuad: Boolean) = voiceViewModel.onFmStructureChange(crossQuad)
         override fun onTotalFeedbackChange(value: Float) = voiceViewModel.onTotalFeedbackChange(value)
-        override fun onVibratoChange(value: Float) = voiceViewModel.onVibratoChange(value)
+        override fun onVibratoChange(value: Float) = voiceViewModel.panelActions.onVibratoChange(value)
         override fun onVoiceCouplingChange(value: Float) = voiceViewModel.onVoiceCouplingChange(value)
         override fun onDialogActiveChange(active: Boolean) { /* Not used here */ }
         override fun onWobblePulseStart(index: Int, x: Float, y: Float) = voiceViewModel.onWobblePulseStart(index, x, y)

@@ -1,7 +1,5 @@
 package org.balch.orpheus.ui.panels
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -70,6 +68,7 @@ fun CollapsibleColumnPanel(
     initialExpanded: Boolean = false,
     expandedWidth: Dp = 140.dp,
     expandedTitle: String? = null,
+    showCollapsedHeader: Boolean = true,
     content: @Composable () -> Unit
 ) {
     var internalExpanded by remember { mutableStateOf(initialExpanded) }
@@ -88,9 +87,9 @@ fun CollapsibleColumnPanel(
 
     val shape = RoundedCornerShape(8.dp)
 
-    // Base modifier - ensure minimum width for the header strip
+    // Base modifier - ensure minimum width for the header strip ONLY if showing header
     val baseModifier = modifier
-        .widthIn(min = collapsedWidth)
+        .then(if (showCollapsedHeader) Modifier.widthIn(min = collapsedWidth) else Modifier)
         .fillMaxHeight()
         .clip(shape)
 
@@ -118,23 +117,25 @@ fun CollapsibleColumnPanel(
                 .fillMaxHeight()
                 .let { if (effectiveExpanded) it.fillMaxWidth() else it }
         ) {
-            // [LEFT] Vertical Header Strip (Always visible)
-            Box(
-                modifier = Modifier
-                    .width(collapsedWidth)
-                    .fillMaxHeight()
-                    .clickable { toggleExpanded() }
-                    .background(color.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = title.toList().joinToString("\n"),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (effectiveExpanded) color else color.copy(alpha = 0.7f),
-                    lineHeight = 12.sp,
-                    textAlign = TextAlign.Center
-                )
+            // [LEFT] Vertical Header Strip (Visible if enabled)
+            if (showCollapsedHeader) {
+                Box(
+                    modifier = Modifier
+                        .width(collapsedWidth)
+                        .fillMaxHeight()
+                        .clickable { toggleExpanded() }
+                        .background(color.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = title.toList().joinToString("\n"),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (effectiveExpanded) color else color.copy(alpha = 0.7f),
+                        lineHeight = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
             // [RIGHT] Content Area - Fills remaining space

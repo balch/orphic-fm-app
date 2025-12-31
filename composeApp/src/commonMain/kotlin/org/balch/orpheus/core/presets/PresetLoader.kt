@@ -35,6 +35,9 @@ class PresetLoader(
      *    To be safe and ensure UI/Engine sync, we emit to ViewModels and let them update the engine as they usually do,
      *    OR we update engine here and ViewModels just update their UI state.
      *    Adopting the "Reactive" approach: We emit the preset. ViewModels subscribe, update their state, AND push to engine.
+     * 
+     * Note: Master Volume is intentionally NOT applied from presets. It is only
+     * controllable via direct user interaction.
      */
     fun applyPreset(preset: DronePreset) {
         _presetFlow.tryEmit(preset)

@@ -49,6 +49,7 @@ data class DronePreset(
     val voiceCoupling: Float = 0.0f,
     val quadGroupPitches: List<Float> = List(3) { 0.5f },
     val quadGroupHolds: List<Float> = List(3) { 0.0f },
+    val quadGroupVolumes: List<Float> = List(3) { 1.0f },
 
     // Metadata
     val createdAt: Long = currentTimeMillis()

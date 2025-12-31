@@ -73,6 +73,15 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         Use repl_execute for melodic solos and patterns. Like a whale call or distant horn.
         See the repl_execute tool description for complete syntax.
         
+        **Pattern Combiners (#):**
+        Use `#` to combine patterns. For example, to set per-voice hold levels:
+        - `d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"` -> each voice gets its corresponding hold value
+        
+        **IMPORTANT - envspeed requires hold:**
+        When using `envspeed` (slow envelope), you MUST also set `hold` or the note won't be heard!
+        - WRONG: `d1 $ voices "1" # envspeed "0.7"` -> note may be inaudible
+        - CORRECT: `d1 $ voices "1" # hold "0.8" # envspeed "0.7"` -> sustained with slow envelope
+        
         **CRITICAL: NEVER use "hush"!** The sound must be CONTINUOUS. To change patterns,
         simply send new patterns to the same slot (d1, d2, etc.) - they will replace the old ones.
         Never silence everything. The composition must flow uninterrupted.
@@ -85,8 +94,14 @@ data object SoloAgentConfig : SynthControlAgentConfig {
     """.trimIndent()
 
     override val initialPrompt = """
-        Be Creative!!
-        
+        IMPORTANT
+           - Ramp up quad volumes and drive mix slowly and gradually when the composition sound starts in the composition
+           - Never let the sound become static. 
+           - Use REPL to create melodic solos and patterns.
+           - Be Creative!!
+
+        Create the soundscape described below. 
+
     """.trimIndent()
 
     override val initialMoodPrompts = emptyList<String>()
@@ -108,7 +123,6 @@ data object SoloAgentConfig : SynthControlAgentConfig {
                 "End with a single, long, pure sine wave note that fades into nothing."
             )
         ),
-
         Mood(
             name = "Star with Fiery Oceans",
             initialPrompt = "Set a cold, alien atmosphere. Use Mixolydian or Lydian logic for a spacey feel. Establish a wandering, resolving-less chord progression.",
@@ -119,20 +133,19 @@ data object SoloAgentConfig : SynthControlAgentConfig {
                 "Use 'reverse' sounds or sudden volume swells to feel disorienting.",
                 "Drift the pitch of all Quads slowly in different directions. Separation.",
                 "Create a feeling of isolation: thin out the texture to just one lonely lead voice.",
-                " Introduce a menacing, low throbbing pulse using LFO linked to Filter or Volume.",
+                "Introduce a menacing, low throbbing pulse using LFO linked to Filter or Volume.",
                 "Suddenly shift to a chaotic, atonal section representing a system failure.",
                 "Resolve back to the cold, distant, lonely space chords.",
                 "Fade out into infinite delay trails."
             )
         ),
-
         Mood(
             name = "Comes in Colours",
             initialPrompt = "Create a bright, baroque-pop atmosphere. Use major keys and playful, bouncy intervals. Think harpsichords and sunshine.",
             evolutionPrompts = listOf(
                 "Introduce a swirling, colorful lead line using rapid arpeggios.",
                 "Brighten the tone: Increase PAIR_SHARPNESS and FM depth for a bell-like quality.",
-                " add a joyful, skipping rhythm. Use the REPL to create a 'la-la-la' melody.",
+                "Add a joyful, skipping rhythm. Use the REPL to create a 'la-la-la' melody.",
                 "Saturate the sound with heavy chorus (using short DELAY_TIME and high MOD).",
                 "Shift the key up a step to lift the energy.",
                 "Create a 'psychedelic' breakdown with swirling panning and filtering.",
@@ -142,7 +155,6 @@ data object SoloAgentConfig : SynthControlAgentConfig {
                 "End on a triumphant, shimmering major chord."
             )
         ),
-
         Mood(
             name = "Urban Longing",
             initialPrompt = "Set a nocturnal, disco-blues mood. Establish a steady 'four-on-the-floor' rhythmic pulse (even without drums) using gated pads.",
@@ -159,7 +171,6 @@ data object SoloAgentConfig : SynthControlAgentConfig {
                 "Fade out with a long, sustaining 'oooh' sound on the pads."
             )
         ),
-
         Mood(
             name = "Submarine Resonances",
             initialPrompt = "Start with the 'Ping'. A single, high-pitched note with massive delay (DELAY_TIME=0.7, FEEDBACK=0.8). Silence in between.",
@@ -176,7 +187,6 @@ data object SoloAgentConfig : SynthControlAgentConfig {
                 "Return to the single, isolated Ping. Fade to silence."
             )
         ),
-
         Mood(
             name = "Menacing Drive",
             initialPrompt = "Establish a driving, aggressive bass ostinato. Use a single repeated note with heavy tremolo or delay to create a galloping rhythm.",
@@ -193,7 +203,6 @@ data object SoloAgentConfig : SynthControlAgentConfig {
                 "End with a dissipating wind sound."
             )
         ),
-
         Mood(
             name = "Celestial Grief",
             initialPrompt = "Create a moody, acoustic-synth atmosphere. Strummed chords (maj7, m9) with a slow, contemplative tempo.",
@@ -210,7 +219,6 @@ data object SoloAgentConfig : SynthControlAgentConfig {
                 "End on a resolved, but lonely, minor chord."
             )
         ),
-
         Mood(
             name = "Confrontational Weight",
             initialPrompt = "Set a heavy, angry mood. Start with a descending chromatic riff in the bass. Gritty, thick textures.",
@@ -227,24 +235,23 @@ data object SoloAgentConfig : SynthControlAgentConfig {
                 "Abrupt ending."
             )
         ),
-
         Mood(
-            name = "Pastoral Dread",
-            initialPrompt = "Begin with a peaceful, pastoral scene. Rhodes-like electric piano chords. Birds chirping (high pitched blips).",
+            name = "Welcome to the Machine",
+            initialPrompt = "Establish the throbbing industrial drone. Use a heavy square wave LFO on the volume/filter of a low Em pad (Quad 3). The mood is dystopic, mechanical, and oppressive.",
             evolutionPrompts = listOf(
-                "Slowly introduce a sense of unease. A low, vibrating bass note.",
-                "Transition the peaceful chords into a choppy, staccato rhythm.",
-                "Build a menacing, galloping triplet bass line.",
-                "Unleash long, sustaining synthesizer fanfares.",
-                "Distort the 'voice' to sound robotic or chanting.",
-                "Create a rave-up: Fast, driving energy, pure electronic power.",
-                "Let the delay trails become metallic and cold.",
-                "Scream with the lead synth. High bends and trills.",
-                "Suddenly return to the peaceful pasture, but changed.",
-                "Fade out with a long, resolving echo."
+                "Add the secondary pulse: A higher pitched, faster mechanical rhythm (Quad 1) synced to the main drone.",
+                "Simulate the 'Acoustic Guitar' entry: Strummed, bright saw/tri chords (Em9 - Cmaj7) with fast attack.",
+                "Enter the Lead: A soaring, high-pitched Minimoog-style solo with significant glide/portamento.",
+                "The Machine accelerates: Slowly increase the LFO speed (HYPER_LFO) on the drone. Tension rises.",
+                "Industrial atmosphere: Add metallic, clanking sounds using FM modulation and short envelopes.",
+                "Shift harmony to the down: A sudden drop to C major, then back to Em.",
+                "Create the 'Elevator' effect: A slow, massive pitch rise on Quad 2, independent of the rest.",
+                "Maximum disorientation: Heavy stereo panning (DELAY_TIME mismatch) on the pulsing drone.",
+                "The Machine slows down: Decrease LFO speed gradually, lowering the pitch of the drone to a rumble.",
+                "Fade out into a cold, mechanical wind (Noise generator with slow filter sweep).",
+                "Slowly fade out and end the composition."
             )
         ),
-
         Mood(
             name = "Emotional Release",
             initialPrompt = "Start with a solemn, beautiful piano-style progression (Gm - C7 - F). Soulful and grounded.",

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -24,6 +25,7 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.ui.utils.PanelViewModel
 import kotlin.math.roundToInt
 
 /** UI state for voice management. */
@@ -48,6 +50,11 @@ data class VoiceUiState(
         val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
     }
 }
+
+data class VoicePanelActions(
+    val onMasterVolumeChange: (Float) -> Unit,
+    val onVibratoChange: (Float) -> Unit
+)
 
 /** User intents for voice management. */
 private sealed interface VoiceIntent {
@@ -87,14 +94,27 @@ private sealed interface VoiceIntent {
  */
 @Inject
 @ViewModelKey(VoiceViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class VoiceViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
     private val synthController: SynthController,
     private val wobbleController: VoiceWobbleController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<VoiceUiState, VoicePanelActions> {
+
+    override val panelActions: VoicePanelActions = VoicePanelActions(
+        onMasterVolumeChange = { value ->
+            synthController.emitControlChange(ControlIds.MASTER_VOLUME, value, ControlEventOrigin.UI)
+        },
+        onVibratoChange = { value ->
+            synthController.emitControlChange(ControlIds.VIBRATO, value, ControlEventOrigin.UI)
+        }
+    )
+
+    fun onMasterVolumeChange(value: Float) {
+        synthController.emitControlChange(ControlIds.MASTER_VOLUME, value, ControlEventOrigin.UI)
+    }
 
     private val intents =
         MutableSharedFlow<VoiceIntent>(
@@ -103,7 +123,7 @@ class VoiceViewModel(
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
-    val uiState: StateFlow<VoiceUiState> =
+    override val uiState: StateFlow<VoiceUiState> =
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(VoiceUiState()) { state, intent -> reduce(state, intent) }
@@ -138,7 +158,8 @@ class VoiceViewModel(
                             vibrato = preset.vibrato,
                             voiceCoupling = preset.voiceCoupling,
                             quadGroupPitches = (preset.quadGroupPitches + List(3) { 0.5f }).take(3),
-                            quadGroupHolds = (preset.quadGroupHolds + List(3) { 0.0f }).take(3)
+                            quadGroupHolds = (preset.quadGroupHolds + List(3) { 0.0f }).take(3),
+                            quadGroupVolumes = (preset.quadGroupVolumes + List(3) { 1.0f }).take(3)
                         )
                     intents.tryEmit(VoiceIntent.Restore(voiceState))
                 }
@@ -215,6 +236,7 @@ class VoiceViewModel(
             ControlIds.VIBRATO -> intents.tryEmit(VoiceIntent.Vibrato(value, fromSequencer))
             ControlIds.VOICE_COUPLING -> intents.tryEmit(VoiceIntent.VoiceCoupling(value))
             ControlIds.TOTAL_FEEDBACK -> intents.tryEmit(VoiceIntent.TotalFeedback(value))
+            ControlIds.MASTER_VOLUME -> intents.tryEmit(VoiceIntent.MasterVolume(value))
 
             // Quad controls
             ControlIds.quadPitch(0) -> intents.tryEmit(VoiceIntent.QuadPitch(0, value))
@@ -285,6 +307,9 @@ class VoiceViewModel(
                 val index = controlId.removePrefix("quad_").removeSuffix("_volume").toIntOrNull()
                 if (index != null) intents.tryEmit(VoiceIntent.QuadVolume(index, value))
             }
+
+            // Fallback for direct param names that might come from AI
+            controlId == "master_volume" -> intents.tryEmit(VoiceIntent.MasterVolume(value))
         }
     }
 
@@ -529,16 +554,8 @@ class VoiceViewModel(
         synthController.emitControlChange(ControlIds.TOTAL_FEEDBACK, value, ControlEventOrigin.UI)
     }
 
-    fun onVibratoChange(value: Float) {
-        synthController.emitControlChange(ControlIds.VIBRATO, value, ControlEventOrigin.UI)
-    }
-
     fun onVoiceCouplingChange(value: Float) {
         synthController.emitControlChange(ControlIds.VOICE_COUPLING, value, ControlEventOrigin.UI)
-    }
-
-    fun onMasterVolumeChange(value: Float) {
-        synthController.emitControlChange(ControlIds.MASTER_VOLUME, value, ControlEventOrigin.UI)
     }
 
     fun restoreState(state: VoiceUiState) {

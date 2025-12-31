@@ -451,6 +451,15 @@ class TidalRepl(
             return parseVoicesPattern(voicesStr, voicesOffset)
         }
         
+        // Tidal-style hold pattern: hold "0.2 0.5 0" - sequence of hold values for voices 0, 1, 2...
+        // This enables: d1 $ voices "1 2 3" # hold "0.2 0.5 0"
+        val quotedHoldMatch = Regex("^hold\\s*\"([^\"]+)\"$").find(trimmed)
+        if (quotedHoldMatch != null) {
+            val holdStr = quotedHoldMatch.groupValues[1]
+            val holdOffset = trimOffset + trimmed.indexOf(holdStr)
+            return parseHoldPattern(holdStr, holdOffset)
+        }
+        
         // ============================================================
         // SYNTH CONTROL PATTERNS
         // ============================================================
@@ -489,6 +498,10 @@ class TidalRepl(
                       val v = parts[0].replace("\"", "").replace("'", "").toIntOrNull()
                       val valF = parts[1].replace("\"", "").replace("'", "").toFloatOrNull()
                       if (v != null && valF != null) return v to valF
+                 } else if (parts.isNotEmpty()) {
+                     // Single value -> implicit voice 1
+                     val valF = parts[0].replace("\"", "").replace("'", "").toFloatOrNull()
+                     if (valF != null) return 1 to valF
                  }
             }
             return null
@@ -777,6 +790,49 @@ class TidalRepl(
                  }
              }
              is TidalParser.ParseResult.Failure -> throw IllegalArgumentException(result.message)
+        }
+    }
+    
+    /**
+     * Parse hold values to VoiceHold events with source locations.
+     * Creates a sequence of hold values paired with voice indices 0, 1, 2...
+     * This enables: d1 $ voices "1 2 3" # hold "0.2 0.5 0"
+     * 
+     * @param pattern The hold pattern string (e.g., "0.2 0.5 0")
+     * @param globalOffset Character offset of this pattern in the full code string
+     */
+    private fun parseHoldPattern(pattern: String, globalOffset: Int = 0): Pattern<TidalEvent> {
+        // Parse the pattern string to get individual float tokens with their positions
+        val tokens = pattern.trim().split(Regex("\\s+"))
+        if (tokens.isEmpty() || (tokens.size == 1 && tokens[0].isBlank())) {
+            return Pattern.silence()
+        }
+        
+        // Create individual VoiceHold patterns with voice indices assigned at compile time
+        var currentOffset = 0
+        val holdPatterns = tokens.mapIndexedNotNull { index, token ->
+            val floatVal = token.toFloatOrNull()
+            if (floatVal == null) {
+                currentOffset += token.length + 1 // +1 for whitespace
+                return@mapIndexedNotNull null
+            }
+            
+            val voiceIndex = index % 8 // Cycle through voices 0-7
+            val location = SourceLocation(
+                globalOffset + pattern.indexOf(token, currentOffset),
+                globalOffset + pattern.indexOf(token, currentOffset) + token.length
+            )
+            currentOffset = pattern.indexOf(token, currentOffset) + token.length
+            
+            Pattern.pure<TidalEvent>(TidalEvent.VoiceHold(voiceIndex, floatVal.coerceIn(0f, 1f), listOf(location)))
+        }
+        
+        return if (holdPatterns.isEmpty()) {
+            Pattern.silence()
+        } else if (holdPatterns.size == 1) {
+            holdPatterns[0]
+        } else {
+            Pattern.fastcat(holdPatterns)
         }
     }
     

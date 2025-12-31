@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -21,6 +22,7 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.ui.utils.PanelViewModel
 
 /** UI state for the Distortion/Volume panel. */
 data class DistortionUiState(
@@ -28,6 +30,12 @@ data class DistortionUiState(
     val volume: Float = 0.7f,
     val mix: Float = 0.5f,
     val peak: Float = 0.0f
+)
+
+data class DistortionPanelActions(
+    val onDriveChange: (Float) -> Unit,
+    val onVolumeChange: (Float) -> Unit,
+    val onMixChange: (Float) -> Unit
 )
 
 /** User intents for the Distortion panel. */
@@ -46,13 +54,19 @@ private sealed interface DistortionIntent {
  */
 @Inject
 @ViewModelKey(DistortionViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class DistortionViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
     private val synthController: SynthController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<DistortionUiState, DistortionPanelActions> {
+
+    override val panelActions = DistortionPanelActions(
+        onDriveChange = ::onDriveChange,
+        onVolumeChange = ::onVolumeChange,
+        onMixChange = ::onMixChange
+    )
 
     private val intents =
         MutableSharedFlow<DistortionIntent>(
@@ -61,7 +75,7 @@ class DistortionViewModel(
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
-    val uiState: StateFlow<DistortionUiState> =
+    override val uiState: StateFlow<DistortionUiState> =
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(DistortionUiState()) { state, intent -> reduce(state, intent) }
@@ -78,10 +92,11 @@ class DistortionViewModel(
 
             launch {
                 presetLoader.presetFlow.collect { preset ->
+                    // Master Volume is NEVER set from presets - only user interaction
                     val distortionState =
                         DistortionUiState(
                             drive = preset.drive,
-                            volume = preset.masterVolume,
+                            volume = uiState.value.volume,  // Always preserve current
                             mix = preset.distortionMix
                         )
                     intents.tryEmit(DistortionIntent.Restore(distortionState))

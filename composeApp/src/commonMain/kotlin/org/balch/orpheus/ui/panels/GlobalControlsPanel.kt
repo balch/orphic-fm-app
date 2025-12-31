@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.lfo.HyperLfoMode
 import org.balch.orpheus.features.lfo.HyperLfoPanelLayout
+import org.balch.orpheus.features.lfo.LfoPanelActions
+import org.balch.orpheus.features.lfo.LfoUiState
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -56,6 +58,7 @@ fun GlobalControlsPanel(
     onPanChange: (Float) -> Unit,
     liquidState: LiquidState? = LocalLiquidState.current,
     effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
+    showCollapsedHeader: Boolean = true,
 ) {
     val shape = RoundedCornerShape(12.dp)
     Row(
@@ -75,14 +78,19 @@ fun GlobalControlsPanel(
     ) {
         // LEFT: Hyper LFO Section
         HyperLfoPanelLayout(
-            lfo1Rate = vibrato,
-            onLfo1RateChange = onVibratoChange,
-            lfo2Rate = lfo2Rate,
-            onLfo2RateChange = onLfo2RateChange,
-            mode = hyperLfoMode,
-            onModeChange = onHyperLfoModeChange,
-            linkEnabled = false, // TODO: Expose this up if needed
-            onLinkChange = {}
+            uiState = LfoUiState(
+                lfoA = vibrato,
+                lfoB = lfo2Rate,
+                mode = hyperLfoMode,
+                linkEnabled = false // Default or add param if needed
+            ),
+            actions = LfoPanelActions(
+                onLfoAChange = onVibratoChange,
+                onLfoBChange = onLfo2RateChange,
+                onModeChange = onHyperLfoModeChange,
+                onLinkChange = {}
+            ),
+            showCollapsedHeader = showCollapsedHeader
         )
 
         Spacer(modifier = Modifier.width(8.dp))

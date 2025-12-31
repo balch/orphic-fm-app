@@ -35,12 +35,11 @@ fun StereoPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
+    val actions = viewModel.panelActions
 
     StereoPanelLayout(
-        mode = state.mode,
-        onModeChange = viewModel::onModeChange,
-        masterPan = state.masterPan,
-        onMasterPanChange = viewModel::onMasterPanChange,
+        uiState = state,
+        actions = actions,
         modifier = modifier,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange
@@ -57,13 +56,12 @@ fun StereoPanel(
  */
 @Composable
 fun StereoPanelLayout(
-    mode: StereoMode,
-    onModeChange: (StereoMode) -> Unit,
-    masterPan: Float,
-    onMasterPanChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    uiState: StereoUiState,
+    actions: StereoPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
 ) {
     CollapsibleColumnPanel(
         title = "PAN",
@@ -73,7 +71,8 @@ fun StereoPanelLayout(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         expandedWidth = 120.dp,
-        modifier = modifier
+        modifier = modifier,
+        showCollapsedHeader = showCollapsedHeader
     ) {
         // Side-by-side layout: Mode toggle | Pan knob
         Row(
@@ -85,9 +84,9 @@ fun StereoPanelLayout(
             VerticalToggle(
                 topLabel = "VOICE",
                 bottomLabel = "DELAY",
-                isTop = mode == StereoMode.VOICE_PAN,
+                isTop = uiState.mode == StereoMode.VOICE_PAN,
                 onToggle = { isVoicePan ->
-                    onModeChange(
+                    actions.onModeChange(
                         if (isVoicePan) StereoMode.VOICE_PAN else StereoMode.STEREO_DELAYS
                     )
                 },
@@ -98,9 +97,9 @@ fun StereoPanelLayout(
 
             // Master Pan knob
             RotaryKnob(
-                value = (masterPan + 1f) / 2f,
+                value = (uiState.masterPan + 1f) / 2f,
                 onValueChange = { normalized ->
-                    onMasterPanChange((normalized * 2f) - 1f)
+                    actions.onMasterPanChange((normalized * 2f) - 1f)
                 },
                 label = "PAN",
                 controlId = "stereo_pan",
@@ -118,11 +117,15 @@ fun StereoPanelPreview(
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
         StereoPanelLayout(
-            mode = StereoMode.VOICE_PAN,
-            isExpanded = true,
-            onModeChange = {},
-            masterPan = 0f,
-            onMasterPanChange = {}
+            uiState = StereoUiState(
+                mode = StereoMode.VOICE_PAN,
+                masterPan = 0f
+            ),
+            actions = StereoPanelActions(
+                onModeChange = {},
+                onMasterPanChange = {}
+            ),
+            isExpanded = true
         )
     }
 }

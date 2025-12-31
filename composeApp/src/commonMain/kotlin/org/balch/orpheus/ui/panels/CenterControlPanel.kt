@@ -37,7 +37,7 @@ fun CenterControlPanel(modifier: Modifier = Modifier) {
     CenterControlPanelLayout(
         voiceState = voiceState,
         effects = effects,
-        onVibratoChange = voiceViewModel::onVibratoChange,
+        onVibratoChange = { voiceViewModel.panelActions.onVibratoChange(it) },
         onVoiceCouplingChange = voiceViewModel::onVoiceCouplingChange,
         onTotalFeedbackChange = voiceViewModel::onTotalFeedbackChange,
         onFmStructureChange = voiceViewModel::onFmStructureChange,

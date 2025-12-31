@@ -86,9 +86,9 @@ class TidalParserTest {
     
     @Test
     fun `parseGates rejects invalid voice index`() {
-        val result = TidalParser.parseGates("9")
+        val result = TidalParser.parseGates("13")
         assertIs<TidalParser.ParseResult.Failure<TidalEvent>>(result)
-        assertTrue(result.message.contains("1-8"))
+        assertTrue(result.message.contains("1-12"))
     }
     
     @Test
@@ -163,5 +163,73 @@ class TidalParserTest {
         
         val events = result.pattern.query(Arc.UNIT)
         assertEquals(3, events.size)
+    }
+
+    @Test
+    fun `parseNotes parses simple notes`() {
+        val result = TidalParser.parseNotes("c3 e3 g3")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(3, events.size)
+        
+        val notes = events.sortedBy { it.part.start }
+            .map { (it.value as TidalEvent.Note).midiNote }
+        // c3 = 48, e3 = 52, g3 = 55
+        assertEquals(listOf(48, 52, 55), notes)
+    }
+
+    @Test
+    fun `parseNotes handles sharps`() {
+        val result = TidalParser.parseNotes("c#3")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(1, events.size)
+        // c#3 = 49
+        assertEquals(49, (events[0].value as TidalEvent.Note).midiNote)
+    }
+
+    @Test
+    fun `parseNotes handles flats with b`() {
+        val result = TidalParser.parseNotes("eb3")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(1, events.size)
+        // eb3 = 51 (e3=52 minus 1)
+        assertEquals(51, (events[0].value as TidalEvent.Note).midiNote)
+    }
+
+    @Test
+    fun `parseNotes handles flats with minus sign`() {
+        // Alternative flat notation: e-3 = eb3
+        val result = TidalParser.parseNotes("e-3")
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(result)
+        
+        val events = result.pattern.query(Arc.UNIT)
+        assertEquals(1, events.size)
+        // e-3 = eb3 = 51
+        assertEquals(51, (events[0].value as TidalEvent.Note).midiNote)
+    }
+
+    @Test
+    fun `parseNotes handles mixed flat notations`() {
+        // Both eb and e- should parse to the same MIDI note
+        val resultB = TidalParser.parseNotes("a-3 b-3")
+        val resultMinus = TidalParser.parseNotes("ab3 bb3") 
+        
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(resultB)
+        assertIs<TidalParser.ParseResult.Success<TidalEvent>>(resultMinus)
+        
+        val notesB = resultB.pattern.query(Arc.UNIT)
+            .sortedBy { it.part.start }
+            .map { (it.value as TidalEvent.Note).midiNote }
+        val notesMinus = resultMinus.pattern.query(Arc.UNIT)
+            .sortedBy { it.part.start }
+            .map { (it.value as TidalEvent.Note).midiNote }
+        
+        // ab3=56, bb3=58 and a-3=56, b-3=58
+        assertEquals(notesMinus, notesB)
     }
 }

@@ -35,6 +35,8 @@ import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
+import org.balch.orpheus.ui.viz.VizPanelActions
+import org.balch.orpheus.ui.viz.VizUiState
 import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -56,16 +58,11 @@ fun VizPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
+    val actions = viewModel.panelActions
 
     VizPanelLayout(
-        currentViz = state.selectedViz,
-        visualizations = state.visualizations,
-        showKnobs = state.showKnobs,
-        knob1Value = state.knob1Value,
-        knob2Value = state.knob2Value,
-        onSelectViz = viewModel::selectVisualization,
-        onKnob1Change = viewModel::onKnob1Change,
-        onKnob2Change = viewModel::onKnob2Change,
+        uiState = state,
+        actions = actions,
         modifier = modifier,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange
@@ -74,17 +71,12 @@ fun VizPanel(
 
 @Composable
 fun VizPanelLayout(
-    currentViz: Visualization,
-    visualizations: List<Visualization>,
-    showKnobs: Boolean,
-    knob1Value: Float = 0.5f,
-    knob2Value: Float = 0.5f,
-    onSelectViz: (Visualization) -> Unit,
-    onKnob1Change: (Float) -> Unit,
-    onKnob2Change: (Float) -> Unit,
     modifier: Modifier = Modifier,
+    uiState: VizUiState,
+    actions: VizPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
 ) {
     CollapsibleColumnPanel(
         title = "VIZ",
@@ -94,7 +86,8 @@ fun VizPanelLayout(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         expandedWidth = 140.dp,
-        modifier = modifier
+        modifier = modifier,
+        showCollapsedHeader = showCollapsedHeader
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -122,15 +115,15 @@ fun VizPanelLayout(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = currentViz.name,
+                        text = uiState.selectedViz.name,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (showKnobs) VizColor else Color.Gray
+                        color = if (uiState.showKnobs) VizColor else Color.Gray
                     )
                     Text(
                         text = "▼",
                         fontSize = 12.sp,
-                        color = if (showKnobs) VizColor else Color.Gray,
+                        color = if (uiState.showKnobs) VizColor else Color.Gray,
                     )
                 }
 
@@ -139,16 +132,16 @@ fun VizPanelLayout(
                     onDismissRequest = { expanded = false },
                     modifier = Modifier.background(OrpheusColors.softPurple) // Use explicit color
                 ) {
-                    visualizations.forEach { viz ->
+                    uiState.visualizations.forEach { viz ->
                         DropdownMenuItem(
                             text = {
                                 Text(
                                     viz.name,
-                                    color = if (viz.id == currentViz.id) VizColor else Color.White
+                                    color = if (viz.id == uiState.selectedViz.id) VizColor else Color.White
                                 )
                             },
                             onClick = {
-                                onSelectViz(viz)
+                                actions.onSelectViz(viz)
                                 expanded = false
                             }
                         )
@@ -168,22 +161,22 @@ fun VizPanelLayout(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 RotaryKnob(
-                    value = knob1Value,
-                    onValueChange = onKnob1Change,
-                    label = if (showKnobs) currentViz.knob1Label else "-",
+                    value = uiState.knob1Value,
+                    onValueChange = actions.onKnob1Change,
+                    label = if (uiState.showKnobs) uiState.selectedViz.knob1Label else "-",
                     controlId = "viz_knob1",
                     size = 48.dp,
-                    progressColor = if (showKnobs) VizColor else Color.Gray.copy(alpha = 0.3f),
-                    enabled = showKnobs
+                    progressColor = if (uiState.showKnobs) VizColor else Color.Gray.copy(alpha = 0.3f),
+                    enabled = uiState.showKnobs
                 )
                 RotaryKnob(
-                    value = knob2Value,
-                    onValueChange = onKnob2Change,
-                    label = if (showKnobs) currentViz.knob2Label else "-",
+                    value = uiState.knob2Value,
+                    onValueChange = actions.onKnob2Change,
+                    label = if (uiState.showKnobs) uiState.selectedViz.knob2Label else "-",
                     controlId = "viz_knob2",
                     size = 48.dp,
-                    progressColor = if (showKnobs) VizColor else Color.Gray.copy(alpha = 0.3f),
-                    enabled = showKnobs
+                    progressColor = if (uiState.showKnobs) VizColor else Color.Gray.copy(alpha = 0.3f),
+                    enabled = uiState.showKnobs
                 )
             }
         }
@@ -199,6 +192,7 @@ private object PreviewViz : Visualization {
     override val color = Color.White
     override val knob1Label = "Speed"
     override val knob2Label = "Zoom"
+    override val liquidEffects = VisualizationLiquidEffects()
     override fun setKnob1(value: Float) {}
     override fun setKnob2(value: Float) {}
     override fun onActivate() {}
@@ -214,13 +208,19 @@ fun VizPanelPreview(
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
         VizPanelLayout(
-            currentViz = PreviewViz,
-            visualizations = listOf(PreviewViz),
-            showKnobs = true,
-            isExpanded = true,
-            onSelectViz = {},
-            onKnob1Change = {},
-            onKnob2Change = {}
+            uiState = VizUiState(
+                selectedViz = PreviewViz,
+                visualizations = listOf(PreviewViz),
+                showKnobs = true,
+                knob1Value = 0.5f,
+                knob2Value = 0.5f
+            ),
+            actions = VizPanelActions(
+                onSelectViz = {},
+                onKnob1Change = {},
+                onKnob2Change = {}
+            ),
+            isExpanded = true
         )
     }
 }

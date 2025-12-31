@@ -81,7 +81,7 @@ fun DesktopSynthScreen(
         override fun onQuadHoldChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadHoldChange(quadIndex, value)
         override fun onFmStructureChange(crossQuad: Boolean) = voiceViewModel.onFmStructureChange(crossQuad)
         override fun onTotalFeedbackChange(value: Float) = voiceViewModel.onTotalFeedbackChange(value)
-        override fun onVibratoChange(value: Float) = voiceViewModel.onVibratoChange(value)
+        override fun onVibratoChange(value: Float) = voiceViewModel.panelActions.onVibratoChange(value)
         override fun onVoiceCouplingChange(value: Float) = voiceViewModel.onVoiceCouplingChange(value)
         override fun onDialogActiveChange(active: Boolean) { /* handled by parent */ }
         override fun onWobblePulseStart(index: Int, x: Float, y: Float) = voiceViewModel.onWobblePulseStart(index, x, y)

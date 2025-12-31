@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -21,6 +22,7 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.ui.utils.PanelViewModel
 
 /** UI state for the Mod Delay panel. */
 data class DelayUiState(
@@ -32,6 +34,17 @@ data class DelayUiState(
     val mix: Float = 0.5f,
     val isLfoSource: Boolean = true,
     val isTriangleWave: Boolean = true
+)
+
+data class DelayPanelActions(
+    val onTime1Change: (Float) -> Unit,
+    val onMod1Change: (Float) -> Unit,
+    val onTime2Change: (Float) -> Unit,
+    val onMod2Change: (Float) -> Unit,
+    val onFeedbackChange: (Float) -> Unit,
+    val onMixChange: (Float) -> Unit,
+    val onSourceChange: (Boolean) -> Unit,
+    val onWaveformChange: (Boolean) -> Unit
 )
 
 /** User intents for the Delay panel. */
@@ -54,13 +67,24 @@ private sealed interface DelayIntent {
  */
 @Inject
 @ViewModelKey(DelayViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class DelayViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
     private val synthController: SynthController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<DelayUiState, DelayPanelActions> {
+
+    override val panelActions = DelayPanelActions(
+        onTime1Change = ::onTime1Change,
+        onMod1Change = ::onMod1Change,
+        onTime2Change = ::onTime2Change,
+        onMod2Change = ::onMod2Change,
+        onFeedbackChange = ::onFeedbackChange,
+        onMixChange = ::onMixChange,
+        onSourceChange = ::onSourceChange,
+        onWaveformChange = ::onWaveformChange
+    )
 
     private val intents =
         MutableSharedFlow<DelayIntent>(
@@ -69,7 +93,7 @@ class DelayViewModel(
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
-    val uiState: StateFlow<DelayUiState> =
+    override val uiState: StateFlow<DelayUiState> =
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(DelayUiState()) { state, intent -> reduce(state, intent) }

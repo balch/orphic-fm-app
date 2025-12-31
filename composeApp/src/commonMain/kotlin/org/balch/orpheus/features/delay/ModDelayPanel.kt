@@ -34,24 +34,11 @@ fun ModDelayPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
+    val actions = viewModel.panelActions
 
     ModDelayPanelLayout(
-        time1 = state.time1,
-        onTime1Change = viewModel::onTime1Change,
-        mod1 = state.mod1,
-        onMod1Change = viewModel::onMod1Change,
-        time2 = state.time2,
-        onTime2Change = viewModel::onTime2Change,
-        mod2 = state.mod2,
-        onMod2Change = viewModel::onMod2Change,
-        feedback = state.feedback,
-        onFeedbackChange = viewModel::onFeedbackChange,
-        mix = state.mix,
-        onMixChange = viewModel::onMixChange,
-        isLfoSource = state.isLfoSource,
-        onSourceChange = viewModel::onSourceChange,
-        isTriangleWave = state.isTriangleWave,
-        onWaveformChange = viewModel::onWaveformChange,
+        uiState = state,
+        actions = actions,
         modifier = modifier,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange
@@ -64,25 +51,12 @@ fun ModDelayPanel(
  */
 @Composable
 fun ModDelayPanelLayout(
-    time1: Float,
-    onTime1Change: (Float) -> Unit,
-    mod1: Float,
-    onMod1Change: (Float) -> Unit,
-    time2: Float,
-    onTime2Change: (Float) -> Unit,
-    mod2: Float,
-    onMod2Change: (Float) -> Unit,
-    feedback: Float,
-    onFeedbackChange: (Float) -> Unit,
-    mix: Float,
-    onMixChange: (Float) -> Unit,
-    isLfoSource: Boolean,
-    onSourceChange: (Boolean) -> Unit,
-    isTriangleWave: Boolean,
-    onWaveformChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    uiState: DelayUiState,
+    actions: DelayPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
 ) {
     CollapsibleColumnPanel(
         title = "DELAY",
@@ -92,7 +66,8 @@ fun ModDelayPanelLayout(
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
         expandedWidth = 240.dp,
-        modifier = modifier
+        modifier = modifier,
+        showCollapsedHeader = showCollapsedHeader
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -106,16 +81,16 @@ fun ModDelayPanelLayout(
                 verticalAlignment = Alignment.Top
             ) {
                 RotaryKnob(
-                    value = mod1,
-                    onValueChange = onMod1Change,
+                    value = uiState.mod1,
+                    onValueChange = actions.onMod1Change,
                     label = "MOD 1",
                     controlId = null,
                     size = 40.dp,
                     progressColor = OrpheusColors.warmGlow
                 )
                 RotaryKnob(
-                    value = mod2,
-                    onValueChange = onMod2Change,
+                    value = uiState.mod2,
+                    onValueChange = actions.onMod2Change,
                     label = "MOD 2",
                     controlId = null,
                     size = 40.dp,
@@ -129,8 +104,8 @@ fun ModDelayPanelLayout(
                     VerticalToggle(
                         topLabel = "LFO",
                         bottomLabel = "SELF",
-                        isTop = isLfoSource,
-                        onToggle = { onSourceChange(it) },
+                        isTop = uiState.isLfoSource,
+                        onToggle = { actions.onSourceChange(it) },
                         color = OrpheusColors.warmGlow
                     )
                 }
@@ -141,8 +116,8 @@ fun ModDelayPanelLayout(
                     VerticalToggle(
                         topLabel = "TRI",
                         bottomLabel = "SQR",
-                        isTop = isTriangleWave,
-                        onToggle = { onWaveformChange(it) },
+                        isTop = uiState.isTriangleWave,
+                        onToggle = { actions.onWaveformChange(it) },
                         color = OrpheusColors.warmGlow
                     )
                 }
@@ -155,32 +130,32 @@ fun ModDelayPanelLayout(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 RotaryKnob(
-                    value = time1,
-                    onValueChange = onTime1Change,
+                    value = uiState.time1,
+                    onValueChange = actions.onTime1Change,
                     label = "TIME 1",
                     controlId = null,
                     size = 40.dp,
                     progressColor = OrpheusColors.warmGlow
                 )
                 RotaryKnob(
-                    value = time2,
-                    onValueChange = onTime2Change,
+                    value = uiState.time2,
+                    onValueChange = actions.onTime2Change,
                     label = "TIME 2",
                     controlId = null,
                     size = 40.dp,
                     progressColor = OrpheusColors.warmGlow
                 )
                 RotaryKnob(
-                    value = feedback,
-                    onValueChange = onFeedbackChange,
+                    value = uiState.feedback,
+                    onValueChange = actions.onFeedbackChange,
                     label = "FB",
                     controlId = null,
                     size = 40.dp,
                     progressColor = OrpheusColors.warmGlow
                 )
                 RotaryKnob(
-                    value = mix,
-                    onValueChange = onMixChange,
+                    value = uiState.mix,
+                    onValueChange = actions.onMixChange,
                     label = "MIX",
                     controlId = null,
                     size = 40.dp,
@@ -198,22 +173,26 @@ fun ModDelayPanelPreview(
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
         ModDelayPanelLayout(
-            time1 = 0.5f,
-            onTime1Change = {},
-            mod1 = 0.3f,
-            onMod1Change = {},
-            time2 = 0.6f,
-            onTime2Change = {},
-            mod2 = 0.4f,
-            onMod2Change = {},
-            feedback = 0.7f,
-            onFeedbackChange = {},
-            mix = 0.5f,
-            onMixChange = {},
-            isLfoSource = true,
-            onSourceChange = {},
-            isTriangleWave = true,
-            onWaveformChange = {}
+            uiState = DelayUiState(
+                time1 = 0.5f,
+                mod1 = 0.3f,
+                time2 = 0.6f,
+                mod2 = 0.4f,
+                feedback = 0.7f,
+                mix = 0.5f,
+                isLfoSource = true,
+                isTriangleWave = true
+            ),
+            actions = DelayPanelActions(
+                onTime1Change = {},
+                onMod1Change = {},
+                onTime2Change = {},
+                onMod2Change = {},
+                onFeedbackChange = {},
+                onMixChange = {},
+                onSourceChange = {},
+                onWaveformChange = {}
+            )
         )
     }
 }

@@ -33,19 +33,27 @@ class ReplExecuteTool @Inject constructor(
         Use slots d1-d8 for different pattern layers.
         
         IMMEDIATE vs CYCLED COMMANDS:
-        - Bare control commands (once $) are applied ONCE immediately: drive:0.45
-        - Slot assignment (d1 $) cycles the pattern every beat: d1 $ drive:0.45
+        - Bare control commands are applied ONCE immediately: drive:0.45, envspeed:1 0.8
+        - Slot assignment (d1 $) cycles the pattern every beat: d1 $ note "c3"
         - Use bare commands for static settings, slots for rhythmic patterns!
+        - WRONG: once $ drive:0.5 ("once $" does NOT work!)
+        - CORRECT: drive:0.5 (bare command, no prefix)
         
         PATTERN TYPES:
         - note "<notes>" - Melodic notes (octaves 2-6, sharps: c#3, flats: db3)
         - voices:<indices> - Trigger voice envelopes (indices 1-8)
+        - hold "<values>" - Per-voice hold pattern for use with # combiner
         
         VOICE CONTROLS (voice index 1-8):
         - hold:<voice> <val> - Voice sustain level (0.0-1.0)
         - tune:<voice> <val> - Voice pitch (0.5 = unity)
         - pan:<voice> <val> - Voice pan (-1.0 to 1.0)
         - envspeed:<voice> <val> - Envelope speed (0.0=fast, 1.0=slow)
+        
+        **IMPORTANT - envspeed requires hold:**
+        When using envspeed, you MUST also set hold or the note won't be heard!
+        - WRONG: d1 $ voices "1" # envspeed "0.7"
+        - CORRECT: d1 $ voices "1" # hold "0.8" # envspeed "0.7"
         
         QUAD CONTROLS (quad index 1-3):
         - quadhold:<quad> <val> - Quad hold level (0.0-1.0)
@@ -66,13 +74,14 @@ class ReplExecuteTool @Inject constructor(
         - fast <n> <pattern> - Speed up by factor n
         - slow <n> <pattern> - Slow down by factor n
         
-        COMBINING PATTERNS:
-        Use # to combine patterns on one line.
+        COMBINING PATTERNS (#):
+        Use # to combine patterns. Per-voice hold example:
+        d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"
         
         EXAMPLES:
         d1 $ note "c2 db2 g2 ab2"
         d2 $ voices:1 2 3 4
-        d3 $ hold:1 0.8 # tune:1 0.5
+        d3 $ voices "1" # hold "0.8" # envspeed "0.7"
         
         Use hush to silence all patterns.
     """.trimIndent()
@@ -82,14 +91,15 @@ class ReplExecuteTool @Inject constructor(
     @Serializable
     data class Args(
         @property:LLMDescription("""
-            REPL code. Each line:
-                once $ <command> - immediate execution once
-                d<slot> $ <pattern>
-            Notes: d1 $ note "c3 e3"
-            Voices: d1 $ voices:1 2 3 4
-            Hold: d2 $ hold:1 0.8
-            Effects: once $ drive:0.5
-            Combine: d1 $ note "c3" # hold:1 0.8
+            REPL code. Each line is either:
+            - Bare command (applied immediately): drive:0.5, envspeed:1 0.8, hold:1 0.9
+            - Slot pattern (cycled): d<slot> $ <pattern>
+            Examples:
+            drive:0.5
+            envspeed:1 0.8
+            hold:1 0.9
+            d1 $ note "c3 e3"
+            d2 $ voices "1 2 3" # hold "0.2 0.5 0.8"
         """)
         val code: String,
     )

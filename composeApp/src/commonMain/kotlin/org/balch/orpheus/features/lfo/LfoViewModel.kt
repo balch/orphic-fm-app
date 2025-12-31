@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -21,6 +22,7 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.ui.utils.PanelViewModel
 
 /** UI state for the Hyper LFO panel. */
 data class LfoUiState(
@@ -28,6 +30,13 @@ data class LfoUiState(
     val lfoB: Float = 0.0f,
     val mode: HyperLfoMode = HyperLfoMode.OFF,
     val linkEnabled: Boolean = false
+)
+
+data class LfoPanelActions(
+    val onLfoAChange: (Float) -> Unit,
+    val onLfoBChange: (Float) -> Unit,
+    val onModeChange: (HyperLfoMode) -> Unit,
+    val onLinkChange: (Boolean) -> Unit
 )
 
 /** User intents for the LFO panel. */
@@ -46,13 +55,20 @@ private sealed interface LfoIntent {
  */
 @Inject
 @ViewModelKey(LfoViewModel::class)
-@ContributesIntoMap(AppScope::class)
+@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class LfoViewModel(
     private val engine: SynthEngine,
     private val presetLoader: PresetLoader,
     private val synthController: SynthController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<LfoUiState, LfoPanelActions> {
+
+    override val panelActions = LfoPanelActions(
+        onLfoAChange = ::onLfoAChange,
+        onLfoBChange = ::onLfoBChange,
+        onModeChange = ::onModeChange,
+        onLinkChange = ::onLinkChange
+    )
 
     private val intents =
         MutableSharedFlow<LfoIntent>(
@@ -61,7 +77,7 @@ class LfoViewModel(
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
-    val uiState: StateFlow<LfoUiState> =
+    override val uiState: StateFlow<LfoUiState> =
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(LfoUiState()) { state, intent -> reduce(state, intent) }
