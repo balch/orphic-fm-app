@@ -15,7 +15,9 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.features.viz.OffViz
 import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /**
  * UI State for the VIZ panel.
@@ -171,5 +173,16 @@ class VizViewModel(
         super.onCleared()
         _currentViz.value.onDeactivate()
         dynamicEffectsJob?.cancel()
+    }
+
+    companion object {
+        val PREVIEW = ViewModelStateActionMapper(
+            state = VizUiState(
+                selectedViz = OffViz(),
+                visualizations = listOf(OffViz()),
+                showKnobs = false
+            ),
+            actions = VizPanelActions.EMPTY,
+        )
     }
 }

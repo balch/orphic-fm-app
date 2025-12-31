@@ -22,6 +22,8 @@ import org.balch.orpheus.core.midi.MidiInputHandler
 import org.balch.orpheus.core.midi.MidiMappingRepository
 import org.balch.orpheus.core.midi.MidiMappingState
 import org.balch.orpheus.core.midi.MidiMappingStateHolder
+import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /** UI state for the MIDI panel. */
 data class MidiUiState(
@@ -46,7 +48,7 @@ class MidiViewModel(
     private val stateHolder: MidiMappingStateHolder,
     private val midiInputHandler: MidiInputHandler,
     private val dispatcherProvider: DispatcherProvider
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<MidiUiState, MidiPanelActions> {
 
     private val log = logging("MidiViewModel")
 
@@ -55,7 +57,7 @@ class MidiViewModel(
     private val _isConnected = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     // UI state combines local device state with shared mapping state
-    val uiState: StateFlow<MidiUiState> = combine(
+    override val uiState: StateFlow<MidiUiState> = combine(
         _deviceName,
         _isConnected,
         stateHolder.isLearnModeActive,
@@ -71,6 +73,24 @@ class MidiViewModel(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = MidiUiState()
+    )
+
+    override val panelActions: MidiPanelActions = MidiPanelActions(
+        onToggleLearnMode = { toggleLearnMode() },
+        onSaveLearnedMappings = { saveLearnedMappings() },
+        onCancelLearnMode = { cancelLearnMode() },
+        onSelectControlForLearning = { id -> selectControlForLearning(id) },
+        onSelectVoiceForLearning = { idx -> selectVoiceForLearning(idx) },
+        // Direct queries logic can stay in VM or be pure functions of state.
+        // We don't necessarily need them in actions if UI reads state. 
+        // But some UI components might use callbacks. Let's see usage.
+        // Usage: isVoiceBeingLearned(index). 
+        // We can include a lambda for it if needed, or UI checks state.
+        // UI code in DesktopSynthScreen passes `isVoiceBeingLearned: (Int) -> Boolean`. 
+        // We can keep `isVoiceBeingLearned` method in VM and pass references, 
+        // or put it in actions. Putting in actions is cleaner for the pattern.
+        isControlBeingLearned = { id -> isControlBeingLearned(id) },
+        isVoiceBeingLearned = { idx -> isVoiceBeingLearned(idx) }
     )
 
     // Backup state for cancellation
@@ -231,4 +251,29 @@ class MidiViewModel(
         super.onCleared()
         stop()
     }
+    
+    companion object {
+        val PREVIEW = ViewModelStateActionMapper(
+            state = MidiUiState(isConnected = true, deviceName = "Mock Device"),
+            actions = MidiPanelActions(
+                onToggleLearnMode = {},
+                onSaveLearnedMappings = {},
+                onCancelLearnMode = {},
+                onSelectControlForLearning = {},
+                onSelectVoiceForLearning = {},
+                isControlBeingLearned = { false },
+                isVoiceBeingLearned = { false }
+            )
+        )
+    }
 }
+
+data class MidiPanelActions(
+    val onToggleLearnMode: () -> Unit,
+    val onSaveLearnedMappings: () -> Unit,
+    val onCancelLearnMode: () -> Unit,
+    val onSelectControlForLearning: (String) -> Unit,
+    val onSelectVoiceForLearning: (Int) -> Unit,
+    val isControlBeingLearned: (String) -> Boolean,
+    val isVoiceBeingLearned: (Int) -> Boolean
+)

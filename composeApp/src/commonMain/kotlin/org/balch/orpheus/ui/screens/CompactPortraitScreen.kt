@@ -33,7 +33,6 @@ import org.balch.orpheus.features.distortion.DistortionPanelActions
 import org.balch.orpheus.features.distortion.DistortionPanelLayout
 import org.balch.orpheus.features.distortion.DistortionUiState
 import org.balch.orpheus.features.distortion.DistortionViewModel
-import org.balch.orpheus.features.evo.AudioEvolutionStrategy
 import org.balch.orpheus.features.evo.EvoPanelActions
 import org.balch.orpheus.features.evo.EvoPanelLayout
 import org.balch.orpheus.features.evo.EvoUiState
@@ -54,7 +53,6 @@ import org.balch.orpheus.features.tidal.LiveCodePanelActions
 import org.balch.orpheus.features.tidal.LiveCodeUiState
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tidal.ui.LiveCodePanelLayout
-import org.balch.orpheus.features.viz.OffViz
 import org.balch.orpheus.features.viz.VizPanelLayout
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
@@ -388,19 +386,6 @@ private fun PanelContent(
 
 // ==================== PREVIEWS ====================
 
-private object PreviewEvoStrategy : AudioEvolutionStrategy {
-    override val id = "preview"
-    override val name = "Drift"
-    override val color = androidx.compose.ui.graphics.Color(0xFF4CAF50)
-    override val knob1Label = "SPEED"
-    override val knob2Label = "RANGE"
-    override fun setKnob1(value: Float) {}
-    override fun setKnob2(value: Float) {}
-    override suspend fun evolve(engine: org.balch.orpheus.core.audio.SynthEngine) {}
-    override fun onActivate() {}
-    override fun onDeactivate() {}
-}
-
 @Preview(widthDp = 360, heightDp = 700)
 @Composable
 private fun CompactPortraitLayoutPreview() {
@@ -408,51 +393,17 @@ private fun CompactPortraitLayoutPreview() {
         val liquidState = LocalLiquidState.current
         if (liquidState != null) {
             CompactPortraitScreenLayout(
-                presetFeature = ViewModelStateActionMapper(
-                    state = PresetUiState(),
-                    actions = PresetPanelActions.EMPTY,
-                ),
-                voiceFeature = ViewModelStateActionMapper(
-                    state = VoiceUiState(),
-                    actions = VoicePanelActions.EMPTY,
-                ),
-                distortionFeature = ViewModelStateActionMapper(
-                    state = DistortionUiState(),
-                    actions = DistortionPanelActions.EMPTY,
-                ),
+                presetFeature = PresetsViewModel.PREVIEW,
+                voiceFeature = VoiceViewModel.PREVIEW,
+                distortionFeature = DistortionViewModel.PREVIEW,
                 liquidState = liquidState,
                 effects = VisualizationLiquidEffects.Default,
-                liveCodeFeature = ViewModelStateActionMapper(
-                    state = LiveCodeUiState(),
-                    actions = LiveCodePanelActions.EMPTY,
-                ),
+                liveCodeFeature = LiveCodeViewModel.PREVIEW,
                 delayFeature = DelayViewModel.PREVIEW,
-                evoFeature = ViewModelStateActionMapper(
-                     state = EvoUiState(
-                         selectedStrategy = PreviewEvoStrategy,
-                         strategies = listOf(PreviewEvoStrategy),
-                         isEnabled = false,
-                         knob1Value = 0.5f,
-                         knob2Value = 0.5f
-                     ),
-                    actions = EvoPanelActions.EMPTY,
-                ),
-                lfoFeature = ViewModelStateActionMapper(
-                    state = LfoUiState(),
-                    actions = LfoPanelActions.EMPTY,
-                ),
-                stereoFeature = ViewModelStateActionMapper(
-                    state = StereoUiState(),
-                    actions = StereoPanelActions.EMPTY,
-                ),
-                vizFeature = ViewModelStateActionMapper(
-                    state = VizUiState(
-                        selectedViz = OffViz(),
-                        visualizations = listOf(OffViz()),
-                        showKnobs = false
-                    ),
-                    actions = VizPanelActions.EMPTY,
-                ),
+                evoFeature = EvoViewModel.PREVIEW,
+                lfoFeature = LfoViewModel.PREVIEW,
+                stereoFeature = StereoViewModel.PREVIEW,
+                vizFeature = VizViewModel.PREVIEW,
                 aiSectionContent = { _ -> CompactAiSectionPreview() }
             )
         }

@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,14 +29,16 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.sequencer.TweakPlaybackMode
+import org.balch.orpheus.features.sequencer.TweakSequencerPanelActions
 import org.balch.orpheus.features.sequencer.TweakSequencerUiState
 import org.balch.orpheus.features.sequencer.TweakSequencerViewModel
 import org.balch.orpheus.features.sequencer.ui.CompactTweakSequencerView
-import org.balch.orpheus.features.sequencer.ui.ExpandedTweakSequencerScreen
+import org.balch.orpheus.features.sequencer.ui.ExpandedTweakSequencerContent
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
+import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
@@ -47,7 +48,10 @@ import org.balch.orpheus.ui.panels.compact.CompactLandscapeHeaderPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.ui.utils.rememberPanelState
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
+import org.balch.orpheus.ui.viz.VizPanelActions
 import org.balch.orpheus.ui.viz.VizUiState
 import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -72,10 +76,10 @@ fun CompactLandscapeScreen(
     vizViewModel: VizViewModel = metroViewModel(),
     sequencerViewModel: TweakSequencerViewModel = metroViewModel(),
 ) {
-    val voiceState by voiceViewModel.uiState.collectAsState()
-    val presetState by presetViewModel.uiState.collectAsState()
-    val vizState by vizViewModel.uiState.collectAsState()
-    val sequencerState by sequencerViewModel.uiState.collectAsState()
+    val voice = rememberPanelState(voiceViewModel)
+    val preset = rememberPanelState(presetViewModel)
+    val viz = rememberPanelState(vizViewModel)
+    val sequencer = rememberPanelState(sequencerViewModel)
 
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
@@ -83,52 +87,38 @@ fun CompactLandscapeScreen(
     Box(modifier = modifier.fillMaxSize()) {
         CompactLandscapeLayout(
             modifier = Modifier.fillMaxSize(),
-            presetState = presetState,
-            voiceState = voiceState,
-            vizState = vizState,
-            sequencerState = sequencerState,
+            presetFeature = preset,
+            voiceFeature = voice,
+            vizFeature = viz,
+            sequencerFeature = sequencer,
             liquidState = liquidState,
             effects = effects,
-            onPresetSelect = { presetViewModel.applyPreset(it) },
-            onVizSelect = { vizViewModel.selectVisualization(it) },
-            onVoiceTuneChange = { i, v -> voiceViewModel.onVoiceTuneChange(i, v) },
-            onEnvelopeSpeedChange = { i, v -> voiceViewModel.onVoiceEnvelopeSpeedChange(i, v) },
-            onPulseStart = { i -> voiceViewModel.onPulseStart(i) },
-            onPulseEnd = { i -> voiceViewModel.onPulseEnd(i) },
-            onVoiceHoldChange = { i, h -> voiceViewModel.onHoldChange(i, h) },
-            onQuadPitchChange = { i, v -> voiceViewModel.onQuadPitchChange(i, v) },
-            onQuadHoldChange = { i, v -> voiceViewModel.onQuadHoldChange(i, v) },
-            onMasterVolumeChange = { v -> voiceViewModel.onMasterVolumeChange(v) },
-            onWobblePulseStart = { i, x, y -> voiceViewModel.onWobblePulseStart(i, x, y) },
-            onWobbleMove = { i, x, y -> voiceViewModel.onWobbleMove(i, x, y) },
-            onWobblePulseEnd = { i -> voiceViewModel.onWobblePulseEnd(i) },
-            onSequencerPlayPause = { sequencerViewModel.togglePlayPause() },
-            onSequencerStop = { sequencerViewModel.stop() },
-            onSequencerPlaybackModeChange = { sequencerViewModel.setPlaybackMode(it) },
-            onSequencerExpand = { sequencerViewModel.expand() },
             onKeyEvent = { event, isDialogActive ->
+                // Still using ViewModel instance here as SynthKeyboardHandler expects it.
+                // Ideally SynthKeyboardHandler should be refactored too, but for now this works 
+                // as the ViewModel is available in the screen scope.
                 SynthKeyboardHandler.handleKeyEvent(
                     keyEvent = event,
-                    voiceState = voiceState,
-                    voiceViewModel = voiceViewModel,
+                    voiceState = voice.state,
+                    voiceViewModel = voiceViewModel, 
                     isDialogActive = isDialogActive
                 )
             }
         )
         
         // Expanded Sequencer Screen Overlay
-        if (sequencerState.isExpanded) {
+        if (sequencer.state.isExpanded) {
             Dialog(
-                onDismissRequest = { sequencerViewModel.cancel() },
+                onDismissRequest = { sequencer.actions.onCancel() },
                 properties = DialogProperties(
                     usePlatformDefaultWidth = false,
                     dismissOnBackPress = true,
                     dismissOnClickOutside = true
                 )
             ) {
-                ExpandedTweakSequencerScreen(
-                    onDismiss = { },
-                    viewModel = sequencerViewModel,
+                ExpandedTweakSequencerContent(
+                    sequencerFeature = sequencer,
+                    onDismiss = { sequencer.actions.onCancel() },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -136,32 +126,16 @@ fun CompactLandscapeScreen(
     }
 }
 
+
 @Composable
 private fun CompactLandscapeLayout(
     modifier: Modifier = Modifier,
-    presetState: PresetUiState,
-    voiceState: VoiceUiState,
-    vizState: VizUiState,
-    sequencerState: TweakSequencerUiState,
+    presetFeature: ViewModelStateActionMapper<PresetUiState, PresetPanelActions>,
+    voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
+    vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
+    sequencerFeature: ViewModelStateActionMapper<TweakSequencerUiState, TweakSequencerPanelActions>,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
-    onPresetSelect: (org.balch.orpheus.core.presets.DronePreset) -> Unit,
-    onVizSelect: (org.balch.orpheus.ui.viz.Visualization) -> Unit,
-    onVoiceTuneChange: (Int, Float) -> Unit,
-    onEnvelopeSpeedChange: (Int, Float) -> Unit,
-    onPulseStart: (Int) -> Unit,
-    onPulseEnd: (Int) -> Unit,
-    onVoiceHoldChange: (Int, Boolean) -> Unit,
-    onQuadPitchChange: (Int, Float) -> Unit,
-    onQuadHoldChange: (Int, Float) -> Unit,
-    onMasterVolumeChange: (Float) -> Unit,
-    onWobblePulseStart: ((Int, Float, Float) -> Unit)? = null,
-    onWobbleMove: ((Int, Float, Float) -> Unit)? = null,
-    onWobblePulseEnd: ((Int) -> Unit)? = null,
-    onSequencerPlayPause: () -> Unit,
-    onSequencerStop: () -> Unit,
-    onSequencerPlaybackModeChange: (TweakPlaybackMode) -> Unit,
-    onSequencerExpand: () -> Unit,
     onKeyEvent: (androidx.compose.ui.input.key.KeyEvent, Boolean) -> Boolean,
 ) {
     val shape = RoundedCornerShape(12.dp)
@@ -176,6 +150,13 @@ private fun CompactLandscapeLayout(
     var presetDropdownExpanded by remember { mutableStateOf(false) }
     var vizDropdownExpanded by remember { mutableStateOf(false) }
 
+    val voiceState = voiceFeature.state
+    val voiceActions = voiceFeature.actions
+    val presetState = presetFeature.state
+    val vizState = vizFeature.state
+    val sequencerState = sequencerFeature.state
+    val sequencerActions = sequencerFeature.actions
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -188,19 +169,13 @@ private fun CompactLandscapeLayout(
     ) {
         // Top bar: Patch and Viz dropdowns
             CompactLandscapeHeaderPanel(
-                selectedPresetName = presetState.selectedPreset?.name ?: "Init Patch",
-                presets = presetState.presets,
+                presetFeature = presetFeature,
+                vizFeature = vizFeature,
+                voiceFeature = voiceFeature,
                 presetDropdownExpanded = presetDropdownExpanded,
                 onPresetDropdownExpandedChange = { presetDropdownExpanded = it },
-                onPresetSelect = onPresetSelect,
-                selectedVizName = vizState.selectedViz.name,
-                visualizations = vizState.visualizations,
                 vizDropdownExpanded = vizDropdownExpanded,
                 onVizDropdownExpandedChange = { vizDropdownExpanded = it },
-                onVizSelect = onVizSelect,
-                masterVolume = voiceState.masterVolume,
-                peakLevel = voiceState.peakLevel,
-                onMasterVolumeChange = onMasterVolumeChange,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.fillMaxWidth()
@@ -217,27 +192,26 @@ private fun CompactLandscapeLayout(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RotaryKnob(
                     value = voiceState.quadGroupPitches[0],
-                    onValueChange = { onQuadPitchChange(0, it) },
+                    onValueChange = { voiceActions.onQuadPitchChange(0, it) },
                     label = "Pitch",
                     size = 38.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
                 RotaryKnob(
                     value = voiceState.quadGroupHolds[0],
-                    onValueChange = { onQuadHoldChange(0, it) },
+                    onValueChange = { voiceActions.onQuadHoldChange(0, it) },
                     label = "Hold",
                     size = 38.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
             }
 
-
             CompactTweakSequencerView(
                 state = sequencerState.sequencer,
-                onPlayPause = onSequencerPlayPause,
-                onStop = onSequencerStop,
-                onPlaybackModeChange = onSequencerPlaybackModeChange,
-                onExpand = onSequencerExpand,
+                onPlayPause = sequencerActions.onTogglePlayPause,
+                onStop = sequencerActions.onStop,
+                onPlaybackModeChange = sequencerActions.onSetPlaybackMode,
+                onExpand = sequencerActions.onExpand,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier
@@ -250,14 +224,14 @@ private fun CompactLandscapeLayout(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RotaryKnob(
                     value = voiceState.quadGroupPitches[1],
-                    onValueChange = { onQuadPitchChange(1, it) },
+                    onValueChange = { voiceActions.onQuadPitchChange(1, it) },
                     label = "Pitch",
                     size = 38.dp,
                     progressColor = OrpheusColors.synthGreen
                 )
                 RotaryKnob(
                     value = voiceState.quadGroupHolds[1],
-                    onValueChange = { onQuadHoldChange(1, it) },
+                    onValueChange = { voiceActions.onQuadHoldChange(1, it) },
                     label = "Hold",
                     size = 38.dp,
                     progressColor = OrpheusColors.synthGreen
@@ -281,18 +255,18 @@ private fun CompactLandscapeLayout(
                 pairIndex = 0,
                 voiceStates = voiceState.voiceStates,
                 voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                onVoiceTuneChange = onVoiceTuneChange,
-                onEnvelopeSpeedChange = onEnvelopeSpeedChange,
-                onPulseStart = onPulseStart,
-                onPulseEnd = onPulseEnd,
-                onVoiceHoldChange = onVoiceHoldChange,
+                onVoiceTuneChange = voiceActions.onVoiceTuneChange,
+                onEnvelopeSpeedChange = voiceActions.onVoiceEnvelopeSpeedChange,
+                onPulseStart = voiceActions.onPulseStart,
+                onPulseEnd = voiceActions.onPulseEnd,
+                onVoiceHoldChange = voiceActions.onHoldChange,
                 borderColor = OrpheusColors.neonMagenta,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                onWobblePulseStart = onWobblePulseStart,
-                onWobbleMove = onWobbleMove,
-                onWobblePulseEnd = onWobblePulseEnd
+                onWobblePulseStart = voiceActions.onWobblePulseStart,
+                onWobbleMove = voiceActions.onWobbleMove,
+                onWobblePulseEnd = voiceActions.onWobblePulseEnd
             )
 
             // Duo 3-4: Electric Blue Border, Cyan Accents
@@ -300,18 +274,18 @@ private fun CompactLandscapeLayout(
                 pairIndex = 1,
                 voiceStates = voiceState.voiceStates,
                 voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                onVoiceTuneChange = onVoiceTuneChange,
-                onEnvelopeSpeedChange = onEnvelopeSpeedChange,
-                onPulseStart = onPulseStart,
-                onPulseEnd = onPulseEnd,
-                onVoiceHoldChange = onVoiceHoldChange,
+                onVoiceTuneChange = voiceActions.onVoiceTuneChange,
+                onEnvelopeSpeedChange = voiceActions.onVoiceEnvelopeSpeedChange,
+                onPulseStart = voiceActions.onPulseStart,
+                onPulseEnd = voiceActions.onPulseEnd,
+                onVoiceHoldChange = voiceActions.onHoldChange,
                 borderColor = OrpheusColors.electricBlue,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                onWobblePulseStart = onWobblePulseStart,
-                onWobbleMove = onWobbleMove,
-                onWobblePulseEnd = onWobblePulseEnd
+                onWobblePulseStart = voiceActions.onWobblePulseStart,
+                onWobbleMove = voiceActions.onWobbleMove,
+                onWobblePulseEnd = voiceActions.onWobblePulseEnd
             )
 
             // Duo 5-6: Green Border, Orange Accents (matching uploaded_image_1766749385773.png)
@@ -319,18 +293,18 @@ private fun CompactLandscapeLayout(
                 pairIndex = 2,
                 voiceStates = voiceState.voiceStates,
                 voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                onVoiceTuneChange = onVoiceTuneChange,
-                onEnvelopeSpeedChange = onEnvelopeSpeedChange,
-                onPulseStart = onPulseStart,
-                onPulseEnd = onPulseEnd,
-                onVoiceHoldChange = onVoiceHoldChange,
+                onVoiceTuneChange = voiceActions.onVoiceTuneChange,
+                onEnvelopeSpeedChange = voiceActions.onVoiceEnvelopeSpeedChange,
+                onPulseStart = voiceActions.onPulseStart,
+                onPulseEnd = voiceActions.onPulseEnd,
+                onVoiceHoldChange = voiceActions.onHoldChange,
                 borderColor = OrpheusColors.neonOrange,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                onWobblePulseStart = onWobblePulseStart,
-                onWobbleMove = onWobbleMove,
-                onWobblePulseEnd = onWobblePulseEnd
+                onWobblePulseStart = voiceActions.onWobblePulseStart,
+                onWobbleMove = voiceActions.onWobbleMove,
+                onWobblePulseEnd = voiceActions.onWobblePulseEnd
             )
 
             // Duo 7-8: Green Border, Orange Accents
@@ -338,18 +312,18 @@ private fun CompactLandscapeLayout(
                 pairIndex = 3,
                 voiceStates = voiceState.voiceStates,
                 voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                onVoiceTuneChange = onVoiceTuneChange,
-                onEnvelopeSpeedChange = onEnvelopeSpeedChange,
-                onPulseStart = onPulseStart,
-                onPulseEnd = onPulseEnd,
-                onVoiceHoldChange = onVoiceHoldChange,
+                onVoiceTuneChange = voiceActions.onVoiceTuneChange,
+                onEnvelopeSpeedChange = voiceActions.onVoiceEnvelopeSpeedChange,
+                onPulseStart = voiceActions.onPulseStart,
+                onPulseEnd = voiceActions.onPulseEnd,
+                onVoiceHoldChange = voiceActions.onHoldChange,
                 borderColor = OrpheusColors.synthGreen,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                onWobblePulseStart = onWobblePulseStart,
-                onWobbleMove = onWobbleMove,
-                onWobblePulseEnd = onWobblePulseEnd
+                onWobblePulseStart = voiceActions.onWobblePulseStart,
+                onWobbleMove = voiceActions.onWobbleMove,
+                onWobblePulseEnd = voiceActions.onWobblePulseEnd
             )
         }
     }
@@ -370,30 +344,12 @@ private fun CompactLandscapeLayoutPreview(
         val liquidState = LocalLiquidState.current
         if (liquidState != null) {
             CompactLandscapeLayout(
-                presetState = PresetUiState(),
-                voiceState = VoiceUiState(),
-                vizState = VizUiState(
-                    selectedViz = org.balch.orpheus.features.viz.OffViz(),
-                    visualizations = listOf(org.balch.orpheus.features.viz.OffViz()),
-                    showKnobs = false
-                ),
-                sequencerState = TweakSequencerUiState(),
+                presetFeature = PresetsViewModel.PREVIEW,
+                voiceFeature = VoiceViewModel.PREVIEW,
+                vizFeature = VizViewModel.PREVIEW,
+                sequencerFeature = TweakSequencerViewModel.PREVIEW,
                 liquidState = liquidState,
                 effects = effects,
-                onPresetSelect = {},
-                onVizSelect = {},
-                onVoiceTuneChange = { _, _ -> },
-                onEnvelopeSpeedChange = { _, _ -> },
-                onPulseStart = {},
-                onPulseEnd = {},
-                onVoiceHoldChange = { _, _ -> },
-                onQuadPitchChange = { _, _ -> },
-                onQuadHoldChange = { _, _ -> },
-                onMasterVolumeChange = { _ -> },
-                onSequencerPlayPause = {},
-                onSequencerStop = {},
-                onSequencerPlaybackModeChange = {},
-                onSequencerExpand = {},
                 onKeyEvent = { _, _ -> false }
             )
         }

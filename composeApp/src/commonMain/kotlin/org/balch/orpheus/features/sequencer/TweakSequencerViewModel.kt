@@ -24,6 +24,8 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 import org.balch.orpheus.util.currentTimeMillis
 
 /**
@@ -93,7 +95,7 @@ class TweakSequencerViewModel(
     private val dispatcherProvider: DispatcherProvider,
     private val synthController: SynthController,
     private val engine: SynthEngine
-) : ViewModel() {
+) : ViewModel(), PanelViewModel<TweakSequencerUiState, TweakSequencerPanelActions> {
 
     private val intents = MutableSharedFlow<TweakSequencerIntent>(
         replay = 1,
@@ -101,7 +103,7 @@ class TweakSequencerViewModel(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    val uiState: StateFlow<TweakSequencerUiState> =
+    override val uiState: StateFlow<TweakSequencerUiState> =
         intents
             .onEach { intent -> applySideEffects(intent) }
             .scan(TweakSequencerUiState()) { state, intent -> reduce(state, intent) }
@@ -111,6 +113,31 @@ class TweakSequencerViewModel(
                 started = SharingStarted.Eagerly,
                 initialValue = TweakSequencerUiState()
             )
+
+    override val panelActions: TweakSequencerPanelActions = TweakSequencerPanelActions(
+        onPlay = { intents.tryEmit(TweakSequencerIntent.Play) },
+        onPause = { intents.tryEmit(TweakSequencerIntent.Pause) },
+        onStop = { intents.tryEmit(TweakSequencerIntent.Stop) },
+        onTogglePlayPause = {
+            if (uiState.value.sequencer.isPlaying) intents.tryEmit(TweakSequencerIntent.Pause)
+            else intents.tryEmit(TweakSequencerIntent.Play)
+        },
+        onStartPath = { param, point -> intents.tryEmit(TweakSequencerIntent.StartPath(param, point)) },
+        onAddPoint = { param, point -> intents.tryEmit(TweakSequencerIntent.AddPoint(param, point)) },
+        onRemovePointsAfter = { param, time -> intents.tryEmit(TweakSequencerIntent.RemovePointsAfter(param, time)) },
+        onClearPath = { param -> intents.tryEmit(TweakSequencerIntent.ClearPath(param)) },
+        onCompletePath = { param, endValue -> intents.tryEmit(TweakSequencerIntent.CompletePath(param, endValue)) },
+        onAddParameter = { param -> intents.tryEmit(TweakSequencerIntent.AddParameter(param)) },
+        onRemoveParameter = { param -> intents.tryEmit(TweakSequencerIntent.RemoveParameter(param)) },
+        onSelectActiveParameter = { param -> intents.tryEmit(TweakSequencerIntent.SelectActiveParameter(param)) },
+        onSetDuration = { seconds -> intents.tryEmit(TweakSequencerIntent.SetDuration(seconds)) },
+        onSetPlaybackMode = { mode -> intents.tryEmit(TweakSequencerIntent.SetPlaybackMode(mode)) },
+        onSetEnabled = { enabled -> intents.tryEmit(TweakSequencerIntent.SetEnabled(enabled)) },
+        onExpand = { intents.tryEmit(TweakSequencerIntent.Expand) },
+        onCollapse = { intents.tryEmit(TweakSequencerIntent.Collapse) },
+        onSave = { intents.tryEmit(TweakSequencerIntent.Save) },
+        onCancel = { intents.tryEmit(TweakSequencerIntent.Cancel) }
+    )
 
     private var playbackJob: Job? = null
 
@@ -291,37 +318,6 @@ class TweakSequencerViewModel(
             val tickMs = 32L  // ~30fps for UI
             var lastTime = currentTimeMillis()
             
-            // If resuming from pause, we need to handle position
-            // But engine automation usually restarts? 
-            // My engine impl calls play() which restarts envelope.
-            // So we should effectively restart UI position too?
-            // Yes, simplistic sync.
-            // If we wanted resume, we'd need seek().
-            
-            // To keep simple: Always restart from current position or 0?
-            // Ideally 0 if stop was pressed.
-            // But if Play/Pause, current position matters.
-            // Engine automation does NOT support seeking yet (seek was unimplemented).
-            // So if I pause/play, engine restarts from 0.
-            // So UI should restart from 0.
-            // BUT: intent.Play doesn't reset position. intent.Stop does.
-            // If I press Pause then Play, position is > 0.
-            // Engine restarts from 0. Desync!
-            // I should reset position to 0 on Play if it's not 0?
-            // Or implement seek in Engine.
-            // Since seek is hard, I will enforce restart from 0 on Play for now.
-            // `TweakSequencerIntent.Play` -> `reduce` keeps position.
-            // I will force it to 0 in startPlayback if we want sync.
-            // Or just accept the desync for now (UI shows resuming, Audio restarts).
-            // Actually, `AutomationPlayer` usually restarts.
-            // Let's reset UI position to 0 in startPlayback logic if starting fresh?
-            // No, the user might want resume.
-            // Given the constraint, I will assume Restart behavior for now.
-            
-            // Reset position to match engine start
-            // intents.tryEmit(TweakSequencerIntent.UpdatePosition(0f, 1)) 
-            // Actually, let's just run loop from current position, but careful.
-            
             while (isActive) {
                 val currentState = uiState.value.sequencer
                 if (!currentState.isPlaying || !currentState.config.enabled) {
@@ -411,45 +407,55 @@ class TweakSequencerViewModel(
     }
 
     // ═══════════════════════════════════════════════════════════
-    // PUBLIC INTENT METHODS
+    // PUBLIC INTENT METHODS - KEEP FOR COMPATIBILITY IF NEEDED
     // ═══════════════════════════════════════════════════════════
 
-    fun play() = intents.tryEmit(TweakSequencerIntent.Play)
-    fun pause() = intents.tryEmit(TweakSequencerIntent.Pause)
-    fun stop() = intents.tryEmit(TweakSequencerIntent.Stop)
-    fun togglePlayPause() {
-        if (uiState.value.sequencer.isPlaying) pause() else play()
-    }
-
-    fun startPath(param: TweakSequencerParameter, point: SequencerPoint) =
-        intents.tryEmit(TweakSequencerIntent.StartPath(param, point))
-    fun addPoint(param: TweakSequencerParameter, point: SequencerPoint) =
-        intents.tryEmit(TweakSequencerIntent.AddPoint(param, point))
-    fun removePointsAfter(param: TweakSequencerParameter, time: Float) =
-        intents.tryEmit(TweakSequencerIntent.RemovePointsAfter(param, time))
-    fun clearPath(param: TweakSequencerParameter) =
-        intents.tryEmit(TweakSequencerIntent.ClearPath(param))
-    fun completePath(param: TweakSequencerParameter, endValue: Float) =
-        intents.tryEmit(TweakSequencerIntent.CompletePath(param, endValue))
-
-    fun addParameter(param: TweakSequencerParameter) =
-        intents.tryEmit(TweakSequencerIntent.AddParameter(param))
-    fun removeParameter(param: TweakSequencerParameter) =
-        intents.tryEmit(TweakSequencerIntent.RemoveParameter(param))
-    fun selectActiveParameter(param: TweakSequencerParameter?) =
-        intents.tryEmit(TweakSequencerIntent.SelectActiveParameter(param))
-
-    fun setDuration(seconds: Float) = intents.tryEmit(TweakSequencerIntent.SetDuration(seconds))
-    fun setPlaybackMode(mode: TweakPlaybackMode) = intents.tryEmit(TweakSequencerIntent.SetPlaybackMode(mode))
-    fun setEnabled(enabled: Boolean) = intents.tryEmit(TweakSequencerIntent.SetEnabled(enabled))
-
-    fun expand() = intents.tryEmit(TweakSequencerIntent.Expand)
-    fun collapse() = intents.tryEmit(TweakSequencerIntent.Collapse)
-    fun save() = intents.tryEmit(TweakSequencerIntent.Save)
-    fun cancel() = intents.tryEmit(TweakSequencerIntent.Cancel)
+    fun togglePlayPause() = panelActions.onTogglePlayPause()
+    fun play() = panelActions.onPlay()
+    fun pause() = panelActions.onPause()
+    fun stop() = panelActions.onStop()
+    fun expand() = panelActions.onExpand()
+    fun cancel() = panelActions.onCancel()
+    fun setPlaybackMode(mode: TweakPlaybackMode) = panelActions.onSetPlaybackMode(mode)
 
     override fun onCleared() {
         super.onCleared()
         playbackJob?.cancel()
     }
+    
+    companion object {
+        val PREVIEW = ViewModelStateActionMapper(
+            state = TweakSequencerUiState(),
+            actions = TweakSequencerPanelActions(
+                onPlay = {}, onPause = {}, onStop = {}, onTogglePlayPause = {},
+                onStartPath = { _, _ -> }, onAddPoint = { _, _ -> }, onRemovePointsAfter = { _, _ -> },
+                onClearPath = {}, onCompletePath = { _, _ -> },
+                onAddParameter = {}, onRemoveParameter = {}, onSelectActiveParameter = {},
+                onSetDuration = {}, onSetPlaybackMode = {}, onSetEnabled = {},
+                onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {}
+            )
+        )
+    }
 }
+
+data class TweakSequencerPanelActions(
+    val onPlay: () -> Unit,
+    val onPause: () -> Unit,
+    val onStop: () -> Unit,
+    val onTogglePlayPause: () -> Unit,
+    val onStartPath: (TweakSequencerParameter, SequencerPoint) -> Unit,
+    val onAddPoint: (TweakSequencerParameter, SequencerPoint) -> Unit,
+    val onRemovePointsAfter: (TweakSequencerParameter, Float) -> Unit,
+    val onClearPath: (TweakSequencerParameter) -> Unit,
+    val onCompletePath: (TweakSequencerParameter, Float) -> Unit,
+    val onAddParameter: (TweakSequencerParameter) -> Unit,
+    val onRemoveParameter: (TweakSequencerParameter) -> Unit,
+    val onSelectActiveParameter: (TweakSequencerParameter?) -> Unit,
+    val onSetDuration: (Float) -> Unit,
+    val onSetPlaybackMode: (TweakPlaybackMode) -> Unit,
+    val onSetEnabled: (Boolean) -> Unit,
+    val onExpand: () -> Unit,
+    val onCollapse: () -> Unit,
+    val onSave: () -> Unit,
+    val onCancel: () -> Unit
+)

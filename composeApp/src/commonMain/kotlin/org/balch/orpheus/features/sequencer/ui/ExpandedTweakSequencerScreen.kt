@@ -21,8 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,10 +34,14 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.features.sequencer.SequencerPath
 import org.balch.orpheus.features.sequencer.SequencerPoint
 import org.balch.orpheus.features.sequencer.TweakSequencerConfig
+import org.balch.orpheus.features.sequencer.TweakSequencerPanelActions
 import org.balch.orpheus.features.sequencer.TweakSequencerParameter
 import org.balch.orpheus.features.sequencer.TweakSequencerState
+import org.balch.orpheus.features.sequencer.TweakSequencerUiState
 import org.balch.orpheus.features.sequencer.TweakSequencerViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.ui.utils.rememberPanelState
 import org.balch.orpheus.ui.widgets.CompactSecondsSlider
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -59,26 +61,41 @@ fun ExpandedTweakSequencerScreen(
     viewModel: TweakSequencerViewModel = metroViewModel(),
     modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val sequencerFeature = rememberPanelState(viewModel)
+    ExpandedTweakSequencerContent(
+        sequencerFeature = sequencerFeature,
+        onDismiss = onDismiss,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun ExpandedTweakSequencerContent(
+    sequencerFeature: ViewModelStateActionMapper<TweakSequencerUiState, TweakSequencerPanelActions>,
+    onDismiss: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val state = sequencerFeature.state
+    val actions = sequencerFeature.actions
 
     ExpandedTweakSequencerLayout(
-        state = uiState.sequencer,
-        activeParameter = uiState.activeParameter,
-        onDurationChange = { viewModel.setDuration(it) },
-        onAddParameter = { viewModel.addParameter(it) },
-        onRemoveParameter = { viewModel.removeParameter(it) },
-        onSelectActiveParameter = { viewModel.selectActiveParameter(it) },
-        onPathStarted = { param, point -> viewModel.startPath(param, point) },
-        onPointAdded = { param, point -> viewModel.addPoint(param, point) },
-        onPointsRemovedAfter = { param, time -> viewModel.removePointsAfter(param, time) },
-        onPathCompleted = { param, value -> viewModel.completePath(param, value) },
-        onClearPath = { viewModel.clearPath(it) },
+        state = state.sequencer,
+        activeParameter = state.activeParameter,
+        onDurationChange = actions.onSetDuration,
+        onAddParameter = actions.onAddParameter,
+        onRemoveParameter = actions.onRemoveParameter,
+        onSelectActiveParameter = actions.onSelectActiveParameter,
+        onPathStarted = actions.onStartPath,
+        onPointAdded = actions.onAddPoint,
+        onPointsRemovedAfter = actions.onRemovePointsAfter,
+        onPathCompleted = actions.onCompletePath,
+        onClearPath = actions.onClearPath,
         onSave = {
-            viewModel.save()
+            actions.onSave()
             onDismiss(true)
         },
         onCancel = {
-            viewModel.cancel()
+            actions.onCancel()
             onDismiss(false)
         },
         modifier = modifier
@@ -253,7 +270,7 @@ fun ExpandedTweakSequencerLayout(
                                                   else if (state.config.selectedParameters.size < TweakSequencerParameter.MAX_SELECTED) {
                                                        onAddParameter(param)
                                                        onSelectActiveParameter(param)
-                                                  }
+                                                   }
                                               },
                                           contentAlignment = Alignment.Center
                                       ) {
@@ -396,9 +413,11 @@ private fun ExpandedTweakSequencerScreenPreview() {
         ),
         isComplete = true
     )
-
-    ExpandedTweakSequencerLayout(
-        state = TweakSequencerState(
+    
+    // We can use the PREVIEW mapper from the ViewModel
+    // but here we manually construct one to show the path data which is specific to this preview
+    val previewState = TweakSequencerUiState(
+        sequencer = TweakSequencerState(
             config = TweakSequencerConfig(
                 enabled = true,
                 durationSeconds = 45f,
@@ -415,18 +434,21 @@ private fun ExpandedTweakSequencerScreenPreview() {
             ),
             currentPosition = 0.4f
         ),
-        activeParameter = TweakSequencerParameter.LFO_FREQ_A,
-        onDurationChange = {},
-        onAddParameter = {},
-        onRemoveParameter = {},
-        onSelectActiveParameter = {},
-        onPathStarted = { _, _ -> },
-        onPointAdded = { _, _ -> },
-        onPointsRemovedAfter = { _, _ -> },
-        onPathCompleted = { _, _ -> },
-        onClearPath = {},
-        onSave = {},
-        onCancel = {},
+        activeParameter = TweakSequencerParameter.LFO_FREQ_A
+    )
+    
+    val previewActions = TweakSequencerPanelActions(
+        onPlay = {}, onPause = {}, onStop = {}, onTogglePlayPause = {},
+        onStartPath = { _, _ -> }, onAddPoint = { _, _ -> }, onRemovePointsAfter = { _, _ -> },
+        onClearPath = {}, onCompletePath = { _, _ -> },
+        onAddParameter = {}, onRemoveParameter = {}, onSelectActiveParameter = {},
+        onSetDuration = {}, onSetPlaybackMode = {}, onSetEnabled = {},
+        onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {}
+    )
+
+    ExpandedTweakSequencerContent(
+        sequencerFeature = ViewModelStateActionMapper(previewState, previewActions),
+        onDismiss = {},
         modifier = Modifier.fillMaxSize().padding(16.dp)
     )
 }

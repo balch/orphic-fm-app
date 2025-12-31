@@ -23,6 +23,7 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /** UI state for the Hyper LFO panel. */
 data class LfoUiState(
@@ -196,5 +197,12 @@ class LfoViewModel(
 
     fun restoreState(state: LfoUiState) {
         intents.tryEmit(LfoIntent.Restore(state))
+    }
+
+    companion object {
+        val PREVIEW = ViewModelStateActionMapper(
+            state = LfoUiState(),
+            actions = LfoPanelActions.EMPTY,
+        )
     }
 }

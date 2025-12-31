@@ -22,6 +22,7 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /** UI state for the Stereo panel. */
 data class StereoUiState(
@@ -164,5 +165,12 @@ class StereoViewModel(
 
     fun restoreState(state: StereoUiState) {
         intents.tryEmit(StereoIntent.Restore(state))
+    }
+
+    companion object {
+        val PREVIEW = ViewModelStateActionMapper(
+            state = StereoUiState(),
+            actions = StereoPanelActions.EMPTY,
+        )
     }
 }

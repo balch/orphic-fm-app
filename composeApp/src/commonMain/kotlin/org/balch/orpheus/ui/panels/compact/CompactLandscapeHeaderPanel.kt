@@ -26,33 +26,42 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.core.presets.DronePreset
+import org.balch.orpheus.features.presets.PresetPanelActions
+import org.balch.orpheus.features.presets.PresetUiState
+import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.voice.VoicePanelActions
+import org.balch.orpheus.features.voice.VoiceUiState
+import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.Visualization
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
+import org.balch.orpheus.ui.viz.VizPanelActions
+import org.balch.orpheus.ui.viz.VizUiState
+import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompactLandscapeHeaderPanel(
-    selectedPresetName: String,
-    presets: List<DronePreset>,
+    presetFeature: ViewModelStateActionMapper<PresetUiState, PresetPanelActions>,
+    vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
+    voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
     presetDropdownExpanded: Boolean,
     onPresetDropdownExpandedChange: (Boolean) -> Unit,
-    onPresetSelect: (DronePreset) -> Unit,
-    selectedVizName: String,
-    visualizations: List<Visualization>,
     vizDropdownExpanded: Boolean,
     onVizDropdownExpandedChange: (Boolean) -> Unit,
-    onVizSelect: (Visualization) -> Unit,
-    masterVolume: Float,
-    peakLevel: Float,
-    onMasterVolumeChange: (Float) -> Unit,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     modifier: Modifier = Modifier
 ) {
+    val presetState = presetFeature.state
+    val presetActions = presetFeature.actions
+    val vizState = vizFeature.state
+    val vizActions = vizFeature.actions
+    val voiceState = voiceFeature.state
+    val voiceActions = voiceFeature.actions
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -127,7 +136,7 @@ fun CompactLandscapeHeaderPanel(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = selectedPresetName,
+                            text = presetState.selectedPreset?.name ?: "Init Patch",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.9f),
                             maxLines = 1,
@@ -149,11 +158,11 @@ fun CompactLandscapeHeaderPanel(
                         )
                     } else Modifier.background(Color(0xFF2A2A3A))
                 ) {
-                    presets.forEach { preset ->
+                    presetState.presets.forEach { preset ->
                         DropdownMenuItem(
                             text = { Text(preset.name, style = MaterialTheme.typography.bodySmall) },
                             onClick = {
-                                onPresetSelect(preset)
+                                presetActions.onPresetSelect(preset)
                                 onPresetDropdownExpandedChange(false)
                             }
                         )
@@ -194,7 +203,7 @@ fun CompactLandscapeHeaderPanel(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = selectedVizName,
+                            text = vizState.selectedViz.name,
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.9f),
                             maxLines = 1,
@@ -216,11 +225,11 @@ fun CompactLandscapeHeaderPanel(
                         )
                     } else Modifier.background(Color(0xFF2A2A3A))
                 ) {
-                    visualizations.forEach { viz ->
+                    vizState.visualizations.forEach { viz ->
                         DropdownMenuItem(
                             text = { Text(viz.name, style = MaterialTheme.typography.bodySmall) },
                             onClick = {
-                                onVizSelect(viz)
+                                vizActions.onSelectViz(viz)
                                 onVizDropdownExpandedChange(false)
                             }
                         )
@@ -228,12 +237,12 @@ fun CompactLandscapeHeaderPanel(
                 }
             }
 
-            PeakLed(level = peakLevel)
+            PeakLed(level = voiceState.peakLevel)
             
             Box(modifier = Modifier.size(36.dp)) {
                 org.balch.orpheus.ui.widgets.RotaryKnob(
-                    value = masterVolume,
-                    onValueChange = onMasterVolumeChange,
+                    value = voiceState.masterVolume,
+                    onValueChange = voiceActions.onMasterVolumeChange,
                     range = 0f..1f,
                     size = 36.dp,
                     progressColor = OrpheusColors.neonCyan
@@ -272,19 +281,13 @@ private fun PeakLed(level: Float) {
 @Composable
 private fun CompactLandscapeHeaderPanelPreview() {
     CompactLandscapeHeaderPanel(
-        selectedPresetName = "Factory Patch 1",
-        presets = emptyList(),
+        presetFeature = PresetsViewModel.PREVIEW,
+        vizFeature = VizViewModel.PREVIEW,
+        voiceFeature = VoiceViewModel.PREVIEW,
         presetDropdownExpanded = false,
         onPresetDropdownExpandedChange = {},
-        onPresetSelect = {},
-        selectedVizName = "Oscilloscope",
-        visualizations = emptyList(),
         vizDropdownExpanded = false,
         onVizDropdownExpandedChange = {},
-        onVizSelect = {},
-        masterVolume = 0.8f,
-        peakLevel = 0.5f,
-        onMasterVolumeChange = {},
         liquidState = null,
         effects = VisualizationLiquidEffects()
     )

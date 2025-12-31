@@ -26,6 +26,7 @@ import org.balch.orpheus.core.tidal.TidalSchedulerState
 import org.balch.orpheus.features.ai.ReplCodeEvent
 import org.balch.orpheus.features.ai.ReplCodeEventBus
 import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /**
  * UI state for the Live Code editor.
@@ -538,6 +539,11 @@ d4 $ quadpitch:1 0.3
 d1 $ note "[c2 e2 g2]*2"
 d2 $ slow 4 voices:<1 2> <3 4> <5 6>
             """.trimIndent()
+        )
+
+        val PREVIEW = ViewModelStateActionMapper(
+            state = LiveCodeUiState(),
+            actions = LiveCodePanelActions.EMPTY,
         )
     }
 }

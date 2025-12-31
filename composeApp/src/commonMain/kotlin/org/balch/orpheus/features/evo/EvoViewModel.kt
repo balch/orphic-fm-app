@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 @Immutable
 data class EvoUiState(
@@ -186,5 +187,31 @@ class EvoViewModel @Inject constructor(
         stopEvolutionLoop()
         _currentStrategy.value.onDeactivate()
         log.info { "EvoViewModel cleared" }
+    }
+
+    companion object {
+        private object PreviewStrategy : AudioEvolutionStrategy {
+            override val id = "preview"
+            override val name = "Preview"
+            override val color = androidx.compose.ui.graphics.Color(0xFF4CAF50)
+            override val knob1Label = "SPEED"
+            override val knob2Label = "RANGE"
+            override fun setKnob1(value: Float) {}
+            override fun setKnob2(value: Float) {}
+            override suspend fun evolve(engine: SynthEngine) {}
+            override fun onActivate() {}
+            override fun onDeactivate() {}
+        }
+
+        val PREVIEW = ViewModelStateActionMapper(
+            state = EvoUiState(
+                selectedStrategy = PreviewStrategy,
+                strategies = listOf(PreviewStrategy),
+                isEnabled = false,
+                knob1Value = 0.5f,
+                knob2Value = 0.5f
+            ),
+            actions = EvoPanelActions.EMPTY,
+        )
     }
 }

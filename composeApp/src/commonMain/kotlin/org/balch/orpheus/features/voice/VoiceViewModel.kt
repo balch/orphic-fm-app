@@ -26,6 +26,7 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 import kotlin.math.roundToInt
 
 /** UI state for voice management. */
@@ -48,15 +49,6 @@ data class VoiceUiState(
 ) {
     companion object {
         val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
-    }
-}
-
-data class VoicePanelActions(
-    val onMasterVolumeChange: (Float) -> Unit,
-    val onVibratoChange: (Float) -> Unit
-) {
-    companion object {
-        val EMPTY = VoicePanelActions({ }, { })
     }
 }
 
@@ -113,7 +105,24 @@ class VoiceViewModel(
         },
         onVibratoChange = { value ->
             synthController.emitControlChange(ControlIds.VIBRATO, value, ControlEventOrigin.UI)
-        }
+        },
+        onVoiceTuneChange = ::onVoiceTuneChange,
+        onVoiceModDepthChange = ::onVoiceModDepthChange,
+        onDuoModDepthChange = ::onDuoModDepthChange,
+        onPairSharpnessChange = ::onPairSharpnessChange,
+        onVoiceEnvelopeSpeedChange = ::onVoiceEnvelopeSpeedChange,
+        onPulseStart = ::onPulseStart,
+        onPulseEnd = ::onPulseEnd,
+        onHoldChange = ::onHoldChange,
+        onDuoModSourceChange = ::onDuoModSourceChange,
+        onQuadPitchChange = ::onQuadPitchChange,
+        onQuadHoldChange = ::onQuadHoldChange,
+        onFmStructureChange = ::onFmStructureChange,
+        onTotalFeedbackChange = ::onTotalFeedbackChange,
+        onVoiceCouplingChange = ::onVoiceCouplingChange,
+        onWobblePulseStart = ::onWobblePulseStart,
+        onWobbleMove = ::onWobbleMove,
+        onWobblePulseEnd = ::onWobblePulseEnd
     )
 
     fun onMasterVolumeChange(value: Float) {
@@ -598,6 +607,59 @@ class VoiceViewModel(
         wobbleController.onPulseEnd(index)
         // Reset to unity gain on release
         engine.setVoiceWobble(index, 0f, 0f)
+    }
+
+    companion object {
+        val PREVIEW = ViewModelStateActionMapper(
+            state = VoiceUiState(),
+            actions = VoicePanelActions(
+                onMasterVolumeChange = {}, onVibratoChange = {}, 
+                onVoiceTuneChange = {_, _ -> }, onVoiceModDepthChange = {_, _ -> }, 
+                onDuoModDepthChange = {_, _ -> }, onPairSharpnessChange = {_, _ -> },
+                onVoiceEnvelopeSpeedChange = {_, _ -> }, onPulseStart = {}, onPulseEnd = {},
+                onHoldChange = {_, _ -> }, onDuoModSourceChange = {_, _ -> },
+                onQuadPitchChange = {_, _ -> }, onQuadHoldChange = {_, _ -> },
+                onFmStructureChange = {}, onTotalFeedbackChange = {},
+                onVoiceCouplingChange = {}, onWobblePulseStart = {_, _, _ -> },
+                onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {}
+            )
+        )
+    }
+}
+
+data class VoicePanelActions(
+    val onMasterVolumeChange: (Float) -> Unit,
+    val onVibratoChange: (Float) -> Unit,
+    val onVoiceTuneChange: (Int, Float) -> Unit,
+    val onVoiceModDepthChange: (Int, Float) -> Unit,
+    val onDuoModDepthChange: (Int, Float) -> Unit,
+    val onPairSharpnessChange: (Int, Float) -> Unit,
+    val onVoiceEnvelopeSpeedChange: (Int, Float) -> Unit,
+    val onPulseStart: (Int) -> Unit,
+    val onPulseEnd: (Int) -> Unit,
+    val onHoldChange: (Int, Boolean) -> Unit,
+    val onDuoModSourceChange: (Int, ModSource) -> Unit,
+    val onQuadPitchChange: (Int, Float) -> Unit,
+    val onQuadHoldChange: (Int, Float) -> Unit,
+    val onFmStructureChange: (Boolean) -> Unit,
+    val onTotalFeedbackChange: (Float) -> Unit,
+    val onVoiceCouplingChange: (Float) -> Unit,
+    val onWobblePulseStart: (Int, Float, Float) -> Unit,
+    val onWobbleMove: (Int, Float, Float) -> Unit,
+    val onWobblePulseEnd: (Int) -> Unit
+) {
+    companion object {
+        val EMPTY = VoicePanelActions(
+            onMasterVolumeChange = {}, onVibratoChange = {}, 
+            onVoiceTuneChange = {_, _ -> }, onVoiceModDepthChange = {_, _ -> }, 
+            onDuoModDepthChange = {_, _ -> }, onPairSharpnessChange = {_, _ -> },
+            onVoiceEnvelopeSpeedChange = {_, _ -> }, onPulseStart = {}, onPulseEnd = {},
+            onHoldChange = {_, _ -> }, onDuoModSourceChange = {_, _ -> },
+            onQuadPitchChange = {_, _ -> }, onQuadHoldChange = {_, _ -> },
+            onFmStructureChange = {}, onTotalFeedbackChange = {},
+            onVoiceCouplingChange = {}, onWobblePulseStart = {_, _, _ -> },
+            onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {}
+        )
     }
 }
 

@@ -23,6 +23,7 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /** UI state for the Distortion/Volume panel. */
 data class DistortionUiState(
@@ -198,5 +199,12 @@ class DistortionViewModel(
 
     fun restoreState(state: DistortionUiState) {
         intents.tryEmit(DistortionIntent.Restore(state))
+    }
+
+    companion object {
+        val PREVIEW = ViewModelStateActionMapper(
+            state = DistortionUiState(),
+            actions = DistortionPanelActions.EMPTY,
+        )
     }
 }

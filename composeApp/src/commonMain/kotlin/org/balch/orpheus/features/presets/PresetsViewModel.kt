@@ -23,6 +23,7 @@ import org.balch.orpheus.core.presets.DronePresetRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.SynthPatch
 import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /** UI state for the Presets panel. */
 data class PresetUiState(
@@ -230,5 +231,12 @@ class PresetsViewModel(
         val allPresets = factoryPresets + userPresets
         intents.tryEmit(PresetIntent.SetPresets(allPresets, factoryPresetNames))
         intents.tryEmit(PresetIntent.Select(allPresets.find { it.name == selectName }))
+    }
+
+    companion object {
+        val PREVIEW = ViewModelStateActionMapper(
+            state = PresetUiState(),
+            actions = PresetPanelActions.EMPTY,
+        )
     }
 }

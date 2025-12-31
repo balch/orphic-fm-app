@@ -18,8 +18,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,9 +34,11 @@ import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.features.evo.EvoViewModel
+import org.balch.orpheus.features.midi.MidiPanelActions
 import org.balch.orpheus.features.midi.MidiUiState
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
+import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.ui.MidiActions
@@ -49,6 +49,8 @@ import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.ui.utils.rememberPanelState
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -66,34 +68,11 @@ fun DesktopSynthScreen(
     focusRequester: FocusRequester,
     isVizInitiallyExpanded: Boolean = true
 ) {
-    val voiceState by voiceViewModel.uiState.collectAsState()
-    val midiState by midiViewModel.uiState.collectAsState()
+    val voice = rememberPanelState(voiceViewModel)
+    val midi = rememberPanelState(midiViewModel)
+    val evo = rememberPanelState(evoViewModel) // Not strictly needed for layout logic, but consistent
+    
     val effects = LocalLiquidEffects.current
-
-    val voiceActions = object : VoiceActions {
-        override fun onDuoModSourceChange(pairIndex: Int, source: ModSource) = voiceViewModel.onDuoModSourceChange(pairIndex, source)
-        override fun onVoiceTuneChange(index: Int, value: Float) = voiceViewModel.onVoiceTuneChange(index, value)
-        override fun onDuoModDepthChange(pairIndex: Int, value: Float) = voiceViewModel.onDuoModDepthChange(pairIndex, value)
-        override fun onVoiceEnvelopeSpeedChange(index: Int, value: Float) = voiceViewModel.onVoiceEnvelopeSpeedChange(index, value)
-        override fun onHoldChange(index: Int, holding: Boolean) = voiceViewModel.onHoldChange(index, holding)
-        override fun onPulseStart(index: Int) = voiceViewModel.onPulseStart(index)
-        override fun onPulseEnd(index: Int) = voiceViewModel.onPulseEnd(index)
-        override fun onPairSharpnessChange(pairIndex: Int, value: Float) = voiceViewModel.onPairSharpnessChange(pairIndex, value)
-        override fun onQuadPitchChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadPitchChange(quadIndex, value)
-        override fun onQuadHoldChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadHoldChange(quadIndex, value)
-        override fun onFmStructureChange(crossQuad: Boolean) = voiceViewModel.onFmStructureChange(crossQuad)
-        override fun onTotalFeedbackChange(value: Float) = voiceViewModel.onTotalFeedbackChange(value)
-        override fun onVibratoChange(value: Float) = voiceViewModel.panelActions.onVibratoChange(value)
-        override fun onVoiceCouplingChange(value: Float) = voiceViewModel.onVoiceCouplingChange(value)
-        override fun onDialogActiveChange(active: Boolean) { /* handled by parent */ }
-        override fun onWobblePulseStart(index: Int, x: Float, y: Float) = voiceViewModel.onWobblePulseStart(index, x, y)
-        override fun onWobbleMove(index: Int, x: Float, y: Float) = voiceViewModel.onWobbleMove(index, x, y)
-        override fun onWobblePulseEnd(index: Int) = voiceViewModel.onWobblePulseEnd(index)
-    }
-
-    val midiActions = object : MidiActions {
-        override fun selectVoiceForLearning(voiceIndex: Int) = midiViewModel.selectVoiceForLearning(voiceIndex)
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -104,7 +83,7 @@ fun DesktopSynthScreen(
                 .onPreviewKeyEvent { event ->
                     SynthKeyboardHandler.handleKeyEvent(
                         keyEvent = event,
-                        voiceState = voiceState,
+                        voiceState = voice.state,
                         voiceViewModel = voiceViewModel,
                         isDialogActive = isDialogActive
                     )
@@ -113,12 +92,8 @@ fun DesktopSynthScreen(
             verticalArrangement = Arrangement.Top
         ) {
             DesktopSynthScreenLayout(
-                voiceState = voiceState,
-                midiState = midiState,
-                voiceActions = voiceActions,
-                midiActions = midiActions,
-                isVoiceBeingLearned = midiViewModel::isVoiceBeingLearned,
-                evoViewModel = evoViewModel,
+                voiceFeature = voice,
+                midiFeature = midi,
                 effects = effects,
                 headerContent = {
                     HeaderPanel(
@@ -134,15 +109,46 @@ fun DesktopSynthScreen(
 
 @Composable
 fun ColumnScope.DesktopSynthScreenLayout(
-    voiceState: VoiceUiState,
-    midiState: MidiUiState,
-    voiceActions: VoiceActions,
-    midiActions: MidiActions,
-    isVoiceBeingLearned: (Int) -> Boolean,
-    evoViewModel: EvoViewModel? = null,
+    voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
+    midiFeature: ViewModelStateActionMapper<MidiUiState, MidiPanelActions>,
     effects: VisualizationLiquidEffects,
     headerContent: @Composable () -> Unit
 ) {
+    val voiceState = voiceFeature.state
+    val voicePanelActions = voiceFeature.actions
+    val midiState = midiFeature.state
+    val midiPanelActions = midiFeature.actions
+
+    // Create adapters for legacy subcomponents
+    val voiceActions = remember(voicePanelActions) {
+        object : VoiceActions {
+            override fun onDuoModSourceChange(pairIndex: Int, source: ModSource) = voicePanelActions.onDuoModSourceChange(pairIndex, source)
+            override fun onVoiceTuneChange(index: Int, value: Float) = voicePanelActions.onVoiceTuneChange(index, value)
+            override fun onDuoModDepthChange(pairIndex: Int, value: Float) = voicePanelActions.onDuoModDepthChange(pairIndex, value)
+            override fun onVoiceEnvelopeSpeedChange(index: Int, value: Float) = voicePanelActions.onVoiceEnvelopeSpeedChange(index, value)
+            override fun onHoldChange(index: Int, holding: Boolean) = voicePanelActions.onHoldChange(index, holding)
+            override fun onPulseStart(index: Int) = voicePanelActions.onPulseStart(index)
+            override fun onPulseEnd(index: Int) = voicePanelActions.onPulseEnd(index)
+            override fun onPairSharpnessChange(pairIndex: Int, value: Float) = voicePanelActions.onPairSharpnessChange(pairIndex, value)
+            override fun onQuadPitchChange(quadIndex: Int, value: Float) = voicePanelActions.onQuadPitchChange(quadIndex, value)
+            override fun onQuadHoldChange(quadIndex: Int, value: Float) = voicePanelActions.onQuadHoldChange(quadIndex, value)
+            override fun onFmStructureChange(crossQuad: Boolean) = voicePanelActions.onFmStructureChange(crossQuad)
+            override fun onTotalFeedbackChange(value: Float) = voicePanelActions.onTotalFeedbackChange(value)
+            override fun onVibratoChange(value: Float) = voicePanelActions.onVibratoChange(value)
+            override fun onVoiceCouplingChange(value: Float) = voicePanelActions.onVoiceCouplingChange(value)
+            override fun onDialogActiveChange(active: Boolean) { /* handled by parent */ }
+            override fun onWobblePulseStart(index: Int, x: Float, y: Float) = voicePanelActions.onWobblePulseStart(index, x, y)
+            override fun onWobbleMove(index: Int, x: Float, y: Float) = voicePanelActions.onWobbleMove(index, x, y)
+            override fun onWobblePulseEnd(index: Int) = voicePanelActions.onWobblePulseEnd(index)
+        }
+    }
+
+    val midiActions = remember(midiPanelActions) {
+        object : MidiActions {
+            override fun selectVoiceForLearning(voiceIndex: Int) = midiPanelActions.onSelectVoiceForLearning(voiceIndex)
+        }
+    }
+
     // Top panel row
     headerContent()
 
@@ -165,7 +171,7 @@ fun ColumnScope.DesktopSynthScreenLayout(
                 midiState = midiState,
                 voiceActions = voiceActions,
                 midiActions = midiActions,
-                isVoiceBeingLearned = isVoiceBeingLearned,
+                isVoiceBeingLearned = midiPanelActions.isVoiceBeingLearned,
                 effects = effects
             )
 
@@ -181,8 +187,6 @@ fun ColumnScope.DesktopSynthScreenLayout(
                 onFmStructureChange = voiceActions::onFmStructureChange
             )
 
-
-
             VoiceGroupSectionLayout(
                 quadLabel = "5-8",
                 quadColor = OrpheusColors.synthGreen,
@@ -192,7 +196,7 @@ fun ColumnScope.DesktopSynthScreenLayout(
                 midiState = midiState,
                 voiceActions = voiceActions,
                 midiActions = midiActions,
-                isVoiceBeingLearned = isVoiceBeingLearned,
+                isVoiceBeingLearned = midiPanelActions.isVoiceBeingLearned,
                 effects = effects
             )
         }
@@ -248,39 +252,11 @@ fun ColumnScope.DesktopSynthScreenLayout(
 @Preview(widthDp = 800, heightDp = 600)
 @Composable
 fun DesktopSynthScreenPreview() {
-    val voiceActions = object : VoiceActions {
-        override fun onDuoModSourceChange(pairIndex: Int, source: ModSource) {}
-        override fun onVoiceTuneChange(index: Int, value: Float) {}
-        override fun onDuoModDepthChange(pairIndex: Int, value: Float) {}
-        override fun onVoiceEnvelopeSpeedChange(index: Int, value: Float) {}
-        override fun onHoldChange(index: Int, holding: Boolean) {}
-        override fun onPulseStart(index: Int) {}
-        override fun onPulseEnd(index: Int) {}
-        override fun onPairSharpnessChange(pairIndex: Int, value: Float) {}
-        override fun onQuadPitchChange(quadIndex: Int, value: Float) {}
-        override fun onQuadHoldChange(quadIndex: Int, value: Float) {}
-        override fun onFmStructureChange(crossQuad: Boolean) {}
-        override fun onTotalFeedbackChange(value: Float) {}
-        override fun onVibratoChange(value: Float) {}
-        override fun onVoiceCouplingChange(value: Float) {}
-        override fun onDialogActiveChange(active: Boolean) {}
-        override fun onWobblePulseStart(index: Int, x: Float, y: Float) {}
-        override fun onWobbleMove(index: Int, x: Float, y: Float) {}
-        override fun onWobblePulseEnd(index: Int) {}
-    }
-
-    val midiActions = object : MidiActions {
-        override fun selectVoiceForLearning(voiceIndex: Int) {}
-    }
-
     Box(modifier = Modifier.background(Color.Black)) {
         Column(modifier = Modifier.fillMaxSize()) {
             DesktopSynthScreenLayout(
-                voiceState = VoiceUiState(),
-                midiState = MidiUiState(),
-                voiceActions = voiceActions,
-                midiActions = midiActions,
-                isVoiceBeingLearned = { false },
+                voiceFeature = VoiceViewModel.PREVIEW,
+                midiFeature = MidiViewModel.PREVIEW,
                 effects = LocalLiquidEffects.current,
                 headerContent = {
                     Box(
