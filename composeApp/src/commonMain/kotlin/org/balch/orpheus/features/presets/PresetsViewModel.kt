@@ -40,7 +40,18 @@ data class PresetPanelActions(
     val onDelete: () -> Unit,
     val onApply: (DronePreset) -> Unit,
     val onDialogActiveChange: (Boolean) -> Unit = {} // Called when naming dialog opens/closes
-)
+) {
+    companion object {
+        val EMPTY = PresetPanelActions(
+            onPresetSelect = {},
+            onSelect = {},
+            onNew = {},
+            onOverride = {},
+            onDelete = {},
+            onApply = {}
+        )
+    }
+}
 
 /** User intents for the Presets panel. */
 private sealed interface PresetIntent {

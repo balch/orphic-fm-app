@@ -35,7 +35,16 @@ data class EvoPanelActions(
     val onEnabledChange: (Boolean) -> Unit,
     val onKnob1Change: (Float) -> Unit,
     val onKnob2Change: (Float) -> Unit
-)
+) {
+    companion object {
+        val EMPTY = EvoPanelActions(
+            onStrategyChange = {},
+            onEnabledChange = {},
+            onKnob1Change = {},
+            onKnob2Change = {}
+        )
+    }
+}
 
 @ViewModelKey(EvoViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())

@@ -8,11 +8,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 data class ViewModelStateActionMapper<S, A>(
     val state: S,
-    private val _actions: A? = null,
-) {
-    val actions: A get() =
-        _actions ?: error("Actions not available for this state")
-}
+    val actions: A,
+)
 
 @Composable
 fun <VM, S, A> rememberViewModelStateActionMapper(

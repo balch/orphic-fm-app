@@ -76,7 +76,9 @@ fun PresetsPanelLayout(
     actions: PresetPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
-    onDialogActiveChange: (Boolean) -> Unit = {}
+    onDialogActiveChange: (Boolean) -> Unit = {},
+    fillMaxHeight: Boolean = true,
+    showCollapsedHeader: Boolean = true
 ) {
     var showNewDialog by remember { mutableStateOf(false) }
     var showOverrideDialog by remember { mutableStateOf(false) }
@@ -96,7 +98,9 @@ fun PresetsPanelLayout(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         expandedWidth = 200.dp,
-        modifier = modifier
+        modifier = modifier,
+        fillMaxHeight = fillMaxHeight,
+        showCollapsedHeader = showCollapsedHeader
     ) {
         Column(
             modifier = Modifier

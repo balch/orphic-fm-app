@@ -5,18 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.features.viz.Blob
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VizViewModel
+import org.balch.orpheus.ui.viz.Visualization
 
 /**
  * Background component that renders the active visualization.
@@ -24,17 +21,15 @@ import org.balch.orpheus.ui.viz.VizViewModel
 @Composable
 fun VizBackground(
     modifier: Modifier = Modifier,
-    vizViewModel: VizViewModel = metroViewModel()
+    selectedViz: Visualization,
 ) {
-    val state by vizViewModel.uiState.collectAsState()
-
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(OrpheusColors.darkVoid) // Base background color
     ) {
         // Render the active visualization's content
-        state.selectedViz.Content(modifier = Modifier.fillMaxSize())
+        selectedViz.Content(modifier = Modifier.fillMaxSize())
     }
 }
 

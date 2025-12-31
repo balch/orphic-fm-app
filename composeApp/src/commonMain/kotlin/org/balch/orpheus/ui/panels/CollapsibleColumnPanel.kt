@@ -69,6 +69,7 @@ fun CollapsibleColumnPanel(
     expandedWidth: Dp = 140.dp,
     expandedTitle: String? = null,
     showCollapsedHeader: Boolean = true,
+    fillMaxHeight: Boolean = true,
     content: @Composable () -> Unit
 ) {
     var internalExpanded by remember { mutableStateOf(initialExpanded) }
@@ -90,7 +91,7 @@ fun CollapsibleColumnPanel(
     // Base modifier - ensure minimum width for the header strip ONLY if showing header
     val baseModifier = modifier
         .then(if (showCollapsedHeader) Modifier.widthIn(min = collapsedWidth) else Modifier)
-        .fillMaxHeight()
+        .then(if (fillMaxHeight) Modifier.fillMaxHeight() else Modifier)
         .clip(shape)
 
     // Apply liquid effect

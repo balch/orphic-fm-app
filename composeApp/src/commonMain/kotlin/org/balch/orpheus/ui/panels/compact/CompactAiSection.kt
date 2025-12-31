@@ -18,9 +18,6 @@ import org.balch.orpheus.features.ai.chat.ChatViewModel
 import org.balch.orpheus.features.ai.generative.AiDashboard
 import org.balch.orpheus.features.ai.widgets.AiMode
 import org.balch.orpheus.features.ai.widgets.AiModeSelector
-import org.balch.orpheus.features.tidal.LiveCodePanelActions
-import org.balch.orpheus.features.tidal.LiveCodeUiState
-import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.ui.utils.rememberPanelState
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -39,12 +36,10 @@ fun CompactAiSection(
     modifier: Modifier = Modifier,
     aiViewModel: AiOptionsViewModel = metroViewModel(),
     chatViewModel: ChatViewModel = metroViewModel(),
-    liveCodeViewModel: LiveCodeViewModel = metroViewModel(),
     onShowRepl: () -> Unit = {}
 ) {
     val aiState = rememberPanelState(aiViewModel)
     val chatState = rememberPanelState(chatViewModel)
-    val liveCodeState = rememberPanelState(liveCodeViewModel)
 
     CompactAiSectionLayout(
         modifier = modifier,
@@ -52,8 +47,6 @@ fun CompactAiSection(
         aiOptionsActions = aiState.actions,
         chatState = chatState.state,
         chatActions = chatState.actions,
-        liveCodeState = liveCodeState.state,
-        liveCodeActions = liveCodeState.actions,
         onShowRepl = onShowRepl
     )
 }
@@ -65,8 +58,6 @@ fun CompactAiSectionLayout(
     aiOptionsActions: AiOptionsPanelActions,
     chatState: ChatUiState,
     chatActions: ChatPanelActions,
-    liveCodeState: LiveCodeUiState,
-    liveCodeActions: LiveCodePanelActions,
     onShowRepl: () -> Unit
 ) {
     // Determine current AI mode from states
@@ -164,8 +155,6 @@ fun CompactAiSectionPreview() {
         aiOptionsActions = AiOptionsPanelActions.EMPTY,
         chatState = ChatUiState(),
         chatActions = ChatPanelActions.EMPTY,
-        liveCodeState = LiveCodeUiState(),
-        liveCodeActions = LiveCodePanelActions.EMPTY,
         onShowRepl = {}
     )
 }

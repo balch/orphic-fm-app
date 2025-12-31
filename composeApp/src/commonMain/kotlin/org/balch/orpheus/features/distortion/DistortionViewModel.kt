@@ -36,7 +36,15 @@ data class DistortionPanelActions(
     val onDriveChange: (Float) -> Unit,
     val onVolumeChange: (Float) -> Unit,
     val onMixChange: (Float) -> Unit
-)
+) {
+    companion object {
+        val EMPTY = DistortionPanelActions(
+            onDriveChange = {},
+            onVolumeChange = {},
+            onMixChange = {}
+        )
+    }
+}
 
 /** User intents for the Distortion panel. */
 private sealed interface DistortionIntent {

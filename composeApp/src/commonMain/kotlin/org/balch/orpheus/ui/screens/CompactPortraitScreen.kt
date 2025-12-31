@@ -44,6 +44,7 @@ import org.balch.orpheus.features.lfo.LfoUiState
 import org.balch.orpheus.features.lfo.LfoViewModel
 import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
+import org.balch.orpheus.features.presets.PresetsPanelLayout
 import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.stereo.StereoPanelActions
 import org.balch.orpheus.features.stereo.StereoPanelLayout
@@ -65,7 +66,6 @@ import org.balch.orpheus.ui.panels.compact.CompactAiSectionPreview
 import org.balch.orpheus.ui.panels.compact.CompactPanelSwitcher
 import org.balch.orpheus.ui.panels.compact.CompactPanelType
 import org.balch.orpheus.ui.panels.compact.CompactPortraitHeaderPanel
-import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
@@ -77,7 +77,6 @@ import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.DraggableDivider
 import org.balch.orpheus.ui.widgets.VizBackground
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 /**
  * Compact Portrait Layout: Mobile-optimized design for portrait orientation.
@@ -197,74 +196,72 @@ private fun CompactPortraitScreenLayout(
     // Selected panel for switcher
     var selectedPanel by remember { mutableStateOf(CompactPanelType.REPL) }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        // 1. Header panel
-        // 1. Header panel
-        CompactPortraitHeaderPanel(
-            selectedPresetName = presetFeature.state.selectedPreset?.name ?: "No Preset",
-            presets = presetFeature.state.presets,
-            presetDropdownExpanded = false, // Simplified - can add state later if needed
-            onPresetDropdownExpandedChange = { },
-            onPresetSelect = presetFeature.actions.onPresetSelect,
-            peakLevel = distortionFeature.state.peak,
-            liquidState = liquidState,
-            effects = effects
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .then(
+                Modifier.liquefiable(liquidState)
+            )
+    ) {
+        // 0. Visualization background (behind everything, including status bar)
+        VizBackground(
+            modifier = Modifier.fillMaxSize(),
+            selectedViz = vizFeature.state.selectedViz,
         )
 
-        // 2. Body with visualization background
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(
-                    Modifier.liquefiable(liquidState)
-                )
-        ) {
-            // Visualization background
-            VizBackground(
-                modifier = Modifier.fillMaxSize(),
+        // Content Overylay
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 1. Header panel
+            CompactPortraitHeaderPanel(
+                peakLevel = distortionFeature.state.peak,
+                liquidState = liquidState,
+                effects = effects
             )
 
-            // Content overlay
-            Column(modifier = Modifier.fillMaxSize()) {
-                // 3a. Synth panels section (resizable)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(topSectionHeight)
-                ) {
-                    CompactPanelSwitcher(
-                        selectedPanel = selectedPanel,
-                        onPanelSelected = { selectedPanel = it }
-                    ) { panel ->
-                        PanelContent(
-                            panel = panel,
-                            liveCodeFeature = liveCodeFeature,
-                            activeReplHighlights = activeReplHighlights,
-                            voiceFeature = voiceFeature,
-                            delayFeature = delayFeature,
-                            distortionFeature = distortionFeature,
-                            evoFeature = evoFeature,
-                            lfoFeature = lfoFeature,
-                            stereoFeature = stereoFeature,
-                            vizFeature = vizFeature,
-                        )
-                    }
-                }
-
-                // 3b. Draggable divider
-                DraggableDivider(
-                    onDrag = { delta ->
-                        with(density) {
-                            val newHeight = topSectionHeight + delta.toDp()
-                            topSectionHeight = newHeight.coerceIn(minTopHeight, maxTopHeight)
+            // 2. Main Content
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                     // 3a. Synth panels section (resizable)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(topSectionHeight)
+                    ) {
+                        CompactPanelSwitcher(
+                            selectedPanel = selectedPanel,
+                            onPanelSelected = { selectedPanel = it }
+                        ) { panel ->
+                            PanelContent(
+                                panel = panel,
+                                presetFeature = presetFeature,
+                                liveCodeFeature = liveCodeFeature,
+                                activeReplHighlights = activeReplHighlights,
+                                voiceFeature = voiceFeature,
+                                delayFeature = delayFeature,
+                                distortionFeature = distortionFeature,
+                                evoFeature = evoFeature,
+                                lfoFeature = lfoFeature,
+                                stereoFeature = stereoFeature,
+                                vizFeature = vizFeature,
+                            )
                         }
                     }
-                )
 
-                // 3c. AI section (fills remaining space)
-                Box(modifier = Modifier.weight(1f)) {
-                    aiSectionContent {
-                        selectedPanel = CompactPanelType.REPL
+                    // 3b. Draggable divider
+                    DraggableDivider(
+                        onDrag = { delta ->
+                            with(density) {
+                                val newHeight = topSectionHeight + delta.toDp()
+                                topSectionHeight = newHeight.coerceIn(minTopHeight, maxTopHeight)
+                            }
+                        }
+                    )
+
+                    // 3c. AI section (fills remaining space)
+                    Box(modifier = Modifier.weight(1f)) {
+                        aiSectionContent {
+                            selectedPanel = CompactPanelType.REPL
+                        }
                     }
                 }
             }
@@ -278,6 +275,7 @@ private fun CompactPortraitScreenLayout(
 @Composable
 private fun PanelContent(
     panel: CompactPanelType,
+    presetFeature: ViewModelStateActionMapper<PresetUiState, PresetPanelActions>,
     liveCodeFeature: ViewModelStateActionMapper<LiveCodeUiState, LiveCodePanelActions>,
     activeReplHighlights: List<IntRange>,
     voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
@@ -302,6 +300,17 @@ private fun PanelContent(
                 uiState = liveCodeFeature.state,
                 actions = liveCodeFeature.actions,
                 activeHighlights = activeReplHighlights,
+                modifier = panelModifier,
+                isExpanded = true,
+                onExpandedChange = null,
+                showCollapsedHeader = false
+            )
+        }
+
+        CompactPanelType.PRESET -> {
+            PresetsPanelLayout(
+                uiState = presetFeature.state,
+                actions = presetFeature.actions,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,
@@ -394,33 +403,30 @@ private object PreviewEvoStrategy : AudioEvolutionStrategy {
 
 @Preview(widthDp = 360, heightDp = 700)
 @Composable
-private fun CompactPortraitLayoutPreview(
-    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
-) {
-    LiquidPreviewContainerWithGradient(effects = effects) {
+private fun CompactPortraitLayoutPreview() {
+    LiquidPreviewContainerWithGradient() {
         val liquidState = LocalLiquidState.current
         if (liquidState != null) {
             CompactPortraitScreenLayout(
                 presetFeature = ViewModelStateActionMapper(
                     state = PresetUiState(),
-                    _actions = PresetPanelActions({}, {}, {}, {}, {}, {})
+                    actions = PresetPanelActions.EMPTY,
                 ),
                 voiceFeature = ViewModelStateActionMapper(
                     state = VoiceUiState(),
-                    _actions = VoicePanelActions({}, {})
+                    actions = VoicePanelActions.EMPTY,
                 ),
                 distortionFeature = ViewModelStateActionMapper(
                     state = DistortionUiState(),
-                    _actions = DistortionPanelActions({}, {}, {})
+                    actions = DistortionPanelActions.EMPTY,
                 ),
                 liquidState = liquidState,
-                effects = effects,
+                effects = VisualizationLiquidEffects.Default,
                 liveCodeFeature = ViewModelStateActionMapper(
-                    state = LiveCodeUiState()
+                    state = LiveCodeUiState(),
+                    actions = LiveCodePanelActions.EMPTY,
                 ),
-                delayFeature = ViewModelStateActionMapper(
-                    state = DelayUiState(),
-                ),
+                delayFeature = DelayViewModel.PREVIEW,
                 evoFeature = ViewModelStateActionMapper(
                      state = EvoUiState(
                          selectedStrategy = PreviewEvoStrategy,
@@ -429,13 +435,15 @@ private fun CompactPortraitLayoutPreview(
                          knob1Value = 0.5f,
                          knob2Value = 0.5f
                      ),
-                     _actions = EvoPanelActions({}, {}, {}, {})
+                    actions = EvoPanelActions.EMPTY,
                 ),
                 lfoFeature = ViewModelStateActionMapper(
                     state = LfoUiState(),
+                    actions = LfoPanelActions.EMPTY,
                 ),
                 stereoFeature = ViewModelStateActionMapper(
                     state = StereoUiState(),
+                    actions = StereoPanelActions.EMPTY,
                 ),
                 vizFeature = ViewModelStateActionMapper(
                     state = VizUiState(
@@ -443,6 +451,7 @@ private fun CompactPortraitLayoutPreview(
                         visualizations = listOf(OffViz()),
                         showKnobs = false
                     ),
+                    actions = VizPanelActions.EMPTY,
                 ),
                 aiSectionContent = { _ -> CompactAiSectionPreview() }
             )

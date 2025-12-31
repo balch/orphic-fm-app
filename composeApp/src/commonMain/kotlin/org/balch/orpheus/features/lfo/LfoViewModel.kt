@@ -37,7 +37,16 @@ data class LfoPanelActions(
     val onLfoBChange: (Float) -> Unit,
     val onModeChange: (HyperLfoMode) -> Unit,
     val onLinkChange: (Boolean) -> Unit
-)
+) {
+    companion object {
+        val EMPTY = LfoPanelActions(
+            onLfoAChange = {},
+            onLfoBChange = {},
+            onModeChange = {},
+            onLinkChange = {}
+        )
+    }
+}
 
 /** User intents for the LFO panel. */
 private sealed interface LfoIntent {

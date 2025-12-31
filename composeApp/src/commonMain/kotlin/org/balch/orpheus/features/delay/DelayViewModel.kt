@@ -23,6 +23,7 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.ui.utils.PanelViewModel
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /** UI state for the Mod Delay panel. */
 data class DelayUiState(
@@ -45,7 +46,20 @@ data class DelayPanelActions(
     val onMixChange: (Float) -> Unit,
     val onSourceChange: (Boolean) -> Unit,
     val onWaveformChange: (Boolean) -> Unit
-)
+) {
+    companion object {
+        val EMPTY = DelayPanelActions(
+            onTime1Change = {},
+            onMod1Change = {},
+            onTime2Change = {},
+            onMod2Change = {},
+            onFeedbackChange = {},
+            onMixChange = {},
+            onSourceChange = {},
+            onWaveformChange = {}
+        )
+    }
+}
 
 /** User intents for the Delay panel. */
 private sealed interface DelayIntent {
@@ -249,5 +263,12 @@ class DelayViewModel(
 
     fun restoreState(state: DelayUiState) {
         intents.tryEmit(DelayIntent.Restore(state))
+    }
+
+    companion object {
+        val PREVIEW = ViewModelStateActionMapper(
+                state = DelayUiState(),
+                actions = DelayPanelActions.EMPTY,
+            )
     }
 }

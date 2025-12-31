@@ -54,7 +54,11 @@ data class VoiceUiState(
 data class VoicePanelActions(
     val onMasterVolumeChange: (Float) -> Unit,
     val onVibratoChange: (Float) -> Unit
-)
+) {
+    companion object {
+        val EMPTY = VoicePanelActions({ }, { })
+    }
+}
 
 /** User intents for voice management. */
 private sealed interface VoiceIntent {

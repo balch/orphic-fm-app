@@ -33,7 +33,15 @@ data class VizPanelActions(
     val onSelectViz: (Visualization) -> Unit,
     val onKnob1Change: (Float) -> Unit,
     val onKnob2Change: (Float) -> Unit
-)
+) {
+    companion object {
+        val EMPTY = VizPanelActions(
+            onSelectViz = {},
+            onKnob1Change = {},
+            onKnob2Change = {}
+        )
+    }
+}
 
 /**
  * ViewModel for managing visualizations.

@@ -33,7 +33,14 @@ data class StereoUiState(
 data class StereoPanelActions(
     val onModeChange: (StereoMode) -> Unit,
     val onMasterPanChange: (Float) -> Unit
-)
+) {
+    companion object {
+        val EMPTY = StereoPanelActions(
+            onModeChange = {},
+            onMasterPanChange = {}
+        )
+    }
+}
 
 /** User intents for the Stereo panel. */
 private sealed interface StereoIntent {

@@ -42,6 +42,7 @@ fun App(graph: OrpheusGraph) {
         val dialogPosition by aiViewModel.dialogPosition.collectAsState()
         val dialogSize by aiViewModel.dialogSize.collectAsState()
 
+        val vizModelUiState by vizViewModel.uiState.collectAsState()
         OrpheusTheme {
             CompositionLocalProvider(
                 LocalLiquidState provides liquidState,
@@ -57,7 +58,8 @@ fun App(graph: OrpheusGraph) {
                         VizBackground(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .liquefiable(liquidState)
+                                .liquefiable(liquidState),
+                            selectedViz = vizModelUiState.selectedViz
                         )
 
                         Column(modifier = Modifier.fillMaxSize()) {
