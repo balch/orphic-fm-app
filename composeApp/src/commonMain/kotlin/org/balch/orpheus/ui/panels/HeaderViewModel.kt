@@ -55,6 +55,9 @@ class HeaderViewModel(
     
     private val _codeExpanded = MutableStateFlow(false)
     val codeExpanded: StateFlow<Boolean> = _codeExpanded.asStateFlow()
+
+    private val _evoExpanded = MutableStateFlow(false)
+    val evoExpanded: StateFlow<Boolean> = _evoExpanded.asStateFlow()
     
     private val _aiExpanded = MutableStateFlow(false)
     val aiExpanded: StateFlow<Boolean> = _aiExpanded.asStateFlow()
@@ -85,10 +88,12 @@ class HeaderViewModel(
         log.debug { "HeaderViewModel: setCodeExpanded=$expanded" }
         _codeExpanded.value = expanded 
     }
+    fun setEvoExpanded(expanded: Boolean) { _evoExpanded.value = expanded }
     fun setAiExpanded(expanded: Boolean) { _aiExpanded.value = expanded }
     
     private fun setPanelExpanded(panelId: PanelId, expanded: Boolean) {
         when (panelId) {
+            PanelId.EVO -> _evoExpanded.value = expanded
             PanelId.PRESETS -> _presetExpanded.value = expanded
             PanelId.MIDI -> _midiExpanded.value = expanded
             PanelId.STEREO -> _stereoExpanded.value = expanded

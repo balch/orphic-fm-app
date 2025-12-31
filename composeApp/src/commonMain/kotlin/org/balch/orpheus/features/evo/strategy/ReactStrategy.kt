@@ -1,0 +1,230 @@
+package org.balch.orpheus.features.evo.strategy
+
+import androidx.compose.ui.graphics.Color
+import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
+import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.routing.ControlEventOrigin
+import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.features.evo.AudioEvolutionStrategy
+import kotlin.math.abs
+import kotlin.time.Duration.Companion.milliseconds
+
+/**
+ * React Strategy - Audio & Input Reactive Evolution
+ * 
+ * Modulates parameters in response to:
+ * - Audio peaks (when sound gets louder/quieter)
+ * - User input (when user adjusts controls)
+ * 
+ * SENS (Knob 1): Sensitivity - how responsive to audio levels
+ * FOLLOW (Knob 2): Follow amount - how strongly to track user changes
+ */
+@Inject
+@ContributesIntoSet(AppScope::class)
+class ReactStrategy(
+    private val synthController: SynthController,
+    private val synthEngine: SynthEngine
+) : AudioEvolutionStrategy {
+
+    private val log = logging("ReactStrategy")
+
+    override val id = "react"
+    override val name = "React"
+    override val color = Color(0xFFFF9800) // Orange - reactive/dynamic
+    override val knob1Label = "SENS"
+    override val knob2Label = "FOLLOW"
+
+    private var sensitivityKnob = 0.5f
+    private var followKnob = 0.5f
+    
+    // Historical tracking for audio reactivity
+    private var peakHistory = FloatArray(10) { 0f }
+    private var historyIndex = 0
+    private var lastPeak = 0f
+    private var peakTrend = 0f  // Positive = getting louder, negative = quieter
+    
+    // User input tracking
+    private var lastUserChange: UserChange? = null
+    private var userChangeDecay = 0f
+    
+    // Coroutine scope for monitoring flows
+    private var monitorScope: CoroutineScope? = null
+    private var monitorJob: Job? = null
+    
+    data class UserChange(
+        val controlId: String,
+        val direction: Float,  // Positive = increasing, negative = decreasing
+        val timestamp: Long
+    )
+
+    override fun setKnob1(value: Float) {
+        sensitivityKnob = value.coerceIn(0f, 1f)
+        log.debug { "SENS set to $sensitivityKnob" }
+    }
+
+    override fun setKnob2(value: Float) {
+        followKnob = value.coerceIn(0f, 1f)
+        log.debug { "FOLLOW set to $followKnob" }
+    }
+
+    private fun emit(controlId: String, value: Float) {
+        synthController.emitControlChange(controlId, value.coerceIn(0f, 1f), ControlEventOrigin.EVO)
+    }
+
+    @OptIn(FlowPreview::class)
+    override fun onActivate() {
+        log.info { "Activated (SENS=$sensitivityKnob, FOLLOW=$followKnob)" }
+        
+        // Reset state
+        peakHistory.fill(0f)
+        historyIndex = 0
+        lastPeak = 0f
+        peakTrend = 0f
+        lastUserChange = null
+        userChangeDecay = 0f
+        
+        // Start monitoring user input
+        monitorScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        monitorJob = monitorScope?.launch {
+            synthController.onControlChange
+                .filter { it.origin == ControlEventOrigin.UI || it.origin == ControlEventOrigin.MIDI }
+                .debounce(100.milliseconds)
+                .collect { event ->
+                    // Track direction of change by comparing to current engine value
+                    val currentValue = when (event.controlId) {
+                        ControlIds.DRIVE -> synthEngine.getDrive()
+                        ControlIds.DELAY_MIX -> synthEngine.getDelayMix()
+                        ControlIds.DELAY_FEEDBACK -> synthEngine.getDelayFeedback()
+                        ControlIds.VIBRATO -> synthEngine.getVibrato()
+                        else -> 0.5f
+                    }
+                    val direction = event.value - currentValue
+                    
+                    lastUserChange = UserChange(
+                        controlId = event.controlId,
+                        direction = direction,
+                        timestamp = System.currentTimeMillis()
+                    )
+                    userChangeDecay = 1f
+                    
+                    log.debug { "User adjusted ${event.controlId}: ${if (direction > 0) "↑" else "↓"}" }
+                }
+        }
+    }
+
+    override fun onDeactivate() {
+        log.info { "Deactivated" }
+        monitorJob?.cancel()
+        monitorScope?.cancel()
+        monitorScope = null
+        monitorJob = null
+    }
+
+    override suspend fun evolve(engine: SynthEngine) {
+        // === 1. Audio Reactivity ===
+        val currentPeak = engine.getPeak()
+        
+        // Update history and compute trend
+        peakHistory[historyIndex] = currentPeak
+        historyIndex = (historyIndex + 1) % peakHistory.size
+        
+        val avgPeak = peakHistory.average().toFloat()
+        val newTrend = currentPeak - lastPeak
+        peakTrend = peakTrend * 0.7f + newTrend * 0.3f  // Smoothed trend
+        lastPeak = currentPeak
+        
+        // Sensitivity determines how much we react to peaks
+        val sensitivity = sensitivityKnob
+        val peakInfluence = (currentPeak - avgPeak) * sensitivity * 2f
+        val trendInfluence = peakTrend * sensitivity * 5f
+        
+        // === 2. User Follow Reactivity ===
+        // Decay the user influence over time
+        userChangeDecay *= 0.95f
+        if (userChangeDecay < 0.01f) userChangeDecay = 0f
+        
+        val userInfluence = lastUserChange?.let { change ->
+            change.direction * userChangeDecay * followKnob
+        } ?: 0f
+        
+        // === 3. Apply Reactive Modulation ===
+        
+        // When peak is high → increase Drive slightly
+        if (abs(peakInfluence) > 0.01f) {
+            val currentDrive = engine.getDrive()
+            val targetDrive = (currentDrive + peakInfluence * 0.1f).coerceIn(0f, 0.7f)
+            emit(ControlIds.DRIVE, currentDrive + (targetDrive - currentDrive) * 0.2f)
+        }
+        
+        // When trend is rising → increase Delay Mix for "bloom" effect
+        if (trendInfluence > 0.02f) {
+            val currentDelay = engine.getDelayMix()
+            val targetDelay = (currentDelay + trendInfluence * 0.3f).coerceIn(0f, 0.8f)
+            emit(ControlIds.DELAY_MIX, currentDelay + (targetDelay - currentDelay) * 0.1f)
+        }
+        
+        // When trend is falling → reduce Delay feedback for "tightening"
+        if (trendInfluence < -0.02f) {
+            val currentFeedback = engine.getDelayFeedback()
+            val targetFeedback = (currentFeedback + trendInfluence * 0.2f).coerceIn(0.1f, 0.85f)
+            emit(ControlIds.DELAY_FEEDBACK, currentFeedback + (targetFeedback - currentFeedback) * 0.1f)
+        }
+        
+        // User follow: if user pushed a parameter up, gently push related params
+        if (userInfluence != 0f && lastUserChange != null) {
+            applyUserFollow(engine, lastUserChange!!, userInfluence)
+        }
+        
+        // Vibrato follows peak intensity
+        val vibratoTarget = 0.1f + (avgPeak * sensitivity * 0.4f)
+        val currentVibrato = engine.getVibrato()
+        emit(ControlIds.VIBRATO, currentVibrato + (vibratoTarget - currentVibrato) * 0.05f)
+        
+        // Log occasionally
+        if (historyIndex == 0) {
+            log.debug { 
+                "React: peak=%.2f, trend=%+.3f, userDecay=%.2f"
+                    .format(currentPeak, peakTrend, userChangeDecay) 
+            }
+        }
+    }
+    
+    private fun applyUserFollow(engine: SynthEngine, change: UserChange, influence: Float) {
+        // When user changes one parameter, subtly adjust related ones
+        when {
+            change.controlId == ControlIds.DRIVE -> {
+                // User increased drive → increase distortion mix slightly
+                val currentMix = engine.getDistortionMix()
+                emit(ControlIds.DISTORTION_MIX, (currentMix + influence * 0.3f).coerceIn(0f, 1f))
+            }
+            change.controlId == ControlIds.DELAY_MIX -> {
+                // User increased delay → increase feedback slightly
+                val currentFb = engine.getDelayFeedback()
+                emit(ControlIds.DELAY_FEEDBACK, (currentFb + influence * 0.2f).coerceIn(0f, 0.85f))
+            }
+            change.controlId.startsWith("quad_") && change.controlId.endsWith("_pitch") -> {
+                // User changed quad pitch → adjust vibrato
+                val currentVibrato = engine.getVibrato()
+                emit(ControlIds.VIBRATO, (currentVibrato + abs(influence) * 0.1f).coerceIn(0f, 0.5f))
+            }
+            change.controlId == ControlIds.VIBRATO -> {
+                // User increased vibrato → increase voice coupling
+                val currentCoupling = engine.getVoiceCoupling()
+                emit(ControlIds.VOICE_COUPLING, (currentCoupling + influence * 0.15f).coerceIn(0f, 0.5f))
+            }
+        }
+    }
+}

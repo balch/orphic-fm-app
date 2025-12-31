@@ -16,7 +16,8 @@ enum class ControlEventOrigin {
     UI,        // Manual UI interaction (Knobs/Sliders)
     SEQUENCER, // Internal Automation/Sequencer
     TIDAL,     // Tidal Cycles OSC input (future)
-    AI         // AI Agent Automation
+    AI,        // AI Agent Automation
+    EVO        // Audio Evolution Strategies
 }
 
 /**

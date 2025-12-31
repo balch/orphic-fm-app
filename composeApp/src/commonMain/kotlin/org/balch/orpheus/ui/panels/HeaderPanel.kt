@@ -18,6 +18,8 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.features.ai.AiOptionsPanel
 import org.balch.orpheus.features.delay.ModDelayPanel
 import org.balch.orpheus.features.distortion.DistortionPanel
+import org.balch.orpheus.features.evo.EvoPanel
+import org.balch.orpheus.features.evo.EvoViewModel
 import org.balch.orpheus.features.lfo.HyperLfoPanel
 import org.balch.orpheus.features.midi.MidiPanel
 import org.balch.orpheus.features.presets.PresetsPanel
@@ -33,6 +35,7 @@ import org.balch.orpheus.features.viz.VizPanel
 fun HeaderPanel(
     modifier: Modifier = Modifier,
     viewModel: HeaderViewModel = metroViewModel(),
+    evoViewModel: EvoViewModel = metroViewModel(),
     height: Dp = 260.dp,
     isVizInitiallyExpanded: Boolean = true,
     onDialogActiveChange: (Boolean) -> Unit = {}
@@ -46,6 +49,7 @@ fun HeaderPanel(
     val delayExpanded by viewModel.delayExpanded.collectAsState()
     val distortionExpanded by viewModel.distortionExpanded.collectAsState()
     val codeExpanded by viewModel.codeExpanded.collectAsState()
+    val evoExpanded by viewModel.evoExpanded.collectAsState()
     val aiExpanded by viewModel.aiExpanded.collectAsState()
 
     Row(
@@ -75,6 +79,12 @@ fun HeaderPanel(
             isExpanded = vizExpanded,
             onExpandedChange = viewModel::setVizExpanded,
             modifier = panelModifier(vizExpanded)
+        )
+        EvoPanel(
+            viewModel = evoViewModel,
+            isExpanded = evoExpanded,
+            onExpandedChange = viewModel::setEvoExpanded,
+            modifier = panelModifier(evoExpanded)
         )
         HyperLfoPanel(
             isExpanded = lfoExpanded,

@@ -50,6 +50,7 @@ enum class CompactPanelType(val displayName: String, val color: Color) {
     REPL("REPL", OrpheusColors.neonCyan),
     VIZ("Viz", Color(0xFF90EE90)),
     DISTORTION("Distortion", OrpheusColors.neonMagenta),
+    EVO("Evo", Color(0xFFFDBB30)), // Cavs Gold
     LFO("LFO", OrpheusColors.neonCyan),
     DELAY("Delay", OrpheusColors.warmGlow),
     STEREO("Stereo", Color(0xFF008B8B)),

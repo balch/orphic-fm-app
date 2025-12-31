@@ -97,6 +97,11 @@ data class MidiMappingState(
             // Structure
             const val FM_STRUCTURE = "fm_structure"
             
+            // Evo controls
+            const val EVO_DEPTH = "evo_depth"
+            const val EVO_RATE = "evo_rate"
+            const val EVO_VARIATION = "evo_variation"
+
             // Viz controls
             const val VIZ_KNOB_1 = "viz_knob_1"
             const val VIZ_KNOB_2 = "viz_knob_2"

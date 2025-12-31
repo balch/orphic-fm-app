@@ -16,6 +16,7 @@ enum class PanelId(val displayName: String) {
     MIDI("MIDI"),
     STEREO("Stereo"),
     VIZ("Visualization"),
+    EVO("Evolution"),
     LFO("Hyper LFO"),
     DELAY("Mod Delay"),
     DISTORTION("Distortion"),

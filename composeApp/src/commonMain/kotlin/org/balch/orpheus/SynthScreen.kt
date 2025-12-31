@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import com.diamondedge.logging.logging
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.features.evo.EvoViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.screens.CompactLandscapeScreen
 import org.balch.orpheus.ui.screens.CompactPortraitScreen
@@ -64,6 +65,7 @@ fun SynthScreen(
     var isDialogActive by remember { mutableStateOf(false) }
 
     val voiceViewModel: VoiceViewModel = metroViewModel()
+    val evoViewModel: EvoViewModel = metroViewModel()
 
     LearnModeProvider {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -87,6 +89,7 @@ fun SynthScreen(
                     // Original desktop layout
                     DesktopSynthScreen(
                         voiceViewModel = voiceViewModel,
+                        evoViewModel = evoViewModel,
                         isDialogActive = isDialogActive,
                         onDialogActiveChange = { isDialogActive = it },
                         focusRequester = focusRequester,

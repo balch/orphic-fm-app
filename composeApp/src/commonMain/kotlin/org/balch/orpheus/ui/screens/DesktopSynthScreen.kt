@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.features.evo.EvoViewModel
 import org.balch.orpheus.features.midi.MidiUiState
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
@@ -59,6 +60,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun DesktopSynthScreen(
     voiceViewModel: VoiceViewModel = metroViewModel(),
     midiViewModel: MidiViewModel = metroViewModel(),
+    evoViewModel: EvoViewModel = metroViewModel(),
     isDialogActive: Boolean,
     onDialogActiveChange: (Boolean) -> Unit,
     focusRequester: FocusRequester,
@@ -116,11 +118,13 @@ fun DesktopSynthScreen(
                 voiceActions = voiceActions,
                 midiActions = midiActions,
                 isVoiceBeingLearned = midiViewModel::isVoiceBeingLearned,
+                evoViewModel = evoViewModel,
                 effects = effects,
                 headerContent = {
                     HeaderPanel(
                         onDialogActiveChange = onDialogActiveChange,
-                        isVizInitiallyExpanded = isVizInitiallyExpanded
+                        isVizInitiallyExpanded = isVizInitiallyExpanded,
+                        evoViewModel = evoViewModel
                     )
                 }
             )
@@ -135,6 +139,7 @@ fun ColumnScope.DesktopSynthScreenLayout(
     voiceActions: VoiceActions,
     midiActions: MidiActions,
     isVoiceBeingLearned: (Int) -> Boolean,
+    evoViewModel: EvoViewModel? = null,
     effects: VisualizationLiquidEffects,
     headerContent: @Composable () -> Unit
 ) {
@@ -175,6 +180,8 @@ fun ColumnScope.DesktopSynthScreenLayout(
                 onTotalFeedbackChange = voiceActions::onTotalFeedbackChange,
                 onFmStructureChange = voiceActions::onFmStructureChange
             )
+
+
 
             VoiceGroupSectionLayout(
                 quadLabel = "5-8",

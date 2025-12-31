@@ -33,6 +33,11 @@ import org.balch.orpheus.features.distortion.DistortionPanelActions
 import org.balch.orpheus.features.distortion.DistortionPanelLayout
 import org.balch.orpheus.features.distortion.DistortionUiState
 import org.balch.orpheus.features.distortion.DistortionViewModel
+import org.balch.orpheus.features.evo.AudioEvolutionStrategy
+import org.balch.orpheus.features.evo.EvoPanelActions
+import org.balch.orpheus.features.evo.EvoPanelLayout
+import org.balch.orpheus.features.evo.EvoUiState
+import org.balch.orpheus.features.evo.EvoViewModel
 import org.balch.orpheus.features.lfo.HyperLfoPanelLayout
 import org.balch.orpheus.features.lfo.LfoPanelActions
 import org.balch.orpheus.features.lfo.LfoUiState
@@ -92,6 +97,8 @@ fun CompactPortraitScreen(
     vizViewModel: VizViewModel = metroViewModel(),
     delayViewModel: DelayViewModel = metroViewModel(),
     distortionViewModel: DistortionViewModel = metroViewModel(),
+
+    evoViewModel: EvoViewModel = metroViewModel(),
     lfoViewModel: LfoViewModel = metroViewModel(),
     stereoViewModel: StereoViewModel = metroViewModel(),
     liveCodeViewModel: LiveCodeViewModel = metroViewModel(),
@@ -101,6 +108,7 @@ fun CompactPortraitScreen(
     val liveCode = rememberPanelState(liveCodeViewModel)
     val delay = rememberPanelState(delayViewModel)
     val distortion = rememberPanelState(distortionViewModel)
+    val evo = rememberPanelState(evoViewModel)
     val lfo = rememberPanelState(lfoViewModel)
     val stereo = rememberPanelState(stereoViewModel)
     val viz = rememberPanelState(vizViewModel)
@@ -151,6 +159,7 @@ fun CompactPortraitScreen(
         liveCodeFeature = liveCode,
         activeReplHighlights = activeHighlights,
         delayFeature = delay,
+        evoFeature = evo,
         lfoFeature = lfo,
         stereoFeature = stereo,
         vizFeature = viz
@@ -168,6 +177,7 @@ private fun CompactPortraitScreenLayout(
     liveCodeFeature: ViewModelStateActionMapper<LiveCodeUiState, LiveCodePanelActions>,
     activeReplHighlights: List<IntRange> = emptyList(),
     delayFeature: ViewModelStateActionMapper<DelayUiState, DelayPanelActions>,
+    evoFeature: ViewModelStateActionMapper<EvoUiState, EvoPanelActions>,
     lfoFeature: ViewModelStateActionMapper<LfoUiState, LfoPanelActions>,
     stereoFeature: ViewModelStateActionMapper<StereoUiState, StereoPanelActions>,
     vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
@@ -233,6 +243,7 @@ private fun CompactPortraitScreenLayout(
                             voiceFeature = voiceFeature,
                             delayFeature = delayFeature,
                             distortionFeature = distortionFeature,
+                            evoFeature = evoFeature,
                             lfoFeature = lfoFeature,
                             stereoFeature = stereoFeature,
                             vizFeature = vizFeature,
@@ -272,6 +283,7 @@ private fun PanelContent(
     voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
     delayFeature: ViewModelStateActionMapper<DelayUiState, DelayPanelActions>,
     distortionFeature: ViewModelStateActionMapper<DistortionUiState, DistortionPanelActions>,
+    evoFeature: ViewModelStateActionMapper<EvoUiState, EvoPanelActions>,
     lfoFeature: ViewModelStateActionMapper<LfoUiState, LfoPanelActions>,
     stereoFeature: ViewModelStateActionMapper<StereoUiState, StereoPanelActions>,
     vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
@@ -318,6 +330,17 @@ private fun PanelContent(
                 showCollapsedHeader = false
             )
         }
+        
+        CompactPanelType.EVO -> {
+            EvoPanelLayout(
+                uiState = evoFeature.state,
+                actions = evoFeature.actions,
+                modifier = panelModifier,
+                isExpanded = true,
+                onExpandedChange = null,
+                showCollapsedHeader = false
+            )
+        }
 
         CompactPanelType.LFO -> {
             HyperLfoPanelLayout(
@@ -356,6 +379,19 @@ private fun PanelContent(
 
 // ==================== PREVIEWS ====================
 
+private object PreviewEvoStrategy : AudioEvolutionStrategy {
+    override val id = "preview"
+    override val name = "Drift"
+    override val color = androidx.compose.ui.graphics.Color(0xFF4CAF50)
+    override val knob1Label = "SPEED"
+    override val knob2Label = "RANGE"
+    override fun setKnob1(value: Float) {}
+    override fun setKnob2(value: Float) {}
+    override suspend fun evolve(engine: org.balch.orpheus.core.audio.SynthEngine) {}
+    override fun onActivate() {}
+    override fun onDeactivate() {}
+}
+
 @Preview(widthDp = 360, heightDp = 700)
 @Composable
 private fun CompactPortraitLayoutPreview(
@@ -384,6 +420,16 @@ private fun CompactPortraitLayoutPreview(
                 ),
                 delayFeature = ViewModelStateActionMapper(
                     state = DelayUiState(),
+                ),
+                evoFeature = ViewModelStateActionMapper(
+                     state = EvoUiState(
+                         selectedStrategy = PreviewEvoStrategy,
+                         strategies = listOf(PreviewEvoStrategy),
+                         isEnabled = false,
+                         knob1Value = 0.5f,
+                         knob2Value = 0.5f
+                     ),
+                     _actions = EvoPanelActions({}, {}, {}, {})
                 ),
                 lfoFeature = ViewModelStateActionMapper(
                     state = LfoUiState(),
