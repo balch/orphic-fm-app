@@ -140,6 +140,12 @@ class EvoViewModel @Inject constructor(
             while (isActive && _uiState.value.isEnabled) {
                 val strategy = _currentStrategy.value
                 
+                // Double-check before evolving
+                if (!_uiState.value.isEnabled) {
+                    log.debug { "Evolution disabled during loop, breaking" }
+                    break
+                }
+                
                 // Execute evolution step
                 try {
                     strategy.evolve(synthEngine)
@@ -154,13 +160,16 @@ class EvoViewModel @Inject constructor(
                 val delayMs = (2000f - (knob1 * 1900f)).toLong().coerceAtLeast(100L)
                 delay(delayMs)
             }
+            log.debug { "Evolution loop exited normally" }
         }
     }
 
     private fun stopEvolutionLoop() {
+        if (evoJob != null) {
+            log.info { "Stopping evolution loop (job active: ${evoJob?.isActive})" }
+        }
         evoJob?.cancel()
         evoJob = null
-        log.debug { "Evolution loop stopped" }
     }
 
     override fun onCleared() {

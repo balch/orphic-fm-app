@@ -14,6 +14,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Clock
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.routing.ControlEventOrigin
@@ -116,7 +117,7 @@ class ReactStrategy(
                     lastUserChange = UserChange(
                         controlId = event.controlId,
                         direction = direction,
-                        timestamp = System.currentTimeMillis()
+                        timestamp = Clock.System.now().toEpochMilliseconds()
                     )
                     userChangeDecay = 1f
                     
