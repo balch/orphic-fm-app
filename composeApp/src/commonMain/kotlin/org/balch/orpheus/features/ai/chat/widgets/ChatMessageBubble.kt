@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,9 @@ import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.model.DefaultMarkdownColors
 import com.mikepenz.markdown.model.DefaultMarkdownTypography
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.jetbrains.compose.resources.painterResource
+import orpheus.composeapp.generated.resources.Res
+import orpheus.composeapp.generated.resources.orpheus_avatar
 
 /**
  * Chat message bubble for AI conversations.
@@ -111,12 +115,24 @@ fun ChatMessageBubble(
                                 ) {
                                     when (message.type) {
                                         ChatMessageType.Agent -> {
-                                            Text(
-                                                text = "🎵 Orpheus",
-                                                style = typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = OrpheusColors.metallicBlue // Vibrant Blue label
-                                            )
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Image(
+                                                    painter = painterResource(Res.drawable.orpheus_avatar),
+                                                    contentDescription = "Orpheus",
+                                                    modifier = Modifier
+                                                        .size(24.dp)
+                                                        .clip(CircleShape)
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "Orpheus",
+                                                    style = typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = OrpheusColors.metallicBlue // Vibrant Blue label
+                                                )
+                                            }
                                         }
                                         ChatMessageType.Error -> {
                                             Text(
@@ -245,12 +261,16 @@ private fun LoadingIndicator(text: String = "Thinking...") {
     Row(
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Orpheus label
-        Text(
-            text = "🎵",
-            style = typography.bodyMedium,
-            modifier = Modifier.padding(end = 6.dp)
+        // Orpheus avatar
+        Image(
+            painter = painterResource(Res.drawable.orpheus_avatar),
+            contentDescription = "Orpheus",
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .padding(end = 2.dp)
         )
+        Spacer(modifier = Modifier.width(4.dp))
         
         // Message text
         Text(

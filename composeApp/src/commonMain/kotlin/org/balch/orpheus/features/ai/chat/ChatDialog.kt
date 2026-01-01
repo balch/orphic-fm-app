@@ -64,7 +64,7 @@ fun ChatDialog(
 
     DraggableDialog(
         title = if (isDashboardMode) "Dashboard" else AppConfig.CHAT_DISPLAY_NAME,
-        emoji = if (isDashboardMode) null else AppConfig.CHAT_EMOJI,
+        showAvatar = !isDashboardMode,
         onClose = onClose,
         liquidState = liquidState,
         position = position,

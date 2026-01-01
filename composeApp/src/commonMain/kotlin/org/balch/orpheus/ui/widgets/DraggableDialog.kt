@@ -1,5 +1,6 @@
 package org.balch.orpheus.ui.widgets
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -40,6 +41,9 @@ import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
 import org.balch.orpheus.core.config.AppConfig
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.jetbrains.compose.resources.painterResource
+import orpheus.composeapp.generated.resources.Res
+import orpheus.composeapp.generated.resources.orpheus_avatar
 import kotlin.math.roundToInt
 
 /**
@@ -49,7 +53,7 @@ import kotlin.math.roundToInt
 @Composable
 fun DraggableDialog(
     title: String = AppConfig.CHAT_DISPLAY_NAME,
-    emoji: String? = AppConfig.CHAT_EMOJI,
+    showAvatar: Boolean = true,
     onClose: () -> Unit,
     liquidState: LiquidState? = null,
     position: Pair<Float, Float>,
@@ -119,11 +123,14 @@ fun DraggableDialog(
                         .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (emoji != null) {
-                        // Emoji icon
-                        Text(
-                            text = emoji,
-                            fontSize = 16.sp
+                    if (showAvatar) {
+                        // Avatar image
+                        Image(
+                            painter = painterResource(Res.drawable.orpheus_avatar),
+                            contentDescription = "Orpheus",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
                         )
 
                         Spacer(modifier = Modifier.width(8.dp))

@@ -15,11 +15,6 @@ object AppConfig {
     const val CHAT_DISPLAY_NAME = "Orpheus"
     
     /**
-     * Emoji icon for the chat/AI persona.
-     */
-    const val CHAT_EMOJI = "🎵"
-    
-    /**
      * App version string.
      */
     const val VERSION = "1.0.0"
