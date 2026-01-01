@@ -116,10 +116,6 @@ class ReplExecuteTool @Inject constructor(
         val code = args.code.trim()
         log.info { "ReplExecuteTool: Executing: ${code.take(80)}..." }
         
-        log.debug { "ReplExecuteTool: Expanding CODE panel" }
-        panelExpansionEventBus.expand(PanelId.CODE)
-        replCodeEventBus.emitGenerating()
-
         // Handle hush command specially
         if (code.equals("hush", ignoreCase = true)) {
             log.debug { "ReplExecuteTool: Executing hush" }
@@ -131,6 +127,10 @@ class ReplExecuteTool @Inject constructor(
                 activeSlots = emptyList()
             )
         }
+        
+        log.debug { "ReplExecuteTool: Expanding CODE panel" }
+        panelExpansionEventBus.expand(PanelId.CODE)
+        replCodeEventBus.emitGenerating()
         
         log.debug { "ReplExecuteTool: Evaluating REPL code" }
         val result = tidalRepl.evaluateSuspend(code)

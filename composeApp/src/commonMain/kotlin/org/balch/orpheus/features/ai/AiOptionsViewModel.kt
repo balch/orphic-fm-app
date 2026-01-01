@@ -735,6 +735,11 @@ class AiOptionsViewModel(
             )
         } else {
             log.info { "REPL mode deactivated" }
+
+            // Emit UserInteraction to clear the AI generating state
+            viewModelScope.launch {
+                replCodeEventBus.emitUserInteraction()
+            }
             
             // Stop all REPL patterns with ramp down
             viewModelScope.launch {
