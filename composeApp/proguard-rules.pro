@@ -34,3 +34,19 @@
 -keep class javax.sound.midi.** { *; }
 -keep class javax.sound.midi.spi.** { *; }
 -keep class * extends javax.sound.midi.spi.MidiDeviceProvider { *; }
+
+# Suppress warnings for missing classes in Android release builds
+# These are JVM/Desktop-only classes used by Ktor, Netty, and reactive libraries
+-dontwarn io.micrometer.context.ContextAccessor
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn java.lang.management.RuntimeMXBean
+-dontwarn javax.enterprise.inject.spi.Extension
+-dontwarn org.apache.log4j.Level
+-dontwarn org.apache.log4j.Logger
+-dontwarn org.apache.log4j.Priority
+-dontwarn org.apache.logging.log4j.LogManager
+-dontwarn org.apache.logging.log4j.Logger
+-dontwarn org.apache.logging.log4j.message.MessageFactory
+-dontwarn org.apache.logging.log4j.spi.ExtendedLogger
+-dontwarn org.apache.logging.log4j.spi.ExtendedLoggerWrapper
+-dontwarn reactor.blockhound.integration.BlockHoundIntegration
