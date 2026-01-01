@@ -54,6 +54,7 @@ import org.balch.orpheus.features.tidal.LiveCodePanelActions
 import org.balch.orpheus.features.tidal.LiveCodeUiState
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tidal.ui.LiveCodePanelLayout
+import org.balch.orpheus.features.viz.VizPanelLayout
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -241,6 +242,7 @@ private fun CompactPortraitScreenLayout(
                                 evoFeature = evoFeature,
                                 lfoFeature = lfoFeature,
                                 stereoFeature = stereoFeature,
+                                vizFeature = vizFeature,
                             )
                         }
                     }
@@ -310,6 +312,7 @@ private fun PanelContent(
     evoFeature: ViewModelStateActionMapper<EvoUiState, EvoPanelActions>,
     lfoFeature: ViewModelStateActionMapper<LfoUiState, LfoPanelActions>,
     stereoFeature: ViewModelStateActionMapper<StereoUiState, StereoPanelActions>,
+    vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
     modifier: Modifier = Modifier,
 ) {
     val panelModifier = modifier
@@ -391,6 +394,17 @@ private fun PanelContent(
             StereoPanelLayout(
                 uiState = stereoFeature.state,
                 actions = stereoFeature.actions,
+                modifier = panelModifier,
+                isExpanded = true,
+                onExpandedChange = null,
+                showCollapsedHeader = false
+            )
+        }
+
+        CompactPanelType.VIZ -> {
+            VizPanelLayout(
+                uiState = vizFeature.state,
+                actions = vizFeature.actions,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,

@@ -254,8 +254,8 @@ fun LiveCodePanelLayout(
                                 liquidState = liquidState,
                                 scope = effects.bottom,
                                 frostAmount = effects.frostLarge.dp,
-                                color = OrpheusColors.slateSilver,
-                                tintAlpha = effects.tintAlpha,
+                                color = OrpheusColors.deepSpaceBlue,
+                                tintAlpha = .6f,
                             )
                             .padding(12.dp)
                             .verticalScroll(rememberScrollState())
