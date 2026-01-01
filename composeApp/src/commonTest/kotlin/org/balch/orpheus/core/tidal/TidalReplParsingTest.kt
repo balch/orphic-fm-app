@@ -679,4 +679,90 @@ class TidalReplParsingTest {
         assertEquals(amounts1, amounts2)
         assertEquals(amounts2, amounts3)
     }
+    
+    // =========================================================================
+    // BPM Command Tests
+    // =========================================================================
+    
+    @Test
+    fun `evaluate supports bpm command with space syntax`() = kotlinx.coroutines.test.runTest {
+        // bpm 108 should set tempo
+        val result = repl.evaluateSuspend("bpm 108")
+        assertIs<ReplResult.Success>(result)
+    }
+    
+    @Test
+    fun `evaluate supports bpm command with colon syntax`() = kotlinx.coroutines.test.runTest {
+        // bpm:120 should set tempo
+        val result = repl.evaluateSuspend("bpm:120")
+        assertIs<ReplResult.Success>(result)
+    }
+    
+    @Test
+    fun `evaluate supports bpm command with quoted value`() = kotlinx.coroutines.test.runTest {
+        // bpm "90" should work
+        val result = repl.evaluateSuspend("bpm \"90\"")
+        assertIs<ReplResult.Success>(result)
+    }
+    
+    @Test
+    fun `evaluate supports bpm command with decimal`() = kotlinx.coroutines.test.runTest {
+        // bpm 108.5 should work
+        val result = repl.evaluateSuspend("bpm 108.5")
+        assertIs<ReplResult.Success>(result)
+    }
+    
+    // =========================================================================
+    // Full Example Pattern Tests
+    // =========================================================================
+    
+    @Test
+    fun `evaluate parses In-A-Gadda-Da-Vida example`() = kotlinx.coroutines.test.runTest {
+        // The full In-A-Gadda-Da-Vida pattern from the sheet music transcription
+        val code = """
+            bpm 108
+            
+            # Add some organ-like sustain
+            hold:1 0.8
+            hold:2 0.8
+            drive:0.3
+            delaymix:0.2
+            feedback:0.4
+            
+            # Main vocal/melody line (the iconic riff)
+            d1 $ note "d4 d4 d4 d4 d4 d4 d4 d4"
+            d2 $ slow 2 $ note "c5 a4 f4 d4 [c4 f4@3]"
+            
+            # Bass line (classic rock organ bass)
+            d3 $ note "d2 ~ d2 ~ [a2 g#2 g2] ~"
+            
+            # Piano chords (right hand)
+            d4 $ slow 2 $ note "[d4 f4 a4] ~ [d4 f4 a4] [c4 e4 g4]"
+        """.trimIndent()
+        
+        val result = repl.evaluateSuspend(code)
+        assertIs<ReplResult.Success>(result)
+        
+        // Verify all 4 pattern slots were created
+        val slots = result.slots
+        assertTrue(slots.contains("d1"), "Should have d1 slot")
+        assertTrue(slots.contains("d2"), "Should have d2 slot")
+        assertTrue(slots.contains("d3"), "Should have d3 slot")
+        assertTrue(slots.contains("d4"), "Should have d4 slot")
+    }
+    
+    @Test
+    fun `evaluate handles multiline pattern with bpm and effects`() = kotlinx.coroutines.test.runTest {
+        // Simplified test with bpm and a few patterns
+        val code = """
+            bpm 120
+            drive:0.5
+            d1 $ note "c4 e4 g4"
+        """.trimIndent()
+        
+        val result = repl.evaluateSuspend(code)
+        assertIs<ReplResult.Success>(result)
+        assertTrue(result.slots.contains("d1"))
+    }
 }
+

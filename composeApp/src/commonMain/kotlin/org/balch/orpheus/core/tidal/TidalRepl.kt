@@ -234,6 +234,23 @@ class TidalRepl(
                         continue
                     }
                     
+                    // bpm command - set tempo
+                    trimmed.startsWith("bpm ") || trimmed.startsWith("bpm:") -> {
+                        val bpmStr = if (trimmed.startsWith("bpm:")) {
+                            trimmed.substringAfter("bpm:").trim()
+                        } else {
+                            trimmed.substringAfter("bpm ").trim()
+                        }
+                        val bpmValue = bpmStr.replace("\"", "").replace("'", "").toDoubleOrNull()
+                        if (bpmValue != null && bpmValue > 0) {
+                            scheduler.setBpm(bpmValue)
+                            logConsole(ConsoleType.INFO, "bpm: $bpmValue")
+                        } else {
+                            logConsole(ConsoleType.ERROR, "Invalid BPM value: $bpmStr")
+                        }
+                        continue
+                    }
+                    
                     // "once $" prefix - execute pattern immediately without cycling
                     trimmed.startsWith("once ") || trimmed.startsWith("once$") -> {
                         val patternCode = if (trimmed.startsWith("once $")) {

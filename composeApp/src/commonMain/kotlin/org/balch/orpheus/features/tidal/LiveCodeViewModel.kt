@@ -542,14 +542,18 @@ d1 $ voices:1 2 3 4
             """.trimIndent(),
             
             "gadda" to """
-once $ drive:0.75
-once $ delay:0.3
-once $ tune:1 0.35
-once $ tune:2 0.70
-once $ tune:3 0.35
-once $ tune:4 0.70
-d1 $ note "d2 d2 f2 e2 c2@2 d2 a2 ab2 g2"
-d2 $ voices:1 2 3 4
+bpm 108
+
+# Add some organ-like sustain
+drive:0.55
+distmix:0.55
+feedback:0.3
+delaymix:0.15
+
+d1 $ note "d3 d3 d3 d3 a3 g#3 g3 f#3"
+d2 $ note "d2@4 [a2 g#2 g2 f#2]"
+d3 $ note "d4 ~ d4 ~ [a4 g#4 g4 f#4] ~"
+d4 $ slow 2 $ note "d2 d2 d2 d2 [a2 g#2 g2 f#2] d2 d2 d2"
             """.trimIndent(),
             
             "euclidean" to """
