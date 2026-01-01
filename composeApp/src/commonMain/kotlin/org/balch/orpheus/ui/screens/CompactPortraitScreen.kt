@@ -213,7 +213,7 @@ private fun CompactPortraitScreenLayout(
             // 1. Header panel
             CompactPortraitHeaderPanel(
                 modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(start = 8.dp, end = 16.dp),
                 peakLevel = distortionFeature.state.peak,
                 liquidState = liquidState,
                 effects = effects

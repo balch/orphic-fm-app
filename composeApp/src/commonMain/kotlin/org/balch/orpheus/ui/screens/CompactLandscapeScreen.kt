@@ -179,7 +179,9 @@ private fun CompactLandscapeLayout(
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier.fillMaxWidth()
-            )
+                    .padding(vertical = 4.dp)
+                    .padding(end = 8.dp),
+                )
         Row(
             modifier = Modifier
                 .fillMaxWidth()

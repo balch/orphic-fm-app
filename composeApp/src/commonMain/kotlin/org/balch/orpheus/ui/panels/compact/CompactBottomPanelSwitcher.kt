@@ -76,6 +76,7 @@ fun CompactBottomPanelSwitcher(
     Column(modifier = modifier.fillMaxSize()) {
         // Panel content with swipe gestures
         HorizontalPager(
+            userScrollEnabled = false,
             state = pagerState,
             modifier = Modifier
                 .weight(1f)
