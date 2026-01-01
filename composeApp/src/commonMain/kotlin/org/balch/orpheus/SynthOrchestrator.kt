@@ -43,6 +43,7 @@ class SynthOrchestrator(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var isStarted = false
     private var isPaused = false
+    private var isMediaSessionActive = false
     private var savedMasterVolume = 1f
     private var currentPlaybackMode = PlaybackMode.USER
 
@@ -55,6 +56,9 @@ class SynthOrchestrator(
                 when (event) {
                     is PlaybackLifecycleEvent.RequestResume -> {
                         log.debug { "Received RequestResume event" }
+                        // Activate media session when actual playback starts (e.g., REPL)
+                        ensureMediaSessionActive()
+                        updateMediaSessionMetadata()
                         if (isPaused) {
                             resume()
                         }
@@ -67,6 +71,12 @@ class SynthOrchestrator(
         }
     }
 
+    /**
+     * Start the synth engine. This does NOT activate the media session.
+     * The media session is only activated when actual playback begins
+     * (REPL, Drone, Solo mode) to avoid showing a "Playing" notification
+     * when nothing is actually playing.
+     */
     fun start() {
         if (!isStarted) {
             engine.start()
@@ -74,12 +84,23 @@ class SynthOrchestrator(
             engine.setMasterVolume(savedMasterVolume)
             log.debug { "Restored master volume to $savedMasterVolume after start" }
             
-            mediaSessionManager.activate()
-            mediaSessionManager.updatePlaybackState(true)
-            updateMediaSessionMetadata()
+            // Don't activate media session here - wait for actual playback
             isStarted = true
             isPaused = false
-            log.info { "SynthOrchestrator: Engine started" }
+            log.info { "SynthOrchestrator: Engine started (media session not yet active)" }
+        }
+    }
+    
+    /**
+     * Activate the media session if not already active.
+     * Called when actual playback begins (REPL, Drone, Solo).
+     */
+    private fun ensureMediaSessionActive() {
+        if (!isMediaSessionActive && isStarted) {
+            mediaSessionManager.activate()
+            mediaSessionManager.updatePlaybackState(true)
+            isMediaSessionActive = true
+            log.info { "SynthOrchestrator: Media session activated" }
         }
     }
     
@@ -127,8 +148,12 @@ class SynthOrchestrator(
             }
             log.debug { "Saved master volume: $savedMasterVolume for next start" }
             
-            mediaSessionManager.updatePlaybackState(false)
-            mediaSessionManager.deactivate()
+            // Only deactivate media session if it was active
+            if (isMediaSessionActive) {
+                mediaSessionManager.updatePlaybackState(false)
+                mediaSessionManager.deactivate()
+                isMediaSessionActive = false
+            }
             engine.stop()
             isStarted = false
             isPaused = false
@@ -161,11 +186,18 @@ class SynthOrchestrator(
     /**
      * Set the current playback mode for display in notifications and lock screen.
      * Call this when AI modes are activated/deactivated.
+     * 
+     * Also activates the media session if entering a playing mode (DRONE, SOLO, REPL).
      */
     fun setPlaybackMode(mode: PlaybackMode) {
         if (currentPlaybackMode != mode) {
             currentPlaybackMode = mode
             log.info { "Playback mode changed to: ${mode.displayName}" }
+            
+            // Activate media session when entering a playing mode
+            if (mode != PlaybackMode.USER) {
+                ensureMediaSessionActive()
+            }
             updateMediaSessionMetadata()
         }
     }
@@ -174,7 +206,7 @@ class SynthOrchestrator(
      * Update MediaSession metadata with current mode and state.
      */
     private fun updateMediaSessionMetadata() {
-        if (!isStarted) return
+        if (!isMediaSessionActive) return
         
         val metadata = PlaybackMetadata(
             title = "Orpheus Synthesizer",
