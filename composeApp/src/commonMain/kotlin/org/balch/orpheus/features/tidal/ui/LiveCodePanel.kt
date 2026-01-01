@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -163,45 +162,32 @@ fun LiveCodePanelLayout(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // Play/Stop Group
+                // Play/Pause Toggle Button
                 Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (uiState.isPlaying) OrpheusColors.synthGreen.copy(alpha = 0.3f)
+                            else OrpheusColors.softPurple.copy(alpha = 0.4f)
+                        )
+                        .clickable { 
+                            if (uiState.isPlaying) actions.onStop() else actions.onExecute() 
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (uiState.isPlaying) OrpheusColors.synthGreen.copy(alpha = 0.3f)
-                                else OrpheusColors.softPurple
-                            )
-                            .clickable { actions.onExecute() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "▶",
-                            color = if (uiState.isPlaying) OrpheusColors.synthGreen else Color.White,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(
-                                OrpheusColors.warmGlow.copy(alpha = 0.2f)
-                            )
-                            .clickable(enabled = uiState.isPlaying) { actions.onStop() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "■",
-                            fontSize = 12.sp,
-                            color = if (uiState.isPlaying) OrpheusColors.warmGlow else OrpheusColors.warmGlow.copy(alpha = 0.4f)
-                        )
-                    }
+                    Text(
+                        text = if (uiState.isPlaying) "▐▐" else "▶",
+                        color = if (uiState.isPlaying) OrpheusColors.synthGreen else Color.White,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = if (uiState.isPlaying) "Pause" else "Play",
+                        color = if (uiState.isPlaying) OrpheusColors.synthGreen else Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
 
                 Text(
