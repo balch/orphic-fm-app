@@ -13,6 +13,8 @@ import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionActionHandler
 import org.balch.orpheus.core.media.MediaSessionManager
+import org.balch.orpheus.core.media.PlaybackMetadata
+import org.balch.orpheus.core.media.PlaybackMode
 
 /**
  * Orchestrates the lifecycle of the synthesizer engine.
@@ -42,6 +44,7 @@ class SynthOrchestrator(
     private var isStarted = false
     private var isPaused = false
     private var savedMasterVolume = 1f
+    private var currentPlaybackMode = PlaybackMode.USER
 
     init {
         mediaSessionManager.setActionHandler(this)
@@ -73,6 +76,7 @@ class SynthOrchestrator(
             
             mediaSessionManager.activate()
             mediaSessionManager.updatePlaybackState(true)
+            updateMediaSessionMetadata()
             isStarted = true
             isPaused = false
             log.info { "SynthOrchestrator: Engine started" }
@@ -90,6 +94,7 @@ class SynthOrchestrator(
             engine.setMasterVolume(0f)
             mediaSessionManager.updatePlaybackState(false)
             isPaused = true
+            updateMediaSessionMetadata()
             log.info { "SynthOrchestrator: Paused (muted, savedVolume=$savedMasterVolume)" }
         }
     }
@@ -103,6 +108,7 @@ class SynthOrchestrator(
             engine.setMasterVolume(savedMasterVolume)
             mediaSessionManager.updatePlaybackState(true)
             isPaused = false
+            updateMediaSessionMetadata()
             log.info { "SynthOrchestrator: Resumed (restored volume=$savedMasterVolume)" }
         }
     }
@@ -150,6 +156,32 @@ class SynthOrchestrator(
     override fun onStop() {
         log.info { "MediaSession: Stop requested" }
         stop()
+    }
+    
+    /**
+     * Set the current playback mode for display in notifications and lock screen.
+     * Call this when AI modes are activated/deactivated.
+     */
+    fun setPlaybackMode(mode: PlaybackMode) {
+        if (currentPlaybackMode != mode) {
+            currentPlaybackMode = mode
+            log.info { "Playback mode changed to: ${mode.displayName}" }
+            updateMediaSessionMetadata()
+        }
+    }
+    
+    /**
+     * Update MediaSession metadata with current mode and state.
+     */
+    private fun updateMediaSessionMetadata() {
+        if (!isStarted) return
+        
+        val metadata = PlaybackMetadata(
+            title = "Orpheus Synthesizer",
+            mode = currentPlaybackMode,
+            isPlaying = !isPaused
+        )
+        mediaSessionManager.updateMetadata(metadata)
     }
 }
 

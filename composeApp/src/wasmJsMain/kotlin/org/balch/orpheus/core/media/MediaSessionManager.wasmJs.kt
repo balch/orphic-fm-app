@@ -51,6 +51,26 @@ actual class MediaSessionManager {
         this.handler = handler
     }
     
+    actual fun updateMetadata(metadata: PlaybackMetadata) {
+        try {
+            updateMediaSessionMetadata(metadata.title, metadata.subtitle, metadata.mode.displayName)
+        } catch (e: Exception) {
+            // MediaSession may not be available
+        }
+    }
+    
+    private fun updateMediaSessionMetadata(title: String, artist: String, album: String) {
+        js("""
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: title,
+                    artist: artist,
+                    album: album
+                });
+            }
+        """)
+    }
+    
     private fun setupMediaSession() {
         // Set metadata
         js("""

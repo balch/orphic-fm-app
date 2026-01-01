@@ -26,6 +26,12 @@ expect class MediaSessionManager {
     fun updatePlaybackState(isPlaying: Boolean)
     
     /**
+     * Update the playback metadata (mode, title) for system UI.
+     * This updates what is displayed in notifications and lock screen.
+     */
+    fun updateMetadata(metadata: PlaybackMetadata)
+    
+    /**
      * Set the handler for media button actions (play/pause/stop).
      */
     fun setActionHandler(handler: MediaSessionActionHandler)

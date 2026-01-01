@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
+import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.GeminiKeyProvider
@@ -34,6 +35,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.media.PlaybackMode
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
 import org.balch.orpheus.features.ai.generative.AiStatusMessage
@@ -127,6 +129,7 @@ class AiOptionsViewModel(
     private val aiModelProvider: AiModelProvider,
     private val dispatcherProvider: DispatcherProvider,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
+    private val synthOrchestrator: SynthOrchestrator,
 ) : ViewModel(), PanelViewModel<AiOptionsUiState, AiOptionsPanelActions> {
 
     private val log = logging("AiOptionsViewModel")
@@ -205,6 +208,9 @@ class AiOptionsViewModel(
                 }
             }
         }
+        
+        // Reset playback mode to USER since no AI is active
+        synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
     }
 
     private val _sessionId = MutableStateFlow(0)
@@ -369,6 +375,19 @@ class AiOptionsViewModel(
             _soloAgent.value?.stop()
             _soloAgent.value = null  // Clear the reference so its flows stop
         }
+        
+        // If REPL is active, turn it off first
+        val wasReplActive = _isReplActive.value
+        if (wasReplActive && !wasActive) {
+            _isReplActive.value = false
+            viewModelScope.launch {
+                try {
+                    replExecuteTool.execute(ReplExecuteTool.Args(code = "hush"))
+                } catch (e: Exception) {
+                    log.warn { "Failed to hush REPL: ${e.message}" }
+                }
+            }
+        }
 
         _isDroneActive.value = !wasActive
 
@@ -377,6 +396,9 @@ class AiOptionsViewModel(
             if (showDialog) {
                 _showChatDialog.value = true // Ensure ChatDialog is visible
             }
+            
+            // Update playback mode for notifications
+            synthOrchestrator.setPlaybackMode(PlaybackMode.DRONE)
             
             // Clear old drone agent reference (if any) before incrementing session
             _droneAgent.value = null
@@ -422,6 +444,9 @@ class AiOptionsViewModel(
             log.info { "Stopping Drone Agent" }
             _droneAgent.value?.stop()
             _droneAgent.value = null  // Clear the reference
+            
+            // Reset playback mode to USER
+            synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
         }
     }
     
@@ -486,6 +511,19 @@ class AiOptionsViewModel(
             _droneAgent.value?.stop()
             _droneAgent.value = null  // Clear the reference so its flows stop
         }
+        
+        // If REPL is active, turn it off first
+        val wasReplActive = _isReplActive.value
+        if (wasReplActive && !wasActive) {
+            _isReplActive.value = false
+            viewModelScope.launch {
+                try {
+                    replExecuteTool.execute(ReplExecuteTool.Args(code = "hush"))
+                } catch (e: Exception) {
+                    log.warn { "Failed to hush REPL: ${e.message}" }
+                }
+            }
+        }
 
         _isSoloActive.value = !wasActive
         
@@ -494,6 +532,9 @@ class AiOptionsViewModel(
             if (showDialog) {
                 _showChatDialog.value = true
             }
+            
+            // Update playback mode for notifications
+            synthOrchestrator.setPlaybackMode(PlaybackMode.SOLO)
             
             // Clear old solo agent reference (if any) before incrementing session
             _soloAgent.value = null
@@ -539,6 +580,9 @@ class AiOptionsViewModel(
             log.info { "Stopping Solo Agent" }
             _soloAgent.value?.stop()
             _soloAgent.value = null  // Clear the reference
+            
+            // Reset playback mode to USER
+            synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
         }
     }
 

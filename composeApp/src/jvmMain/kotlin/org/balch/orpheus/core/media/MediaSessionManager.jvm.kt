@@ -56,6 +56,11 @@ actual class MediaSessionManager {
         this.handler = handler
     }
     
+    actual fun updateMetadata(metadata: PlaybackMetadata) {
+        // TODO: Update JMTC metadata when dependency is added
+        // jmtcInstance?.setMetadata(metadata.title, metadata.subtitle)
+    }
+    
     private fun initializeJmtc() {
         // TODO: Initialize JMTC when dependency is added
         // Example:

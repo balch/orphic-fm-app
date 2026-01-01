@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
@@ -22,12 +23,19 @@ import com.diamondedge.logging.logging
  * 
  * Provides a persistent notification with media controls and integrates
  * with Android's MediaSession for lock screen and Bluetooth controls.
+ * 
+ * Features:
+ * - App icon displayed in notifications and lock screen
+ * - Mode-aware display (REPL/Drone/Solo/User)
+ * - Cool color scheme with gradient-inspired theming
  */
 class AudioForegroundService : Service() {
     
     private val log = logging("AudioForegroundService")
     private var mediaSession: MediaSessionCompat? = null
     private var isPlaying = true  // Track current playback state
+    private var currentModeName = "Manual Play"  // Current mode display name
+    private var currentMode = "USER"  // Current mode enum name for color selection
     
     companion object {
         const val NOTIFICATION_ID = 1
@@ -37,8 +45,28 @@ class AudioForegroundService : Service() {
         const val ACTION_STOP = "org.balch.orpheus.STOP"
         const val ACTION_UPDATE_STATE_PLAYING = "org.balch.orpheus.UPDATE_STATE_PLAYING"
         const val ACTION_UPDATE_STATE_PAUSED = "org.balch.orpheus.UPDATE_STATE_PAUSED"
+        const val ACTION_UPDATE_METADATA = "org.balch.orpheus.UPDATE_METADATA"
+        
+        // Intent extras for metadata
+        const val EXTRA_MODE = "extra_mode"
+        const val EXTRA_MODE_DISPLAY_NAME = "extra_mode_display_name"
+        const val EXTRA_IS_PLAYING = "extra_is_playing"
         
         var actionHandler: ((String) -> Unit)? = null
+        
+        /**
+         * Color scheme for different playback modes.
+         * Each mode has a distinct color for visual identification.
+         */
+        private val MODE_COLORS = mapOf(
+            "USER" to Color.parseColor("#6B7FD7"),    // Soft indigo - calm, manual control
+            "DRONE" to Color.parseColor("#7B68EE"),   // Medium slate blue - ambient, expansive
+            "SOLO" to Color.parseColor("#9370DB"),    // Medium purple - expressive, lead
+            "REPL" to Color.parseColor("#00CED1")     // Dark turquoise - code, live coding vibe
+        )
+        
+        // Default notification color (deep purple gradient base)
+        private val DEFAULT_COLOR = Color.parseColor("#7B68EE")
     }
     
     override fun onCreate() {
@@ -80,6 +108,21 @@ class AudioForegroundService : Service() {
                 isPlaying = false
                 updatePlaybackState(false)
             }
+            ACTION_UPDATE_METADATA -> {
+                // Extract metadata from intent
+                val mode = intent.getStringExtra(EXTRA_MODE) ?: "USER"
+                val modeDisplayName = intent.getStringExtra(EXTRA_MODE_DISPLAY_NAME) ?: "Manual Play"
+                val intentIsPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, true)
+                
+                log.debug { "Metadata update: mode=$mode, displayName=$modeDisplayName, isPlaying=$intentIsPlaying" }
+                
+                currentMode = mode
+                currentModeName = modeDisplayName
+                isPlaying = intentIsPlaying
+                
+                updateMediaSessionMetadata()
+                updateNotification()
+            }
             else -> {
                 // Initial start - no action, just start foreground
                 log.info { "Initial foreground service start" }
@@ -110,6 +153,9 @@ class AudioForegroundService : Service() {
             ).apply {
                 description = "Shows when Orpheus is playing audio"
                 setShowBadge(false)
+                // Enable lights with our theme color
+                enableLights(true)
+                lightColor = DEFAULT_COLOR
             }
             
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -136,21 +182,38 @@ class AudioForegroundService : Service() {
                 }
             })
             
-            // Set metadata
-            setMetadata(
-                MediaMetadataCompat.Builder()
-                    .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "Orpheus Synthesizer")
-                    .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "Playing")
-                    .build()
-            )
-            
             isActive = true
         }
         
+        updateMediaSessionMetadata()
         updatePlaybackState(true)
     }
     
+    private fun updateMediaSessionMetadata() {
+        val albumArt = BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+        
+        mediaSession?.setMetadata(
+            MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "Orpheus Synthesizer")
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, getSubtitle())
+                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, currentModeName)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, albumArt)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, albumArt)
+                .build()
+        )
+    }
+    
+    private fun getSubtitle(): String {
+        return if (isPlaying) "Playing: $currentModeName" else "Paused: $currentModeName"
+    }
+    
+    private fun getModeColor(): Int {
+        return MODE_COLORS[currentMode] ?: DEFAULT_COLOR
+    }
+    
     fun updatePlaybackState(isPlaying: Boolean) {
+        this.isPlaying = isPlaying
+        
         val state = if (isPlaying) {
             PlaybackStateCompat.STATE_PLAYING
         } else {
@@ -169,7 +232,11 @@ class AudioForegroundService : Service() {
                 .build()
         )
         
-        // Update notification
+        updateMediaSessionMetadata()
+        updateNotification()
+    }
+    
+    private fun updateNotification() {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, createNotification(isPlaying))
     }
@@ -205,11 +272,15 @@ class AudioForegroundService : Service() {
             createActionIntent(ACTION_STOP)
         )
         
+        // Get app icon for large icon
+        val albumArt = BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+        
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Orpheus Synthesizer")
-            .setContentText(if (isPlaying) "Playing" else "Paused")
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setLargeIcon(BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
+            .setContentText(getSubtitle())
+            .setSubText(currentModeName)  // Shows mode in notification shade
+            .setSmallIcon(R.mipmap.ic_launcher_foreground)  // Use app icon for status bar
+            .setLargeIcon(albumArt)  // App icon in expanded notification
             .setContentIntent(contentIntent)
             .addAction(playPauseAction)
             .addAction(stopAction)
@@ -218,6 +289,8 @@ class AudioForegroundService : Service() {
                     .setMediaSession(mediaSession?.sessionToken)
                     .setShowActionsInCompactView(0, 1)
             )
+            .setColor(getModeColor())  // Cool color scheme per mode
+            .setColorized(true)  // Enable colorized notification for media style
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .build()

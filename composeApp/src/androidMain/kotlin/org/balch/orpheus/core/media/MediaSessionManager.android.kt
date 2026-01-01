@@ -72,5 +72,20 @@ actual class MediaSessionManager(
     actual fun setActionHandler(handler: MediaSessionActionHandler) {
         this.handler = handler
     }
+    
+    actual fun updateMetadata(metadata: PlaybackMetadata) {
+        if (!isActive) return
+        
+        log.debug { "Updating metadata: mode=${metadata.mode}, isPlaying=${metadata.isPlaying}" }
+        
+        // Send intent to update the service's metadata
+        val intent = Intent(context, AudioForegroundService::class.java).apply {
+            action = AudioForegroundService.ACTION_UPDATE_METADATA
+            putExtra(AudioForegroundService.EXTRA_MODE, metadata.mode.name)
+            putExtra(AudioForegroundService.EXTRA_MODE_DISPLAY_NAME, metadata.mode.displayName)
+            putExtra(AudioForegroundService.EXTRA_IS_PLAYING, metadata.isPlaying)
+        }
+        context.startService(intent)
+    }
 }
 
