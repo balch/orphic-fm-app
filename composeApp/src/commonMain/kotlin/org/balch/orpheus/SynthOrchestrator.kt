@@ -5,6 +5,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionActionHandler
 import org.balch.orpheus.core.media.MediaSessionManager
 
@@ -14,12 +15,17 @@ import org.balch.orpheus.core.media.MediaSessionManager
  * Manages engine start/stop to ensure proper audio lifecycle management
  * independent of UI composition. Also manages the MediaSession for
  * background audio and system media controls.
+ * 
+ * When stopped (including from the foreground service notification),
+ * broadcasts a stop event via [PlaybackLifecycleManager] so all 
+ * audio-producing components (AI agents, schedulers) can shut down.
  */
 @SingleIn(AppScope::class)
 @Inject
 class SynthOrchestrator(
     private val engine: SynthEngine,
-    private val mediaSessionManager: MediaSessionManager
+    private val mediaSessionManager: MediaSessionManager,
+    private val playbackLifecycleManager: PlaybackLifecycleManager
 ) : MediaSessionActionHandler {
     private val log = logging("SynthOrchestrator")
     private var isStarted = false
@@ -40,6 +46,10 @@ class SynthOrchestrator(
 
     fun stop() {
         if (isStarted) {
+            log.info { "SynthOrchestrator: Stopping - broadcasting stop event" }
+            // Broadcast stop event to all listeners (agents, schedulers, etc.)
+            playbackLifecycleManager.tryRequestStopAll()
+            
             mediaSessionManager.updatePlaybackState(false)
             mediaSessionManager.deactivate()
             engine.stop()

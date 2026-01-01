@@ -32,6 +32,8 @@ import org.balch.orpheus.core.ai.GeminiKeyProvider
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
 import org.balch.orpheus.features.ai.generative.AiStatusMessage
@@ -124,6 +126,7 @@ class AiOptionsViewModel(
     private val geminiKeyProvider: GeminiKeyProvider,
     private val aiModelProvider: AiModelProvider,
     private val dispatcherProvider: DispatcherProvider,
+    private val playbackLifecycleManager: PlaybackLifecycleManager,
 ) : ViewModel(), PanelViewModel<AiOptionsUiState, AiOptionsPanelActions> {
 
     private val log = logging("AiOptionsViewModel")
@@ -149,6 +152,55 @@ class AiOptionsViewModel(
                 if (event is ReplCodeEvent.UserInteraction && _isReplActive.value) {
                     log.info { "User interaction detected, deactivating REPL mode" }
                     _isReplActive.value = false
+                }
+            }
+        }
+        
+        // Subscribe to playback lifecycle events (e.g., foreground service stop)
+        viewModelScope.launch {
+            playbackLifecycleManager.events.collect { event ->
+                when (event) {
+                    is PlaybackLifecycleEvent.StopAll -> {
+                        log.info { "Received StopAll event - stopping all agents" }
+                        stopAllAgents()
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Stop all active agents and deactivate REPL mode.
+     * Called when playback is stopped (e.g., from foreground service).
+     */
+    private fun stopAllAgents() {
+        // Stop Drone agent if active
+        if (_isDroneActive.value) {
+            log.info { "Stopping Drone Agent (lifecycle)" }
+            _isDroneActive.value = false
+            _droneAgent.value?.stop()
+            _droneAgent.value = null
+        }
+        
+        // Stop Solo agent if active
+        if (_isSoloActive.value) {
+            log.info { "Stopping Solo Agent (lifecycle)" }
+            _isSoloActive.value = false
+            _soloAgent.value?.stop()
+            _soloAgent.value = null
+        }
+        
+        // Deactivate REPL mode if active
+        if (_isReplActive.value) {
+            log.info { "Deactivating REPL mode (lifecycle)" }
+            _isReplActive.value = false
+            viewModelScope.launch {
+                try {
+                    replExecuteTool.execute(
+                        ReplExecuteTool.Args(code = "hush")
+                    )
+                } catch (e: Exception) {
+                    log.warn { "Failed to hush REPL: ${e.message}" }
                 }
             }
         }

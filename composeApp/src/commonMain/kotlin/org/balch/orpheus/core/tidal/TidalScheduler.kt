@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.util.currentTimeMillis
@@ -46,13 +48,28 @@ data class TidalSchedulerState(
 @Inject
 class TidalScheduler(
     private val synthController: SynthController,
-    private val synthEngine: SynthEngine
+    private val synthEngine: SynthEngine,
+    private val playbackLifecycleManager: PlaybackLifecycleManager
 ) {
     private val log = logging("TidalScheduler")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     
     private val _state = MutableStateFlow(TidalSchedulerState())
     val state: StateFlow<TidalSchedulerState> = _state.asStateFlow()
+    
+    init {
+        // Subscribe to playback lifecycle events (e.g., foreground service stop)
+        scope.launch {
+            playbackLifecycleManager.events.collect { event ->
+                when (event) {
+                    is PlaybackLifecycleEvent.StopAll -> {
+                        log.info { "Received StopAll event - stopping scheduler" }
+                        stop()
+                    }
+                }
+            }
+        }
+    }
     
     /**
      * Trigger event for UI highlighting with source locations.
