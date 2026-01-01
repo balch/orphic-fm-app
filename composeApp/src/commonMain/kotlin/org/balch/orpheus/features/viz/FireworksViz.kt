@@ -37,6 +37,7 @@ import org.balch.orpheus.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 // --------------------------------------------------------------------------------
@@ -86,21 +87,21 @@ class FireworksViz(
     override val name = "Fireworks"
     override val color = OrpheusColors.synthPink
     override val knob1Label = "DEPTH"
-    override val knob2Label = "DECAY"
+    override val knob2Label = "DENSITY"
 
-    // Night sky theme
+    // Liquid/Glassmorphism theme matching LavaLamp/Galaxy
     override val liquidEffects = Default
     
     // Knobs
-    private var _depthKnob = 0.5f // Controls color depth (Bright -> Dark/Deep)
-    private var _decayKnob = 0.5f 
+    private var _colorKnob = 0.5f // Controls color intensity/brightness
+    private var _countKnob = 0.5f // Controls quantity/frequency
 
     override fun setKnob1(value: Float) {
-        _depthKnob = value.coerceIn(0f, 1f)
+        _colorKnob = value.coerceIn(0f, 1f)
     }
 
     override fun setKnob2(value: Float) {
-        _decayKnob = value.coerceIn(0f, 1f)
+        _countKnob = value.coerceIn(0f, 1f)
     }
 
     // State
@@ -117,7 +118,6 @@ class FireworksViz(
     private var timeSinceLastLaunch = 0f
     
     // Config
-    private val launchIntervalMin = 0.2f // Seconds
     private val colors = listOf(
         OrpheusColors.neonCyan,
         OrpheusColors.neonMagenta,
@@ -130,17 +130,20 @@ class FireworksViz(
     )
     
     // Helper to control brightness/depth
-    private fun applyDepth(c: Color): Color {
-        // Depth 0: Original Bright
-        // Depth 1: Darker/Deeper (less luminance)
-        if (_depthKnob < 0.01f) return c
+    private fun applyColorIntensity(c: Color): Color {
+        // Knob 1: COLOR
+        // 0.0 -> Dim, desaturated, transparent
+        // 0.5 -> Normal
+        // 1.0 -> Extremely bright, opaque, max saturation
         
-        val factor = 1f - (_depthKnob * 0.7f) // Keep 30% brightness at max depth
+        // Base intensity factor from knob
+        val intensity = 0.2f + (_colorKnob * 0.8f) // 0.2 to 1.0
+        
         return Color(
-            red = c.red * factor,
-            green = c.green * factor,
-            blue = c.blue * factor,
-            alpha = c.alpha * (1f - _depthKnob * 0.2f)
+            red = c.red,
+            green = c.green,
+            blue = c.blue,
+            alpha = (c.alpha * intensity).coerceIn(0f, 1f)
         )
     }
 
@@ -182,42 +185,61 @@ class FireworksViz(
         val lfoValue = engine.lfoOutputFlow.value
 
         // 1. Detect Triggers
-        // Energy spike detection
         val energyDelta = masterLevel - previousEnergy
-        val isBeat = energyDelta > 0.1f && masterLevel > 0.3f
+        // Beat sensitivity
+        val beatThreshold = 0.2f
+        val isBeat = energyDelta > 0.15f && masterLevel > beatThreshold
         
         timeSinceLastLaunch += dt
 
         // Logic to launch rockets
-        // Launch on beats or randomly if enough time passed
-        if ((isBeat && timeSinceLastLaunch > launchIntervalMin) || 
-            (timeSinceLastLaunch > 2.0f && Random.nextFloat() < 0.05f)) {
+        // Volume controls IF we see fireworks.
+        // Count Knob controls HOW MANY / HOW OFTEN.
+        
+        val volFactor = masterLevel.coerceIn(0f, 1f)
+        
+        // Base Interval heavily modified by knob and volume
+        // Knob 0.0 -> very slow (2.0s)
+        // Knob 1.0 -> very fast (0.1s)
+        val knobFactor = 2.0f - (_countKnob * 1.9f) // 2.0 to 0.1
+        
+        // If volume is low, we slow down even more or stop
+        if (volFactor > 0.05f) { // Silence threshold
+            // Volume boosts speed
+            val adjustedInterval = knobFactor / (1f + volFactor * 2f)
             
-            launchFirework(masterLevel)
-            timeSinceLastLaunch = 0f
+            if (isBeat && timeSinceLastLaunch > 0.1f) {
+                // Beat trigger - maybe launch multiple if knob is high
+                val count = if (_countKnob > 0.7f) Random.nextInt(1, 3) else 1
+                repeat(count) { launchFirework(masterLevel) }
+                timeSinceLastLaunch = 0f
+            } else if (timeSinceLastLaunch > adjustedInterval) {
+                // Time based trigger
+                 launchFirework(masterLevel)
+                timeSinceLastLaunch = 0f
+            }
         }
         
-        // Voice reaction: specific voices can continuously spawn particles (fountains)
+        // Voice reaction: fountains and sparkles
+        // Scale probability by count knob
         for (i in voiceLevels.indices) {
             val level = voiceLevels[i]
             if (level > 0.4f && level > previousVoiceLevels.getOrElse(i) { 0f }) {
-                // Determine spawn position based on voice index (spread periodically)
-                val xNorm = 0.1f + (i * 0.1f) % 0.8f
-                // Low voices -> Low fountains, High voices -> Sparkles high up
-                if (i < 2) { // Bass
-                    spawnFountain(xNorm, level, applyDepth(OrpheusColors.neonOrange))
-                } else if (i > 5) { // High hats / synth
-                    spawnSparkle(xNorm, level, applyDepth(OrpheusColors.neonCyan)) 
+                if (Random.nextFloat() < (0.2f + _countKnob * 0.8f)) {
+                    val xNorm = 0.1f + (i * 0.1f) % 0.8f
+                    if (i < 2) { 
+                        spawnFountain(xNorm, level, applyColorIntensity(OrpheusColors.neonOrange))
+                    } else if (i > 5) {
+                        spawnSparkle(xNorm, level, applyColorIntensity(OrpheusColors.neonCyan)) 
+                    }
                 }
             }
         }
 
         // 2. Physics & Update
-        val gravity = 550f
-        val baseDecay = 0.3f + (1f - _decayKnob) * 0.5f // Knob controls 'sustain' (inverse of decay)
+        val gravity = 800f 
+        val baseDecay = 0.5f // Fixed decay, knob used for count now
         
-        // Iterate backwards to allow safe removal
-        // Capture size at start to avoid iterating over newly spawned particles in the same frame
         val count = particles.size
         for (i in count - 1 downTo 0) {
             val p = particles[i]
@@ -230,18 +252,13 @@ class FireworksViz(
             var newLife = p.life - p.decay * dt * baseDecay
             
             if (p.type == ParticleType.ROCKET) {
-                newLife = 1f // Rockets persist until explosion
-                
-                // Rocket Logic: Explode at apex (when velocity slows down enough)
-                // Launch is negative Vy (UP). Gravity adds positive Vy (DOWN).
-                // Apex is when Vy approaches 0.
-                if (newVy > -100f) { 
-                     explodeRocket(p)
+                newLife = 1f 
+                // Explode at apex
+                if (newVy > -50f) { 
+                     explodeRocket(p, masterLevel)
                      particles.removeAt(i)
                      continue
                 }
-            } else if (p.type == ParticleType.SPARK) {
-                 // Sparks leave trails (optional, skipping for performance/simplicity)
             }
 
             if (newLife <= 0f) {
@@ -257,14 +274,10 @@ class FireworksViz(
             }
         }
 
-        
-        // Limit particle count
-        if (particles.size > 1500) {
-            // Remove oldest indices (start of list usually if appended)
-            // Or random. Random is better to avoid chopping one firework.
-            // But just trimming the end (newest? oldest?)
-            // `particles` is appened to end. So index 0 is oldest.
-            val toRemove = particles.size - 1500
+        // Limit particle count based on knob (performance + density control)
+        val maxParticles = 500 + (_countKnob * 2500).toInt()
+        if (particles.size > maxParticles) {
+            val toRemove = particles.size - maxParticles
             if (toRemove > 0) {
                 particles.subList(0, toRemove).clear()
             }
@@ -276,21 +289,22 @@ class FireworksViz(
         }
         for(i in voiceLevels.indices) previousVoiceLevels[i] = voiceLevels[i]
 
-        val flash = (masterLevel - 0.5f).coerceAtLeast(0f) * 0.2f
+        val flash = (masterLevel - 0.6f).coerceAtLeast(0f) * 0.4f * _colorKnob // Flash also obeys color knob
         _uiState.value = FireworksUiState(
-            particles = particles.toList(), // Copy for UI thread
+            particles = particles.toList(),
             masterEnergy = masterLevel,
             flashIntensity = flash
         )
         
         // Dynamic Title Effects
-        val titleColor = lerpColor(Color.White, color, (lfoValue + 1f) / 2f)
+        val titleColor = lerpColor(OrpheusColors.synthPink, OrpheusColors.neonCyan, (lfoValue + 1f) / 2f)
         val elevation = 6.dp + (masterLevel * 10).dp
         _liquidEffects.value = Default.copy(
              title = Default.title.copy(
                  titleColor = titleColor,
                  titleElevation = elevation,
-                 titleSize = (22 + masterLevel * 3).sp
+                 titleSize = (22 + masterLevel * 3).sp,
+                 borderColor = titleColor.copy(alpha = 0.5f * _colorKnob)
              )
         )
     }
@@ -300,41 +314,24 @@ class FireworksViz(
     // ----------------------------------------------------------------------------
     
     private fun launchFirework(intensity: Float) {
-        // Start from bottom of screen (we'll map 0..1 later to screen coords)
-        // Assume logical coords: W=0..1, H=0..1 (aspect ratio handled in draw)
-        // Actually, let's use pixel-like coords relative to a 1000x1000 virtual space?
-        // Or normalized. Normalized is easier.
-        // X: 0.1 .. 0.9
-        // Y: 1.1 (below screen)
+        val startX = Random.nextFloat() * 800f + 100f // 100..900
+        val startY = 1100f 
         
-        val startX = Random.nextFloat() * 0.8f + 0.1f
-        val startY = 1.1f
+        // Target Height logic (corrected physics)
+        val targetY = 100f + Random.nextFloat() * 300f 
         
-        // Velocity needed to reach 0.2..0.5 Y
-        // v^2 = u^2 + 2as. v=0 at apex. u = sqrt(-2as). s = targetY - startY.
-        // H = 1.0 (bottom) -> 0.2 (top). s approx -0.8.
-        // a = gravity (e.g. 1.0 units/sec^2).
-        // Let's tune manually.
+        val dist = targetY - startY
+        val gravity = 800f 
+        val launchSpeed = sqrt(-2 * gravity * dist) 
         
-        // Target height random 0.1 (high) to 0.4 (mid)
-        val targetH = 0.1f + Random.nextFloat() * 0.3f
-        // Speed to reach that?
-        // Vy = - (1000 + Random) 
-        // We'll use pixels in logic to be consistent with GalaxyViz if it used pixels, 
-        // but Galaxy used logic coords centered at 0,0.
-        // Let's use logic Space 0..1
-        
-        // But draw expects absolute coordinates? 
-        // Best to use a virtual resolution, e.g. 1000.0f height.
-        
-        val speed = -(1200f + Random.nextFloat() * 400f) // negative is UP
+        val speedVar = (Random.nextFloat() - 0.5f) * 50f
         
         particles.add(Particle(
-            x = startX * 1000f, // Map 0..1 to 0..1000
-            y = 1100f,
-            vx = (Random.nextFloat() - 0.5f) * 100f, // Drift
-            vy = speed * (0.8f + intensity * 0.4f), // Harder hits go higher
-            color = applyDepth(colors.random()),
+            x = startX,
+            y = startY,
+            vx = (Random.nextFloat() - 0.5f) * 80f,
+            vy = -(launchSpeed + speedVar),
+            color = applyColorIntensity(colors.random()),
             size = 4f,
             life = 1f,
             decay = 0f,
@@ -342,16 +339,20 @@ class FireworksViz(
         ))
     }
     
-    private fun explodeRocket(parent: Particle) {
-        // Boom!
-        val pCount = Random.nextInt(40, 100)
+    private fun explodeRocket(parent: Particle, intensity: Float) {
+        // Count Knob affects explosion density too
+        val countMult = 0.5f + _countKnob // 0.5x to 1.5x particles
+        
+        val baseCount = if (intensity < 0.2f) 30 else 80
+        val pCount = ((baseCount + (intensity * 100)) * countMult).toInt().coerceAtMost(300)
+        
         val type = if (Random.nextBoolean()) ParticleType.SPARK else ParticleType.GLITTER
         val color = parent.color
-        val secondaryColor = if (Random.nextBoolean()) applyDepth(colors.random()) else color
+        val secondaryColor = if (Random.nextBoolean()) applyColorIntensity(colors.random()) else color
         
         for (i in 0 until pCount) {
              val angle = Random.nextFloat() * 2 * PI.toFloat()
-             val speed = Random.nextFloat() * 300f 
+             val speed = Random.nextFloat() * (200f + intensity * 300f)
              
              particles.add(Particle(
                  x = parent.x,
@@ -361,7 +362,7 @@ class FireworksViz(
                  color = if (Random.nextFloat() > 0.7f) secondaryColor else color,
                  size = Random.nextFloat() * 3f + 1f,
                  life = 1.0f,
-                 decay = 0.5f + Random.nextFloat(), // Variance
+                 decay = 0.5f + Random.nextFloat(), 
                  type = type
              ))
         }
@@ -371,8 +372,8 @@ class FireworksViz(
              x = parent.x,
              y = parent.y,
              vx = 0f, vy = 0f,
-             color = Color.White,
-             size = 20f,
+             color = Color.White.copy(alpha = _colorKnob), // Obey knob
+             size = 20f + intensity * 20f,
              life = 0.2f,
              decay = 5f,
              type = ParticleType.CORE
@@ -380,7 +381,6 @@ class FireworksViz(
     }
     
     private fun spawnFountain(xNorm: Float, intensity: Float, color: Color) {
-         // Spawns from bottom
          particles.add(Particle(
              x = xNorm * 1000f + (Random.nextFloat() - 0.5f) * 20f,
              y = 1000f,
@@ -395,12 +395,11 @@ class FireworksViz(
     }
     
     private fun spawnSparkle(xNorm: Float, intensity: Float, color: Color) {
-         // Spawns random high location
          particles.add(Particle(
              x = xNorm * 1000f + (Random.nextFloat() - 0.5f) * 100f,
              y = Random.nextFloat() * 500f,
              vx = 0f,
-             vy = 50f, // Dripping down
+             vy = 50f, 
              color = color,
              size = 1f + intensity,
              life = 0.5f,
@@ -421,37 +420,33 @@ class FireworksViz(
             val scaleX = size.width / 1000f
             val scaleY = size.height / 1000f
             
-            // Draw Background
-            drawRect(OrpheusColors.deepSpaceBlue) // Consistent deep background
+            drawRect(Color(0xFF050510)) 
             
-            // Draw Flash based on bass
             if (state.flashIntensity > 0.01f) {
                 drawRect(
-                    color = Color.White.copy(alpha = state.flashIntensity.coerceIn(0f, 0.3f)),
+                    color = Color.White.copy(alpha = state.flashIntensity.coerceIn(0f, 0.2f)),
                     blendMode = BlendMode.Plus
                 )
             }
             
-            // Draw Particles
             state.particles.forEach { p ->
                 val alpha = p.life.coerceIn(0f, 1f)
-                val drawColor = p.color.copy(alpha = alpha)
+                val drawColor = p.color.copy(alpha = (p.color.alpha * alpha).coerceIn(0f, 1f))
                 val px = p.x * scaleX
                 val py = p.y * scaleY
-                val pScale = p.size * (0.5f + alpha * 0.5f) // Shrink as they die
+                val pScale = p.size * (0.5f + alpha * 0.5f) 
                 
                 when (p.type) {
                     ParticleType.ROCKET -> {
-                         // Draw trail
                          drawLine(
-                             color = Color.White.copy(alpha = 0.5f),
+                             color = Color.White.copy(alpha = 0.5f * _colorKnob),
                              start = Offset(px - p.vx * 0.05f * scaleX, py - p.vy * 0.05f * scaleY),
                              end = Offset(px, py),
                              strokeWidth = 2f
                          )
                          drawCircle(
-                             color = Color.White,
-                             radius = 2f * scaleX, // small dot
+                             color = Color.White.copy(alpha = _colorKnob),
+                             radius = 2f * scaleX,
                              center = Offset(px, py)
                          )
                     }
@@ -480,12 +475,24 @@ class FireworksViz(
 
     companion object {
         val Default = VisualizationLiquidEffects(
-            frostSmall = 0f, // Clear view
-            frostMedium = 0f,
-            frostLarge = 0f,
-            tintAlpha = 0.05f,
+            frostSmall = 1f,
+            frostMedium = 2f,
+            frostLarge = 4f,
+            tintAlpha = 0.04f,
+            top = VisualizationLiquidScope(
+                saturation = 2.0f,
+                dispersion = .5f,
+                curve = 0.02f,
+                refraction = 0.2f,
+            ),
+            bottom = VisualizationLiquidScope(
+                saturation = 1f,
+                dispersion = .2f,
+                curve = 0.2f,
+                refraction = 0.1f,
+            ),
             title = CenterPanelStyle(
-                scope = VisualizationLiquidScope(contrast = 1.4f, saturation = 1.2f),
+                scope = VisualizationLiquidScope(contrast = 1.5f, saturation = 2f),
                 titleColor = OrpheusColors.synthPink,
                 borderColor = OrpheusColors.synthPink.copy(alpha = 0.4f),
                 titleElevation = 8.dp
