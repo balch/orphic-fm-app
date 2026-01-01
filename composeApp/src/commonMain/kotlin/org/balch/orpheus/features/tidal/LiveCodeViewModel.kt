@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.tidal.ConsoleEntry
 import org.balch.orpheus.core.tidal.EvalMode
 import org.balch.orpheus.core.tidal.Pattern
+import org.balch.orpheus.core.tidal.ReplResult
 import org.balch.orpheus.core.tidal.TidalEvent
 import org.balch.orpheus.core.tidal.TidalParser
 import org.balch.orpheus.core.tidal.TidalRepl
@@ -206,8 +207,6 @@ class LiveCodeViewModel(
                     isAiGenerating = false
                 )
             }
-            
-
 
             is LiveCodeIntent.Execute -> {
                 // Execute full code - Replace mode ensures deleted lines stop playing
@@ -232,13 +231,14 @@ class LiveCodeViewModel(
             
             is LiveCodeIntent.Play -> {
                 scheduler.play()
-                state.copy(isPlaying = true)
+                state.copy(isPlaying = true, isAiGenerating = false)
             }
             
             is LiveCodeIntent.Stop -> {
                 // Hush all patterns and stop the scheduler for a clean stop
+                // Also clear isAiGenerating so user can edit the code after stopping
                 repl.hush()
-                state.copy(isPlaying = false, activeSlots = emptySet())
+                state.copy(isPlaying = false, activeSlots = emptySet(), isAiGenerating = false)
             }
             
             is LiveCodeIntent.SetBpm -> {
@@ -272,24 +272,18 @@ class LiveCodeViewModel(
     ): LiveCodeUiState {
         if (code.isBlank()) return state.copy(error = "No code selected")
         
-        var resultState = state
-        
         repl.evaluate(code, mode) { result ->
             when (result) {
-                is org.balch.orpheus.core.tidal.ReplResult.Success -> {
-                    viewModelScope.launch {
-                        _uiState.value = _uiState.value.copy(
-                            error = null,
-                            isPlaying = true,
-                            activeSlots = result.slots,
-                            history = (listOf(code) + _uiState.value.history).take(10)
-                        )
-                    }
+                is ReplResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        error = null,
+                        isPlaying = true,
+                        activeSlots = result.slots,
+                        history = (listOf(code) + _uiState.value.history).take(10)
+                    )
                 }
-                is org.balch.orpheus.core.tidal.ReplResult.Error -> {
-                    viewModelScope.launch {
-                        _uiState.value = _uiState.value.copy(error = result.message)
-                    }
+                is ReplResult.Error -> {
+                    _uiState.value = _uiState.value.copy(error = result.message)
                 }
             }
         }
@@ -439,8 +433,7 @@ class LiveCodeViewModel(
             
             // Default: treat as gate pattern (just numbers)
             else -> {
-                val result = TidalParser.parseGates(line)
-                when (result) {
+                when (val result = TidalParser.parseGates(line)) {
                     is TidalParser.ParseResult.Success -> result.pattern
                     is TidalParser.ParseResult.Failure -> throw IllegalArgumentException(result.message)
                 }
@@ -455,18 +448,24 @@ class LiveCodeViewModel(
     }
     
     fun execute() {
-        viewModelScope.launch { replCodeEventBus.emitUserInteraction() }
-        _intents.value = LiveCodeIntent.Execute
+        viewModelScope.launch {
+            replCodeEventBus.emitUserInteraction()
+            _intents.value = LiveCodeIntent.Execute
+        }
     }
     
     fun executeBlock() {
-        viewModelScope.launch { replCodeEventBus.emitUserInteraction() }
-        _intents.value = LiveCodeIntent.ExecuteBlock
+        viewModelScope.launch {
+            replCodeEventBus.emitUserInteraction()
+            _intents.value = LiveCodeIntent.ExecuteBlock
+        }
     }
     
     fun executeLine() {
-        viewModelScope.launch { replCodeEventBus.emitUserInteraction() }
-        _intents.value = LiveCodeIntent.ExecuteLine
+        viewModelScope.launch {
+            replCodeEventBus.emitUserInteraction()
+            _intents.value = LiveCodeIntent.ExecuteLine
+        }
     }
     
     fun play() {
@@ -474,8 +473,10 @@ class LiveCodeViewModel(
     }
     
     fun stop() {
-        viewModelScope.launch { replCodeEventBus.emitUserInteraction() }
-        _intents.value = LiveCodeIntent.Stop
+        viewModelScope.launch {
+            replCodeEventBus.emitUserInteraction()
+            _intents.value = LiveCodeIntent.Stop
+        }
     }
     
     fun setBpm(bpm: Double) {
@@ -488,14 +489,6 @@ class LiveCodeViewModel(
 
     fun deleteLine() {
         _intents.value = LiveCodeIntent.DeleteLine
-    }
-    
-    /**
-     * Silence all patterns (delegated to REPL).
-     */
-    fun hush() {
-        repl.hush()
-        _uiState.value = _uiState.value.copy(isPlaying = false, activeSlots = emptySet())
     }
     
     override fun onCleared() {
