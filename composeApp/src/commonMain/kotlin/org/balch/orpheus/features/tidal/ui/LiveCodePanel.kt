@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.tidal.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -56,8 +59,11 @@ import org.balch.orpheus.features.tidal.LiveCodePanelActions
 import org.balch.orpheus.features.tidal.LiveCodeUiState
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.panels.LocalLiquidEffects
+import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -141,10 +147,11 @@ fun LiveCodePanelLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,  // Closed by default
-        expandedWidth = 280.dp,
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
+        val effects = LocalLiquidEffects.current
+        val liquidState = LocalLiquidState.current
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -245,10 +252,11 @@ fun LiveCodePanelLayout(
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth()
             ) {
-                Surface(
+                Card(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color(0xFF1E1E2E), // Dark editor background
-                    shape = RoundedCornerShape(8.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(2.dp, OrpheusColors.neonCyan.copy(alpha = 0.12f))
                 ) {
                     BasicTextField(
                         value = uiState.code,
@@ -256,6 +264,13 @@ fun LiveCodePanelLayout(
                         readOnly = uiState.isAiGenerating, // Allow editing while playing for true live coding
                         modifier = Modifier
                             .fillMaxSize()
+                            .liquidVizEffects(
+                                liquidState = liquidState,
+                                scope = effects.bottom,
+                                frostAmount = effects.frostLarge.dp,
+                                color = OrpheusColors.slateSilver,
+                                tintAlpha = effects.tintAlpha,
+                            )
                             .padding(12.dp)
                             .verticalScroll(rememberScrollState())
                             .onKeyEvent { event ->
@@ -297,9 +312,7 @@ fun LiveCodePanelLayout(
                                         style = TextStyle(
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(
-                                                alpha = 0.4f
-                                            )
+                                            color = Color.Transparent
                                         )
                                     )
                                 }

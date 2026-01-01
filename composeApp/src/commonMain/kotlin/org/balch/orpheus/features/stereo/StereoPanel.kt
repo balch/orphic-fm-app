@@ -70,7 +70,6 @@ fun StereoPanelLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        expandedWidth = 120.dp,
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {

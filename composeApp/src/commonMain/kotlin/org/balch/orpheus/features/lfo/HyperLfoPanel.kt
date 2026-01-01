@@ -88,7 +88,6 @@ fun HyperLfoPanelLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        expandedWidth = 280.dp,
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {

@@ -79,7 +79,6 @@ private fun MidiPanelLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        expandedWidth = 180.dp,
         modifier = modifier
     ) {
         Column(

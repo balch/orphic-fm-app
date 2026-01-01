@@ -65,7 +65,6 @@ fun ModDelayPanelLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        expandedWidth = 240.dp,
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {

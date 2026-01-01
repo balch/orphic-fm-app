@@ -54,17 +54,19 @@ import org.balch.orpheus.features.tidal.LiveCodePanelActions
 import org.balch.orpheus.features.tidal.LiveCodeUiState
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tidal.ui.LiveCodePanelLayout
-import org.balch.orpheus.features.viz.VizPanelLayout
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.panels.compact.CompactAiSection
-import org.balch.orpheus.ui.panels.compact.CompactAiSectionPreview
+import org.balch.orpheus.ui.panels.compact.CompactBottomPanelSwitcher
+import org.balch.orpheus.ui.panels.compact.CompactBottomPanelType
 import org.balch.orpheus.ui.panels.compact.CompactPanelSwitcher
 import org.balch.orpheus.ui.panels.compact.CompactPanelType
 import org.balch.orpheus.ui.panels.compact.CompactPortraitHeaderPanel
+import org.balch.orpheus.ui.panels.compact.CompactPortraitVoicePads
+import org.balch.orpheus.ui.panels.compact.CompactStringPanel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
@@ -179,12 +181,6 @@ private fun CompactPortraitScreenLayout(
     lfoFeature: ViewModelStateActionMapper<LfoUiState, LfoPanelActions>,
     stereoFeature: ViewModelStateActionMapper<StereoUiState, StereoPanelActions>,
     vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
-    aiSectionContent: @Composable (onShowRepl: () -> Unit) -> Unit = { onShowRepl ->
-        CompactAiSection(
-            modifier = Modifier.fillMaxSize(),
-            onShowRepl = onShowRepl
-        )
-    }
 ) {
     // Track section heights
     val density = LocalDensity.current
@@ -192,8 +188,11 @@ private fun CompactPortraitScreenLayout(
     val minTopHeight = 150.dp
     val maxTopHeight = 450.dp
 
-    // Selected panel for switcher
-    var selectedPanel by remember { mutableStateOf(CompactPanelType.REPL) }
+    // Selected panel for top switcher
+    var selectedPanel by remember { mutableStateOf(CompactPanelType.EVO) }
+    
+    // Selected panel for bottom panel switcher
+    var selectedBottomPanel by remember { mutableStateOf(CompactBottomPanelType.PADS) }
 
     Box(
         modifier = modifier
@@ -237,13 +236,11 @@ private fun CompactPortraitScreenLayout(
                                 presetFeature = presetFeature,
                                 liveCodeFeature = liveCodeFeature,
                                 activeReplHighlights = activeReplHighlights,
-                                voiceFeature = voiceFeature,
                                 delayFeature = delayFeature,
                                 distortionFeature = distortionFeature,
                                 evoFeature = evoFeature,
                                 lfoFeature = lfoFeature,
                                 stereoFeature = stereoFeature,
-                                vizFeature = vizFeature,
                             )
                         }
                     }
@@ -258,10 +255,39 @@ private fun CompactPortraitScreenLayout(
                         }
                     )
 
-                    // 3c. AI section (fills remaining space)
+                    // 3c. Bottom panel section (fills remaining space)
                     Box(modifier = Modifier.weight(1f)) {
-                        aiSectionContent {
-                            selectedPanel = CompactPanelType.REPL
+                        CompactBottomPanelSwitcher(
+                            selectedPanel = selectedBottomPanel,
+                            onPanelSelected = { selectedBottomPanel = it },
+                            modifier = Modifier.fillMaxSize()
+                        ) { bottomPanel ->
+                            when (bottomPanel) {
+                                CompactBottomPanelType.AI -> {
+                                    CompactAiSection(
+                                        modifier = Modifier.fillMaxSize(),
+                                        onShowRepl = { selectedPanel = CompactPanelType.REPL }
+                                    )
+                                }
+                                CompactBottomPanelType.PADS -> {
+                                    CompactPortraitVoicePads(
+                                        voiceState = voiceFeature.state,
+                                        actions = voiceFeature.actions,
+                                        modifier = Modifier.fillMaxSize(),
+                                        liquidState = liquidState,
+                                        effects = effects
+                                    )
+                                }
+                                CompactBottomPanelType.STRINGS -> {
+                                    CompactStringPanel(
+                                        voiceState = voiceFeature.state,
+                                        actions = voiceFeature.actions,
+                                        modifier = Modifier.fillMaxSize(),
+                                        liquidState = liquidState,
+                                        effects = effects
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -279,13 +305,11 @@ private fun PanelContent(
     presetFeature: ViewModelStateActionMapper<PresetUiState, PresetPanelActions>,
     liveCodeFeature: ViewModelStateActionMapper<LiveCodeUiState, LiveCodePanelActions>,
     activeReplHighlights: List<IntRange>,
-    voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
     delayFeature: ViewModelStateActionMapper<DelayUiState, DelayPanelActions>,
     distortionFeature: ViewModelStateActionMapper<DistortionUiState, DistortionPanelActions>,
     evoFeature: ViewModelStateActionMapper<EvoUiState, EvoPanelActions>,
     lfoFeature: ViewModelStateActionMapper<LfoUiState, LfoPanelActions>,
     stereoFeature: ViewModelStateActionMapper<StereoUiState, StereoPanelActions>,
-    vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
     modifier: Modifier = Modifier,
 ) {
     val panelModifier = modifier
@@ -373,17 +397,6 @@ private fun PanelContent(
                 showCollapsedHeader = false
             )
         }
-
-        CompactPanelType.VIZ -> {
-            VizPanelLayout(
-                uiState = vizFeature.state,
-                actions = vizFeature.actions,
-                modifier = panelModifier,
-                isExpanded = true,
-                onExpandedChange = null,
-                showCollapsedHeader = false
-            )
-        }
     }
 }
 
@@ -406,8 +419,7 @@ private fun CompactPortraitLayoutPreview() {
                 evoFeature = EvoViewModel.PREVIEW,
                 lfoFeature = LfoViewModel.PREVIEW,
                 stereoFeature = StereoViewModel.PREVIEW,
-                vizFeature = VizViewModel.PREVIEW,
-                aiSectionContent = { _ -> CompactAiSectionPreview() }
+                vizFeature = VizViewModel.PREVIEW
             )
         }
     }

@@ -47,13 +47,12 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * Enum representing available compact panels for portrait mode.
  */
 enum class CompactPanelType(val displayName: String, val color: Color) {
-    REPL("REPL", OrpheusColors.neonCyan),
-    PRESET("Preset", Color(0xFFFFAB40)), // Patches Color
-    VIZ("Viz", Color(0xFF90EE90)),
-    DISTORTION("Distortion", OrpheusColors.neonMagenta),
     EVO("Evo", Color(0xFFFDBB30)), // Cavs Gold
+    PRESET("Preset", Color(0xFFFFAB40)), // Patches Color
+    DISTORTION("Distortion", OrpheusColors.neonMagenta),
     LFO("LFO", OrpheusColors.neonCyan),
     DELAY("Delay", OrpheusColors.warmGlow),
+    REPL("REPL", OrpheusColors.neonCyan),
     STEREO("Stereo", Color(0xFF008B8B)),
 }
 

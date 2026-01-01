@@ -85,7 +85,6 @@ fun VizPanelLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        expandedWidth = 140.dp,
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {

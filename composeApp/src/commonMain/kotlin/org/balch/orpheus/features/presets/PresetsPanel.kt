@@ -97,7 +97,6 @@ fun PresetsPanelLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        expandedWidth = 200.dp,
         modifier = modifier,
         fillMaxHeight = fillMaxHeight,
         showCollapsedHeader = showCollapsedHeader

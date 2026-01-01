@@ -72,7 +72,6 @@ fun DistortionPanelLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        expandedWidth = 200.dp,
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {

@@ -29,7 +29,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
@@ -66,7 +65,6 @@ fun CollapsibleColumnPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     initialExpanded: Boolean = false,
-    expandedWidth: Dp = 140.dp,
     expandedTitle: String? = null,
     showCollapsedHeader: Boolean = true,
     fillMaxHeight: Boolean = true,

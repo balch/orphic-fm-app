@@ -1,90 +1,69 @@
-package org.balch.orpheus.ui.screens
+package org.balch.orpheus.ui.panels.compact
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.voice.SynthKeyboardHandler
-import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.features.voice.VoicePanelActions
+import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.abs
 
 /**
- * TODO - this is on hold for now
+ * Compact string panel for the bottom panel navigation in portrait mode.
  *
- * Compact Portrait Layout: Designed for mobile portrait orientation.
- * Displays 4 strummable "strings" that trigger voices when plucked.
- * Each string represents a pair of voices (duo).
+ * Layout:
+ * - Left: Quad 0 pitch and hold controls
+ * - Center: 4 strummable vertical strings (each triggers a duo of voices)
+ * - Right: Quad 1 pitch and hold controls
+ *
+ * Interactions:
+ * - Tap or drag across strings to "strum" and trigger voices
+ * - String deflection provides visual feedback
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CompactPortraitStringScreen(
+fun CompactStringPanel(
+    voiceState: VoiceUiState,
+    actions: VoicePanelActions,
     modifier: Modifier = Modifier,
-    voiceViewModel: VoiceViewModel = metroViewModel(),
-    presetViewModel: PresetsViewModel = metroViewModel(),
+    liquidState: LiquidState? = LocalLiquidState.current,
+    effects: VisualizationLiquidEffects = LocalLiquidEffects.current
 ) {
-    val voiceState by voiceViewModel.uiState.collectAsState()
-    val presetState by presetViewModel.uiState.collectAsState()
-    val liquidState = LocalLiquidState.current
-    val effects = LocalLiquidEffects.current
     val shape = RoundedCornerShape(12.dp)
-
-    // Focus handling for keyboard input
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    // Preset dropdown state
-    var presetDropdownExpanded by remember { mutableStateOf(false) }
 
     // String colors for the 4 duos
     val stringColors = listOf(
@@ -94,19 +73,10 @@ fun CompactPortraitStringScreen(
         OrpheusColors.synthGreen
     )
 
-    Row(
-        modifier = modifier
-            .fillMaxSize()
-            .focusRequester(focusRequester)
-            .focusable()
-            .onPreviewKeyEvent { event ->
-                SynthKeyboardHandler.handleKeyEvent(
-                    keyEvent = event,
-                    voiceState = voiceState,
-                    voiceViewModel = voiceViewModel,
-                    isDialogActive = presetDropdownExpanded
-                )
-            }
+    val baseModifier = modifier.fillMaxSize()
+
+    val panelModifier = if (liquidState != null) {
+        baseModifier
             .liquidVizEffects(
                 liquidState = liquidState,
                 scope = effects.bottom,
@@ -117,7 +87,11 @@ fun CompactPortraitStringScreen(
             )
             .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
             .padding(8.dp)
-    ) {
+    } else {
+        baseModifier.padding(8.dp)
+    }
+
+    Row(modifier = panelModifier) {
         // Left controls column
         Column(
             modifier = Modifier
@@ -127,19 +101,19 @@ fun CompactPortraitStringScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly
         ) {
-            // Quad 1 Pitch
+            // Quad 0 Pitch
             RotaryKnob(
-                value = voiceState.quadGroupPitches[0],
-                onValueChange = { voiceViewModel.onQuadPitchChange(0, it) },
+                value = voiceState.quadGroupPitches.getOrElse(0) { 0.5f },
+                onValueChange = { actions.onQuadPitchChange(0, it) },
                 label = "PITCH",
                 controlId = ControlIds.quadPitch(0),
                 size = 40.dp,
                 progressColor = OrpheusColors.neonMagenta
             )
-            // Quad 1 Hold
+            // Quad 0 Hold
             RotaryKnob(
-                value = voiceState.quadGroupHolds[0],
-                onValueChange = { voiceViewModel.onQuadHoldChange(0, it) },
+                value = voiceState.quadGroupHolds.getOrElse(0) { 0f },
+                onValueChange = { actions.onQuadHoldChange(0, it) },
                 label = "HOLD",
                 controlId = ControlIds.quadHold(0),
                 size = 40.dp,
@@ -161,15 +135,15 @@ fun CompactPortraitStringScreen(
                     val voiceA = stringIndex * 2
                     val voiceB = stringIndex * 2 + 1
                     if (amplitude > 0.1f) {
-                        voiceViewModel.onPulseStart(voiceA)
-                        voiceViewModel.onPulseStart(voiceB)
+                        actions.onPulseStart(voiceA)
+                        actions.onPulseStart(voiceB)
                     }
                 },
                 onStringReleased = { stringIndex ->
                     val voiceA = stringIndex * 2
                     val voiceB = stringIndex * 2 + 1
-                    voiceViewModel.onPulseEnd(voiceA)
-                    voiceViewModel.onPulseEnd(voiceB)
+                    actions.onPulseEnd(voiceA)
+                    actions.onPulseEnd(voiceB)
                 }
             )
         }
@@ -183,61 +157,24 @@ fun CompactPortraitStringScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceEvenly
         ) {
-            // Quad 2 Pitch
+            // Quad 1 Pitch
             RotaryKnob(
-                value = voiceState.quadGroupPitches[1],
-                onValueChange = { voiceViewModel.onQuadPitchChange(1, it) },
+                value = voiceState.quadGroupPitches.getOrElse(1) { 0.5f },
+                onValueChange = { actions.onQuadPitchChange(1, it) },
                 label = "PITCH",
                 controlId = ControlIds.quadPitch(1),
                 size = 40.dp,
                 progressColor = OrpheusColors.synthGreen
             )
-            // Quad 2 Hold
+            // Quad 1 Hold
             RotaryKnob(
-                value = voiceState.quadGroupHolds[1],
-                onValueChange = { voiceViewModel.onQuadHoldChange(1, it) },
+                value = voiceState.quadGroupHolds.getOrElse(1) { 0f },
+                onValueChange = { actions.onQuadHoldChange(1, it) },
                 label = "HOLD",
                 controlId = ControlIds.quadHold(1),
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )
-        }
-    }
-
-    // Bottom: Patch selector (minimal row at bottom)
-    Spacer(Modifier.height(4.dp))
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.Center
-    ) {
-        ExposedDropdownMenuBox(
-            expanded = presetDropdownExpanded,
-            onExpandedChange = { presetDropdownExpanded = it }
-        ) {
-            TextField(
-                value = presetState.selectedPreset?.name ?: "Select Patch",
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = presetDropdownExpanded) },
-                modifier = Modifier
-                    .menuAnchor()
-                    .width(200.dp),
-                textStyle = MaterialTheme.typography.bodySmall
-            )
-            ExposedDropdownMenu(
-                expanded = presetDropdownExpanded,
-                onDismissRequest = { presetDropdownExpanded = false }
-            ) {
-                presetState.presets.forEach { preset ->
-                    DropdownMenuItem(
-                        text = { Text(preset.name) },
-                        onClick = {
-                            presetViewModel.applyPreset(preset)
-                            presetDropdownExpanded = false
-                        }
-                    )
-                }
-            }
         }
     }
 }
@@ -381,5 +318,22 @@ private fun StringsCanvas(
                 center = Offset(stringCenterX, 24f)
             )
         }
+    }
+}
+
+// ==================== PREVIEWS ====================
+
+@Preview(widthDp = 360, heightDp = 300)
+@Composable
+private fun CompactStringPanelPreview() {
+    OrpheusTheme {
+        CompactStringPanel(
+            voiceState = VoiceUiState(
+                voiceStates = List(8) { index -> VoiceState(index = index) },
+                quadGroupPitches = listOf(0.5f, 0.5f),
+                quadGroupHolds = listOf(0f, 0f)
+            ),
+            actions = VoicePanelActions.EMPTY
+        )
     }
 }

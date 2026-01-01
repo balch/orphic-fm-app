@@ -84,7 +84,6 @@ fun EvoPanelLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        expandedWidth = 280.dp,
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
