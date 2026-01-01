@@ -4,7 +4,12 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionActionHandler
 import org.balch.orpheus.core.media.MediaSessionManager
@@ -15,6 +20,11 @@ import org.balch.orpheus.core.media.MediaSessionManager
  * Manages engine start/stop to ensure proper audio lifecycle management
  * independent of UI composition. Also manages the MediaSession for
  * background audio and system media controls.
+ * 
+ * Supports three states:
+ * - Playing: Audio is audible, engine is running
+ * - Paused: Audio is muted, but engine and agents keep running
+ * - Stopped: Engine stopped, agents stopped, service deactivated
  * 
  * When stopped (including from the foreground service notification),
  * broadcasts a stop event via [PlaybackLifecycleManager] so all 
@@ -28,19 +38,72 @@ class SynthOrchestrator(
     private val playbackLifecycleManager: PlaybackLifecycleManager
 ) : MediaSessionActionHandler {
     private val log = logging("SynthOrchestrator")
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var isStarted = false
+    private var isPaused = false
+    private var savedMasterVolume = 1f
 
     init {
         mediaSessionManager.setActionHandler(this)
+        
+        // Subscribe to lifecycle events (e.g., resume requests from scheduler)
+        scope.launch {
+            playbackLifecycleManager.events.collect { event ->
+                when (event) {
+                    is PlaybackLifecycleEvent.RequestResume -> {
+                        log.debug { "Received RequestResume event" }
+                        if (isPaused) {
+                            resume()
+                        }
+                    }
+                    is PlaybackLifecycleEvent.StopAll -> {
+                        // Handled by the emitting stop(), no action needed here
+                    }
+                }
+            }
+        }
     }
 
     fun start() {
         if (!isStarted) {
             engine.start()
+            // Restore master volume after starting (engine may reset to 0 on restart)
+            engine.setMasterVolume(savedMasterVolume)
+            log.debug { "Restored master volume to $savedMasterVolume after start" }
+            
             mediaSessionManager.activate()
             mediaSessionManager.updatePlaybackState(true)
             isStarted = true
+            isPaused = false
             log.info { "SynthOrchestrator: Engine started" }
+        }
+    }
+    
+    /**
+     * Pause audio playback by muting output.
+     * The engine and all agents continue running, just silenced.
+     */
+    fun pause() {
+        if (isStarted && !isPaused) {
+            // Save current master volume and mute
+            savedMasterVolume = engine.getMasterVolume()
+            engine.setMasterVolume(0f)
+            mediaSessionManager.updatePlaybackState(false)
+            isPaused = true
+            log.info { "SynthOrchestrator: Paused (muted, savedVolume=$savedMasterVolume)" }
+        }
+    }
+    
+    /**
+     * Resume audio playback by restoring volume.
+     */
+    fun resume() {
+        if (isStarted && isPaused) {
+            // Restore master volume
+            engine.setMasterVolume(savedMasterVolume)
+            mediaSessionManager.updatePlaybackState(true)
+            isPaused = false
+            log.info { "SynthOrchestrator: Resumed (restored volume=$savedMasterVolume)" }
         }
     }
 
@@ -50,10 +113,19 @@ class SynthOrchestrator(
             // Broadcast stop event to all listeners (agents, schedulers, etc.)
             playbackLifecycleManager.tryRequestStopAll()
             
+            // Save the current master volume before stopping
+            // If paused, we already have the pre-pause volume saved
+            // If not paused, save the current volume for next restart
+            if (!isPaused) {
+                savedMasterVolume = engine.getMasterVolume()
+            }
+            log.debug { "Saved master volume: $savedMasterVolume for next start" }
+            
             mediaSessionManager.updatePlaybackState(false)
             mediaSessionManager.deactivate()
             engine.stop()
             isStarted = false
+            isPaused = false
             log.info { "SynthOrchestrator: Engine stopped" }
         }
     }
@@ -63,12 +135,16 @@ class SynthOrchestrator(
     // MediaSessionActionHandler implementation
     override fun onPlay() {
         log.info { "MediaSession: Play requested" }
-        start()
+        if (!isStarted) {
+            start()
+        } else if (isPaused) {
+            resume()
+        }
     }
     
     override fun onPause() {
         log.info { "MediaSession: Pause requested" }
-        stop()
+        pause()
     }
     
     override fun onStop() {
@@ -76,3 +152,4 @@ class SynthOrchestrator(
         stop()
     }
 }
+

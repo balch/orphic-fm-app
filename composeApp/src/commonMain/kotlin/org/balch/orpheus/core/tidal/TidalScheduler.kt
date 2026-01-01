@@ -66,6 +66,7 @@ class TidalScheduler(
                         log.info { "Received StopAll event - stopping scheduler" }
                         stop()
                     }
+                    else -> { /* Ignore other events */ }
                 }
             }
         }
@@ -114,6 +115,10 @@ class TidalScheduler(
         if (playbackJob?.isActive == true) return
         
         log.info { "TidalScheduler: Starting playback" }
+        
+        // Request resume in case orchestrator was paused (muted)
+        playbackLifecycleManager.tryRequestResume()
+        
         _state.value = _state.value.copy(isPlaying = true, currentCycle = 0, cyclePosition = 0.0)
         
         playbackJob = scope.launch {

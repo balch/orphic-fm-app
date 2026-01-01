@@ -27,6 +27,7 @@ class AudioForegroundService : Service() {
     
     private val log = logging("AudioForegroundService")
     private var mediaSession: MediaSessionCompat? = null
+    private var isPlaying = true  // Track current playback state
     
     companion object {
         const val NOTIFICATION_ID = 1
@@ -34,6 +35,8 @@ class AudioForegroundService : Service() {
         const val ACTION_PLAY = "org.balch.orpheus.PLAY"
         const val ACTION_PAUSE = "org.balch.orpheus.PAUSE"
         const val ACTION_STOP = "org.balch.orpheus.STOP"
+        const val ACTION_UPDATE_STATE_PLAYING = "org.balch.orpheus.UPDATE_STATE_PLAYING"
+        const val ACTION_UPDATE_STATE_PAUSED = "org.balch.orpheus.UPDATE_STATE_PAUSED"
         
         var actionHandler: ((String) -> Unit)? = null
     }
@@ -45,20 +48,45 @@ class AudioForegroundService : Service() {
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        log.info { "AudioForegroundService started" }
+        log.info { "AudioForegroundService onStartCommand: action=${intent?.action}" }
         
         // Handle media button actions
         when (intent?.action) {
-            ACTION_PLAY -> actionHandler?.invoke("play")
-            ACTION_PAUSE -> actionHandler?.invoke("pause")
+            ACTION_PLAY -> {
+                log.info { "Play action received" }
+                isPlaying = true
+                updatePlaybackState(true)
+                actionHandler?.invoke("play")
+            }
+            ACTION_PAUSE -> {
+                log.info { "Pause action received" }
+                isPlaying = false
+                updatePlaybackState(false)
+                actionHandler?.invoke("pause")
+            }
             ACTION_STOP -> {
+                log.info { "Stop action received" }
                 actionHandler?.invoke("stop")
                 stopSelf()
                 return START_NOT_STICKY
             }
+            ACTION_UPDATE_STATE_PLAYING -> {
+                log.debug { "State update: PLAYING" }
+                isPlaying = true
+                updatePlaybackState(true)
+            }
+            ACTION_UPDATE_STATE_PAUSED -> {
+                log.debug { "State update: PAUSED" }
+                isPlaying = false
+                updatePlaybackState(false)
+            }
+            else -> {
+                // Initial start - no action, just start foreground
+                log.info { "Initial foreground service start" }
+            }
         }
         
-        val notification = createNotification(isPlaying = true)
+        val notification = createNotification(isPlaying)
         startForeground(NOTIFICATION_ID, notification)
         
         return START_STICKY

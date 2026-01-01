@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.tidal.ConsoleEntry
 import org.balch.orpheus.core.tidal.EvalMode
 import org.balch.orpheus.core.tidal.Pattern
@@ -97,7 +99,8 @@ sealed class LiveCodeIntent {
 class LiveCodeViewModel(
     private val scheduler: TidalScheduler,
     private val repl: TidalRepl,
-    private val replCodeEventBus: ReplCodeEventBus
+    private val replCodeEventBus: ReplCodeEventBus,
+    private val playbackLifecycleManager: PlaybackLifecycleManager
 ) : ViewModel(), PanelViewModel<LiveCodeUiState, LiveCodePanelActions> {
 
     override val panelActions = LiveCodePanelActions(
@@ -182,6 +185,24 @@ class LiveCodeViewModel(
                 }
             }
         }
+        
+        // Subscribe to playback lifecycle events (e.g., foreground service stop)
+        viewModelScope.launch {
+            playbackLifecycleManager.events.collect { event ->
+                when (event) {
+                    is PlaybackLifecycleEvent.StopAll -> {
+                        logger.info { "Received StopAll event - stopping REPL" }
+                        repl.hush()
+                        _uiState.value = _uiState.value.copy(
+                            isPlaying = false, 
+                            activeSlots = emptySet(),
+                            isAiGenerating = false
+                        )
+                    }
+                    else -> { /* Ignore other events */ }
+                }
+            }
+        }
     }
     
     /**
@@ -230,7 +251,14 @@ class LiveCodeViewModel(
             }
             
             is LiveCodeIntent.Play -> {
-                scheduler.play()
+                // If already playing, do nothing
+                // If stopped, re-execute the code to reapply all parameters
+                if (!state.isPlaying && state.code.text.isNotBlank()) {
+                    logger.info { "Re-executing code after stop to restore parameters" }
+                    executeCode(state.code.text, state, EvalMode.REPLACE)
+                } else {
+                    scheduler.play()
+                }
                 state.copy(isPlaying = true, isAiGenerating = false)
             }
             

@@ -17,6 +17,12 @@ sealed interface PlaybackLifecycleEvent {
      * Emitted when the foreground service is stopped or the app/synth is shutting down.
      */
     data object StopAll : PlaybackLifecycleEvent
+    
+    /**
+     * Request to resume/unmute playback.
+     * Emitted when any component starts playing (e.g., TidalScheduler).
+     */
+    data object RequestResume : PlaybackLifecycleEvent
 }
 
 /**
@@ -56,5 +62,14 @@ class PlaybackLifecycleManager {
     fun tryRequestStopAll() {
         log.info { "Requesting stop all playback (try)" }
         _events.tryEmit(PlaybackLifecycleEvent.StopAll)
+    }
+    
+    /**
+     * Request to resume playback (unmute audio).
+     * Called when a component starts playing.
+     */
+    fun tryRequestResume() {
+        log.debug { "Requesting resume playback" }
+        _events.tryEmit(PlaybackLifecycleEvent.RequestResume)
     }
 }

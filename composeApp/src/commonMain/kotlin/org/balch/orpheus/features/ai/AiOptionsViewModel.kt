@@ -164,6 +164,7 @@ class AiOptionsViewModel(
                         log.info { "Received StopAll event - stopping all agents" }
                         stopAllAgents()
                     }
+                    else -> { /* Ignore other events */ }
                 }
             }
         }
