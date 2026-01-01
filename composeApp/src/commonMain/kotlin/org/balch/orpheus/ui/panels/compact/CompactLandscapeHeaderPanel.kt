@@ -140,7 +140,7 @@ fun CompactLandscapeHeaderPanel(
                         DropdownMenuItem(
                             text = { Text(preset.name, style = MaterialTheme.typography.bodySmall) },
                             onClick = {
-                                presetActions.onPresetSelect(preset)
+                                presetActions.onApply(preset)
                                 onPresetDropdownExpandedChange(false)
                             }
                         )
