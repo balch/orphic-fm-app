@@ -34,9 +34,9 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * AI operation modes for the compact portrait layout.
  */
 enum class AiMode(val displayName: String, val color: Color) {
+    TIDAL("Tidal", OrpheusColors.neonCyan),
     DRONE("Drone", OrpheusColors.synthGreen),
     SOLO("Solo", OrpheusColors.neonMagenta),
-    TIDAL("Tidal", OrpheusColors.neonCyan)
 }
 
 /**
