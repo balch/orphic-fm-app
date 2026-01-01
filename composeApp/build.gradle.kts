@@ -47,6 +47,7 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.jsyn)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.androidx.media)
         }
         commonMain.dependencies {
             implementation(compose.runtime)

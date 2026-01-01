@@ -5,24 +5,34 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.media.MediaSessionActionHandler
+import org.balch.orpheus.core.media.MediaSessionManager
 
 /**
  * Orchestrates the lifecycle of the synthesizer engine.
  * 
  * Manages engine start/stop to ensure proper audio lifecycle management
- * independent of UI composition.
+ * independent of UI composition. Also manages the MediaSession for
+ * background audio and system media controls.
  */
 @SingleIn(AppScope::class)
 @Inject
 class SynthOrchestrator(
-    private val engine: SynthEngine
-) {
+    private val engine: SynthEngine,
+    private val mediaSessionManager: MediaSessionManager
+) : MediaSessionActionHandler {
     private val log = logging("SynthOrchestrator")
     private var isStarted = false
+
+    init {
+        mediaSessionManager.setActionHandler(this)
+    }
 
     fun start() {
         if (!isStarted) {
             engine.start()
+            mediaSessionManager.activate()
+            mediaSessionManager.updatePlaybackState(true)
             isStarted = true
             log.info { "SynthOrchestrator: Engine started" }
         }
@@ -30,6 +40,8 @@ class SynthOrchestrator(
 
     fun stop() {
         if (isStarted) {
+            mediaSessionManager.updatePlaybackState(false)
+            mediaSessionManager.deactivate()
             engine.stop()
             isStarted = false
             log.info { "SynthOrchestrator: Engine stopped" }
@@ -37,4 +49,20 @@ class SynthOrchestrator(
     }
 
     val peakFlow get() = engine.peakFlow
+    
+    // MediaSessionActionHandler implementation
+    override fun onPlay() {
+        log.info { "MediaSession: Play requested" }
+        start()
+    }
+    
+    override fun onPause() {
+        log.info { "MediaSession: Pause requested" }
+        stop()
+    }
+    
+    override fun onStop() {
+        log.info { "MediaSession: Stop requested" }
+        stop()
+    }
 }

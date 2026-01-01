@@ -21,8 +21,9 @@ kotlinx-datetime = "0.7.1-0.6.x-compat"
 liquid = "1.1.0"
 jsyn = "v17.2.0"
 kmlogging = "2.1.0"
+media = "1.7.1"
 slf4jApi = "2.0.17"
-logback = "1.5.19"
+logback = "1.5.23"
 metro = "0.9.2"
 ktmidi = "0.11.2"
 coremidi4j = "1.6"
@@ -32,9 +33,10 @@ material3 = "1.5.0-alpha11"
 koog = "0.6.0"
 ktor = "3.3.3"
 buildkonfig = "0.17.1"
-markdown = "0.38.1"
+markdown = "0.38.1"  # don't upgrade w/o a compose upgrade
 
 [libraries]
+androidx-media = { module = "androidx.media:media", version.ref = "media" }
 liquid = { module = "io.github.fletchmckee.liquid:liquid", version.ref = "liquid" }
 jsyn = { module = "com.github.philburk:jsyn", version.ref = "jsyn" }
 kmlogging = { module = "com.diamondedge:logging", version.ref = "kmlogging" }
