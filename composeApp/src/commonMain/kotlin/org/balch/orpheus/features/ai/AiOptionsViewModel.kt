@@ -35,6 +35,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.media.PlaybackMode
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
@@ -130,6 +131,7 @@ class AiOptionsViewModel(
     private val dispatcherProvider: DispatcherProvider,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val synthOrchestrator: SynthOrchestrator,
+    private val mediaSessionStateManager: MediaSessionStateManager,
 ) : ViewModel(), PanelViewModel<AiOptionsUiState, AiOptionsPanelActions> {
 
     private val log = logging("AiOptionsViewModel")
@@ -372,6 +374,7 @@ class AiOptionsViewModel(
         if (wasSoloActive && !wasActive) {
             // Stop solo synchronously (just the state, not the full coroutine stop)
             _isSoloActive.value = false
+            mediaSessionStateManager.setSoloActive(false)
             _soloAgent.value?.stop()
             _soloAgent.value = null  // Clear the reference so its flows stop
         }
@@ -390,6 +393,7 @@ class AiOptionsViewModel(
         }
 
         _isDroneActive.value = !wasActive
+        mediaSessionStateManager.setDroneActive(_isDroneActive.value)
 
         if (_isDroneActive.value) {
             log.info { "Starting Drone Agent" }
@@ -508,6 +512,7 @@ class AiOptionsViewModel(
         if (wasDroneActive && !wasActive) {
             // Stop drone synchronously (just the state, not the full coroutine stop)
             _isDroneActive.value = false
+            mediaSessionStateManager.setDroneActive(false)
             _droneAgent.value?.stop()
             _droneAgent.value = null  // Clear the reference so its flows stop
         }
@@ -526,6 +531,7 @@ class AiOptionsViewModel(
         }
 
         _isSoloActive.value = !wasActive
+        mediaSessionStateManager.setSoloActive(_isSoloActive.value)
         
         if (_isSoloActive.value) {
             log.info { "Starting Solo Agent" }

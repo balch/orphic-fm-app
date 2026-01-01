@@ -1,5 +1,7 @@
 package org.balch.orpheus.di
 
+import android.app.Application
+import android.content.Context
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
@@ -24,5 +26,12 @@ interface AndroidRepositoryModule {
         @Provides
         @SingleIn(AppScope::class)
         fun provideAppPreferencesRepository(impl: AndroidAppPreferencesRepository): AppPreferencesRepository = impl
+        
+        /**
+         * Provide Context from Application for components that need it.
+         * Application is passed to the factory, and extends Context.
+         */
+        @Provides
+        fun provideContext(application: Application): Context = application
     }
 }

@@ -13,6 +13,7 @@ import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionActionHandler
 import org.balch.orpheus.core.media.MediaSessionManager
+import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.media.PlaybackMetadata
 import org.balch.orpheus.core.media.PlaybackMode
 
@@ -22,6 +23,10 @@ import org.balch.orpheus.core.media.PlaybackMode
  * Manages engine start/stop to ensure proper audio lifecycle management
  * independent of UI composition. Also manages the MediaSession for
  * background audio and system media controls.
+ * 
+ * MediaSession is automatically managed based on [MediaSessionStateManager]:
+ * - ACTIVATED when any audio source is active (Evo, REPL, Drone, Solo)
+ * - DEACTIVATED when all audio sources become inactive
  * 
  * Supports three states:
  * - Playing: Audio is audible, engine is running
@@ -37,7 +42,8 @@ import org.balch.orpheus.core.media.PlaybackMode
 class SynthOrchestrator(
     private val engine: SynthEngine,
     private val mediaSessionManager: MediaSessionManager,
-    private val playbackLifecycleManager: PlaybackLifecycleManager
+    private val playbackLifecycleManager: PlaybackLifecycleManager,
+    private val mediaSessionStateManager: MediaSessionStateManager
 ) : MediaSessionActionHandler {
     private val log = logging("SynthOrchestrator")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -50,24 +56,64 @@ class SynthOrchestrator(
     init {
         mediaSessionManager.setActionHandler(this)
         
+        // Subscribe to MediaSessionStateManager to auto-activate/deactivate MediaSession
+        scope.launch {
+            mediaSessionStateManager.isMediaSessionNeeded.collect { needed ->
+                if (needed && !isMediaSessionActive && isStarted) {
+                    log.info { "MediaSession needed - activating (source: ${mediaSessionStateManager.activeSource.value})" }
+                    activateMediaSession()
+                } else if (!needed && isMediaSessionActive) {
+                    log.info { "MediaSession no longer needed - deactivating" }
+                    deactivateMediaSession()
+                }
+            }
+        }
+        
         // Subscribe to lifecycle events (e.g., resume requests from scheduler)
         scope.launch {
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
                     is PlaybackLifecycleEvent.RequestResume -> {
                         log.debug { "Received RequestResume event" }
-                        // Activate media session when actual playback starts (e.g., REPL)
-                        ensureMediaSessionActive()
+                        // Update metadata when playback resumes
                         updateMediaSessionMetadata()
                         if (isPaused) {
                             resume()
                         }
                     }
                     is PlaybackLifecycleEvent.StopAll -> {
-                        // Handled by the emitting stop(), no action needed here
+                        // Clear all activity states when stopping
+                        mediaSessionStateManager.clearAll()
                     }
                 }
             }
+        }
+    }
+    
+    /**
+     * Activate the MediaSession (internal).
+     */
+    private fun activateMediaSession() {
+        if (!isMediaSessionActive && isStarted) {
+            mediaSessionManager.activate()
+            mediaSessionManager.updatePlaybackState(!isPaused)
+            isMediaSessionActive = true
+            updateMediaSessionMetadata()
+            log.info { "SynthOrchestrator: Media session activated" }
+        }
+    }
+    
+    /**
+     * Deactivate the MediaSession (internal).
+     */
+    private fun deactivateMediaSession() {
+        if (isMediaSessionActive) {
+            mediaSessionManager.updatePlaybackState(false)
+            mediaSessionManager.deactivate()
+            isMediaSessionActive = false
+            // Reset playback mode to USER when session deactivates
+            currentPlaybackMode = PlaybackMode.USER
+            log.info { "SynthOrchestrator: Media session deactivated" }
         }
     }
 
@@ -90,19 +136,7 @@ class SynthOrchestrator(
             log.info { "SynthOrchestrator: Engine started (media session not yet active)" }
         }
     }
-    
-    /**
-     * Activate the media session if not already active.
-     * Called when actual playback begins (REPL, Drone, Solo).
-     */
-    private fun ensureMediaSessionActive() {
-        if (!isMediaSessionActive && isStarted) {
-            mediaSessionManager.activate()
-            mediaSessionManager.updatePlaybackState(true)
-            isMediaSessionActive = true
-            log.info { "SynthOrchestrator: Media session activated" }
-        }
-    }
+
     
     /**
      * Pause audio playback by muting output.
@@ -148,12 +182,8 @@ class SynthOrchestrator(
             }
             log.debug { "Saved master volume: $savedMasterVolume for next start" }
             
-            // Only deactivate media session if it was active
-            if (isMediaSessionActive) {
-                mediaSessionManager.updatePlaybackState(false)
-                mediaSessionManager.deactivate()
-                isMediaSessionActive = false
-            }
+            // Deactivate media session using the centralized method
+            deactivateMediaSession()
             engine.stop()
             isStarted = false
             isPaused = false
@@ -187,17 +217,13 @@ class SynthOrchestrator(
      * Set the current playback mode for display in notifications and lock screen.
      * Call this when AI modes are activated/deactivated.
      * 
-     * Also activates the media session if entering a playing mode (DRONE, SOLO, REPL).
+     * Note: MediaSession activation is now handled by MediaSessionStateManager.
+     * This method only updates the mode for metadata display.
      */
     fun setPlaybackMode(mode: PlaybackMode) {
         if (currentPlaybackMode != mode) {
             currentPlaybackMode = mode
             log.info { "Playback mode changed to: ${mode.displayName}" }
-            
-            // Activate media session when entering a playing mode
-            if (mode != PlaybackMode.USER) {
-                ensureMediaSessionActive()
-            }
             updateMediaSessionMetadata()
         }
     }

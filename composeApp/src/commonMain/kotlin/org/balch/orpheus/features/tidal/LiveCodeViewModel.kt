@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.tidal.ConsoleEntry
 import org.balch.orpheus.core.tidal.EvalMode
 import org.balch.orpheus.core.tidal.Pattern
@@ -100,7 +101,8 @@ class LiveCodeViewModel(
     private val scheduler: TidalScheduler,
     private val repl: TidalRepl,
     private val replCodeEventBus: ReplCodeEventBus,
-    private val playbackLifecycleManager: PlaybackLifecycleManager
+    private val playbackLifecycleManager: PlaybackLifecycleManager,
+    private val mediaSessionStateManager: MediaSessionStateManager
 ) : ViewModel(), PanelViewModel<LiveCodeUiState, LiveCodePanelActions> {
 
     override val panelActions = LiveCodePanelActions(
@@ -147,12 +149,18 @@ class LiveCodeViewModel(
         // Subscribe to scheduler state updates
         viewModelScope.launch {
             scheduler.state.collect { schedState ->
+                val wasPlaying = _uiState.value.isPlaying
                 _uiState.value = _uiState.value.copy(
                     isPlaying = schedState.isPlaying,
                     currentCycle = schedState.currentCycle,
                     cyclePosition = schedState.cyclePosition,
                     bpm = schedState.bpm
                 )
+                
+                // Notify MediaSessionStateManager when REPL playing state changes
+                if (wasPlaying != schedState.isPlaying) {
+                    mediaSessionStateManager.setReplPlaying(schedState.isPlaying)
+                }
             }
         }
         

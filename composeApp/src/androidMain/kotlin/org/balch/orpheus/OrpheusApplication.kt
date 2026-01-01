@@ -21,11 +21,15 @@ class OrpheusApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
-        // Create the DI graph ONCE at Application level with Context
+        // Create the DI graph ONCE at Application level with Application
         // This survives Activity recreation on configuration changes
-        graph = createGraphFactory<OrpheusGraph.Factory>().create(applicationContext)
+        graph = createGraphFactory<OrpheusGraph.Factory>().create(this)
         
         // Wire up logging to UI
         KmLogging.addLogger(graph.consoleLogger)
+        
+        // Eagerly initialize AndroidAppLifecycleManager to register lifecycle callbacks
+        // This enables muting audio when the app is backgrounded without MediaSession
+        graph.androidAppLifecycleManager
     }
 }

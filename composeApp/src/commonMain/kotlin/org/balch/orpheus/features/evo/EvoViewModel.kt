@@ -19,6 +19,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.ui.utils.PanelViewModel
 import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
@@ -52,7 +53,8 @@ data class EvoPanelActions(
 class EvoViewModel @Inject constructor(
     strategies: Set<AudioEvolutionStrategy>,
     private val synthEngine: SynthEngine,
-    private val dispatcherProvider: DispatcherProvider
+    private val dispatcherProvider: DispatcherProvider,
+    private val mediaSessionStateManager: MediaSessionStateManager
 ) : ViewModel(), PanelViewModel<EvoUiState, EvoPanelActions> {
 
     private val log = logging("EvoViewModel")
@@ -119,6 +121,9 @@ class EvoViewModel @Inject constructor(
         log.info { "Evolution ${if (enabled) "enabled" else "disabled"} with ${_currentStrategy.value.name}" }
         
         _uiState.update { it.copy(isEnabled = enabled) }
+        
+        // Notify MediaSessionStateManager of Evo activity state
+        mediaSessionStateManager.setEvoActive(enabled)
         
         if (enabled) {
             _currentStrategy.value.onActivate()
