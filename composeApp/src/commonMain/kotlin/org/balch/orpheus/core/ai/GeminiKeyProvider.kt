@@ -132,6 +132,8 @@ class GeminiKeyProvider @Inject constructor(
                 _apiKeyState.value = null
                 _isUserProvidedKey.value = false
                 log.info { "Cleared user-provided API key" }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 log.error { "Failed to clear API key: ${e.message}" }
             }

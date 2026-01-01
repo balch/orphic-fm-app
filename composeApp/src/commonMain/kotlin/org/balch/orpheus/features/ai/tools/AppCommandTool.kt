@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.tidal.TidalRepl
 
 /**
@@ -70,7 +71,7 @@ class AppCommandTool @Inject constructor(
     )
 
     override suspend fun execute(args: AppCommand): Result {
-        log.info { "AppCommandTool: Executing command: $args" }
+        log.info { "Executing command: $args" }
 
         return when (args) {
             is AppCommand.Mute -> executeMute()
@@ -79,41 +80,48 @@ class AppCommandTool @Inject constructor(
         }
     }
 
-    private suspend fun executeMute(): Result {
-        return try {
-            log.info { "AppCommandTool: Executing mute/hush" }
+    private fun executeMute(): Result =
+        runCatching {
+            log.info { "Executing mute/hush" }
             tidalRepl.hush()
-            Result(
-                success = true,
-                message = "All sounds muted and patterns stopped"
-            )
-        } catch (e: Exception) {
-            log.error { "AppCommandTool: Failed to mute: ${e.message}" }
-            Result(
-                success = false,
-                message = "Failed to mute: ${e.message}"
-            )
-        }
-    }
+        }.fold(
+            onSuccess = {
+                Result(
+                    success = true,
+                    message = "All sounds muted and patterns stopped"
+                )
+            },
+            onFailure = { e ->
+                log.error(e) { "AppCommandTool: Failed to mute: ${e.message}" }
+                Result(
+                    success = false,
+                    message = "Failed to mute: ${e.message}"
+                )
+            }
+        )
 
     private suspend fun executeChangeModel(modelId: String): Result {
         val model = AiModel.entries.find { it.id == modelId }
-        
+
         return if (model != null) {
-            try {
-                log.info { "AppCommandTool: Changing model to ${model.displayName}" }
+            runCatchingSuspend {
+                log.info { "Changing model to ${model.displayName}" }
                 aiModelProvider.selectModel(model)
-                Result(
-                    success = true,
-                    message = "Changed AI model to ${model.displayName}. The new model will be used for the next session."
-                )
-            } catch (e: Exception) {
-                log.error { "AppCommandTool: Failed to change model: ${e.message}" }
-                Result(
-                    success = false,
-                    message = "Failed to change model: ${e.message}"
-                )
-            }
+            }.fold(
+                onSuccess = {
+                    Result(
+                        success = true,
+                        message = "Changed AI model to ${model.displayName}. The new model will be used for the next session."
+                    )
+                },
+                onFailure = {
+                    log.error(it) { "Failed to change model: ${it.message}" }
+                    Result(
+                        success = false,
+                        message = "Error AI model to ${model.displayName}. The new model will be used for the next session."
+                    )
+                }
+            )
         } else {
             log.warn { "AppCommandTool: Unknown model ID: $modelId" }
             Result(
