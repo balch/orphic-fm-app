@@ -1,6 +1,5 @@
 package org.balch.orpheus.features.viz.shader
 
-import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.compose.foundation.Canvas
@@ -13,8 +12,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ShaderBrush
 import org.balch.orpheus.features.viz.Blob
 
 /**
@@ -43,7 +41,11 @@ actual class MetaballsRenderer {
         runtimeShader = null
     }
     
-    fun updateUniforms(
+    /**
+     * Get a ShaderBrush with updated uniforms for rendering.
+     * Updates all shader uniforms and returns a brush that can be used to fill shapes.
+     */
+    fun getShaderBrush(
         width: Float,
         height: Float,
         blobs: List<Blob>,
@@ -51,8 +53,8 @@ actual class MetaballsRenderer {
         lfoModulation: Float,
         masterEnergy: Float,
         time: Float
-    ) {
-        val shader = runtimeShader ?: return
+    ): ShaderBrush? {
+        val shader = runtimeShader ?: return null
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             shader.setFloatUniform("resolution", width, height)
@@ -92,14 +94,16 @@ actual class MetaballsRenderer {
             
             shader.setFloatUniform("balls", ballsData)
             shader.setFloatUniform("colors", colorsData)
+            
+            return ShaderBrush(shader)
         }
+        return null
     }
-    
-    fun getShader(): RuntimeShader? = runtimeShader
 }
 
 /**
  * Android MetaballsCanvas implementation.
+ * Uses ShaderBrush to fill a rect with the shader output (generative shader).
  */
 @Composable
 actual fun MetaballsCanvas(
@@ -117,37 +121,22 @@ actual fun MetaballsCanvas(
     }
     
     if (renderer.isSupported() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        // Shader-based rendering using graphicsLayer with RenderEffect
-        // We remember the RenderEffect to avoid recreating it every frame
-        val shader = renderer.getShader()
-        val renderEffect = remember(shader) {
-            if (shader != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                RenderEffect
-                    .createShaderEffect(shader)
-                    .asComposeRenderEffect()
-            } else {
-                null
+        // Shader-based rendering using ShaderBrush
+        // This draws the shader output directly as content (generative shader)
+        Canvas(modifier = modifier.fillMaxSize()) {
+            val shaderBrush = renderer.getShaderBrush(
+                width = size.width,
+                height = size.height,
+                blobs = blobs,
+                config = config,
+                lfoModulation = lfoModulation,
+                masterEnergy = masterEnergy,
+                time = time
+            )
+            
+            if (shaderBrush != null) {
+                drawRect(brush = shaderBrush)
             }
-        }
-
-        Canvas(
-            modifier = modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    renderer.updateUniforms(
-                        width = size.width,
-                        height = size.height,
-                        blobs = blobs,
-                        config = config,
-                        lfoModulation = lfoModulation,
-                        masterEnergy = masterEnergy,
-                        time = time
-                    )
-                    this.renderEffect = renderEffect
-                }
-        ) {
-            // The shader will process this content
-            drawRect(color = Color.Black)
         }
     } else {
         // Fallback to Canvas-based rendering
