@@ -1,7 +1,7 @@
 package org.balch.orpheus.ui.widgets
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -95,12 +95,12 @@ fun RotaryKnob(
                         if (isLearning || !enabled) {
                             return@pointerInput
                         }
-                        detectVerticalDragGestures(
-                            onVerticalDrag = { change, dragAmount ->
+                        detectDragGestures(
+                            onDrag = { change, dragAmount ->
                                 change.consume()
-                                // Use vertical drag only for precise control and to allow horizontal swipe
+                                // Use both vertical and horizontal drag
                                 val delta =
-                                    (-dragAmount) * (range.endInclusive - range.start) / sensitivity
+                                    (-dragAmount.y + dragAmount.x) * (range.endInclusive - range.start) / sensitivity
                                 val newValue = (internalValue + delta).coerceIn(range)
                                 if (newValue != internalValue) {
                                     internalValue = newValue
