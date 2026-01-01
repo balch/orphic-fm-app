@@ -284,10 +284,14 @@ class OrpheusAgent @Inject constructor(
                         send(errorMessageAsState(ctx.throwable, "Something went wrong..."))
                     }
                 }
-                onToolCallFailed { _ -> logger.e { "Tool call failed" } }
-                onToolCallStarting { _ -> logger.d { "Tool call starting" } }
-                onToolCallCompleted { _ ->
-                    logger.d { "Tool call completed" }
+                onToolCallFailed { context ->
+                    logger.e { "Tool call failed: ${context.toolName} : ${context.message}" }
+                }
+                onToolCallStarting { context ->
+                    logger.d { "Tool call starting: ${context.toolName}" }
+                }
+                onToolCallCompleted { context ->
+                    logger.d { "Tool call completed: ${context.toolName}" }
                     trackToolCall()
                 }
             }
