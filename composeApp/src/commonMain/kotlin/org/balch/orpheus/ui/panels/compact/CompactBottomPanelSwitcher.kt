@@ -1,12 +1,10 @@
 package org.balch.orpheus.ui.panels.compact
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,10 +13,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
@@ -55,54 +55,39 @@ fun CompactBottomPanelSwitcher(
     content: @Composable (CompactBottomPanelType) -> Unit
 ) {
     val panels = CompactBottomPanelType.entries
-    val currentIndex = panels.indexOf(selectedPanel)
-    var swipeDirection by remember { mutableStateOf(1) } // 1 = right, -1 = left
+    val pagerState = rememberPagerState(initialPage = panels.indexOf(selectedPanel)) {
+        panels.size
+    }
+
+    LaunchedEffect(selectedPanel) {
+        val targetPage = panels.indexOf(selectedPanel)
+        if (targetPage != pagerState.currentPage) {
+            pagerState.animateScrollToPage(targetPage)
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage) {
+        val currentPanel = panels[pagerState.currentPage]
+        if (currentPanel != selectedPanel) {
+            onPanelSelected(currentPanel)
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         // Panel content with swipe gestures
-        Box(
+        HorizontalPager(
+            state = pagerState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .pointerInput(currentIndex) {
-                    var totalDrag = 0f
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            val threshold = 100f
-                            if (totalDrag < -threshold && currentIndex < panels.size - 1) {
-                                swipeDirection = 1
-                                onPanelSelected(panels[currentIndex + 1])
-                            } else if (totalDrag > threshold && currentIndex > 0) {
-                                swipeDirection = -1
-                                onPanelSelected(panels[currentIndex - 1])
-                            }
-                            totalDrag = 0f
-                        },
-                        onDragCancel = { totalDrag = 0f },
-                        onHorizontalDrag = { _, dragAmount ->
-                            totalDrag += dragAmount
-                        }
-                    )
-                }
-        ) {
-            // Use Crossfade instead of AnimatedContent to preserve liquid effects
-            Crossfade(
-                targetState = selectedPanel,
-                animationSpec = tween(200),
-                modifier = Modifier.fillMaxSize()
-            ) { panel ->
-                content(panel)
-            }
+        ) { page ->
+            content(panels[page])
         }
 
         // Oval bottom nav bar
         OvalBottomNavBar(
             selectedPanel = selectedPanel,
-            onPanelSelected = { panel ->
-                val newIndex = panels.indexOf(panel)
-                swipeDirection = if (newIndex > currentIndex) 1 else -1
-                onPanelSelected(panel)
-            },
+            onPanelSelected = onPanelSelected,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 8.dp)

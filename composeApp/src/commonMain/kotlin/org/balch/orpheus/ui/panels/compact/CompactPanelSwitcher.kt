@@ -1,17 +1,10 @@
 package org.balch.orpheus.ui.panels.compact
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -20,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -75,46 +70,32 @@ fun CompactPanelSwitcher(
 ) {
     val panels = CompactPanelType.entries
     val currentIndex = panels.indexOf(selectedPanel)
-    var swipeDirection by remember { mutableStateOf(1) } // 1 = right, -1 = left
+    val pagerState = rememberPagerState(initialPage = currentIndex) {
+        panels.size
+    }
+
+    LaunchedEffect(selectedPanel) {
+        val targetPage = panels.indexOf(selectedPanel)
+        if (targetPage != pagerState.currentPage) {
+            pagerState.animateScrollToPage(targetPage)
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage) {
+        val currentPanel = panels[pagerState.currentPage]
+        if (currentPanel != selectedPanel) {
+            onPanelSelected(currentPanel)
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
 
-        // Panel content with swipe gestures and animated transitions
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(currentIndex) {
-                    var totalDrag = 0f
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            val threshold = 100f
-                            if (totalDrag < -threshold && currentIndex < panels.size - 1) {
-                                swipeDirection = 1
-                                onPanelSelected(panels[currentIndex + 1])
-                            } else if (totalDrag > threshold && currentIndex > 0) {
-                                swipeDirection = -1
-                                onPanelSelected(panels[currentIndex - 1])
-                            }
-                            totalDrag = 0f
-                        },
-                        onDragCancel = { totalDrag = 0f },
-                        onHorizontalDrag = { _, dragAmount ->
-                            totalDrag += dragAmount
-                        }
-                    )
-                }
-        ) {
-            AnimatedContent(
-                targetState = selectedPanel,
-                transitionSpec = {
-                    val direction = swipeDirection
-                    (slideInHorizontally { width -> direction * width } + fadeIn(tween(200)))
-                        .togetherWith(slideOutHorizontally { width -> -direction * width } + fadeOut(tween(200)))
-                },
-                modifier = Modifier.fillMaxSize()
-            ) { panel ->
-                content(panel)
-            }
+        // Panel content with swipe gestures
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            content(panels[page])
         }
 
         // Navigation header with arrows and title
@@ -125,13 +106,11 @@ fun CompactPanelSwitcher(
             canGoRight = currentIndex < panels.size - 1,
             onLeftClick = {
                 if (currentIndex > 0) {
-                    swipeDirection = -1
                     onPanelSelected(panels[currentIndex - 1])
                 }
             },
             onRightClick = {
                 if (currentIndex < panels.size - 1) {
-                    swipeDirection = 1
                     onPanelSelected(panels[currentIndex + 1])
                 }
             }
