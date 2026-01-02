@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -50,7 +51,7 @@ private val CavsGold = Color(0xFFFDBB30)
 fun EvoPanel(
     modifier: Modifier = Modifier,
     viewModel: EvoViewModel = metroViewModel(),
-    isExpanded: Boolean? = null,
+    isExpanded: Boolean,
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -70,7 +71,7 @@ fun EvoPanelLayout(
     modifier: Modifier = Modifier,
     uiState: EvoUiState,
     actions: EvoPanelActions,
-    isExpanded: Boolean? = null,
+    isExpanded: Boolean,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
@@ -96,7 +97,6 @@ fun EvoPanelLayout(
 
             // 1. Top Row: Strategy Dropdown + Enable Toggle
             Row(
-                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -106,7 +106,6 @@ fun EvoPanelLayout(
                     strategies = uiState.strategies,
                     onStrategySelected = actions.onStrategyChange,
                     color = accentColor,
-                    modifier = Modifier.weight(1f)
                 )
 
                 // Enable Toggle (Mini Vertical Switch)
@@ -176,8 +175,9 @@ private fun StrategyDropdown(
         contentAlignment = Alignment.CenterStart
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.wrapContentWidth()
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -239,6 +239,7 @@ fun EvoPanelPreview(
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
         EvoPanelLayout(
+            isExpanded = true,
             uiState = EvoUiState(
                 selectedStrategy = PreviewStrategy,
                 strategies = listOf(PreviewStrategy),

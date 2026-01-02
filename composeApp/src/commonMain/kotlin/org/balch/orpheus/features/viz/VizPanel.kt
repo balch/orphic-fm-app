@@ -100,7 +100,6 @@ fun VizPanelLayout(
 
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.9f)
                     .height(32.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(Color.Black.copy(alpha = 0.3f))
@@ -109,9 +108,9 @@ fun VizPanelLayout(
                 contentAlignment = Alignment.CenterStart
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = uiState.selectedViz.name,
