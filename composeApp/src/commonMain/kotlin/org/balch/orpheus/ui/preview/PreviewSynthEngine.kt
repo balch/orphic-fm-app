@@ -58,6 +58,10 @@ class PreviewSynthEngine() : SynthEngine {
     override fun setVibrato(amount: Float) {}
     override fun setVoiceCoupling(amount: Float) {}
 
+    // Bender stubs
+    override fun setBend(amount: Float) {}
+    override fun getBend(): Float = 0f
+
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
     override fun setHyperLfoMode(mode: Int) {}
     override fun setHyperLfoLink(active: Boolean) {}
@@ -83,6 +87,7 @@ class PreviewSynthEngine() : SynthEngine {
     override val delayFeedbackFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
     override val quadPitchFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(3)).asStateFlow()
     override val quadHoldFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(3)).asStateFlow()
+    override val bendFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
 
     override fun getVoiceTune(index: Int): Float = 0f
     override fun getVoiceFmDepth(index: Int): Float = 0f

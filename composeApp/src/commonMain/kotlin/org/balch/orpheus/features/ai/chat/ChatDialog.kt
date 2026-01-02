@@ -29,7 +29,7 @@ import org.balch.orpheus.features.ai.generative.AiDashboard
 import org.balch.orpheus.features.ai.generative.AiStatusMessage
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryScreen
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.widgets.DraggableDialog
+import org.balch.orpheus.ui.widgets.dialogs.DraggableDialog
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**

@@ -1,4 +1,4 @@
-package org.balch.orpheus.ui.widgets
+package org.balch.orpheus.ui.widgets.dialogs
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape

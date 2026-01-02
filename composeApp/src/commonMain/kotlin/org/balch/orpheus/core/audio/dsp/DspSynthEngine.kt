@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.dsp.plugins.DspBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDelayPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDistortionPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspHyperLfoPlugin
@@ -41,6 +42,7 @@ class DspSynthEngine(
     private val distortionPlugin = plugins.filterIsInstance<DspDistortionPlugin>().first()
     private val stereoPlugin = plugins.filterIsInstance<DspStereoPlugin>().first()
     private val vibratoPlugin = plugins.filterIsInstance<DspVibratoPlugin>().first()
+    private val benderPlugin = plugins.filterIsInstance<DspBenderPlugin>().first()
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
@@ -99,6 +101,9 @@ class DspSynthEngine(
 
     private val _quadHoldFlow = MutableStateFlow(FloatArray(3))
     override val quadHoldFlow: StateFlow<FloatArray> = _quadHoldFlow.asStateFlow()
+
+    private val _bendFlow = MutableStateFlow(0f)
+    override val bendFlow: StateFlow<Float> = _bendFlow.asStateFlow()
 
     // ═══════════════════════════════════════════════════════════
     // Audio-Rate Automation System
@@ -165,6 +170,10 @@ class DspSynthEngine(
         delayPlugin.outputs["wet2Left"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
         delayPlugin.outputs["wet2Right"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
 
+        // Bender audio effects (tension/spring sounds) → Stereo sum (mono to both channels)
+        benderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        benderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+
         // Stereo outputs → LineOut
         stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
         stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
@@ -177,6 +186,10 @@ class DspSynthEngine(
             // VIBRATO → Voice frequency modulation
             vibratoPlugin.outputs["output"]?.connect(voice.vibratoInput)
             voice.vibratoDepth.set(1.0)
+
+            // BENDER → Voice pitch bend modulation
+            benderPlugin.outputs["pitchOutput"]?.connect(voice.benderInput)
+            // Bender depth is set dynamically based on voice base frequency
 
             // COUPLING default depth
             voice.couplingDepth.set(0.0)
@@ -435,6 +448,13 @@ class DspSynthEngine(
     // Vibrato delegation
     override fun setVibrato(amount: Float) = vibratoPlugin.setDepth(amount)
     override fun getVibrato(): Float = vibratoPlugin.getDepth()
+    
+    // Bender delegation
+    override fun setBend(amount: Float) {
+        benderPlugin.setBend(amount)
+        _bendFlow.value = amount
+    }
+    override fun getBend(): Float = benderPlugin.getBend()
 
     // Voice controls (still managed locally)
     override fun setVoiceTune(index: Int, tune: Float) {

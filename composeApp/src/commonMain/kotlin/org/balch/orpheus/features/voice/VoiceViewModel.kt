@@ -122,7 +122,9 @@ class VoiceViewModel(
         onVoiceCouplingChange = ::onVoiceCouplingChange,
         onWobblePulseStart = ::onWobblePulseStart,
         onWobbleMove = ::onWobbleMove,
-        onWobblePulseEnd = ::onWobblePulseEnd
+        onWobblePulseEnd = ::onWobblePulseEnd,
+        onBendChange = ::onBendChange,
+        onBendRelease = ::onBendRelease
     )
 
     fun onMasterVolumeChange(value: Float) {
@@ -608,6 +610,38 @@ class VoiceViewModel(
         // Reset to unity gain on release
         engine.setVoiceWobble(index, 0f, 0f)
     }
+    
+    // ═══════════════════════════════════════════════════════════
+    // BENDER METHODS
+    // ═══════════════════════════════════════════════════════════
+    
+    /**
+     * Called continuously as the bender slider is dragged.
+     * @param amount Bend amount from -1 (down) to +1 (up), 0 = center
+     */
+    fun onBendChange(amount: Float) {
+        engine.setBend(amount)
+        
+        // Also affect the current visualizer's knob2
+        // Map bend amount (-1 to +1) to knob range (0 to 1)
+        // Center (0) = 0.5, full up (+1) = 1.0, full down (-1) = 0.0
+        val vizKnob2Value = (amount + 1f) / 2f
+        synthController.emitControlChange(
+            ControlIds.VIZ_KNOB_2, 
+            vizKnob2Value, 
+            ControlEventOrigin.UI
+        )
+    }
+    
+    /**
+     * Called when the bender slider is released.
+     * The UI handles the spring animation; this resets the engine state.
+     */
+    fun onBendRelease() {
+        engine.setBend(0f)
+        // Reset viz knob2 to center
+        synthController.emitControlChange(ControlIds.VIZ_KNOB_2, 0.5f, ControlEventOrigin.UI)
+    }
 
     companion object {
         val PREVIEW = ViewModelStateActionMapper(
@@ -621,7 +655,8 @@ class VoiceViewModel(
                 onQuadPitchChange = {_, _ -> }, onQuadHoldChange = {_, _ -> },
                 onFmStructureChange = {}, onTotalFeedbackChange = {},
                 onVoiceCouplingChange = {}, onWobblePulseStart = {_, _, _ -> },
-                onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {}
+                onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {},
+                onBendChange = {}, onBendRelease = {}
             )
         )
     }
@@ -646,7 +681,9 @@ data class VoicePanelActions(
     val onVoiceCouplingChange: (Float) -> Unit,
     val onWobblePulseStart: (Int, Float, Float) -> Unit,
     val onWobbleMove: (Int, Float, Float) -> Unit,
-    val onWobblePulseEnd: (Int) -> Unit
+    val onWobblePulseEnd: (Int) -> Unit,
+    val onBendChange: (Float) -> Unit,
+    val onBendRelease: () -> Unit
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
@@ -658,7 +695,8 @@ data class VoicePanelActions(
             onQuadPitchChange = {_, _ -> }, onQuadHoldChange = {_, _ -> },
             onFmStructureChange = {}, onTotalFeedbackChange = {},
             onVoiceCouplingChange = {}, onWobblePulseStart = {_, _, _ -> },
-            onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {}
+            onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {},
+            onBendChange = {}, onBendRelease = {}
         )
     }
 }

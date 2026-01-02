@@ -63,6 +63,10 @@ interface SynthEngine {
     fun setVibrato(amount: Float) // 0-1, global pitch wobble depth
     fun setVoiceCoupling(amount: Float) // 0-1, partner envelope→frequency depth
 
+    // Bender - spring-loaded pitch/timbre bend
+    fun setBend(amount: Float) // -1 to +1, 0=center
+    fun getBend(): Float
+
     // Test/Debug
     fun playTestTone(frequency: Float = 440f)
     fun stopTestTone()
@@ -87,6 +91,7 @@ interface SynthEngine {
     val delayFeedbackFlow: StateFlow<Float>
     val quadPitchFlow: StateFlow<FloatArray>    // 3 quads
     val quadHoldFlow: StateFlow<FloatArray>     // 3 quads
+    val bendFlow: StateFlow<Float>              // -1 to +1 range, bender position
 
     /**
      * AI TODO

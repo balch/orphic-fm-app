@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +31,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
+import org.balch.orpheus.ui.widgets.BenderFaderWidget
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -94,7 +94,22 @@ fun CompactPortraitVoicePads(
             modifier = Modifier.weight(1f)
         )
 
-        Spacer(modifier = Modifier.width(8.dp))
+        // Center: Bender slider between columns
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .padding(horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            BenderFaderWidget(
+                value = 0f, // State managed externally in real use
+                onValueChange = { actions.onBendChange(it) },
+                onRelease = { actions.onBendRelease() },
+                trackHeight = 120, // Use defaults for other params (wider thumb, narrower track)
+                accentColor = OrpheusColors.softPurple
+            )
+        }
 
         // Right column: Voices 8, 7, 6, 5 with Quad 1 controls
         VoiceColumn(

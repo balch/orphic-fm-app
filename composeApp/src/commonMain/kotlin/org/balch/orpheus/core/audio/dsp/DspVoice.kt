@@ -55,6 +55,10 @@ class DspVoice(
     private val vibratoScaler = audioEngine.createMultiply() // LFO * depth
     private val vibratoMixer = audioEngine.createAdd()       // Base freq + vibrato
 
+    // Bender: Pitch bend input scaled and added to frequency
+    private val benderScaler = audioEngine.createMultiply()  // Bend signal * depth
+    private val benderMixer = audioEngine.createAdd()        // Vibrato freq + bend
+
     // VCA control (envelope + hold)
     private val vcaControlMixer = audioEngine.createAdd()
 
@@ -71,6 +75,8 @@ class DspVoice(
     val sharpness: AudioInput get() = sharpnessProxy.input         // Waveform (0=tri, 1=sq)
     val vibratoInput: AudioInput get() = vibratoScaler.inputA      // Vibrato LFO input
     val vibratoDepth: AudioInput get() = vibratoScaler.inputB      // Vibrato depth (Hz range)
+    val benderInput: AudioInput get() = benderScaler.inputA        // Bender signal input
+    val benderDepth: AudioInput get() = benderScaler.inputB        // Bender depth (Hz range)
     val couplingInput: AudioInput get() = couplingScaler.inputA    // Partner envelope input
     val couplingDepth: AudioInput get() = couplingScaler.inputB    // Coupling depth (Hz range)
     val holdLevel: AudioInput get() = vcaControlMixer.inputB       // Hold/drone level
@@ -127,6 +133,8 @@ class DspVoice(
         audioEngine.addUnit(directFreqMixer)
         audioEngine.addUnit(vibratoScaler)
         audioEngine.addUnit(vibratoMixer)
+        audioEngine.addUnit(benderScaler)
+        audioEngine.addUnit(benderMixer)
         audioEngine.addUnit(vcaControlMixer)
 
         // Envelope follower setup - longer halflife for better hold/sustain detection
@@ -184,7 +192,11 @@ class DspVoice(
         directFreqMixer.output.connect(vibratoMixer.inputA)
         vibratoScaler.output.connect(vibratoMixer.inputB)
 
-        vibratoMixer.output.connect(couplingMixer.inputA)
+        // Bender wiring: vibrato output + bend modulation
+        vibratoMixer.output.connect(benderMixer.inputA)
+        benderScaler.output.connect(benderMixer.inputB)
+
+        benderMixer.output.connect(couplingMixer.inputA)
         couplingScaler.output.connect(couplingMixer.inputB)
 
         couplingMixer.output.connect(fmFreqMixer.inputC)
@@ -200,6 +212,9 @@ class DspVoice(
 
         // Default vibrato depth = 0 (no wobble)
         vibratoDepth.set(0.0)
+
+        // Default bender depth = base frequency (so bend multiplies correctly)
+        benderDepth.set(100.0)  // 100Hz modulation depth at full bend
 
         // Default coupling depth = 0 (no partner influence)
         couplingDepth.set(0.0)

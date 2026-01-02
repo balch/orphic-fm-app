@@ -33,8 +33,8 @@ import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
-import org.balch.orpheus.ui.widgets.ConfirmDialog
-import org.balch.orpheus.ui.widgets.PresetNameDialog
+import org.balch.orpheus.ui.widgets.dialogs.ConfirmDialog
+import org.balch.orpheus.ui.widgets.dialogs.PresetNameDialog
 
 /**
  * Preset management properties
