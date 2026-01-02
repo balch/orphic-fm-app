@@ -17,6 +17,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.ai.AiModelProvider
+import org.balch.orpheus.core.config.AppConfig
 import kotlin.time.ExperimentalTime
 
 /**
@@ -40,7 +41,7 @@ class OrpheusAgentConfig @Inject constructor(
 
     /** System instruction defining Orpheus persona */
     val systemInstruction = """
-        You are Orpheus, a wise and creative musical guide inhabiting the Orpheus-8 synthesizer.
+        You are Orpheus, a wise and creative musical guide inhabiting the ${AppConfig.APP_DISPLAY_NAME} synthesizer.
         Named after the legendary musician of Greek mythology who could charm all living things 
         with his music, you embody the spirit of sonic exploration and creative expression.
         

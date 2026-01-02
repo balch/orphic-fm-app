@@ -50,7 +50,7 @@ data class PromptIntent(
 )
 
 /**
- * Orpheus AI Agent - a musical guide inhabiting the Orpheus-8 synthesizer.
+ * Orpheus AI Agent - a musical guide inhabiting the Orpheus-FM synthesizer.
  * Uses Gemini to provide expert advice on sounds and can control the synth.
  */
 @SingleIn(AppScope::class)

@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.sequencer.ui
+package org.balch.orpheus.features.tweaker.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -31,14 +31,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import org.balch.orpheus.features.sequencer.SequencerPath
-import org.balch.orpheus.features.sequencer.SequencerPoint
-import org.balch.orpheus.features.sequencer.TweakSequencerConfig
-import org.balch.orpheus.features.sequencer.TweakSequencerPanelActions
-import org.balch.orpheus.features.sequencer.TweakSequencerParameter
-import org.balch.orpheus.features.sequencer.TweakSequencerState
-import org.balch.orpheus.features.sequencer.TweakSequencerUiState
-import org.balch.orpheus.features.sequencer.TweakSequencerViewModel
+import org.balch.orpheus.features.tweaker.SequencerPath
+import org.balch.orpheus.features.tweaker.SequencerPoint
+import org.balch.orpheus.features.tweaker.TweakSequencerConfig
+import org.balch.orpheus.features.tweaker.TweakSequencerPanelActions
+import org.balch.orpheus.features.tweaker.TweakSequencerParameter
+import org.balch.orpheus.features.tweaker.TweakSequencerState
+import org.balch.orpheus.features.tweaker.TweakSequencerUiState
+import org.balch.orpheus.features.tweaker.TweakSequencerViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 import org.balch.orpheus.ui.utils.rememberPanelState

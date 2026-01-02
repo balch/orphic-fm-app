@@ -10,7 +10,7 @@ data class SourceLocation(
 )
 
 /**
- * Tidal events that control Orpheus-8 synth parameters.
+ * Tidal events that control Orpheus-FM synth parameters.
  * Each event type maps to specific SynthController methods.
  * Events carry source locations for UI highlighting.
  */
@@ -335,7 +335,7 @@ sealed class TidalEvent {
 }
 
 /**
- * DSL builder functions for creating Orpheus-8 patterns.
+ * DSL builder functions for creating Orpheus-FM patterns.
  */
 object Orpheus {
     

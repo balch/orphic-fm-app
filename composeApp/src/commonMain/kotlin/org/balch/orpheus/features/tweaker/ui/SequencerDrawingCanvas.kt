@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.sequencer.ui
+package org.balch.orpheus.features.tweaker.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -26,9 +26,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.features.sequencer.SequencerPath
-import org.balch.orpheus.features.sequencer.SequencerPoint
-import org.balch.orpheus.features.sequencer.TweakSequencerParameter
+import org.balch.orpheus.features.tweaker.SequencerPath
+import org.balch.orpheus.features.tweaker.SequencerPoint
+import org.balch.orpheus.features.tweaker.TweakSequencerParameter
 
 /**
  * Canvas for drawing sequencer automation paths.

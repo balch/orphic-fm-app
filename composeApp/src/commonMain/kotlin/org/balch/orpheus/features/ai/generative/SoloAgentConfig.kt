@@ -1,5 +1,7 @@
 package org.balch.orpheus.features.ai.generative
 
+import org.balch.orpheus.core.config.AppConfig
+
 /**
  * Configuration for the Solo mode.
  * Creates full, long-lasting autonomous compositions with atmospheric, cinematic qualities.
@@ -11,7 +13,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
     override val throttleIntervalMs = 5_000L   // Minimum 5 seconds between actions
 
     override val systemPrompt = """
-        You are a Solo Composer AI for the Orpheus-8 synthesizer. Your mission is to create 
+        You are a Solo Composer AI for the ${AppConfig.APP_DISPLAY_NAME} synthesizer. Your mission is to create 
         COMPLETE, LONG-LASTING compositions with atmospheric, cinematic qualities.
         
         Think: whale song echoing through ocean depths, distant thunder rolling across vast 

@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.sequencer.ui
+package org.balch.orpheus.features.tweaker.ui
 
 /**
  * Compact inline view for multi-parameter sequencer automation.
@@ -43,12 +43,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.features.sequencer.SequencerPath
-import org.balch.orpheus.features.sequencer.SequencerPoint
-import org.balch.orpheus.features.sequencer.TweakPlaybackMode
-import org.balch.orpheus.features.sequencer.TweakSequencerConfig
-import org.balch.orpheus.features.sequencer.TweakSequencerParameter
-import org.balch.orpheus.features.sequencer.TweakSequencerState
+import org.balch.orpheus.features.tweaker.SequencerPath
+import org.balch.orpheus.features.tweaker.SequencerPoint
+import org.balch.orpheus.features.tweaker.TweakPlaybackMode
+import org.balch.orpheus.features.tweaker.TweakSequencerConfig
+import org.balch.orpheus.features.tweaker.TweakSequencerParameter
+import org.balch.orpheus.features.tweaker.TweakSequencerState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects

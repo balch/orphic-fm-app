@@ -149,12 +149,12 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "Orpheus-8"
+            packageName = "Orpheus-FM"
             packageVersion = "1.0.0"
 
             macOS {
                 iconFile.set(project.file("src/jvmMain/resources/icon.icns"))
-                dockName = "Orpheus-8"
+                dockName = "Orpheus-FM"
             }
             linux {
                 iconFile.set(project.file("src/jvmMain/resources/icon.png"))

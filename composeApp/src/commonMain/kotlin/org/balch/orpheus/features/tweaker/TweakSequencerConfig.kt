@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.sequencer
+package org.balch.orpheus.features.tweaker
 
 import androidx.compose.ui.graphics.Color
 import org.balch.orpheus.ui.theme.OrpheusColors

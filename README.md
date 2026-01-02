@@ -1,4 +1,4 @@
-# Orpheus-8
+# Orpheus-FM
 
 An 8-oscillator organismic synthesizer inspired by
 classic drone synthesizers, built with Kotlin
@@ -6,7 +6,7 @@ Multiplatform targeting Desktop and Android.
 
 ## Overview
 
-Orpheus-8 features non-linear voice generators (similar to old electric organ tone generators) with a
+Orpheus-FM features non-linear voice generators (similar to old electric organ tone generators) with a
 hierarchical modulation structure:
 
 - **8 Voices**: Individual tone generators with tune, pulse, and hold controls

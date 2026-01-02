@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.sequencer
+package org.balch.orpheus.features.tweaker
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

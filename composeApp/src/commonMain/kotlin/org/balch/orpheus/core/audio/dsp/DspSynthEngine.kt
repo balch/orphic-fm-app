@@ -18,6 +18,7 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDelayPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDistortionPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspHyperLfoPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspPerStringBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspStereoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspVibratoPlugin
@@ -43,6 +44,7 @@ class DspSynthEngine(
     private val stereoPlugin = plugins.filterIsInstance<DspStereoPlugin>().first()
     private val vibratoPlugin = plugins.filterIsInstance<DspVibratoPlugin>().first()
     private val benderPlugin = plugins.filterIsInstance<DspBenderPlugin>().first()
+    private val perStringBenderPlugin = plugins.filterIsInstance<DspPerStringBenderPlugin>().first()
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
@@ -179,7 +181,7 @@ class DspSynthEngine(
         stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
 
         // Wire voices to audio paths
-        voices.forEach { voice ->
+        voices.forEachIndexed { index, voice ->
             // VOICES → DELAYS (wet path)
             voice.output.connect(delayPlugin.inputs["input"]!!)
 
@@ -187,13 +189,22 @@ class DspSynthEngine(
             vibratoPlugin.outputs["output"]?.connect(voice.vibratoInput)
             voice.vibratoDepth.set(1.0)
 
-            // BENDER → Voice pitch bend modulation
+            // GLOBAL BENDER → Voice pitch bend modulation (for fader bender)
             benderPlugin.outputs["pitchOutput"]?.connect(voice.benderInput)
-            // Bender depth is set dynamically based on voice base frequency
+            
+            // PER-STRING BENDER → Voice pitch bend modulation (for string bender)
+            // Only wire first 8 voices (quad 0 and 1 = 4 strings * 2 voices)
+            if (index < 8) {
+                perStringBenderPlugin.outputs["voiceBend$index"]?.connect(voice.benderInput)
+            }
 
             // COUPLING default depth
             voice.couplingDepth.set(0.0)
         }
+        
+        // Per-String Bender audio effects (tension/spring sounds) → Stereo sum
+        perStringBenderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        perStringBenderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
 
         // Wire voice coupling
         for (pairIndex in 0 until 6) {
@@ -455,6 +466,44 @@ class DspSynthEngine(
         _bendFlow.value = amount
     }
     override fun getBend(): Float = benderPlugin.getBend()
+    
+    // Per-String Bender delegation
+    override fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float) {
+        if (perStringBenderPlugin.setStringBend(stringIndex, bendAmount, voiceMix)) {
+            // Plugin requests voice trigger
+            val voiceA = stringIndex * 2
+            val voiceB = stringIndex * 2 + 1
+            // Ensure we don't go out of bounds (though strings 0-3 map to voices 0-7 so its safe)
+            if (voiceA < 12) setVoiceGate(voiceA, true)
+            if (voiceB < 12) setVoiceGate(voiceB, true)
+        }
+    }
+    
+    override fun releaseStringBend(stringIndex: Int): Int {
+        val (springDuration, shouldRelease) = perStringBenderPlugin.releaseString(stringIndex)
+        
+        if (shouldRelease) {
+             val voiceA = stringIndex * 2
+             val voiceB = stringIndex * 2 + 1
+             if (voiceA < 12) setVoiceGate(voiceA, false)
+             if (voiceB < 12) setVoiceGate(voiceB, false)
+        }
+        
+        return springDuration
+    }
+    
+    // Slide Bar delegation
+    override fun setSlideBar(yPosition: Float, xPosition: Float) {
+        perStringBenderPlugin.setSlideBar(yPosition, xPosition)
+    }
+    
+    override fun releaseSlideBar() {
+        perStringBenderPlugin.releaseSlideBar()
+    }
+    
+    override fun resetStringBenders() {
+        perStringBenderPlugin.resetAll()
+    }
 
     // Voice controls (still managed locally)
     override fun setVoiceTune(index: Int, tune: Float) {
@@ -471,6 +520,13 @@ class DspSynthEngine(
         val pitchMultiplier = 2.0.pow((quadPitch - 0.5) * 2.0)
         val finalFreq = baseFreq * pitchMultiplier
         voices[index].frequency.set(finalFreq)
+        
+        // Update string pluck frequency if this is the primary voice (A) of a pair
+        // This ensures the string "pluck" sound matches the user's tuned notes (Issue 2)
+        if (index % 2 == 0) {
+            val stringIndex = index / 2
+            perStringBenderPlugin.setStringFrequency(stringIndex, finalFreq)
+        }
     }
 
     override fun setVoiceGate(index: Int, active: Boolean) {

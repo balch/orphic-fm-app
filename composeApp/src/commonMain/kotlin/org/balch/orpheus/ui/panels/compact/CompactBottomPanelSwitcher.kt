@@ -66,12 +66,7 @@ fun CompactBottomPanelSwitcher(
         }
     }
 
-    LaunchedEffect(pagerState.currentPage) {
-        val currentPanel = panels[pagerState.currentPage]
-        if (currentPanel != selectedPanel) {
-            onPanelSelected(currentPanel)
-        }
-    }
+
 
     Column(modifier = modifier.fillMaxSize()) {
         // Panel content with swipe gestures

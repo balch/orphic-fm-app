@@ -61,6 +61,16 @@ class PreviewSynthEngine() : SynthEngine {
     // Bender stubs
     override fun setBend(amount: Float) {}
     override fun getBend(): Float = 0f
+    
+    // Per-String Bender stubs
+    override fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float) {}
+    override fun releaseStringBend(stringIndex: Int): Int = 0
+    
+    // Slide Bar stubs
+    override fun setSlideBar(yPosition: Float, xPosition: Float) {}
+    override fun releaseSlideBar() {}
+    override fun resetStringBenders() {}
+
 
     override fun setHyperLfoFreq(index: Int, frequency: Float) {}
     override fun setHyperLfoMode(mode: Int) {}

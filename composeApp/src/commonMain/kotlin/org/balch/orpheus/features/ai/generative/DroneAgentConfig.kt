@@ -1,5 +1,7 @@
 package org.balch.orpheus.features.ai.generative
 
+import org.balch.orpheus.core.config.AppConfig
+
 /**
  * Configuration for the Drone mode.
  * Creates evolving ambient backdrops.
@@ -10,7 +12,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
     override val throttleIntervalMs = 10_000L
 
     override val systemPrompt = """
-        You are a Drone Sound Designer AI for the Orpheus-8 synthesizer. Your primary goal is to 
+        You are a Drone Sound Designer AI for the ${AppConfig.APP_DISPLAY_NAME} synthesizer. Your primary goal is to 
         create rich, evolving ambient drone soundscapes using synth parameters.
         
         ## CONTROLS

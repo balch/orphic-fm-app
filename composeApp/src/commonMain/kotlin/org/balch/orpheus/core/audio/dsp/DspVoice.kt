@@ -60,6 +60,7 @@ class DspVoice(
     private val benderMixer = audioEngine.createAdd()        // Vibrato freq + bend
 
     // VCA control (envelope + hold)
+    private val holdRamp = audioEngine.createLinearRamp()  // Smooth hold changes
     private val vcaControlMixer = audioEngine.createAdd()
 
     // State for Hold-Envelope interaction
@@ -135,6 +136,7 @@ class DspVoice(
         audioEngine.addUnit(vibratoMixer)
         audioEngine.addUnit(benderScaler)
         audioEngine.addUnit(benderMixer)
+        audioEngine.addUnit(holdRamp)
         audioEngine.addUnit(vcaControlMixer)
 
         // Envelope follower setup - longer halflife for better hold/sustain detection
@@ -222,9 +224,11 @@ class DspVoice(
         // Wire: Mixed Oscillator -> VCA inputA
         oscMixer.output.connect(vca.inputA)
 
-        // VCA inputB = Envelope + HoldLevel
+        // VCA inputB = Envelope + HoldLevel (ramped for click-free transitions)
         ampEnv.output.connect(vcaControlMixer.inputA)
-        vcaControlMixer.inputB.set(0.0) // Default hold = 0
+        holdRamp.time.set(0.02) // 20ms ramp for smooth hold transitions
+        holdRamp.input.set(0.0)  // Default hold = 0
+        holdRamp.output.connect(vcaControlMixer.inputB)
         vcaControlMixer.output.connect(vca.inputB)
 
         // Wire VCA output through wobbleGain for finger modulation
@@ -288,6 +292,6 @@ class DspVoice(
         // In fast mode, you need higher Hold to sustain
         val scaleFactor = 0.5 + (currentEnvelopeSpeed * 1.5) // 0.5 → 2.0
         val scaledHold = (rawHoldLevel * scaleFactor).coerceAtMost(1.0)
-        vcaControlMixer.inputB.set(scaledHold)
+        holdRamp.input.set(scaledHold)  // Ramp to avoid clicks
     }
 }

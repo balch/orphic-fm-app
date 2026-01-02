@@ -32,11 +32,11 @@ import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.sequencer.TweakSequencerPanelActions
-import org.balch.orpheus.features.sequencer.TweakSequencerUiState
-import org.balch.orpheus.features.sequencer.TweakSequencerViewModel
-import org.balch.orpheus.features.sequencer.ui.CompactTweakSequencerView
-import org.balch.orpheus.features.sequencer.ui.ExpandedTweakSequencerContent
+import org.balch.orpheus.features.tweaker.TweakSequencerPanelActions
+import org.balch.orpheus.features.tweaker.TweakSequencerUiState
+import org.balch.orpheus.features.tweaker.TweakSequencerViewModel
+import org.balch.orpheus.features.tweaker.ui.CompactTweakSequencerView
+import org.balch.orpheus.features.tweaker.ui.ExpandedTweakSequencerContent
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState

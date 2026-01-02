@@ -124,7 +124,11 @@ class VoiceViewModel(
         onWobbleMove = ::onWobbleMove,
         onWobblePulseEnd = ::onWobblePulseEnd,
         onBendChange = ::onBendChange,
-        onBendRelease = ::onBendRelease
+        onBendRelease = ::onBendRelease,
+        onStringBendChange = ::onStringBendChange,
+        onStringBendRelease = ::onStringBendRelease,
+        onSlideBarChange = ::onSlideBarChange,
+        onSlideBarRelease = ::onSlideBarRelease
     )
 
     fun onMasterVolumeChange(value: Float) {
@@ -531,8 +535,12 @@ class VoiceViewModel(
     }
 
     fun onPulseStart(index: Int) {
+        // Reset per-string benders to ensure clean state when pulsing from voice pads
+        // This handles the case when user switches from strings panel to voice pads
+        engine.resetStringBenders()
         synthController.emitPulseStart(index)
     }
+
 
     fun onPulseEnd(index: Int) {
         synthController.emitPulseEnd(index)
@@ -620,6 +628,10 @@ class VoiceViewModel(
      * @param amount Bend amount from -1 (down) to +1 (up), 0 = center
      */
     fun onBendChange(amount: Float) {
+        // Reset per-string benders to ensure clean state when using global bender
+        // This handles the case when user switches from strings panel to voice pads
+        engine.resetStringBenders()
+        
         engine.setBend(amount)
         
         // Also affect the current visualizer's knob2
@@ -632,6 +644,7 @@ class VoiceViewModel(
             ControlEventOrigin.UI
         )
     }
+
     
     /**
      * Called when the bender slider is released.
@@ -641,6 +654,68 @@ class VoiceViewModel(
         engine.setBend(0f)
         // Reset viz knob2 to center
         synthController.emitControlChange(ControlIds.VIZ_KNOB_2, 0.5f, ControlEventOrigin.UI)
+    }
+    
+    // ═══════════════════════════════════════════════════════════
+    // PER-STRING BENDER METHODS
+    // ═══════════════════════════════════════════════════════════
+    
+    /**
+     * Called when a string is bent (during drag).
+     * @param stringIndex 0-3
+     * @param bendAmount Horizontal deflection -1 to +1
+     * @param voiceMix Vertical position 0 to 1 (0=top/voice A, 0.5=center, 1=bottom/voice B)
+     */
+    fun onStringBendChange(stringIndex: Int, bendAmount: Float, voiceMix: Float) {
+        engine.setStringBend(stringIndex, bendAmount, voiceMix)
+        
+        // Map string bends to Viz Knobs
+        // Purple (0) -> Knob 1
+        // Green (3) -> Knob 2
+        // Map -1..1 to 0..1
+        val vizValue = (bendAmount + 1f) / 2f
+        
+        if (stringIndex == 0) {
+            synthController.emitControlChange(ControlIds.VIZ_KNOB_1, vizValue, ControlEventOrigin.UI)
+        } else if (stringIndex == 3) {
+            synthController.emitControlChange(ControlIds.VIZ_KNOB_2, vizValue, ControlEventOrigin.UI)
+        }
+    }
+    
+    /**
+     * Called when a string is released. Returns spring duration for UI animation.
+     * @param stringIndex 0-3
+     * @return Spring duration in milliseconds
+     */
+    fun onStringBendRelease(stringIndex: Int): Int {
+        // Reset viz knobs if applicable
+        if (stringIndex == 0) {
+            synthController.emitControlChange(ControlIds.VIZ_KNOB_1, 0.5f, ControlEventOrigin.UI)
+        } else if (stringIndex == 3) {
+            synthController.emitControlChange(ControlIds.VIZ_KNOB_2, 0.5f, ControlEventOrigin.UI)
+        }
+        
+        return engine.releaseStringBend(stringIndex)
+    }
+    
+    // ═══════════════════════════════════════════════════════════
+    // SLIDE BAR METHODS
+    // ═══════════════════════════════════════════════════════════
+    
+    /**
+     * Called when the slide bar is moved.
+     * @param yPosition 0 to 1 (0=top, 1=bottom) - down = higher pitch
+     * @param xPosition 0 to 1 (horizontal) - wiggling creates vibrato
+     */
+    fun onSlideBarChange(yPosition: Float, xPosition: Float) {
+        engine.setSlideBar(yPosition, xPosition)
+    }
+    
+    /**
+     * Called when the slide bar is released.
+     */
+    fun onSlideBarRelease() {
+        engine.releaseSlideBar()
     }
 
     companion object {
@@ -656,7 +731,9 @@ class VoiceViewModel(
                 onFmStructureChange = {}, onTotalFeedbackChange = {},
                 onVoiceCouplingChange = {}, onWobblePulseStart = {_, _, _ -> },
                 onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {},
-                onBendChange = {}, onBendRelease = {}
+                onBendChange = {}, onBendRelease = {},
+                onStringBendChange = {_, _, _ -> }, onStringBendRelease = { 0 },
+                onSlideBarChange = {_, _ -> }, onSlideBarRelease = {}
             )
         )
     }
@@ -683,7 +760,11 @@ data class VoicePanelActions(
     val onWobbleMove: (Int, Float, Float) -> Unit,
     val onWobblePulseEnd: (Int) -> Unit,
     val onBendChange: (Float) -> Unit,
-    val onBendRelease: () -> Unit
+    val onBendRelease: () -> Unit,
+    val onStringBendChange: (stringIndex: Int, bendAmount: Float, voiceMix: Float) -> Unit,
+    val onStringBendRelease: (stringIndex: Int) -> Int,
+    val onSlideBarChange: (yPosition: Float, xPosition: Float) -> Unit,
+    val onSlideBarRelease: () -> Unit
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
@@ -696,7 +777,9 @@ data class VoicePanelActions(
             onFmStructureChange = {}, onTotalFeedbackChange = {},
             onVoiceCouplingChange = {}, onWobblePulseStart = {_, _, _ -> },
             onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {},
-            onBendChange = {}, onBendRelease = {}
+            onBendChange = {}, onBendRelease = {},
+            onStringBendChange = {_, _, _ -> }, onStringBendRelease = { 0 },
+            onSlideBarChange = {_, _ -> }, onSlideBarRelease = {}
         )
     }
 }

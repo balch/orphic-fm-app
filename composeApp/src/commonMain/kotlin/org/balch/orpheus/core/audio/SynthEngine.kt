@@ -67,6 +67,39 @@ interface SynthEngine {
     fun setBend(amount: Float) // -1 to +1, 0=center
     fun getBend(): Float
 
+    // Per-String Bender - individual string pitch bending for strings panel
+    /**
+     * Set bend for a specific string (controls its 2 associated voices).
+     * @param stringIndex 0-3 (each string controls voices stringIndex*2 and stringIndex*2+1)
+     * @param bendAmount -1 to +1, horizontal deflection
+     * @param voiceMix 0 to 1, vertical position (0=voice A, 0.5=both, 1=voice B)
+     */
+    fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float)
+    
+    /**
+     * Release a string, triggering spring animation.
+     * @return Spring duration in milliseconds for UI animation sync
+     */
+    fun releaseStringBend(stringIndex: Int): Int
+    
+    /**
+     * Set the slide bar position for global pitch control.
+     * @param yPosition 0 to 1 (0=top, 1=bottom) - down = higher pitch
+     * @param xPosition 0 to 1 (horizontal) - used for vibrato from wiggling
+     */
+    fun setSlideBar(yPosition: Float, xPosition: Float)
+    
+    /**
+     * Release the slide bar (springs back to center).
+     */
+    fun releaseSlideBar()
+    
+    /**
+     * Reset all per-string bender state to neutral.
+     * Call this when switching away from strings panel or when using voice pads' global bender.
+     */
+    fun resetStringBenders()
+
     // Test/Debug
     fun playTestTone(frequency: Float = 440f)
     fun stopTestTone()

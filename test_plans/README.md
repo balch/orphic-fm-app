@@ -1,6 +1,6 @@
-# Orpheus-8 Test Plans
+# Orpheus-FM Test Plans
 
-This directory contains comprehensive test plans for all major features of the Orpheus-8 synthesizer.
+This directory contains comprehensive test plans for all major features of the Orpheus-FM synthesizer.
 
 ## Test Plan Index
 
