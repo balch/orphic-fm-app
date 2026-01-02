@@ -565,11 +565,12 @@ private fun BenderStringsCanvas(
             val glowAlpha = if (isActive) 0.4f else 0.1f
 
             val tension = abs(deflection).coerceIn(0f, 1f)
+            // Brighten the string's own color when under tension (instead of shifting to orange)
             val tensionColor = if (tension > 0.1f) {
                 Color(
-                    red = color.red + (OrpheusColors.warmGlow.red - color.red) * tension,
-                    green = color.green + (OrpheusColors.warmGlow.green - color.green) * tension,
-                    blue = color.blue + (OrpheusColors.warmGlow.blue - color.blue) * tension,
+                    red = (color.red + (1f - color.red) * tension * 0.5f).coerceIn(0f, 1f),
+                    green = (color.green + (1f - color.green) * tension * 0.5f).coerceIn(0f, 1f),
+                    blue = (color.blue + (1f - color.blue) * tension * 0.5f).coerceIn(0f, 1f),
                     alpha = 1f
                 )
             } else color
