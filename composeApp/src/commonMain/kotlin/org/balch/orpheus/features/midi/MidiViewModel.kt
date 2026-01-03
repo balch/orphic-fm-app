@@ -71,7 +71,7 @@ class MidiViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        started = SharingStarted.WhileSubscribed(5000),
         initialValue = MidiUiState()
     )
 
@@ -81,14 +81,6 @@ class MidiViewModel(
         onCancelLearnMode = { cancelLearnMode() },
         onSelectControlForLearning = { id -> selectControlForLearning(id) },
         onSelectVoiceForLearning = { idx -> selectVoiceForLearning(idx) },
-        // Direct queries logic can stay in VM or be pure functions of state.
-        // We don't necessarily need them in actions if UI reads state. 
-        // But some UI components might use callbacks. Let's see usage.
-        // Usage: isVoiceBeingLearned(index). 
-        // We can include a lambda for it if needed, or UI checks state.
-        // UI code in DesktopSynthScreen passes `isVoiceBeingLearned: (Int) -> Boolean`. 
-        // We can keep `isVoiceBeingLearned` method in VM and pass references, 
-        // or put it in actions. Putting in actions is cleaner for the pattern.
         isControlBeingLearned = { id -> isControlBeingLearned(id) },
         isVoiceBeingLearned = { idx -> isVoiceBeingLearned(idx) }
     )
@@ -101,8 +93,6 @@ class MidiViewModel(
 
     // Last known device name for reconnection
     private var lastDeviceName: String? = null
-
-    // MidiInputHandler is injected directly - no lazy creation needed
 
     init {
         viewModelScope.launch(dispatcherProvider.io) {

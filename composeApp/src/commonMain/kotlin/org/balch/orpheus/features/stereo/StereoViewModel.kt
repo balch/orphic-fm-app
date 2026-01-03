@@ -11,11 +11,14 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
@@ -53,7 +56,7 @@ private sealed interface StereoIntent {
 
 /**
  * ViewModel for the Stereo panel.
- * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
+ * Uses MVI pattern with flow { emit(initial); emitAll(updates) } for proper WhileSubscribed support.
  */
 @Inject
 @ViewModelKey(StereoViewModel::class)
@@ -61,7 +64,7 @@ private sealed interface StereoIntent {
 class StereoViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
-    dispatcherProvider: DispatcherProvider
+    private val dispatcherProvider: DispatcherProvider
 ) : ViewModel(), PanelViewModel<StereoUiState, StereoPanelActions> {
 
     override val panelActions = StereoPanelActions(
@@ -69,45 +72,55 @@ class StereoViewModel(
         onMasterPanChange = ::onMasterPanChange
     )
 
-    private val intents = MutableSharedFlow<StereoIntent>(
-        replay = 1,
+    // User intents flow
+    private val _userIntents = MutableSharedFlow<StereoIntent>(
+        replay = 0,
         extraBufferCapacity = 64,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    override val uiState: StateFlow<StereoUiState> =
-        intents
-            .onEach { intent -> applyToEngine(intent) }
-            .scan(StereoUiState()) { state, intent -> reduce(state, intent) }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.Eagerly,
-                initialValue = StereoUiState()
-            )
-
-    init {
-        viewModelScope.launch(dispatcherProvider.io) {
-            // Apply initial state to engine
-            applyFullState(uiState.value)
-
-            // Subscribe to control changes for Stereo controls
-            launch {
-                synthController.onControlChange.collect { event ->
-                    when (event.controlId) {
-                        ControlIds.STEREO_PAN -> {
-                            // Convert 0-1 to -1..1 for pan
-                            intents.tryEmit(StereoIntent.SetMasterPan((event.value * 2f) - 1f))
-                        }
-                        ControlIds.STEREO_MODE -> {
-                            intents.tryEmit(StereoIntent.SetMode(
-                                if (event.value >= 0.5f) StereoMode.STEREO_DELAYS else StereoMode.VOICE_PAN
-                            ))
-                        }
-                    }
-                }
+    // Control changes -> StereoIntent
+    private val controlIntents = synthController.onControlChange.map { event ->
+        when (event.controlId) {
+            ControlIds.STEREO_PAN -> {
+                // Convert 0-1 to -1..1 for pan
+                StereoIntent.SetMasterPan((event.value * 2f) - 1f)
             }
+            ControlIds.STEREO_MODE -> {
+                StereoIntent.SetMode(
+                    if (event.value >= 0.5f) StereoMode.STEREO_DELAYS else StereoMode.VOICE_PAN
+                )
+            }
+            else -> null
         }
+    }
+
+    override val uiState: StateFlow<StereoUiState> = flow {
+        // Emit initial state from engine
+        val initial = loadInitialState()
+        applyFullState(initial)
+        emit(initial)
+        
+        // Then emit from merged intent sources
+        emitAll(
+            merge(_userIntents, controlIntents)
+                .onEach { intent -> if (intent != null) applyToEngine(intent) }
+                .scan(initial) { state, intent -> if (intent != null) reduce(state, intent) else state }
+        )
+    }
+    .flowOn(dispatcherProvider.io)
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = StereoUiState()
+    )
+
+    private fun loadInitialState(): StereoUiState {
+        return StereoUiState(
+            mode = engine.getStereoMode(),
+            masterPan = engine.getMasterPan(),
+            voicePans = List(8) { engine.getVoicePan(it) }
+        )
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -152,19 +165,19 @@ class StereoViewModel(
     // ═══════════════════════════════════════════════════════════
 
     fun onModeChange(mode: StereoMode) {
-        intents.tryEmit(StereoIntent.SetMode(mode))
+        _userIntents.tryEmit(StereoIntent.SetMode(mode))
     }
 
     fun onMasterPanChange(pan: Float) {
-        intents.tryEmit(StereoIntent.SetMasterPan(pan))
+        _userIntents.tryEmit(StereoIntent.SetMasterPan(pan))
     }
 
     fun onVoicePanChange(index: Int, pan: Float) {
-        intents.tryEmit(StereoIntent.SetVoicePan(index, pan))
+        _userIntents.tryEmit(StereoIntent.SetVoicePan(index, pan))
     }
 
     fun restoreState(state: StereoUiState) {
-        intents.tryEmit(StereoIntent.Restore(state))
+        _userIntents.tryEmit(StereoIntent.Restore(state))
     }
 
     companion object {

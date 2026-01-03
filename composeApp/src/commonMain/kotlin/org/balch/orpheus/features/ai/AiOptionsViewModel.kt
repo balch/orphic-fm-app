@@ -39,13 +39,14 @@ import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.media.PlaybackMode
 import org.balch.orpheus.core.presets.DronePreset
+import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.presets.PresetsRepository
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
 import org.balch.orpheus.features.ai.generative.AiStatusMessage
 import org.balch.orpheus.features.ai.generative.DroneAgentConfig
 import org.balch.orpheus.features.ai.generative.SoloAgentConfig
 import org.balch.orpheus.features.ai.generative.SynthControlAgent
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
-import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.ui.utils.PanelViewModel
 import kotlin.random.Random
 
@@ -122,7 +123,8 @@ private data class AiOptionsSession(
 class AiOptionsViewModel(
     private val agent: OrpheusAgent,
     private val synthAgentFactory: SynthControlAgent.Factory,
-    private val presetsViewModel: PresetsViewModel,
+    private val presetsRepository: PresetsRepository,
+    private val presetLoader: PresetLoader,
     private val replExecuteTool: ReplExecuteTool,
     private val replCodeEventBus: ReplCodeEventBus,
     private val panelExpansionEventBus: PanelExpansionEventBus,
@@ -428,7 +430,7 @@ class AiOptionsViewModel(
                     quadGroupVolumes = listOf(0f, 0f, 0f)
                 )
                 
-                presetsViewModel.applyPreset(presetWithZeroQuadVol)
+                presetLoader.applyPreset(presetWithZeroQuadVol)
                 log.info { "Applied drone preset: ${uniquePreset.name} (fading in)" }
                 
                 // Fade in Quad Volumes from 0 to 1 over ~1 second
@@ -566,7 +568,7 @@ class AiOptionsViewModel(
                     quadGroupVolumes = listOf(0f, 0f, 0f)
                 )
                 
-                presetsViewModel.applyPreset(presetWithZeroQuadVol)
+                presetLoader.applyPreset(presetWithZeroQuadVol)
                 log.info { "Applied solo preset: ${soloPreset.name} (fading in)" }
                 
                 // Fade in Quad Volumes from 0 to 1 over ~1 second
@@ -731,13 +733,10 @@ class AiOptionsViewModel(
             }
             
             // Reset to Default preset
-            viewModelScope.launch {
-                val presets = presetsViewModel.uiState.value.presets
-                val defaultPreset = presets.find { it.name == "Default" }
-                if (defaultPreset != null) {
-                    presetsViewModel.applyPreset(defaultPreset)
-                    log.info { "Reset to Default preset for REPL" }
-                }
+            viewModelScope.launch(dispatcherProvider.io) {
+                val defaultPreset = presetsRepository.getDefault()
+                presetLoader.applyPreset(defaultPreset)
+                log.info { "Reset to Default preset for REPL" }
             }
             
             // Open the chat dialog so user can see the AI working
@@ -872,7 +871,7 @@ class AiOptionsViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        started = SharingStarted.WhileSubscribed(5000),
         initialValue = AiOptionsUiState(
             availableModels = availableModels,
             aiStatusMessages = aiStatusMessages,

@@ -84,9 +84,15 @@ fun PresetsPanelLayout(
     var showOverrideDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
+    // Extract values from the sealed interface
+    val (presets, selectedPreset) = when (uiState) {
+        is PresetUiState.Loading -> emptyList<DronePreset>() to null
+        is PresetUiState.Loaded -> uiState.presets to uiState.selectedPreset
+    }
+
     val presetProps = PresetProps(
-        presets = uiState.presets,
-        selectedPreset = uiState.selectedPreset,
+        presets = presets,
+        selectedPreset = selectedPreset,
         presetActions = actions,
     )
 

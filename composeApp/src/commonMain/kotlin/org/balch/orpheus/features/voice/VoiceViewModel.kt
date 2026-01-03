@@ -149,7 +149,7 @@ class VoiceViewModel(
             .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                started = SharingStarted.WhileSubscribed(5000),
                 initialValue = VoiceUiState()
             )
 

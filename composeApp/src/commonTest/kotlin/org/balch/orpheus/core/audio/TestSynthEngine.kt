@@ -151,4 +151,20 @@ open class TestSynthEngine : SynthEngine {
     fun emitVoiceLevels(levels: FloatArray) { _voiceLevelsFlow.value = levels }
     fun emitLfoOutput(value: Float) { _lfoOutputFlow.value = value }
     fun emitMasterLevel(value: Float) { _masterLevelFlow.value = value }
+    
+    // Bender methods
+    private var _bend: Float = 0f
+    private val _bendFlow = MutableStateFlow(0f)
+    override fun setBend(amount: Float) { _bend = amount; _bendFlow.value = amount }
+    override fun getBend(): Float = _bend
+    override val bendFlow: StateFlow<Float> = _bendFlow.asStateFlow()
+    
+    // String bend methods
+    override fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float) {}
+    override fun releaseStringBend(stringIndex: Int): Int = 250
+    override fun resetStringBenders() {}
+    
+    // Slide bar methods
+    override fun setSlideBar(yPosition: Float, xPosition: Float) {}
+    override fun releaseSlideBar() {}
 }

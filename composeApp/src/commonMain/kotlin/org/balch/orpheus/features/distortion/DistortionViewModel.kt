@@ -11,11 +11,14 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
@@ -59,15 +62,15 @@ private sealed interface DistortionIntent {
 /**
  * ViewModel for the Distortion panel.
  *
- * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
+ * Uses MVI pattern with flow { emit(initial); emitAll(updates) } for proper WhileSubscribed support.
  */
 @Inject
 @ViewModelKey(DistortionViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class DistortionViewModel(
     private val engine: SynthEngine,
-    private val presetLoader: PresetLoader,
-    private val synthController: SynthController,
+    presetLoader: PresetLoader,
+    synthController: SynthController,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), PanelViewModel<DistortionUiState, DistortionPanelActions> {
 
@@ -77,59 +80,68 @@ class DistortionViewModel(
         onMixChange = ::onMixChange
     )
 
-    private val intents =
-        MutableSharedFlow<DistortionIntent>(
-            replay = 1,
-            extraBufferCapacity = 256,
-            onBufferOverflow = BufferOverflow.DROP_OLDEST
-        )
+    // User intents flow
+    private val _userIntents = MutableSharedFlow<DistortionIntent>(
+        replay = 0,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
 
-    override val uiState: StateFlow<DistortionUiState> =
-        intents
-            .onEach { intent -> applyToEngine(intent) }
-            .scan(DistortionUiState()) { state, intent -> reduce(state, intent) }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.Eagerly,
-                initialValue = DistortionUiState()
+    // Preset changes -> DistortionIntent.Restore (preserving volume)
+    private val presetIntents = presetLoader.presetFlow.map { preset ->
+        // Master Volume is NEVER set from presets - only user interaction
+        DistortionIntent.Restore(
+            DistortionUiState(
+                drive = preset.drive,
+                volume = engine.getMasterVolume(),  // Always preserve current
+                mix = preset.distortionMix
             )
+        )
+    }
 
-    init {
-        viewModelScope.launch(dispatcherProvider.io) {
-            applyFullState(uiState.value)
+    // Peak level updates from engine
+    private val peakIntents = engine.peakFlow.map { peak ->
+        DistortionIntent.Peak(peak)
+    }
 
-            launch {
-                presetLoader.presetFlow.collect { preset ->
-                    // Master Volume is NEVER set from presets - only user interaction
-                    val distortionState =
-                        DistortionUiState(
-                            drive = preset.drive,
-                            volume = uiState.value.volume,  // Always preserve current
-                            mix = preset.distortionMix
-                        )
-                    intents.tryEmit(DistortionIntent.Restore(distortionState))
-                }
-            }
-
-            launch {
-                engine.peakFlow.collect { peak ->
-                    intents.tryEmit(DistortionIntent.Peak(peak))
-                }
-            }
-
-            // Subscribe to control changes for Distortion controls
-            launch {
-                synthController.onControlChange.collect { event ->
-                    val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
-                    when (event.controlId) {
-                        ControlIds.MASTER_VOLUME -> intents.tryEmit(DistortionIntent.Volume(event.value))
-                        ControlIds.DRIVE -> intents.tryEmit(DistortionIntent.Drive(event.value, fromSequencer))
-                        ControlIds.DISTORTION_MIX -> intents.tryEmit(DistortionIntent.Mix(event.value, fromSequencer))
-                    }
-                }
-            }
+    // Control changes -> DistortionIntent
+    private val controlIntents = synthController.onControlChange.map { event ->
+        val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
+        when (event.controlId) {
+            ControlIds.MASTER_VOLUME -> DistortionIntent.Volume(event.value)
+            ControlIds.DRIVE -> DistortionIntent.Drive(event.value, fromSequencer)
+            ControlIds.DISTORTION_MIX -> DistortionIntent.Mix(event.value, fromSequencer)
+            else -> null
         }
+    }
+
+    override val uiState: StateFlow<DistortionUiState> = flow {
+        // Emit initial state from engine
+        val initial = loadInitialState()
+        applyFullState(initial)
+        emit(initial)
+        
+        // Then emit from merged intent sources
+        emitAll(
+            merge(_userIntents, presetIntents, peakIntents, controlIntents)
+                .onEach { intent -> if (intent != null) applyToEngine(intent) }
+                .scan(initial) { state, intent -> if (intent != null) reduce(state, intent) else state }
+        )
+    }
+    .flowOn(dispatcherProvider.io)
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = DistortionUiState()
+    )
+
+    private fun loadInitialState(): DistortionUiState {
+        return DistortionUiState(
+            drive = engine.getDrive(),
+            volume = engine.getMasterVolume(),
+            mix = engine.getDistortionMix(),
+            peak = 0.0f
+        )
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -138,18 +150,10 @@ class DistortionViewModel(
 
     private fun reduce(state: DistortionUiState, intent: DistortionIntent): DistortionUiState =
         when (intent) {
-            is DistortionIntent.Drive ->
-                state.copy(drive = intent.value)
-
-            is DistortionIntent.Volume ->
-                state.copy(volume = intent.value)
-
-            is DistortionIntent.Mix ->
-                state.copy(mix = intent.value)
-
-            is DistortionIntent.Peak ->
-                state.copy(peak = intent.value)
-
+            is DistortionIntent.Drive -> state.copy(drive = intent.value)
+            is DistortionIntent.Volume -> state.copy(volume = intent.value)
+            is DistortionIntent.Mix -> state.copy(mix = intent.value)
+            is DistortionIntent.Peak -> state.copy(peak = intent.value)
             is DistortionIntent.Restore -> intent.state
         }
 
@@ -163,10 +167,7 @@ class DistortionViewModel(
             is DistortionIntent.Drive -> if (!intent.fromSequencer) engine.setDrive(intent.value)
             is DistortionIntent.Volume -> engine.setMasterVolume(intent.value)
             is DistortionIntent.Mix -> if (!intent.fromSequencer) engine.setDistortionMix(intent.value)
-            is DistortionIntent.Peak -> {
-                /* Peak is read-only from engine */
-            }
-
+            is DistortionIntent.Peak -> { /* Peak is read-only from engine */ }
             is DistortionIntent.Restore -> applyFullState(intent.state)
         }
     }
@@ -182,23 +183,23 @@ class DistortionViewModel(
     // ═══════════════════════════════════════════════════════════
 
     fun onDriveChange(value: Float) {
-        intents.tryEmit(DistortionIntent.Drive(value))
+        _userIntents.tryEmit(DistortionIntent.Drive(value))
     }
 
     fun onVolumeChange(value: Float) {
-        intents.tryEmit(DistortionIntent.Volume(value))
+        _userIntents.tryEmit(DistortionIntent.Volume(value))
     }
 
     fun onMixChange(value: Float) {
-        intents.tryEmit(DistortionIntent.Mix(value))
+        _userIntents.tryEmit(DistortionIntent.Mix(value))
     }
 
     fun updatePeak(value: Float) {
-        intents.tryEmit(DistortionIntent.Peak(value))
+        _userIntents.tryEmit(DistortionIntent.Peak(value))
     }
 
     fun restoreState(state: DistortionUiState) {
-        intents.tryEmit(DistortionIntent.Restore(state))
+        _userIntents.tryEmit(DistortionIntent.Restore(state))
     }
 
     companion object {

@@ -112,7 +112,7 @@ fun CompactLandscapeHeaderPanel(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = presetState.selectedPreset?.name ?: "Init Patch",
+                            text = (presetState as? PresetUiState.Loaded)?.selectedPreset?.name ?: "Init Patch",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.9f),
                             maxLines = 1,
@@ -134,7 +134,7 @@ fun CompactLandscapeHeaderPanel(
                         )
                     } else Modifier.background(Color(0xFF2A2A3A))
                 ) {
-                    presetState.presets.forEach { preset ->
+                    (presetState as? PresetUiState.Loaded)?.presets?.forEach { preset ->
                         DropdownMenuItem(
                             text = { Text(preset.name, style = MaterialTheme.typography.bodySmall) },
                             onClick = {

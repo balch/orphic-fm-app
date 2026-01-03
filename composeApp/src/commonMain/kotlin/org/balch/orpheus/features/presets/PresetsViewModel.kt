@@ -12,26 +12,28 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.DronePreset
-import org.balch.orpheus.core.presets.DronePresetRepository
 import org.balch.orpheus.core.presets.PresetLoader
-import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.core.presets.PresetsRepository
 import org.balch.orpheus.ui.utils.PanelViewModel
 import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /** UI state for the Presets panel. */
-data class PresetUiState(
-    val presets: List<DronePreset> = emptyList(),
-    val selectedPreset: DronePreset? = null,
-    val isLoading: Boolean = false,
-    val factoryPresetNames: Set<String> = emptySet() // Track which presets are factory (read-only)
-)
+sealed interface PresetUiState {
+    data object Loading : PresetUiState
+    data class Loaded(
+        val presets: List<DronePreset> = emptyList(),
+        val selectedPreset: DronePreset? = null,
+        val factoryPresetNames: Set<String> = emptySet() // Track which presets are factory (read-only)
+    ): PresetUiState
+}
 
 data class PresetPanelActions(
     val onPresetSelect: (DronePreset) -> Unit,
@@ -54,13 +56,6 @@ data class PresetPanelActions(
     }
 }
 
-/** User intents for the Presets panel. */
-private sealed interface PresetIntent {
-    data class SetPresets(val presets: List<DronePreset>, val factoryNames: Set<String>) : PresetIntent
-    data class Select(val preset: DronePreset?) : PresetIntent
-    data class SetLoading(val loading: Boolean) : PresetIntent
-}
-
 /**
  * ViewModel for the Presets panel.
  *
@@ -70,11 +65,10 @@ private sealed interface PresetIntent {
 @ViewModelKey(PresetsViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class PresetsViewModel(
-    private val repository: DronePresetRepository,
+    private val presetsRepository: PresetsRepository,
     private val presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider,
-    private val appPreferencesRepository: AppPreferencesRepository,
-    factoryPatches: Set<SynthPatch>
+    private val appPreferencesRepository: AppPreferencesRepository
 ) : ViewModel(), PanelViewModel<PresetUiState, PresetPanelActions> {
 
     override val panelActions = PresetPanelActions(
@@ -88,83 +82,48 @@ class PresetsViewModel(
 
     private val log = logging("PresetsViewModel")
 
-    // Convert factory patches to DronePresets, sorted by name
-    private val factoryPresets: List<DronePreset> = factoryPatches
-        .map { it.preset }
-        .sortedBy { it.name }
-
-    private val factoryPresetNames: Set<String> = factoryPatches.map { it.name }.toSet()
-
-    private val intents =
-        MutableSharedFlow<PresetIntent>(
-            replay = 1,
-            extraBufferCapacity = 256,
-            onBufferOverflow = BufferOverflow.DROP_OLDEST
-        )
+    private val _userIntent = MutableSharedFlow<PresetUiState.Loaded>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
 
     override val uiState: StateFlow<PresetUiState> =
-        intents
-            .scan(PresetUiState()) { state, intent -> reduce(state, intent) }
-            .flowOn(dispatcherProvider.io)
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.Eagerly,
-                initialValue = PresetUiState()
-            )
-
-    init {
-        loadPresets()
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // REDUCER
-    // ═══════════════════════════════════════════════════════════
-
-    private fun reduce(state: PresetUiState, intent: PresetIntent): PresetUiState =
-        when (intent) {
-            is PresetIntent.SetPresets ->
-                state.copy(presets = intent.presets, factoryPresetNames = intent.factoryNames)
-
-            is PresetIntent.Select ->
-                state.copy(selectedPreset = intent.preset)
-
-            is PresetIntent.SetLoading ->
-                state.copy(isLoading = intent.loading)
+        flow<PresetUiState> {
+            emit(loadPresets())
+            emitAll(_userIntent)
         }
+        .flowOn(dispatcherProvider.io)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = PresetUiState.Loading
+        )
+
 
     // ═══════════════════════════════════════════════════════════
     // PUBLIC INTENT METHODS
     // ═══════════════════════════════════════════════════════════
 
-    private fun loadPresets() {
-        viewModelScope.launch(dispatcherProvider.io) {
-            intents.tryEmit(PresetIntent.SetLoading(true))
-            val userPresets = repository.list()
-            // Combine factory presets (first) + user presets (sorted by creation date)
-            val allPresets = factoryPresets + userPresets
-            intents.tryEmit(PresetIntent.SetPresets(allPresets, factoryPresetNames))
-            intents.tryEmit(PresetIntent.SetLoading(false))
-            log.info { "Loaded ${factoryPresets.size} factory + ${userPresets.size} user presets" }
-            
-            // Load last selected preset from preferences, fallback to Default
-            val prefs = appPreferencesRepository.load()
-            val lastPresetName = prefs.lastPresetName ?: "Default"
-            val presetToApply = allPresets.find { it.name == lastPresetName }
-                ?: allPresets.find { it.name == "Default" }
-            
-            if (presetToApply != null) {
-                intents.tryEmit(PresetIntent.Select(presetToApply))
-                presetLoader.applyPreset(presetToApply)
-                log.info { "Applied preset on startup: ${presetToApply.name}" }
-            }
-        }
+    private suspend fun loadPresets(): PresetUiState.Loaded {
+        val allPresets = presetsRepository.getAll()
+        log.info { "Loaded ${allPresets.size} presets" }
+
+        // Load last selected preset from preferences, fallback to Default
+        val prefs = appPreferencesRepository.load()
+        val lastPresetName = prefs.lastPresetName ?: "Default"
+        val presetToApply = allPresets.find { it.name == lastPresetName }
+            ?: presetsRepository.getDefault()
+        return PresetUiState.Loaded(allPresets, presetToApply, presetsRepository.getFactoryPresetNames())
     }
 
     /** Check if a preset is a factory preset (read-only) */
-    fun isFactoryPreset(preset: DronePreset): Boolean = preset.name in factoryPresetNames
+    fun isFactoryPreset(preset: DronePreset): Boolean = presetsRepository.isFactoryPreset(preset.name)
 
     fun selectPreset(preset: DronePreset?) {
-        intents.tryEmit(PresetIntent.Select(preset))
+        (uiState.value as? PresetUiState.Loaded)?.let {
+            _userIntent.tryEmit(it.copy(selectedPreset = preset))
+        }
     }
 
     fun applyPreset(preset: DronePreset) {
@@ -181,61 +140,69 @@ class PresetsViewModel(
 
     fun saveNewPreset(name: String) {
         // Prevent overwriting factory presets
-        if (name in factoryPresetNames) {
+        val currentState = (uiState.value as? PresetUiState.Loaded) ?: return
+
+        if (presetsRepository.isFactoryPreset(name)) {
             log.warn { "Cannot overwrite factory preset: $name" }
             return
         }
         val preset = presetLoader.currentStateAsPreset(name)
         viewModelScope.launch(dispatcherProvider.io) {
-            repository.save(preset)
-            loadPresetsAfterChange(name)
+            presetsRepository.save(preset)
+            loadPresetsAfterChange(currentState, name)
             log.info { "Saved new preset: $name" }
         }
     }
 
     fun overridePreset() {
-        val current = uiState.value.selectedPreset ?: return
+        val currentState = (uiState.value as? PresetUiState.Loaded)
+        val current = currentState?.selectedPreset ?: return
         // Prevent overwriting factory presets
-        if (current.name in factoryPresetNames) {
+        if (presetsRepository.isFactoryPreset(current.name)) {
             log.warn { "Cannot overwrite factory preset: ${current.name}" }
             return
         }
         val preset = presetLoader.currentStateAsPreset(current.name).copy(createdAt = current.createdAt)
         viewModelScope.launch(dispatcherProvider.io) {
-            repository.save(preset)
-            loadPresetsAfterChange(current.name)
+            presetsRepository.save(preset)
+            loadPresetsAfterChange(currentState, current.name)
             log.info { "Overrode preset: ${current.name}" }
         }
     }
 
     fun deletePreset() {
-        val current = uiState.value.selectedPreset ?: return
+        val currentState = (uiState.value as? PresetUiState.Loaded)
+        val current = currentState?.selectedPreset ?: return
         // Prevent deleting factory presets
-        if (current.name in factoryPresetNames) {
+        if (presetsRepository.isFactoryPreset(current.name)) {
             log.warn { "Cannot delete factory preset: ${current.name}" }
             return
         }
         viewModelScope.launch(dispatcherProvider.io) {
-            repository.delete(current.name)
-            val userPresets = repository.list()
-            val allPresets = factoryPresets + userPresets
-            intents.tryEmit(PresetIntent.SetPresets(allPresets, factoryPresetNames))
-            intents.tryEmit(PresetIntent.Select(null))
+            presetsRepository.delete(current.name)
+            val allPresets = presetsRepository.getAll()
+            _userIntent.emit(currentState.copy(presets = allPresets, selectedPreset = null))
             log.info { "Deleted preset: ${current.name}" }
         }
     }
 
     /** Helper to reload presets after a change and select the given preset name */
-    private suspend fun loadPresetsAfterChange(selectName: String) {
-        val userPresets = repository.list()
-        val allPresets = factoryPresets + userPresets
-        intents.tryEmit(PresetIntent.SetPresets(allPresets, factoryPresetNames))
-        intents.tryEmit(PresetIntent.Select(allPresets.find { it.name == selectName }))
+    private suspend fun loadPresetsAfterChange(
+        loadedState: PresetUiState.Loaded,
+        selectName: String
+    ) {
+        val allPresets = presetsRepository.getAll()
+        _userIntent.emit(
+            loadedState.copy(
+                presets = allPresets,
+                selectedPreset = allPresets.find { it.name == selectName }
+            )
+        )
     }
 
     companion object {
         val PREVIEW = ViewModelStateActionMapper(
-            state = PresetUiState(),
+            state = PresetUiState.Loading as PresetUiState,
             actions = PresetPanelActions.EMPTY,
         )
     }
