@@ -29,6 +29,7 @@ import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.core.tidal.TidalSchedulerState
 import org.balch.orpheus.features.ai.ReplCodeEvent
 import org.balch.orpheus.features.ai.ReplCodeEventBus
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.ui.utils.PanelViewModel
 import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
@@ -42,6 +43,7 @@ data class LiveCodeUiState(
     val currentCycle: Int = 0,
     val cyclePosition: Double = 0.0,
     val bpm: Double = 120.0,
+    val replVolume: Float = 0.8f,  // REPL voice volume (Quad 2, voices 8-11) - default slightly boosted
     val error: String? = null,
     val history: List<String> = emptyList(),
     val activeSlots: Set<String> = emptySet(),
@@ -53,6 +55,7 @@ data class LiveCodePanelActions(
     val onExecuteBlock: () -> Unit,
     val onExecuteLine: () -> Unit,
     val onBpmChange: (Double) -> Unit,
+    val onReplVolumeChange: (Float) -> Unit,
     val onExecute: () -> Unit,
     val onStop: () -> Unit,
     val onLoadExample: (String) -> Unit,
@@ -64,6 +67,7 @@ data class LiveCodePanelActions(
             onExecuteBlock = { },
             onExecuteLine = { },
             onBpmChange = { },
+            onReplVolumeChange = { },
             onExecute = { },
             onStop = { },
             onLoadExample = { },
@@ -82,6 +86,7 @@ sealed class LiveCodeIntent {
     data object ExecuteBlock : LiveCodeIntent()
     data object ExecuteLine : LiveCodeIntent()
     data class SetBpm(val bpm: Double) : LiveCodeIntent()
+    data class SetReplVolume(val volume: Float) : LiveCodeIntent()
     data class LoadExample(val name: String) : LiveCodeIntent()
     data class HandleAiCode(val code: String, val slots: List<String>) : LiveCodeIntent()
     data object DeleteLine : LiveCodeIntent()
@@ -102,7 +107,8 @@ class LiveCodeViewModel(
     private val repl: TidalRepl,
     private val replCodeEventBus: ReplCodeEventBus,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
-    private val mediaSessionStateManager: MediaSessionStateManager
+    private val mediaSessionStateManager: MediaSessionStateManager,
+    private val synthEngine: SynthEngine
 ) : ViewModel(), PanelViewModel<LiveCodeUiState, LiveCodePanelActions> {
 
     override val panelActions = LiveCodePanelActions(
@@ -110,6 +116,7 @@ class LiveCodeViewModel(
         onExecuteBlock = ::executeBlock,
         onExecuteLine = ::executeLine,
         onBpmChange = ::setBpm,
+        onReplVolumeChange = ::setReplVolume,
         onExecute = ::execute,
         onStop = ::stop,
         onLoadExample = ::loadExample,
@@ -134,6 +141,9 @@ class LiveCodeViewModel(
     
     init {
         logger.i { "LiveCodeViewModel initialized, subscribing to ReplCodeEventBus" }
+        
+        // Initialize REPL volume (Quad 2 = voices 8-11) with slightly boosted default
+        synthEngine.setQuadVolume(2, _uiState.value.replVolume)
         
         // Subscribe to intents using scan pattern
         viewModelScope.launch {
@@ -293,6 +303,12 @@ class LiveCodeViewModel(
                     isPlaying = false,
                     activeSlots = emptySet()
                 )
+            }
+            
+            is LiveCodeIntent.SetReplVolume -> {
+                // Apply volume to Quad 2 (voices 8-11) - the REPL voices
+                synthEngine.setQuadVolume(2, intent.volume)
+                state.copy(replVolume = intent.volume)
             }
         }
     }
@@ -517,6 +533,10 @@ class LiveCodeViewModel(
     
     fun setBpm(bpm: Double) {
         _intents.value = LiveCodeIntent.SetBpm(bpm)
+    }
+    
+    fun setReplVolume(volume: Float) {
+        _intents.value = LiveCodeIntent.SetReplVolume(volume)
     }
     
     fun loadExample(name: String) {

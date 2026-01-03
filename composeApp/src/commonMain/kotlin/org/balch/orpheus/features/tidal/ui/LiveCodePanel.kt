@@ -207,34 +207,69 @@ fun LiveCodePanelLayout(
                 )
             }
 
-            // BPM Control
+            // BPM and Volume Controls Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = "BPM",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 9.sp
-                )
+                // BPM Control
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "BPM",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 9.sp
+                    )
 
-                HorizontalMiniSlider(
-                    trackWidth = 110,
-                    value = ((uiState.bpm - 40) / 200).toFloat().coerceIn(0f, 1f),
-                    onValueChange = { frac ->
-                        actions.onBpmChange(40 + (frac * 200).toDouble())
-                    },
-                    color = OrpheusColors.neonCyan
-                )
-                Text(
-                    text = "${uiState.bpm.toInt()}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = OrpheusColors.neonCyan,
-                    fontSize = 9.sp,
-                    maxLines = 1,
-                )
+                    HorizontalMiniSlider(
+                        trackWidth = 80,
+                        value = ((uiState.bpm - 40) / 200).toFloat().coerceIn(0f, 1f),
+                        onValueChange = { frac ->
+                            actions.onBpmChange(40 + (frac * 200).toDouble())
+                        },
+                        color = OrpheusColors.neonCyan
+                    )
+                    Text(
+                        text = "${uiState.bpm.toInt()}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = OrpheusColors.neonCyan,
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                    )
+                }
+                
+                // REPL Volume Control
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "VOL",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 9.sp
+                    )
+
+                    HorizontalMiniSlider(
+                        trackWidth = 60,
+                        value = (uiState.replVolume / 1.5f).coerceIn(0f, 1f),  // 0-150% range
+                        onValueChange = { frac ->
+                            actions.onReplVolumeChange(frac * 1.5f)  // 0.0 to 1.5
+                        },
+                        color = OrpheusColors.warmGlow
+                    )
+                    Text(
+                        text = "${(uiState.replVolume * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = OrpheusColors.warmGlow,
+                        fontSize = 9.sp,
+                        maxLines = 1,
+                    )
+                }
             }
 
             // Code editor with AI loading overlay
@@ -432,6 +467,7 @@ private fun LiveCodePanelCollapsedPreview() {
                     onExecuteBlock = {},
                     onExecuteLine = {},
                     onBpmChange = {},
+                    onReplVolumeChange = {},
                     onExecute = {},
                     onStop = {},
                     onLoadExample = {},
@@ -461,6 +497,7 @@ private fun LiveCodePanelExpandedPreview() {
                     onExecuteBlock = {},
                     onExecuteLine = {},
                     onBpmChange = {},
+                    onReplVolumeChange = {},
                     onExecute = {},
                     onStop = {},
                     onLoadExample = {},
@@ -493,6 +530,7 @@ private fun LiveCodePanelPlayingPreview() {
                     onExecuteBlock = {},
                     onExecuteLine = {},
                     onBpmChange = {},
+                    onReplVolumeChange = {},
                     onExecute = {},
                     onStop = {},
                     onLoadExample = {},
@@ -522,6 +560,7 @@ private fun LiveCodePanelErrorPreview() {
                     onExecuteBlock = {},
                     onExecuteLine = {},
                     onBpmChange = {},
+                    onReplVolumeChange = {},
                     onExecute = {},
                     onStop = {},
                     onLoadExample = {},
