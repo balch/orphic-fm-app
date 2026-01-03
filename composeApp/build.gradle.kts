@@ -149,7 +149,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "Orpheus-FM"
+            packageName = "Orphic-FM"
             packageVersion = "1.0.0"
 
             macOS {

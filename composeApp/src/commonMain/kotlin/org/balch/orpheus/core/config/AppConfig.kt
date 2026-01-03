@@ -7,7 +7,7 @@ object AppConfig {
     /**
      * Full app display name with model number.
      */
-    const val APP_DISPLAY_NAME = "Orpheus-FM"
+    const val APP_DISPLAY_NAME = "Orphic-FM"
     
     /**
      * Chat/AI persona display name.

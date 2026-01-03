@@ -49,7 +49,7 @@ enum class AiModel(
     PRO_25("pro_25", "Pro 2.5", GoogleModels.Gemini2_5Pro),
     FLASH_30("flash_30", "Flash 3.0 - Preview", Gemini3_Flash_Preview);
     companion object {
-        val DEFAULT = FLASH_25
+        val DEFAULT = FLASH_30
         
         fun fromId(id: String): AiModel = entries.find { it.id == id } ?: DEFAULT
     }

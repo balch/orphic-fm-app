@@ -36,7 +36,6 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.min
 import kotlin.math.sign
 import kotlin.math.sin
@@ -123,13 +122,13 @@ data class BlackholeSunUiState(
  */
 @Inject
 @ContributesIntoSet(AppScope::class)
-class BlackholeSunViz(
+class BlackHoleSunViz(
     private val engine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,
 ) : Visualization {
 
     override val id = "blackhole_sun"
-    override val name = "Blackhole Sun"
+    override val name = "Black Hole Sun"
     override val color = OrpheusColors.neonMagenta
     override val knob1Label = "SPIN"
     override val knob2Label = "DENSITY"
@@ -648,7 +647,7 @@ class BlackholeSunViz(
         )
     }
 
-    companion object {
+    companion object Companion {
         val Default = VisualizationLiquidEffects(
             frostSmall = 2f,
             frostMedium = 2f,

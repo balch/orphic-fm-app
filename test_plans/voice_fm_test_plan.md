@@ -2,7 +2,7 @@
 
 ## Overview
 
-Orpheus-FM features an 8-voice FM synthesis system organized into 4 Duo pairs within 2 Quads. Each
+Orphic-FM features an 8-voice FM synthesis system organized into 4 Duo pairs within 2 Quads. Each
 voice has independent tuning, envelope speed, and modulation depth, with sophisticated routing
 options.
 

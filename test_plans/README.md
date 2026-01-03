@@ -1,4 +1,4 @@
-# Orpheus-FM Test Plans
+# Orphic-FM Test Plans
 
 This directory contains comprehensive test plans for all major features of the Orpheus-FM synthesizer.
 
