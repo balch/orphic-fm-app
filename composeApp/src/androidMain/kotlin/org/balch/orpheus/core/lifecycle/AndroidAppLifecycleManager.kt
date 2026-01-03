@@ -35,11 +35,13 @@ class AndroidAppLifecycleManager(
     private val log = logging("AndroidAppLifecycleManager")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
-    private var activityCount = 0
     private val _isAppInForeground = MutableStateFlow(true)
     val isAppInForeground: StateFlow<Boolean> = _isAppInForeground.asStateFlow()
     
     private var savedMasterVolume: Float? = null
+    
+    // Simple flag: true if the activity is currently in a configuration change
+    private var isInConfigChange = false
     
     init {
         registerActivityLifecycleCallbacks()
@@ -48,18 +50,19 @@ class AndroidAppLifecycleManager(
     
     private fun registerActivityLifecycleCallbacks() {
         application.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
-            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+                isInConfigChange = false
+            }
             override fun onActivityStarted(activity: Activity) {
-                activityCount++
-                if (activityCount == 1) {
-                    onAppForegrounded()
-                }
+                onAppForegrounded()
             }
             override fun onActivityResumed(activity: Activity) {}
             override fun onActivityPaused(activity: Activity) {}
             override fun onActivityStopped(activity: Activity) {
-                activityCount--
-                if (activityCount == 0) {
+                if (activity.isChangingConfigurations) {
+                    log.debug { "Activity stopped due to configuration change, skipping background" }
+                    isInConfigChange = true
+                } else {
                     onAppBackgrounded()
                 }
             }
