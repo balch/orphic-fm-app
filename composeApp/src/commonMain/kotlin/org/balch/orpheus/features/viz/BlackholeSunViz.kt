@@ -295,13 +295,15 @@ class BlackholeSunViz(
             val voiceLevel = voiceLevels.getOrElse(i) { 0f }
             val effectiveLevel = maxOf(voiceLevel, masterLevel * 0.3f)
             
-            // Only emit when there's actual audio - threshold higher
-            if (effectiveLevel < 0.15f) continue
+            // Low threshold so we see occasional particles even at quiet levels
+            if (effectiveLevel < 0.03f) continue
             
-            // DENSITY KNOB LOGIC:
-            // Controls spawn probability directly. 
-            // Low knob = sparse particles. High knob = constant stream.
-            val emitChance = effectiveLevel * (0.05f + _densityKnob * 0.95f)
+            // EMISSION CURVE:
+            // Use quadratic curve so low volumes = sparse occasional particles
+            // High volumes = full stream (same as before)
+            // effectiveLevel^2 gives: 0.1 -> 0.01, 0.3 -> 0.09, 0.5 -> 0.25, 1.0 -> 1.0
+            val scaledLevel = effectiveLevel * effectiveLevel
+            val emitChance = scaledLevel * (0.05f + _densityKnob * 0.95f)
             
             if (Random.nextFloat() < emitChance) {
                 emitParticle(i, effectiveLevel, orbitDir)
@@ -466,51 +468,8 @@ class BlackholeSunViz(
         // Key change: base intensity is near zero, only shows with audio
         val diskIntensity = (state.diskGlow * 0.6f + state.masterEnergy * 0.4f).coerceIn(0f, 0.8f)
 
-        // Draw disk sectors with varying heat colors (apply rotation)
-        for (sector in 0 until 8) {
-            val baseSectorAngle = (sector.toFloat() / 8f) * 2 * PI.toFloat() - PI.toFloat()
-            val baseNextAngle = ((sector + 1).toFloat() / 8f) * 2 * PI.toFloat() - PI.toFloat()
-            // Apply disk rotation
-            val sectorAngle = baseSectorAngle + state.diskRotation
-            val nextAngle = baseNextAngle + state.diskRotation
-            val midAngle = (sectorAngle + nextAngle) / 2f
-            
-            val heat = state.diskHeat.getOrElse(sector) { 0f }
-            val sectorIntensity = diskIntensity + heat * 0.4f
-            
-            // Color shifts from purple (cool) to orange/white (hot)
-            val coolColor = Color(0xFF5522aa)
-            val hotColor = Color(0xFFff6622)
-            val whiteHot = Color(0xFFffddcc)
-            
-            val diskColor = if (heat > 0.5f) {
-                lerpColor(hotColor, whiteHot, (heat - 0.5f) * 2f)
-            } else {
-                lerpColor(coolColor, hotColor, heat * 2f)
-            }
-            
-            // Draw radial glow for this sector
-            val sectorCenterX = cx + cos(midAngle) * (diskInnerRadius + diskOuterRadius) / 2f * scale
-            val sectorCenterY = cy + sin(midAngle) * (diskInnerRadius + diskOuterRadius) / 2f * scale
-            
-            // Only draw sector glow if there's enough intensity
-            if (sectorIntensity > 0.05f) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0f to diskColor.copy(alpha = sectorIntensity * 0.5f),
-                            0.5f to diskColor.copy(alpha = sectorIntensity * 0.2f),
-                            1f to Color.Transparent
-                        ),
-                        center = Offset(sectorCenterX, sectorCenterY),
-                        radius = scale * 0.10f
-                    ),
-                    radius = scale * 0.10f,
-                    center = Offset(sectorCenterX, sectorCenterY),
-                    blendMode = BlendMode.Plus
-                )
-            }
-        }
+        // Disk sector heat colors are now represented by the cloud particles themselves
+        // (removed the 8 orbiting sector glow circles)
 
         // Main disk ring glow - only visible with audio
         if (diskIntensity > 0.03f) {
@@ -569,7 +528,7 @@ class BlackholeSunViz(
             center = Offset(cx, cy)
         )
 
-        // Draw particles
+        // Draw particles as irregular cloud-like shapes
         state.particles.forEach { p ->
             val alpha = (p.life * p.color.alpha).coerceIn(0f, 1f)
             if (alpha < 0.01f) return@forEach
@@ -594,19 +553,62 @@ class BlackholeSunViz(
                 else -> p.color
             }
 
-            // Draw particle with glow
+            // Calculate angle toward center for cloud stretching
+            val angleToCenter = atan2(p.y, p.x)
+            
+            // Draw irregular cloud shape using multiple overlapping blobs
+            // Each particle gets 5-7 sub-blobs positioned with pseudo-noise
+            val blobCount = 5 + (p.id % 3)
+            val seed = p.id * 1337f
+            
+            for (i in 0 until blobCount) {
+                // Pseudo-noise offsets using sine/cosine of seed values
+                val noiseAngle = seed + i * 2.3f + state.time * 0.3f
+                val noiseRadius = particleSize * (0.8f + sin(noiseAngle * 0.7f) * 0.6f)
+                
+                // Offset position - clouds stretch perpendicular to center direction (wrapping around)
+                val tangentAngle = angleToCenter + PI.toFloat() / 2f
+                val offsetStretch = cos(noiseAngle * 1.3f + i) * particleSize * 1.5f  // Tangential stretch
+                val offsetRadial = sin(noiseAngle * 0.9f + i * 1.7f) * particleSize * 0.6f  // Radial variation
+                
+                val blobX = px + cos(tangentAngle) * offsetStretch + cos(angleToCenter) * offsetRadial
+                val blobY = py + sin(tangentAngle) * offsetStretch + sin(angleToCenter) * offsetRadial
+                
+                // Vary blob size
+                val blobSize = noiseRadius * (0.6f + (i.toFloat() / blobCount) * 0.8f)
+                
+                // Vary alpha per blob for organic feel
+                val blobAlpha = alpha * (0.4f + sin(noiseAngle * 0.5f) * 0.3f)
+                
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colorStops = arrayOf(
+                            0f to glowColor.copy(alpha = blobAlpha * 0.7f),
+                            0.3f to glowColor.copy(alpha = blobAlpha * 0.5f),
+                            0.6f to glowColor.copy(alpha = blobAlpha * 0.2f),
+                            1f to Color.Transparent
+                        ),
+                        center = Offset(blobX, blobY),
+                        radius = blobSize * 2.5f
+                    ),
+                    radius = blobSize * 2.5f,
+                    center = Offset(blobX, blobY),
+                    blendMode = BlendMode.Plus
+                )
+            }
+            
+            // Core glow at center of cloud
             drawCircle(
                 brush = Brush.radialGradient(
                     colorStops = arrayOf(
-                        0f to glowColor.copy(alpha = alpha * 0.9f),
-                        0.4f to glowColor.copy(alpha = alpha * 0.6f),
-                        0.7f to glowColor.copy(alpha = alpha * 0.2f),
+                        0f to glowColor.copy(alpha = alpha * 0.6f),
+                        0.5f to glowColor.copy(alpha = alpha * 0.3f),
                         1f to Color.Transparent
                     ),
                     center = Offset(px, py),
-                    radius = particleSize * 3f
+                    radius = particleSize * 2f
                 ),
-                radius = particleSize * 3f,
+                radius = particleSize * 2f,
                 center = Offset(px, py),
                 blendMode = BlendMode.Plus
             )
@@ -614,8 +616,8 @@ class BlackholeSunViz(
             // Bright core for emitted particles
             if (p.type == AccretionParticleType.EMITTED && alpha > 0.5f) {
                 drawCircle(
-                    color = Color.White.copy(alpha = alpha * 0.4f),
-                    radius = particleSize * 0.5f,
+                    color = Color.White.copy(alpha = alpha * 0.3f),
+                    radius = particleSize * 0.4f,
                     center = Offset(px, py),
                     blendMode = BlendMode.Plus
                 )
