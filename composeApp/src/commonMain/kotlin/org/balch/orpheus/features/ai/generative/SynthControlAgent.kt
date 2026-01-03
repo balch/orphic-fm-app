@@ -121,6 +121,11 @@ class SynthControlAgent(
     // User influence prompts (for Solo mode)
     private val _userPrompts = MutableSharedFlow<String>(extraBufferCapacity = 5)
     
+    // Completion signal (emits when all evolution prompts are finished)
+    private val _completed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** Emits when the agent has completed all evolution prompts (Solo mode) */
+    val completed: SharedFlow<Unit> = _completed.asSharedFlow()
+    
     /**
      * Inject a user prompt into the agent's input stream.
      * Used by Solo mode to let users influence the composition.
@@ -217,12 +222,20 @@ class SynthControlAgent(
                     while (isActive) {
                         delay(config.evolutionIntervalMs)
                         if (selectedMood != null && selectedMood.evolutionPrompts.isNotEmpty()) {
-                            // Emit evolution prompts sequentially, cycling through the list
-                            emit(selectedMood.evolutionPrompts[evolutionIndex++])
+                            // Check if we've completed all prompts and should finish
                             if (evolutionIndex >= selectedMood.evolutionPrompts.size) {
-                                evolutionIndex = 0
+                                if (config.finishOnLastEvolution) {
+                                    // Signal completion and stop the flow
+                                    log.info { "All evolution prompts completed - signaling completion" }
+                                    _completed.tryEmit(Unit)
+                                    return@flow
+                                } else {
+                                    // Cycle back to start (Drone mode behavior)
+                                    evolutionIndex = 0
+                                }
                             }
-
+                            // Emit the current evolution prompt
+                            emit(selectedMood.evolutionPrompts[evolutionIndex++])
                         } else if (config.initialMoodPrompts.isNotEmpty()) {
                             emit(config.initialMoodPrompts.random())
                         }

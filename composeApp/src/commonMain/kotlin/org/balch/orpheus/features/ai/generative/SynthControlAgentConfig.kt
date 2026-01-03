@@ -11,6 +11,8 @@ sealed interface SynthControlAgentConfig {
     val evolutionIntervalMs: Long
     val throttleIntervalMs: Long
     val moods: List<Mood> get() = emptyList()
+    /** If true, the agent will stop after completing all evolution prompts in a mood */
+    val finishOnLastEvolution: Boolean get() = false
 }
 
 /**

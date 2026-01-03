@@ -11,6 +11,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
     override val name = "SoloAgent"
     override val evolutionIntervalMs = 20_000L  // Evolve every 15 seconds
     override val throttleIntervalMs = 5_000L   // Minimum 5 seconds between actions
+    override val finishOnLastEvolution = true  // Stop after completing all evolution prompts
 
     override val systemPrompt = """
         You are a Solo Composer AI for the ${AppConfig.APP_DISPLAY_NAME} synthesizer. Your mission is to create 

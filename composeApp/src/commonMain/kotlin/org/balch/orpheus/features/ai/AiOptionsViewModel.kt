@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.ai.AiModel
@@ -581,6 +582,15 @@ class AiOptionsViewModel(
                 }
                 
                 newAgent.start()
+                
+                // Subscribe to completion signal - auto-stop Solo when all evolution prompts are done
+                newAgent.completed.collect {
+                    log.info { "Solo composition completed - auto-stopping" }
+                    // Fade out and turn off Solo mode (on main thread)
+                    withContext(dispatcherProvider.main) {
+                        onSoloCompleted()
+                    }
+                }
             }
         } else {
             log.info { "Stopping Solo Agent" }
@@ -643,6 +653,25 @@ class AiOptionsViewModel(
             quadGroupHolds = List(3) { 0.0f }
             // Note: masterVolume not set - it's user-controlled only
         )
+    }
+
+    /**
+     * Called when Solo mode completes all evolution prompts.
+     * Fades out the sound and turns off Solo mode.
+     */
+    private fun onSoloCompleted() {
+        if (!_isSoloActive.value) return // Already stopped
+        
+        log.info { "Solo composition completed - fading out and stopping" }
+        
+        // Stop the agent first (this will handle the fade out)
+        _soloAgent.value?.stop()
+        _soloAgent.value = null
+        
+        // Update state
+        _isSoloActive.value = false
+        mediaSessionStateManager.setSoloActive(false)
+        synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
     }
 
     // ============================================================
