@@ -61,12 +61,11 @@ class MutateStrategy(
         DELAY_FEEDBACK({ engine -> ControlIds.DELAY_FEEDBACK to engine.getDelayFeedback() }),
         DELAY_TIME_0({ engine -> ControlIds.DELAY_TIME_1 to engine.getDelayTime(0) }),
         DELAY_TIME_1({ engine -> ControlIds.DELAY_TIME_2 to engine.getDelayTime(1) }),
+        // Note: Quad 3 (index 2) is reserved for Drone mode and not mutated
         QUAD_PITCH_0({ engine -> ControlIds.quadPitch(0) to engine.getQuadPitch(0) }),
         QUAD_PITCH_1({ engine -> ControlIds.quadPitch(1) to engine.getQuadPitch(1) }),
-        QUAD_PITCH_2({ engine -> ControlIds.quadPitch(2) to engine.getQuadPitch(2) }),
         QUAD_HOLD_0({ engine -> ControlIds.quadHold(0) to engine.getQuadHold(0) }),
         QUAD_HOLD_1({ engine -> ControlIds.quadHold(1) to engine.getQuadHold(1) }),
-        QUAD_HOLD_2({ engine -> ControlIds.quadHold(2) to engine.getQuadHold(2) }),
         LFO_0({ engine -> ControlIds.HYPER_LFO_A to engine.getHyperLfoFreq(0) }),
         LFO_1({ engine -> ControlIds.HYPER_LFO_B to engine.getHyperLfoFreq(1) }),
         VIBRATO({ engine -> ControlIds.VIBRATO to engine.getVibrato() }),
@@ -101,7 +100,7 @@ class MutateStrategy(
                 MutableParam.DELAY_FEEDBACK -> (currentValue + jumpAmount * 0.5f).coerceIn(0f, 0.85f)
                 MutableParam.DELAY_TIME_0, MutableParam.DELAY_TIME_1 -> 
                     (currentValue + jumpAmount).coerceIn(0.05f, 1f)
-                MutableParam.QUAD_PITCH_0, MutableParam.QUAD_PITCH_1, MutableParam.QUAD_PITCH_2 ->
+                MutableParam.QUAD_PITCH_0, MutableParam.QUAD_PITCH_1 ->
                     (currentValue + jumpAmount * 0.3f).coerceIn(0.2f, 0.8f)
                 MutableParam.VIBRATO -> (currentValue + jumpAmount * 0.5f).coerceIn(0f, 0.6f)
                 MutableParam.VOICE_COUPLING -> (currentValue + jumpAmount * 0.3f).coerceIn(0f, 0.5f)

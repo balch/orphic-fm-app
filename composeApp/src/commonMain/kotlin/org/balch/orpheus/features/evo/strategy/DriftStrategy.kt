@@ -94,8 +94,8 @@ class DriftStrategy(
             changedParams.add("delayFb: $old->$new")
         }
         
-        // Quad pitch drift (all 3 quads)
-        for (q in 0..2) {
+        // Quad pitch drift (Quads 1 and 2 only - Quad 3 is reserved for Drone)
+        for (q in 0..1) {
             if (r.nextFloat() < changeChance * 0.5f) {
                 val old = engine.getQuadPitch(q)
                 val new = nudge(old)
