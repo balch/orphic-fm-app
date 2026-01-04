@@ -103,7 +103,7 @@ fun CompactPortraitVoicePads(
             verticalArrangement = Arrangement.Center
         ) {
             BenderFaderWidget(
-                value = 0f, // State managed externally in real use
+                value = voiceState.bendPosition, // Reflects actual bend position (including AI control)
                 onValueChange = { actions.onBendChange(it) },
                 onRelease = { actions.onBendRelease() },
                 trackHeight = 120, // Use defaults for other params (wider thumb, narrower track)

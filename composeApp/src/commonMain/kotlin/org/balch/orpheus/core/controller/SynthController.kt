@@ -61,11 +61,18 @@ class SynthController {
         extraBufferCapacity = 256,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
+    
+    private val _onBendChange = MutableSharedFlow<Float>(
+        replay = 1,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
 
     // Public read-only flows for ViewModels to subscribe
     val onPulseStart: Flow<Int> = _onPulseStart.asSharedFlow()
     val onPulseEnd: Flow<Int> = _onPulseEnd.asSharedFlow()
     val onControlChange: Flow<ControlEvent> = _onControlChange.asSharedFlow()
+    val onBendChange: Flow<Float> = _onBendChange.asSharedFlow()
 
     /**
      * Emit a pulse start event for a voice.
@@ -93,5 +100,14 @@ class SynthController {
         origin: ControlEventOrigin = ControlEventOrigin.UI
     ) {
         _onControlChange.tryEmit(ControlEvent(controlId, value, origin))
+    }
+
+    /**
+     * Emit a bend change event.
+     * Called by AI agents and other sources to control the pitch bender.
+     * @param amount Bend amount from -1 (full down) to +1 (full up), 0 = center/neutral
+     */
+    fun emitBendChange(amount: Float) {
+        _onBendChange.tryEmit(amount.coerceIn(-1f, 1f))
     }
 }

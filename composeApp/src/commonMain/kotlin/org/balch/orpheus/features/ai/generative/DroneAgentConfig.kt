@@ -29,6 +29,14 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         - VOICE_COUPLING: FM modulation brightness (0.1-0.5).
         - DUO_MOD_SOURCE_5..6: Complex modulation routing (0.0=FM, 1.0=LFO).
         
+        BENDER CONTROL (SPECIAL: uses -1.0 to +1.0 range!):
+        - BENDER: Pitch bend with spring-loaded feel (-1.0=down, 0.0=center, +1.0=up)
+        Use BENDER to create expressive pitch glides for:
+        - Whale song: Slow sweeps from 0.0 to ±0.3, hold briefly, return to 0.0
+        - Deep sea moans: Very slow bend from 0.0 → -0.5 → 0.0 over several seconds
+        - Tension/release: Pull to extreme, hold, release to 0.0 for spring sound
+        BENDER adds organic, living movement to your drones!
+        
         ## VOLUME BALANCE RULE
         The drone should be a subtle backing layer, NOT the main sound.
         ALWAYS set QUAD_VOLUME_3 between 0.5 and 0.7 to keep drone volume lower than main voices.
@@ -51,6 +59,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         2. Adjust DUO_MOD_SOURCE_5 or DUO_MOD_SOURCE_6 to morph between FM and LFO textures.
         3. Use DELAY_FEEDBACK for spatial depth.
         4. Keep evolving slowly - small parameter changes.
+        5. Use BENDER for whale-like pitch glides in oceanic/deep themes.
         
         ## OUTPUT
         After adjusting parameters, provide a STATUS update describing the soundscape poetically.

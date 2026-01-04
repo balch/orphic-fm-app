@@ -45,7 +45,8 @@ data class VoiceUiState(
     val vibrato: Float = 0.0f,
     val voiceCoupling: Float = 0.0f,
     val masterVolume: Float = 1.0f,
-    val peakLevel: Float = 0.0f
+    val peakLevel: Float = 0.0f,
+    val bendPosition: Float = 0.0f // -1 to +1, current bender position for UI display
 ) {
     companion object {
         val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
@@ -78,6 +79,7 @@ private sealed interface VoiceIntent {
     data class VoiceCoupling(val value: Float) : VoiceIntent
     data class MasterVolume(val value: Float) : VoiceIntent
     data class PeakLevel(val value: Float) : VoiceIntent
+    data class BendPosition(val value: Float) : VoiceIntent // For UI updates from engine
 
     // Restore
     data class Restore(val state: VoiceUiState) : VoiceIntent
@@ -206,6 +208,20 @@ class VoiceViewModel(
             launch {
                 engine.peakFlow.collect { peak ->
                     intents.tryEmit(VoiceIntent.PeakLevel(peak))
+                }
+            }
+            
+            // Subscribe to bend changes (for AI-controlled bending)
+            launch {
+                synthController.onBendChange.collect { amount ->
+                    onBendChange(amount)
+                }
+            }
+            
+            // Subscribe to bend flow for UI display updates
+            launch {
+                engine.bendFlow.collect { bendAmount ->
+                    intents.tryEmit(VoiceIntent.BendPosition(bendAmount))
                 }
             }
         }
@@ -387,6 +403,9 @@ class VoiceViewModel(
             is VoiceIntent.PeakLevel ->
                 state.copy(peakLevel = intent.value)
 
+            is VoiceIntent.BendPosition ->
+                state.copy(bendPosition = intent.value)
+
             is VoiceIntent.Restore -> intent.state
         }
 
@@ -481,6 +500,7 @@ class VoiceViewModel(
             is VoiceIntent.VoiceCoupling -> engine.setVoiceCoupling(intent.value)
             is VoiceIntent.MasterVolume -> engine.setMasterVolume(intent.value)
             is VoiceIntent.PeakLevel -> { /* No side effect, strictly monitoring */ }
+            is VoiceIntent.BendPosition -> { /* No side effect, UI display only - engine already updated via bendFlow */ }
             is VoiceIntent.Restore -> applyFullState(intent.state)
         }
     }

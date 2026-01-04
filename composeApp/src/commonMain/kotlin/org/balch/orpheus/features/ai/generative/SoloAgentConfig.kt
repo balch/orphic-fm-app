@@ -72,6 +72,16 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - VOICE_COUPLING: FM coupling between voices
         - TOTAL_FEEDBACK: Global feedback amount
         
+        ### BENDER (SPECIAL: uses -1.0 to +1.0 range!)
+        - BENDER: Pitch bend with spring-loaded feel (-1.0=full down, 0.0=center, +1.0=full up)
+        Creates expressive pitch glides for organic, living soundscapes:
+        - Whale song: Slow sweeps 0.0 → ±0.3 → 0.0 over several seconds
+        - Dolphin clicks: Quick bends 0.0 → 0.5 → 0.0 rapidly  
+        - Sirens: Oscillate between -0.5 and +0.5 at varying speeds
+        - Tension/release: Pull to extreme (±1.0), hold, release to 0.0 for spring "boing"
+        - Submarine resonance: Deep, slow bends for underwater atmosphere
+        Use BENDER to add life and expression to your compositions!
+        
         ### REPL - YOUR LEAD VOICE
         Use repl_execute for melodic solos and patterns. Like a whale call or distant horn.
         See the repl_execute tool description for complete syntax.
@@ -180,14 +190,14 @@ data object SoloAgentConfig : SynthControlAgentConfig {
             evolutionPrompts = listOf(
                 "Begin to introduce a slow, C# minor swelling pad underneath the pings.",
                 "Transition into a 'funk' groove using rhythmic chopping on Quad 1.",
-                "Create 'whale song' glissandos using the REPL lead voice.",
+                "Create 'whale song' by using BENDER: slow sweep from 0.0 to 0.3, hold, return to 0.0. Combine with REPL glissandos.",
                 "Build a massive, orchestral wall of sound using all Quads.",
-                "Enter the 'wind section': White noise sweeps and howling resonance.",
+                "Enter the 'wind section': White noise sweeps and howling resonance. Use BENDER for eerie pitch dives (-0.5).",
                 "Return to the beautiful, ascending choral chord progression.",
                 "Let the delay feedback build to near-chaos, then suddenly cut it.",
-                "Introduce a distinctive, melodic lead line that climbs and falls.",
-                "Slow everything down. The ocean depth increases.",
-                "Return to the single, isolated Ping. Fade to silence."
+                "Dolphin clicks: Use BENDER with quick, short sweeps (0.0 → 0.4 → 0.0) for playful sounds.",
+                "Slow everything down. The ocean depth increases. Deep BENDER sweeps toward -0.7.",
+                "Return to the single, isolated Ping. Release BENDER to 0.0 for final spring sound. Fade to silence."
             )
         ),
         Mood(
@@ -195,15 +205,15 @@ data object SoloAgentConfig : SynthControlAgentConfig {
             initialPrompt = "Establish a driving, aggressive bass ostinato. Use a single repeated note with heavy tremolo or delay to create a galloping rhythm.",
             evolutionPrompts = listOf(
                 "Slowly open the filter/sharpness on the bass to make it bite harder.",
-                "Introduce a screaming, distorted lead sound that slides down (like a slide guitar).",
+                "Introduce a screaming, distorted lead sound using BENDER: pull up to +0.7 and hold for tension.",
                 "Add sudden, explosive crashes using white noise or detuned clusters.",
                 "Pan the sounds aggressively from left to right (use mismatched DELAY_TIME).",
-                "Build tension by raising the pitch of the background drone slowly.",
-                "Unleash a chaotic, shredded lead solo.",
+                "Build tension by raising the pitch of the background drone slowly. Use BENDER to add siren sweep (+0.5 → -0.5).",
+                "Unleash a chaotic, shredded lead solo with wild BENDER oscillations.",
                 "Cut the drums/rhythm, leave a scary, suspended atmospheric chord.",
                 "Slam back into the driving rhythm with maximum force.",
-                "Use VIBRATO to make the whole track wobble and destabilize.",
-                "End with a dissipating wind sound."
+                "Use VIBRATO and BENDER together to make the whole track wobble and destabilize.",
+                "End with a dissipating wind sound. Release BENDER to 0.0 for final spring release."
             )
         ),
         Mood(

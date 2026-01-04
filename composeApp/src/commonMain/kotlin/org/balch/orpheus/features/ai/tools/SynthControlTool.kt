@@ -23,10 +23,18 @@ class SynthControlTool @Inject constructor(
     resultSerializer = Result.serializer(),
     name = "synth_control",
     description = """
-        Control synthesizer parameters like volume, vibrato, distortion, delay, pan, quad settings, and duo mod sources.
+        Control synthesizer parameters like volume, vibrato, distortion, delay, pan, quad settings, duo mod sources, and the pitch bender.
         Use this to adjust the sound based on user requests.
-        Values should be between 0.0 and 1.0. 
+        Values should be between 0.0 and 1.0 (except BENDER which uses -1.0 to +1.0).
         For DUO_MOD_SOURCE: 0.0=VoiceFM, 0.5=Off, 1.0=LFO.
+        
+        BENDER SPECIAL CONTROL:
+        The BENDER creates expressive pitch glides with a spring-loaded feel. Perfect for:
+        - Whale song effects: Slow sweeps from 0.0 to ±0.3 with gradual return to center
+        - Dolphin clicks: Quick, short bends (0.0 → 0.5 → 0.0 rapidly)
+        - Sirens: Oscillate between -0.5 and +0.5 at varying speeds
+        - Tension/release: Pull to extreme (+1.0 or -1.0), hold, then release to 0.0 for spring sound
+        Use BENDER when you want to create organic, gliding pitch movements.
     """.trimIndent()
 ) {
     // Track current values for each control to enable smooth ramping
@@ -78,10 +86,16 @@ class SynthControlTool @Inject constructor(
             PAIRS/DUOS (1-6):
             - DUO_MOD_SOURCE_1..6: Modulation source (0=VoiceFM, 0.5=Off, 1=LFO)
             - PAIR_SHARPNESS_1..6: Waveform sharpness (0=triangle, 1=square)
+            
+            BENDER (SPECIAL - uses -1.0 to +1.0 range!):
+            - BENDER: Pitch bend control (-1.0=full down, 0.0=center, +1.0=full up)
+              Creates organic gliding pitch effects with spring-loaded feel.
+              Perfect for whale songs, dolphin clicks, sirens, and tension/release effects.
+              Set to 0.0 to release and trigger the spring sound.
         """)
         val controlId: String,
 
-        @property:LLMDescription("Value to set (0.0 to 1.0)")
+        @property:LLMDescription("Value to set. Most controls: 0.0 to 1.0. BENDER: -1.0 to +1.0")
         val value: Float
     )
 
@@ -92,6 +106,11 @@ class SynthControlTool @Inject constructor(
     )
 
     override suspend fun execute(args: Args): Result {
+        // Special handling for BENDER - uses -1 to +1 range
+        if (args.controlId.uppercase() == "BENDER") {
+            return executeBend(args.value)
+        }
+        
         val normalizedValue = args.value.coerceIn(0f, 1f)
         
         // Map friendly aliases to actual system IDs (which are lowercase)
@@ -188,6 +207,46 @@ class SynthControlTool @Inject constructor(
         return Result(
             success = true,
             message = "Ramped $targetId to ${(normalizedValue * 100).toInt()}%"
+        )
+    }
+
+    /**
+     * Special handling for BENDER control.
+     * Uses -1 to +1 range and the dedicated emitBendChange method.
+     * Creates smooth pitch glides for expressive effects like whale songs.
+     */
+    private suspend fun executeBend(targetValue: Float): Result {
+        val normalizedValue = targetValue.coerceIn(-1f, 1f)
+        
+        // Get current bend value (or use 0f as default starting point - center)
+        val startValue = currentValues["bender"] ?: 0f
+        val stepDelayMs = rampDurationMs / rampSteps
+        
+        // Smooth ramp from current to target
+        for (step in 1..rampSteps) {
+            val t = step.toFloat() / rampSteps
+            val interpolatedValue = startValue + (normalizedValue - startValue) * t
+            
+            synthController.emitBendChange(interpolatedValue)
+            
+            if (step < rampSteps) {
+                delay(stepDelayMs)
+            }
+        }
+        
+        // Update tracked value
+        currentValues["bender"] = normalizedValue
+        
+        // Format the message based on bend direction
+        val direction = when {
+            normalizedValue > 0.1f -> "up"
+            normalizedValue < -0.1f -> "down"
+            else -> "center"
+        }
+        
+        return Result(
+            success = true,
+            message = "Bent pitch $direction to ${(normalizedValue * 100).toInt()}%"
         )
     }
 }

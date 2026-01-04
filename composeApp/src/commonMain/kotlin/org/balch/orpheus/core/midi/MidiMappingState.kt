@@ -105,6 +105,9 @@ data class MidiMappingState(
             // Viz controls
             const val VIZ_KNOB_1 = "viz_knob_1"
             const val VIZ_KNOB_2 = "viz_knob_2"
+            
+            // Bender - pitch bend with spring-loaded behavior
+            const val BENDER = "bender"
         }
     }
 
