@@ -512,11 +512,15 @@ class VoiceViewModel(
         state.voiceEnvelopeSpeeds.forEachIndexed { i, s ->
             engine.setVoiceEnvelopeSpeed(i, s)
         }
-        state.duoModSources.forEachIndexed { i, s -> engine.setDuoModSource(i, s) }
         state.quadGroupPitches.forEachIndexed { i, p -> engine.setQuadPitch(i, p) }
         state.quadGroupHolds.forEachIndexed { i, h -> engine.setQuadHold(i, h) }
         state.quadGroupVolumes.forEachIndexed { i, v -> engine.setQuadVolume(i, v) }
+        
+        // IMPORTANT: Set FM structure BEFORE duoModSources!
+        // VOICE_FM routing in setDuoModSource depends on the fmStructureCrossQuad flag
         engine.setFmStructure(state.fmStructureCrossQuad)
+        state.duoModSources.forEachIndexed { i, s -> engine.setDuoModSource(i, s) }
+        
         engine.setTotalFeedback(state.totalFeedback)
         engine.setVibrato(state.vibrato)
         engine.setVoiceCoupling(state.voiceCoupling)
