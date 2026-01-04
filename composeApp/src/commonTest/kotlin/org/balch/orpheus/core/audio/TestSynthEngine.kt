@@ -94,6 +94,7 @@ open class TestSynthEngine : SynthEngine {
     override fun setQuadPitch(quadIndex: Int, pitch: Float) { _quadPitch[quadIndex] = pitch }
     override fun setQuadHold(quadIndex: Int, amount: Float) { _quadHold[quadIndex] = amount }
     override fun setQuadVolume(quadIndex: Int, volume: Float) { _quadVolume[quadIndex] = volume }
+    override fun fadeQuadVolume(quadIndex: Int, targetVolume: Float, durationSeconds: Float) { _quadVolume[quadIndex] = targetVolume }
     override fun setVoiceHold(index: Int, amount: Float) {}
     override fun setVoiceWobble(index: Int, wobbleOffset: Float, range: Float) {}
     override fun setFmStructure(crossQuad: Boolean) { _fmStructureCrossQuad = crossQuad }

@@ -47,9 +47,30 @@ class ReplExecuteTool @Inject constructor(
         
         VOICE CONTROLS (voice index 1-8):
         - hold:<voice> <val> - Voice sustain level (0.0-1.0)
-        - tune:<voice> <val> - Voice pitch (0.5 = unity)
+        - tune:<voice> <val> - Voice pitch (see TUNING TO NOTES below)
         - pan:<voice> <val> - Voice pan (-1.0 to 1.0)
         - envspeed:<voice> <val> - Envelope speed (0.0=fast, 1.0=slow)
+        
+        TUNING VOICES TO MUSICAL NOTES:
+        The tune command uses 0.0-1.0 where 0.5 = A3 (220Hz).
+        Formula: tuneValue = 0.5 + (semitones from A3 / 48.0)
+        
+        Common note values:
+        - A3 (unity) = 0.500
+        - C4 (+3 semi) = 0.562
+        - D4 (+5 semi) = 0.604
+        - E4 (+7 semi) = 0.646
+        - G4 (+10 semi) = 0.708
+        - A4 (+12 semi) = 0.750
+        
+        Voice pitch multipliers affect final pitch:
+        - Voices 1-2: 0.5× (one octave lower)
+        - Voices 3-6: 1.0× (as calculated)
+        - Voices 7-8: 2.0× (one octave higher, so tune=0.5 = A4/440Hz)
+        
+        Examples:
+        - tune:3 0.562 → Voice 3 plays C4
+        - tune:7 0.5 → Voice 7 plays A4 (concert pitch, due to 2x multiplier)
         
         **IMPORTANT - envspeed requires hold:**
         When using envspeed, you MUST also set hold or the note won't be heard!
@@ -83,6 +104,7 @@ class ReplExecuteTool @Inject constructor(
         d1 $ note "c2 db2 g2 ab2"
         d2 $ voices:1 2 3 4
         d3 $ voices "1" # hold "0.8" # envspeed "0.7"
+        tune:3 0.562
         
         Use hush to silence all patterns.
     """.trimIndent()

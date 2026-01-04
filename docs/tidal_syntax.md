@@ -201,21 +201,69 @@ d1 $ slow 2 $ note "c3 e3"  -- Chained transformation
 
 All values are normalized 0.0-1.0 unless otherwise specified.
 
-### Voice Level Controls (0-7)
+### Voice Level Controls (1-8)
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `hold:<voice> <val>` | Voice sustain/hold level | `d1 $ hold:0 0.8` |
-| `tune:<voice> <val>` | Voice pitch (0.5 = unity) | `d1 $ tune:0 0.6` |
-| `pan:<voice> <val>` | Voice pan (-1 to 1) | `d1 $ pan:0 -0.5` |
+| `hold:<voice> <val>` | Voice sustain/hold level | `d1 $ hold:1 0.8` |
+| `tune:<voice> <val>` | Voice pitch (see TUNING below) | `tune:3 0.562` |
+| `pan:<voice> <val>` | Voice pan (-1 to 1) | `d1 $ pan:1 -0.5` |
 
-### Quad Level Controls (0-2)
-Quads group 4 voices: Quad 0 = voices 0-3, Quad 1 = voices 4-7, Quad 2 = voices 8-11
+### Tuning Voices to Musical Notes
+
+The `tune` command uses a 0.0-1.0 range to control voice pitch.
+
+**Base Frequency Formula:**
+```
+frequency = 55Hz × 2^(tune × 4)
+```
+
+**Key Values:**
+- 0.0 = A1 (55 Hz)
+- 0.5 = A3 (220 Hz) ← "Unity" point
+- 1.0 = A5 (880 Hz)
+
+**Semitone Calculation:**
+To tune to a specific note relative to A3:
+```
+tuneValue = 0.5 + (semitones from A3 / 48.0)
+```
+
+**Common Musical Notes:**
+
+| Note | Semitones from A3 | Tune Value |
+|------|-------------------|------------|
+| A3   | 0                 | 0.500      |
+| B3   | +2                | 0.542      |
+| C4   | +3                | 0.562      |
+| D4   | +5                | 0.604      |
+| E4   | +7                | 0.646      |
+| F4   | +8                | 0.667      |
+| G4   | +10               | 0.708      |
+| A4   | +12               | 0.750      |
+| C5   | +15               | 0.812      |
+
+**Voice Pitch Multipliers:**
+Each voice has a built-in pitch multiplier that affects the final frequency:
+- Voices 1-2: 0.5× (one octave lower than calculated)
+- Voices 3-6: 1.0× (as calculated)
+- Voices 7-8: 2.0× (one octave higher, so tune=0.5 = A4/440Hz concert pitch)
+- Voices 9-12: 1.0× (as calculated)
+
+**Examples:**
+```tidal
+tune:3 0.562       -- Voice 3 plays C4
+tune:7 0.5         -- Voice 7 plays A4 (concert pitch, due to 2x multiplier)
+tune:1 0.750       -- Voice 1 plays A3 (A4 calculation minus 0.5x multiplier = A3)
+```
+
+### Quad Level Controls (1-3)
+Quads group 4 voices: Quad 1 = voices 1-4, Quad 2 = voices 5-8, Quad 3 = voices 9-12
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `quadhold:<quad> <val>` | Quad hold level | `d1 $ quadhold:0 0.7` |
-| `quadpitch:<quad> <val>` | Quad pitch (0.5 = unity) | `d1 $ quadpitch:1 0.6` |
+| `quadhold:<quad> <val>` | Quad hold level | `quadhold:1 0.7` |
+| `quadpitch:<quad> <val>` | Quad pitch (0.5 = unity) | `quadpitch:2 0.6` |
 
 ### Duo Level Controls (0-3)
 Duos group 2 voices: Duo 0 = voices 0-1, Duo 1 = voices 2-3, etc.

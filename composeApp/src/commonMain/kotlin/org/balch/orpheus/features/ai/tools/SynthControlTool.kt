@@ -14,6 +14,42 @@ import org.balch.orpheus.core.routing.SynthController
 /**
  * Tool for controlling synth parameters via the SynthController.
  * Uses linear ramping for smooth transitions when AI changes values.
+ * 
+ * ## Tuning Voices to Musical Notes
+ * 
+ * VOICE_TUNE_1 through VOICE_TUNE_12 control voice pitch using a 0.0-1.0 range.
+ * 
+ * **Base Frequency Formula:**
+ * `frequency = 55Hz × 2^(tune × 4)`
+ * 
+ * **Key Values:**
+ * - 0.0 = A1 (55 Hz)
+ * - 0.5 = A3 (220 Hz) ← "Unity" point
+ * - 1.0 = A5 (880 Hz)
+ * 
+ * **Semitone Calculation:**
+ * To tune to a specific note relative to A3 (at tune=0.5):
+ * `tuneValue = 0.5 + (semitones / 48.0)`
+ * 
+ * **Common Musical Notes (relative to A3):**
+ * - A3 (unity) = 0.500
+ * - B3 (+2 semi) = 0.542
+ * - C4 (+3 semi) = 0.562
+ * - D4 (+5 semi) = 0.604
+ * - E4 (+7 semi) = 0.646
+ * - F4 (+8 semi) = 0.667
+ * - G4 (+10 semi) = 0.708
+ * - A4 (+12 semi) = 0.750
+ * - C5 (+15 semi) = 0.812
+ * 
+ * **Voice Pitch Multipliers:**
+ * Each voice has a built-in pitch multiplier:
+ * - Voices 1-2: 0.5× (one octave lower)
+ * - Voices 3-6: 1.0× (as calculated)
+ * - Voices 7-8: 2.0× (one octave higher)
+ * - Voices 9-12: 1.0× (as calculated)
+ * 
+ * So voices 7-8 at tune=0.5 play A4 (440Hz, concert pitch).
  */
 @ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
 class SynthControlTool @Inject constructor(
@@ -27,6 +63,12 @@ class SynthControlTool @Inject constructor(
         Use this to adjust the sound based on user requests.
         Values should be between 0.0 and 1.0 (except BENDER which uses -1.0 to +1.0).
         For DUO_MOD_SOURCE: 0.0=VoiceFM, 0.5=Off, 1.0=LFO.
+        
+        VOICE TUNING TO MUSICAL NOTES:
+        VOICE_TUNE uses 0.0-1.0 where 0.5 = A3 (220Hz).
+        To tune to other notes: tuneValue = 0.5 + (semitones from A3 / 48.0)
+        Common notes: C4=0.562, D4=0.604, E4=0.646, F4=0.667, G4=0.708, A4=0.750
+        Note: Voices 7-8 have 2x pitch multiplier, so at 0.5 they play A4 (440Hz concert pitch).
         
         BENDER SPECIAL CONTROL:
         The BENDER creates expressive pitch glides with a spring-loaded feel. Perfect for:

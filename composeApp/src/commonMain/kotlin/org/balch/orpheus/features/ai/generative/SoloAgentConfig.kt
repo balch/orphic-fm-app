@@ -27,9 +27,14 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         
         ### VOICES 1-8 (Individual Control)
         Each voice can be shaped independently:
-        - VOICE_TUNE_1 through VOICE_TUNE_8: Pitch (0.5=unity, vary for detuning)
+        - VOICE_TUNE_1 through VOICE_TUNE_8: Pitch (0.5=A3/220Hz, see TUNING below)
         - VOICE_FM_DEPTH_1 through VOICE_FM_DEPTH_8: FM modulation depth
         - VOICE_ENV_SPEED_1 through VOICE_ENV_SPEED_8: Envelope (0=fast attack, 1=slow pad)
+        
+        TUNING TO MUSICAL NOTES:
+        Formula: tuneValue = 0.5 + (semitones from A3 / 48.0)
+        Examples: C4=0.562, D4=0.604, E4=0.646, G4=0.708, A4=0.750
+        Voice pitch multipliers: Voices 1-2=0.5×, 3-6=1.0×, 7-8=2.0× (so tune=0.5 on voice 7-8 = A4/440Hz)
         
         ### QUADS 1, 2, 3 - ALWAYS KEEP THESE MOVING!
         All three quads should have SLOWLY RAMPING values. Never static!

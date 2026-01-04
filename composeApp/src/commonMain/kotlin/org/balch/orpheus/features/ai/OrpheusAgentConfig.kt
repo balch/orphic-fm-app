@@ -77,9 +77,22 @@ class OrpheusAgentConfig @Inject constructor(
         - DELAY_LFO_WAVEFORM (0/1): Mod shape (0=tri, 1=sq)
         
         ### VOICES (1-8)
-        - VOICE_TUNE_1..8: Pitch (0.5=unity)
+        - VOICE_TUNE_1..8: Pitch (see TUNING TO NOTES below)
         - VOICE_FM_DEPTH_1..8: FM depth
         - VOICE_ENV_SPEED_1..8: Envelope speed (0=fast, 1=slow)
+        
+        ### TUNING VOICES TO MUSICAL NOTES
+        VOICE_TUNE uses 0.0-1.0 where 0.5 = A3 (220Hz base).
+        Formula: tuneValue = 0.5 + (semitones from A3 / 48.0)
+        
+        Common note values:
+        - A3 (unity) = 0.500 | C4 = 0.562 | D4 = 0.604 | E4 = 0.646
+        - G4 = 0.708 | A4 = 0.750 | C5 = 0.812
+        
+        Voice pitch multipliers:
+        - Voices 1-2: 0.5× (one octave lower)
+        - Voices 3-6: 1.0× (as calculated)
+        - Voices 7-8: 2.0× (one octave higher, so tune=0.5 = A4/440Hz concert pitch)
         
         ### QUADS (Group Controls)
         - QUAD_PITCH_1..3: Pitch for quad groups (1=Voices 1-4, 2=Voices 5-8, 3=Voices 9-12)
