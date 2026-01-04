@@ -1,6 +1,5 @@
 package org.balch.orpheus.features.debug
 
-// Imports removed
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,9 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -35,37 +31,54 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.audio.SynthEngine
+import dev.zacsweers.metrox.viewmodel.metroViewModel
+import androidx.compose.material3.Text
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
-import org.balch.orpheus.ui.preview.PreviewSynthEngine
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
-import org.balch.orpheus.util.ConsoleLogger
+import org.balch.orpheus.util.LogEntry
 import org.balch.orpheus.util.LogLevel
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 import kotlin.math.log10
 
+/**
+ * Entry point that obtains the ViewModel and delegates to the stateless composable.
+ */
 @Composable
 fun DebugBottomBar(
-    engine: SynthEngine, 
-    consoleLogger: ConsoleLogger,
+    modifier: Modifier = Modifier
+) {
+    val viewModel: DebugViewModel = metroViewModel()
+    val state by viewModel.uiState.collectAsState()
+    
+    DebugBottomBarContent(
+        state = state,
+        actions = viewModel.panelActions,
+        modifier = modifier
+    )
+}
+
+/**
+ * Stateless composable that renders the debug bar.
+ */
+@Composable
+fun DebugBottomBarContent(
+    state: DebugUiState,
+    actions: DebugPanelActions,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-
-    // Collect logs from StateFlow
-    val logs by consoleLogger.logsFlow.collectAsState()
 
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
@@ -103,7 +116,7 @@ fun DebugBottomBar(
             ) {
                 // Find last INFO or ERROR message (skip warnings and debug)
                 val lastRelevantLog =
-                    logs.firstOrNull { it.level == LogLevel.INFO || it.level == LogLevel.ERROR }
+                    state.logs.firstOrNull { it.level == LogLevel.INFO || it.level == LogLevel.ERROR }
                 val statusColor =
                     when (lastRelevantLog?.level) {
                         LogLevel.ERROR -> OrpheusColors.neonMagenta
@@ -132,20 +145,16 @@ fun DebugBottomBar(
             ) {
                 // MONITORING METRICS
 
-                // Collect from engine flows
-                val peak by engine.peakFlow.collectAsState()
-                val cpu by engine.cpuLoadFlow.collectAsState()
-
                 // CPU Display
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("CPU:", fontSize = 10.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "${cpu.toInt()}%",
+                        text = "${state.cpuLoad.toInt()}%",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
                         color =
-                            if (cpu > 80) OrpheusColors.neonMagenta
+                            if (state.cpuLoad > 80) OrpheusColors.neonMagenta
                             else OrpheusColors.synthGreen
                     )
                 }
@@ -156,48 +165,19 @@ fun DebugBottomBar(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("PEAK:", fontSize = 10.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.width(4.dp))
-                    val peakDb = if (peak > 0) 20 * log10(peak) else -60f
-                    val displayPeak = ((peak * 100).toInt() / 100.0).toString()
+                    val peakDb = if (state.peak > 0) 20 * log10(state.peak) else -60f
+                    val displayPeak = ((state.peak * 100).toInt() / 100.0).toString()
 
                     Text(
                         text = displayPeak,
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
                         color =
-                            if (peak > 0.95f) Color.Red
-                            else if (peak > 0.8f) Color.Yellow else OrpheusColors.electricBlue
+                            if (state.peak > 0.95f) Color.Red
+                            else if (state.peak > 0.8f) Color.Yellow else OrpheusColors.electricBlue
                     )
                 }
 
-/*
-                // Audio Test (Quick Action)
-                var isTestTonePlaying by remember { mutableStateOf(false) }
-                Box(
-                    modifier =
-                        Modifier.clickable {
-                            isTestTonePlaying = !isTestTonePlaying
-                            if (isTestTonePlaying) {
-                                engine.playTestTone(440f)
-                            } else {
-                                engine.stopTestTone()
-                            }
-                        }
-                            .background(
-                                if (isTestTonePlaying)
-                                    OrpheusColors.neonCyan.copy(alpha = 0.3f)
-                                else Color(0xFF333333),
-                                RoundedCornerShape(4.dp)
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = if (isTestTonePlaying) "STOP TONE" else "TEST TONE",
-                        fontSize = 10.sp,
-                        color = if (isTestTonePlaying) OrpheusColors.neonCyan else Color.Gray
-                    )
-                }
-
- */
                 // Expand Button
                 Box(modifier = Modifier.clickable { isExpanded = !isExpanded }.padding(4.dp)) {
                     Text(text = if (isExpanded) "▼" else "▲", color = Color.Gray, fontSize = 12.sp)
@@ -207,82 +187,73 @@ fun DebugBottomBar(
 
         // Expanded Content (Logs List)
         if (isExpanded) {
-            Column(
-                modifier =
-                    Modifier.fillMaxWidth()
-                        .heightIn(max = 200.dp)
-                        .background(Color(0xFF0D0D0D))
-            ) {
-                // Header with Clear button
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth()
-                            .background(Color(0xFF1A1A1A))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "Logs (${logs.size})", fontSize = 10.sp, color = Color.Gray)
-                    Text(
-                        text = "CLEAR",
-                        fontSize = 10.sp,
-                        color = OrpheusColors.neonMagenta,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { consoleLogger.clear() }.padding(4.dp)
-                    )
-                }
-
-                // Auto-scrolling log list
-                val listState = rememberLazyListState()
-                val logCount = logs.size
-
-                // Auto-scroll to top (newest) when new logs arrive
-                LaunchedEffect(logCount) {
-                    if (logCount > 0) {
-                        listState.animateScrollToItem(0)
-                    }
-                }
-
-                LazyColumn(state = listState, modifier = Modifier.padding(8.dp)) {
-                    items(logs) { log ->
-                        val color =
-                            when (log.level) {
-                                LogLevel.ERROR -> OrpheusColors.neonMagenta
-                                LogLevel.WARNING -> Color.Yellow
-                                LogLevel.DEBUG -> Color.Gray
-                                else -> OrpheusColors.synthGreen
-                            }
-                        Text(
-                            text = "[${log.timestamp % 10000}] ${log.message}",
-                            color = color,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(vertical = 1.dp)
-                        )
-                    }
-                }
-            }
+            DebugLogsPanel(
+                logs = state.logs,
+                onClearLogs = actions.onClearLogs
+            )
         }
     }
 }
 
 @Composable
-private fun DebugToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, fontSize = 10.sp, color = Color.Gray)
-        Spacer(modifier = Modifier.width(4.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            modifier = Modifier.scale(0.6f),
-            colors =
-                SwitchDefaults.colors(
-                    checkedThumbColor = OrpheusColors.neonCyan,
-                    checkedTrackColor = OrpheusColors.neonCyan.copy(alpha = 0.3f),
-                    uncheckedThumbColor = Color.Gray,
-                    uncheckedTrackColor = Color.DarkGray
+private fun DebugLogsPanel(
+    logs: List<LogEntry>,
+    onClearLogs: () -> Unit
+) {
+    Column(
+        modifier =
+            Modifier.fillMaxWidth()
+                .heightIn(max = 200.dp)
+                .background(Color(0xFF0D0D0D))
+    ) {
+        // Header with Clear button
+        Row(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .background(Color(0xFF1A1A1A))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Logs (${logs.size})", fontSize = 10.sp, color = Color.Gray)
+            Text(
+                text = "CLEAR",
+                fontSize = 10.sp,
+                color = OrpheusColors.neonMagenta,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { onClearLogs() }.padding(4.dp)
+            )
+        }
+
+        // Auto-scrolling log list
+        val listState = rememberLazyListState()
+        val logCount = logs.size
+
+        // Auto-scroll to top (newest) when new logs arrive
+        LaunchedEffect(logCount) {
+            if (logCount > 0) {
+                listState.animateScrollToItem(0)
+            }
+        }
+
+        LazyColumn(state = listState, modifier = Modifier.padding(8.dp)) {
+            items(logs) { log ->
+                val color =
+                    when (log.level) {
+                        LogLevel.ERROR -> OrpheusColors.neonMagenta
+                        LogLevel.WARNING -> Color.Yellow
+                        LogLevel.DEBUG -> Color.Gray
+                        else -> OrpheusColors.synthGreen
+                    }
+                Text(
+                    text = "[${log.timestamp % 10000}] ${log.message}",
+                    color = color,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(vertical = 1.dp)
                 )
-        )
+            }
+        }
     }
 }
 
@@ -291,25 +262,25 @@ private fun DebugToggle(label: String, checked: Boolean, onCheckedChange: (Boole
 fun DebugBottomBarPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects
 ) {
-    val logger = remember {
-        ConsoleLogger().apply {
-            info("Preview", "System initialized")
-            debug("Preview", "Loading voice patches...")
-            warn("Preview", "Low battery detected (simulated)")
-            error("Preview", "Failed to connect to external MIDI", RuntimeException("Connection timeout"))
-            info("Preview", "Ready for performance")
-        }
-    }
+    val previewState = DebugUiState(
+        peak = 0.5f,
+        cpuLoad = 12.5f,
+        logs = listOf(
+            LogEntry(LogLevel.INFO, "System initialized"),
+            LogEntry(LogLevel.DEBUG, "Loading voice patches..."),
+            LogEntry(LogLevel.WARNING, "Low battery detected (simulated)"),
+            LogEntry(LogLevel.ERROR, "Failed to connect to external MIDI"),
+            LogEntry(LogLevel.INFO, "Ready for performance")
+        )
+    )
 
     LiquidPreviewContainerWithGradient(effects = effects) {
         Box(modifier = Modifier.fillMaxSize()) {
-            DebugBottomBar(
-                engine = PreviewSynthEngine(),
-                consoleLogger = logger,
+            DebugBottomBarContent(
+                state = previewState,
+                actions = DebugPanelActions.EMPTY,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
     }
 }
-
-

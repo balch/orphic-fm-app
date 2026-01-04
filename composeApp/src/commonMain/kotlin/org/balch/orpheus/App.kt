@@ -69,10 +69,7 @@ fun App(graph: OrpheusGraph) {
                             }
 
                             // Persistent Debug Bar
-                            DebugBottomBar(
-                                engine = graph.synthEngine,
-                                consoleLogger = graph.consoleLogger
-                            )
+                            DebugBottomBar()
                         }
                     }
                     
