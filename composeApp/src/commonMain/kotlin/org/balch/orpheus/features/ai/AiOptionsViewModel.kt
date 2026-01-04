@@ -415,36 +415,23 @@ class AiOptionsViewModel(
             val newAgent = synthAgentFactory.create(DroneAgentConfig)
             _droneAgent.value = newAgent
             
-            // Generate and apply a unique random preset to jumpstart the creative process
+            // Drone mode only uses Quad 3 (voices 8-11) for background drones
+            // Quads 1 and 2 remain untouched for user to play over
             viewModelScope.launch(dispatcherProvider.io) {
                 // If we just stopped Solo, give it a moment to clean up
                 if (wasSoloActive) {
                     delay(500)
                 }
                 
-                val uniquePreset = generateRandomDronePreset()
+                // Set Quad 3 volume to 0 before starting, then fade in
+                synthEngine.setQuadVolume(2, 0f)
                 
-                // Fade in: Apply preset with Quad Volumes = 0, then ramp up to 1.0
-                // Master Volume is not affected by presets (user control only)
-                val presetWithZeroQuadVol = uniquePreset.copy(
-                    quadGroupVolumes = listOf(0f, 0f, 0f)
-                )
+                // Fade in only Quad 3 using JSyn's LinearRamp
+                val fadeDuration = 2.0f  // seconds
+                log.info { "Fading in Quad 3 for drone over ${fadeDuration}s" }
+                synthEngine.fadeQuadVolume(2, 1f, fadeDuration)
                 
-                presetLoader.applyPreset(presetWithZeroQuadVol)
-                log.info { "Applied drone preset: ${uniquePreset.name} (fading in)" }
-                
-                // Fade in Quad Volumes from 0 to 1 over ~1 second
-                // Use direct setQuadVolume calls - the voice's internal LinearRamp provides smoothing
-                val steps = 20
-                val stepDelay = 50L  // 20 steps * 50ms = 1 second total
-                for (step in 1..steps) {
-                    val volume = step.toFloat() / steps
-                    synthEngine.setQuadVolume(0, volume)
-                    synthEngine.setQuadVolume(1, volume)
-                    synthEngine.setQuadVolume(2, volume)
-                    delay(stepDelay)
-                }
-                
+                // Start the agent immediately - it generates the drone sound that fades in
                 newAgent.start()
             }
         } else {
@@ -455,47 +442,6 @@ class AiOptionsViewModel(
             // Reset playback mode to USER
             synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
         }
-    }
-    
-    private fun generateRandomDronePreset(): DronePreset {
-        val r = Random
-        
-        return DronePreset(
-            name = "Drone Session ${Clock.System.now().epochSeconds}",
-            
-            // Random tunings favoring harmonics (12 voices)
-            voiceTunes = List(12) { 
-                if (r.nextBoolean()) 0.5f + r.nextFloat() * 0.02f // Unison with drift
-                else 0.5f + (listOf(-0.1f, 0.1f, 0.2f).random()) // Intervals
-            },
-            
-            // Evolving textures
-            voiceModDepths = List(12) { r.nextFloat() * 0.4f },
-            voiceEnvelopeSpeeds = List(12) { 0.1f + r.nextFloat() * 0.8f },
-            
-            // Duo configuration (6 pairs)
-            pairSharpness = List(6) { r.nextFloat() * 0.5f },
-            duoModSources = List(6) { 
-                if (r.nextFloat() > 0.7) ModSource.LFO 
-                else ModSource.VOICE_FM 
-            },
-            
-            // Spatial
-            delayTime1 = 0.2f + r.nextFloat() * 0.4f,
-            delayTime2 = 0.3f + r.nextFloat() * 0.4f,
-            delayFeedback = 0.4f + r.nextFloat() * 0.4f, // High feedback for drone
-            delayMix = 0.4f + r.nextFloat() * 0.3f,
-            
-            // Global Character
-            drive = r.nextFloat() * 0.3f,
-            distortionMix = r.nextFloat() * 0.4f,
-            vibrato = 0.2f + r.nextFloat() * 0.3f,
-            voiceCoupling = r.nextFloat() * 0.4f,
-            
-            // Quad setup (defaults)
-            fmStructureCrossQuad = r.nextBoolean()
-            // Note: masterVolume not set - it's user-controlled only
-        )
     }
 
     // ============================================================
@@ -571,18 +517,14 @@ class AiOptionsViewModel(
                 presetLoader.applyPreset(presetWithZeroQuadVol)
                 log.info { "Applied solo preset: ${soloPreset.name} (fading in)" }
                 
-                // Fade in Quad Volumes from 0 to 1 over ~1 second
-                // Use direct setQuadVolume calls - the voice's internal LinearRamp provides smoothing
-                val steps = 20
-                val stepDelay = 50L  // 20 steps * 50ms = 1 second total
-                for (step in 1..steps) {
-                    val volume = step.toFloat() / steps
-                    synthEngine.setQuadVolume(0, volume)
-                    synthEngine.setQuadVolume(1, volume)
-                    synthEngine.setQuadVolume(2, volume)
-                    delay(stepDelay)
-                }
+                // Fade in using JSyn's LinearRamp for sample-accurate, click-free transitions
+                val fadeDuration = 2.0f  // seconds
+                log.info { "Fading in quad volumes over ${fadeDuration}s" }
+                synthEngine.fadeQuadVolume(0, 1f, fadeDuration)
+                synthEngine.fadeQuadVolume(1, 1f, fadeDuration)
+                synthEngine.fadeQuadVolume(2, 1f, fadeDuration)
                 
+                // Start the agent immediately - it generates the sound that fades in
                 newAgent.start()
                 
                 // Subscribe to completion signal - auto-stop Solo when all evolution prompts are done
@@ -783,25 +725,22 @@ class AiOptionsViewModel(
                     val vol1 = synthEngine.getQuadVolume(1)
                     val vol2 = synthEngine.getQuadVolume(2)
                     
-                    // Fade out Quad Volumes over ~1 second
-                    // Use direct setQuadVolume calls - the voice's internal LinearRamp provides smoothing
-                    log.debug { "REPL stop: Ramping down quad volumes" }
-                    val steps = 20
-                    val stepDelay = 50L  // 20 steps * 50ms = 1 second total
-                    for (step in 1..steps) {
-                        val t = step.toFloat() / steps  // 0.05 to 1.0
-                        synthEngine.setQuadVolume(0, vol0 * (1f - t))
-                        synthEngine.setQuadVolume(1, vol1 * (1f - t))
-                        synthEngine.setQuadVolume(2, vol2 * (1f - t))
-                        delay(stepDelay)
-                    }
+                    // Fade out using JSyn's LinearRamp for sample-accurate, click-free transitions
+                    val fadeDuration = 2.0f  // seconds
+                    log.debug { "REPL stop: Fading out quad volumes over ${fadeDuration}s" }
+                    synthEngine.fadeQuadVolume(0, 0f, fadeDuration)
+                    synthEngine.fadeQuadVolume(1, 0f, fadeDuration)
+                    synthEngine.fadeQuadVolume(2, 0f, fadeDuration)
+                    
+                    // Wait for fade to complete
+                    delay((fadeDuration * 1000).toLong())
                     
                     replExecuteTool.execute(
                         ReplExecuteTool.Args(code = "hush")
                     )
                     log.info { "Hushed REPL patterns" }
                     
-                    // Restore volumes after hush
+                    // Restore volumes after hush (instant, not faded)
                     synthEngine.setQuadVolume(0, vol0)
                     synthEngine.setQuadVolume(1, vol1)
                     synthEngine.setQuadVolume(2, vol2)

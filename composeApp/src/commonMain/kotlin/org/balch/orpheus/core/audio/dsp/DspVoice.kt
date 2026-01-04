@@ -104,10 +104,27 @@ class DspVoice(
     
     /**
      * Set voice volume using a smooth ramp to avoid clicks.
+     * Resets ramp time to default (50ms) for quick transitions.
      * @param volume 0.0 to 1.0 volume level
      */
     fun setVolume(volume: Double) {
+        volumeRamp.time.set(DEFAULT_VOLUME_RAMP_TIME)
         volumeRamp.input.set(volume)
+    }
+    
+    /**
+     * Fade voice volume to a target level over a specified duration.
+     * Uses LinearRamp for sample-accurate, click-free transitions.
+     * @param targetVolume Target volume level (0.0 to 1.0)
+     * @param durationSeconds Duration of the fade in seconds
+     */
+    fun fadeVolume(targetVolume: Double, durationSeconds: Double) {
+        volumeRamp.time.set(durationSeconds)
+        volumeRamp.input.set(targetVolume)
+    }
+    
+    companion object {
+        private const val DEFAULT_VOLUME_RAMP_TIME = 0.05  // 50ms for quick transitions
     }
 
     init {

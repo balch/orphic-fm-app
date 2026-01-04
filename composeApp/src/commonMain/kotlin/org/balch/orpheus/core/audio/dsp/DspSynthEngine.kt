@@ -580,6 +580,14 @@ class DspSynthEngine(
         }
     }
 
+    override fun fadeQuadVolume(quadIndex: Int, targetVolume: Float, durationSeconds: Float) {
+        _quadVolume[quadIndex] = targetVolume
+        val startVoice = quadIndex * 4
+        for (i in startVoice until startVoice + 4) {
+            voices[i].fadeVolume(targetVolume.toDouble(), durationSeconds.toDouble())
+        }
+    }
+
     override fun setVoiceHold(index: Int, amount: Float) {
         voices[index].setHoldLevel(amount.toDouble())
     }

@@ -39,6 +39,7 @@ import kotlinx.datetime.Instant
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.GeminiKeyProvider
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
@@ -392,44 +393,37 @@ class SynthControlAgent(
 
         // Silence with ramp down
         scope.launch {
-            try {
-                val vol0 = synthEngine.getQuadVolume(0)
-                val vol1 = synthEngine.getQuadVolume(1)
-                val vol2 = synthEngine.getQuadVolume(2)
-                
-                // Fade out Quad Volumes over ~1.5 seconds
-                // Use direct setQuadVolume calls - the voice's internal LinearRamp provides smoothing
-                log.debug { "Ramping down quad volumes" }
-                val steps = 30
-                val stepDelay = 50L  // 30 steps * 50ms = 1.5 seconds total
-                for (step in 1..steps) {
-                    val t = step.toFloat() / steps
-                    synthEngine.setQuadVolume(0, vol0 * (1f - t))
-                    synthEngine.setQuadVolume(1, vol1 * (1f - t))
-                    synthEngine.setQuadVolume(2, vol2 * (1f - t))
-                    delay(stepDelay)
+            runCatchingSuspend {
+                // Save current volumes for the quads we're going to fade
+                val savedVolumes = config.activeQuads.associateWith { synthEngine.getQuadVolume(it) }
+
+                // Fade out only the quads this agent uses
+                val fadeDuration = 2.0f  // seconds
+                log.debug { "Fading out quads ${config.activeQuads} over ${fadeDuration}s" }
+                config.activeQuads.forEach { quadIndex ->
+                    synthEngine.fadeQuadVolume(quadIndex, 0f, fadeDuration)
                 }
                 
+                // Wait for fade to complete
+                delay((fadeDuration * 1000).toLong())
+
                 replExecuteTool.execute(ReplExecuteTool.Args(code = "hush"))
-                
-                // Restore volumes after hush
-                synthEngine.setQuadVolume(0, vol0)
-                synthEngine.setQuadVolume(1, vol1)
-                synthEngine.setQuadVolume(2, vol2)
-                
+
+                // Restore volumes after hush (instant, not faded)
+                savedVolumes.forEach { (quadIndex, volume) ->
+                    synthEngine.setQuadVolume(quadIndex, volume)
+                }
+
                 log.debug { "Restored quad volumes" }
-                
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                log.warn { "Failed to stop gracefully: ${e.message}" }
+            }.onFailure { e ->
+                log.warn(e) { "Failed to stop gracefully: ${e.message}" }
                 replExecuteTool.execute(ReplExecuteTool.Args(code = "hush"))
-            } finally {
-                emitStatus("Stopped")
-                _state.value = SynthAgentState.Idle
             }
+            emitStatus("Stopped")
+            _state.value = SynthAgentState.Idle
         }
     }
+
 
     @Inject
     class Factory(

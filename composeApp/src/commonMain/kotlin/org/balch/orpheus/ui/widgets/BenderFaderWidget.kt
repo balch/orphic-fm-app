@@ -82,12 +82,15 @@ fun BenderFaderWidget(
     // Animation state for spring-back
     val animatedOffset = remember { Animatable(0f) }
     
-    // Track if we're currently dragging
-    var isDragging by remember { mutableFloatStateOf(0f) } // 0 = not dragging, non-zero = dragging
+    // Track if we're currently in a local interaction (dragging or spring-back animation)
+    // When true, we own the animation and should not sync from external values
+    var isLocallyAnimating by remember { mutableFloatStateOf(0f) } // 0 = idle, non-zero = local control
     
-    // Sync animated offset with external value when not dragging
+    // Sync animated offset with external value only when we're not actively controlling it
+    // This handles AI-driven bends while preventing the external sync from interrupting
+    // our spring-back animation
     LaunchedEffect(value) {
-        if (isDragging == 0f) {
+        if (isLocallyAnimating == 0f) {
             animatedOffset.snapTo(-value * usableRange) // Negate: top = positive
         }
     }
@@ -128,7 +131,7 @@ fun BenderFaderWidget(
                     
                     detectDragGestures(
                         onDragStart = { offset ->
-                            isDragging = 1f
+                            isLocallyAnimating = 1f
                             startY = offset.y
                             startOffset = animatedOffset.value
                         },
@@ -144,7 +147,9 @@ fun BenderFaderWidget(
                             onValueChange(newValue.coerceIn(-1f, 1f))
                         },
                         onDragEnd = {
-                            isDragging = 0f
+                            // Keep isLocallyAnimating = 1f during the spring-back animation
+                            // to prevent external value syncing from interrupting
+                            
                             // Calculate spring duration based on how far back it was pulled
                             // ~1.2s at full extension, shorter for smaller pulls
                             val pullDistance = animatedOffset.value.absoluteValue / usableRange
@@ -190,14 +195,17 @@ fun BenderFaderWidget(
                                 
                                 onRelease()
                                 onValueChange(0f) // Ensure final value is zero
+                                
+                                // NOW we're done with local animation, allow external sync again
+                                isLocallyAnimating = 0f
                             }
                         },
                         onDragCancel = {
-                            isDragging = 0f
                             coroutineScope.launch {
                                 animatedOffset.animateTo(0f, tween(300))
                                 onRelease()
                                 onValueChange(0f)
+                                isLocallyAnimating = 0f
                             }
                         }
                     )

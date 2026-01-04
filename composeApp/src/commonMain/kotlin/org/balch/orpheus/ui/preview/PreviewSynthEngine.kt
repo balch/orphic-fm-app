@@ -34,6 +34,9 @@ class PreviewSynthEngine() : SynthEngine {
     override fun setQuadVolume(quadIndex: Int, volume: Float) {
     }
 
+    override fun fadeQuadVolume(quadIndex: Int, targetVolume: Float, durationSeconds: Float) {
+    }
+
     override fun setVoiceHold(index: Int, amount: Float) {
     }
     

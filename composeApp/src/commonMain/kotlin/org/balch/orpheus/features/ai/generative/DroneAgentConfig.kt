@@ -10,6 +10,10 @@ data object DroneAgentConfig : SynthControlAgentConfig {
     override val name = "DroneAgent"
     override val evolutionIntervalMs = 20_000L
     override val throttleIntervalMs = 10_000L
+    
+    // Drone mode only uses Quad 3 (voices 8-11) for background drones
+    // Quads 1 and 2 remain untouched for user to play over
+    override val activeQuads = listOf(2)
 
     override val systemPrompt = """
         You are a Drone Sound Designer AI for the ${AppConfig.APP_DISPLAY_NAME} synthesizer. Your primary goal is to 

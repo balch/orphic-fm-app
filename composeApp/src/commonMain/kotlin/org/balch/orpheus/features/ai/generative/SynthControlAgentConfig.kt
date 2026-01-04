@@ -13,6 +13,8 @@ sealed interface SynthControlAgentConfig {
     val moods: List<Mood> get() = emptyList()
     /** If true, the agent will stop after completing all evolution prompts in a mood */
     val finishOnLastEvolution: Boolean get() = false
+    /** Which quad indices (0-2) this agent uses. Used for fade in/out. Default: all quads */
+    val activeQuads: List<Int> get() = listOf(0, 1, 2)
 }
 
 /**

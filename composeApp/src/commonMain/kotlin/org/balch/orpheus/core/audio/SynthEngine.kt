@@ -19,6 +19,16 @@ interface SynthEngine {
     fun setQuadPitch(quadIndex: Int, pitch: Float) // 0-1, 0.5=Unity
     fun setQuadHold(quadIndex: Int, amount: Float) // 0-1, VCA bias
     fun setQuadVolume(quadIndex: Int, volume: Float) // 0-1, output volume multiplier
+    
+    /**
+     * Smoothly fade a quad's volume to a target level over a specified duration.
+     * Uses JSyn's LinearRamp for sample-accurate, click-free transitions.
+     * 
+     * @param quadIndex 0-2 (Quad 1-3)
+     * @param targetVolume Target volume level (0.0 to 1.0)
+     * @param durationSeconds Duration of the fade in seconds
+     */
+    fun fadeQuadVolume(quadIndex: Int, targetVolume: Float, durationSeconds: Float)
     fun setVoiceHold(index: Int, amount: Float) // 0-1, per-voice VCA bias
     
     /**
