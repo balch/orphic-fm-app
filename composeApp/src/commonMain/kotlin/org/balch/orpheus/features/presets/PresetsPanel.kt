@@ -267,7 +267,7 @@ fun PresetsPanelLayout(
             title = "Overwrite Preset",
             message = "Overwrite '${presetProps.selectedPreset?.name ?: ""}'?",
             onConfirm = {
-                presetProps.presetActions.onOverride()
+                presetProps.selectedPreset?.let { presetProps.presetActions.onOverride(it) }
                 showOverrideDialog = false
                 presetProps.presetActions.onDialogActiveChange(false)
             },
@@ -284,7 +284,7 @@ fun PresetsPanelLayout(
             title = "Delete Preset",
             message = "Delete '${presetProps.selectedPreset?.name ?: ""}'?",
             onConfirm = {
-                presetProps.presetActions.onDelete()
+                presetProps.selectedPreset?.let { presetProps.presetActions.onDelete(it) }
                 showDeleteDialog = false
                 presetProps.presetActions.onDialogActiveChange(false)
             },

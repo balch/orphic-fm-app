@@ -56,6 +56,7 @@ fun CompactLandscapeHeaderPanel(
     modifier: Modifier = Modifier
 ) {
     val presetState = presetFeature.state
+    val loadedPresetState = presetState as? PresetUiState.Loaded
     val presetActions = presetFeature.actions
     val vizState = vizFeature.state
     val vizActions = vizFeature.actions
@@ -112,7 +113,7 @@ fun CompactLandscapeHeaderPanel(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = (presetState as? PresetUiState.Loaded)?.selectedPreset?.name ?: "Init Patch",
+                            text = loadedPresetState?.selectedPreset?.name ?: "Init Patch",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White.copy(alpha = 0.9f),
                             maxLines = 1,
@@ -134,7 +135,7 @@ fun CompactLandscapeHeaderPanel(
                         )
                     } else Modifier.background(Color(0xFF2A2A3A))
                 ) {
-                    (presetState as? PresetUiState.Loaded)?.presets?.forEach { preset ->
+                    loadedPresetState?.presets?.forEach { preset ->
                         DropdownMenuItem(
                             text = { Text(preset.name, style = MaterialTheme.typography.bodySmall) },
                             onClick = {

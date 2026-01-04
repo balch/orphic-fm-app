@@ -73,25 +73,25 @@ class DriftStrategy(
             val old = engine.getDrive()
             val new = nudge(old)
             emit(ControlIds.DRIVE, new)
-            changedParams.add("drive: %.3f→%.3f".format(old, new))
+            changedParams.add("drive: $old->$new")
         }
         if (r.nextFloat() < changeChance) {
             val old = engine.getDistortionMix()
             val new = nudge(old)
             emit(ControlIds.DISTORTION_MIX, new)
-            changedParams.add("distMix: %.3f→%.3f".format(old, new))
+            changedParams.add("distMix: $old->$new")
         }
         if (r.nextFloat() < changeChance) {
             val old = engine.getDelayMix()
             val new = nudge(old)
             emit(ControlIds.DELAY_MIX, new)
-            changedParams.add("delayMix: %.3f→%.3f".format(old, new))
+            changedParams.add("delayMix: $old->$new")
         }
         if (r.nextFloat() < changeChance) {
             val old = engine.getDelayFeedback()
             val new = nudge(old)
             emit(ControlIds.DELAY_FEEDBACK, new)
-            changedParams.add("delayFb: %.3f→%.3f".format(old, new))
+            changedParams.add("delayFb: $old->$new")
         }
         
         // Quad pitch drift (all 3 quads)
@@ -100,7 +100,7 @@ class DriftStrategy(
                 val old = engine.getQuadPitch(q)
                 val new = nudge(old)
                 emit(ControlIds.quadPitch(q), new)
-                changedParams.add("quadPitch$q: %.3f→%.3f".format(old, new))
+                changedParams.add("quadPitch$q: $old->$new")
             }
         }
         
@@ -111,7 +111,7 @@ class DriftStrategy(
             val new = nudge(old)
             val controlId = if (idx == 0) ControlIds.HYPER_LFO_A else ControlIds.HYPER_LFO_B
             emit(controlId, new)
-            changedParams.add("lfo$idx: %.3f→%.3f".format(old, new))
+            changedParams.add("lfo$idx: $old->$new")
         }
 
         if (changedParams.isNotEmpty()) {

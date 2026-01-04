@@ -429,7 +429,7 @@ class DspPerStringBenderPlugin(
         // SLIDE DETECTION - Vertical movement creates scratchy sound
         // ═══════════════════════════════════════════════════════════
         val gesture = gestureStates[stringIndex]
-        val currentTime = System.currentTimeMillis()
+        val currentTime = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         val deltaY = (voiceMix - gesture.lastY).absoluteValue
         val deltaTime = (currentTime - gesture.lastTime).coerceAtLeast(1L)
         val slideVelocity = deltaY / deltaTime * 1000f  // velocity per second
@@ -494,7 +494,7 @@ class DspPerStringBenderPlugin(
         val gesture = gestureStates[stringIndex]
         
         // Calculate release velocity for pluck detection
-        val currentTime = System.currentTimeMillis()
+        val currentTime = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         val deltaTime = (currentTime - gesture.lastTime).coerceAtLeast(1L)
         val releaseVelocity = pullDistance / deltaTime * 1000f  // per second
         
@@ -669,7 +669,7 @@ class DspPerStringBenderPlugin(
      * @param xPosition 0 to 1 (horizontal position) - used for vibrato detection
      */
     fun setSlideBar(yPosition: Float, xPosition: Float) {
-        val currentTime = System.currentTimeMillis()
+        val currentTime = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         val deltaTime = (currentTime - slideBarLastTime).coerceAtLeast(1L)
         
         // Calculate wiggle velocity for vibrato

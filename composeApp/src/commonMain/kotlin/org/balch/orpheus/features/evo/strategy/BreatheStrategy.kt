@@ -101,8 +101,7 @@ class BreatheStrategy(
         // Log every 20 ticks to avoid spam
         if (tickCount % 20 == 0) {
             log.debug { 
-                "Tick $tickCount: phase=%.2f, delayMix=%.3f, drive=%.3f, vibrato=%.3f"
-                    .format(phase, newDelayMix, newDrive, targetVibrato)
+                "Tick $tickCount: phase=$phase, delayMix=$newDelayMix, drive=$newDrive, vibrato=$targetVibrato"
             }
         }
     }

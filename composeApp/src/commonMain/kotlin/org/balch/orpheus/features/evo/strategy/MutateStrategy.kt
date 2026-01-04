@@ -109,7 +109,7 @@ class MutateStrategy(
             }
             
             emit(controlId, newValue)
-            mutations.add("${param.name.lowercase()}: %.2f→%.2f".format(currentValue, newValue))
+            mutations.add("${param.name.lowercase()}: $currentValue->$newValue")
         }
 
         log.info { "Mutation #$mutationCount: ${mutations.joinToString(", ")}" }

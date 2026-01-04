@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -29,7 +30,6 @@ import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.core.tidal.TidalSchedulerState
 import org.balch.orpheus.features.ai.ReplCodeEvent
 import org.balch.orpheus.features.ai.ReplCodeEventBus
-import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.ui.utils.PanelViewModel
 import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
@@ -141,9 +141,6 @@ class LiveCodeViewModel(
     
     init {
         logger.i { "LiveCodeViewModel initialized, subscribing to ReplCodeEventBus" }
-        
-        // Initialize REPL volume (Quad 2 = voices 8-11) with slightly boosted default
-        synthEngine.setQuadVolume(2, _uiState.value.replVolume)
         
         // Subscribe to intents using scan pattern
         viewModelScope.launch {

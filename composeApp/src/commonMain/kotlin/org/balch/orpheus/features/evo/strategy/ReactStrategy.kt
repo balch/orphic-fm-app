@@ -197,8 +197,7 @@ class ReactStrategy(
         // Log occasionally
         if (historyIndex == 0) {
             log.debug { 
-                "React: peak=%.2f, trend=%+.3f, userDecay=%.2f"
-                    .format(currentPeak, peakTrend, userChangeDecay) 
+                "React: peak=$currentPeak, trend=$peakTrend, userDecay=$userChangeDecay" 
             }
         }
     }
