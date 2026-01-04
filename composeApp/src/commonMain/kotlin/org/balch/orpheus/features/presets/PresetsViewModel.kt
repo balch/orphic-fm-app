@@ -125,7 +125,7 @@ class PresetsViewModel(
 
     private suspend fun loadPresets(): PresetUiState.Loaded {
         val allPresets = presetsRepository.getAll()
-        log.info { "Loaded ${allPresets.size} presets" }
+        log.debug { "Loaded ${allPresets.size} presets" }
 
         // Load last selected preset from preferences, fallback to Default
         val prefs = appPreferencesRepository.load()

@@ -83,13 +83,13 @@ class EvoViewModel @Inject constructor(
     )
 
     init {
-        log.info { "Initialized with ${sortedStrategies.size} strategies: ${sortedStrategies.map { it.name }}" }
+        log.debug { "Initialized with ${sortedStrategies.size} strategies: ${sortedStrategies.map { it.name }}" }
     }
 
     private fun selectStrategy(strategy: AudioEvolutionStrategy) {
         if (_currentStrategy.value == strategy) return
 
-        log.info { "Switching strategy: ${_currentStrategy.value.name} → ${strategy.name}" }
+        log.debug { "Switching strategy: ${_currentStrategy.value.name} → ${strategy.name}" }
 
         // Deactivate old strategy
         _currentStrategy.value.onDeactivate()
@@ -118,7 +118,7 @@ class EvoViewModel @Inject constructor(
     }
 
     private fun setEnabled(enabled: Boolean) {
-        log.info { "Evolution ${if (enabled) "enabled" else "disabled"} with ${_currentStrategy.value.name}" }
+        log.debug { "Evolution ${if (enabled) "enabled" else "disabled"} with ${_currentStrategy.value.name}" }
         
         _uiState.update { it.copy(isEnabled = enabled) }
         
@@ -181,7 +181,7 @@ class EvoViewModel @Inject constructor(
 
     private fun stopEvolutionLoop() {
         if (evoJob != null) {
-            log.info { "Stopping evolution loop (job active: ${evoJob?.isActive})" }
+            log.debug { "Stopping evolution loop (job active: ${evoJob?.isActive})" }
         }
         evoJob?.cancel()
         evoJob = null
@@ -191,7 +191,7 @@ class EvoViewModel @Inject constructor(
         super.onCleared()
         stopEvolutionLoop()
         _currentStrategy.value.onDeactivate()
-        log.info { "EvoViewModel cleared" }
+        log.debug { "EvoViewModel cleared" }
     }
 
     companion object {

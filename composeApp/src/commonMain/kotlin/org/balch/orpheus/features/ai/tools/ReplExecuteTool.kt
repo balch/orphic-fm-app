@@ -114,7 +114,7 @@ class ReplExecuteTool @Inject constructor(
 
     override suspend fun execute(args: Args): Result {
         val code = args.code.trim()
-        log.info { "ReplExecuteTool: Executing: ${code.take(80)}..." }
+        log.debug { "ReplExecuteTool: Executing: ${code.take(80)}..." }
         
         // Handle hush command specially
         if (code.equals("hush", ignoreCase = true)) {
@@ -155,7 +155,7 @@ class ReplExecuteTool @Inject constructor(
         }
         
         if (resultSuccess) {
-            log.info { "ReplExecuteTool: Code executed successfully, slots=$slots" }
+            log.debug { "ReplExecuteTool: Code executed successfully, slots=$slots" }
             replCodeEventBus.emitGenerated(code, slots.toList())
         } else {
             log.warn { "ReplExecuteTool: Failed - $resultMessage" }

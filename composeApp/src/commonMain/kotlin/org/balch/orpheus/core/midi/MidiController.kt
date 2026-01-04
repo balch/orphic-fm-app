@@ -99,7 +99,7 @@ class MidiController(
                     handleMidiMessage(data, start, length)
                 })
 
-                log.info { "Opened MIDI device: $deviceName" }
+                log.debug { "Opened MIDI device: $deviceName" }
             } catch (e: Exception) {
                 log.error { "Failed to open MIDI device: ${e.message}" }
             }
@@ -125,7 +125,7 @@ class MidiController(
      */
     fun start(listener: MidiEventListener) {
         this.listener = listener
-        log.info { "Started listening for MIDI events" }
+        log.debug { "Started listening for MIDI events" }
     }
 
     /**

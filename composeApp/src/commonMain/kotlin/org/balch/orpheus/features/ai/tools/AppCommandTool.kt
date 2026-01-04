@@ -71,7 +71,7 @@ class AppCommandTool @Inject constructor(
     )
 
     override suspend fun execute(args: AppCommand): Result {
-        log.info { "Executing command: $args" }
+        log.debug { "Executing command: $args" }
 
         return when (args) {
             is AppCommand.Mute -> executeMute()
@@ -82,7 +82,7 @@ class AppCommandTool @Inject constructor(
 
     private fun executeMute(): Result =
         runCatching {
-            log.info { "Executing mute/hush" }
+            log.debug { "Executing mute/hush" }
             tidalRepl.hush()
         }.fold(
             onSuccess = {
@@ -105,7 +105,7 @@ class AppCommandTool @Inject constructor(
 
         return if (model != null) {
             runCatchingSuspend {
-                log.info { "Changing model to ${model.displayName}" }
+                log.debug { "Changing model to ${model.displayName}" }
                 aiModelProvider.selectModel(model)
             }.fold(
                 onSuccess = {

@@ -60,10 +60,10 @@ class SynthOrchestrator(
         scope.launch {
             mediaSessionStateManager.isMediaSessionNeeded.collect { needed ->
                 if (needed && !isMediaSessionActive && isStarted) {
-                    log.info { "MediaSession needed - activating (source: ${mediaSessionStateManager.activeSource.value})" }
+                    log.debug { "MediaSession needed - activating (source: ${mediaSessionStateManager.activeSource.value})" }
                     activateMediaSession()
                 } else if (!needed && isMediaSessionActive) {
-                    log.info { "MediaSession no longer needed - deactivating" }
+                    log.debug { "MediaSession no longer needed - deactivating" }
                     deactivateMediaSession()
                 }
             }
@@ -99,7 +99,7 @@ class SynthOrchestrator(
             mediaSessionManager.updatePlaybackState(!isPaused)
             isMediaSessionActive = true
             updateMediaSessionMetadata()
-            log.info { "SynthOrchestrator: Media session activated" }
+            log.debug { "SynthOrchestrator: Media session activated" }
         }
     }
     
@@ -113,7 +113,7 @@ class SynthOrchestrator(
             isMediaSessionActive = false
             // Reset playback mode to USER when session deactivates
             currentPlaybackMode = PlaybackMode.USER
-            log.info { "SynthOrchestrator: Media session deactivated" }
+            log.debug { "SynthOrchestrator: Media session deactivated" }
         }
     }
 
@@ -133,7 +133,7 @@ class SynthOrchestrator(
             // Don't activate media session here - wait for actual playback
             isStarted = true
             isPaused = false
-            log.info { "SynthOrchestrator: Engine started (media session not yet active)" }
+            log.debug { "SynthOrchestrator: Engine started (media session not yet active)" }
         }
     }
 
@@ -150,7 +150,7 @@ class SynthOrchestrator(
             mediaSessionManager.updatePlaybackState(false)
             isPaused = true
             updateMediaSessionMetadata()
-            log.info { "SynthOrchestrator: Paused (muted, savedVolume=$savedMasterVolume)" }
+            log.debug { "SynthOrchestrator: Paused (muted, savedVolume=$savedMasterVolume)" }
         }
     }
     
@@ -164,13 +164,13 @@ class SynthOrchestrator(
             mediaSessionManager.updatePlaybackState(true)
             isPaused = false
             updateMediaSessionMetadata()
-            log.info { "SynthOrchestrator: Resumed (restored volume=$savedMasterVolume)" }
+            log.debug { "SynthOrchestrator: Resumed (restored volume=$savedMasterVolume)" }
         }
     }
 
     fun stop() {
         if (isStarted) {
-            log.info { "SynthOrchestrator: Stopping - broadcasting stop event" }
+            log.debug { "SynthOrchestrator: Stopping - broadcasting stop event" }
             // Broadcast stop event to all listeners (agents, schedulers, etc.)
             playbackLifecycleManager.tryRequestStopAll()
             
@@ -187,7 +187,7 @@ class SynthOrchestrator(
             engine.stop()
             isStarted = false
             isPaused = false
-            log.info { "SynthOrchestrator: Engine stopped" }
+            log.debug { "SynthOrchestrator: Engine stopped" }
         }
     }
 
@@ -195,7 +195,7 @@ class SynthOrchestrator(
     
     // MediaSessionActionHandler implementation
     override fun onPlay() {
-        log.info { "MediaSession: Play requested" }
+        log.debug { "MediaSession: Play requested" }
         if (!isStarted) {
             start()
         } else if (isPaused) {
@@ -204,12 +204,12 @@ class SynthOrchestrator(
     }
     
     override fun onPause() {
-        log.info { "MediaSession: Pause requested" }
+        log.debug { "MediaSession: Pause requested" }
         pause()
     }
     
     override fun onStop() {
-        log.info { "MediaSession: Stop requested" }
+        log.debug { "MediaSession: Stop requested" }
         stop()
     }
     
@@ -223,7 +223,7 @@ class SynthOrchestrator(
     fun setPlaybackMode(mode: PlaybackMode) {
         if (currentPlaybackMode != mode) {
             currentPlaybackMode = mode
-            log.info { "Playback mode changed to: ${mode.displayName}" }
+            log.debug { "Playback mode changed to: ${mode.displayName}" }
             updateMediaSessionMetadata()
         }
     }

@@ -170,7 +170,7 @@ class MidiViewModel(
     private fun tryConnectMidi(): Boolean {
         val devices = midiController.getAvailableDevices()
         if (devices.isNotEmpty()) {
-            log.info { "Available MIDI devices: $devices" }
+            log.debug { "Available MIDI devices: $devices" }
 
             val deviceName =
                 if (lastDeviceName != null && devices.contains(lastDeviceName)) {
@@ -185,18 +185,18 @@ class MidiViewModel(
 
                 _deviceName.value = deviceName
                 _isConnected.value = true
-                log.info { "MIDI initialized and listening on: $deviceName" }
+                log.debug { "MIDI initialized and listening on: $deviceName" }
 
                 viewModelScope.launch(dispatcherProvider.io) {
                     midiRepository.load(deviceName)?.let { savedMapping ->
                         stateHolder.updateState(savedMapping)
-                        log.info { "Loaded saved MIDI mappings for $deviceName" }
+                        log.debug { "Loaded saved MIDI mappings for $deviceName" }
                     }
                 }
                 return true
             }
         } else {
-            log.info { "No MIDI devices found" }
+            log.debug { "No MIDI devices found" }
         }
         return false
     }
@@ -213,14 +213,14 @@ class MidiViewModel(
 
                     if (wasOpen && !stillAvailable) {
                         val name = midiController.currentDeviceName
-                        log.info { "MIDI device disconnected: $name" }
+                        log.debug { "MIDI device disconnected: $name" }
                         midiController.closeDevice()
                         _deviceName.value = null
                         _isConnected.value = false
                     } else if (!wasOpen) {
                         val devices = midiController.getAvailableDevices()
                         if (devices.isNotEmpty()) {
-                            log.info { "MIDI device(s) available, attempting to connect..." }
+                            log.debug { "MIDI device(s) available, attempting to connect..." }
                             tryConnectMidi()
                         }
                     }

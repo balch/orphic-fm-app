@@ -360,7 +360,7 @@ class DspSynthEngine(
 
     override fun start() {
         if (audioEngine.isRunning) return
-        log.info { "Starting Shared Audio Engine..." }
+        log.debug { "Starting Shared Audio Engine..." }
         audioEngine.start()
 
         monitoringJob = monitoringScope.launch {
@@ -385,15 +385,15 @@ class DspSynthEngine(
                 delay(33) // ~30fps
             }
         }
-        log.info { "Audio Engine Started" }
+        log.debug { "Audio Engine Started" }
     }
 
     override fun stop() {
-        log.info { "Stopping Audio Engine..." }
+        log.debug { "Stopping Audio Engine..." }
         monitoringJob?.cancel()
         monitoringJob = null
         audioEngine.stop()
-        log.info { "Audio Engine Stopped" }
+        log.debug { "Audio Engine Stopped" }
     }
 
     // Delay delegations
@@ -672,7 +672,7 @@ class DspSynthEngine(
     private var testGain: Multiply? = null
     
     override fun playTestTone(frequency: Float) {
-        log.info { "Playing test tone at ${frequency}Hz" }
+        log.debug { "Playing test tone at ${frequency}Hz" }
         if (!audioEngine.isRunning) {
             audioEngine.start()
         }
@@ -699,11 +699,11 @@ class DspSynthEngine(
     override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) {
         val setup = automationSetups[controlId]
         if (setup == null) {
-            log.info { "Automation NOT FOUND: $controlId" }
+            log.debug { "Automation NOT FOUND: $controlId" }
             return
         }
         if (controlId.startsWith("voice_freq")) {
-            log.info { "Automation: $controlId, first value=${values.firstOrNull()} Hz, targets=${setup.targets.size}" }
+            log.debug { "Automation: $controlId, first value=${values.firstOrNull()} Hz, targets=${setup.targets.size}" }
         }
         
         val secondarySetup = when (controlId) {

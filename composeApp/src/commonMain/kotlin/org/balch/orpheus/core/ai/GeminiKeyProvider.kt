@@ -65,7 +65,7 @@ class GeminiKeyProvider @Inject constructor(
                 val userKey = prefs.userApiKeys[AiProvider.GOOGLE.id]
 
                 if (buildTimeKey.isNullOrEmpty() && !userKey.isNullOrEmpty()) {
-                    log.info { "Loaded user-provided API key" }
+                    log.debug { "Loaded user-provided API key" }
                     _apiKeyState.value = userKey
                     _isUserProvidedKey.value = true
                 }
@@ -102,7 +102,7 @@ class GeminiKeyProvider @Inject constructor(
 
                 _apiKeyState.value = key
                 _isUserProvidedKey.value = true
-                log.info { "Saved user-provided API key" }
+                log.debug { "Saved user-provided API key" }
                 true
             } catch (ce: CancellationException) {
                 throw ce
@@ -131,7 +131,7 @@ class GeminiKeyProvider @Inject constructor(
 
                 _apiKeyState.value = null
                 _isUserProvidedKey.value = false
-                log.info { "Cleared user-provided API key" }
+                log.debug { "Cleared user-provided API key" }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

@@ -132,7 +132,7 @@ class SynthControlAgent(
      * Used by Solo mode to let users influence the composition.
      */
     fun injectUserPrompt(text: String) {
-        log.info { "User influence: $text" }
+        log.debug { "User influence: $text" }
         _userPrompts.tryEmit(text)
     }
 
@@ -162,7 +162,7 @@ class SynthControlAgent(
                     return
                 }
 
-                log.info { "Executing CONTROL: $id = $value" }
+                log.debug { "Executing CONTROL: $id = $value" }
                 emitControl("Set $id: ${value.format(2)}")
                 val result = synthControlTool.execute(SynthControlTool.Args(id, value))
                 if (!result.success) emitControl("Failed: ${result.message}", isError = true)
@@ -177,14 +177,14 @@ class SynthControlAgent(
                     return
                 }
 
-                log.info { "Executing REPL: $code" }
+                log.debug { "Executing REPL: $code" }
                 emitControl("Pattern: $code")
                 val result = replExecuteTool.execute(ReplExecuteTool.Args(code))
                 if (!result.success) emitControl("Failed: ${result.message}", isError = true)
             }
             ActionType.STATUS -> {
                 val msg = action.details.getOrNull(0) ?: return
-                log.info { "STATUS: $msg" }
+                log.debug { "STATUS: $msg" }
                 _state.value = SynthAgentState.Playing(msg)
                 emitStatus(msg)
             }
@@ -209,7 +209,7 @@ class SynthControlAgent(
             return
         }
 
-        log.info { "Starting ${config.name}" }
+        log.debug { "Starting ${config.name}" }
         _state.value = SynthAgentState.Starting
         val apiKey = geminiKeyProvider.apiKey ?: return
 
@@ -227,7 +227,7 @@ class SynthControlAgent(
                             if (evolutionIndex >= selectedMood.evolutionPrompts.size) {
                                 if (config.finishOnLastEvolution) {
                                     // Signal completion and stop the flow
-                                    log.info { "All evolution prompts completed - signaling completion" }
+                                    log.debug { "All evolution prompts completed - signaling completion" }
                                     _completed.tryEmit(Unit)
                                     return@flow
                                 } else {
@@ -285,7 +285,7 @@ class SynthControlAgent(
                         // Access the LLM context inside the node
                         llm.writeSession {
                             val session = this
-                            log.info { "Session started (Structured)" }
+                            log.debug { "Session started (Structured)" }
                             
                             val mdDefinition = synthActionDefinition()
 
@@ -330,7 +330,7 @@ class SynthControlAgent(
         
                             inputFlow.collect { inputPrompt ->
                                 if (isActive && !isBusy) {
-                                     log.info { "Event received: $inputPrompt" }
+                                     log.debug { "Event received: $inputPrompt" }
                                      _state.value = SynthAgentState.Processing
                                      emitInput(inputPrompt)
                                      
@@ -368,12 +368,12 @@ class SynthControlAgent(
                     toolRegistry = toolRegistry
                 )
                 
-                log.info { "Running agent loop..." }
+                log.debug { "Running agent loop..." }
                 agent.run(Unit)
-                log.info { "Agent loop finished naturally." }
+                log.debug { "Agent loop finished naturally." }
 
             } catch (e: CancellationException) {
-                log.info { "Agent job cancelled" }
+                log.debug { "Agent job cancelled" }
                 throw e
             } catch (e: Exception) {
                 log.error(e) { "Agent error" }
@@ -387,7 +387,7 @@ class SynthControlAgent(
      * Stop the agent and silence.
      */
     fun stop() {
-        log.info { "Stopping ${config.name}" }
+        log.debug { "Stopping ${config.name}" }
         agentJob?.cancel()
         agentJob = null
 

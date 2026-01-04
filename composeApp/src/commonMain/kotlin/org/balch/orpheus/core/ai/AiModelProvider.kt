@@ -92,7 +92,7 @@ class AiModelProvider @Inject constructor(
                 val modelId = prefs.selectedAiModel
                 if (modelId != null) {
                     _selectedModel.value = AiModel.fromId(modelId)
-                    log.info { "Loaded saved model: ${_selectedModel.value.displayName}" }
+                    log.debug { "Loaded saved model: ${_selectedModel.value.displayName}" }
                 }
             }.exceptionOrNull()?.let { e ->
                 log.error(e) { "Failed to load selected model: ${e.message}" }
@@ -109,7 +109,7 @@ class AiModelProvider @Inject constructor(
                 val prefs = preferencesRepository.load()
                 preferencesRepository.save(prefs.copy(selectedAiModel = model.id))
                 _selectedModel.value = model
-                log.info { "Selected model: ${model.displayName}" }
+                log.debug { "Selected model: ${model.displayName}" }
             }.exceptionOrNull()?.let { e ->
                 log.error(e) { "Failed to save model selection: ${e.message}" }
             }

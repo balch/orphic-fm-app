@@ -87,7 +87,7 @@ class ReactStrategy(
 
     @OptIn(FlowPreview::class)
     override fun onActivate() {
-        log.info { "Activated (SENS=$sensitivityKnob, FOLLOW=$followKnob)" }
+        log.debug { "Activated (SENS=$sensitivityKnob, FOLLOW=$followKnob)" }
         
         // Reset state
         peakHistory.fill(0f)
@@ -127,7 +127,7 @@ class ReactStrategy(
     }
 
     override fun onDeactivate() {
-        log.info { "Deactivated" }
+        log.debug { "Deactivated" }
         monitorJob?.cancel()
         monitorScope?.cancel()
         monitorScope = null

@@ -228,7 +228,7 @@ class OrpheusAgent @Inject constructor(
             .lowercase()
             .replaceFirstChar { it.uppercase() }
         
-        logger.info { "Restarting agent with model: $modelName" }
+        logger.debug { "Restarting agent with model: $modelName" }
         
         // Cancel current agent
         currentAgentJob?.cancel()

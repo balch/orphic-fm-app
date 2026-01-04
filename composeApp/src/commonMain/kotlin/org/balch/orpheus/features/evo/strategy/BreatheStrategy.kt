@@ -109,11 +109,11 @@ class BreatheStrategy(
     override fun onActivate() {
         phase = 0.0
         tickCount = 0
-        log.info { "Activated (SPEED=$speedKnob, DEPTH=$depthKnob)" }
+        log.debug { "Activated (SPEED=$speedKnob, DEPTH=$depthKnob)" }
     }
 
     override fun onDeactivate() {
-        log.info { "Deactivated after $tickCount ticks" }
+        log.debug { "Deactivated after $tickCount ticks" }
         phase = 0.0
         tickCount = 0
     }

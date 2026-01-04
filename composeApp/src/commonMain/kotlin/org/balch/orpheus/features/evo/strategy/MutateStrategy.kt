@@ -112,16 +112,16 @@ class MutateStrategy(
             mutations.add("${param.name.lowercase()}: $currentValue->$newValue")
         }
 
-        log.info { "Mutation #$mutationCount: ${mutations.joinToString(", ")}" }
+        log.debug { "Mutation #$mutationCount: ${mutations.joinToString(", ")}" }
     }
 
     override fun onActivate() {
         mutationCount = 0
-        log.info { "Activated (SPEED=$speedKnob, CHAOS=$chaosKnob)" }
+        log.debug { "Activated (SPEED=$speedKnob, CHAOS=$chaosKnob)" }
     }
 
     override fun onDeactivate() {
-        log.info { "Deactivated after $mutationCount mutations" }
+        log.debug { "Deactivated after $mutationCount mutations" }
         mutationCount = 0
     }
 }

@@ -52,7 +52,7 @@ class PlaybackLifecycleManager {
      * This should be called when the foreground service stops or the synth shuts down.
      */
     suspend fun requestStopAll() {
-        log.info { "Requesting stop all playback" }
+        log.debug { "Requesting stop all playback" }
         _events.emit(PlaybackLifecycleEvent.StopAll)
     }
     
@@ -60,7 +60,7 @@ class PlaybackLifecycleManager {
      * Non-suspending version for use from callbacks.
      */
     fun tryRequestStopAll() {
-        log.info { "Requesting stop all playback (try)" }
+        log.debug { "Requesting stop all playback (try)" }
         _events.tryEmit(PlaybackLifecycleEvent.StopAll)
     }
     

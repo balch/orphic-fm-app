@@ -67,7 +67,7 @@ class HeaderViewModel(
         // Subscribe to panel expansion events
         viewModelScope.launch {
             panelExpansionEventBus.events.collect { event ->
-                log.info { "HeaderViewModel: ${event.panelId.displayName} -> ${if (event.expand) "EXPAND" else "COLLAPSE"}" }
+                log.debug { "HeaderViewModel: ${event.panelId.displayName} -> ${if (event.expand) "EXPAND" else "COLLAPSE"}" }
                 setPanelExpanded(event.panelId, event.expand)
             }
         }

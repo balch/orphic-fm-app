@@ -82,7 +82,7 @@ class MediaSessionStateManager {
                 needed to source
             }.collect { (needed, source) ->
                 if (_isMediaSessionNeeded.value != needed) {
-                    log.info { "MediaSession needed: $needed (source: $source)" }
+                    log.debug { "MediaSession needed: $needed (source: $source)" }
                     _isMediaSessionNeeded.value = needed
                     _activeSource.value = source
                 }
@@ -134,7 +134,7 @@ class MediaSessionStateManager {
      * Clear all activity states (e.g., when stopping everything).
      */
     fun clearAll() {
-        log.info { "Clearing all activity states" }
+        log.debug { "Clearing all activity states" }
         _isEvoActive.value = false
         _isReplPlaying.value = false
         _isDroneActive.value = false

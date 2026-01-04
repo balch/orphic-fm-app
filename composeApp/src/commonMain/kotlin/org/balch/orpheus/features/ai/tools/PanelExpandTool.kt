@@ -62,7 +62,7 @@ class PanelExpandTool @Inject constructor(
     )
 
     override suspend fun execute(args: Args): Result {
-        log.info { "PanelExpandTool: ${args.panelId} expand=${args.expand}" }
+        log.debug { "PanelExpandTool: ${args.panelId} expand=${args.expand}" }
         
         val panelId = try {
             PanelId.valueOf(args.panelId.uppercase())
@@ -81,7 +81,7 @@ class PanelExpandTool @Inject constructor(
         }
         
         val action = if (args.expand) "expanded" else "collapsed"
-        log.info { "PanelExpandTool: ${panelId.displayName} $action" }
+        log.debug { "PanelExpandTool: ${panelId.displayName} $action" }
         return Result(
             success = true,
             message = "${panelId.displayName} panel $action"

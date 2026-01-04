@@ -71,7 +71,7 @@ class ReplCodeEventBus @Inject constructor() {
      * Emit that REPL code was generated successfully.
      */
     suspend fun emitGenerated(code: String, slots: List<String>) {
-        log.info { "ReplCodeEventBus: Generated code (${code.length} chars)" }
+        log.debug { "ReplCodeEventBus: Generated code (${code.length} chars)" }
         _events.emit(ReplCodeEvent.Generated(code, slots))
     }
     

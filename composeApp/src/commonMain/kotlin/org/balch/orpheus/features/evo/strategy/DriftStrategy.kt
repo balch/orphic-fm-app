@@ -120,10 +120,10 @@ class DriftStrategy(
     }
 
     override fun onActivate() {
-        log.info { "Activated (SPEED=$speedKnob, RANGE=$rangeKnob)" }
+        log.debug { "Activated (SPEED=$speedKnob, RANGE=$rangeKnob)" }
     }
 
     override fun onDeactivate() {
-        log.info { "Deactivated" }
+        log.debug { "Deactivated" }
     }
 }

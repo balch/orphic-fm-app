@@ -140,7 +140,7 @@ class LiveCodeViewModel(
     val triggers = scheduler.triggers
     
     init {
-        logger.i { "LiveCodeViewModel initialized, subscribing to ReplCodeEventBus" }
+        logger.d { "LiveCodeViewModel initialized, subscribing to ReplCodeEventBus" }
         
         // Subscribe to intents using scan pattern
         viewModelScope.launch {
@@ -175,10 +175,10 @@ class LiveCodeViewModel(
         viewModelScope.launch {
             logger.d { "Starting ReplCodeEventBus subscription..." }
             replCodeEventBus.events.collect { event ->
-                logger.i { "Received ReplCodeEvent: $event" }
+                logger.d { "Received ReplCodeEvent: $event" }
                 when (event) {
                     is ReplCodeEvent.Generated -> {
-                        logger.i { "AI generated code received, updating editor: ${event.code.take(50)}..." }
+                        logger.d { "AI generated code received, updating editor: ${event.code.take(50)}..." }
                         _intents.value = LiveCodeIntent.HandleAiCode(event.code, event.slots)
                     }
                     is ReplCodeEvent.Generating -> {
@@ -206,7 +206,7 @@ class LiveCodeViewModel(
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
                     is PlaybackLifecycleEvent.StopAll -> {
-                        logger.info { "Received StopAll event - stopping REPL" }
+                        logger.debug { "Received StopAll event - stopping REPL" }
                         repl.hush()
                         _uiState.value = _uiState.value.copy(
                             isPlaying = false, 
@@ -269,7 +269,7 @@ class LiveCodeViewModel(
                 // If already playing, do nothing
                 // If stopped, re-execute the code to reapply all parameters
                 if (!state.isPlaying && state.code.text.isNotBlank()) {
-                    logger.info { "Re-executing code after stop to restore parameters" }
+                    logger.debug { "Re-executing code after stop to restore parameters" }
                     executeCode(state.code.text, state, EvalMode.REPLACE)
                 } else {
                     scheduler.play()

@@ -63,7 +63,7 @@ class TidalScheduler(
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
                     is PlaybackLifecycleEvent.StopAll -> {
-                        log.info { "Received StopAll event - stopping scheduler" }
+                        log.debug { "Received StopAll event - stopping scheduler" }
                         stop()
                     }
                     else -> { /* Ignore other events */ }
@@ -114,7 +114,7 @@ class TidalScheduler(
     fun play() {
         if (playbackJob?.isActive == true) return
         
-        log.info { "TidalScheduler: Starting playback" }
+        log.debug { "TidalScheduler: Starting playback" }
         
         // Request resume in case orchestrator was paused (muted)
         playbackLifecycleManager.tryRequestResume()
@@ -184,7 +184,7 @@ class TidalScheduler(
      * Stop pattern playback.
      */
     fun stop() {
-        log.info { "TidalScheduler: Stopping playback" }
+        log.debug { "TidalScheduler: Stopping playback" }
         playbackJob?.cancel()
         playbackJob = null
         
@@ -366,7 +366,7 @@ class TidalScheduler(
             
             // Send Freq Automation
             if (freqTimes.isNotEmpty()) {
-                log.info { 
+                log.debug { 
                     "Note Freq: voice=$voiceIndex, times=${freqTimes.take(5)}, freqs=${freqValues.take(5)} Hz" 
                 }
                 synthEngine.setParameterAutomation(

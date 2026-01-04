@@ -149,7 +149,7 @@ class AiOptionsViewModel(
             aiModelProvider.selectedModel
                 .drop(1) // Skip initial emission to avoid restart on startup
                 .collect { model ->
-                    log.info { "Model changed to ${model.displayName}, restarting chat agent" }
+                    log.debug { "Model changed to ${model.displayName}, restarting chat agent" }
                     agent.restart()
                 }
         }
@@ -158,7 +158,7 @@ class AiOptionsViewModel(
         viewModelScope.launch {
             replCodeEventBus.events.collect { event ->
                 if (event is ReplCodeEvent.UserInteraction && _isReplActive.value) {
-                    log.info { "User interaction detected, deactivating REPL mode" }
+                    log.debug { "User interaction detected, deactivating REPL mode" }
                     _isReplActive.value = false
                 }
             }
@@ -169,7 +169,7 @@ class AiOptionsViewModel(
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
                     is PlaybackLifecycleEvent.StopAll -> {
-                        log.info { "Received StopAll event - stopping all agents" }
+                        log.debug { "Received StopAll event - stopping all agents" }
                         stopAllAgents()
                     }
                     else -> { /* Ignore other events */ }
@@ -185,7 +185,7 @@ class AiOptionsViewModel(
     private fun stopAllAgents() {
         // Stop Drone agent if active
         if (_isDroneActive.value) {
-            log.info { "Stopping Drone Agent (lifecycle)" }
+            log.debug { "Stopping Drone Agent (lifecycle)" }
             _isDroneActive.value = false
             _droneAgent.value?.stop()
             _droneAgent.value = null
@@ -193,7 +193,7 @@ class AiOptionsViewModel(
         
         // Stop Solo agent if active
         if (_isSoloActive.value) {
-            log.info { "Stopping Solo Agent (lifecycle)" }
+            log.debug { "Stopping Solo Agent (lifecycle)" }
             _isSoloActive.value = false
             _soloAgent.value?.stop()
             _soloAgent.value = null
@@ -201,7 +201,7 @@ class AiOptionsViewModel(
         
         // Deactivate REPL mode if active
         if (_isReplActive.value) {
-            log.info { "Deactivating REPL mode (lifecycle)" }
+            log.debug { "Deactivating REPL mode (lifecycle)" }
             _isReplActive.value = false
             viewModelScope.launch {
                 try {
@@ -309,7 +309,7 @@ class AiOptionsViewModel(
         viewModelScope.launch {
             val success = geminiKeyProvider.saveApiKey(key)
             if (success) {
-                log.info { "API key saved successfully" }
+                log.debug { "API key saved successfully" }
             } else {
                 log.warn { "Failed to save API key" }
             }
@@ -322,7 +322,7 @@ class AiOptionsViewModel(
     fun clearApiKey() {
         viewModelScope.launch {
             geminiKeyProvider.clearApiKey()
-            log.info { "API key cleared" }
+            log.debug { "API key cleared" }
         }
     }
 
@@ -346,7 +346,7 @@ class AiOptionsViewModel(
     fun selectModel(model: AiModel) {
         viewModelScope.launch {
             aiModelProvider.selectModel(model)
-            log.info { "Model selected: ${model.displayName}" }
+            log.debug { "Model selected: ${model.displayName}" }
         }
     }
 
@@ -399,7 +399,7 @@ class AiOptionsViewModel(
         mediaSessionStateManager.setDroneActive(_isDroneActive.value)
 
         if (_isDroneActive.value) {
-            log.info { "Starting Drone Agent" }
+            log.debug { "Starting Drone Agent" }
             if (showDialog) {
                 _showChatDialog.value = true // Ensure ChatDialog is visible
             }
@@ -428,14 +428,14 @@ class AiOptionsViewModel(
                 
                 // Fade in only Quad 3 using JSyn's LinearRamp
                 val fadeDuration = 2.0f  // seconds
-                log.info { "Fading in Quad 3 for drone over ${fadeDuration}s" }
+                log.debug { "Fading in Quad 3 for drone over ${fadeDuration}s" }
                 synthEngine.fadeQuadVolume(2, 1f, fadeDuration)
                 
                 // Start the agent immediately - it generates the drone sound that fades in
                 newAgent.start()
             }
         } else {
-            log.info { "Stopping Drone Agent" }
+            log.debug { "Stopping Drone Agent" }
             _droneAgent.value?.stop()
             _droneAgent.value = null  // Clear the reference
             
@@ -453,7 +453,7 @@ class AiOptionsViewModel(
      */
     fun toggleSolo(showDialog: Boolean = true) {
         val wasActive = _isSoloActive.value
-        log.info { "toggleSolo called. Was active: $wasActive" }
+        log.debug { "toggleSolo called. Was active: $wasActive" }
 
         // If Drone is active, turn it off first
         // We need to properly stop and clear the drone agent before starting solo
@@ -483,7 +483,7 @@ class AiOptionsViewModel(
         mediaSessionStateManager.setSoloActive(_isSoloActive.value)
         
         if (_isSoloActive.value) {
-            log.info { "Starting Solo Agent" }
+            log.debug { "Starting Solo Agent" }
             if (showDialog) {
                 _showChatDialog.value = true
             }
@@ -515,11 +515,11 @@ class AiOptionsViewModel(
                 )
                 
                 presetLoader.applyPreset(presetWithZeroQuadVol)
-                log.info { "Applied solo preset: ${soloPreset.name} (fading in)" }
+                log.debug { "Applied solo preset: ${soloPreset.name} (fading in)" }
                 
                 // Fade in using JSyn's LinearRamp for sample-accurate, click-free transitions
                 val fadeDuration = 2.0f  // seconds
-                log.info { "Fading in quad volumes over ${fadeDuration}s" }
+                log.debug { "Fading in quad volumes over ${fadeDuration}s" }
                 synthEngine.fadeQuadVolume(0, 1f, fadeDuration)
                 synthEngine.fadeQuadVolume(1, 1f, fadeDuration)
                 synthEngine.fadeQuadVolume(2, 1f, fadeDuration)
@@ -529,7 +529,7 @@ class AiOptionsViewModel(
                 
                 // Subscribe to completion signal - auto-stop Solo when all evolution prompts are done
                 newAgent.completed.collect {
-                    log.info { "Solo composition completed - auto-stopping" }
+                    log.debug { "Solo composition completed - auto-stopping" }
                     // Fade out and turn off Solo mode (on main thread)
                     withContext(dispatcherProvider.main) {
                         onSoloCompleted()
@@ -537,7 +537,7 @@ class AiOptionsViewModel(
                 }
             }
         } else {
-            log.info { "Stopping Solo Agent" }
+            log.debug { "Stopping Solo Agent" }
             _soloAgent.value?.stop()
             _soloAgent.value = null  // Clear the reference
             
@@ -606,7 +606,7 @@ class AiOptionsViewModel(
     private fun onSoloCompleted() {
         if (!_isSoloActive.value) return // Already stopped
         
-        log.info { "Solo composition completed - fading out and stopping" }
+        log.debug { "Solo composition completed - fading out and stopping" }
         
         // Stop the agent first (this will handle the fade out)
         _soloAgent.value?.stop()
@@ -627,14 +627,14 @@ class AiOptionsViewModel(
      */
     fun toggleChatDialog() {
         _showChatDialog.value = !_showChatDialog.value
-        log.info { "Toggled chat dialog: ${_showChatDialog.value}" }
+        log.debug { "Toggled chat dialog: ${_showChatDialog.value}" }
     }
 
     /**
      * Send a user influence prompt to the Solo agent.
      */
     fun sendSoloInfluence(text: String) {
-        log.info { "Sending solo influence: $text" }
+        log.debug { "Sending solo influence: $text" }
         _soloAgent.value?.injectUserPrompt(text)
     }
 
@@ -658,7 +658,7 @@ class AiOptionsViewModel(
         _isReplActive.value = !wasActive
         
         if (_isReplActive.value) {
-            log.info { "REPL mode activated" }
+            log.debug { "REPL mode activated" }
             
             // Immediately open CODE panel and close LFO/DELAY panels
             // This gives instant UI feedback before AI starts generating
@@ -678,7 +678,7 @@ class AiOptionsViewModel(
             viewModelScope.launch(dispatcherProvider.io) {
                 val defaultPreset = presetsRepository.getDefault()
                 presetLoader.applyPreset(defaultPreset)
-                log.info { "Reset to Default preset for REPL" }
+                log.debug { "Reset to Default preset for REPL" }
             }
             
             // Open the chat dialog so user can see the AI working
@@ -710,7 +710,7 @@ class AiOptionsViewModel(
                 selectedKey = selectedKey
             )
         } else {
-            log.info { "REPL mode deactivated" }
+            log.debug { "REPL mode deactivated" }
 
             // Emit UserInteraction to clear the AI generating state
             viewModelScope.launch {
@@ -738,7 +738,7 @@ class AiOptionsViewModel(
                     replExecuteTool.execute(
                         ReplExecuteTool.Args(code = "hush")
                     )
-                    log.info { "Hushed REPL patterns" }
+                    log.debug { "Hushed REPL patterns" }
                     
                     // Restore volumes after hush (instant, not faded)
                     synthEngine.setQuadVolume(0, vol0)
