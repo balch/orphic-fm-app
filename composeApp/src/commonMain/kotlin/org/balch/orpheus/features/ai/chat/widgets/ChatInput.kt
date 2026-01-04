@@ -101,7 +101,7 @@ fun ChatInputField(
                 color = OrpheusColors.sterlingSilver
             ),
             shape = RoundedCornerShape(16.dp),
-            singleLine = true,
+            singleLine = false,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { sendMessage() }),
             colors = OutlinedTextFieldDefaults.colors(
