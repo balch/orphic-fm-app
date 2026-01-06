@@ -125,10 +125,6 @@ class TidalScheduler(
             val startTime = currentTimeMillis()
             var nextScheduleTime = startTime
             
-            // Initial silence to allow scheduling?
-            // We want to start immediately.
-            // We schedule the first window [0, windowMs].
-            
             var lastScheduledSeconds = 0.0
             
             while (isActive) {
@@ -326,7 +322,7 @@ class TidalScheduler(
                 
                 // Add Freq Step with hold point
                 if (event.value is TidalEvent.Note) {
-                    val note = event.value as TidalEvent.Note
+                    val note = event.value
                     // Standard MIDI to frequency: 440Hz = A4 = MIDI 69
                     val freq = 440.0 * 2.0.pow((note.midiNote - 69) / 12.0)
                     
@@ -339,7 +335,7 @@ class TidalScheduler(
                     freqTimes.add(tEnd)
                     freqValues.add(freq.toFloat())
                 } else if (event.value is TidalEvent.Sample) {
-                    val sample = event.value as TidalEvent.Sample
+                    val sample = event.value
                     // Lookup in Drum Library, default to 440Hz if not found
                     val patch = DrumDefs.LIBRARY[sample.name]
                     val freq = patch?.frequency?.toDouble() ?: 440.0
@@ -496,8 +492,7 @@ class TidalScheduler(
              is TidalEvent.DistortionMix,
              is TidalEvent.Vibrato,
              is TidalEvent.DelayFeedback,
-             is TidalEvent.DelayMix,
-             is TidalEvent.MasterVolume -> {
+             is TidalEvent.DelayMix -> {
                  if (event.locations.isNotEmpty()) {
                      _triggers.tryEmit(TriggerEvent(0, event.locations))
                  }
@@ -637,15 +632,6 @@ class TidalScheduler(
                     ControlEventOrigin.TIDAL
                 )
                 synthEngine.setVoiceEnvelopeSpeed(event.voiceIndex, event.speed)
-            }
-            
-            is TidalEvent.MasterVolume -> {
-                synthController.emitControlChange(
-                    "master_volume",
-                    event.volume,
-                    ControlEventOrigin.TIDAL
-                )
-                synthEngine.setMasterVolume(event.volume)
             }
             
             is TidalEvent.DuoMod -> {

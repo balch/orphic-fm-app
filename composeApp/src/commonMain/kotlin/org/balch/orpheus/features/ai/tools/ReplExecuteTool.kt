@@ -90,7 +90,6 @@ class ReplExecuteTool @Inject constructor(
         - vibrato:<val> - LFO depth (0.0-1.0)
         - feedback:<val> - Delay feedback (0.0-1.0)
         - delay:<val> OR delaymix:<val> - Delay mix (0.0-1.0)
-        - volume:<val> - Master volume (0.0-1.0)
         
         TRANSFORMATIONS:
         - fast <n> <pattern> - Speed up by factor n

@@ -284,23 +284,7 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
-    
 
-    
-    /**
-     * Master volume control.
-     * @param volume Master volume (0.0-1.0)
-     */
-    data class MasterVolume(
-        val volume: Float,
-        override val locations: List<SourceLocation> = emptyList()
-    ) : TidalEvent() {
-        override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
-        override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
-    }
-    
-
-    
     /**
      * Duo modulation source control.
      * @param duoIndex Duo index (0-3, where duo 0 = voices 0-1, duo 1 = voices 2-3, etc.)
@@ -439,28 +423,9 @@ object Orpheus {
     fun voicePan(voiceIndex: Int, pan: Float): Pattern<TidalEvent> =
         Pattern.pure(TidalEvent.VoicePan(voiceIndex, pan))
     
-    fun masterVolume(volume: Float): Pattern<TidalEvent> =
-        Pattern.pure(TidalEvent.MasterVolume(volume))
-    
+
     // === Silence ===
     
     fun silence(): Pattern<TidalEvent> = Pattern.silence()
 }
 
-// Extension functions to add parameters to gate patterns
-fun Pattern<TidalEvent>.withTune(voiceIndex: Int, tune: Float): Pattern<TidalEvent> =
-    Pattern.stack(this, Orpheus.voiceTune(voiceIndex, tune))
-
-fun Pattern<TidalEvent>.withHold(voiceIndex: Int, amount: Float): Pattern<TidalEvent> =
-    Pattern.stack(this, Orpheus.voiceHold(voiceIndex, amount))
-
-fun Pattern<TidalEvent>.withEnvSpeed(voiceIndex: Int, speed: Float): Pattern<TidalEvent> =
-    Pattern.stack(this, Orpheus.voiceEnvSpeed(voiceIndex, speed))
-
-fun Pattern<TidalEvent>.withDelay(time: Float, feedback: Float = 0.5f): Pattern<TidalEvent> =
-    Pattern.stack(
-        this,
-        Orpheus.delayTime(0, time),
-        Orpheus.delayTime(1, time),
-        Orpheus.delayFeedback(feedback)
-    )

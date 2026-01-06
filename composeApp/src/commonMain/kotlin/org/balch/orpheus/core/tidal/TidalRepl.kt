@@ -273,7 +273,7 @@ class TidalRepl(
                 }
                 
                 // Pattern assignment: d1 $ pattern or d1 = pattern
-                val assignMatch = Regex("^(d\\d+)\\s*[\\$=]\\s*(.+)$").find(trimmed)
+                val assignMatch = Regex("^(d\\d+)\\s*[$=]\\s*(.+)$").find(trimmed)
                 if (assignMatch != null) {
                     val (slotName, patternCode) = assignMatch.destructured
                     // Calculate offset to pattern code within the line
@@ -590,13 +590,7 @@ class TidalRepl(
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.DistortionMix(value.coerceIn(0f, 1f), listOf(location)))
         }
-        
-        // volume:<value> or volume <value> - Master volume (0.0-1.0)
-        extractValue(trimmed, "volume")?.let { value ->
-            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
-            return Pattern.pure(TidalEvent.MasterVolume(value.coerceIn(0f, 1f), listOf(location)))
-        }
-        
+
         // pan:<voiceIndex> <value> - Voice pan position (-1.0 to 1.0)
         extractVoiceParam(trimmed, "pan")?.let { (voiceIndex, value) ->
             if (voiceIndex !in 1..8) throw IllegalArgumentException("Line $lineNum: Voice index must be 1-8, got: $voiceIndex")
