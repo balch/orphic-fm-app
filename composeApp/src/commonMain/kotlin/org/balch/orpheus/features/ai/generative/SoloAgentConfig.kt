@@ -70,7 +70,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - DELAY_MOD_SOURCE: Modulation source (0=self, 1=LFO)
         - DELAY_LFO_WAVEFORM: Mod shape (0=triangle, 1=square)
         
-        ### GLOBAL EFFECTS
+        ### GLOBAL EFFECTS (Do NOT use MASTER_VOLUME)
         - DRIVE: Saturation warmth (0.1-0.3 for gentle, 0.4+ for gritty)
         - DISTORTION_MIX: Distortion wet/dry
         - VIBRATO: LFO modulation depth (0.15-0.4)

@@ -155,6 +155,12 @@ class SynthControlAgent(
                 val id = action.details.getOrNull(0) ?: return
                 val valueStr = action.details.getOrNull(1) ?: return
                 val value = valueStr.toFloatOrNull() ?: return
+                
+                // Block Master Volume changes from AI
+                if (id.lowercase() == "master_volume") {
+                    log.warn { "Blocked master_volume change from AI" }
+                    return
+                }
 
                 log.debug { "Executing CONTROL: $id = $value" }
                 emitControl("Set $id: ${value.format(2)}")
