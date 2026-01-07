@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
@@ -89,7 +90,7 @@ fun DistortionPanelLayout(
                     value = uiState.drive,
                     onValueChange = actions.onDriveChange,
                     label = "DRIVE",
-                    controlId = null,
+                    controlId = ControlIds.DRIVE,
                     size = 56.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
@@ -97,7 +98,7 @@ fun DistortionPanelLayout(
                     value = uiState.volume,
                     onValueChange = actions.onVolumeChange,
                     label = "VOL",
-                    controlId = null,
+                    controlId = ControlIds.MASTER_VOLUME,
                     size = 56.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
@@ -113,7 +114,7 @@ fun DistortionPanelLayout(
                     value = uiState.mix,
                     onValueChange = actions.onMixChange,
                     label = "MIX",
-                    controlId = null,
+                    controlId = ControlIds.DISTORTION_MIX,
                     size = 56.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
