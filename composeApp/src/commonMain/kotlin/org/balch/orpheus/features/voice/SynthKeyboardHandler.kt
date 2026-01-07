@@ -6,6 +6,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import org.balch.orpheus.core.input.KeyboardInputHandler
+import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /**
  * Handles keyboard events and dispatches to ViewModels.
@@ -15,8 +16,7 @@ object SynthKeyboardHandler {
     fun handleKeyEvent(
         keyEvent: KeyEvent,
         isDialogActive: Boolean,
-        voiceState: VoiceUiState,
-        voiceViewModel: VoiceViewModel,
+        voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
     ): Boolean {
 
         // Skip keyboard handling when dialog is active
@@ -30,11 +30,11 @@ object SynthKeyboardHandler {
         KeyboardInputHandler.getVoiceFromKey(key)?.let { voiceIndex ->
             if (isKeyDown && !KeyboardInputHandler.isVoiceKeyPressed(voiceIndex)) {
                 KeyboardInputHandler.onVoiceKeyDown(voiceIndex)
-                voiceViewModel.onPulseStart(voiceIndex)
+                voiceFeature.actions.onPulseStart(voiceIndex)
                 return true
             } else if (isKeyUp) {
                 KeyboardInputHandler.onVoiceKeyUp(voiceIndex)
-                voiceViewModel.onPulseEnd(voiceIndex)
+                voiceFeature.actions.onPulseEnd(voiceIndex)
                 return true
             }
         }
@@ -43,10 +43,10 @@ object SynthKeyboardHandler {
         if (isKeyDown) {
             KeyboardInputHandler.getTuneVoiceFromKey(key)
                 ?.let { voiceIndex ->
-                    val currentTune = voiceState.voiceStates[voiceIndex].tune
+                    val currentTune = voiceFeature.state.voiceStates[voiceIndex].tune
                     val delta =KeyboardInputHandler.getTuneDelta(keyEvent.isShiftPressed)
                     val newTune = (currentTune + delta).coerceIn(0f, 1f )
-                    voiceViewModel.onVoiceTuneChange(voiceIndex,newTune)
+                    voiceFeature.actions.onVoiceTuneChange(voiceIndex,newTune)
                     return true
                 }
 

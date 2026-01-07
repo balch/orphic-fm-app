@@ -99,8 +99,7 @@ fun CompactLandscapeScreen(
                 // as the ViewModel is available in the screen scope.
                 SynthKeyboardHandler.handleKeyEvent(
                     keyEvent = event,
-                    voiceState = voice.state,
-                    voiceViewModel = voiceViewModel, 
+                    voiceFeature = voice,
                     isDialogActive = isDialogActive
                 )
             }

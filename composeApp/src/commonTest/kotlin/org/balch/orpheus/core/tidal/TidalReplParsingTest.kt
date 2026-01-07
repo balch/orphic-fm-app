@@ -1,7 +1,7 @@
 package org.balch.orpheus.core.tidal
 
-import kotlinx.coroutines.Dispatchers
 import org.balch.orpheus.core.audio.TestSynthEngine
+import org.balch.orpheus.core.coroutines.TestDispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.routing.SynthController
 import kotlin.test.BeforeTest
@@ -18,14 +18,22 @@ import kotlin.test.assertTrue
 class TidalReplParsingTest {
 
     private lateinit var repl: TidalRepl
+    private val dispatcherProvider = TestDispatcherProvider()
+
 
     @BeforeTest
     fun setup() {
         val synthEngine = TestSynthEngine()
         val synthController = SynthController()
         val playbackLifecycleManager = PlaybackLifecycleManager()
-        val scheduler = TidalScheduler(synthController, synthEngine, playbackLifecycleManager)
-        repl = TidalRepl(scheduler, Dispatchers.Unconfined)
+        val scheduler = TidalScheduler(
+            synthController,
+            synthEngine,
+            playbackLifecycleManager,
+            dispatcherProvider,
+
+        )
+        repl = TidalRepl(scheduler, dispatcherProvider)
     }
 
     // =========================================================================

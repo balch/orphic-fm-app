@@ -42,33 +42,11 @@ fun VoiceGroupSection(
 ) {
     val voiceState by voiceViewModel.uiState.collectAsState()
     val midiState by midiViewModel.uiState.collectAsState()
-    val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
 
-    val voiceActions = object : VoiceActions {
-        override fun onDuoModSourceChange(pairIndex: Int, source: org.balch.orpheus.core.audio.ModSource) = voiceViewModel.onDuoModSourceChange(pairIndex, source)
-        override fun onVoiceTuneChange(index: Int, value: Float) = voiceViewModel.onVoiceTuneChange(index, value)
-        override fun onDuoModDepthChange(pairIndex: Int, value: Float) = voiceViewModel.onDuoModDepthChange(pairIndex, value)
-        override fun onVoiceEnvelopeSpeedChange(index: Int, value: Float) = voiceViewModel.onVoiceEnvelopeSpeedChange(index, value)
-        override fun onHoldChange(index: Int, holding: Boolean) = voiceViewModel.onHoldChange(index, holding)
-        override fun onPulseStart(index: Int) = voiceViewModel.onPulseStart(index)
-        override fun onPulseEnd(index: Int) = voiceViewModel.onPulseEnd(index)
-        override fun onPairSharpnessChange(pairIndex: Int, value: Float) = voiceViewModel.onPairSharpnessChange(pairIndex, value)
-        override fun onQuadPitchChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadPitchChange(quadIndex, value)
-        override fun onQuadHoldChange(quadIndex: Int, value: Float) = voiceViewModel.onQuadHoldChange(quadIndex, value)
-        override fun onFmStructureChange(crossQuad: Boolean) = voiceViewModel.onFmStructureChange(crossQuad)
-        override fun onTotalFeedbackChange(value: Float) = voiceViewModel.onTotalFeedbackChange(value)
-        override fun onVibratoChange(value: Float) = voiceViewModel.panelActions.onVibratoChange(value)
-        override fun onVoiceCouplingChange(value: Float) = voiceViewModel.onVoiceCouplingChange(value)
-        override fun onDialogActiveChange(active: Boolean) { /* Not used here */ }
-        override fun onWobblePulseStart(index: Int, x: Float, y: Float) = voiceViewModel.onWobblePulseStart(index, x, y)
-        override fun onWobbleMove(index: Int, x: Float, y: Float) = voiceViewModel.onWobbleMove(index, x, y)
-        override fun onWobblePulseEnd(index: Int) = voiceViewModel.onWobblePulseEnd(index)
-    }
+    val voiceActions = voiceViewModel.panelActions.toVoiceActions()
 
-    val midiActions = object : MidiActions {
-        override fun selectVoiceForLearning(voiceIndex: Int) = midiViewModel.selectVoiceForLearning(voiceIndex)
-    }
+    val midiActions = midiViewModel.panelActions.toMidiActions()
 
     VoiceGroupSectionLayout(
         modifier = modifier,

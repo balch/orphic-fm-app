@@ -37,7 +37,6 @@ fun HeaderPanel(
     viewModel: HeaderViewModel = metroViewModel(),
     evoViewModel: EvoViewModel = metroViewModel(),
     height: Dp = 260.dp,
-    isVizInitiallyExpanded: Boolean = true,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
     // Observe expansion state from ViewModel

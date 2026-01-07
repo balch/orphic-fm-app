@@ -83,17 +83,12 @@ fun SynthScreen(
                     )
                 }
                 LayoutMode.Desktop -> {
-                    // Larger than tablet dimension check (e.g. 1100dp)
-                    val isVizInitiallyExpanded = maxWidth.value > 1100f
-                    
                     // Original desktop layout
                     DesktopSynthScreen(
                         voiceViewModel = voiceViewModel,
-                        evoViewModel = evoViewModel,
                         isDialogActive = isDialogActive,
                         onDialogActiveChange = { isDialogActive = it },
                         focusRequester = focusRequester,
-                        isVizInitiallyExpanded = isVizInitiallyExpanded
                     )
                 }
             }
