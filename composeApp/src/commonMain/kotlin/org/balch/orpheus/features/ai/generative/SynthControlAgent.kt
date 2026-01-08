@@ -34,8 +34,6 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.GeminiKeyProvider
 import org.balch.orpheus.core.audio.SynthEngine
@@ -44,7 +42,10 @@ import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
 import org.balch.orpheus.features.ai.tools.SynthControlTool
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Helper for formatting floats
@@ -69,6 +70,7 @@ sealed interface SynthAgentState {
 /**
  * A status message from the Agent for display.
  */
+@OptIn(ExperimentalTime::class)
 data class AiStatusMessage(
     val text: String,
     val isLoading: Boolean = false,
@@ -82,6 +84,7 @@ data class AiStatusMessage(
  *
  * Use [SynthControlAgent.Factory] to create instances.
  */
+@OptIn(ExperimentalTime::class)
 class SynthControlAgent(
     private val config: SynthControlAgentConfig,
     private val geminiKeyProvider: GeminiKeyProvider,

@@ -14,14 +14,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.features.evo.AudioEvolutionStrategy
 import kotlin.math.abs
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.ExperimentalTime
 
 /**
  * React Strategy - Audio & Input Reactive Evolution
@@ -33,6 +34,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * SENS (Knob 1): Sensitivity - how responsive to audio levels
  * FOLLOW (Knob 2): Follow amount - how strongly to track user changes
  */
+@OptIn(ExperimentalTime::class)
 @Inject
 @ContributesIntoSet(AppScope::class)
 class ReactStrategy(

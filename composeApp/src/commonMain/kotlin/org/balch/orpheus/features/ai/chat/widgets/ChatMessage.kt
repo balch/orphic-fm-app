@@ -3,10 +3,11 @@ package org.balch.orpheus.features.ai.chat.widgets
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Types of chat messages in the AI conversation.
@@ -21,6 +22,7 @@ enum class ChatMessageType {
 /**
  * Represents a chat message in the AI conversation.
  */
+@OptIn(ExperimentalTime::class)
 @Serializable
 data class ChatMessage(
     val id: String = randomId(),
@@ -38,7 +40,7 @@ private fun randomId(): String =
 /**
  * Platform-independent timestamp.
  */
-private fun currentTimeMillis(): Long = 
+private fun currentTimeMillis(): Long =
     Clock.System.now().toEpochMilliseconds()
 
 @Composable

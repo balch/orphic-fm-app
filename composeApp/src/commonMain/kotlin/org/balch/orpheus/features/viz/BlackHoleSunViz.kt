@@ -74,7 +74,7 @@ data class AccretionParticle(
 data class BlackholeSunUiState(
     val particles: List<AccretionParticle> = emptyList(),
     val diskGlow: Float = 0f,          // Accumulated glow from absorbed particles
-    val diskHeat: FloatArray = FloatArray(8) { 0f }, // Heat per sector for disk coloring
+    val diskHeat: FloatArray = FloatArray(8), // Heat per sector for disk coloring
     val masterEnergy: Float = 0f,
     val orbitDirection: Float = 1f,    // 1 = clockwise, -1 = counter-clockwise
     val diskRotation: Float = 0f,      // Accumulated disk rotation angle

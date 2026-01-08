@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
 import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.SynthViewModel
@@ -52,6 +51,8 @@ import org.balch.orpheus.features.ai.generative.SoloAgentConfig
 import org.balch.orpheus.features.ai.generative.SynthControlAgent
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 
 /**
@@ -549,6 +550,7 @@ class AiOptionsViewModel(
         }
     }
 
+    @OptIn(ExperimentalTime::class)
     private fun generateRandomSoloPreset(): DronePreset {
         val r = Random
         
