@@ -1,5 +1,7 @@
 package org.balch.orpheus.core.audio.dsp
 
+import kotlin.math.pow
+
 /**
  * Shared voice implementation using DSP primitive interfaces.
  * This class contains the voice wiring logic in a platform-independent way.
@@ -123,9 +125,7 @@ class DspVoice(
         volumeRamp.input.set(targetVolume)
     }
     
-    companion object {
-        private const val DEFAULT_VOLUME_RAMP_TIME = 0.05  // 50ms for quick transitions
-    }
+
 
     init {
         // Register all units with audio engine
@@ -304,11 +304,24 @@ class DspVoice(
     }
 
     private fun applyScaledHold() {
+        // Severe ease-in curve: At fastest envelope speed (0), hold values are raised to a high power,
+        // making low values produce almost no output while high values still reach full range.
+        // As envelope speed increases toward 1 (slow/drone mode), the curve becomes more linear.
+        // 
+        // Exponent interpolation: speed=0 → exponent=4 (severe), speed=1 → exponent=1 (linear)
+        val exponent = FAST_EASE_EXPONENT - (currentEnvelopeSpeed * (FAST_EASE_EXPONENT - 1.0))
+        val easedHold = rawHoldLevel.pow(exponent)
+        
         // Scale factor: slow mode (speed=1) → 2x, fast mode (speed=0) → 0.5x
         // This means in slow mode, a low Hold value still creates a drone
         // In fast mode, you need higher Hold to sustain
         val scaleFactor = 0.5 + (currentEnvelopeSpeed * 1.5) // 0.5 → 2.0
-        val scaledHold = (rawHoldLevel * scaleFactor).coerceAtMost(1.0)
+        val scaledHold = (easedHold * scaleFactor).coerceAtMost(1.0)
         holdRamp.input.set(scaledHold)  // Ramp to avoid clicks
+    }
+    
+    companion object {
+        private const val DEFAULT_VOLUME_RAMP_TIME = 0.05  // 50ms for quick transitions
+        private const val FAST_EASE_EXPONENT = 4.0  // Power curve exponent at fastest envspeed (severe ease-in)
     }
 }
