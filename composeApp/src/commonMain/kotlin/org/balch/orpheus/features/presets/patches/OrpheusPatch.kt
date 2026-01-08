@@ -45,7 +45,9 @@ class OrpheusPatch : SynthPatch {
         delayMod2 = 0.10875f,
         delayFeedback = 0.30750036f,
         delayMix = 0.51125044f,
-        masterVolume = 1.0f,
+        drive = 0.4f,
+        distortionMix = .6f,
+        masterVolume = .7f,
         createdAt = 1767461190433L
     )
 }
