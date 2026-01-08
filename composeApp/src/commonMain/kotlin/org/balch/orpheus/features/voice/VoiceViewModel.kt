@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.voice
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -9,6 +10,7 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
@@ -16,6 +18,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.VoiceState
@@ -25,8 +29,7 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.core.synthViewModel
 import kotlin.math.roundToInt
 
 /** UI state for voice management. */
@@ -99,9 +102,9 @@ class VoiceViewModel(
     private val synthController: SynthController,
     private val wobbleController: VoiceWobbleController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel(), PanelViewModel<VoiceUiState, VoicePanelActions> {
+) : ViewModel(), SynthViewModel<VoiceUiState, VoicePanelActions> {
 
-    override val panelActions: VoicePanelActions = VoicePanelActions(
+    override val actions: VoicePanelActions = VoicePanelActions(
         onMasterVolumeChange = { value ->
             synthController.emitControlChange(ControlIds.MASTER_VOLUME, value, ControlEventOrigin.UI)
         },
@@ -144,7 +147,7 @@ class VoiceViewModel(
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
 
-    override val uiState: StateFlow<VoiceUiState> =
+    override val stateFlow: StateFlow<VoiceUiState> =
         intents
             .onEach { intent -> applyToEngine(intent) }
             .scan(VoiceUiState()) { state, intent -> reduce(state, intent) }
@@ -157,7 +160,7 @@ class VoiceViewModel(
 
     init {
         viewModelScope.launch(dispatcherProvider.io) {
-            uiState.value.voiceStates.forEachIndexed { i, v -> engine.setVoiceTune(i, v.tune) }
+            stateFlow.value.voiceStates.forEachIndexed { i, v -> engine.setVoiceTune(i, v.tune) }
 
             // Subscribe to preset changes
             launch {
@@ -165,7 +168,7 @@ class VoiceViewModel(
                     val voiceState =
                         VoiceUiState(
                             voiceStates =
-                                uiState.value.voiceStates.mapIndexed { index, state ->
+                                stateFlow.value.voiceStates.mapIndexed { index, state ->
                                     state.copy(
                                         tune = preset.voiceTunes.getOrElse(index) { state.tune }
                                     )
@@ -450,7 +453,7 @@ class VoiceViewModel(
 
             is VoiceIntent.PulseStart -> engine.setVoiceGate(intent.index, true)
             is VoiceIntent.PulseEnd -> {
-                val voice = uiState.value.voiceStates[intent.index]
+                val voice = stateFlow.value.voiceStates[intent.index]
                 // Always close the gate to trigger envelope release
                 engine.setVoiceGate(intent.index, false)
                 // If holding, the hold level provides the floor that VCA won't go below
@@ -461,12 +464,12 @@ class VoiceViewModel(
                 if (intent.holding) {
                     // Set hold level based on envelope speed (same as QuadHold behavior)
                     // Speed 0 (fast) → 0.5 hold level, Speed 1 (slow) → 1.0 hold level
-                    val envSpeed = uiState.value.voiceEnvelopeSpeeds[intent.index]
+                    val envSpeed = stateFlow.value.voiceEnvelopeSpeeds[intent.index]
                     val holdLevel = 0.5f + (envSpeed * 0.5f)
                     engine.setVoiceHold(intent.index, holdLevel)
                 } else {
                     engine.setVoiceHold(intent.index, 0f)
-                    val voice = uiState.value.voiceStates[intent.index]
+                    val voice = stateFlow.value.voiceStates[intent.index]
                     if (!voice.pulse) engine.setVoiceGate(intent.index, false)
                 }
             }
@@ -488,7 +491,7 @@ class VoiceViewModel(
 
             is VoiceIntent.FmStructure -> {
                 engine.setFmStructure(intent.crossQuad)
-                uiState.value.duoModSources.forEachIndexed { index, source ->
+                stateFlow.value.duoModSources.forEachIndexed { index, source ->
                     if (source == ModSource.VOICE_FM)
                         engine.setDuoModSource(index, source)
                 }
@@ -743,23 +746,31 @@ class VoiceViewModel(
     }
 
     companion object {
-        val PREVIEW = ViewModelStateActionMapper(
-            state = VoiceUiState(),
-            actions = VoicePanelActions(
-                onMasterVolumeChange = {}, onVibratoChange = {}, 
-                onVoiceTuneChange = {_, _ -> }, onVoiceModDepthChange = {_, _ -> }, 
-                onDuoModDepthChange = {_, _ -> }, onPairSharpnessChange = {_, _ -> },
-                onVoiceEnvelopeSpeedChange = {_, _ -> }, onPulseStart = {}, onPulseEnd = {},
-                onHoldChange = {_, _ -> }, onDuoModSourceChange = {_, _ -> },
-                onQuadPitchChange = {_, _ -> }, onQuadHoldChange = {_, _ -> },
-                onFmStructureChange = {}, onTotalFeedbackChange = {},
-                onVoiceCouplingChange = {}, onWobblePulseStart = {_, _, _ -> },
-                onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {},
-                onBendChange = {}, onBendRelease = {},
-                onStringBendChange = {_, _, _ -> }, onStringBendRelease = { 0 },
-                onSlideBarChange = {_, _ -> }, onSlideBarRelease = {}
-            )
+        val PREVIEW_STATE = MutableStateFlow(VoiceUiState())
+        val PREVIEW_ACTIONS = VoicePanelActions(
+            onMasterVolumeChange = {}, onVibratoChange = {}, 
+            onVoiceTuneChange = {_, _ -> }, onVoiceModDepthChange = {_, _ -> }, 
+            onDuoModDepthChange = {_, _ -> }, onPairSharpnessChange = {_, _ -> },
+            onVoiceEnvelopeSpeedChange = {_, _ -> }, onPulseStart = {}, onPulseEnd = {},
+            onHoldChange = {_, _ -> }, onDuoModSourceChange = {_, _ -> },
+            onQuadPitchChange = {_, _ -> }, onQuadHoldChange = {_, _ -> },
+            onFmStructureChange = {}, onTotalFeedbackChange = {},
+            onVoiceCouplingChange = {}, onWobblePulseStart = {_, _, _ -> },
+            onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {},
+            onBendChange = {}, onBendRelease = {},
+            onStringBendChange = {_, _, _ -> }, onStringBendRelease = { 0 },
+            onSlideBarChange = {_, _ -> }, onSlideBarRelease = {}
         )
+
+        fun previewFeature(state: VoiceUiState = VoiceUiState()) =
+            object : SynthFeature<VoiceUiState, VoicePanelActions> {
+                override val stateFlow: StateFlow<VoiceUiState> = MutableStateFlow(state)
+                override val actions: VoicePanelActions = VoicePanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<VoiceUiState, VoicePanelActions> =
+            synthViewModel<VoiceViewModel, VoiceUiState, VoicePanelActions>()
     }
 }
 

@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.presets
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
@@ -10,6 +11,7 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -19,13 +21,14 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.core.synthViewModel
 
 /** UI state for the Presets panel. */
 sealed interface PresetUiState {
@@ -80,9 +83,9 @@ class PresetsViewModel(
     private val presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider,
     private val appPreferencesRepository: AppPreferencesRepository
-) : ViewModel(), PanelViewModel<PresetUiState, PresetPanelActions> {
+) : ViewModel(), SynthViewModel<PresetUiState, PresetPanelActions> {
 
-    override val panelActions = PresetPanelActions(
+    override val actions = PresetPanelActions(
         onPresetSelect = ::selectPreset,
         onSelect = ::applyPreset,
         onNew = ::saveNewPreset,
@@ -99,7 +102,7 @@ class PresetsViewModel(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    override val uiState: StateFlow<PresetUiState> =
+    override val stateFlow: StateFlow<PresetUiState> =
         flow<PresetUiState> {
             val initial = loadPresets()
             initial.selectedPreset?.let { presetLoader.applyPreset(it) }
@@ -236,9 +239,17 @@ class PresetsViewModel(
     }
 
     companion object {
-        val PREVIEW = ViewModelStateActionMapper(
-            state = PresetUiState.Loading as PresetUiState,
-            actions = PresetPanelActions.EMPTY,
-        )
+        val PREVIEW_STATE: MutableStateFlow<PresetUiState> = MutableStateFlow(PresetUiState.Loading)
+        val PREVIEW_ACTIONS = PresetPanelActions.EMPTY
+
+        fun previewFeature(state: PresetUiState = PresetUiState.Loading) =
+            object : SynthFeature<PresetUiState, PresetPanelActions> {
+                override val stateFlow: StateFlow<PresetUiState> = MutableStateFlow(state)
+                override val actions: PresetPanelActions = PresetPanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<PresetUiState, PresetPanelActions> =
+            synthViewModel<PresetsViewModel, PresetUiState, PresetPanelActions>()
     }
 }

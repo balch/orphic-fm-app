@@ -14,8 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -29,32 +30,13 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 @Composable
-fun CenterControlPanel(modifier: Modifier = Modifier) {
-    val voiceViewModel: VoiceViewModel = metroViewModel()
-    val voiceState by voiceViewModel.uiState.collectAsState()
-    val effects = LocalLiquidEffects.current
-
-    CenterControlPanelLayout(
-        voiceState = voiceState,
-        effects = effects,
-        onVibratoChange = { voiceViewModel.panelActions.onVibratoChange(it) },
-        onVoiceCouplingChange = voiceViewModel::onVoiceCouplingChange,
-        onTotalFeedbackChange = voiceViewModel::onTotalFeedbackChange,
-        onFmStructureChange = voiceViewModel::onFmStructureChange,
-        modifier = modifier
-    )
-}
-
-@Composable
-fun CenterControlPanelLayout(
-    voiceState: VoiceUiState,
-    effects: VisualizationLiquidEffects,
-    onFmStructureChange: (Boolean) -> Unit,
-    onTotalFeedbackChange: (Float) -> Unit,
-    onVibratoChange: (Float) -> Unit,
-    onVoiceCouplingChange: (Float) -> Unit,
+fun CenterControlPanel(
+    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
     modifier: Modifier = Modifier,
 ) {
+    val voiceState by voiceFeature.stateFlow.collectAsState()
+    val actions = voiceFeature.actions
+    val effects = LocalLiquidEffects.current
     val liquidState = LocalLiquidState.current
     val shape = RoundedCornerShape(8.dp)
 
@@ -76,12 +58,12 @@ fun CenterControlPanelLayout(
         Spacer(modifier = Modifier.height(80.dp))
         CrossModSelector(
             isCrossQuad = voiceState.fmStructureCrossQuad,
-            onToggle = onFmStructureChange
+            onToggle = actions.onFmStructureChange
         )
         Spacer(modifier = Modifier.weight(.1f))
         RotaryKnob(
             value = voiceState.totalFeedback,
-            onValueChange = onTotalFeedbackChange,
+            onValueChange = actions.onTotalFeedbackChange,
             label = "TOTAL FB",
             controlId = ControlIds.TOTAL_FEEDBACK,
             size = 32.dp,
@@ -90,7 +72,7 @@ fun CenterControlPanelLayout(
         Spacer(modifier = Modifier.weight(.1f))
         RotaryKnob(
             value = voiceState.vibrato,
-            onValueChange = onVibratoChange,
+            onValueChange = actions.onVibratoChange,
             label = "VIB",
             controlId = ControlIds.VIBRATO,
             size = 32.dp,
@@ -99,7 +81,7 @@ fun CenterControlPanelLayout(
         Spacer(modifier = Modifier.weight(.1f))
         RotaryKnob(
             value = voiceState.voiceCoupling,
-            onValueChange = onVoiceCouplingChange,
+            onValueChange = actions.onVoiceCouplingChange,
             label = "COUPLE",
             controlId = ControlIds.VOICE_COUPLING,
             size = 32.dp,
@@ -109,20 +91,15 @@ fun CenterControlPanelLayout(
     }
 }
 
+@Suppress("StateFlowValueCalledInComposition")
 @Preview(heightDp = 360)
 @Composable
 fun CenterControlPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        CenterControlPanelLayout(
-            voiceState = VoiceUiState(),
-            effects = effects,
-            onVibratoChange = {},
-            onVoiceCouplingChange = {},
-            onTotalFeedbackChange = {},
-            onFmStructureChange = {}
+        CenterControlPanel(
+            voiceFeature = VoiceViewModel.previewFeature()
         )
     }
 }
-

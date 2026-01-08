@@ -32,7 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -50,31 +50,13 @@ private val CavsGold = Color(0xFFFDBB30)
 @Composable
 fun EvoPanel(
     modifier: Modifier = Modifier,
-    viewModel: EvoViewModel = metroViewModel(),
-    isExpanded: Boolean,
-    onExpandedChange: ((Boolean) -> Unit)? = null,
-) {
-    val state by viewModel.uiState.collectAsState()
-    val actions = viewModel.panelActions
-
-    EvoPanelLayout(
-        uiState = state,
-        actions = actions,
-        modifier = modifier,
-        isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange
-    )
-}
-
-@Composable
-fun EvoPanelLayout(
-    modifier: Modifier = Modifier,
-    uiState: EvoUiState,
+    stateFlow: StateFlow<EvoUiState>,
     actions: EvoPanelActions,
     isExpanded: Boolean,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
+    val uiState by stateFlow.collectAsState()
     // Use the selected strategy's color for accents
     val accentColor = if (uiState.isEnabled) uiState.selectedStrategy.color else Color.Gray
 
@@ -238,16 +220,10 @@ fun EvoPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        EvoPanelLayout(
+        EvoPanel(
             isExpanded = true,
-            uiState = EvoUiState(
-                selectedStrategy = PreviewStrategy,
-                strategies = listOf(PreviewStrategy),
-                isEnabled = true,
-                knob1Value = 0.5f,
-                knob2Value = 0.5f
-            ),
-            actions = EvoPanelActions({}, {}, {}, {})
+            stateFlow = EvoViewModel.PREVIEW_STATE,
+            actions = EvoViewModel.PREVIEW_ACTIONS
         )
     }
 }

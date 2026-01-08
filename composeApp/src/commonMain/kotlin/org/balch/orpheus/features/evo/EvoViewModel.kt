@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.evo
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,11 +18,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.media.MediaSessionStateManager
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.core.synthViewModel
+
 
 @Immutable
 data class EvoUiState(
@@ -55,7 +58,7 @@ class EvoViewModel @Inject constructor(
     private val synthEngine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,
     private val mediaSessionStateManager: MediaSessionStateManager
-) : ViewModel(), PanelViewModel<EvoUiState, EvoPanelActions> {
+) : ViewModel(), SynthViewModel<EvoUiState, EvoPanelActions> {
 
     private val log = logging("EvoViewModel")
 
@@ -71,11 +74,11 @@ class EvoViewModel @Inject constructor(
             isEnabled = false
         )
     )
-    override val uiState: StateFlow<EvoUiState> = _uiState.asStateFlow()
+    override val stateFlow: StateFlow<EvoUiState> = _uiState.asStateFlow()
 
     private var evoJob: Job? = null
 
-    override val panelActions = EvoPanelActions(
+    override val actions = EvoPanelActions(
         onStrategyChange = ::selectStrategy,
         onEnabledChange = ::setEnabled,
         onKnob1Change = ::onKnob1Change,
@@ -208,15 +211,23 @@ class EvoViewModel @Inject constructor(
             override fun onDeactivate() {}
         }
 
-        val PREVIEW = ViewModelStateActionMapper(
-            state = EvoUiState(
-                selectedStrategy = PreviewStrategy,
-                strategies = listOf(PreviewStrategy),
-                isEnabled = false,
-                knob1Value = 0.5f,
-                knob2Value = 0.5f
-            ),
-            actions = EvoPanelActions.EMPTY,
-        )
+        val PREVIEW_STATE = MutableStateFlow(EvoUiState(
+            selectedStrategy = PreviewStrategy,
+            strategies = listOf(PreviewStrategy),
+            isEnabled = false,
+            knob1Value = 0.5f,
+            knob2Value = 0.5f
+        ))
+        val PREVIEW_ACTIONS = EvoPanelActions.EMPTY
+
+        fun previewFeature(state: EvoUiState = PREVIEW_STATE.value) =
+            object : SynthFeature<EvoUiState, EvoPanelActions> {
+                override val stateFlow: StateFlow<EvoUiState> = MutableStateFlow(state)
+                override val actions: EvoPanelActions = EvoPanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<EvoUiState, EvoPanelActions> =
+            synthViewModel<EvoViewModel, EvoUiState, EvoPanelActions>()
     }
 }

@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.tweaker.SequencerPath
 import org.balch.orpheus.features.tweaker.SequencerPoint
 import org.balch.orpheus.features.tweaker.TweakSequencerConfig
@@ -38,10 +40,7 @@ import org.balch.orpheus.features.tweaker.TweakSequencerPanelActions
 import org.balch.orpheus.features.tweaker.TweakSequencerParameter
 import org.balch.orpheus.features.tweaker.TweakSequencerState
 import org.balch.orpheus.features.tweaker.TweakSequencerUiState
-import org.balch.orpheus.features.tweaker.TweakSequencerViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
-import org.balch.orpheus.ui.utils.rememberPanelState
 import org.balch.orpheus.ui.widgets.CompactSecondsSlider
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -57,68 +56,15 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun ExpandedTweakSequencerScreen(
-    onDismiss: (Boolean) -> Unit,
-    viewModel: TweakSequencerViewModel = metroViewModel(),
-    modifier: Modifier = Modifier
-) {
-    val sequencerFeature = rememberPanelState(viewModel)
-    ExpandedTweakSequencerContent(
-        sequencerFeature = sequencerFeature,
-        onDismiss = onDismiss,
-        modifier = modifier
-    )
-}
-
-@Composable
-fun ExpandedTweakSequencerContent(
-    sequencerFeature: ViewModelStateActionMapper<TweakSequencerUiState, TweakSequencerPanelActions>,
+    sequencerFeature: SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions>,
     onDismiss: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val state = sequencerFeature.state
+    val uiState by sequencerFeature.stateFlow.collectAsState()
     val actions = sequencerFeature.actions
+    val state = uiState.sequencer
+    val activeParameter = uiState.activeParameter
 
-    ExpandedTweakSequencerLayout(
-        state = state.sequencer,
-        activeParameter = state.activeParameter,
-        onDurationChange = actions.onSetDuration,
-        onAddParameter = actions.onAddParameter,
-        onRemoveParameter = actions.onRemoveParameter,
-        onSelectActiveParameter = actions.onSelectActiveParameter,
-        onPathStarted = actions.onStartPath,
-        onPointAdded = actions.onAddPoint,
-        onPointsRemovedAfter = actions.onRemovePointsAfter,
-        onPathCompleted = actions.onCompletePath,
-        onClearPath = actions.onClearPath,
-        onSave = {
-            actions.onSave()
-            onDismiss(true)
-        },
-        onCancel = {
-            actions.onCancel()
-            onDismiss(false)
-        },
-        modifier = modifier
-    )
-}
-
-@Composable
-fun ExpandedTweakSequencerLayout(
-    state: TweakSequencerState,
-    activeParameter: TweakSequencerParameter?,
-    onDurationChange: (Float) -> Unit,
-    onAddParameter: (TweakSequencerParameter) -> Unit,
-    onRemoveParameter: (TweakSequencerParameter) -> Unit,
-    onSelectActiveParameter: (TweakSequencerParameter?) -> Unit,
-    onPathStarted: (TweakSequencerParameter, SequencerPoint) -> Unit,
-    onPointAdded: (TweakSequencerParameter, SequencerPoint) -> Unit,
-    onPointsRemovedAfter: (TweakSequencerParameter, Float) -> Unit,
-    onPathCompleted: (TweakSequencerParameter, Float) -> Unit,
-    onClearPath: (TweakSequencerParameter) -> Unit,
-    onSave: () -> Unit,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier
-) {
     val shape = RoundedCornerShape(16.dp)
     val accentColor = OrpheusColors.neonCyan
 
@@ -159,7 +105,10 @@ fun ExpandedTweakSequencerLayout(
                         .clip(CircleShape)
                         .background(Color(0xFF3A2A2A))
                         .border(1.dp, Color(0xFFFF6B6B).copy(alpha = 0.5f), CircleShape)
-                        .clickable { onCancel() },
+                        .clickable {
+                            actions.onCancel()
+                            onDismiss(false)
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -178,7 +127,10 @@ fun ExpandedTweakSequencerLayout(
                         .clip(CircleShape)
                         .background(Color(0xFF2A3A2A))
                         .border(1.dp, Color(0xFF6BFF6B).copy(alpha = 0.5f), CircleShape)
-                        .clickable { onSave() },
+                        .clickable {
+                            actions.onSave()
+                            onDismiss(true)
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -242,11 +194,11 @@ fun ExpandedTweakSequencerLayout(
                                     .background(if (isSelected) param.color.copy(alpha = 0.2f) else Color.Transparent)
                                     .clickable {
                                         if (isIncluded) {
-                                            onSelectActiveParameter(param)
+                                            actions.onSelectActiveParameter(param)
                                         } else {
                                             if (state.config.selectedParameters.size < TweakSequencerParameter.MAX_SELECTED) {
-                                                onAddParameter(param)
-                                                onSelectActiveParameter(param)
+                                                actions.onAddParameter(param)
+                                                actions.onSelectActiveParameter(param)
                                             }
                                         }
                                     }
@@ -264,12 +216,12 @@ fun ExpandedTweakSequencerLayout(
                                               .border(1.dp, param.color, RoundedCornerShape(3.dp))
                                               .clickable {
                                                   if (isIncluded) {
-                                                      onRemoveParameter(param)
-                                                      onClearPath(param)
+                                                      actions.onRemoveParameter(param)
+                                                      actions.onClearPath(param)
                                                   }
                                                   else if (state.config.selectedParameters.size < TweakSequencerParameter.MAX_SELECTED) {
-                                                       onAddParameter(param)
-                                                       onSelectActiveParameter(param)
+                                                       actions.onAddParameter(param)
+                                                       actions.onSelectActiveParameter(param)
                                                    }
                                               },
                                           contentAlignment = Alignment.Center
@@ -306,7 +258,7 @@ fun ExpandedTweakSequencerLayout(
                                               .size(16.dp)
                                               .clip(CircleShape)
                                               .background(Color.White.copy(alpha = 0.1f))
-                                              .clickable { onClearPath(param) },
+                                              .clickable { actions.onClearPath(param) },
                                           contentAlignment = Alignment.Center
                                       ) {
                                           Canvas(modifier = Modifier.size(8.dp)) {
@@ -352,7 +304,7 @@ fun ExpandedTweakSequencerLayout(
                     }
                     CompactSecondsSlider(
                         valueSeconds = state.config.durationSeconds,
-                        onValueChange = onDurationChange,
+                        onValueChange = { actions.onSetDuration(it) },
                         color = accentColor,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -373,10 +325,10 @@ fun ExpandedTweakSequencerLayout(
                         paths = state.paths,
                         activeParameter = activeParameter,
                         currentPosition = state.currentPosition,
-                        onPathStarted = { onPathStarted(activeParameter, it) },
-                        onPointAdded = { onPointAdded(activeParameter, it) },
-                        onPointsRemovedAfter = { onPointsRemovedAfter(activeParameter, it) },
-                        onPathCompleted = { onPathCompleted(activeParameter, it) },
+                        onPathStarted = { actions.onStartPath(activeParameter, it) },
+                        onPointAdded = { actions.onAddPoint(activeParameter, it) },
+                        onPointsRemovedAfter = { actions.onRemovePointsAfter(activeParameter, it) },
+                        onPathCompleted = { actions.onCompletePath(activeParameter, it) },
                         enabled = true,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -446,8 +398,13 @@ private fun ExpandedTweakSequencerScreenPreview() {
         onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {}
     )
 
-    ExpandedTweakSequencerContent(
-        sequencerFeature = ViewModelStateActionMapper(previewState, previewActions),
+    val previewFeature = object : SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions> {
+        override val stateFlow = kotlinx.coroutines.flow.MutableStateFlow(previewState)
+        override val actions = previewActions
+    }
+
+    ExpandedTweakSequencerScreen(
+        sequencerFeature = previewFeature,
         onDismiss = {},
         modifier = Modifier.fillMaxSize().padding(16.dp)
     )

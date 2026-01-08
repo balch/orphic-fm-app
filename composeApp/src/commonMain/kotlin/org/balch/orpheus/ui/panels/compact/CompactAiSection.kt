@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -18,7 +20,6 @@ import org.balch.orpheus.features.ai.chat.ChatViewModel
 import org.balch.orpheus.features.ai.generative.AiDashboard
 import org.balch.orpheus.features.ai.widgets.AiMode
 import org.balch.orpheus.features.ai.widgets.AiModeSelector
-import org.balch.orpheus.ui.utils.rememberPanelState
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
@@ -38,15 +39,15 @@ fun CompactAiSection(
     chatViewModel: ChatViewModel = metroViewModel(),
     onShowRepl: () -> Unit = {}
 ) {
-    val aiState = rememberPanelState(aiViewModel)
-    val chatState = rememberPanelState(chatViewModel)
+    val aiOptionsState by aiViewModel.stateFlow.collectAsState()
+    val chatState by chatViewModel.stateFlow.collectAsState()
 
     CompactAiSectionLayout(
         modifier = modifier,
-        aiOptionsState = aiState.state,
-        aiOptionsActions = aiState.actions,
-        chatState = chatState.state,
-        chatActions = chatState.actions,
+        aiOptionsState = aiOptionsState,
+        aiOptionsActions = aiViewModel.actions,
+        chatState = chatState,
+        chatActions = chatViewModel.actions,
         onShowRepl = onShowRepl
     )
 }

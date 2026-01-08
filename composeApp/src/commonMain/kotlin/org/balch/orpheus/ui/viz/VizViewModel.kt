@@ -1,5 +1,6 @@
 package org.balch.orpheus.ui.viz
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -12,12 +13,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.viz.OffViz
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+
 
 /**
  * UI State for the VIZ panel.
@@ -56,9 +59,9 @@ class VizViewModel(
     visualizations: Set<Visualization>,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val synthController: SynthController,
-) : ViewModel(), PanelViewModel<VizUiState, VizPanelActions> {
+) : ViewModel(), SynthViewModel<VizUiState, VizPanelActions> {
 
-    override val panelActions = VizPanelActions(
+    override val actions = VizPanelActions(
         onSelectViz = { selectVisualization(it) },
         onKnob1Change = ::onKnob1Change,
         onKnob2Change = ::onKnob2Change
@@ -80,7 +83,7 @@ class VizViewModel(
             liquidEffects = sortedVisualizations.first().liquidEffects
         )
     )
-    override val uiState: StateFlow<VizUiState> = _uiState.asStateFlow()
+    override val stateFlow: StateFlow<VizUiState> = _uiState.asStateFlow()
 
     init {
         // Activate initial visualization if it's not off (likely is off initially)
@@ -176,13 +179,21 @@ class VizViewModel(
     }
 
     companion object {
-        val PREVIEW = ViewModelStateActionMapper(
-            state = VizUiState(
-                selectedViz = OffViz(),
-                visualizations = listOf(OffViz()),
-                showKnobs = false
-            ),
-            actions = VizPanelActions.EMPTY,
-        )
+        val PREVIEW_STATE = MutableStateFlow(VizUiState(
+            selectedViz = OffViz(),
+            visualizations = listOf(OffViz()),
+            showKnobs = false
+        ))
+        val PREVIEW_ACTIONS = VizPanelActions.EMPTY
+
+        fun previewFeature(state: VizUiState = PREVIEW_STATE.value) =
+            object : SynthFeature<VizUiState, VizPanelActions> {
+                override val stateFlow: StateFlow<VizUiState> = MutableStateFlow(state)
+                override val actions: VizPanelActions = VizPanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<VizUiState, VizPanelActions> =
+            synthViewModel<VizViewModel, VizUiState, VizPanelActions>()
     }
 }

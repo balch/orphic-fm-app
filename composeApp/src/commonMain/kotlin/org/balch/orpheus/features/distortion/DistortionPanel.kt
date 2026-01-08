@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -33,39 +33,20 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 import kotlin.math.roundToInt
 
-/** Smart wrapper that connects DistortionViewModel to the layout. */
-@Composable
-fun DistortionPanel(
-    modifier: Modifier = Modifier,
-    viewModel: DistortionViewModel = metroViewModel(),
-    isExpanded: Boolean? = null,
-    onExpandedChange: ((Boolean) -> Unit)? = null,
-) {
-    val state by viewModel.uiState.collectAsState()
-    val actions = viewModel.panelActions
-
-    DistortionPanelLayout(
-        uiState = state,
-        actions = actions,
-        modifier = modifier,
-        isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange
-    )
-}
-
 /**
- * Distortion/Volume panel with output metering. Layout: 2x2 grid with Drive, Volume in top row;
- * Mix, Peak LED in bottom row.
+ * DistortionPanel consuming PanelFeature interface.
  */
 @Composable
-fun DistortionPanelLayout(
+fun DistortionPanel(
+    feature: SynthFeature<DistortionUiState, DistortionPanelActions>,
     modifier: Modifier = Modifier,
-    uiState: DistortionUiState,
-    actions: DistortionPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
+    val uiState by feature.stateFlow.collectAsState()
+    val actions = feature.actions
+
     CollapsibleColumnPanel(
         title = "VOL",
         color = OrpheusColors.neonMagenta,
@@ -180,18 +161,8 @@ fun DistortionPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        DistortionPanelLayout(
-            uiState = DistortionUiState(
-                drive = 0.5f,
-                volume = 0.7f,
-                mix = 0.5f,
-                peak = 0.2f
-            ),
-            actions = DistortionPanelActions(
-                onDriveChange = {},
-                onVolumeChange = {},
-                onMixChange = {}
-            )
+        DistortionPanel(
+            feature = DistortionViewModel.previewFeature()
         )
     }
 }

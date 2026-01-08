@@ -5,8 +5,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.input.KeyboardInputHandler
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 
 /**
  * Handles keyboard events and dispatches to ViewModels.
@@ -16,7 +16,7 @@ object SynthKeyboardHandler {
     fun handleKeyEvent(
         keyEvent: KeyEvent,
         isDialogActive: Boolean,
-        voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
+        voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
     ): Boolean {
 
         // Skip keyboard handling when dialog is active
@@ -43,7 +43,7 @@ object SynthKeyboardHandler {
         if (isKeyDown) {
             KeyboardInputHandler.getTuneVoiceFromKey(key)
                 ?.let { voiceIndex ->
-                    val currentTune = voiceFeature.state.voiceStates[voiceIndex].tune
+                    val currentTune = voiceFeature.stateFlow.value.voiceStates[voiceIndex].tune
                     val delta =KeyboardInputHandler.getTuneDelta(keyEvent.isShiftPressed)
                     val newTune = (currentTune + delta).coerceIn(0f, 1f )
                     voiceFeature.actions.onVoiceTuneChange(voiceIndex,newTune)

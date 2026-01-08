@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -37,13 +38,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import androidx.compose.material3.Text
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.util.LogEntry
@@ -60,11 +59,11 @@ fun DebugBottomBar(
     modifier: Modifier = Modifier
 ) {
     val viewModel: DebugViewModel = metroViewModel()
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.stateFlow.collectAsState()
     
     DebugBottomBarContent(
         state = state,
-        actions = viewModel.panelActions,
+        actions = viewModel.actions,
         modifier = modifier
     )
 }

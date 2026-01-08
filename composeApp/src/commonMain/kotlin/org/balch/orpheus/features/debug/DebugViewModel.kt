@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.debug
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -7,13 +8,15 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.util.ConsoleLogger
 import org.balch.orpheus.util.LogEntry
 
@@ -46,13 +49,13 @@ data class DebugPanelActions(
 class DebugViewModel(
     private val engine: SynthEngine,
     private val consoleLogger: ConsoleLogger
-) : ViewModel(), PanelViewModel<DebugUiState, DebugPanelActions> {
+) : ViewModel(), SynthViewModel<DebugUiState, DebugPanelActions> {
 
-    override val panelActions = DebugPanelActions(
+    override val actions = DebugPanelActions(
         onClearLogs = ::onClearLogs
     )
 
-    override val uiState: StateFlow<DebugUiState> = combine(
+    override val stateFlow: StateFlow<DebugUiState> = combine(
         engine.peakFlow,
         engine.cpuLoadFlow,
         consoleLogger.logsFlow
@@ -73,13 +76,21 @@ class DebugViewModel(
     }
 
     companion object {
-        val PREVIEW = ViewModelStateActionMapper(
-            state = DebugUiState(
-                peak = 0.5f,
-                cpuLoad = 12.5f,
-                logs = emptyList()
-            ),
-            actions = DebugPanelActions.EMPTY
-        )
+        val PREVIEW_STATE = MutableStateFlow(DebugUiState(
+            peak = 0.5f,
+            cpuLoad = 12.5f,
+            logs = emptyList()
+        ))
+        val PREVIEW_ACTIONS = DebugPanelActions.EMPTY
+
+        fun previewFeature(state: DebugUiState = PREVIEW_STATE.value) =
+            object : SynthFeature<DebugUiState, DebugPanelActions> {
+                override val stateFlow: StateFlow<DebugUiState> = MutableStateFlow(state)
+                override val actions: DebugPanelActions = DebugPanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<DebugUiState, DebugPanelActions> =
+            synthViewModel<DebugViewModel, DebugUiState, DebugPanelActions>()
     }
 }

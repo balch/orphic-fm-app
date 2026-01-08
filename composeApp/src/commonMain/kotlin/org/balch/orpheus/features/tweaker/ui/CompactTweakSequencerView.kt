@@ -9,11 +9,6 @@ package org.balch.orpheus.features.tweaker.ui
  * - Time remaining display
  * - Mini sequencer preview with all paths (click to expand)
  * - Clickable legend for parameter identification
- *
- * @param state Current sequencer state with all paths
- * @param onPlayPause Called when play/pause is toggled
- * @param onStop Called when stop is pressed
- * @param onExpand Called when mini preview is tapped
  */
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -31,6 +26,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,12 +40,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.tweaker.SequencerPath
 import org.balch.orpheus.features.tweaker.SequencerPoint
 import org.balch.orpheus.features.tweaker.TweakPlaybackMode
 import org.balch.orpheus.features.tweaker.TweakSequencerConfig
+import org.balch.orpheus.features.tweaker.TweakSequencerPanelActions
 import org.balch.orpheus.features.tweaker.TweakSequencerParameter
 import org.balch.orpheus.features.tweaker.TweakSequencerState
+import org.balch.orpheus.features.tweaker.TweakSequencerUiState
+import org.balch.orpheus.features.tweaker.TweakSequencerViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
@@ -63,23 +64,18 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * - Time remaining display
  * - Mini sequencer preview with all paths (click to expand)
  * - Clickable legend for parameter identification
- *
- * @param state Current sequencer state with all paths
- * @param onPlayPause Called when play/pause is toggled
- * @param onStop Called when stop is pressed
- * @param onExpand Called when mini preview is tapped
  */
 @Composable
 fun CompactTweakSequencerView(
-    state: TweakSequencerState,
+    sequencerFeature: SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions>,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
-    onPlayPause: () -> Unit,
-    onStop: () -> Unit,
-    onPlaybackModeChange: (TweakPlaybackMode) -> Unit,
-    onExpand: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val uiState by sequencerFeature.stateFlow.collectAsState()
+    val actions = sequencerFeature.actions
+    val state = uiState.sequencer
+
     val shape = RoundedCornerShape(8.dp)
     val isActive = state.config.enabled
     val accentColor = OrpheusColors.neonCyan
@@ -107,7 +103,7 @@ fun CompactTweakSequencerView(
                             .clip(CircleShape)
                             .background(if (isActive) accentColor.copy(alpha = 0.3f) else Color(0xFF2A2A3A))
                             .border(1.dp, accentColor.copy(alpha = 0.5f), CircleShape)
-                            .clickable(enabled = isActive) { onPlayPause() },
+                            .clickable(enabled = isActive) { actions.onTogglePlayPause() },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -125,7 +121,7 @@ fun CompactTweakSequencerView(
                             .clip(CircleShape)
                             .background(Color(0xFF2A2A3A))
                             .border(1.dp, accentColor.copy(alpha = 0.3f), CircleShape)
-                            .clickable(enabled = isActive && (state.isPlaying || state.currentPosition > 0f)) { onStop() },
+                            .clickable(enabled = isActive && (state.isPlaying || state.currentPosition > 0f)) { actions.onStop() },
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -154,7 +150,7 @@ fun CompactTweakSequencerView(
                                 TweakPlaybackMode.LOOP -> TweakPlaybackMode.PING_PONG
                                 TweakPlaybackMode.PING_PONG -> TweakPlaybackMode.ONCE
                             }
-                            onPlaybackModeChange(nextMode)
+                            actions.onSetPlaybackMode(nextMode)
                         }
                         .padding(horizontal = 6.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -201,7 +197,7 @@ fun CompactTweakSequencerView(
                 enabled = isActive,
                 liquidState = liquidState,
                 effects = effects,
-                onClick = onExpand,
+                onClick = { actions.onExpand() },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -331,8 +327,8 @@ private fun CompactTweakSequencerViewPreview() {
         isComplete = true
     )
 
-    CompactTweakSequencerView(
-        state = TweakSequencerState(
+    val state = TweakSequencerUiState(
+        sequencer = TweakSequencerState(
             config = TweakSequencerConfig(
                 enabled = true,
                 selectedParameters = listOf(
@@ -351,13 +347,13 @@ private fun CompactTweakSequencerViewPreview() {
             ),
             currentPosition = 0.4f,
             isPlaying = true
-        ),
+        )
+    )
+
+    CompactTweakSequencerView(
+        sequencerFeature = TweakSequencerViewModel.previewFeature(state),
         liquidState = null,
         effects = VisualizationLiquidEffects(),
-        onPlayPause = {},
-        onStop = {},
-        onPlaybackModeChange = {},
-        onExpand = {},
         modifier = Modifier.fillMaxWidth()
     )
 }
@@ -365,19 +361,19 @@ private fun CompactTweakSequencerViewPreview() {
 @Preview(heightDp = 240)
 @Composable
 private fun CompactTweakSequencerViewDisabledPreview() {
-    CompactTweakSequencerView(
-        state = TweakSequencerState(
+    val state = TweakSequencerUiState(
+        sequencer = TweakSequencerState(
             config = TweakSequencerConfig(enabled = false),
             paths = emptyMap(),
             currentPosition = 0f,
             isPlaying = false
-        ),
+        )
+    )
+
+    CompactTweakSequencerView(
+        sequencerFeature = TweakSequencerViewModel.previewFeature(state),
         liquidState = null,
         effects = VisualizationLiquidEffects(),
-        onPlayPause = {},
-        onStop = {},
-        onPlaybackModeChange = {},
-        onExpand = {},
         modifier = Modifier.fillMaxWidth()
     )
 }

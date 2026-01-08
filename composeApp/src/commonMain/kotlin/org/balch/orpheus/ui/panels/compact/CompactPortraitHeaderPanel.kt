@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,6 +21,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.rememberLiquidState
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.features.distortion.DistortionPanelActions
+import org.balch.orpheus.features.distortion.DistortionUiState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
@@ -38,11 +43,13 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompactPortraitHeaderPanel(
-    peakLevel: Float,
+    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
     liquidState: LiquidState,
     effects: VisualizationLiquidEffects,
     modifier: Modifier = Modifier
 ) {
+    val state by distortionFeature.stateFlow.collectAsState()
+    val peakLevel = state.peak
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -99,8 +106,12 @@ private fun PeakLed(level: Float) {
 @Preview(widthDp = 360, heightDp = 70)
 @Composable
 private fun CompactPortraitHeaderPanelPreview() {
+    val previewFeature = object : SynthFeature<DistortionUiState, DistortionPanelActions> {
+        override val stateFlow = kotlinx.coroutines.flow.MutableStateFlow(DistortionUiState(peak = 0.5f))
+        override val actions = DistortionPanelActions.EMPTY
+    }
     CompactPortraitHeaderPanel(
-        peakLevel = 0.5f,
+        distortionFeature = previewFeature,
         liquidState = rememberLiquidState(),
         effects = VisualizationLiquidEffects()
     )

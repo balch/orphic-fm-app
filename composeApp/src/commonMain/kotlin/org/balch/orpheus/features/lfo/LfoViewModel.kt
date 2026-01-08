@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.lfo
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -9,6 +10,7 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -19,14 +21,15 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.core.synthViewModel
 
 /** UI state for the Hyper LFO panel. */
 data class LfoUiState(
@@ -74,9 +77,9 @@ class LfoViewModel(
     presetLoader: PresetLoader,
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel(), PanelViewModel<LfoUiState, LfoPanelActions> {
+) : ViewModel(), SynthViewModel<LfoUiState, LfoPanelActions> {
 
-    override val panelActions = LfoPanelActions(
+    override val actions = LfoPanelActions(
         onLfoAChange = ::onLfoAChange,
         onLfoBChange = ::onLfoBChange,
         onModeChange = ::onModeChange,
@@ -118,7 +121,7 @@ class LfoViewModel(
         }
     }
 
-    override val uiState: StateFlow<LfoUiState> = flow {
+    override val stateFlow: StateFlow<LfoUiState> = flow {
         // Emit initial state from engine
         val initial = loadInitialState()
         applyFullState(initial)
@@ -207,9 +210,17 @@ class LfoViewModel(
     }
 
     companion object {
-        val PREVIEW = ViewModelStateActionMapper(
-            state = LfoUiState(),
-            actions = LfoPanelActions.EMPTY,
-        )
+        val PREVIEW_STATE = MutableStateFlow(LfoUiState())
+        val PREVIEW_ACTIONS = LfoPanelActions.EMPTY
+
+        fun previewFeature(state: LfoUiState = LfoUiState()) =
+            object : SynthFeature<LfoUiState, LfoPanelActions> {
+                override val stateFlow: StateFlow<LfoUiState> = MutableStateFlow(state)
+                override val actions: LfoPanelActions = LfoPanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<LfoUiState, LfoPanelActions> =
+            synthViewModel<LfoViewModel, LfoUiState, LfoPanelActions>()
     }
 }

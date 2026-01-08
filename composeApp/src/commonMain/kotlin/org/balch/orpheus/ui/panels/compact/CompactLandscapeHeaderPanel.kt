@@ -19,12 +19,15 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsViewModel
@@ -32,7 +35,6 @@ import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VizPanelActions
 import org.balch.orpheus.ui.viz.VizUiState
@@ -43,10 +45,11 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+
 fun CompactLandscapeHeaderPanel(
-    presetFeature: ViewModelStateActionMapper<PresetUiState, PresetPanelActions>,
-    vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
-    voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
+    presetFeature: SynthFeature<PresetUiState, PresetPanelActions>,
+    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
+    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
     presetDropdownExpanded: Boolean,
     onPresetDropdownExpandedChange: (Boolean) -> Unit,
     vizDropdownExpanded: Boolean,
@@ -55,12 +58,14 @@ fun CompactLandscapeHeaderPanel(
     effects: VisualizationLiquidEffects,
     modifier: Modifier = Modifier
 ) {
-    val presetState = presetFeature.state
+    val presetState by presetFeature.stateFlow.collectAsState()
     val loadedPresetState = presetState as? PresetUiState.Loaded
     val presetActions = presetFeature.actions
-    val vizState = vizFeature.state
+
+    val vizState by vizFeature.stateFlow.collectAsState()
     val vizActions = vizFeature.actions
-    val voiceState = voiceFeature.state
+
+    val voiceState by voiceFeature.stateFlow.collectAsState()
     val voiceActions = voiceFeature.actions
 
     Row(
@@ -258,9 +263,9 @@ private fun PeakLed(level: Float) {
 @Composable
 private fun CompactLandscapeHeaderPanelPreview() {
     CompactLandscapeHeaderPanel(
-        presetFeature = PresetsViewModel.PREVIEW,
-        vizFeature = VizViewModel.PREVIEW,
-        voiceFeature = VoiceViewModel.PREVIEW,
+        presetFeature = PresetsViewModel.previewFeature(),
+        vizFeature = VizViewModel.previewFeature(),
+        voiceFeature = VoiceViewModel.previewFeature(),
         presetDropdownExpanded = false,
         onPresetDropdownExpandedChange = {},
         vizDropdownExpanded = false,

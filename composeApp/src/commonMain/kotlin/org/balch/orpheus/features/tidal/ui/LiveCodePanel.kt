@@ -55,8 +55,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.features.tidal.LiveCodePanelActions
 import org.balch.orpheus.features.tidal.LiveCodeUiState
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
@@ -70,6 +72,13 @@ import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
+ * Extended PanelFeature for LiveCode that includes trigger events for highlighting.
+ */
+interface LiveCodeFeature : SynthFeature<LiveCodeUiState, LiveCodePanelActions> {
+    val triggers: Flow<TidalScheduler.TriggerEvent>
+}
+
+/**
  * Collapsible live coding panel for the header row.
  * 
  * When collapsed: Shows "CODE" title vertically
@@ -77,13 +86,14 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun LiveCodePanel(
+    feature: LiveCodeFeature,
     modifier: Modifier = Modifier,
-    viewModel: LiveCodeViewModel = metroViewModel(),
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
 ) {
-    val state by viewModel.uiState.collectAsState()
-    val actions = viewModel.panelActions
+    val state by feature.stateFlow.collectAsState()
+    val actions = feature.actions
     
     // Track active highlight ranges for token highlighting (Map of unique ID to range)
     var activeHighlightMap by remember { mutableStateOf(mapOf<Long, IntRange>()) }
@@ -95,7 +105,7 @@ fun LiveCodePanel(
     
     // Subscribe to trigger events for token highlighting
     LaunchedEffect(Unit) {
-        viewModel.triggers.collect { triggerEvent ->
+        feature.triggers.collect { triggerEvent ->
             // Create unique IDs for each new highlight
             val newHighlights = triggerEvent.locations.associate { loc ->
                 val id = highlightIdCounter++
@@ -118,7 +128,8 @@ fun LiveCodePanel(
         activeHighlights = activeHighlights,
         modifier = modifier,
         isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange
+        onExpandedChange = onExpandedChange,
+        showCollapsedHeader = showCollapsedHeader
     )
 }
 

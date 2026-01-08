@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.tidal
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
@@ -10,15 +11,18 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
+import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.core.tidal.ConsoleEntry
 import org.balch.orpheus.core.tidal.EvalMode
 import org.balch.orpheus.core.tidal.Pattern
@@ -30,8 +34,8 @@ import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.core.tidal.TidalSchedulerState
 import org.balch.orpheus.features.ai.ReplCodeEvent
 import org.balch.orpheus.features.ai.ReplCodeEventBus
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
+
 
 /**
  * UI state for the Live Code editor.
@@ -109,9 +113,9 @@ class LiveCodeViewModel(
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val mediaSessionStateManager: MediaSessionStateManager,
     private val synthEngine: SynthEngine
-) : ViewModel(), PanelViewModel<LiveCodeUiState, LiveCodePanelActions> {
+) : ViewModel(), LiveCodeFeature {
 
-    override val panelActions = LiveCodePanelActions(
+    override val actions = LiveCodePanelActions(
         onCodeChange = ::updateCode,
         onExecuteBlock = ::executeBlock,
         onExecuteLine = ::executeLine,
@@ -128,7 +132,7 @@ class LiveCodeViewModel(
     private val _intents = MutableStateFlow<LiveCodeIntent?>(null)
     
     private val _uiState = MutableStateFlow(LiveCodeUiState())
-    override val uiState: StateFlow<LiveCodeUiState> = _uiState.asStateFlow()
+    override val stateFlow: StateFlow<LiveCodeUiState> = _uiState.asStateFlow()
     
     // Expose scheduler state for cycle position display
     val schedulerState: StateFlow<TidalSchedulerState> = scheduler.state
@@ -137,7 +141,7 @@ class LiveCodeViewModel(
     val console: StateFlow<List<ConsoleEntry>> = repl.console
     
     // Expose trigger events for UI highlighting (voice indices when triggered)
-    val triggers = scheduler.triggers
+    override val triggers = scheduler.triggers
     
     init {
         logger.d { "LiveCodeViewModel initialized, subscribing to ReplCodeEventBus" }
@@ -591,9 +595,15 @@ d2 $ slow 4 voices:<1 2> <3 4> <5 6>
             """.trimIndent()
         )
 
-        val PREVIEW = ViewModelStateActionMapper(
-            state = LiveCodeUiState(),
-            actions = LiveCodePanelActions.EMPTY,
-        )
+        fun previewFeature(state: LiveCodeUiState = LiveCodeUiState()) =
+            object : LiveCodeFeature {
+                override val stateFlow: StateFlow<LiveCodeUiState> = MutableStateFlow(state)
+                override val actions: LiveCodePanelActions = LiveCodePanelActions.EMPTY
+                override val triggers: Flow<TidalScheduler.TriggerEvent> = emptyFlow()
+            }
+
+        @Composable
+        fun panelFeature(): LiveCodeFeature =
+             synthViewModel<LiveCodeViewModel, LiveCodeUiState, LiveCodePanelActions>() as LiveCodeFeature
     }
 }

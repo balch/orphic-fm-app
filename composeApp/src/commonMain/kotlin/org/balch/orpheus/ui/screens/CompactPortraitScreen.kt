@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,35 +27,36 @@ import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.delay.DelayPanelActions
 import org.balch.orpheus.features.delay.DelayUiState
 import org.balch.orpheus.features.delay.DelayViewModel
-import org.balch.orpheus.features.delay.ModDelayPanelLayout
+import org.balch.orpheus.features.delay.ModDelayPanel
+import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.distortion.DistortionPanelActions
-import org.balch.orpheus.features.distortion.DistortionPanelLayout
 import org.balch.orpheus.features.distortion.DistortionUiState
 import org.balch.orpheus.features.distortion.DistortionViewModel
+import org.balch.orpheus.features.evo.EvoPanel
 import org.balch.orpheus.features.evo.EvoPanelActions
-import org.balch.orpheus.features.evo.EvoPanelLayout
 import org.balch.orpheus.features.evo.EvoUiState
 import org.balch.orpheus.features.evo.EvoViewModel
-import org.balch.orpheus.features.lfo.HyperLfoPanelLayout
+import org.balch.orpheus.features.lfo.HyperLfoPanel
 import org.balch.orpheus.features.lfo.LfoPanelActions
 import org.balch.orpheus.features.lfo.LfoUiState
 import org.balch.orpheus.features.lfo.LfoViewModel
 import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
-import org.balch.orpheus.features.presets.PresetsPanelLayout
+import org.balch.orpheus.features.presets.PresetsPanel
 import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.stereo.StereoPanel
 import org.balch.orpheus.features.stereo.StereoPanelActions
-import org.balch.orpheus.features.stereo.StereoPanelLayout
 import org.balch.orpheus.features.stereo.StereoUiState
 import org.balch.orpheus.features.stereo.StereoViewModel
 import org.balch.orpheus.features.tidal.LiveCodePanelActions
 import org.balch.orpheus.features.tidal.LiveCodeUiState
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tidal.ui.LiveCodePanelLayout
-import org.balch.orpheus.features.viz.VizPanelLayout
+import org.balch.orpheus.features.viz.VizPanel
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -70,8 +72,6 @@ import org.balch.orpheus.ui.panels.compact.CompactPortraitVoicePads
 import org.balch.orpheus.ui.panels.compact.CompactStringPanel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
-import org.balch.orpheus.ui.utils.rememberPanelState
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VizPanelActions
 import org.balch.orpheus.ui.viz.VizUiState
@@ -104,15 +104,7 @@ fun CompactPortraitScreen(
     stereoViewModel: StereoViewModel = metroViewModel(),
     liveCodeViewModel: LiveCodeViewModel = metroViewModel(),
 ) {
-    val voice = rememberPanelState(voiceViewModel)
-    val preset = rememberPanelState(presetViewModel)
-    val liveCode = rememberPanelState(liveCodeViewModel)
-    val delay = rememberPanelState(delayViewModel)
-    val distortion = rememberPanelState(distortionViewModel)
-    val evo = rememberPanelState(evoViewModel)
-    val lfo = rememberPanelState(lfoViewModel)
-    val stereo = rememberPanelState(stereoViewModel)
-    val viz = rememberPanelState(vizViewModel)
+
 
     // Track active highlight ranges for token highlighting (Map of unique ID to range)
     var activeHighlightMap by remember { mutableStateOf(mapOf<Long, IntRange>()) }
@@ -152,36 +144,36 @@ fun CompactPortraitScreen(
 
     CompactPortraitScreenLayout(
         modifier = modifier,
-        presetFeature = preset,
-        voiceFeature = voice,
-        distortionFeature = distortion,
+        presetFeature = presetViewModel,
+        voiceFeature = voiceViewModel,
+        distortionFeature = distortionViewModel,
         liquidState = liquidState,
         effects = effects,
-        liveCodeFeature = liveCode,
+        liveCodeFeature = liveCodeViewModel,
         activeReplHighlights = activeHighlights,
-        delayFeature = delay,
-        evoFeature = evo,
-        lfoFeature = lfo,
-        stereoFeature = stereo,
-        vizFeature = viz
+        delayFeature = delayViewModel,
+        evoFeature = evoViewModel,
+        lfoFeature = lfoViewModel,
+        stereoFeature = stereoViewModel,
+        vizFeature = vizViewModel
     )
 }
 
 @Composable
 private fun CompactPortraitScreenLayout(
     modifier: Modifier = Modifier,
-    presetFeature: ViewModelStateActionMapper<PresetUiState, PresetPanelActions>,
-    voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
-    distortionFeature: ViewModelStateActionMapper<DistortionUiState, DistortionPanelActions>,
+    presetFeature: SynthFeature<PresetUiState, PresetPanelActions>,
+    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
+    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
     liquidState: LiquidState,
     effects: VisualizationLiquidEffects,
-    liveCodeFeature: ViewModelStateActionMapper<LiveCodeUiState, LiveCodePanelActions>,
+    liveCodeFeature: SynthFeature<LiveCodeUiState, LiveCodePanelActions>,
     activeReplHighlights: List<IntRange> = emptyList(),
-    delayFeature: ViewModelStateActionMapper<DelayUiState, DelayPanelActions>,
-    evoFeature: ViewModelStateActionMapper<EvoUiState, EvoPanelActions>,
-    lfoFeature: ViewModelStateActionMapper<LfoUiState, LfoPanelActions>,
-    stereoFeature: ViewModelStateActionMapper<StereoUiState, StereoPanelActions>,
-    vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
+    delayFeature: SynthFeature<DelayUiState, DelayPanelActions>,
+    evoFeature: SynthFeature<EvoUiState, EvoPanelActions>,
+    lfoFeature: SynthFeature<LfoUiState, LfoPanelActions>,
+    stereoFeature: SynthFeature<StereoUiState, StereoPanelActions>,
+    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
 ) {
     // Track section heights
     val density = LocalDensity.current
@@ -195,6 +187,8 @@ private fun CompactPortraitScreenLayout(
     // Selected panel for bottom panel switcher
     var selectedBottomPanel by remember { mutableStateOf(CompactBottomPanelType.PADS) }
 
+    val vizState by vizFeature.stateFlow.collectAsState()
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -205,7 +199,7 @@ private fun CompactPortraitScreenLayout(
         // 0. Visualization background (behind everything, including status bar)
         VizBackground(
             modifier = Modifier.fillMaxSize(),
-            selectedViz = vizFeature.state.selectedViz,
+            selectedViz = vizState.selectedViz,
         )
 
         // Content Overylay
@@ -214,7 +208,7 @@ private fun CompactPortraitScreenLayout(
             CompactPortraitHeaderPanel(
                 modifier = Modifier.fillMaxWidth()
                     .padding(start = 8.dp, end = 16.dp),
-                peakLevel = distortionFeature.state.peak,
+                distortionFeature = distortionFeature,
                 liquidState = liquidState,
                 effects = effects
             )
@@ -272,8 +266,9 @@ private fun CompactPortraitScreenLayout(
                                     )
                                 }
                                 CompactBottomPanelType.PADS -> {
+                                    val voiceState by voiceFeature.stateFlow.collectAsState()
                                     CompactPortraitVoicePads(
-                                        voiceState = voiceFeature.state,
+                                        voiceState = voiceState,
                                         actions = voiceFeature.actions,
                                         modifier = Modifier.fillMaxSize(),
                                         liquidState = liquidState,
@@ -281,8 +276,9 @@ private fun CompactPortraitScreenLayout(
                                     )
                                 }
                                 CompactBottomPanelType.STRINGS -> {
+                                    val voiceState by voiceFeature.stateFlow.collectAsState()
                                     CompactStringPanel(
-                                        voiceState = voiceFeature.state,
+                                        voiceState = voiceState,
                                         actions = voiceFeature.actions,
                                         modifier = Modifier.fillMaxSize(),
                                         liquidState = liquidState,
@@ -304,15 +300,15 @@ private fun CompactPortraitScreenLayout(
 @Composable
 private fun PanelContent(
     panel: CompactPanelType,
-    presetFeature: ViewModelStateActionMapper<PresetUiState, PresetPanelActions>,
-    liveCodeFeature: ViewModelStateActionMapper<LiveCodeUiState, LiveCodePanelActions>,
+    presetFeature: SynthFeature<PresetUiState, PresetPanelActions>,
+    liveCodeFeature: SynthFeature<LiveCodeUiState, LiveCodePanelActions>,
     activeReplHighlights: List<IntRange>,
-    delayFeature: ViewModelStateActionMapper<DelayUiState, DelayPanelActions>,
-    distortionFeature: ViewModelStateActionMapper<DistortionUiState, DistortionPanelActions>,
-    evoFeature: ViewModelStateActionMapper<EvoUiState, EvoPanelActions>,
-    lfoFeature: ViewModelStateActionMapper<LfoUiState, LfoPanelActions>,
-    stereoFeature: ViewModelStateActionMapper<StereoUiState, StereoPanelActions>,
-    vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
+    delayFeature: SynthFeature<DelayUiState, DelayPanelActions>,
+    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
+    evoFeature: SynthFeature<EvoUiState, EvoPanelActions>,
+    lfoFeature: SynthFeature<LfoUiState, LfoPanelActions>,
+    stereoFeature: SynthFeature<StereoUiState, StereoPanelActions>,
+    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
     modifier: Modifier = Modifier,
 ) {
     val panelModifier = modifier
@@ -324,8 +320,9 @@ private fun PanelContent(
 
     when (panel) {
         CompactPanelType.REPL -> {
+            val state by liveCodeFeature.stateFlow.collectAsState()
             LiveCodePanelLayout(
-                uiState = liveCodeFeature.state,
+                uiState = state,
                 actions = liveCodeFeature.actions,
                 activeHighlights = activeReplHighlights,
                 modifier = panelModifier,
@@ -336,9 +333,8 @@ private fun PanelContent(
         }
 
         CompactPanelType.PRESET -> {
-            PresetsPanelLayout(
-                uiState = presetFeature.state,
-                actions = presetFeature.actions,
+            PresetsPanel(
+                feature = presetFeature,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,
@@ -347,9 +343,8 @@ private fun PanelContent(
         }
 
         CompactPanelType.DELAY -> {
-            ModDelayPanelLayout(
-                uiState = delayFeature.state,
-                actions = delayFeature.actions,
+            ModDelayPanel(
+                feature = delayFeature,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,
@@ -358,9 +353,8 @@ private fun PanelContent(
         }
 
         CompactPanelType.DISTORTION -> {
-            DistortionPanelLayout(
-                uiState = distortionFeature.state,
-                actions = distortionFeature.actions,
+            DistortionPanel(
+                feature = distortionFeature,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,
@@ -369,8 +363,8 @@ private fun PanelContent(
         }
         
         CompactPanelType.EVO -> {
-            EvoPanelLayout(
-                uiState = evoFeature.state,
+            EvoPanel(
+                stateFlow = evoFeature.stateFlow,
                 actions = evoFeature.actions,
                 modifier = panelModifier,
                 isExpanded = true,
@@ -380,9 +374,8 @@ private fun PanelContent(
         }
 
         CompactPanelType.LFO -> {
-            HyperLfoPanelLayout(
-                uiState = lfoFeature.state,
-                actions = lfoFeature.actions,
+            HyperLfoPanel(
+                feature = lfoFeature,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,
@@ -391,9 +384,8 @@ private fun PanelContent(
         }
 
         CompactPanelType.STEREO -> {
-            StereoPanelLayout(
-                uiState = stereoFeature.state,
-                actions = stereoFeature.actions,
+            StereoPanel(
+                feature = stereoFeature,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,
@@ -402,9 +394,8 @@ private fun PanelContent(
         }
 
         CompactPanelType.VIZ -> {
-            VizPanelLayout(
-                uiState = vizFeature.state,
-                actions = vizFeature.actions,
+            VizPanel(
+                feature = vizFeature,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,
@@ -423,17 +414,17 @@ private fun CompactPortraitLayoutPreview() {
         val liquidState = LocalLiquidState.current
         if (liquidState != null) {
             CompactPortraitScreenLayout(
-                presetFeature = PresetsViewModel.PREVIEW,
-                voiceFeature = VoiceViewModel.PREVIEW,
-                distortionFeature = DistortionViewModel.PREVIEW,
+                presetFeature = PresetsViewModel.previewFeature(),
+                voiceFeature = VoiceViewModel.previewFeature(),
+                distortionFeature = DistortionViewModel.previewFeature(),
                 liquidState = liquidState,
                 effects = VisualizationLiquidEffects.Default,
-                liveCodeFeature = LiveCodeViewModel.PREVIEW,
-                delayFeature = DelayViewModel.PREVIEW,
-                evoFeature = EvoViewModel.PREVIEW,
-                lfoFeature = LfoViewModel.PREVIEW,
-                stereoFeature = StereoViewModel.PREVIEW,
-                vizFeature = VizViewModel.PREVIEW
+                liveCodeFeature = LiveCodeViewModel.previewFeature(),
+                delayFeature = DelayViewModel.previewFeature(),
+                evoFeature = EvoViewModel.previewFeature(),
+                lfoFeature = LfoViewModel.previewFeature(),
+                stereoFeature = StereoViewModel.previewFeature(),
+                vizFeature = VizViewModel.previewFeature()
             )
         }
     }

@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.ai
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
@@ -28,6 +29,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import org.balch.orpheus.SynthOrchestrator
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.GeminiKeyProvider
@@ -41,13 +44,13 @@ import org.balch.orpheus.core.media.PlaybackMode
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
+import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
 import org.balch.orpheus.features.ai.generative.AiStatusMessage
 import org.balch.orpheus.features.ai.generative.DroneAgentConfig
 import org.balch.orpheus.features.ai.generative.SoloAgentConfig
 import org.balch.orpheus.features.ai.generative.SynthControlAgent
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
-import org.balch.orpheus.ui.utils.PanelViewModel
 import kotlin.random.Random
 
 
@@ -135,7 +138,7 @@ class AiOptionsViewModel(
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val synthOrchestrator: SynthOrchestrator,
     private val mediaSessionStateManager: MediaSessionStateManager,
-) : ViewModel(), PanelViewModel<AiOptionsUiState, AiOptionsPanelActions> {
+) : ViewModel(), SynthViewModel<AiOptionsUiState, AiOptionsPanelActions> {
 
     private val log = logging("AiOptionsViewModel")
 
@@ -767,7 +770,7 @@ class AiOptionsViewModel(
     private val _dialogSize = MutableStateFlow(420f to 550f)
     val dialogSize: StateFlow<Pair<Float, Float>> = _dialogSize.asStateFlow()
 
-    override val panelActions = AiOptionsPanelActions(
+    override val actions = AiOptionsPanelActions(
         onToggleDrone = { toggleDrone(it) },
         onToggleSolo = { toggleSolo(it) },
         onToggleRepl = { toggleRepl(it) },
@@ -778,7 +781,7 @@ class AiOptionsViewModel(
         onSelectModel = ::selectModel
     )
 
-    override val uiState: StateFlow<AiOptionsUiState> = combine(
+    override val stateFlow: StateFlow<AiOptionsUiState> = combine(
         combine(
             _isDroneActive,
             _isSoloActive,
@@ -825,5 +828,17 @@ class AiOptionsViewModel(
 
     fun updateDialogSize(width: Float, height: Float) {
         _dialogSize.value = width to height
+    }
+
+    companion object {
+        fun previewFeature(state: AiOptionsUiState = AiOptionsUiState()) =
+            object : SynthFeature<AiOptionsUiState, AiOptionsPanelActions> {
+                override val stateFlow: StateFlow<AiOptionsUiState> = MutableStateFlow(state)
+                override val actions: AiOptionsPanelActions = AiOptionsPanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<AiOptionsUiState, AiOptionsPanelActions> =
+            synthViewModel<AiOptionsViewModel, AiOptionsUiState, AiOptionsPanelActions>()
     }
 }

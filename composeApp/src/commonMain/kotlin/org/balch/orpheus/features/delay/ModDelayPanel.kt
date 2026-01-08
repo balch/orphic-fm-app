@@ -12,7 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -25,40 +25,19 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 /**
- * Smart wrapper that connects DelayViewModel to the layout. Collects state and dispatches events.
+ * ModDelayPanel consuming PanelFeature interface.
  */
 @Composable
 fun ModDelayPanel(
+    feature: SynthFeature<DelayUiState, DelayPanelActions>,
     modifier: Modifier = Modifier,
-    viewModel: DelayViewModel = metroViewModel(),
-    isExpanded: Boolean? = null,
-    onExpandedChange: ((Boolean) -> Unit)? = null,
-) {
-    val state by viewModel.uiState.collectAsState()
-    val actions = viewModel.panelActions
-
-    ModDelayPanelLayout(
-        uiState = state,
-        actions = actions,
-        modifier = modifier,
-        isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange
-    )
-}
-
-/**
- * Mod Delay panel with dual delay lines, modulation, and mix controls. Layout: Row 1: MOD 1, MOD 2,
- * LFO/SELF toggle, TRI/SQR toggle Row 2: TIME 1, TIME 2, FB, MIX
- */
-@Composable
-fun ModDelayPanelLayout(
-    modifier: Modifier = Modifier,
-    uiState: DelayUiState,
-    actions: DelayPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
+    val uiState by feature.stateFlow.collectAsState()
+    val actions = feature.actions
+
     CollapsibleColumnPanel(
         title = "DELAY",
         color = OrpheusColors.warmGlow,
@@ -172,27 +151,8 @@ fun ModDelayPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        ModDelayPanelLayout(
-            uiState = DelayUiState(
-                time1 = 0.5f,
-                mod1 = 0.3f,
-                time2 = 0.6f,
-                mod2 = 0.4f,
-                feedback = 0.7f,
-                mix = 0.5f,
-                isLfoSource = true,
-                isTriangleWave = true
-            ),
-            actions = DelayPanelActions(
-                onTime1Change = {},
-                onMod1Change = {},
-                onTime2Change = {},
-                onMod2Change = {},
-                onFeedbackChange = {},
-                onMixChange = {},
-                onSourceChange = {},
-                onWaveformChange = {}
-            )
+        ModDelayPanel(
+            feature = DelayViewModel.previewFeature()
         )
     }
 }

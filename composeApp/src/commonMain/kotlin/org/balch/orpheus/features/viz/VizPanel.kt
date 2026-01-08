@@ -28,7 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
@@ -46,38 +46,21 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 private val VizColor = Color(0xFF90EE90)  // Light green
 
 /**
- * VIZ Panel for controlling background visualizations.
- * Shows "VIZ" when collapsed, "Background" as expanded header.
- * Uses a dropdown to select active visualization.
+ * VizPanel consuming PanelFeature interface.
  */
 @Composable
 fun VizPanel(
+    feature: SynthFeature<VizUiState, VizPanelActions>,
     modifier: Modifier = Modifier,
-    viewModel: VizViewModel = metroViewModel(),
-    isExpanded: Boolean? = null,
-    onExpandedChange: ((Boolean) -> Unit)? = null,
-) {
-    val state by viewModel.uiState.collectAsState()
-    val actions = viewModel.panelActions
-
-    VizPanelLayout(
-        uiState = state,
-        actions = actions,
-        modifier = modifier,
-        isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange
-    )
-}
-
-@Composable
-fun VizPanelLayout(
-    modifier: Modifier = Modifier,
-    uiState: VizUiState,
-    actions: VizPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
+    val uiState by feature.stateFlow.collectAsState()
+    val actions = feature.actions
+
+    var dropdownExpanded by remember { mutableStateOf(false) }
+
     CollapsibleColumnPanel(
         title = "VIZ",
         color = VizColor,
@@ -205,19 +188,8 @@ fun VizPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        VizPanelLayout(
-            uiState = VizUiState(
-                selectedViz = PreviewViz,
-                visualizations = listOf(PreviewViz),
-                showKnobs = true,
-                knob1Value = 0.5f,
-                knob2Value = 0.5f
-            ),
-            actions = VizPanelActions(
-                onSelectViz = {},
-                onKnob1Change = {},
-                onKnob2Change = {}
-            ),
+        VizPanel(
+            feature = VizViewModel.previewFeature(),
             isExpanded = true
         )
     }

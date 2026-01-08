@@ -555,7 +555,7 @@ class DspSynthEngine(
 
     override fun setQuadPitch(quadIndex: Int, pitch: Float) {
         _quadPitch[quadIndex] = pitch
-        _quadPitchFlow.value = _quadPitch.clone() // shallow copy is fine for primitive array
+        _quadPitchFlow.value = _quadPitch.copyOf() // shallow copy is fine for primitive array
         quadPitchOffsets[quadIndex] = pitch.toDouble()
         val startVoice = quadIndex * 4
         for (i in startVoice until startVoice + 4) {
@@ -565,7 +565,7 @@ class DspSynthEngine(
 
     override fun setQuadHold(quadIndex: Int, amount: Float) {
         _quadHold[quadIndex] = amount
-        _quadHoldFlow.value = _quadHold.clone()
+        _quadHoldFlow.value = _quadHold.copyOf()
         val startVoice = quadIndex * 4
         for (i in startVoice until startVoice + 4) {
             voices[i].setHoldLevel(amount.toDouble())

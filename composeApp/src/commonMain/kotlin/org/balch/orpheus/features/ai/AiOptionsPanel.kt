@@ -29,7 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.features.ai.widgets.AiButton
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryCompact
@@ -55,65 +55,15 @@ object AiButtonColors {
  */
 @Composable
 fun AiOptionsPanel(
-    modifier: Modifier = Modifier,
-    viewModel: AiOptionsViewModel = metroViewModel(),
-    isExpanded: Boolean? = null,
-    onExpandedChange: ((Boolean) -> Unit)? = null,
-) {
-    val isDroneActive by viewModel.isDroneActive.collectAsState()
-    val isSoloActive by viewModel.isSoloActive.collectAsState()
-    val isReplActive by viewModel.isReplActive.collectAsState()
-    val showChatDialog by viewModel.showChatDialog.collectAsState()
-    val isApiKeySet by viewModel.apiKeyState.collectAsState()
-    val isUserProvidedKey by viewModel.isUserProvidedKey.collectAsState()
-    val selectedModel by viewModel.selectedModel.collectAsState()
-
-    AiOptionsLayout(
-        isApiKeySet = isApiKeySet,
-        isUserProvidedKey = isUserProvidedKey,
-        isDroneActive = isDroneActive,
-        isSoloActive = isSoloActive,
-        isReplActive = isReplActive,
-        isChatActive = showChatDialog,
-        selectedModel = selectedModel,
-        availableModels = viewModel.availableModels,
-        onToggleDrone = { viewModel.toggleDrone(true) },
-        onToggleSolo = { viewModel.toggleSolo(true) },
-        onToggleRepl = { viewModel.toggleRepl() },
-        onToggleChat = viewModel::toggleChatDialog,
-        onSelectModel = viewModel::selectModel,
-        onSaveApiKey = viewModel::saveApiKey,
-        onClearApiKey = viewModel::clearApiKey,
-        modifier = modifier,
-        isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange
-    )
-}
-
-/**
- * Layout for the AI panel content with 2x2 button grid.
- */
-@Composable
-fun AiOptionsLayout(
-    isApiKeySet: Boolean,
-    isUserProvidedKey: Boolean = false,
-    isDroneActive: Boolean = false,
-    isSoloActive: Boolean = false,
-    isReplActive: Boolean = false,
-    isChatActive: Boolean = false,
-    selectedModel: AiModel = AiModel.DEFAULT,
-    availableModels: List<AiModel> = AiModel.entries,
-    onToggleDrone: () -> Unit = {},
-    onToggleSolo: () -> Unit = {},
-    onToggleRepl: () -> Unit = {},
-    onToggleChat: () -> Unit = {},
-    onSelectModel: (AiModel) -> Unit = {},
-    onSaveApiKey: (String) -> Unit = {},
-    onClearApiKey: () -> Unit = {},
+    feature: SynthFeature<AiOptionsUiState, AiOptionsPanelActions> = AiOptionsViewModel.panelFeature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
 ) {
+    val uiState by feature.stateFlow.collectAsState()
+    val actions = feature.actions
+
     CollapsibleColumnPanel(
         title = "AI",
         color = OrpheusColors.metallicBlue,
@@ -121,17 +71,18 @@ fun AiOptionsLayout(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        modifier = modifier
+        modifier = modifier,
+        showCollapsedHeader = showCollapsedHeader
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            if (!isApiKeySet) {
+            if (!uiState.isApiKeySet) {
                 // Key entry UI
                 ApiKeyEntryCompact(
-                    onSubmit = onSaveApiKey,
+                    onSubmit = actions.onSaveApiKey,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
@@ -141,9 +92,9 @@ fun AiOptionsLayout(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     // User key indicator (if applicable)
-                    if (isUserProvidedKey) {
+                    if (uiState.isUserProvidedKey) {
                         UserKeyIndicator(
-                            onRemove = onClearApiKey,
+                            onRemove = actions.onClearApiKey,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
                     }
@@ -155,14 +106,14 @@ fun AiOptionsLayout(
                         AiButton(
                             label = "Drone",
                             color = AiButtonColors.drone,
-                            isActive = isDroneActive,
-                            onClick = onToggleDrone
+                            isActive = uiState.isDroneActive,
+                            onClick = { actions.onToggleDrone(true) }
                         )
                         AiButton(
                             label = "Solo",
                             color = AiButtonColors.solo,
-                            isActive = isSoloActive,
-                            onClick = onToggleSolo
+                            isActive = uiState.isSoloActive,
+                            onClick = { actions.onToggleSolo(true) }
                         )
                     }
                     
@@ -173,22 +124,22 @@ fun AiOptionsLayout(
                         AiButton(
                             label = "Tidal",
                             color = AiButtonColors.repl,
-                            isActive = isReplActive,
-                            onClick = onToggleRepl
+                            isActive = uiState.isReplActive,
+                            onClick = { actions.onToggleRepl(true) }
                         )
                         AiButton(
                             label = "AI",
                             color = AiButtonColors.chat,
-                            isActive = isChatActive,
-                            onClick = onToggleChat
+                            isActive = uiState.showChatDialog,
+                            onClick = { actions.onToggleChatDialog() }
                         )
                     }
                     
                     // Model Selector
                     ModelSelector(
-                        selectedModel = selectedModel,
-                        availableModels = availableModels,
-                        onSelectModel = onSelectModel,
+                        selectedModel = uiState.selectedModel ?: AiModel.DEFAULT,
+                        availableModels = uiState.availableModels,
+                        onSelectModel = actions.onSelectModel,
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
@@ -201,10 +152,14 @@ fun AiOptionsLayout(
 @Preview
 fun AiOptionsLayoutPreview() {
     OrpheusTheme {
-        AiOptionsLayout(
-            isApiKeySet = true,
-            isDroneActive = true,
-            isSoloActive = false,
+        AiOptionsPanel(
+            feature = AiOptionsViewModel.previewFeature(
+                AiOptionsUiState(
+                    isApiKeySet = true,
+                    isDroneActive = true,
+                    isSoloActive = false
+                )
+            ),
             isExpanded = true
         )
     }
@@ -214,8 +169,10 @@ fun AiOptionsLayoutPreview() {
 @Preview
 fun AiOptionsLayoutNoKeyPreview() {
     OrpheusTheme {
-        AiOptionsLayout(
-            isApiKeySet = false,
+        AiOptionsPanel(
+            feature = AiOptionsViewModel.previewFeature(
+                AiOptionsUiState(isApiKeySet = false)
+            ),
             isExpanded = true
         )
     }

@@ -30,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.widgets.dialogs.ConfirmDialog
@@ -48,46 +48,30 @@ data class PresetProps(
 // Lighter orange for PATCHES panel
 private val PatchesColor = Color(0xFFFFAB40)  // Light orange/amber
 
+/**
+ * PresetsPanel consuming PanelFeature interface.
+ */
 @Composable
 fun PresetsPanel(
+    feature: SynthFeature<PresetUiState, PresetPanelActions>,
     modifier: Modifier = Modifier,
-    presetsViewModel: PresetsViewModel = metroViewModel(),
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
-    onDialogActiveChange: (Boolean) -> Unit = {}
-) {
-    val state by presetsViewModel.uiState.collectAsState()
-    val actions = presetsViewModel.panelActions
-
-    PresetsPanelLayout(
-        modifier = modifier,
-        uiState = state,
-        actions = actions,
-        isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange,
-        onDialogActiveChange = onDialogActiveChange
-    )
-}
-
-@Composable
-fun PresetsPanelLayout(
-    modifier: Modifier = Modifier,
-    uiState: PresetUiState,
-    actions: PresetPanelActions,
-    isExpanded: Boolean? = null,
-    onExpandedChange: ((Boolean) -> Unit)? = null,
-    onDialogActiveChange: (Boolean) -> Unit = {},
     fillMaxHeight: Boolean = true,
     showCollapsedHeader: Boolean = true
 ) {
+    val uiState by feature.stateFlow.collectAsState()
+    val actions = feature.actions
+
     var showNewDialog by remember { mutableStateOf(false) }
     var showOverrideDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Extract values from the sealed interface
-    val (presets, selectedPreset) = when (uiState) {
+    val currentState = uiState
+    val (presets, selectedPreset) = when (currentState) {
         is PresetUiState.Loading -> emptyList<DronePreset>() to null
-        is PresetUiState.Loaded -> uiState.presets to uiState.selectedPreset
+        is PresetUiState.Loaded -> currentState.presets to currentState.selectedPreset
     }
 
     val presetProps = PresetProps(

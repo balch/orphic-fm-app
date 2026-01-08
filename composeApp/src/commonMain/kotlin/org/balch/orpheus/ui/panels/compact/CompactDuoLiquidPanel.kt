@@ -18,7 +18,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.core.audio.VoiceState
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.features.voice.VoicePanelActions
+import org.balch.orpheus.features.voice.VoiceUiState
+import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
@@ -35,21 +38,11 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun CompactDuoLiquidPanel(
     pairIndex: Int,
-    voiceStates: List<VoiceState>,
-    voiceEnvelopeSpeeds: List<Float>,
-    onVoiceTuneChange: (Int, Float) -> Unit,
-    onEnvelopeSpeedChange: (Int, Float) -> Unit,
-    onPulseStart: (Int) -> Unit,
-    onPulseEnd: (Int) -> Unit,
-    onVoiceHoldChange: (Int, Boolean) -> Unit,
+    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
     borderColor: Color,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
-    modifier: Modifier = Modifier,
-    // Wobble callbacks (optional)
-    onWobblePulseStart: ((Int, Float, Float) -> Unit)? = null,
-    onWobbleMove: ((Int, Float, Float) -> Unit)? = null,
-    onWobblePulseEnd: ((Int) -> Unit)? = null
+    modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(10.dp)
     val startIndex = pairIndex * 2
@@ -73,7 +66,6 @@ fun CompactDuoLiquidPanel(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -81,32 +73,12 @@ fun CompactDuoLiquidPanel(
             ) {
                 repeat(2) { i ->
                     val voiceIndex = startIndex + i
-                    if (voiceIndex < voiceStates.size) {
-                        val state = voiceStates[voiceIndex]
-                        CompactVoicePanel(
-                            voiceIndex = voiceIndex,
-                            tune = state.tune,
-                            envelopeSpeed = voiceEnvelopeSpeeds.getOrElse(voiceIndex) { 0.5f },
-                            isActive = state.pulse,
-                            isHolding = state.isHolding,
-                            onTuneChange = { onVoiceTuneChange(voiceIndex, it) },
-                            onEnvelopeSpeedChange = { onEnvelopeSpeedChange(voiceIndex, it) },
-                            onPulseStart = { onPulseStart(voiceIndex) },
-                            onPulseEnd = { onPulseEnd(voiceIndex) },
-                            onHoldChange = { onVoiceHoldChange(voiceIndex, it) },
-                            color = borderColor,
-                            modifier = Modifier.weight(1f),
-                            onWobblePulseStart = onWobblePulseStart?.let { callback ->
-                                { x, y -> callback(voiceIndex, x, y) }
-                            },
-                            onWobbleMove = onWobbleMove?.let { callback ->
-                                { x, y -> callback(voiceIndex, x, y) }
-                            },
-                            onWobblePulseEnd = onWobblePulseEnd?.let { callback ->
-                                { callback(voiceIndex) }
-                            }
-                        )
-                    }
+                    CompactVoicePanel(
+                        voiceIndex = voiceIndex,
+                        voiceFeature = voiceFeature,
+                        color = borderColor,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -116,23 +88,13 @@ fun CompactDuoLiquidPanel(
 @Preview
 @Composable
 private fun CompactDuoLiquidPanelPreview() {
-    val mockVoiceState = VoiceState(index = 0, tune = 0.5f)
-    val mockVoiceStates = List(8) { i -> VoiceState(index = i, tune = 0.3f) }
-    val mockEnvelopeSpeeds = List(8) { 0.7f }
-
     Row(
         modifier = Modifier.background(Color.Black).padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         CompactDuoLiquidPanel(
             pairIndex = 0,
-            voiceStates = mockVoiceStates,
-            voiceEnvelopeSpeeds = mockEnvelopeSpeeds,
-            onVoiceTuneChange = { _, _ -> },
-            onEnvelopeSpeedChange = { _, _ -> },
-            onPulseStart = {},
-            onPulseEnd = {},
-            onVoiceHoldChange = { _, _ -> },
+            voiceFeature = VoiceViewModel.previewFeature(),
             borderColor = OrpheusColors.neonMagenta,
             liquidState = null,
             effects = VisualizationLiquidEffects.Default,

@@ -10,7 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -25,44 +25,19 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 private val PanColor = Color(0xFF008B8B)  // Dark cyan
 
 /**
- * Smart wrapper that connects StereoViewModel to the layout.
+ * StereoPanel consuming PanelFeature interface.
  */
 @Composable
 fun StereoPanel(
+    feature: SynthFeature<StereoUiState, StereoPanelActions>,
     modifier: Modifier = Modifier,
-    viewModel: StereoViewModel = metroViewModel(),
-    isExpanded: Boolean? = null,
-    onExpandedChange: ((Boolean) -> Unit)? = null,
-) {
-    val state by viewModel.uiState.collectAsState()
-    val actions = viewModel.panelActions
-
-    StereoPanelLayout(
-        uiState = state,
-        actions = actions,
-        modifier = modifier,
-        isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange
-    )
-}
-
-/**
- * Stereo panel with mode switch and master pan control.
- * 
- * Layout:
- * - Title "Stereo"
- * - Mode toggle: Voice Pan / Stereo Delays
- * - Large master pan knob
- */
-@Composable
-fun StereoPanelLayout(
-    modifier: Modifier = Modifier,
-    uiState: StereoUiState,
-    actions: StereoPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
+    val uiState by feature.stateFlow.collectAsState()
+    val actions = feature.actions
+
     CollapsibleColumnPanel(
         title = "PAN",
         color = PanColor,
@@ -115,15 +90,8 @@ fun StereoPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        StereoPanelLayout(
-            uiState = StereoUiState(
-                mode = StereoMode.VOICE_PAN,
-                masterPan = 0f
-            ),
-            actions = StereoPanelActions(
-                onModeChange = {},
-                onMasterPanChange = {}
-            ),
+        StereoPanel(
+            feature = StereoViewModel.previewFeature(),
             isExpanded = true
         )
     }

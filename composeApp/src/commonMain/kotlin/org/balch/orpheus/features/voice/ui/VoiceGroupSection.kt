@@ -18,12 +18,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.features.midi.MidiPanelActions
 import org.balch.orpheus.features.midi.MidiUiState
-import org.balch.orpheus.features.midi.MidiViewModel
+import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
-import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -33,20 +33,19 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 
 @Composable
 fun VoiceGroupSection(
-    modifier: Modifier = Modifier,
+    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
+    midiFeature: SynthFeature<MidiUiState, MidiPanelActions>,
     quadLabel: String,
     quadColor: Color,
     voiceStartIndex: Int,
-    voiceViewModel: VoiceViewModel = metroViewModel(),
-    midiViewModel: MidiViewModel = metroViewModel(),
+    modifier: Modifier = Modifier,
 ) {
-    val voiceState by voiceViewModel.uiState.collectAsState()
-    val midiState by midiViewModel.uiState.collectAsState()
+    val voiceState by voiceFeature.stateFlow.collectAsState()
+    val midiState by midiFeature.stateFlow.collectAsState()
     val effects = LocalLiquidEffects.current
 
-    val voiceActions = voiceViewModel.panelActions.toVoiceActions()
-
-    val midiActions = midiViewModel.panelActions.toMidiActions()
+    val voiceActions = voiceFeature.actions.toVoiceActions()
+    val midiActions = midiFeature.actions.toMidiActions()
 
     VoiceGroupSectionLayout(
         modifier = modifier,
@@ -57,7 +56,7 @@ fun VoiceGroupSection(
         midiState = midiState,
         voiceActions = voiceActions,
         midiActions = midiActions,
-        isVoiceBeingLearned = midiViewModel::isVoiceBeingLearned,
+        isVoiceBeingLearned = midiFeature.actions.isVoiceBeingLearned,
         effects = effects
     )
 }

@@ -23,6 +23,7 @@ import org.balch.orpheus.features.navigation.AppNavigation
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.VizBackground
 
@@ -30,8 +31,12 @@ import org.balch.orpheus.ui.widgets.VizBackground
 fun App(graph: OrpheusGraph) {
     CompositionLocalProvider(LocalMetroViewModelFactory provides graph.metroViewModelFactory) {
         val vizViewModel: VizViewModel = metroViewModel()
-        val vizState by vizViewModel.uiState.collectAsState()
+        val vizState by vizViewModel.stateFlow.collectAsState()
         val liquidState = rememberLiquidState()
+        
+        // Create shared liquid effects
+        val liquidEffects = androidx.compose.runtime.remember { VisualizationLiquidEffects() }
+        
         
         // Double liquid state: one for the viz effects, one for the dialog glass effect
         val dialogLiquidState = rememberLiquidState()
@@ -42,11 +47,11 @@ fun App(graph: OrpheusGraph) {
         val dialogPosition by aiViewModel.dialogPosition.collectAsState()
         val dialogSize by aiViewModel.dialogSize.collectAsState()
 
-        val vizModelUiState by vizViewModel.uiState.collectAsState()
+
         OrpheusTheme {
             CompositionLocalProvider(
                 LocalLiquidState provides liquidState,
-                LocalLiquidEffects provides vizState.liquidEffects
+                LocalLiquidEffects provides liquidEffects
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     // Wrap main content in a liquefiable box for the dialog to "see" through
@@ -59,7 +64,7 @@ fun App(graph: OrpheusGraph) {
                             modifier = Modifier
                                 .fillMaxSize()
                                 .liquefiable(liquidState),
-                            selectedViz = vizModelUiState.selectedViz
+                            selectedViz = vizState.selectedViz
                         )
 
                         Column(modifier = Modifier.fillMaxSize()) {

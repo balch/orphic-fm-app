@@ -14,18 +14,37 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.ai.AiOptionsPanel
+import org.balch.orpheus.features.ai.AiOptionsPanelActions
+import org.balch.orpheus.features.ai.AiOptionsUiState
+import org.balch.orpheus.features.ai.PanelId
+import org.balch.orpheus.features.delay.DelayPanelActions
+import org.balch.orpheus.features.delay.DelayUiState
 import org.balch.orpheus.features.delay.ModDelayPanel
 import org.balch.orpheus.features.distortion.DistortionPanel
+import org.balch.orpheus.features.distortion.DistortionPanelActions
+import org.balch.orpheus.features.distortion.DistortionUiState
 import org.balch.orpheus.features.evo.EvoPanel
-import org.balch.orpheus.features.evo.EvoViewModel
+import org.balch.orpheus.features.evo.EvoPanelActions
+import org.balch.orpheus.features.evo.EvoUiState
 import org.balch.orpheus.features.lfo.HyperLfoPanel
+import org.balch.orpheus.features.lfo.LfoPanelActions
+import org.balch.orpheus.features.lfo.LfoUiState
 import org.balch.orpheus.features.midi.MidiPanel
+import org.balch.orpheus.features.midi.MidiPanelActions
+import org.balch.orpheus.features.midi.MidiUiState
+import org.balch.orpheus.features.presets.PresetPanelActions
+import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsPanel
 import org.balch.orpheus.features.stereo.StereoPanel
+import org.balch.orpheus.features.stereo.StereoPanelActions
+import org.balch.orpheus.features.stereo.StereoUiState
+import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
 import org.balch.orpheus.features.tidal.ui.LiveCodePanel
 import org.balch.orpheus.features.viz.VizPanel
+import org.balch.orpheus.ui.viz.VizPanelActions
+import org.balch.orpheus.ui.viz.VizUiState
 
 /**
  * A container for the top header panel row that manages expansion state
@@ -34,22 +53,28 @@ import org.balch.orpheus.features.viz.VizPanel
 @Composable
 fun HeaderPanel(
     modifier: Modifier = Modifier,
-    viewModel: HeaderViewModel = metroViewModel(),
-    evoViewModel: EvoViewModel = metroViewModel(),
+    headerFeature: SynthFeature<HeaderPanelUiState, HeaderPanelActions>,
+    presetsFeature: SynthFeature<PresetUiState, PresetPanelActions>,
+    midiFeature: SynthFeature<MidiUiState, MidiPanelActions>,
+    stereoFeature: SynthFeature<StereoUiState, StereoPanelActions>,
+    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
+    evoFeature: SynthFeature<EvoUiState, EvoPanelActions>,
+    lfoFeature: SynthFeature<LfoUiState, LfoPanelActions>,
+    delayFeature: SynthFeature<DelayUiState, DelayPanelActions>,
+    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
+    liveCodeFeature: LiveCodeFeature,
+    aiOptionsFeature: SynthFeature<AiOptionsUiState, AiOptionsPanelActions>,
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
-    // Observe expansion state from ViewModel
-    val presetExpanded by viewModel.presetExpanded.collectAsState()
-    val midiExpanded by viewModel.midiExpanded.collectAsState()
-    val stereoExpanded by viewModel.stereoExpanded.collectAsState()
-    val vizExpanded by viewModel.vizExpanded.collectAsState()
-    val lfoExpanded by viewModel.lfoExpanded.collectAsState()
-    val delayExpanded by viewModel.delayExpanded.collectAsState()
-    val distortionExpanded by viewModel.distortionExpanded.collectAsState()
-    val codeExpanded by viewModel.codeExpanded.collectAsState()
-    val evoExpanded by viewModel.evoExpanded.collectAsState()
-    val aiExpanded by viewModel.aiExpanded.collectAsState()
+    val uiState by headerFeature.stateFlow.collectAsState()
+    val headerActions = headerFeature.actions
+
+    fun setExpanded(panelId: PanelId, expanded: Boolean) {
+        headerActions.setExpanded(panelId, expanded)
+    }
+
+    fun isExpanded(panelId: PanelId): Boolean = uiState.isExpanded(panelId)
 
     Row(
         modifier = modifier
@@ -59,58 +84,67 @@ fun HeaderPanel(
         verticalAlignment = Alignment.CenterVertically
     ) {
         PresetsPanel(
-            isExpanded = presetExpanded,
-            onExpandedChange = viewModel::setPresetExpanded,
-            onDialogActiveChange = onDialogActiveChange,
-            modifier = panelModifier(presetExpanded)
+            feature = presetsFeature,
+            isExpanded = isExpanded(PanelId.PRESETS),
+            onExpandedChange = { setExpanded(PanelId.PRESETS, it) },
+            modifier = panelModifier(isExpanded(PanelId.PRESETS))
         )
         MidiPanel(
-            isExpanded = midiExpanded,
-            onExpandedChange = viewModel::setMidiExpanded,
-            modifier = panelModifier(midiExpanded)
+            feature = midiFeature,
+            isExpanded = isExpanded(PanelId.MIDI),
+            onExpandedChange = { setExpanded(PanelId.MIDI, it) },
+            modifier = panelModifier(isExpanded(PanelId.MIDI))
         )
         StereoPanel(
-            isExpanded = stereoExpanded,
-            onExpandedChange = viewModel::setStereoExpanded,
-            modifier = panelModifier(stereoExpanded)
+            feature = stereoFeature,
+            isExpanded = isExpanded(PanelId.STEREO),
+            onExpandedChange = { setExpanded(PanelId.STEREO, it) },
+            modifier = panelModifier(isExpanded(PanelId.STEREO))
         )
         VizPanel(
-            isExpanded = vizExpanded,
-            onExpandedChange = viewModel::setVizExpanded,
-            modifier = panelModifier(vizExpanded)
+            feature = vizFeature,
+            isExpanded = isExpanded(PanelId.VIZ),
+            onExpandedChange = { setExpanded(PanelId.VIZ, it) },
+            modifier = panelModifier(isExpanded(PanelId.VIZ))
         )
         EvoPanel(
-            viewModel = evoViewModel,
-            isExpanded = evoExpanded,
-            onExpandedChange = viewModel::setEvoExpanded,
-            modifier = panelModifier(evoExpanded)
+            stateFlow = evoFeature.stateFlow,
+            actions = evoFeature.actions,
+            isExpanded = isExpanded(PanelId.EVO),
+            onExpandedChange = { setExpanded(PanelId.EVO, it) },
+            modifier = panelModifier(isExpanded(PanelId.EVO))
         )
         HyperLfoPanel(
-            isExpanded = lfoExpanded,
-            onExpandedChange = viewModel::setLfoExpanded,
-            modifier = panelModifier(lfoExpanded)
+            feature = lfoFeature,
+            isExpanded = isExpanded(PanelId.LFO),
+            onExpandedChange = { setExpanded(PanelId.LFO, it) },
+            modifier = panelModifier(isExpanded(PanelId.LFO))
         )
         ModDelayPanel(
-            isExpanded = delayExpanded,
-            onExpandedChange = viewModel::setDelayExpanded,
-            modifier = panelModifier(delayExpanded)
+            feature = delayFeature,
+            isExpanded = isExpanded(PanelId.DELAY),
+            onExpandedChange = { setExpanded(PanelId.DELAY, it) },
+            modifier = panelModifier(isExpanded(PanelId.DELAY))
         )
         DistortionPanel(
-            isExpanded = distortionExpanded,
-            onExpandedChange = viewModel::setDistortionExpanded,
-            modifier = panelModifier(distortionExpanded, maxWidth = 220.dp)
+            feature = distortionFeature,
+            isExpanded = isExpanded(PanelId.DISTORTION),
+            onExpandedChange = { setExpanded(PanelId.DISTORTION, it) },
+            modifier = panelModifier(isExpanded(PanelId.DISTORTION), maxWidth = 220.dp)
         )
-        // Live Coding panel - at the end, closed by default
+        // Live Coding panel
         LiveCodePanel(
-            isExpanded = codeExpanded,
-            onExpandedChange = viewModel::setCodeExpanded,
-            modifier = panelModifier(codeExpanded)
+            feature = liveCodeFeature,
+            isExpanded = isExpanded(PanelId.CODE),
+            onExpandedChange = { setExpanded(PanelId.CODE, it) },
+            modifier = panelModifier(isExpanded(PanelId.CODE))
         )
-        // AI Chat panel - at the very end, closed by default
+        // AI Options panel
         AiOptionsPanel(
-            isExpanded = aiExpanded,
-            onExpandedChange = viewModel::setAiExpanded,
-            modifier = panelModifier(aiExpanded, maxWidth = 200.dp)
+            feature = aiOptionsFeature,
+            isExpanded = isExpanded(PanelId.AI),
+            onExpandedChange = { setExpanded(PanelId.AI, it) },
+            modifier = panelModifier(isExpanded(PanelId.AI), maxWidth = 200.dp)
         )
     }
 }

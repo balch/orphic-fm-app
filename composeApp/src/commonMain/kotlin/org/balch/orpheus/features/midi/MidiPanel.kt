@@ -25,7 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -41,14 +41,18 @@ data class MidiProps(
     val onLearnCancel: () -> Unit
 )
 
+/**
+ * MidiPanel consuming PanelFeature interface.
+ */
 @Composable
 fun MidiPanel(
+    feature: SynthFeature<MidiUiState, MidiPanelActions>,
     modifier: Modifier = Modifier,
-    midiViewModel: MidiViewModel = metroViewModel(),
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
-    val midiState by midiViewModel.uiState.collectAsState()
+    val midiState by feature.stateFlow.collectAsState()
+    val actions = feature.actions
 
     MidiPanelLayout(
         modifier = modifier,
@@ -58,9 +62,9 @@ fun MidiPanel(
             deviceName = midiState.deviceName,
             isOpen = midiState.isConnected,
             isLearnModeActive = midiState.isLearnModeActive,
-            onLearnToggle = { midiViewModel.toggleLearnMode() },
-            onLearnSave = { midiViewModel.saveLearnedMappings() },
-            onLearnCancel = { midiViewModel.cancelLearnMode() }
+            onLearnToggle = actions.onToggleLearnMode,
+            onLearnSave = actions.onSaveLearnedMappings,
+            onLearnCancel = actions.onCancelLearnMode
         ),
     )
 }

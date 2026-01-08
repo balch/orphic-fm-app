@@ -9,11 +9,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.features.voice.VoicePanelActions
+import org.balch.orpheus.features.voice.VoiceUiState
+import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.HoldSwitch
@@ -29,22 +35,18 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun CompactVoicePanel(
     voiceIndex: Int,
-    tune: Float,
-    envelopeSpeed: Float,
-    isActive: Boolean,
-    isHolding: Boolean,
-    onTuneChange: (Float) -> Unit,
-    onEnvelopeSpeedChange: (Float) -> Unit,
-    onPulseStart: () -> Unit,
-    onPulseEnd: () -> Unit,
-    onHoldChange: (Boolean) -> Unit,
+    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
     color: Color,
-    modifier: Modifier = Modifier,
-    // Wobble callbacks (optional for backwards compatibility)
-    onWobblePulseStart: ((Float, Float) -> Unit)? = null,
-    onWobbleMove: ((Float, Float) -> Unit)? = null,
-    onWobblePulseEnd: (() -> Unit)? = null
+    modifier: Modifier = Modifier
 ) {
+    val voiceState by voiceFeature.stateFlow.collectAsState()
+    val actions = voiceFeature.actions
+
+    val state = voiceState.voiceStates.getOrNull(voiceIndex) ?: return
+    val tune = state.tune
+    val envelopeSpeed = voiceState.voiceEnvelopeSpeeds.getOrElse(voiceIndex) { 0.5f }
+    val isActive = state.pulse
+    val isHolding = state.isHolding
 
     Column(
         modifier = modifier.padding(2.dp),
@@ -65,14 +67,14 @@ fun CompactVoicePanel(
         ) {
             RotaryKnob(
                 value = tune,
-                onValueChange = onTuneChange,
+                onValueChange = { actions.onVoiceTuneChange(voiceIndex, it) },
                 size = 32.dp,
                 progressColor = color,
             )
 
             HoldSwitch(
                 checked = isHolding,
-                onCheckedChange = { onHoldChange(it) },
+                onCheckedChange = { actions.onHoldChange(voiceIndex, it) },
                 activeColor = color,
                 orientation = SwitchOrientation.Vertical
             )
@@ -82,7 +84,7 @@ fun CompactVoicePanel(
 
         HorizontalMiniSlider(
             value = envelopeSpeed,
-            onValueChange = onEnvelopeSpeedChange,
+            onValueChange = { actions.onVoiceEnvelopeSpeedChange(voiceIndex, it) },
             leftLabel = "F",
             rightLabel = "S",
             color = color,
@@ -93,33 +95,26 @@ fun CompactVoicePanel(
             size = 36.dp,
             label = "",
             isActive = isActive,
-            onPulseStart = onPulseStart,
+            onPulseStart = { actions.onPulseStart(voiceIndex) },
             onPulseEnd = {
-                onPulseEnd()
-                onWobblePulseEnd?.invoke()
+                actions.onPulseEnd(voiceIndex)
+                actions.onWobblePulseEnd(voiceIndex)
             },
             activeColor = color,
-            onPulseStartWithPosition = onWobblePulseStart,
-            onWobbleMove = onWobbleMove
+            onPulseStartWithPosition = { x, y -> actions.onWobblePulseStart(voiceIndex, x, y) },
+            onWobbleMove = { x, y -> actions.onWobbleMove(voiceIndex, x, y) }
         )
     }
 }
 
+
 @Preview
 @Composable
-private fun CCompactVoicePanelPreview_Inactive() {
+private fun CompactVoicePanelPreview_Inactive() {
     OrpheusTheme {
         CompactVoicePanel(
             voiceIndex = 0,
-            tune = 0.5f,
-            envelopeSpeed = 0.5f,
-            isActive = false,
-            isHolding = false,
-            onTuneChange = {},
-            onEnvelopeSpeedChange = {},
-            onPulseStart = {},
-            onPulseEnd = {},
-            onHoldChange = {},
+            voiceFeature = VoiceViewModel.previewFeature(),
             color = OrpheusColors.neonMagenta
         )
     }
@@ -128,18 +123,16 @@ private fun CCompactVoicePanelPreview_Inactive() {
 @Preview
 @Composable
 private fun CompactVoicePanelPreview_Active() {
+    val state = VoiceUiState(
+        voiceStates = List(12) { i ->
+            org.balch.orpheus.core.audio.VoiceState(index = i, tune = 0.8f, pulse = i == 4)
+        },
+        voiceEnvelopeSpeeds = List(12) { 0.2f }
+    )
     OrpheusTheme {
         CompactVoicePanel(
             voiceIndex = 4,
-            tune = 0.8f,
-            envelopeSpeed = 0.2f,
-            isActive = true,
-            isHolding = false,
-            onTuneChange = {},
-            onEnvelopeSpeedChange = {},
-            onPulseStart = {},
-            onPulseEnd = {},
-            onHoldChange = {},
+            voiceFeature = VoiceViewModel.previewFeature(state),
             color = OrpheusColors.synthGreen
         )
     }
@@ -147,19 +140,17 @@ private fun CompactVoicePanelPreview_Active() {
 
 @Preview
 @Composable
-private fun CCompactVoicePanelPreview_Holding() {
+private fun CompactVoicePanelPreview_Holding() {
+    val state = VoiceUiState(
+        voiceStates = List(12) { i ->
+            org.balch.orpheus.core.audio.VoiceState(index = i, tune = 0.3f, isHolding = i == 2)
+        },
+        voiceEnvelopeSpeeds = List(12) { 0.9f }
+    )
     OrpheusTheme {
         CompactVoicePanel(
             voiceIndex = 2,
-            tune = 0.3f,
-            envelopeSpeed = 0.9f,
-            isActive = false,
-            isHolding = true,
-            onTuneChange = {},
-            onEnvelopeSpeedChange = {},
-            onPulseStart = {},
-            onPulseEnd = {},
-            onHoldChange = {},
+            voiceFeature = VoiceViewModel.previewFeature(state),
             color = OrpheusColors.neonMagenta
         )
     }
@@ -168,18 +159,16 @@ private fun CCompactVoicePanelPreview_Holding() {
 @Preview
 @Composable
 private fun CompactVoicePanelPreview_ActiveAndHolding() {
+    val state = VoiceUiState(
+        voiceStates = List(12) { i ->
+            org.balch.orpheus.core.audio.VoiceState(index = i, tune = 1.0f, pulse = i == 7, isHolding = i == 7)
+        },
+        voiceEnvelopeSpeeds = List(12) { 0.0f }
+    )
     OrpheusTheme {
         CompactVoicePanel(
             voiceIndex = 7,
-            tune = 1.0f,
-            envelopeSpeed = 0.0f,
-            isActive = true,
-            isHolding = true,
-            onTuneChange = {},
-            onEnvelopeSpeedChange = {},
-            onPulseStart = {},
-            onPulseEnd = {},
-            onHoldChange = {},
+            voiceFeature = VoiceViewModel.previewFeature(state),
             color = OrpheusColors.synthGreen
         )
     }
@@ -188,35 +177,24 @@ private fun CompactVoicePanelPreview_ActiveAndHolding() {
 @Preview(widthDp = 200, heightDp = 120)
 @Composable
 private fun CompactVoicePanelPreview_AllColors() {
+    val state = VoiceUiState(
+        voiceStates = List(12) { i ->
+            org.balch.orpheus.core.audio.VoiceState(index = i, tune = 0.5f, pulse = true, isHolding = true)
+        },
+        voiceEnvelopeSpeeds = List(12) { 0.5f }
+    )
     OrpheusTheme {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CompactVoicePanel(
                 voiceIndex = 0,
-                tune = 0.5f,
-                envelopeSpeed = 0.5f,
-                isActive = true,
-                isHolding = true,
-                onTuneChange = {},
-                onEnvelopeSpeedChange = {},
-                onPulseStart = {},
-                onPulseEnd = {},
-                onHoldChange = {},
+                voiceFeature = VoiceViewModel.previewFeature(state),
                 color = OrpheusColors.neonMagenta
             )
             CompactVoicePanel(
                 voiceIndex = 4,
-                tune = 0.5f,
-                envelopeSpeed = 0.5f,
-                isActive = true,
-                isHolding = true,
-                onTuneChange = {},
-                onEnvelopeSpeedChange = {},
-                onPulseStart = {},
-                onPulseEnd = {},
-                onHoldChange = {},
+                voiceFeature = VoiceViewModel.previewFeature(state),
                 color = OrpheusColors.synthGreen
             )
         }
     }
 }
-

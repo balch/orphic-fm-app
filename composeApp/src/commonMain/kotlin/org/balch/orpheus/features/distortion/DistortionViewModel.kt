@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.distortion
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -9,6 +10,7 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -19,14 +21,15 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.core.synthViewModel
 
 /** UI state for the Distortion/Volume panel. */
 data class DistortionUiState(
@@ -72,9 +75,9 @@ class DistortionViewModel(
     presetLoader: PresetLoader,
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel(), PanelViewModel<DistortionUiState, DistortionPanelActions> {
+) : ViewModel(), SynthViewModel<DistortionUiState, DistortionPanelActions> {
 
-    override val panelActions = DistortionPanelActions(
+    override val actions = DistortionPanelActions(
         onDriveChange = ::onDriveChange,
         onVolumeChange = ::onVolumeChange,
         onMixChange = ::onMixChange
@@ -115,7 +118,7 @@ class DistortionViewModel(
         }
     }
 
-    override val uiState: StateFlow<DistortionUiState> = flow {
+    override val stateFlow: StateFlow<DistortionUiState> = flow {
         // Emit initial state from engine
         val initial = loadInitialState()
         applyFullState(initial)
@@ -203,9 +206,17 @@ class DistortionViewModel(
     }
 
     companion object {
-        val PREVIEW = ViewModelStateActionMapper(
-            state = DistortionUiState(),
-            actions = DistortionPanelActions.EMPTY,
-        )
+        val PREVIEW_STATE = MutableStateFlow(DistortionUiState())
+        val PREVIEW_ACTIONS = DistortionPanelActions.EMPTY
+
+        fun previewFeature(state: DistortionUiState = DistortionUiState()) =
+            object : SynthFeature<DistortionUiState, DistortionPanelActions> {
+                override val stateFlow: StateFlow<DistortionUiState> = MutableStateFlow(state)
+                override val actions: DistortionPanelActions = DistortionPanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<DistortionUiState, DistortionPanelActions> =
+            synthViewModel<DistortionViewModel, DistortionUiState, DistortionPanelActions>()
     }
 }

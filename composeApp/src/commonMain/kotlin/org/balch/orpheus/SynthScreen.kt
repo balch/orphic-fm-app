@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -12,9 +11,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import com.diamondedge.logging.logging
-import dev.zacsweers.metrox.viewmodel.metroViewModel
-import org.balch.orpheus.features.evo.EvoViewModel
-import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.screens.CompactLandscapeScreen
 import org.balch.orpheus.ui.screens.CompactPortraitScreen
 import org.balch.orpheus.ui.screens.DesktopSynthScreen
@@ -61,11 +57,7 @@ fun SynthScreen(
         log.info { "Orpheus Ready \u2713" }
     }
 
-    val peak by orchestrator.peakFlow.collectAsState()
     var isDialogActive by remember { mutableStateOf(false) }
-
-    val voiceViewModel: VoiceViewModel = metroViewModel()
-    val evoViewModel: EvoViewModel = metroViewModel()
 
     LearnModeProvider {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -83,9 +75,7 @@ fun SynthScreen(
                     )
                 }
                 LayoutMode.Desktop -> {
-                    // Original desktop layout
                     DesktopSynthScreen(
-                        voiceViewModel = voiceViewModel,
                         isDialogActive = isDialogActive,
                         onDialogActiveChange = { isDialogActive = it },
                         focusRequester = focusRequester,

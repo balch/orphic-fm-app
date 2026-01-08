@@ -16,7 +16,33 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.features.ai.AiOptionsPanelActions
+import org.balch.orpheus.features.ai.AiOptionsUiState
+import org.balch.orpheus.features.ai.AiOptionsViewModel
+import org.balch.orpheus.features.delay.DelayPanelActions
+import org.balch.orpheus.features.delay.DelayUiState
+import org.balch.orpheus.features.delay.DelayViewModel
+import org.balch.orpheus.features.distortion.DistortionPanelActions
+import org.balch.orpheus.features.distortion.DistortionUiState
+import org.balch.orpheus.features.distortion.DistortionViewModel
+import org.balch.orpheus.features.evo.EvoPanelActions
+import org.balch.orpheus.features.evo.EvoUiState
+import org.balch.orpheus.features.evo.EvoViewModel
+import org.balch.orpheus.features.lfo.LfoPanelActions
+import org.balch.orpheus.features.lfo.LfoUiState
+import org.balch.orpheus.features.lfo.LfoViewModel
+import org.balch.orpheus.features.midi.MidiPanelActions
+import org.balch.orpheus.features.midi.MidiUiState
+import org.balch.orpheus.features.midi.MidiViewModel
+import org.balch.orpheus.features.presets.PresetPanelActions
+import org.balch.orpheus.features.presets.PresetUiState
+import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.stereo.StereoPanelActions
+import org.balch.orpheus.features.stereo.StereoUiState
+import org.balch.orpheus.features.stereo.StereoViewModel
+import org.balch.orpheus.features.tidal.LiveCodeViewModel
+import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
@@ -24,29 +50,62 @@ import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
 import org.balch.orpheus.ui.panels.CenterControlPanel
 import org.balch.orpheus.ui.panels.HeaderPanel
+import org.balch.orpheus.ui.panels.HeaderPanelActions
+import org.balch.orpheus.ui.panels.HeaderPanelUiState
+import org.balch.orpheus.ui.panels.HeaderViewModel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
-import org.balch.orpheus.ui.utils.rememberPanelState
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
+import org.balch.orpheus.ui.viz.VizPanelActions
+import org.balch.orpheus.ui.viz.VizUiState
+import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 /**
- * The desktop screen - uses component composables that handle their own ViewModel injection
+ * The desktop screen - injects ViewModels internally and calls Layout.
+ * Use DesktopSynthScreenLayout directly for previews with mock features.
  */
 @Composable
 fun DesktopSynthScreen(
-    voiceViewModel: VoiceViewModel = metroViewModel(),
     isDialogActive: Boolean,
     onDialogActiveChange: (Boolean) -> Unit,
     focusRequester: FocusRequester,
 ) {
+    // Inject all ViewModels internally via their factory methods
+    val voiceFeature = VoiceViewModel.panelFeature()
+    val evoFeature = EvoViewModel.panelFeature()
+    val headerFeature = HeaderViewModel.panelFeature()
+    val presetsFeature = PresetsViewModel.panelFeature()
+    val midiFeature = MidiViewModel.panelFeature()
+    val stereoFeature = StereoViewModel.panelFeature()
+    val vizFeature = VizViewModel.panelFeature()
+    val lfoFeature = LfoViewModel.panelFeature()
+    val delayFeature = DelayViewModel.panelFeature()
+    val distortionFeature = DistortionViewModel.panelFeature()
+    val liveCodeFeature = LiveCodeViewModel.panelFeature()
+    val aiOptionsFeature = AiOptionsViewModel.panelFeature()
+
     DesktopSynthScreenLayout(
-        voiceFeature = rememberPanelState(voiceViewModel),
+        voiceFeature = voiceFeature,
+        evoFeature = evoFeature,
+        headerFeature = headerFeature,
+        presetsFeature = presetsFeature,
+        midiFeature = midiFeature,
+        stereoFeature = stereoFeature,
+        vizFeature = vizFeature,
+        lfoFeature = lfoFeature,
+        delayFeature = delayFeature,
+        distortionFeature = distortionFeature,
+        liveCodeFeature = liveCodeFeature,
+        aiOptionsFeature = aiOptionsFeature,
         effects = LocalLiquidEffects.current,
         isDialogActive = isDialogActive,
         onDialogActiveChange = onDialogActiveChange,
-        focusRequester = focusRequester
+        focusRequester = focusRequester,
     )
 }
 
@@ -55,7 +114,18 @@ fun DesktopSynthScreen(
  */
 @Composable
 fun DesktopSynthScreenLayout(
-    voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
+    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
+    evoFeature: SynthFeature<EvoUiState, EvoPanelActions>,
+    headerFeature: SynthFeature<HeaderPanelUiState, HeaderPanelActions>,
+    presetsFeature: SynthFeature<PresetUiState, PresetPanelActions>,
+    midiFeature: SynthFeature<MidiUiState, MidiPanelActions>,
+    stereoFeature: SynthFeature<StereoUiState, StereoPanelActions>,
+    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
+    lfoFeature: SynthFeature<LfoUiState, LfoPanelActions>,
+    delayFeature: SynthFeature<DelayUiState, DelayPanelActions>,
+    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
+    liveCodeFeature: LiveCodeFeature,
+    aiOptionsFeature: SynthFeature<AiOptionsUiState, AiOptionsPanelActions>,
     effects: VisualizationLiquidEffects,
     isDialogActive: Boolean = false,
     onDialogActiveChange: (Boolean) -> Unit,
@@ -79,6 +149,17 @@ fun DesktopSynthScreenLayout(
         ) {
             // Header panel
             HeaderPanel(
+                headerFeature = headerFeature,
+                presetsFeature = presetsFeature,
+                midiFeature = midiFeature,
+                stereoFeature = stereoFeature,
+                vizFeature = vizFeature,
+                evoFeature = evoFeature,
+                lfoFeature = lfoFeature,
+                delayFeature = delayFeature,
+                distortionFeature = distortionFeature,
+                liveCodeFeature = liveCodeFeature,
+                aiOptionsFeature = aiOptionsFeature,
                 onDialogActiveChange = onDialogActiveChange,
             )
 
@@ -94,6 +175,8 @@ fun DesktopSynthScreenLayout(
                     horizontalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
                     VoiceGroupSection(
+                        voiceFeature = voiceFeature,
+                        midiFeature = midiFeature,
                         quadLabel = "1-4",
                         quadColor = OrpheusColors.neonMagenta,
                         voiceStartIndex = 0,
@@ -101,12 +184,15 @@ fun DesktopSynthScreenLayout(
                     )
 
                     CenterControlPanel(
+                        voiceFeature = voiceFeature,
                         modifier = Modifier
                             .fillMaxHeight()
                             .weight(0.4f)
                     )
 
                     VoiceGroupSection(
+                        voiceFeature = voiceFeature,
+                        midiFeature = midiFeature,
                         quadLabel = "5-8",
                         quadColor = OrpheusColors.synthGreen,
                         voiceStartIndex = 4,
@@ -122,5 +208,36 @@ fun DesktopSynthScreenLayout(
                 )
             }
         }
+    }
+}
+
+// ==================== PREVIEWS ====================
+
+@Preview(widthDp = 1200, heightDp = 800)
+@Composable
+private fun DesktopSynthScreenPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(
+        effects = effects,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        DesktopSynthScreenLayout(
+            voiceFeature = VoiceViewModel.previewFeature(),
+            evoFeature = EvoViewModel.previewFeature(),
+            headerFeature = HeaderViewModel.previewFeature(),
+            presetsFeature = PresetsViewModel.previewFeature(),
+            midiFeature = MidiViewModel.previewFeature(),
+            stereoFeature = StereoViewModel.previewFeature(),
+            vizFeature = VizViewModel.previewFeature(),
+            lfoFeature = LfoViewModel.previewFeature(),
+            delayFeature = DelayViewModel.previewFeature(),
+            distortionFeature = DistortionViewModel.previewFeature(),
+            liveCodeFeature = LiveCodeViewModel.previewFeature(),
+            aiOptionsFeature = AiOptionsViewModel.previewFeature(),
+            effects = effects,
+            onDialogActiveChange = {},
+            focusRequester = FocusRequester()
+        )
     }
 }

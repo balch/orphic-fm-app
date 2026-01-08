@@ -28,7 +28,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -47,40 +47,20 @@ enum class HyperLfoMode {
     OR
 }
 
-/** Smart wrapper that connects LfoViewModel to the layout. */
-@Composable
-fun HyperLfoPanel(
-    modifier: Modifier = Modifier,
-    viewModel: LfoViewModel = metroViewModel(),
-    isExpanded: Boolean? = null,
-    onExpandedChange: ((Boolean) -> Unit)? = null,
-) {
-    val state by viewModel.uiState.collectAsState()
-    val actions = viewModel.panelActions
-
-    HyperLfoPanelLayout(
-        uiState = state,
-        actions = actions,
-        modifier = modifier,
-        isExpanded = isExpanded,
-        onExpandedChange = onExpandedChange
-    )
-}
-
 /**
- * Hyper LFO Panel - Two LFOs combined with AND/OR logic
- *
- * In "AND" mode: Both LFOs must be high for output In "OR" mode: Either LFO high produces output
+ * HyperLfoPanel consuming PanelFeature interface.
  */
 @Composable
-fun HyperLfoPanelLayout(
+fun HyperLfoPanel(
+    feature: SynthFeature<LfoUiState, LfoPanelActions>,
     modifier: Modifier = Modifier,
-    uiState: LfoUiState,
-    actions: LfoPanelActions,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
+    val uiState by feature.stateFlow.collectAsState()
+    val actions = feature.actions
+
     CollapsibleColumnPanel(
         title = "LFO",
         color = OrpheusColors.neonCyan,
@@ -376,19 +356,8 @@ fun HyperLfoPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        HyperLfoPanelLayout(
-            uiState = LfoUiState(
-                lfoA = 0.5f,
-                lfoB = 0.2f,
-                mode = HyperLfoMode.AND,
-                linkEnabled = false
-            ),
-            actions = LfoPanelActions(
-                onLfoAChange = {},
-                onLfoBChange = {},
-                onModeChange = {},
-                onLinkChange = {}
-            )
+        HyperLfoPanel(
+            feature = LfoViewModel.previewFeature()
         )
     }
 }

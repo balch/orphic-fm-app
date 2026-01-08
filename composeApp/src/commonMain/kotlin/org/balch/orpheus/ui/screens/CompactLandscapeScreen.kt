@@ -11,10 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +29,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsViewModel
@@ -36,7 +37,7 @@ import org.balch.orpheus.features.tweaker.TweakSequencerPanelActions
 import org.balch.orpheus.features.tweaker.TweakSequencerUiState
 import org.balch.orpheus.features.tweaker.TweakSequencerViewModel
 import org.balch.orpheus.features.tweaker.ui.CompactTweakSequencerView
-import org.balch.orpheus.features.tweaker.ui.ExpandedTweakSequencerContent
+import org.balch.orpheus.features.tweaker.ui.ExpandedTweakSequencerScreen
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
@@ -48,8 +49,6 @@ import org.balch.orpheus.ui.panels.compact.CompactLandscapeHeaderPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
-import org.balch.orpheus.ui.utils.rememberPanelState
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.VizPanelActions
 import org.balch.orpheus.ui.viz.VizUiState
@@ -76,21 +75,16 @@ fun CompactLandscapeScreen(
     vizViewModel: VizViewModel = metroViewModel(),
     sequencerViewModel: TweakSequencerViewModel = metroViewModel(),
 ) {
-    val voice = rememberPanelState(voiceViewModel)
-    val preset = rememberPanelState(presetViewModel)
-    val viz = rememberPanelState(vizViewModel)
-    val sequencer = rememberPanelState(sequencerViewModel)
-
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
-    
+
     Box(modifier = modifier.fillMaxSize()) {
         CompactLandscapeLayout(
             modifier = Modifier.fillMaxSize(),
-            presetFeature = preset,
-            voiceFeature = voice,
-            vizFeature = viz,
-            sequencerFeature = sequencer,
+            presetFeature = presetViewModel,
+            voiceFeature = voiceViewModel,
+            vizFeature = vizViewModel,
+            sequencerFeature = sequencerViewModel,
             liquidState = liquidState,
             effects = effects,
             onKeyEvent = { event, isDialogActive ->
@@ -99,25 +93,27 @@ fun CompactLandscapeScreen(
                 // as the ViewModel is available in the screen scope.
                 SynthKeyboardHandler.handleKeyEvent(
                     keyEvent = event,
-                    voiceFeature = voice,
+                    voiceFeature = voiceViewModel,
                     isDialogActive = isDialogActive
                 )
             }
         )
         
         // Expanded Sequencer Screen Overlay
-        if (sequencer.state.isExpanded) {
+        val sequencerState by sequencerViewModel.stateFlow.collectAsState()
+        val sequencerActions = sequencerViewModel.actions
+        if (sequencerState.isExpanded) {
             Dialog(
-                onDismissRequest = { sequencer.actions.onCancel() },
+                onDismissRequest = { sequencerActions.onCancel() },
                 properties = DialogProperties(
                     usePlatformDefaultWidth = false,
                     dismissOnBackPress = true,
                     dismissOnClickOutside = true
                 )
             ) {
-                ExpandedTweakSequencerContent(
-                    sequencerFeature = sequencer,
-                    onDismiss = { sequencer.actions.onCancel() },
+                ExpandedTweakSequencerScreen(
+                    sequencerFeature = sequencerViewModel,
+                    onDismiss = { sequencerActions.onCancel() },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -129,16 +125,14 @@ fun CompactLandscapeScreen(
 @Composable
 private fun CompactLandscapeLayout(
     modifier: Modifier = Modifier,
-    presetFeature: ViewModelStateActionMapper<PresetUiState, PresetPanelActions>,
-    voiceFeature: ViewModelStateActionMapper<VoiceUiState, VoicePanelActions>,
-    vizFeature: ViewModelStateActionMapper<VizUiState, VizPanelActions>,
-    sequencerFeature: ViewModelStateActionMapper<TweakSequencerUiState, TweakSequencerPanelActions>,
+    presetFeature: SynthFeature<PresetUiState, PresetPanelActions>,
+    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
+    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
+    sequencerFeature: SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions>,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     onKeyEvent: (androidx.compose.ui.input.key.KeyEvent, Boolean) -> Boolean,
 ) {
-    val shape = RoundedCornerShape(12.dp)
-
     // Focus handling for keyboard input
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -149,12 +143,8 @@ private fun CompactLandscapeLayout(
     var presetDropdownExpanded by remember { mutableStateOf(false) }
     var vizDropdownExpanded by remember { mutableStateOf(false) }
 
-    val voiceState = voiceFeature.state
+    val voiceState by voiceFeature.stateFlow.collectAsState()
     val voiceActions = voiceFeature.actions
-    val presetState = presetFeature.state
-    val vizState = vizFeature.state
-    val sequencerState = sequencerFeature.state
-    val sequencerActions = sequencerFeature.actions
 
     Column(
         modifier = modifier
@@ -208,16 +198,13 @@ private fun CompactLandscapeLayout(
             }
 
             CompactTweakSequencerView(
-                state = sequencerState.sequencer,
-                onPlayPause = sequencerActions.onTogglePlayPause,
-                onStop = sequencerActions.onStop,
-                onPlaybackModeChange = sequencerActions.onSetPlaybackMode,
-                onExpand = sequencerActions.onExpand,
+                sequencerFeature = sequencerFeature,
                 liquidState = liquidState,
                 effects = effects,
                 modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.2f)
                     .fillMaxHeight()
-                    .weight(1f)
                     .padding(horizontal = 8.dp)
             )
 
@@ -254,77 +241,41 @@ private fun CompactLandscapeLayout(
             // Duo 1-2: Magenta Border, Cyan Accents
             CompactDuoLiquidPanel(
                 pairIndex = 0,
-                voiceStates = voiceState.voiceStates,
-                voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                onVoiceTuneChange = voiceActions.onVoiceTuneChange,
-                onEnvelopeSpeedChange = voiceActions.onVoiceEnvelopeSpeedChange,
-                onPulseStart = voiceActions.onPulseStart,
-                onPulseEnd = voiceActions.onPulseEnd,
-                onVoiceHoldChange = voiceActions.onHoldChange,
+                voiceFeature = voiceFeature,
                 borderColor = OrpheusColors.neonMagenta,
                 liquidState = liquidState,
                 effects = effects,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onWobblePulseStart = voiceActions.onWobblePulseStart,
-                onWobbleMove = voiceActions.onWobbleMove,
-                onWobblePulseEnd = voiceActions.onWobblePulseEnd
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
 
             // Duo 3-4: Electric Blue Border, Cyan Accents
             CompactDuoLiquidPanel(
                 pairIndex = 1,
-                voiceStates = voiceState.voiceStates,
-                voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                onVoiceTuneChange = voiceActions.onVoiceTuneChange,
-                onEnvelopeSpeedChange = voiceActions.onVoiceEnvelopeSpeedChange,
-                onPulseStart = voiceActions.onPulseStart,
-                onPulseEnd = voiceActions.onPulseEnd,
-                onVoiceHoldChange = voiceActions.onHoldChange,
+                voiceFeature = voiceFeature,
                 borderColor = OrpheusColors.electricBlue,
                 liquidState = liquidState,
                 effects = effects,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onWobblePulseStart = voiceActions.onWobblePulseStart,
-                onWobbleMove = voiceActions.onWobbleMove,
-                onWobblePulseEnd = voiceActions.onWobblePulseEnd
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
 
             // Duo 5-6: Green Border, Orange Accents (matching uploaded_image_1766749385773.png)
             CompactDuoLiquidPanel(
                 pairIndex = 2,
-                voiceStates = voiceState.voiceStates,
-                voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                onVoiceTuneChange = voiceActions.onVoiceTuneChange,
-                onEnvelopeSpeedChange = voiceActions.onVoiceEnvelopeSpeedChange,
-                onPulseStart = voiceActions.onPulseStart,
-                onPulseEnd = voiceActions.onPulseEnd,
-                onVoiceHoldChange = voiceActions.onHoldChange,
+                voiceFeature = voiceFeature,
                 borderColor = OrpheusColors.neonOrange,
                 liquidState = liquidState,
                 effects = effects,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onWobblePulseStart = voiceActions.onWobblePulseStart,
-                onWobbleMove = voiceActions.onWobbleMove,
-                onWobblePulseEnd = voiceActions.onWobblePulseEnd
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
 
             // Duo 7-8: Green Border, Orange Accents
             CompactDuoLiquidPanel(
                 pairIndex = 3,
-                voiceStates = voiceState.voiceStates,
-                voiceEnvelopeSpeeds = voiceState.voiceEnvelopeSpeeds,
-                onVoiceTuneChange = voiceActions.onVoiceTuneChange,
-                onEnvelopeSpeedChange = voiceActions.onVoiceEnvelopeSpeedChange,
-                onPulseStart = voiceActions.onPulseStart,
-                onPulseEnd = voiceActions.onPulseEnd,
-                onVoiceHoldChange = voiceActions.onHoldChange,
+                voiceFeature = voiceFeature,
                 borderColor = OrpheusColors.synthGreen,
                 liquidState = liquidState,
                 effects = effects,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-                onWobblePulseStart = voiceActions.onWobblePulseStart,
-                onWobbleMove = voiceActions.onWobbleMove,
-                onWobblePulseEnd = voiceActions.onWobblePulseEnd
+                modifier = Modifier.weight(1f).fillMaxHeight()
             )
         }
     }
@@ -345,10 +296,10 @@ private fun CompactLandscapeLayoutPreview(
         val liquidState = LocalLiquidState.current
         if (liquidState != null) {
             CompactLandscapeLayout(
-                presetFeature = PresetsViewModel.PREVIEW,
-                voiceFeature = VoiceViewModel.PREVIEW,
-                vizFeature = VizViewModel.PREVIEW,
-                sequencerFeature = TweakSequencerViewModel.PREVIEW,
+                presetFeature = PresetsViewModel.previewFeature(),
+                voiceFeature = VoiceViewModel.previewFeature(),
+                vizFeature = VizViewModel.previewFeature(),
+                sequencerFeature = TweakSequencerViewModel.previewFeature(),
                 liquidState = liquidState,
                 effects = effects,
                 onKeyEvent = { _, _ -> false }

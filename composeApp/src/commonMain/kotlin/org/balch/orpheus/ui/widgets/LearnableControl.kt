@@ -52,7 +52,7 @@ fun LearnModeProvider(
     midiViewModel: MidiViewModel = metroViewModel(),
     content: @Composable () -> Unit
 ) {
-    val midiState by midiViewModel.uiState.collectAsState()
+    val midiState by midiViewModel.stateFlow.collectAsState()
 
     // Get the selected control ID for learn mode
     val selectedControlId =

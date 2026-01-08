@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.stereo
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -9,6 +10,7 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -19,13 +21,14 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.routing.SynthController
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.core.synthViewModel
 
 /** UI state for the Stereo panel. */
 data class StereoUiState(
@@ -65,9 +68,9 @@ class StereoViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider
-) : ViewModel(), PanelViewModel<StereoUiState, StereoPanelActions> {
+) : ViewModel(), SynthViewModel<StereoUiState, StereoPanelActions> {
 
-    override val panelActions = StereoPanelActions(
+    override val actions = StereoPanelActions(
         onModeChange = ::onModeChange,
         onMasterPanChange = ::onMasterPanChange
     )
@@ -95,7 +98,7 @@ class StereoViewModel(
         }
     }
 
-    override val uiState: StateFlow<StereoUiState> = flow {
+    override val stateFlow: StateFlow<StereoUiState> = flow {
         // Emit initial state from engine
         val initial = loadInitialState()
         applyFullState(initial)
@@ -181,9 +184,17 @@ class StereoViewModel(
     }
 
     companion object {
-        val PREVIEW = ViewModelStateActionMapper(
-            state = StereoUiState(),
-            actions = StereoPanelActions.EMPTY,
-        )
+        val PREVIEW_STATE = MutableStateFlow(StereoUiState())
+        val PREVIEW_ACTIONS = StereoPanelActions.EMPTY
+
+        fun previewFeature(state: StereoUiState = StereoUiState()) =
+            object : SynthFeature<StereoUiState, StereoPanelActions> {
+                override val stateFlow: StateFlow<StereoUiState> = MutableStateFlow(state)
+                override val actions: StereoPanelActions = StereoPanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<StereoUiState, StereoPanelActions> =
+            synthViewModel<StereoViewModel, StereoUiState, StereoPanelActions>()
     }
 }

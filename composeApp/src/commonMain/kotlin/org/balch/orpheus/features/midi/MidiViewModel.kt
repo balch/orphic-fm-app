@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.midi
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
@@ -10,20 +11,22 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiController
 import org.balch.orpheus.core.midi.MidiInputHandler
 import org.balch.orpheus.core.midi.MidiMappingRepository
 import org.balch.orpheus.core.midi.MidiMappingState
 import org.balch.orpheus.core.midi.MidiMappingStateHolder
-import org.balch.orpheus.ui.utils.PanelViewModel
-import org.balch.orpheus.ui.utils.ViewModelStateActionMapper
+import org.balch.orpheus.core.synthViewModel
 
 /** UI state for the MIDI panel. */
 data class MidiUiState(
@@ -48,7 +51,7 @@ class MidiViewModel(
     private val stateHolder: MidiMappingStateHolder,
     private val midiInputHandler: MidiInputHandler,
     private val dispatcherProvider: DispatcherProvider
-) : ViewModel(), PanelViewModel<MidiUiState, MidiPanelActions> {
+) : ViewModel(), SynthViewModel<MidiUiState, MidiPanelActions> {
 
     private val log = logging("MidiViewModel")
 
@@ -57,7 +60,7 @@ class MidiViewModel(
     private val _isConnected = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     // UI state combines local device state with shared mapping state
-    override val uiState: StateFlow<MidiUiState> = combine(
+    override val stateFlow: StateFlow<MidiUiState> = combine(
         _deviceName,
         _isConnected,
         stateHolder.isLearnModeActive,
@@ -75,7 +78,7 @@ class MidiViewModel(
         initialValue = MidiUiState()
     )
 
-    override val panelActions: MidiPanelActions = MidiPanelActions(
+    override val actions: MidiPanelActions = MidiPanelActions(
         onToggleLearnMode = { toggleLearnMode() },
         onSaveLearnedMappings = { saveLearnedMappings() },
         onCancelLearnMode = { cancelLearnMode() },
@@ -243,19 +246,28 @@ class MidiViewModel(
     }
     
     companion object {
-        val PREVIEW = ViewModelStateActionMapper(
-            state = MidiUiState(isConnected = true, deviceName = "Mock Device"),
-            actions = MidiPanelActions(
-                onToggleLearnMode = {},
-                onSaveLearnedMappings = {},
-                onCancelLearnMode = {},
-                onSelectControlForLearning = {},
-                onSelectVoiceForLearning = {},
-                isControlBeingLearned = { false },
-                isVoiceBeingLearned = { false }
-            )
+        val PREVIEW_STATE = MutableStateFlow(MidiUiState(isConnected = true, deviceName = "Mock Device"))
+        val PREVIEW_ACTIONS = MidiPanelActions(
+            onToggleLearnMode = {},
+            onSaveLearnedMappings = {},
+            onCancelLearnMode = {},
+            onSelectControlForLearning = {},
+            onSelectVoiceForLearning = {},
+            isControlBeingLearned = { false },
+            isVoiceBeingLearned = { false }
         )
+
+        fun previewFeature(state: MidiUiState = MidiUiState(isConnected = true, deviceName = "Mock Device")) =
+            object : SynthFeature<MidiUiState, MidiPanelActions> {
+                override val stateFlow: StateFlow<MidiUiState> = MutableStateFlow(state)
+                override val actions: MidiPanelActions = PREVIEW_ACTIONS
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<MidiUiState, MidiPanelActions> =
+            synthViewModel<MidiViewModel, MidiUiState, MidiPanelActions>()
     }
+
 }
 
 data class MidiPanelActions(

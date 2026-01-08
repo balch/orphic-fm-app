@@ -18,6 +18,7 @@ ksp = "2.3.4"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.9.0"
 kotlinx-datetime = "0.7.1-0.6.x-compat"
+kotlinx-collections-immutable = "0.3.7"
 liquid = "1.1.0"
 jsyn = "v17.2.0"
 kmlogging = "2.1.0"
@@ -48,6 +49,7 @@ ktmidi-jvm-desktop = { module = "dev.atsushieno:ktmidi-jvm-desktop", version.ref
 coremidi4j = { module = "uk.co.xfactory-librarians:coremidi4j", version.ref = "coremidi4j" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinx-collections-immutable" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }

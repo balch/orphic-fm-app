@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.ai.chat
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,17 +9,20 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.SynthViewModel
+import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.ai.OrpheusAgent
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
 import org.balch.orpheus.features.ai.session.SessionUsage
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.utils.PanelViewModel
 
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -44,7 +48,7 @@ data class ChatPanelActions(
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class ChatViewModel(
     private val agent: OrpheusAgent,
-) : ViewModel(), PanelViewModel<ChatUiState, ChatPanelActions> {
+) : ViewModel(), SynthViewModel<ChatUiState, ChatPanelActions> {
 
     /**
      * Whether the API key is configured.
@@ -86,11 +90,11 @@ class ChatViewModel(
     /**
      * Send a prompt to the agent.
      */
-    override val panelActions = ChatPanelActions(
+    override val actions = ChatPanelActions(
         onSendPrompt = ::sendPrompt
     )
 
-    override val uiState: StateFlow<ChatUiState> = combine(
+    override val stateFlow: StateFlow<ChatUiState> = combine(
         messages,
         isLoading
     ) { msgs, loading ->
@@ -106,6 +110,18 @@ class ChatViewModel(
 
     fun sendPrompt(message: String) {
         agent.sendPrompt(message)
+    }
+
+    companion object {
+        fun previewFeature(state: ChatUiState = ChatUiState()) =
+            object : SynthFeature<ChatUiState, ChatPanelActions> {
+                override val stateFlow: StateFlow<ChatUiState> = MutableStateFlow(state)
+                override val actions: ChatPanelActions = ChatPanelActions.EMPTY
+            }
+
+        @Composable
+        fun panelFeature(): SynthFeature<ChatUiState, ChatPanelActions> =
+            synthViewModel<ChatViewModel, ChatUiState, ChatPanelActions>()
     }
 }
 

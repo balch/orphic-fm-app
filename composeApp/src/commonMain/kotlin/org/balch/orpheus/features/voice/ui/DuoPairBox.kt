@@ -40,12 +40,12 @@ fun DuoPairBox(
     voiceViewModel: VoiceViewModel = metroViewModel(),
     midiViewModel: MidiViewModel = metroViewModel(),
 ) {
-    val voiceState by voiceViewModel.uiState.collectAsState()
-    val midiState by midiViewModel.uiState.collectAsState()
+    val voiceState by voiceViewModel.stateFlow.collectAsState()
+    val midiState by midiViewModel.stateFlow.collectAsState()
 
-    val voiceActions = voiceViewModel.panelActions.toVoiceActions()
+    val voiceActions = voiceViewModel.actions.toVoiceActions()
 
-    val midiActions = midiViewModel.panelActions.toMidiActions()
+    val midiActions = midiViewModel.actions.toMidiActions()
 
     DuoPairBoxLayout(
         modifier = modifier,
