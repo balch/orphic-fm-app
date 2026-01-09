@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -61,8 +63,10 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 fun DesktopSynthScreen(
     isDialogActive: Boolean,
     onDialogActiveChange: (Boolean) -> Unit,
-    focusRequester: FocusRequester,
 ) {
+    // Create focus requester locally - layout will request focus
+    val focusRequester = remember { FocusRequester() }
+    
     // Inject all ViewModels internally via their factory methods
     val voiceFeature = VoiceViewModel.feature()
     val evoFeature = EvoViewModel.feature()
@@ -119,6 +123,11 @@ fun DesktopSynthScreenLayout(
     onDialogActiveChange: (Boolean) -> Unit,
     focusRequester: FocusRequester,
 ) {
+    // Request focus for keyboard input handling
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+    
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier

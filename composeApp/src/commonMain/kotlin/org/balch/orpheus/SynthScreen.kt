@@ -9,7 +9,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import com.diamondedge.logging.logging
 import org.balch.orpheus.ui.screens.CompactLandscapeScreen
 import org.balch.orpheus.ui.screens.CompactPortraitScreen
@@ -48,12 +47,9 @@ private fun determineLayoutMode(widthDp: Float, heightDp: Float): LayoutMode {
 fun SynthScreen(
     orchestrator: SynthOrchestrator,
 ) {
-    val focusRequester = remember { FocusRequester() }
-
     LaunchedEffect(Unit) {
         val log = logging("SynthScreen")
         orchestrator.start()
-        focusRequester.requestFocus()
         log.info { "Orpheus Ready \u2713" }
     }
 
@@ -78,7 +74,6 @@ fun SynthScreen(
                     DesktopSynthScreen(
                         isDialogActive = isDialogActive,
                         onDialogActiveChange = { isDialogActive = it },
-                        focusRequester = focusRequester,
                     )
                 }
             }

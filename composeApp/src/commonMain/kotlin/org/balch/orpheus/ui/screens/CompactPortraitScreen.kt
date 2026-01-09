@@ -1,6 +1,7 @@
 package org.balch.orpheus.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +20,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -51,6 +54,7 @@ import org.balch.orpheus.features.tidal.ui.LiveCodePanelLayout
 import org.balch.orpheus.features.viz.VizFeature
 import org.balch.orpheus.features.viz.VizPanel
 import org.balch.orpheus.features.viz.VizViewModel
+import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
@@ -145,7 +149,15 @@ fun CompactPortraitScreen(
         evoFeature = evoViewModel,
         lfoFeature = lfoViewModel,
         stereoFeature = stereoViewModel,
-        vizFeature = vizViewModel
+        vizFeature = vizViewModel,
+        focusRequester = focusRequester,
+        onKeyEvent = { event ->
+            SynthKeyboardHandler.handleKeyEvent(
+                keyEvent = event,
+                voiceFeature = voiceViewModel,
+                isDialogActive = false
+            )
+        }
     )
 }
 
@@ -164,7 +176,13 @@ private fun CompactPortraitScreenLayout(
     lfoFeature: LfoFeature,
     stereoFeature: StereoFeature,
     vizFeature: VizFeature,
+    focusRequester: FocusRequester = remember { FocusRequester() },
+    onKeyEvent: (androidx.compose.ui.input.key.KeyEvent) -> Boolean = { false },
 ) {
+    // Request focus for keyboard input
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
     // Track section heights
     val density = LocalDensity.current
     var topSectionHeight by remember { mutableStateOf(280.dp) }
@@ -182,6 +200,9 @@ private fun CompactPortraitScreenLayout(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .focusRequester(focusRequester)
+            .focusable()
+            .onPreviewKeyEvent { event -> onKeyEvent(event) }
             .then(
                 Modifier.liquefiable(liquidState)
             )
