@@ -785,10 +785,10 @@ class AiOptionsViewModel(
         val (pos, size) = layout
         
         AiOptionsUiState(
-            isDroneActive = drone as Boolean,
-            isSoloActive = solo as Boolean,
-            isReplActive = repl as Boolean,
-            showChatDialog = chat as Boolean,
+            isDroneActive = drone,
+            isSoloActive = solo,
+            isReplActive = repl,
+            showChatDialog = chat,
             sessionId = sessionId,
             isApiKeySet = apiKeySet,
             isUserProvidedKey = userKey,
