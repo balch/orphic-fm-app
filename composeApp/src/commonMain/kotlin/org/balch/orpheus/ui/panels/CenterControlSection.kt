@@ -30,7 +30,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 @Composable
-fun CenterControlPanel(
+fun CenterControlSection(
     voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
     modifier: Modifier = Modifier,
 ) {
@@ -98,7 +98,7 @@ fun CenterControlPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        CenterControlPanel(
+        CenterControlSection(
             voiceFeature = VoiceViewModel.previewFeature()
         )
     }

@@ -42,7 +42,7 @@ import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
-import org.balch.orpheus.ui.panels.CenterControlPanel
+import org.balch.orpheus.ui.panels.CenterControlSection
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.panels.HeaderViewModel
@@ -180,7 +180,7 @@ fun DesktopSynthScreenLayout(
                         modifier = Modifier.weight(1f),
                     )
 
-                    CenterControlPanel(
+                    CenterControlSection(
                         voiceFeature = voiceFeature,
                         modifier = Modifier
                             .fillMaxHeight()
