@@ -40,12 +40,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.tweaker.SequencerPath
 import org.balch.orpheus.features.tweaker.SequencerPoint
 import org.balch.orpheus.features.tweaker.TweakPlaybackMode
 import org.balch.orpheus.features.tweaker.TweakSequencerConfig
-import org.balch.orpheus.features.tweaker.TweakSequencerPanelActions
+import org.balch.orpheus.features.tweaker.TweakSequencerFeature
 import org.balch.orpheus.features.tweaker.TweakSequencerParameter
 import org.balch.orpheus.features.tweaker.TweakSequencerState
 import org.balch.orpheus.features.tweaker.TweakSequencerUiState
@@ -67,7 +66,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun CompactTweakSequencerView(
-    sequencerFeature: SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions>,
+    sequencerFeature: TweakSequencerFeature,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     modifier: Modifier = Modifier

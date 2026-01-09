@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
 import org.balch.orpheus.features.ai.PanelId
@@ -68,6 +67,7 @@ data class HeaderPanelActions(
     }
 }
 
+typealias HeaderFeature = SynthFeature<HeaderPanelUiState, HeaderPanelActions>
 
 /**
  * ViewModel for the HeaderPanel, managing panel expansion/collapse state.
@@ -77,7 +77,7 @@ data class HeaderPanelActions(
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class HeaderViewModel(
     private val panelExpansionEventBus: PanelExpansionEventBus
-) : ViewModel(), SynthViewModel<HeaderPanelUiState, HeaderPanelActions> {
+) : ViewModel(), HeaderFeature {
 
     private val log = logging("HeaderViewModel")
 
@@ -112,18 +112,15 @@ class HeaderViewModel(
     }
 
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(HeaderPanelUiState())
-        val PREVIEW_ACTIONS = HeaderPanelActions.EMPTY
-
-        fun previewFeature(state: HeaderPanelUiState = HeaderPanelUiState()) =
-            object : SynthFeature<HeaderPanelUiState, HeaderPanelActions> {
+        fun previewFeature(state: HeaderPanelUiState = HeaderPanelUiState()): HeaderFeature =
+            object : HeaderFeature {
                 override val stateFlow: StateFlow<HeaderPanelUiState> = MutableStateFlow(state)
                 override val actions: HeaderPanelActions = HeaderPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<HeaderPanelUiState, HeaderPanelActions> =
-            synthViewModel<HeaderViewModel, HeaderPanelUiState, HeaderPanelActions>()
+        fun feature(): HeaderFeature =
+            synthViewModel<HeaderViewModel, HeaderFeature>()
     }
 }
 

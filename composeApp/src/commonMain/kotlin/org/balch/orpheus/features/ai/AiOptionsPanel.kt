@@ -29,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.features.ai.widgets.AiButton
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryCompact
@@ -55,7 +54,7 @@ object AiButtonColors {
  */
 @Composable
 fun AiOptionsPanel(
-    feature: SynthFeature<AiOptionsUiState, AiOptionsPanelActions> = AiOptionsViewModel.panelFeature(),
+    feature: AiOptionsFeature = AiOptionsViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

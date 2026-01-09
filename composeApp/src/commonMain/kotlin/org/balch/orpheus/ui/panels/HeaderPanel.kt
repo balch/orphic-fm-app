@@ -14,37 +14,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsPanel
-import org.balch.orpheus.features.ai.AiOptionsPanelActions
-import org.balch.orpheus.features.ai.AiOptionsUiState
 import org.balch.orpheus.features.ai.PanelId
-import org.balch.orpheus.features.delay.DelayPanelActions
-import org.balch.orpheus.features.delay.DelayUiState
+import org.balch.orpheus.features.delay.DelayFeature
 import org.balch.orpheus.features.delay.ModDelayPanel
+import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionPanel
-import org.balch.orpheus.features.distortion.DistortionPanelActions
-import org.balch.orpheus.features.distortion.DistortionUiState
+import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
-import org.balch.orpheus.features.evo.EvoPanelActions
-import org.balch.orpheus.features.evo.EvoUiState
 import org.balch.orpheus.features.lfo.HyperLfoPanel
-import org.balch.orpheus.features.lfo.LfoPanelActions
-import org.balch.orpheus.features.lfo.LfoUiState
+import org.balch.orpheus.features.lfo.LfoFeature
+import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiPanel
-import org.balch.orpheus.features.midi.MidiPanelActions
-import org.balch.orpheus.features.midi.MidiUiState
-import org.balch.orpheus.features.presets.PresetPanelActions
-import org.balch.orpheus.features.presets.PresetUiState
+import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsPanel
+import org.balch.orpheus.features.stereo.StereoFeature
 import org.balch.orpheus.features.stereo.StereoPanel
-import org.balch.orpheus.features.stereo.StereoPanelActions
-import org.balch.orpheus.features.stereo.StereoUiState
 import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
 import org.balch.orpheus.features.tidal.ui.LiveCodePanel
+import org.balch.orpheus.features.viz.VizFeature
 import org.balch.orpheus.features.viz.VizPanel
-import org.balch.orpheus.ui.viz.VizPanelActions
-import org.balch.orpheus.ui.viz.VizUiState
 
 /**
  * A container for the top header panel row that manages expansion state
@@ -53,17 +43,17 @@ import org.balch.orpheus.ui.viz.VizUiState
 @Composable
 fun HeaderPanel(
     modifier: Modifier = Modifier,
-    headerFeature: SynthFeature<HeaderPanelUiState, HeaderPanelActions>,
-    presetsFeature: SynthFeature<PresetUiState, PresetPanelActions>,
-    midiFeature: SynthFeature<MidiUiState, MidiPanelActions>,
-    stereoFeature: SynthFeature<StereoUiState, StereoPanelActions>,
-    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
-    evoFeature: SynthFeature<EvoUiState, EvoPanelActions>,
-    lfoFeature: SynthFeature<LfoUiState, LfoPanelActions>,
-    delayFeature: SynthFeature<DelayUiState, DelayPanelActions>,
-    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
+    headerFeature: HeaderFeature,
+    presetsFeature: PresetsFeature,
+    midiFeature: MidiFeature,
+    stereoFeature: StereoFeature,
+    vizFeature: VizFeature,
+    evoFeature: EvoFeature,
+    lfoFeature: LfoFeature,
+    delayFeature: DelayFeature,
+    distortionFeature: DistortionFeature,
     liveCodeFeature: LiveCodeFeature,
-    aiOptionsFeature: SynthFeature<AiOptionsUiState, AiOptionsPanelActions>,
+    aiOptionsFeature: AiOptionsFeature,
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
@@ -108,8 +98,7 @@ fun HeaderPanel(
             modifier = panelModifier(isExpanded(PanelId.VIZ))
         )
         EvoPanel(
-            stateFlow = evoFeature.stateFlow,
-            actions = evoFeature.actions,
+            evoFeature = evoFeature,
             isExpanded = isExpanded(PanelId.EVO),
             onExpandedChange = { setExpanded(PanelId.EVO, it) },
             modifier = panelModifier(isExpanded(PanelId.EVO))

@@ -32,10 +32,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.tweaker.SequencerPath
 import org.balch.orpheus.features.tweaker.SequencerPoint
 import org.balch.orpheus.features.tweaker.TweakSequencerConfig
+import org.balch.orpheus.features.tweaker.TweakSequencerFeature
 import org.balch.orpheus.features.tweaker.TweakSequencerPanelActions
 import org.balch.orpheus.features.tweaker.TweakSequencerParameter
 import org.balch.orpheus.features.tweaker.TweakSequencerState
@@ -56,7 +56,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun ExpandedTweakSequencerScreen(
-    sequencerFeature: SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions>,
+    sequencerFeature: TweakSequencerFeature,
     onDismiss: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -398,7 +398,7 @@ private fun ExpandedTweakSequencerScreenPreview() {
         onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {}
     )
 
-    val previewFeature = object : SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions> {
+    val previewFeature = object : TweakSequencerFeature {
         override val stateFlow = kotlinx.coroutines.flow.MutableStateFlow(previewState)
         override val actions = previewActions
     }

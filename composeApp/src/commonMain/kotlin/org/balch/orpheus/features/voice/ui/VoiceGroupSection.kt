@@ -18,12 +18,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.features.midi.MidiPanelActions
+import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiUiState
-import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
+import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -33,8 +32,8 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 
 @Composable
 fun VoiceGroupSection(
-    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
-    midiFeature: SynthFeature<MidiUiState, MidiPanelActions>,
+    voiceFeature: VoicesFeature,
+    midiFeature: MidiFeature,
     quadLabel: String,
     quadColor: Color,
     voiceStartIndex: Int,

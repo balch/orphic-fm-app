@@ -25,7 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -42,11 +41,11 @@ data class MidiProps(
 )
 
 /**
- * MidiPanel consuming PanelFeature interface.
+ * MidiPanel consuming feature() interface.
  */
 @Composable
 fun MidiPanel(
-    feature: SynthFeature<MidiUiState, MidiPanelActions>,
+    feature: MidiFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

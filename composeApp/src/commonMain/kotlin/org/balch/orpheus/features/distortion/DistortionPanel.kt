@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -34,11 +33,11 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 import kotlin.math.roundToInt
 
 /**
- * DistortionPanel consuming PanelFeature interface.
+ * DistortionPanel consuming feature() interface.
  */
 @Composable
 fun DistortionPanel(
-    feature: SynthFeature<DistortionUiState, DistortionPanelActions>,
+    feature: DistortionFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

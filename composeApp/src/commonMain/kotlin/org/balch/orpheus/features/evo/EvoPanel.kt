@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -50,13 +49,12 @@ private val CavsGold = Color(0xFFFDBB30)
 @Composable
 fun EvoPanel(
     modifier: Modifier = Modifier,
-    stateFlow: StateFlow<EvoUiState>,
-    actions: EvoPanelActions,
+    evoFeature: EvoFeature,
     isExpanded: Boolean,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
-    val uiState by stateFlow.collectAsState()
+    val uiState by evoFeature.stateFlow.collectAsState()
     // Use the selected strategy's color for accents
     val accentColor = if (uiState.isEnabled) uiState.selectedStrategy.color else Color.Gray
 
@@ -86,7 +84,7 @@ fun EvoPanel(
                 StrategyDropdown(
                     selectedStrategy = uiState.selectedStrategy,
                     strategies = uiState.strategies,
-                    onStrategySelected = actions.onStrategyChange,
+                    onStrategySelected = evoFeature.actions.onStrategyChange,
                     color = accentColor,
                 )
 
@@ -95,7 +93,7 @@ fun EvoPanel(
                     topLabel = "ON",
                     bottomLabel = "OFF",
                     isTop = uiState.isEnabled,
-                    onToggle = actions.onEnabledChange,
+                    onToggle = evoFeature.actions.onEnabledChange,
                     color = accentColor,
                     modifier = Modifier.height(60.dp) 
                 )
@@ -110,7 +108,7 @@ fun EvoPanel(
                 // Knob 1 - Label from strategy
                 RotaryKnob(
                     value = uiState.knob1Value,
-                    onValueChange = actions.onKnob1Change,
+                    onValueChange = evoFeature.actions.onKnob1Change,
                     label = if (uiState.isEnabled) uiState.selectedStrategy.knob1Label else "-",
                     controlId = ControlIds.EVO_DEPTH,
                     size = 64.dp,
@@ -122,7 +120,7 @@ fun EvoPanel(
                 // Knob 2 - Label from strategy
                 RotaryKnob(
                     value = uiState.knob2Value,
-                    onValueChange = actions.onKnob2Change,
+                    onValueChange = evoFeature.actions.onKnob2Change,
                     label = if (uiState.isEnabled) uiState.selectedStrategy.knob2Label else "-",
                     controlId = ControlIds.EVO_RATE,
                     size = 64.dp,
@@ -199,21 +197,7 @@ private fun StrategyDropdown(
     }
 }
 
-
 // Preview support
-private object PreviewStrategy : AudioEvolutionStrategy {
-    override val id = "preview"
-    override val name = "Drift"
-    override val color = Color(0xFF4CAF50)
-    override val knob1Label = "SPEED"
-    override val knob2Label = "RANGE"
-    override fun setKnob1(value: Float) {}
-    override fun setKnob2(value: Float) {}
-    override suspend fun evolve(engine: org.balch.orpheus.core.audio.SynthEngine) {}
-    override fun onActivate() {}
-    override fun onDeactivate() {}
-}
-
 @Preview
 @Composable
 fun EvoPanelPreview(
@@ -222,8 +206,7 @@ fun EvoPanelPreview(
     LiquidPreviewContainerWithGradient(effects = effects) {
         EvoPanel(
             isExpanded = true,
-            stateFlow = EvoViewModel.PREVIEW_STATE,
-            actions = EvoViewModel.PREVIEW_ACTIONS
+            evoFeature =  EvoViewModel.previewFeature(),
         )
     }
 }

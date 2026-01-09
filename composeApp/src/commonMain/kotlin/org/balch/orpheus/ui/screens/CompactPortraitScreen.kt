@@ -27,39 +27,32 @@ import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.features.delay.DelayPanelActions
-import org.balch.orpheus.features.delay.DelayUiState
+import org.balch.orpheus.features.delay.DelayFeature
 import org.balch.orpheus.features.delay.DelayViewModel
 import org.balch.orpheus.features.delay.ModDelayPanel
+import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionPanel
-import org.balch.orpheus.features.distortion.DistortionPanelActions
-import org.balch.orpheus.features.distortion.DistortionUiState
 import org.balch.orpheus.features.distortion.DistortionViewModel
+import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
-import org.balch.orpheus.features.evo.EvoPanelActions
-import org.balch.orpheus.features.evo.EvoUiState
 import org.balch.orpheus.features.evo.EvoViewModel
 import org.balch.orpheus.features.lfo.HyperLfoPanel
-import org.balch.orpheus.features.lfo.LfoPanelActions
-import org.balch.orpheus.features.lfo.LfoUiState
+import org.balch.orpheus.features.lfo.LfoFeature
 import org.balch.orpheus.features.lfo.LfoViewModel
-import org.balch.orpheus.features.presets.PresetPanelActions
-import org.balch.orpheus.features.presets.PresetUiState
+import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsPanel
 import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.stereo.StereoFeature
 import org.balch.orpheus.features.stereo.StereoPanel
-import org.balch.orpheus.features.stereo.StereoPanelActions
-import org.balch.orpheus.features.stereo.StereoUiState
 import org.balch.orpheus.features.stereo.StereoViewModel
-import org.balch.orpheus.features.tidal.LiveCodePanelActions
-import org.balch.orpheus.features.tidal.LiveCodeUiState
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
+import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
 import org.balch.orpheus.features.tidal.ui.LiveCodePanelLayout
+import org.balch.orpheus.features.viz.VizFeature
 import org.balch.orpheus.features.viz.VizPanel
-import org.balch.orpheus.features.voice.VoicePanelActions
-import org.balch.orpheus.features.voice.VoiceUiState
+import org.balch.orpheus.features.viz.VizViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.panels.compact.CompactAiSection
@@ -73,9 +66,6 @@ import org.balch.orpheus.ui.panels.compact.CompactStringPanel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.VizPanelActions
-import org.balch.orpheus.ui.viz.VizUiState
-import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.DraggableDivider
 import org.balch.orpheus.ui.widgets.VizBackground
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -162,18 +152,18 @@ fun CompactPortraitScreen(
 @Composable
 private fun CompactPortraitScreenLayout(
     modifier: Modifier = Modifier,
-    presetFeature: SynthFeature<PresetUiState, PresetPanelActions>,
-    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
-    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
+    presetFeature: PresetsFeature,
+    voiceFeature: VoicesFeature,
+    distortionFeature: DistortionFeature,
     liquidState: LiquidState,
     effects: VisualizationLiquidEffects,
-    liveCodeFeature: SynthFeature<LiveCodeUiState, LiveCodePanelActions>,
+    liveCodeFeature: LiveCodeFeature,
     activeReplHighlights: List<IntRange> = emptyList(),
-    delayFeature: SynthFeature<DelayUiState, DelayPanelActions>,
-    evoFeature: SynthFeature<EvoUiState, EvoPanelActions>,
-    lfoFeature: SynthFeature<LfoUiState, LfoPanelActions>,
-    stereoFeature: SynthFeature<StereoUiState, StereoPanelActions>,
-    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
+    delayFeature: DelayFeature,
+    evoFeature: EvoFeature,
+    lfoFeature: LfoFeature,
+    stereoFeature: StereoFeature,
+    vizFeature: VizFeature,
 ) {
     // Track section heights
     val density = LocalDensity.current
@@ -300,15 +290,15 @@ private fun CompactPortraitScreenLayout(
 @Composable
 private fun PanelContent(
     panel: CompactPanelType,
-    presetFeature: SynthFeature<PresetUiState, PresetPanelActions>,
-    liveCodeFeature: SynthFeature<LiveCodeUiState, LiveCodePanelActions>,
+    presetFeature: PresetsFeature,
+    liveCodeFeature: LiveCodeFeature,
     activeReplHighlights: List<IntRange>,
-    delayFeature: SynthFeature<DelayUiState, DelayPanelActions>,
-    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
-    evoFeature: SynthFeature<EvoUiState, EvoPanelActions>,
-    lfoFeature: SynthFeature<LfoUiState, LfoPanelActions>,
-    stereoFeature: SynthFeature<StereoUiState, StereoPanelActions>,
-    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
+    delayFeature: DelayFeature,
+    distortionFeature: DistortionFeature,
+    evoFeature: EvoFeature,
+    lfoFeature: LfoFeature,
+    stereoFeature: StereoFeature,
+    vizFeature: VizFeature,
     modifier: Modifier = Modifier,
 ) {
     val panelModifier = modifier
@@ -364,8 +354,7 @@ private fun PanelContent(
         
         CompactPanelType.EVO -> {
             EvoPanel(
-                stateFlow = evoFeature.stateFlow,
-                actions = evoFeature.actions,
+                evoFeature = evoFeature,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,

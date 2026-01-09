@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
@@ -57,6 +56,8 @@ private sealed interface StereoIntent {
     data class Restore(val state: StereoUiState) : StereoIntent
 }
 
+typealias StereoFeature = SynthFeature<StereoUiState, StereoPanelActions>
+
 /**
  * ViewModel for the Stereo panel.
  * Uses MVI pattern with flow { emit(initial); emitAll(updates) } for proper WhileSubscribed support.
@@ -68,7 +69,7 @@ class StereoViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider
-) : ViewModel(), SynthViewModel<StereoUiState, StereoPanelActions> {
+) : ViewModel(), StereoFeature {
 
     override val actions = StereoPanelActions(
         onModeChange = ::onModeChange,
@@ -184,17 +185,14 @@ class StereoViewModel(
     }
 
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(StereoUiState())
-        val PREVIEW_ACTIONS = StereoPanelActions.EMPTY
-
-        fun previewFeature(state: StereoUiState = StereoUiState()) =
-            object : SynthFeature<StereoUiState, StereoPanelActions> {
+        fun previewFeature(state: StereoUiState = StereoUiState()): StereoFeature =
+            object : StereoFeature {
                 override val stateFlow: StateFlow<StereoUiState> = MutableStateFlow(state)
                 override val actions: StereoPanelActions = StereoPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<StereoUiState, StereoPanelActions> =
-            synthViewModel<StereoViewModel, StereoUiState, StereoPanelActions>()
+        fun feature(): StereoFeature =
+            synthViewModel<StereoViewModel, StereoFeature>()
     }
 }

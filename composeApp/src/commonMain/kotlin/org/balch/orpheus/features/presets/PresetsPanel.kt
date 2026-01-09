@@ -30,7 +30,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.widgets.dialogs.ConfirmDialog
@@ -49,11 +48,11 @@ data class PresetProps(
 private val PatchesColor = Color(0xFFFFAB40)  // Light orange/amber
 
 /**
- * PresetsPanel consuming PanelFeature interface.
+ * PresetsPanel consuming feature() interface.
  */
 @Composable
 fun PresetsPanel(
-    feature: SynthFeature<PresetUiState, PresetPanelActions>,
+    feature: PresetsFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

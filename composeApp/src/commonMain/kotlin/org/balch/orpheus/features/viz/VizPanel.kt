@@ -28,16 +28,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.VizPanelActions
-import org.balch.orpheus.ui.viz.VizUiState
-import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
@@ -46,11 +42,11 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 private val VizColor = Color(0xFF90EE90)  // Light green
 
 /**
- * VizPanel consuming PanelFeature interface.
+ * VizPanel consuming feature() interface.
  */
 @Composable
 fun VizPanel(
-    feature: SynthFeature<VizUiState, VizPanelActions>,
+    feature: VizFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

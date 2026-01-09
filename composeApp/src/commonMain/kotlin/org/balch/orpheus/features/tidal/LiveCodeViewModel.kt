@@ -603,7 +603,7 @@ d2 $ slow 4 voices:<1 2> <3 4> <5 6>
             }
 
         @Composable
-        fun panelFeature(): LiveCodeFeature =
+        fun feature(): LiveCodeFeature =
              synthViewModel<LiveCodeViewModel, LiveCodeUiState, LiveCodePanelActions>() as LiveCodeFeature
     }
 }

@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.ai.OrpheusAgent
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
@@ -40,6 +39,8 @@ data class ChatPanelActions(
     }
 }
 
+typealias ChatFeature = SynthFeature<ChatUiState, ChatPanelActions>
+
 /**
  * ViewModel for the AI chat panel.
  */
@@ -48,7 +49,7 @@ data class ChatPanelActions(
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class ChatViewModel(
     private val agent: OrpheusAgent,
-) : ViewModel(), SynthViewModel<ChatUiState, ChatPanelActions> {
+) : ViewModel(), ChatFeature {
 
     /**
      * Whether the API key is configured.
@@ -113,15 +114,15 @@ class ChatViewModel(
     }
 
     companion object {
-        fun previewFeature(state: ChatUiState = ChatUiState()) =
-            object : SynthFeature<ChatUiState, ChatPanelActions> {
+        fun previewFeature(state: ChatUiState = ChatUiState()): ChatFeature =
+            object : ChatFeature {
                 override val stateFlow: StateFlow<ChatUiState> = MutableStateFlow(state)
                 override val actions: ChatPanelActions = ChatPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<ChatUiState, ChatPanelActions> =
-            synthViewModel<ChatViewModel, ChatUiState, ChatPanelActions>()
+        fun feature(): ChatFeature =
+            synthViewModel<ChatViewModel, ChatFeature>()
     }
 }
 

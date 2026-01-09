@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.util.ConsoleLogger
@@ -38,6 +37,8 @@ data class DebugPanelActions(
     }
 }
 
+typealias DebugFeature = SynthFeature<DebugUiState, DebugPanelActions>
+
 /**
  * ViewModel for the Debug bottom bar.
  *
@@ -49,7 +50,7 @@ data class DebugPanelActions(
 class DebugViewModel(
     private val engine: SynthEngine,
     private val consoleLogger: ConsoleLogger
-) : ViewModel(), SynthViewModel<DebugUiState, DebugPanelActions> {
+) : ViewModel(), DebugFeature {
 
     override val actions = DebugPanelActions(
         onClearLogs = ::onClearLogs
@@ -76,21 +77,14 @@ class DebugViewModel(
     }
 
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(DebugUiState(
-            peak = 0.5f,
-            cpuLoad = 12.5f,
-            logs = emptyList()
-        ))
-        val PREVIEW_ACTIONS = DebugPanelActions.EMPTY
-
-        fun previewFeature(state: DebugUiState = PREVIEW_STATE.value) =
-            object : SynthFeature<DebugUiState, DebugPanelActions> {
+        fun previewFeature(state: DebugUiState = DebugUiState(peak = 0.5f, cpuLoad = 12.5f)): DebugFeature =
+            object : DebugFeature {
                 override val stateFlow: StateFlow<DebugUiState> = MutableStateFlow(state)
                 override val actions: DebugPanelActions = DebugPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<DebugUiState, DebugPanelActions> =
-            synthViewModel<DebugViewModel, DebugUiState, DebugPanelActions>()
+        fun feature(): DebugFeature =
+            synthViewModel<DebugViewModel, DebugFeature>()
     }
 }

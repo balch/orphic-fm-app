@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -51,6 +50,8 @@ data class EvoPanelActions(
     }
 }
 
+typealias EvoFeature = SynthFeature<EvoUiState, EvoPanelActions>
+
 @ViewModelKey(EvoViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class EvoViewModel @Inject constructor(
@@ -58,7 +59,7 @@ class EvoViewModel @Inject constructor(
     private val synthEngine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,
     private val mediaSessionStateManager: MediaSessionStateManager
-) : ViewModel(), SynthViewModel<EvoUiState, EvoPanelActions> {
+) : ViewModel(), EvoFeature {
 
     private val log = logging("EvoViewModel")
 
@@ -211,23 +212,20 @@ class EvoViewModel @Inject constructor(
             override fun onDeactivate() {}
         }
 
-        val PREVIEW_STATE = MutableStateFlow(EvoUiState(
+        fun previewFeature(state: EvoUiState = EvoUiState(
             selectedStrategy = PreviewStrategy,
             strategies = listOf(PreviewStrategy),
             isEnabled = false,
             knob1Value = 0.5f,
             knob2Value = 0.5f
-        ))
-        val PREVIEW_ACTIONS = EvoPanelActions.EMPTY
-
-        fun previewFeature(state: EvoUiState = PREVIEW_STATE.value) =
-            object : SynthFeature<EvoUiState, EvoPanelActions> {
+        )): EvoFeature =
+            object : EvoFeature {
                 override val stateFlow: StateFlow<EvoUiState> = MutableStateFlow(state)
                 override val actions: EvoPanelActions = EvoPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<EvoUiState, EvoPanelActions> =
-            synthViewModel<EvoViewModel, EvoUiState, EvoPanelActions>()
+        fun feature(): EvoFeature =
+            synthViewModel<EvoViewModel, EvoFeature>()
     }
 }

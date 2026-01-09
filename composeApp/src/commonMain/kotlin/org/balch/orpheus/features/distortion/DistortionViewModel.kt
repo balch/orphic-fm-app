@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
@@ -62,6 +61,8 @@ private sealed interface DistortionIntent {
     data class Restore(val state: DistortionUiState) : DistortionIntent
 }
 
+typealias DistortionFeature = SynthFeature<DistortionUiState, DistortionPanelActions>
+
 /**
  * ViewModel for the Distortion panel.
  *
@@ -75,7 +76,7 @@ class DistortionViewModel(
     presetLoader: PresetLoader,
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel(), SynthViewModel<DistortionUiState, DistortionPanelActions> {
+) : ViewModel(), DistortionFeature {
 
     override val actions = DistortionPanelActions(
         onDriveChange = ::onDriveChange,
@@ -206,17 +207,14 @@ class DistortionViewModel(
     }
 
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(DistortionUiState())
-        val PREVIEW_ACTIONS = DistortionPanelActions.EMPTY
-
-        fun previewFeature(state: DistortionUiState = DistortionUiState()) =
-            object : SynthFeature<DistortionUiState, DistortionPanelActions> {
+        fun previewFeature(state: DistortionUiState = DistortionUiState()): DistortionFeature =
+            object : DistortionFeature {
                 override val stateFlow: StateFlow<DistortionUiState> = MutableStateFlow(state)
                 override val actions: DistortionPanelActions = DistortionPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<DistortionUiState, DistortionPanelActions> =
-            synthViewModel<DistortionViewModel, DistortionUiState, DistortionPanelActions>()
+        fun feature(): DistortionFeature =
+            synthViewModel<DistortionViewModel, DistortionFeature>()
     }
 }

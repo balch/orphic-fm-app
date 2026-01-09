@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiController
 import org.balch.orpheus.core.midi.MidiInputHandler
@@ -36,6 +35,8 @@ data class MidiUiState(
     val mappingState: MidiMappingState = MidiMappingState()
 )
 
+typealias MidiFeature = SynthFeature<MidiUiState, MidiPanelActions>
+
 /**
  * ViewModel for the MIDI panel.
  *
@@ -51,7 +52,7 @@ class MidiViewModel(
     private val stateHolder: MidiMappingStateHolder,
     private val midiInputHandler: MidiInputHandler,
     private val dispatcherProvider: DispatcherProvider
-) : ViewModel(), SynthViewModel<MidiUiState, MidiPanelActions> {
+) : ViewModel(), MidiFeature {
 
     private val log = logging("MidiViewModel")
 
@@ -246,26 +247,23 @@ class MidiViewModel(
     }
     
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(MidiUiState(isConnected = true, deviceName = "Mock Device"))
-        val PREVIEW_ACTIONS = MidiPanelActions(
-            onToggleLearnMode = {},
-            onSaveLearnedMappings = {},
-            onCancelLearnMode = {},
-            onSelectControlForLearning = {},
-            onSelectVoiceForLearning = {},
-            isControlBeingLearned = { false },
-            isVoiceBeingLearned = { false }
-        )
-
-        fun previewFeature(state: MidiUiState = MidiUiState(isConnected = true, deviceName = "Mock Device")) =
-            object : SynthFeature<MidiUiState, MidiPanelActions> {
+        fun previewFeature(state: MidiUiState = MidiUiState(isConnected = true, deviceName = "Mock Device")): MidiFeature =
+            object : MidiFeature {
                 override val stateFlow: StateFlow<MidiUiState> = MutableStateFlow(state)
-                override val actions: MidiPanelActions = PREVIEW_ACTIONS
+                override val actions: MidiPanelActions = MidiPanelActions(
+                    onToggleLearnMode = {},
+                    onSaveLearnedMappings = {},
+                    onCancelLearnMode = {},
+                    onSelectControlForLearning = {},
+                    onSelectVoiceForLearning = {},
+                    isControlBeingLearned = { false },
+                    isVoiceBeingLearned = { false }
+                )
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<MidiUiState, MidiPanelActions> =
-            synthViewModel<MidiViewModel, MidiUiState, MidiPanelActions>()
+        fun feature(): MidiFeature =
+            synthViewModel<MidiViewModel, MidiFeature>()
     }
 
 }

@@ -5,7 +5,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.input.KeyboardInputHandler
 
 /**
@@ -16,7 +15,7 @@ object SynthKeyboardHandler {
     fun handleKeyEvent(
         keyEvent: KeyEvent,
         isDialogActive: Boolean,
-        voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
+        voiceFeature: VoicesFeature,
     ): Boolean {
 
         // Skip keyboard handling when dialog is active

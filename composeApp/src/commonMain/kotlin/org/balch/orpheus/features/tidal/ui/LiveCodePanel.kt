@@ -72,7 +72,7 @@ import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
- * Extended PanelFeature for LiveCode that includes trigger events for highlighting.
+ * Extended feature() for LiveCode that includes trigger events for highlighting.
  */
 interface LiveCodeFeature : SynthFeature<LiveCodeUiState, LiveCodePanelActions> {
     val triggers: Flow<TidalScheduler.TriggerEvent>

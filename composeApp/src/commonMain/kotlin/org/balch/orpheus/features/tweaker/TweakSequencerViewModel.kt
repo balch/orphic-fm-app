@@ -6,10 +6,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.synthViewModel
 
-class TweakSequencerViewModel : ViewModel(), SynthViewModel<TweakSequencerUiState, TweakSequencerPanelActions> {
+typealias TweakSequencerFeature = SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions>
+
+class TweakSequencerViewModel : ViewModel(), TweakSequencerFeature {
     private val _state = MutableStateFlow(TweakSequencerUiState())
     override val stateFlow: StateFlow<TweakSequencerUiState> = _state.asStateFlow()
 
@@ -34,30 +35,27 @@ class TweakSequencerViewModel : ViewModel(), SynthViewModel<TweakSequencerUiStat
     )
     
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(TweakSequencerUiState(isExpanded = true))
-        val PREVIEW_ACTIONS = TweakSequencerPanelActions(
-            onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {},
-            onTogglePlayPause = {}, onStop = {}, onSetPlaybackMode = { _ -> },
-            onSetDuration = { _ -> }, onAddParameter = { _ -> }, onRemoveParameter = { _ -> },
-            onSelectActiveParameter = { _ -> },
-            onStartPath = { _, _ -> },
-            onAddPoint = { _, _ -> },
-            onRemovePointsAfter = { _, _ -> },
-            onCompletePath = { _, _ -> },
-            onClearPath = { _ -> },
-            onSetEnabled = { _ -> },
-            onPlay = {}, onPause = {}
-        )
-
-        fun previewFeature(state: TweakSequencerUiState = TweakSequencerUiState(isExpanded = true)) =
-            object : SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions> {
+        fun previewFeature(state: TweakSequencerUiState = TweakSequencerUiState(isExpanded = true)): TweakSequencerFeature =
+            object : TweakSequencerFeature {
                 override val stateFlow: StateFlow<TweakSequencerUiState> = MutableStateFlow(state)
-                override val actions: TweakSequencerPanelActions = PREVIEW_ACTIONS
+                override val actions: TweakSequencerPanelActions = TweakSequencerPanelActions(
+                    onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {},
+                    onTogglePlayPause = {}, onStop = {}, onSetPlaybackMode = { _ -> },
+                    onSetDuration = { _ -> }, onAddParameter = { _ -> }, onRemoveParameter = { _ -> },
+                    onSelectActiveParameter = { _ -> },
+                    onStartPath = { _, _ -> },
+                    onAddPoint = { _, _ -> },
+                    onRemovePointsAfter = { _, _ -> },
+                    onCompletePath = { _, _ -> },
+                    onClearPath = { _ -> },
+                    onSetEnabled = { _ -> },
+                    onPlay = {}, onPause = {}
+                )
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions> =
-            synthViewModel<TweakSequencerViewModel, TweakSequencerUiState, TweakSequencerPanelActions>()
+        fun feature(): TweakSequencerFeature =
+            synthViewModel<TweakSequencerViewModel, TweakSequencerFeature>()
     }
 }
 

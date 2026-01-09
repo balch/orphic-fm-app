@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
@@ -64,6 +63,8 @@ private sealed interface LfoIntent {
     data class Restore(val state: LfoUiState) : LfoIntent
 }
 
+typealias LfoFeature = SynthFeature<LfoUiState, LfoPanelActions>
+
 /**
  * ViewModel for the Hyper LFO panel.
  *
@@ -77,7 +78,7 @@ class LfoViewModel(
     presetLoader: PresetLoader,
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel(), SynthViewModel<LfoUiState, LfoPanelActions> {
+) : ViewModel(), LfoFeature {
 
     override val actions = LfoPanelActions(
         onLfoAChange = ::onLfoAChange,
@@ -210,17 +211,14 @@ class LfoViewModel(
     }
 
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(LfoUiState())
-        val PREVIEW_ACTIONS = LfoPanelActions.EMPTY
-
-        fun previewFeature(state: LfoUiState = LfoUiState()) =
-            object : SynthFeature<LfoUiState, LfoPanelActions> {
+        fun previewFeature(state: LfoUiState = LfoUiState()): LfoFeature =
+            object : LfoFeature {
                 override val stateFlow: StateFlow<LfoUiState> = MutableStateFlow(state)
                 override val actions: LfoPanelActions = LfoPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<LfoUiState, LfoPanelActions> =
-            synthViewModel<LfoViewModel, LfoUiState, LfoPanelActions>()
+        fun feature(): LfoFeature =
+            synthViewModel<LfoViewModel, LfoFeature>()
     }
 }

@@ -15,7 +15,7 @@ interface SynthFeature<S, A> {
 }
 
 /**
- * A ViewModel that acts as a PanelFeature.
+ * A ViewModel that acts as a SynthFeature.
  * Implementers must provide a stable StateFlow and stable Actions.
  */
 interface SynthViewModel<S, A> : SynthFeature<S, A> {
@@ -24,15 +24,18 @@ interface SynthViewModel<S, A> : SynthFeature<S, A> {
 }
 
 /**
- * Retrieve a PanelViewModel from the Metro DI graph, returning it as a PanelFeature.
- * Works like metroViewModel() but returns the PanelFeature interface directly.
+ * Retrieve a ViewModel from the Metro DI graph, returning it as a feature.
+ * Works like metroViewModel() but allows casting to a specific feature interface (e.g. BossFeature).
  *
- * Usage: `val feature: PanelFeature<State, Actions> = panelViewModel<MyViewModel, State, Actions>()`
- *
- * The ViewModel must implement [PanelViewModel<S, A>].
+ * Usage: `val feature: MyFeature = synthViewModel<MyViewModel, MyFeature>()`
  */
 @Suppress("UNCHECKED_CAST")
 @Composable
 inline fun <reified VM : ViewModel, S, A> synthViewModel(): SynthFeature<S, A> =
     metroViewModel<VM>() as SynthFeature<S, A>
 
+
+@Suppress("UNCHECKED_CAST")
+@Composable
+inline fun <reified VM : ViewModel, R> synthViewModel(): R =
+    metroViewModel<VM>() as R

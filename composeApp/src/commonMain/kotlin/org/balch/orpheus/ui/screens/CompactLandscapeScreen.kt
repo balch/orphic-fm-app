@@ -29,19 +29,17 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.features.presets.PresetPanelActions
-import org.balch.orpheus.features.presets.PresetUiState
+import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.tweaker.TweakSequencerPanelActions
-import org.balch.orpheus.features.tweaker.TweakSequencerUiState
+import org.balch.orpheus.features.tweaker.TweakSequencerFeature
 import org.balch.orpheus.features.tweaker.TweakSequencerViewModel
 import org.balch.orpheus.features.tweaker.ui.CompactTweakSequencerView
 import org.balch.orpheus.features.tweaker.ui.ExpandedTweakSequencerScreen
+import org.balch.orpheus.features.viz.VizFeature
+import org.balch.orpheus.features.viz.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
-import org.balch.orpheus.features.voice.VoicePanelActions
-import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.panels.compact.CompactDuoLiquidPanel
@@ -50,9 +48,6 @@ import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.VizPanelActions
-import org.balch.orpheus.ui.viz.VizUiState
-import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
@@ -125,10 +120,10 @@ fun CompactLandscapeScreen(
 @Composable
 private fun CompactLandscapeLayout(
     modifier: Modifier = Modifier,
-    presetFeature: SynthFeature<PresetUiState, PresetPanelActions>,
-    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
-    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
-    sequencerFeature: SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions>,
+    presetFeature: PresetsFeature,
+    voiceFeature: VoicesFeature,
+    vizFeature: VizFeature,
+    sequencerFeature: TweakSequencerFeature,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     onKeyEvent: (androidx.compose.ui.input.key.KeyEvent, Boolean) -> Boolean,

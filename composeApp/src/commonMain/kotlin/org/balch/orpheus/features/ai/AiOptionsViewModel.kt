@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.emptyFlow
@@ -29,7 +28,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.GeminiKeyProvider
@@ -56,16 +54,6 @@ import kotlin.time.ExperimentalTime
 
 
 /**
- *ViewModel for the AI Options panel.
- * 
- * Manages state for the 4 AI feature buttons:
- * - Drone: AI-generated drone accompaniment
- * - Solo: Standalone AI-driven ambient sound
- * - REPL: Generate Tidal code patterns
- * - Chat: Open chat dialog
- */
-
-/**
  * UI State for AI Options.
  */
 data class AiOptionsUiState(
@@ -78,6 +66,9 @@ data class AiOptionsUiState(
     val isUserProvidedKey: Boolean = false,
     val selectedModel: AiModel? = null,
     val availableModels: List<AiModel> = emptyList(),
+    val dialogPosition: Pair<Float, Float> = 0f to 0f,
+    val dialogSize: Pair<Float, Float> = 420f to 550f,
+    val messages: List<ChatMessage> = emptyList(),
     // Flows for dashboard
     val aiStatusMessages: Flow<AiStatusMessage> = emptyFlow(),
     val aiInputLog: Flow<AiStatusMessage> = emptyFlow(),
@@ -108,19 +99,17 @@ data class AiOptionsPanelActions(
     }
 }
 
-private data class AiOptionsFlags(
-    val isDroneActive: Boolean,
-    val isSoloActive: Boolean,
-    val isReplActive: Boolean,
-    val showChatDialog: Boolean
-)
+typealias AiOptionsFeature = SynthFeature<AiOptionsUiState, AiOptionsPanelActions>
 
-private data class AiOptionsSession(
-    val sessionId: Int,
-    val isApiKeySet: Boolean,
-    val isUserProvidedKey: Boolean
-)
-
+/**
+ *ViewModel for the AI Options panel.
+ *
+ * Manages state for the 4 AI feature buttons:
+ * - Drone: AI-generated drone accompaniment
+ * - Solo: Standalone AI-driven ambient sound
+ * - REPL: Generate Tidal code patterns
+ * - Chat: Open chat dialog
+ */
 @Inject
 @ViewModelKey(AiOptionsViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
@@ -139,7 +128,7 @@ class AiOptionsViewModel(
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val synthOrchestrator: SynthOrchestrator,
     private val mediaSessionStateManager: MediaSessionStateManager,
-) : ViewModel(), SynthViewModel<AiOptionsUiState, AiOptionsPanelActions> {
+) : ViewModel(), AiOptionsFeature {
 
     private val log = logging("AiOptionsViewModel")
 
@@ -222,94 +211,15 @@ class AiOptionsViewModel(
         synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
     }
 
-    private val _sessionId = MutableStateFlow(0)
-    /**
-     * Session ID increments whenever a new agent session starts.
-     * Use this to clear UI logs.
-     */
-    val sessionId: StateFlow<Int> = _sessionId.asStateFlow()
-
-    /**
-     * Combined AI status messages fro OrpheusAgent (REPL), DroneAgent, and SoloAgent.
-     * Uses flatMapLatest to ensure we subscribe to the *current* agent instance's logs.
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val aiStatusMessages: Flow<AiStatusMessage> = merge(
-        agent.statusMessages,
-        _droneAgent.flatMapLatest { it?.statusMessages ?: flow {} },
-        _soloAgent.flatMapLatest { it?.statusMessages ?: flow {} }
-    )
-
-    /**
-     * Combined AI input logs (prompts sent).
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val aiInputLog: Flow<AiStatusMessage> = merge(
-        _droneAgent.flatMapLatest { it?.inputLog ?: flow {} },
-        _soloAgent.flatMapLatest { it?.inputLog ?: flow {} }
-    )
-
-    /**
-     * Combined AI control logs (actions executed).
-     */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val aiControlLog: Flow<AiStatusMessage> = merge(
-        _droneAgent.flatMapLatest { it?.controlLog ?: flow {} },
-        _soloAgent.flatMapLatest { it?.controlLog ?: flow {} }
-    )
-
-    // ============================================================
-    // AI Feature Toggle States
-    // ============================================================
-
-    private val _isDroneActive = MutableStateFlow(false)
-    /**
-     * Whether the Drone AI accompaniment is active.
-     */
-    val isDroneActive: StateFlow<Boolean> = _isDroneActive.asStateFlow()
-
-    private val _isSoloActive = MutableStateFlow(false)
-    /**
-     * Whether the Solo AI mode is active.
-     */
-    val isSoloActive: StateFlow<Boolean> = _isSoloActive.asStateFlow()
-
-    private val _isReplActive = MutableStateFlow(false)
-    /**
-     * Whether the REPL AI mode is active.
-     */
-    val isReplActive: StateFlow<Boolean> = _isReplActive.asStateFlow()
-
-    private val _showChatDialog = MutableStateFlow(false)
-    /**
-     * Whether the Chat dialog is visible.
-     */
-    val showChatDialog: StateFlow<Boolean> = _showChatDialog.asStateFlow()
-
-    // ============================================================
-    // API Key Management
-    // ============================================================
-
-    /**
-     * Reactive API key state - true when any key is configured.
-     */
-    val apiKeyState: StateFlow<Boolean> = geminiKeyProvider.apiKeyState
-        .map { !it.isNullOrEmpty() }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = geminiKeyProvider.isApiKeySet
-        )
-    
     /**
      * Whether the current key is user-provided (vs build-time).
      */
-    val isUserProvidedKey: StateFlow<Boolean> = geminiKeyProvider.isUserProvidedKey
+    private val isUserProvidedKey: StateFlow<Boolean> = geminiKeyProvider.isUserProvidedKey
 
     /**
      * Save a user-provided API key.
      */
-    fun saveApiKey(key: String) {
+    private fun saveApiKey(key: String) {
         viewModelScope.launch {
             val success = geminiKeyProvider.saveApiKey(key)
             if (success) {
@@ -323,7 +233,7 @@ class AiOptionsViewModel(
     /**
      * Clear the user-provided API key.
      */
-    fun clearApiKey() {
+    private fun clearApiKey() {
         viewModelScope.launch {
             geminiKeyProvider.clearApiKey()
             log.debug { "API key cleared" }
@@ -337,27 +247,17 @@ class AiOptionsViewModel(
     /**
      * Currently selected AI model.
      */
-    val selectedModel: StateFlow<AiModel> = aiModelProvider.selectedModel
+    private val selectedModel: StateFlow<AiModel> = aiModelProvider.selectedModel
 
     /**
      * List of available AI models for dropdown.
      */
-    val availableModels: List<AiModel> = aiModelProvider.availableModels
-
-    /**
-     * Select a new AI model.
-     */
-    fun selectModel(model: AiModel) {
-        viewModelScope.launch {
-            aiModelProvider.selectModel(model)
-            log.debug { "Model selected: ${model.displayName}" }
-        }
-    }
+    private val availableModels: List<AiModel> = aiModelProvider.availableModels
 
     /**
      * Chat messages flow.
      */
-    val messages: StateFlow<List<ChatMessage>> = agent.agentFlow
+    private val messages: StateFlow<List<ChatMessage>> = agent.agentFlow
         .map { it.messages }
         .stateIn(
             scope = viewModelScope,
@@ -372,7 +272,7 @@ class AiOptionsViewModel(
     /**
      * Toggle the Drone AI on/off.
      */
-    fun toggleDrone(showDialog: Boolean = true) {
+    private fun toggleDrone(showDialog: Boolean = true) {
         val wasActive = _isDroneActive.value
         
         // If Solo is active, turn it off first
@@ -455,7 +355,7 @@ class AiOptionsViewModel(
     /**
      * Toggle the Solo AI on/off.
      */
-    fun toggleSolo(showDialog: Boolean = true) {
+    private fun toggleSolo(showDialog: Boolean = true) {
         val wasActive = _isSoloActive.value
         log.debug { "toggleSolo called. Was active: $wasActive" }
 
@@ -630,7 +530,7 @@ class AiOptionsViewModel(
     /**
      * Toggle the chat dialog visibility.
      */
-    fun toggleChatDialog() {
+    private fun toggleChatDialog() {
         _showChatDialog.value = !_showChatDialog.value
         log.debug { "Toggled chat dialog: ${_showChatDialog.value}" }
     }
@@ -638,7 +538,7 @@ class AiOptionsViewModel(
     /**
      * Send a user influence prompt to the Solo agent.
      */
-    fun sendSoloInfluence(text: String) {
+    private fun sendSoloInfluence(text: String) {
         log.debug { "Sending solo influence: $text" }
         _soloAgent.value?.injectUserPrompt(text)
     }
@@ -658,7 +558,7 @@ class AiOptionsViewModel(
      * When turned OFF:
      * - Stops all REPL patterns with hush
      */
-    fun toggleRepl(showDialog: Boolean = true) {
+    private fun toggleRepl(showDialog: Boolean = true) {
         val wasActive = _isReplActive.value
         _isReplActive.value = !wasActive
         
@@ -766,11 +666,73 @@ class AiOptionsViewModel(
     // Dialog State (Hoisted for persistence like "remember where I left it")
     // ============================================================
 
-    private val _dialogPosition = MutableStateFlow(0f to 0f)
-    val dialogPosition: StateFlow<Pair<Float, Float>> = _dialogPosition.asStateFlow()
+    private val _sessionId = MutableStateFlow(0)
 
+    /**
+     * Combined AI status messages fro OrpheusAgent (REPL), DroneAgent, and SoloAgent.
+     * Uses flatMapLatest to ensure we subscribe to the *current* agent instance's logs.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val aiStatusMessages: Flow<AiStatusMessage> = merge(
+        agent.statusMessages,
+        _droneAgent.flatMapLatest { it?.statusMessages ?: flow {} },
+        _soloAgent.flatMapLatest { it?.statusMessages ?: flow {} }
+    )
+
+    /**
+     * Combined AI input logs (prompts sent).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val aiInputLog: Flow<AiStatusMessage> = merge(
+        _droneAgent.flatMapLatest { it?.inputLog ?: flow {} },
+        _soloAgent.flatMapLatest { it?.inputLog ?: flow {} }
+    )
+
+    /**
+     * Combined AI control logs (actions executed).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val aiControlLog: Flow<AiStatusMessage> = merge(
+        _droneAgent.flatMapLatest { it?.controlLog ?: flow {} },
+        _soloAgent.flatMapLatest { it?.controlLog ?: flow {} }
+    )
+
+    // ============================================================
+    // AI Feature Toggle States
+    // ============================================================
+
+    private val _isDroneActive = MutableStateFlow(false)
+    private val _isSoloActive = MutableStateFlow(false)
+    private val _isReplActive = MutableStateFlow(false)
+    private val _showChatDialog = MutableStateFlow(false)
+
+    // ============================================================
+    // API Key Management
+    // ============================================================
+
+    /**
+     * Reactive API key state - true when any key is configured.
+     */
+    private val apiKeyState: StateFlow<Boolean> = geminiKeyProvider.apiKeyState
+        .map { !it.isNullOrEmpty() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = geminiKeyProvider.isApiKeySet
+        )
+
+    private val _dialogPosition = MutableStateFlow(0f to 0f)
     private val _dialogSize = MutableStateFlow(420f to 550f)
-    val dialogSize: StateFlow<Pair<Float, Float>> = _dialogSize.asStateFlow()
+
+    /**
+     * Select a new AI model.
+     */
+    private fun selectModel(model: AiModel) {
+        viewModelScope.launch {
+            aiModelProvider.selectModel(model)
+            log.debug { "Model selected: ${model.displayName}" }
+        }
+    }
 
     override val actions = AiOptionsPanelActions(
         onToggleDrone = { toggleDrone(it) },
@@ -783,32 +745,58 @@ class AiOptionsViewModel(
         onSelectModel = ::selectModel
     )
 
+    fun updateDialogPosition(x: Float, y: Float) {
+        _dialogPosition.value = x to y
+    }
+
+    fun updateDialogSize(width: Float, height: Float) {
+        _dialogSize.value = width to height
+    }
+
     override val stateFlow: StateFlow<AiOptionsUiState> = combine(
         combine(
             _isDroneActive,
             _isSoloActive,
             _isReplActive,
-            _showChatDialog,
-            ::AiOptionsFlags
-        ),
+            _showChatDialog
+        ) { drone, solo, repl, chat ->
+            listOf(drone, solo, repl, chat)
+        },
         combine(
             _sessionId,
             apiKeyState,
             isUserProvidedKey,
-            ::AiOptionsSession
-        ),
-        selectedModel
-    ) { flags, session, model ->
+            selectedModel,
+            messages
+        ) { sessionId, apiKeySet, userKey, model, msgs ->
+            Triple(sessionId, apiKeySet, userKey) to (model to msgs)
+        },
+        combine(
+            _dialogPosition,
+            _dialogSize
+        ) { pos, size ->
+            pos to size
+        }
+    ) { flags, session, layout ->
+        val (drone, solo, repl, chat) = flags
+        val (sessionInfo, modelData) = session
+        val (sessionId, apiKeySet, userKey) = sessionInfo
+        val (model, msgs) = modelData
+        val (pos, size) = layout
+        
         AiOptionsUiState(
-            isDroneActive = flags.isDroneActive,
-            isSoloActive = flags.isSoloActive,
-            isReplActive = flags.isReplActive,
-            showChatDialog = flags.showChatDialog,
-            sessionId = session.sessionId,
-            isApiKeySet = session.isApiKeySet,
-            isUserProvidedKey = session.isUserProvidedKey,
+            isDroneActive = drone as Boolean,
+            isSoloActive = solo as Boolean,
+            isReplActive = repl as Boolean,
+            showChatDialog = chat as Boolean,
+            sessionId = sessionId,
+            isApiKeySet = apiKeySet,
+            isUserProvidedKey = userKey,
             selectedModel = model,
             availableModels = availableModels,
+            messages = msgs,
+            dialogPosition = pos,
+            dialogSize = size,
             aiStatusMessages = aiStatusMessages,
             aiInputLog = aiInputLog,
             aiControlLog = aiControlLog
@@ -824,23 +812,15 @@ class AiOptionsViewModel(
         )
     )
 
-    fun updateDialogPosition(x: Float, y: Float) {
-        _dialogPosition.value = x to y
-    }
-
-    fun updateDialogSize(width: Float, height: Float) {
-        _dialogSize.value = width to height
-    }
-
     companion object {
-        fun previewFeature(state: AiOptionsUiState = AiOptionsUiState()) =
-            object : SynthFeature<AiOptionsUiState, AiOptionsPanelActions> {
+        fun previewFeature(state: AiOptionsUiState = AiOptionsUiState()): AiOptionsFeature =
+            object : AiOptionsFeature {
                 override val stateFlow: StateFlow<AiOptionsUiState> = MutableStateFlow(state)
                 override val actions: AiOptionsPanelActions = AiOptionsPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<AiOptionsUiState, AiOptionsPanelActions> =
-            synthViewModel<AiOptionsViewModel, AiOptionsUiState, AiOptionsPanelActions>()
+        fun feature(): AiOptionsFeature =
+            synthViewModel<AiOptionsViewModel, AiOptionsFeature>()
     }
 }

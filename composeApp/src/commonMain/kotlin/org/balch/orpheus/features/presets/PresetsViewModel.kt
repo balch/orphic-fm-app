@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.DronePreset
@@ -70,6 +69,8 @@ private sealed interface PresetIntent {
     data class RefreshPresets(val presets: List<DronePreset>, val selectName: String? = null) : PresetIntent
 }
 
+typealias PresetsFeature = SynthFeature<PresetUiState, PresetPanelActions>
+
 /**
  * ViewModel for the Presets panel.
  *
@@ -83,7 +84,7 @@ class PresetsViewModel(
     private val presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider,
     private val appPreferencesRepository: AppPreferencesRepository
-) : ViewModel(), SynthViewModel<PresetUiState, PresetPanelActions> {
+) : ViewModel(), PresetsFeature {
 
     override val actions = PresetPanelActions(
         onPresetSelect = ::selectPreset,
@@ -239,17 +240,14 @@ class PresetsViewModel(
     }
 
     companion object {
-        val PREVIEW_STATE: MutableStateFlow<PresetUiState> = MutableStateFlow(PresetUiState.Loading)
-        val PREVIEW_ACTIONS = PresetPanelActions.EMPTY
-
-        fun previewFeature(state: PresetUiState = PresetUiState.Loading) =
-            object : SynthFeature<PresetUiState, PresetPanelActions> {
+        fun previewFeature(state: PresetUiState = PresetUiState.Loading): PresetsFeature =
+            object : PresetsFeature {
                 override val stateFlow: StateFlow<PresetUiState> = MutableStateFlow(state)
                 override val actions: PresetPanelActions = PresetPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<PresetUiState, PresetPanelActions> =
-            synthViewModel<PresetsViewModel, PresetUiState, PresetPanelActions>()
+        fun feature(): PresetsFeature =
+            synthViewModel<PresetsViewModel, PresetsFeature>()
     }
 }

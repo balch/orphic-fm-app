@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
@@ -80,6 +79,8 @@ private sealed interface DelayIntent {
     data class Restore(val state: DelayUiState) : DelayIntent
 }
 
+typealias DelayFeature = SynthFeature<DelayUiState, DelayPanelActions>
+
 /**
  * ViewModel for the Mod Delay panel.
  *
@@ -93,7 +94,7 @@ class DelayViewModel(
     presetLoader: PresetLoader,
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel(), SynthViewModel<DelayUiState, DelayPanelActions> {
+) : ViewModel(), DelayFeature {
 
     override val actions = DelayPanelActions(
         onTime1Change = ::onTime1Change,
@@ -270,17 +271,14 @@ class DelayViewModel(
     }
 
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(DelayUiState())
-        val PREVIEW_ACTIONS = DelayPanelActions.EMPTY
-
-        fun previewFeature(state: DelayUiState = DelayUiState()) =
-            object : SynthFeature<DelayUiState, DelayPanelActions> {
+        fun previewFeature(state: DelayUiState = DelayUiState()): DelayFeature =
+            object : DelayFeature {
                 override val stateFlow: StateFlow<DelayUiState> = MutableStateFlow(state)
                 override val actions: DelayPanelActions = DelayPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<DelayUiState, DelayPanelActions> =
-            synthViewModel<DelayViewModel, DelayUiState, DelayPanelActions>()
+        fun feature(): DelayFeature =
+            synthViewModel<DelayViewModel, DelayFeature>()
     }
 }

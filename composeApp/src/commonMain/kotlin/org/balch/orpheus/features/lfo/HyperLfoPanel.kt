@@ -28,7 +28,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -48,11 +47,11 @@ enum class HyperLfoMode {
 }
 
 /**
- * HyperLfoPanel consuming PanelFeature interface.
+ * HyperLfoPanel consuming feature() interface.
  */
 @Composable
 fun HyperLfoPanel(
-    feature: SynthFeature<LfoUiState, LfoPanelActions>,
+    feature: LfoFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

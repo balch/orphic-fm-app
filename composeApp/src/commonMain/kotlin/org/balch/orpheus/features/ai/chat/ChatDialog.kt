@@ -54,12 +54,13 @@ fun ChatDialog(
     onSizeChange: (Float, Float) -> Unit,
     onClose: () -> Unit = {},
 ) {
-    val messages by viewModel.messages.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val chatState by viewModel.stateFlow.collectAsState()
+    val messages = chatState.messages
+    val isLoading = chatState.isLoading
 
-    // Determine mode based on AI agent status
-    val isDroneActive = aiViewModel.isDroneActive.collectAsState().value
-    val isSoloActive = aiViewModel.isSoloActive.collectAsState().value
+    val aiState by aiViewModel.stateFlow.collectAsState()
+    val isDroneActive = aiState.isDroneActive
+    val isSoloActive = aiState.isSoloActive
     val isDashboardMode = isDroneActive || isSoloActive
 
     DraggableDialog(
@@ -81,13 +82,13 @@ fun ChatDialog(
                     .padding(8.dp)
             ) {
                 AiDashboard(
-                    inputLog = aiViewModel.aiInputLog,
-                    controlLog = aiViewModel.aiControlLog,
-                    statusMessages = aiViewModel.aiStatusMessages,
+                    inputLog = aiState.aiInputLog,
+                    controlLog = aiState.aiControlLog,
+                    statusMessages = aiState.aiStatusMessages,
                     isActive = true,
                     isSoloMode = isSoloActive,
-                    sessionId = aiViewModel.sessionId.collectAsState().value,
-                    onSendInfluence = { aiViewModel.sendSoloInfluence(it) },
+                    sessionId = aiState.sessionId,
+                    onSendInfluence = { aiViewModel.actions.onSendSoloInfluence(it) },
                     // Give it full space but respect layout
                     modifier = Modifier
                         .fillMaxWidth()
@@ -98,14 +99,14 @@ fun ChatDialog(
             }
         } else {
             // Chat Mode: Standard chat UI
-            val isApiKeySet by aiViewModel.apiKeyState.collectAsState()
+            val isApiKeySet = aiState.isApiKeySet
             
             ChatDialogContent(
                 messages = messages,
                 isLoading = isLoading,
                 isApiKeySet = isApiKeySet,
-                onSendMessage = viewModel::sendPrompt,
-                onSaveApiKey = aiViewModel::saveApiKey
+                onSendMessage = viewModel.actions.onSendPrompt,
+                onSaveApiKey = aiViewModel.actions.onSaveApiKey
             )
         }
     }

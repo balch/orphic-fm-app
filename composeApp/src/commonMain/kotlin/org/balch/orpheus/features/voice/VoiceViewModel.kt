@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.VoiceState
@@ -88,6 +87,8 @@ private sealed interface VoiceIntent {
     data class Restore(val state: VoiceUiState) : VoiceIntent
 }
 
+
+typealias VoicesFeature = SynthFeature<VoiceUiState, VoicePanelActions>
 /**
  * ViewModel for voice management.
  *
@@ -102,7 +103,7 @@ class VoiceViewModel(
     private val synthController: SynthController,
     private val wobbleController: VoiceWobbleController,
     dispatcherProvider: DispatcherProvider
-) : ViewModel(), SynthViewModel<VoiceUiState, VoicePanelActions> {
+) : ViewModel(), VoicesFeature {
 
     override val actions: VoicePanelActions = VoicePanelActions(
         onMasterVolumeChange = { value ->
@@ -746,31 +747,14 @@ class VoiceViewModel(
     }
 
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(VoiceUiState())
-        val PREVIEW_ACTIONS = VoicePanelActions(
-            onMasterVolumeChange = {}, onVibratoChange = {}, 
-            onVoiceTuneChange = {_, _ -> }, onVoiceModDepthChange = {_, _ -> }, 
-            onDuoModDepthChange = {_, _ -> }, onPairSharpnessChange = {_, _ -> },
-            onVoiceEnvelopeSpeedChange = {_, _ -> }, onPulseStart = {}, onPulseEnd = {},
-            onHoldChange = {_, _ -> }, onDuoModSourceChange = {_, _ -> },
-            onQuadPitchChange = {_, _ -> }, onQuadHoldChange = {_, _ -> },
-            onFmStructureChange = {}, onTotalFeedbackChange = {},
-            onVoiceCouplingChange = {}, onWobblePulseStart = {_, _, _ -> },
-            onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {},
-            onBendChange = {}, onBendRelease = {},
-            onStringBendChange = {_, _, _ -> }, onStringBendRelease = { 0 },
-            onSlideBarChange = {_, _ -> }, onSlideBarRelease = {}
-        )
-
         fun previewFeature(state: VoiceUiState = VoiceUiState()) =
-            object : SynthFeature<VoiceUiState, VoicePanelActions> {
+            object : VoicesFeature {
                 override val stateFlow: StateFlow<VoiceUiState> = MutableStateFlow(state)
                 override val actions: VoicePanelActions = VoicePanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<VoiceUiState, VoicePanelActions> =
-            synthViewModel<VoiceViewModel, VoiceUiState, VoicePanelActions>()
+        fun feature(): VoicesFeature = synthViewModel<VoiceViewModel, VoicesFeature>()
     }
 }
 

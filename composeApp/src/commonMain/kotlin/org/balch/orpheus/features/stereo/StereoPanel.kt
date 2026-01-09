@@ -10,7 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -25,11 +24,11 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 private val PanColor = Color(0xFF008B8B)  // Dark cyan
 
 /**
- * StereoPanel consuming PanelFeature interface.
+ * StereoPanel consuming feature() interface.
  */
 @Composable
 fun StereoPanel(
-    feature: SynthFeature<StereoUiState, StereoPanelActions>,
+    feature: StereoFeature,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

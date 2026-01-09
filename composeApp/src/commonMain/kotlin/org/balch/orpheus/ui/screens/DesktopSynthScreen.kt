@@ -16,51 +16,39 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.features.ai.AiOptionsPanelActions
-import org.balch.orpheus.features.ai.AiOptionsUiState
+import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsViewModel
-import org.balch.orpheus.features.delay.DelayPanelActions
-import org.balch.orpheus.features.delay.DelayUiState
+import org.balch.orpheus.features.delay.DelayFeature
 import org.balch.orpheus.features.delay.DelayViewModel
-import org.balch.orpheus.features.distortion.DistortionPanelActions
-import org.balch.orpheus.features.distortion.DistortionUiState
+import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionViewModel
-import org.balch.orpheus.features.evo.EvoPanelActions
-import org.balch.orpheus.features.evo.EvoUiState
+import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoViewModel
-import org.balch.orpheus.features.lfo.LfoPanelActions
-import org.balch.orpheus.features.lfo.LfoUiState
+import org.balch.orpheus.features.lfo.LfoFeature
 import org.balch.orpheus.features.lfo.LfoViewModel
-import org.balch.orpheus.features.midi.MidiPanelActions
-import org.balch.orpheus.features.midi.MidiUiState
+import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiViewModel
-import org.balch.orpheus.features.presets.PresetPanelActions
-import org.balch.orpheus.features.presets.PresetUiState
+import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.stereo.StereoPanelActions
-import org.balch.orpheus.features.stereo.StereoUiState
+import org.balch.orpheus.features.stereo.StereoFeature
 import org.balch.orpheus.features.stereo.StereoViewModel
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
+import org.balch.orpheus.features.viz.VizFeature
+import org.balch.orpheus.features.viz.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
-import org.balch.orpheus.features.voice.VoicePanelActions
-import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
 import org.balch.orpheus.ui.panels.CenterControlPanel
+import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderPanel
-import org.balch.orpheus.ui.panels.HeaderPanelActions
-import org.balch.orpheus.ui.panels.HeaderPanelUiState
 import org.balch.orpheus.ui.panels.HeaderViewModel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.VizPanelActions
-import org.balch.orpheus.ui.viz.VizUiState
-import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
@@ -76,18 +64,18 @@ fun DesktopSynthScreen(
     focusRequester: FocusRequester,
 ) {
     // Inject all ViewModels internally via their factory methods
-    val voiceFeature = VoiceViewModel.panelFeature()
-    val evoFeature = EvoViewModel.panelFeature()
-    val headerFeature = HeaderViewModel.panelFeature()
-    val presetsFeature = PresetsViewModel.panelFeature()
-    val midiFeature = MidiViewModel.panelFeature()
-    val stereoFeature = StereoViewModel.panelFeature()
-    val vizFeature = VizViewModel.panelFeature()
-    val lfoFeature = LfoViewModel.panelFeature()
-    val delayFeature = DelayViewModel.panelFeature()
-    val distortionFeature = DistortionViewModel.panelFeature()
-    val liveCodeFeature = LiveCodeViewModel.panelFeature()
-    val aiOptionsFeature = AiOptionsViewModel.panelFeature()
+    val voiceFeature = VoiceViewModel.feature()
+    val evoFeature = EvoViewModel.feature()
+    val headerFeature = HeaderViewModel.feature()
+    val presetsFeature = PresetsViewModel.feature()
+    val midiFeature = MidiViewModel.feature()
+    val stereoFeature = StereoViewModel.feature()
+    val vizFeature = VizViewModel.feature()
+    val lfoFeature = LfoViewModel.feature()
+    val delayFeature = DelayViewModel.feature()
+    val distortionFeature = DistortionViewModel.feature()
+    val liveCodeFeature = LiveCodeViewModel.feature()
+    val aiOptionsFeature = AiOptionsViewModel.feature()
 
     DesktopSynthScreenLayout(
         voiceFeature = voiceFeature,
@@ -114,18 +102,18 @@ fun DesktopSynthScreen(
  */
 @Composable
 fun DesktopSynthScreenLayout(
-    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
-    evoFeature: SynthFeature<EvoUiState, EvoPanelActions>,
-    headerFeature: SynthFeature<HeaderPanelUiState, HeaderPanelActions>,
-    presetsFeature: SynthFeature<PresetUiState, PresetPanelActions>,
-    midiFeature: SynthFeature<MidiUiState, MidiPanelActions>,
-    stereoFeature: SynthFeature<StereoUiState, StereoPanelActions>,
-    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
-    lfoFeature: SynthFeature<LfoUiState, LfoPanelActions>,
-    delayFeature: SynthFeature<DelayUiState, DelayPanelActions>,
-    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
+    voiceFeature: VoicesFeature,
+    evoFeature: EvoFeature,
+    headerFeature: HeaderFeature,
+    presetsFeature: PresetsFeature,
+    midiFeature: MidiFeature,
+    stereoFeature: StereoFeature,
+    vizFeature: VizFeature,
+    lfoFeature: LfoFeature,
+    delayFeature: DelayFeature,
+    distortionFeature: DistortionFeature,
     liveCodeFeature: LiveCodeFeature,
-    aiOptionsFeature: SynthFeature<AiOptionsUiState, AiOptionsPanelActions>,
+    aiOptionsFeature: AiOptionsFeature,
     effects: VisualizationLiquidEffects,
     isDialogActive: Boolean = false,
     onDialogActiveChange: (Boolean) -> Unit,

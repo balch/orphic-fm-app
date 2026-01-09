@@ -1,4 +1,4 @@
-package org.balch.orpheus.ui.viz
+package org.balch.orpheus.features.viz
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
@@ -14,12 +14,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.SynthViewModel
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
-import org.balch.orpheus.features.viz.OffViz
+import org.balch.orpheus.ui.viz.DynamicVisualization
+import org.balch.orpheus.ui.viz.Visualization
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 
 
 /**
@@ -48,6 +49,8 @@ data class VizPanelActions(
     }
 }
 
+typealias VizFeature = SynthFeature<VizUiState, VizPanelActions>
+
 /**
  * ViewModel for managing visualizations.
  * Injects all available Visualization implementations.
@@ -59,7 +62,7 @@ class VizViewModel(
     visualizations: Set<Visualization>,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val synthController: SynthController,
-) : ViewModel(), SynthViewModel<VizUiState, VizPanelActions> {
+) : ViewModel(), VizFeature {
 
     override val actions = VizPanelActions(
         onSelectViz = { selectVisualization(it) },
@@ -179,21 +182,18 @@ class VizViewModel(
     }
 
     companion object {
-        val PREVIEW_STATE = MutableStateFlow(VizUiState(
+        fun previewFeature(state: VizUiState = VizUiState(
             selectedViz = OffViz(),
             visualizations = listOf(OffViz()),
             showKnobs = false
-        ))
-        val PREVIEW_ACTIONS = VizPanelActions.EMPTY
-
-        fun previewFeature(state: VizUiState = PREVIEW_STATE.value) =
-            object : SynthFeature<VizUiState, VizPanelActions> {
+        )): VizFeature =
+            object : VizFeature {
                 override val stateFlow: StateFlow<VizUiState> = MutableStateFlow(state)
                 override val actions: VizPanelActions = VizPanelActions.EMPTY
             }
 
         @Composable
-        fun panelFeature(): SynthFeature<VizUiState, VizPanelActions> =
-            synthViewModel<VizViewModel, VizUiState, VizPanelActions>()
+        fun feature(): VizFeature =
+            synthViewModel<VizViewModel, VizFeature>()
     }
 }

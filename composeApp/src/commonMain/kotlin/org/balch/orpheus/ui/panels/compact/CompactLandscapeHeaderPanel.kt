@@ -31,14 +31,14 @@ import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.viz.VizPanelActions
+import org.balch.orpheus.features.viz.VizUiState
+import org.balch.orpheus.features.viz.VizViewModel
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.VizPanelActions
-import org.balch.orpheus.ui.viz.VizUiState
-import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import org.jetbrains.compose.ui.tooling.preview.Preview

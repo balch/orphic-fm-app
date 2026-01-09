@@ -19,11 +19,11 @@ import org.balch.orpheus.di.OrpheusGraph
 import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.ai.chat.ChatDialog
 import org.balch.orpheus.features.debug.DebugBottomBar
+import org.balch.orpheus.features.viz.VizViewModel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.VizViewModel
 import org.balch.orpheus.ui.widgets.VizBackground
 
 @Composable
@@ -42,9 +42,10 @@ fun App(graph: OrpheusGraph) {
         
         // Get AI ViewModel for chat dialog state
         val aiViewModel: AiOptionsViewModel = metroViewModel()
-        val showChatDialog by aiViewModel.showChatDialog.collectAsState()
-        val dialogPosition by aiViewModel.dialogPosition.collectAsState()
-        val dialogSize by aiViewModel.dialogSize.collectAsState()
+        val aiState by aiViewModel.stateFlow.collectAsState()
+        val showChatDialog = aiState.showChatDialog
+        val dialogPosition = aiState.dialogPosition
+        val dialogSize = aiState.dialogSize
 
 
         OrpheusTheme {
@@ -80,7 +81,7 @@ fun App(graph: OrpheusGraph) {
                     // Chat dialog overlay - rendered at app level for proper z-order
                     if (showChatDialog) {
                         ChatDialog(
-                            onClose = aiViewModel::toggleChatDialog,
+                            onClose = aiViewModel.actions.onToggleChatDialog,
                             liquidState = dialogLiquidState,
                             position = dialogPosition,
                             onPositionChange = aiViewModel::updateDialogPosition,
