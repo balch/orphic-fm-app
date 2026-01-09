@@ -22,46 +22,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.features.midi.MidiUiState
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
 import org.balch.orpheus.ui.widgets.PulseButton
+import org.jetbrains.compose.ui.tooling.preview.Preview
+
 
 @Composable
 fun DuoPairBox(
-    modifier: Modifier = Modifier,
-    voiceA: Int,
-    voiceB: Int,
-    color: Color,
-    voiceViewModel: VoiceViewModel = metroViewModel(),
-    midiViewModel: MidiViewModel = metroViewModel(),
-) {
-    val voiceState by voiceViewModel.stateFlow.collectAsState()
-    val midiState by midiViewModel.stateFlow.collectAsState()
-
-    val voiceActions = voiceViewModel.actions.toVoiceActions()
-
-    val midiActions = midiViewModel.actions.toMidiActions()
-
-    DuoPairBoxLayout(
-        modifier = modifier,
-        voiceA = voiceA,
-        voiceB = voiceB,
-        color = color,
-        voiceState = voiceState,
-        midiState = midiState,
-        voiceActions = voiceActions,
-        midiActions = midiActions,
-        isVoiceBeingLearned = midiViewModel::isVoiceBeingLearned
-    )
-}
-
-@Composable
-fun DuoPairBoxLayout(
     modifier: Modifier = Modifier,
     voiceA: Int,
     voiceB: Int,
@@ -129,30 +102,10 @@ fun DuoPairBoxLayout(
                 // Knobs
                 VoiceColumnMod(
                     modifier = Modifier.weight(1f),
-                    num = voiceA + 1,
                     voiceIndex = voiceA,
                     pairIndex = pairIndex,
-                    tune = voiceState.voiceStates[voiceA].tune,
-                    onTuneChange = {
-                        voiceActions.onVoiceTuneChange(
-                            voiceA,
-                            it
-                        )
-                    },
-                    modDepth = voiceState.voiceModDepths[voiceA],
-                    onModDepthChange = {
-                        voiceActions.onDuoModDepthChange(
-                            pairIndex,
-                            it
-                        )
-                    }, // Apply to both voices
-                    envSpeed = voiceState.voiceEnvelopeSpeeds[voiceA],
-                    onEnvSpeedChange = {
-                        voiceActions.onVoiceEnvelopeSpeedChange(
-                            voiceA,
-                            it
-                        )
-                    }
+                    voiceState = voiceState,
+                    voiceActions = voiceActions
                 )
 
                 // Buttons
@@ -216,30 +169,10 @@ fun DuoPairBoxLayout(
                 // Knobs
                 VoiceColumnSharp(
                     modifier = Modifier.weight(1f),
-                    num = voiceB + 1,
                     voiceIndex = voiceB,
                     pairIndex = pairIndex,
-                    tune = voiceState.voiceStates[voiceB].tune,
-                    onTuneChange = {
-                        voiceActions.onVoiceTuneChange(
-                            voiceB,
-                            it
-                        )
-                    },
-                    sharpness = voiceState.pairSharpness[pairIndex],
-                    onSharpnessChange = {
-                        voiceActions.onPairSharpnessChange(
-                            pairIndex,
-                            it
-                        )
-                    },
-                    envSpeed = voiceState.voiceEnvelopeSpeeds[voiceB],
-                    onEnvSpeedChange = {
-                        voiceActions.onVoiceEnvelopeSpeedChange(
-                            voiceB,
-                            it
-                        )
-                    }
+                    voiceState = voiceState,
+                    voiceActions = voiceActions
                 )
 
                 // Buttons
@@ -290,6 +223,32 @@ fun DuoPairBoxLayout(
                     )
                 }
             }
-        }
+    }
+}
+
+}
+
+@Preview
+@Composable
+fun DuoPairBoxPreview() {
+    val voiceFeature = VoiceViewModel.previewFeature()
+    val midiFeature = MidiViewModel.previewFeature()
+    val voiceState by voiceFeature.stateFlow.collectAsState()
+    val midiState by midiFeature.stateFlow.collectAsState()
+    val voiceActions = voiceFeature.actions.toVoiceActions()
+    val midiActions = midiFeature.actions.toMidiActions()
+
+    LiquidPreviewContainerWithGradient {
+        DuoPairBox(
+            voiceA = 0,
+            voiceB = 1,
+            color = Color(0xFFFDBB30),
+            voiceState = voiceState,
+            midiState = midiState,
+            voiceActions = voiceActions,
+            midiActions = midiActions,
+            isVoiceBeingLearned = { false },
+            modifier = Modifier.padding(16.dp)
+        )
     }
 }
