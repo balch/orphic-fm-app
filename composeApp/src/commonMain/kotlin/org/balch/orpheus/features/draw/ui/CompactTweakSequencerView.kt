@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.tweaker.ui
+package org.balch.orpheus.features.draw.ui
 
 /**
  * Compact inline view for multi-parameter sequencer automation.
@@ -40,15 +40,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.features.tweaker.SequencerPath
-import org.balch.orpheus.features.tweaker.SequencerPoint
-import org.balch.orpheus.features.tweaker.TweakPlaybackMode
-import org.balch.orpheus.features.tweaker.TweakSequencerConfig
-import org.balch.orpheus.features.tweaker.TweakSequencerFeature
-import org.balch.orpheus.features.tweaker.TweakSequencerParameter
-import org.balch.orpheus.features.tweaker.TweakSequencerState
-import org.balch.orpheus.features.tweaker.TweakSequencerUiState
-import org.balch.orpheus.features.tweaker.TweakSequencerViewModel
+import org.balch.orpheus.features.draw.DrawSequencerConfig
+import org.balch.orpheus.features.draw.DrawSequencerFeature
+import org.balch.orpheus.features.draw.DrawSequencerParameter
+import org.balch.orpheus.features.draw.DrawSequencerPlaybackMode
+import org.balch.orpheus.features.draw.DrawSequencerState
+import org.balch.orpheus.features.draw.DrawSequencerUiState
+import org.balch.orpheus.features.draw.DrawSequencerViewModel
+import org.balch.orpheus.features.draw.SequencerPath
+import org.balch.orpheus.features.draw.SequencerPoint
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
@@ -66,7 +66,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun CompactTweakSequencerView(
-    sequencerFeature: TweakSequencerFeature,
+    sequencerFeature: DrawSequencerFeature,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     modifier: Modifier = Modifier
@@ -133,10 +133,10 @@ fun CompactTweakSequencerView(
                 }
 
                 // Playback mode selector (tap to cycle) - directly under transport buttons
-                val (modeIcon, modeLabel) = when (state.config.tweakPlaybackMode) {
-                    TweakPlaybackMode.ONCE -> "→|" to "Once"
-                    TweakPlaybackMode.LOOP -> "↻" to "Loop"
-                    TweakPlaybackMode.PING_PONG -> "↔" to "P-P"
+                val (modeIcon, modeLabel) = when (state.config.drawSequencerPlaybackMode) {
+                    DrawSequencerPlaybackMode.ONCE -> "→|" to "Once"
+                    DrawSequencerPlaybackMode.LOOP -> "↻" to "Loop"
+                    DrawSequencerPlaybackMode.PING_PONG -> "↔" to "P-P"
                 }
                 Row(
                     modifier = Modifier
@@ -144,10 +144,10 @@ fun CompactTweakSequencerView(
                         .background(accentColor.copy(alpha = 0.15f))
                         .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
                         .clickable {
-                            val nextMode = when (state.config.tweakPlaybackMode) {
-                                TweakPlaybackMode.ONCE -> TweakPlaybackMode.LOOP
-                                TweakPlaybackMode.LOOP -> TweakPlaybackMode.PING_PONG
-                                TweakPlaybackMode.PING_PONG -> TweakPlaybackMode.ONCE
+                            val nextMode = when (state.config.drawSequencerPlaybackMode) {
+                                DrawSequencerPlaybackMode.ONCE -> DrawSequencerPlaybackMode.LOOP
+                                DrawSequencerPlaybackMode.LOOP -> DrawSequencerPlaybackMode.PING_PONG
+                                DrawSequencerPlaybackMode.PING_PONG -> DrawSequencerPlaybackMode.ONCE
                             }
                             actions.onSetPlaybackMode(nextMode)
                         }
@@ -208,7 +208,7 @@ fun CompactTweakSequencerView(
  */
 @Composable
 private fun MultiPathSequencerPreview(
-    paths: Map<TweakSequencerParameter, SequencerPath>,
+    paths: Map<DrawSequencerParameter, SequencerPath>,
     currentPosition: Float,
     enabled: Boolean,
     liquidState: LiquidState?,
@@ -280,7 +280,7 @@ private fun MultiPathSequencerPreview(
  */
 @Composable
 private fun ParameterLegend(
-    parameters: List<TweakSequencerParameter>,
+    parameters: List<DrawSequencerParameter>,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -326,23 +326,23 @@ private fun CompactTweakSequencerViewPreview() {
         isComplete = true
     )
 
-    val state = TweakSequencerUiState(
-        sequencer = TweakSequencerState(
-            config = TweakSequencerConfig(
+    val state = DrawSequencerUiState(
+        sequencer = DrawSequencerState(
+            config = DrawSequencerConfig(
                 enabled = true,
                 selectedParameters = listOf(
-                    TweakSequencerParameter.LFO_FREQ_A,
-                    TweakSequencerParameter.DELAY_TIME_1,
-                    TweakSequencerParameter.DIST_DRIVE
+                    DrawSequencerParameter.LFO_FREQ_A,
+                    DrawSequencerParameter.DELAY_TIME_1,
+                    DrawSequencerParameter.DIST_DRIVE
                 )
             ),
             paths = mapOf(
-                TweakSequencerParameter.LFO_FREQ_A to samplePath,
-                TweakSequencerParameter.DELAY_TIME_1 to SequencerPath(
+                DrawSequencerParameter.LFO_FREQ_A to samplePath,
+                DrawSequencerParameter.DELAY_TIME_1 to SequencerPath(
                     points = listOf(SequencerPoint(0f, 0.2f), SequencerPoint(1f, 0.9f)),
                     isComplete = true
                 ),
-                TweakSequencerParameter.DIST_DRIVE to SequencerPath()
+                DrawSequencerParameter.DIST_DRIVE to SequencerPath()
             ),
             currentPosition = 0.4f,
             isPlaying = true
@@ -350,7 +350,7 @@ private fun CompactTweakSequencerViewPreview() {
     )
 
     CompactTweakSequencerView(
-        sequencerFeature = TweakSequencerViewModel.previewFeature(state),
+        sequencerFeature = DrawSequencerViewModel.previewFeature(state),
         liquidState = null,
         effects = VisualizationLiquidEffects(),
         modifier = Modifier.fillMaxWidth()
@@ -360,9 +360,9 @@ private fun CompactTweakSequencerViewPreview() {
 @Preview(heightDp = 240)
 @Composable
 private fun CompactTweakSequencerViewDisabledPreview() {
-    val state = TweakSequencerUiState(
-        sequencer = TweakSequencerState(
-            config = TweakSequencerConfig(enabled = false),
+    val state = DrawSequencerUiState(
+        sequencer = DrawSequencerState(
+            config = DrawSequencerConfig(enabled = false),
             paths = emptyMap(),
             currentPosition = 0f,
             isPlaying = false
@@ -370,7 +370,7 @@ private fun CompactTweakSequencerViewDisabledPreview() {
     )
 
     CompactTweakSequencerView(
-        sequencerFeature = TweakSequencerViewModel.previewFeature(state),
+        sequencerFeature = DrawSequencerViewModel.previewFeature(state),
         liquidState = null,
         effects = VisualizationLiquidEffects(),
         modifier = Modifier.fillMaxWidth()

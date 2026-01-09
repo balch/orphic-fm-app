@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.tweaker
+package org.balch.orpheus.features.draw
 
 /**
  * A single point on a sequencer automation path.

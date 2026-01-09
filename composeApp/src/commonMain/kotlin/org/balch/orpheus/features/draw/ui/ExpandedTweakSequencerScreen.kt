@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.tweaker.ui
+package org.balch.orpheus.features.draw.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -32,14 +32,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.features.tweaker.SequencerPath
-import org.balch.orpheus.features.tweaker.SequencerPoint
-import org.balch.orpheus.features.tweaker.TweakSequencerConfig
-import org.balch.orpheus.features.tweaker.TweakSequencerFeature
-import org.balch.orpheus.features.tweaker.TweakSequencerPanelActions
-import org.balch.orpheus.features.tweaker.TweakSequencerParameter
-import org.balch.orpheus.features.tweaker.TweakSequencerState
-import org.balch.orpheus.features.tweaker.TweakSequencerUiState
+import org.balch.orpheus.features.draw.DrawSequencerConfig
+import org.balch.orpheus.features.draw.DrawSequencerFeature
+import org.balch.orpheus.features.draw.DrawSequencerPanelActions
+import org.balch.orpheus.features.draw.DrawSequencerParameter
+import org.balch.orpheus.features.draw.DrawSequencerState
+import org.balch.orpheus.features.draw.DrawSequencerUiState
+import org.balch.orpheus.features.draw.SequencerPath
+import org.balch.orpheus.features.draw.SequencerPoint
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.CompactSecondsSlider
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -56,7 +56,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun ExpandedTweakSequencerScreen(
-    sequencerFeature: TweakSequencerFeature,
+    sequencerFeature: DrawSequencerFeature,
     onDismiss: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -182,7 +182,7 @@ fun ExpandedTweakSequencerScreen(
                          verticalArrangement = Arrangement.spacedBy(2.dp),
                          modifier = Modifier.verticalScroll(rememberScrollState())
                      ) {
-                         TweakSequencerParameter.entries.forEach { param ->
+                         DrawSequencerParameter.entries.forEach { param ->
                              val isIncluded = param in state.config.selectedParameters
                              val isSelected = activeParameter == param
                              val hasPath = state.paths[param]?.points?.isNotEmpty() == true
@@ -196,7 +196,7 @@ fun ExpandedTweakSequencerScreen(
                                         if (isIncluded) {
                                             actions.onSelectActiveParameter(param)
                                         } else {
-                                            if (state.config.selectedParameters.size < TweakSequencerParameter.MAX_SELECTED) {
+                                            if (state.config.selectedParameters.size < DrawSequencerParameter.MAX_SELECTED) {
                                                 actions.onAddParameter(param)
                                                 actions.onSelectActiveParameter(param)
                                             }
@@ -219,7 +219,7 @@ fun ExpandedTweakSequencerScreen(
                                                       actions.onRemoveParameter(param)
                                                       actions.onClearPath(param)
                                                   }
-                                                  else if (state.config.selectedParameters.size < TweakSequencerParameter.MAX_SELECTED) {
+                                                  else if (state.config.selectedParameters.size < DrawSequencerParameter.MAX_SELECTED) {
                                                        actions.onAddParameter(param)
                                                        actions.onSelectActiveParameter(param)
                                                    }
@@ -368,28 +368,28 @@ private fun ExpandedTweakSequencerScreenPreview() {
     
     // We can use the PREVIEW mapper from the ViewModel
     // but here we manually construct one to show the path data which is specific to this preview
-    val previewState = TweakSequencerUiState(
-        sequencer = TweakSequencerState(
-            config = TweakSequencerConfig(
+    val previewState = DrawSequencerUiState(
+        sequencer = DrawSequencerState(
+            config = DrawSequencerConfig(
                 enabled = true,
                 durationSeconds = 45f,
                 selectedParameters = listOf(
-                    TweakSequencerParameter.LFO_FREQ_A,
-                    TweakSequencerParameter.DELAY_TIME_1,
-                    TweakSequencerParameter.DIST_DRIVE
+                    DrawSequencerParameter.LFO_FREQ_A,
+                    DrawSequencerParameter.DELAY_TIME_1,
+                    DrawSequencerParameter.DIST_DRIVE
                 )
             ),
             paths = mapOf(
-                TweakSequencerParameter.LFO_FREQ_A to samplePath,
-                TweakSequencerParameter.DELAY_TIME_1 to SequencerPath(),
-                TweakSequencerParameter.DIST_DRIVE to SequencerPath()
+                DrawSequencerParameter.LFO_FREQ_A to samplePath,
+                DrawSequencerParameter.DELAY_TIME_1 to SequencerPath(),
+                DrawSequencerParameter.DIST_DRIVE to SequencerPath()
             ),
             currentPosition = 0.4f
         ),
-        activeParameter = TweakSequencerParameter.LFO_FREQ_A
+        activeParameter = DrawSequencerParameter.LFO_FREQ_A
     )
     
-    val previewActions = TweakSequencerPanelActions(
+    val previewActions = DrawSequencerPanelActions(
         onPlay = {}, onPause = {}, onStop = {}, onTogglePlayPause = {},
         onStartPath = { _, _ -> }, onAddPoint = { _, _ -> }, onRemovePointsAfter = { _, _ -> },
         onClearPath = {}, onCompletePath = { _, _ -> },
@@ -398,7 +398,7 @@ private fun ExpandedTweakSequencerScreenPreview() {
         onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {}
     )
 
-    val previewFeature = object : TweakSequencerFeature {
+    val previewFeature = object : DrawSequencerFeature {
         override val stateFlow = kotlinx.coroutines.flow.MutableStateFlow(previewState)
         override val actions = previewActions
     }

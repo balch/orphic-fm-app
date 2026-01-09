@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.tweaker
+package org.balch.orpheus.features.draw
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
@@ -8,13 +8,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.synthViewModel
 
-typealias TweakSequencerFeature = SynthFeature<TweakSequencerUiState, TweakSequencerPanelActions>
+typealias DrawSequencerFeature = SynthFeature<DrawSequencerUiState, DrawSequencerPanelActions>
 
-class TweakSequencerViewModel : ViewModel(), TweakSequencerFeature {
-    private val _state = MutableStateFlow(TweakSequencerUiState())
-    override val stateFlow: StateFlow<TweakSequencerUiState> = _state.asStateFlow()
+class DrawSequencerViewModel : ViewModel(), DrawSequencerFeature {
+    private val _state = MutableStateFlow(DrawSequencerUiState())
+    override val stateFlow: StateFlow<DrawSequencerUiState> = _state.asStateFlow()
 
-    override val actions = TweakSequencerPanelActions(
+    override val actions = DrawSequencerPanelActions(
         onExpand = { _state.value = _state.value.copy(isExpanded = true) },
         onCollapse = { _state.value = _state.value.copy(isExpanded = false) },
         onSave = { /* Save logic */ },
@@ -34,11 +34,11 @@ class TweakSequencerViewModel : ViewModel(), TweakSequencerFeature {
         onSetEnabled = {}
     )
     
-    companion object {
-        fun previewFeature(state: TweakSequencerUiState = TweakSequencerUiState(isExpanded = true)): TweakSequencerFeature =
-            object : TweakSequencerFeature {
-                override val stateFlow: StateFlow<TweakSequencerUiState> = MutableStateFlow(state)
-                override val actions: TweakSequencerPanelActions = TweakSequencerPanelActions(
+    companion object Companion {
+        fun previewFeature(state: DrawSequencerUiState = DrawSequencerUiState(isExpanded = true)): DrawSequencerFeature =
+            object : DrawSequencerFeature {
+                override val stateFlow: StateFlow<DrawSequencerUiState> = MutableStateFlow(state)
+                override val actions: DrawSequencerPanelActions = DrawSequencerPanelActions(
                     onExpand = {}, onCollapse = {}, onSave = {}, onCancel = {},
                     onTogglePlayPause = {}, onStop = {}, onSetPlaybackMode = { _ -> },
                     onSetDuration = { _ -> }, onAddParameter = { _ -> }, onRemoveParameter = { _ -> },
@@ -54,21 +54,21 @@ class TweakSequencerViewModel : ViewModel(), TweakSequencerFeature {
             }
 
         @Composable
-        fun feature(): TweakSequencerFeature =
-            synthViewModel<TweakSequencerViewModel, TweakSequencerFeature>()
+        fun feature(): DrawSequencerFeature =
+            synthViewModel<DrawSequencerViewModel, DrawSequencerFeature>()
     }
 }
 
 // === Data Definitions (Restored) ===
 
-data class TweakSequencerUiState(
+data class DrawSequencerUiState(
     val isExpanded: Boolean = false,
     val isPlaying: Boolean = false,
-    val sequencer: TweakSequencerState = TweakSequencerState(),
-    val activeParameter: TweakSequencerParameter? = null
+    val sequencer: DrawSequencerState = DrawSequencerState(),
+    val activeParameter: DrawSequencerParameter? = null
 )
 
-data class TweakSequencerPanelActions(
+data class DrawSequencerPanelActions(
     val onExpand: () -> Unit,
     val onCollapse: () -> Unit,
     val onSave: () -> Unit,
@@ -77,26 +77,26 @@ data class TweakSequencerPanelActions(
     val onStop: () -> Unit = {},
     val onSetPlaybackMode: (Any) -> Unit = {},
     val onSetDuration: (Float) -> Unit,
-    val onAddParameter: (TweakSequencerParameter) -> Unit,
-    val onRemoveParameter: (TweakSequencerParameter) -> Unit,
-    val onSelectActiveParameter: (TweakSequencerParameter?) -> Unit,
-    val onStartPath: (TweakSequencerParameter, SequencerPoint) -> Unit,
-    val onAddPoint: (TweakSequencerParameter, SequencerPoint) -> Unit,
-    val onRemovePointsAfter: (TweakSequencerParameter, Float) -> Unit,
-    val onCompletePath: (TweakSequencerParameter, Float) -> Unit,
-    val onClearPath: (TweakSequencerParameter) -> Unit,
+    val onAddParameter: (DrawSequencerParameter) -> Unit,
+    val onRemoveParameter: (DrawSequencerParameter) -> Unit,
+    val onSelectActiveParameter: (DrawSequencerParameter?) -> Unit,
+    val onStartPath: (DrawSequencerParameter, SequencerPoint) -> Unit,
+    val onAddPoint: (DrawSequencerParameter, SequencerPoint) -> Unit,
+    val onRemovePointsAfter: (DrawSequencerParameter, Float) -> Unit,
+    val onCompletePath: (DrawSequencerParameter, Float) -> Unit,
+    val onClearPath: (DrawSequencerParameter) -> Unit,
     val onSetEnabled: (Boolean) -> Unit,
     val onPlay: () -> Unit = {},
     val onPause: () -> Unit = {}
 )
 
-data class TweakSequencerState(
+data class DrawSequencerState(
     val isEnabled: Boolean = false,
     val duration: Float = 4.0f,
-    val paths: Map<TweakSequencerParameter, SequencerPath> = emptyMap(),
-    val playbackMode: TweakPlaybackMode = TweakPlaybackMode.LOOP,
+    val paths: Map<DrawSequencerParameter, SequencerPath> = emptyMap(),
+    val playbackMode: DrawSequencerPlaybackMode = DrawSequencerPlaybackMode.LOOP,
     val isPlaying: Boolean = false,
     val currentPosition: Float = 0f,
-    val config: TweakSequencerConfig = TweakSequencerConfig()
+    val config: DrawSequencerConfig = DrawSequencerConfig()
 )
 

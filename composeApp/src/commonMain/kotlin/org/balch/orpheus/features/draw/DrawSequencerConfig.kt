@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.tweaker
+package org.balch.orpheus.features.draw
 
 import androidx.compose.ui.graphics.Color
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -7,7 +7,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
  * All automatable parameters for the sequencer system.
  * Each parameter has a display label, category, and unique color with alpha.
  */
-enum class TweakSequencerParameter(
+enum class DrawSequencerParameter(
     val label: String,
     val category: String,
     val color: Color
@@ -40,7 +40,7 @@ enum class TweakSequencerParameter(
         const val MAX_SELECTED = 5
 
         /** Get all parameters grouped by category */
-        fun byCategory(): Map<String, List<TweakSequencerParameter>> =
+        fun byCategory(): Map<String, List<DrawSequencerParameter>> =
             entries.groupBy { it.category }
     }
 }
@@ -48,7 +48,7 @@ enum class TweakSequencerParameter(
 /**
  * Playback mode for sequencer automation.
  */
-enum class TweakPlaybackMode {
+enum class DrawSequencerPlaybackMode {
     /** Play sequencer once from start to end, then stop */
     ONCE,
 
@@ -63,15 +63,15 @@ enum class TweakPlaybackMode {
  * Configuration for the parameter sequencer automation.
  *
  * @param durationSeconds Total duration in seconds (10-120 range)
- * @param tweakPlaybackMode How the sequencer loops/repeats
+ * @param drawSequencerPlaybackMode How the sequencer loops/repeats
  * @param enabled Whether sequencer automation is active
  * @param selectedParameters List of up to 5 parameters to automate
  */
-data class TweakSequencerConfig(
+data class DrawSequencerConfig(
     val durationSeconds: Float = 30f,
-    val tweakPlaybackMode: TweakPlaybackMode = TweakPlaybackMode.LOOP,
+    val drawSequencerPlaybackMode: DrawSequencerPlaybackMode = DrawSequencerPlaybackMode.LOOP,
     val enabled: Boolean = false,
-    val selectedParameters: List<TweakSequencerParameter> = emptyList()
+    val selectedParameters: List<DrawSequencerParameter> = emptyList()
 ) {
     companion object Companion {
         const val MIN_DURATION = 10f

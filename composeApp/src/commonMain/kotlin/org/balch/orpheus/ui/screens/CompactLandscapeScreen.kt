@@ -29,12 +29,12 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.features.draw.DrawSequencerFeature
+import org.balch.orpheus.features.draw.DrawSequencerViewModel
+import org.balch.orpheus.features.draw.ui.CompactTweakSequencerView
+import org.balch.orpheus.features.draw.ui.ExpandedTweakSequencerScreen
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.tweaker.TweakSequencerFeature
-import org.balch.orpheus.features.tweaker.TweakSequencerViewModel
-import org.balch.orpheus.features.tweaker.ui.CompactTweakSequencerView
-import org.balch.orpheus.features.tweaker.ui.ExpandedTweakSequencerScreen
 import org.balch.orpheus.features.viz.VizFeature
 import org.balch.orpheus.features.viz.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
@@ -68,7 +68,7 @@ fun CompactLandscapeScreen(
     voiceViewModel: VoiceViewModel = metroViewModel(),
     presetViewModel: PresetsViewModel = metroViewModel(),
     vizViewModel: VizViewModel = metroViewModel(),
-    sequencerViewModel: TweakSequencerViewModel = metroViewModel(),
+    sequencerViewModel: DrawSequencerViewModel = metroViewModel(),
 ) {
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
@@ -123,7 +123,7 @@ private fun CompactLandscapeLayout(
     presetFeature: PresetsFeature,
     voiceFeature: VoicesFeature,
     vizFeature: VizFeature,
-    sequencerFeature: TweakSequencerFeature,
+    sequencerFeature: DrawSequencerFeature,
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     onKeyEvent: (androidx.compose.ui.input.key.KeyEvent, Boolean) -> Boolean,
@@ -294,7 +294,7 @@ private fun CompactLandscapeLayoutPreview(
                 presetFeature = PresetsViewModel.previewFeature(),
                 voiceFeature = VoiceViewModel.previewFeature(),
                 vizFeature = VizViewModel.previewFeature(),
-                sequencerFeature = TweakSequencerViewModel.previewFeature(),
+                sequencerFeature = DrawSequencerViewModel.previewFeature(),
                 liquidState = liquidState,
                 effects = effects,
                 onKeyEvent = { _, _ -> false }

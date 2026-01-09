@@ -48,6 +48,7 @@ enum class CompactPanelType(val displayName: String, val color: Color) {
     DISTORTION("Distortion", OrpheusColors.neonMagenta),
     LFO("LFO", OrpheusColors.neonCyan),
     DELAY("Delay", OrpheusColors.warmGlow),
+    TWEAKS("Tweaks", OrpheusColors.electricBlue), // Mod tweaks panel
     REPL("REPL", OrpheusColors.neonCyan),
     STEREO("Stereo", Color(0xFF008B8B)),
 }

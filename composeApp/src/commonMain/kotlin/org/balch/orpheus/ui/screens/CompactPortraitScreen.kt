@@ -51,6 +51,7 @@ import org.balch.orpheus.features.stereo.StereoViewModel
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
 import org.balch.orpheus.features.tidal.ui.LiveCodePanelLayout
+import org.balch.orpheus.features.tweaks.ModTweaksPanel
 import org.balch.orpheus.features.viz.VizFeature
 import org.balch.orpheus.features.viz.VizPanel
 import org.balch.orpheus.features.viz.VizViewModel
@@ -240,6 +241,7 @@ private fun CompactPortraitScreenLayout(
                             PanelContent(
                                 panel = panel,
                                 presetFeature = presetFeature,
+                                voiceFeature = voiceFeature,
                                 liveCodeFeature = liveCodeFeature,
                                 activeReplHighlights = activeReplHighlights,
                                 delayFeature = delayFeature,
@@ -312,6 +314,7 @@ private fun CompactPortraitScreenLayout(
 private fun PanelContent(
     panel: CompactPanelType,
     presetFeature: PresetsFeature,
+    voiceFeature: VoicesFeature,
     liveCodeFeature: LiveCodeFeature,
     activeReplHighlights: List<IntRange>,
     delayFeature: DelayFeature,
@@ -376,6 +379,16 @@ private fun PanelContent(
         CompactPanelType.EVO -> {
             EvoPanel(
                 evoFeature = evoFeature,
+                modifier = panelModifier,
+                isExpanded = true,
+                onExpandedChange = null,
+                showCollapsedHeader = false
+            )
+        }
+
+        CompactPanelType.TWEAKS -> {
+            ModTweaksPanel(
+                voiceFeature = voiceFeature,
                 modifier = panelModifier,
                 isExpanded = true,
                 onExpandedChange = null,

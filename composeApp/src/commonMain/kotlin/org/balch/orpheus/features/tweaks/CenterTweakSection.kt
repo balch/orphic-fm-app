@@ -1,4 +1,4 @@
-package org.balch.orpheus.ui.panels
+package org.balch.orpheus.features.tweaks
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +19,8 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.ui.panels.LocalLiquidEffects
+import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -82,7 +84,7 @@ fun CenterControlSection(
         RotaryKnob(
             value = voiceState.voiceCoupling,
             onValueChange = actions.onVoiceCouplingChange,
-            label = "COUPLE",
+            label = "COUPLING",
             controlId = ControlIds.VOICE_COUPLING,
             size = 32.dp,
             progressColor = OrpheusColors.warmGlow
