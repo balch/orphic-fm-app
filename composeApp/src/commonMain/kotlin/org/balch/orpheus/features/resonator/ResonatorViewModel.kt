@@ -21,12 +21,10 @@ import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
 
-/**
- * Resonator synthesis mode
- */
 enum class ResonatorMode(val displayName: String) {
     MODAL("Bar"),
     STRING("String"),
@@ -40,6 +38,8 @@ enum class ResonatorMode(val displayName: String) {
 data class ResonatorUiState(
     val enabled: Boolean = false,
     val mode: ResonatorMode = ResonatorMode.MODAL,
+    val targetMix: Float = 0.5f,     // 0=Drums only, 0.5=Both, 1=Synth only
+    val snapBack: Boolean = false,   // Whether fader snaps back to center on release
     val structure: Float = 0.25f,    // Material/inharmonicity (0-1)
     val brightness: Float = 0.5f,    // High freq content (0-1)
     val damping: Float = 0.3f,       // Decay time (0-1)
@@ -54,6 +54,8 @@ data class ResonatorUiState(
 data class ResonatorPanelActions(
     val setEnabled: (Boolean) -> Unit,
     val setMode: (ResonatorMode) -> Unit,
+    val setTargetMix: (Float) -> Unit,
+    val setSnapBack: (Boolean) -> Unit,
     val setStructure: (Float) -> Unit,
     val setBrightness: (Float) -> Unit,
     val setDamping: (Float) -> Unit,
@@ -61,7 +63,7 @@ data class ResonatorPanelActions(
     val setMix: (Float) -> Unit
 ) {
     companion object {
-        val EMPTY = ResonatorPanelActions({}, {}, {}, {}, {}, {}, {})
+        val EMPTY = ResonatorPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -73,6 +75,7 @@ typealias ResonatorFeature = SynthFeature<ResonatorUiState, ResonatorPanelAction
 class ResonatorViewModel(
     private val synthEngine: SynthEngine,
     synthController: SynthController,
+    presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), ResonatorFeature {
 
@@ -91,6 +94,15 @@ class ResonatorViewModel(
             viewModelScope.launch(dispatcherProvider.default) { // Move to BG
                 synthEngine.setResonatorMode(mode.ordinal)
             }
+        },
+        setTargetMix = { targetMix ->
+            _uiState.update { it.copy(targetMix = targetMix) }
+            viewModelScope.launch(dispatcherProvider.default) { // Move to BG
+                synthEngine.setResonatorTargetMix(targetMix)
+            }
+        },
+        setSnapBack = { snapBack ->
+            _uiState.update { it.copy(snapBack = snapBack) }
         },
         setStructure = { structure ->
             _uiState.update { it.copy(structure = structure) }
@@ -130,6 +142,7 @@ class ResonatorViewModel(
             val state = _uiState.value
             synthEngine.setResonatorEnabled(state.enabled)
             synthEngine.setResonatorMode(state.mode.ordinal)
+            synthEngine.setResonatorTargetMix(state.targetMix)
             synthEngine.setResonatorStructure(state.structure)
             synthEngine.setResonatorBrightness(state.brightness)
             synthEngine.setResonatorDamping(state.damping)
@@ -178,6 +191,39 @@ class ResonatorViewModel(
                         synthEngine.setResonatorMix(event.value)
                     }
                 }
+            }
+            .flowOn(dispatcherProvider.default)
+            .launchIn(viewModelScope)
+        
+        // Subscribe to preset changes for state restore
+        presetLoader.presetFlow
+            .onEach { preset ->
+                val mode = try {
+                    ResonatorMode.entries[preset.resonatorMode]
+                } catch (e: Exception) {
+                    ResonatorMode.MODAL
+                }
+                _uiState.update {
+                    it.copy(
+                        enabled = preset.resonatorEnabled,
+                        mode = mode,
+                        targetMix = preset.resonatorTargetMix,
+                        structure = preset.resonatorStructure,
+                        brightness = preset.resonatorBrightness,
+                        damping = preset.resonatorDamping,
+                        position = preset.resonatorPosition,
+                        mix = preset.resonatorMix
+                    )
+                }
+                // Apply to engine
+                synthEngine.setResonatorEnabled(preset.resonatorEnabled)
+                synthEngine.setResonatorMode(preset.resonatorMode)
+                synthEngine.setResonatorTargetMix(preset.resonatorTargetMix)
+                synthEngine.setResonatorStructure(preset.resonatorStructure)
+                synthEngine.setResonatorBrightness(preset.resonatorBrightness)
+                synthEngine.setResonatorDamping(preset.resonatorDamping)
+                synthEngine.setResonatorPosition(preset.resonatorPosition)
+                synthEngine.setResonatorMix(preset.resonatorMix)
             }
             .flowOn(dispatcherProvider.default)
             .launchIn(viewModelScope)

@@ -191,6 +191,8 @@ interface SynthEngine {
     // Rings Resonator
     fun setResonatorEnabled(enabled: Boolean)
     fun setResonatorMode(mode: Int)
+    fun setResonatorTarget(target: Int) // 0=Drums, 1=Both, 2=Synth (legacy)
+    fun setResonatorTargetMix(targetMix: Float) // 0=Drums, 0.5=Both, 1=Synth (continuous)
     fun setResonatorStructure(value: Float)
     fun setResonatorBrightness(value: Float)
     fun setResonatorDamping(value: Float)
@@ -201,6 +203,8 @@ interface SynthEngine {
     // Resonator Getters
     fun getResonatorEnabled(): Boolean
     fun getResonatorMode(): Int
+    fun getResonatorTarget(): Int
+    fun getResonatorTargetMix(): Float
     fun getResonatorStructure(): Float
     fun getResonatorBrightness(): Float
     fun getResonatorDamping(): Float

@@ -11,16 +11,13 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 /**
  * DSP Plugin for Rings-style resonator (modal synthesis and string).
  * 
- * Provides:
- * - Modal resonator (SVF filter bank)
- * - Karplus-Strong string synthesis
- * - Dry/wet mixing
- * - Strum triggering
+ * Signal flow with fader-based routing:
+ * - Fader at 0 (DRM): Drums → Resonator, Synth → Dry bypass
+ * - Fader at 0.5 (BOTH): Both → Resonator
+ * - Fader at 1 (SYN): Synth → Resonator, Drums → Dry bypass
  * 
- * Signal path:
- * Input → ResonatorUnit → WetGain → WetOut
- *       ↘ Bypass → DryGain → DryOut
- * Mix sums WetOut + DryOut → Output
+ * The "dry bypass" path carries signals that SKIP the resonator entirely.
+ * The MIX knob controls wet/dry blend of the RESONATED signal only.
  */
 @Inject
 @ContributesIntoSet(AppScope::class)
@@ -31,23 +28,41 @@ class DspResonatorPlugin(
     // Core resonator unit
     private val resonator = audioEngine.createResonatorUnit()
     
-    // Dry/wet mixing
-    private val dryGainLeft = audioEngine.createMultiply()
-    private val dryGainRight = audioEngine.createMultiply()
-    private val wetGainLeft = audioEngine.createMultiply()
-    private val wetGainRight = audioEngine.createMultiply()
+    // Excitation gains (what goes TO the resonator, controlled by fader)
+    private val drumExciteGainL = audioEngine.createMultiply()
+    private val drumExciteGainR = audioEngine.createMultiply()
+    private val synthExciteGainL = audioEngine.createMultiply()
+    private val synthExciteGainR = audioEngine.createMultiply()
     
-    // Mix summers (dry + wet per channel)
-    private val mixSumLeft = audioEngine.createAdd()
-    private val mixSumRight = audioEngine.createAdd()
+    // Dry bypass gains (what SKIPS the resonator, inverse of excitation)
+    private val drumBypassGainL = audioEngine.createMultiply()
+    private val drumBypassGainR = audioEngine.createMultiply()
+    private val synthBypassGainL = audioEngine.createMultiply()
+    private val synthBypassGainR = audioEngine.createMultiply()
     
-    // Input splitter (for stereo input handling)
-    private val inputSumLeft = audioEngine.createPassThrough()
-    private val inputSumRight = audioEngine.createPassThrough()
+    // Summing units
+    private val excitationSumL = audioEngine.createAdd()
+    private val excitationSumR = audioEngine.createAdd()
+    private val bypassSumL = audioEngine.createAdd()
+    private val bypassSumR = audioEngine.createAdd()
+    
+    // Wet/Dry mix for resonator output
+    private val wetGainL = audioEngine.createMultiply()
+    private val wetGainR = audioEngine.createMultiply()
+    private val dryGainL = audioEngine.createMultiply()
+    private val dryGainR = audioEngine.createMultiply()
+    
+    // Mix resonated (wet+dry) with bypass
+    private val resoMixL = audioEngine.createAdd()
+    private val resoMixR = audioEngine.createAdd()
+    private val finalSumL = audioEngine.createAdd()
+    private val finalSumR = audioEngine.createAdd()
     
     // State
     private var _enabled = false
     private var _mode = 0
+    private var _target = 1
+    private var _targetMix = 0.5f
     private var _structure = 0.25f
     private var _brightness = 0.5f
     private var _damping = 0.3f
@@ -56,49 +71,68 @@ class DspResonatorPlugin(
     
     override val audioUnits: List<AudioUnit> = listOf(
         resonator,
-        dryGainLeft, dryGainRight,
-        wetGainLeft, wetGainRight,
-        mixSumLeft, mixSumRight,
-        inputSumLeft, inputSumRight
+        drumExciteGainL, drumExciteGainR, synthExciteGainL, synthExciteGainR,
+        drumBypassGainL, drumBypassGainR, synthBypassGainL, synthBypassGainR,
+        excitationSumL, excitationSumR, bypassSumL, bypassSumR,
+        wetGainL, wetGainR, dryGainL, dryGainR,
+        resoMixL, resoMixR, finalSumL, finalSumR
     )
     
     override val inputs: Map<String, AudioInput>
         get() = mapOf(
-            "inputLeft" to inputSumLeft.input,
-            "inputRight" to inputSumRight.input
+            // Excitation path inputs
+            "drumLeft" to drumExciteGainL.inputA,
+            "drumRight" to drumExciteGainR.inputA,
+            "synthLeft" to synthExciteGainL.inputA,
+            "synthRight" to synthExciteGainR.inputA,
+            // Bypass path inputs (same source, different gain)
+            "fullDrumLeft" to drumBypassGainL.inputA,
+            "fullDrumRight" to drumBypassGainR.inputA,
+            "fullSynthLeft" to synthBypassGainL.inputA,
+            "fullSynthRight" to synthBypassGainR.inputA
         )
     
     override val outputs: Map<String, AudioOutput>
         get() = mapOf(
-            "outputLeft" to mixSumLeft.output,
-            "outputRight" to mixSumRight.output,
+            "outputLeft" to finalSumL.output,
+            "outputRight" to finalSumR.output,
             "auxLeft" to resonator.auxOutput,
             "auxRight" to resonator.auxOutput
         )
     
     override fun initialize() {
-        // Default mix (50/50 dry/wet)
-        setMix(_mix)
+        // Excitation path: gated sources → sum → resonator
+        drumExciteGainL.output.connect(excitationSumL.inputA)
+        synthExciteGainL.output.connect(excitationSumL.inputB)
+        drumExciteGainR.output.connect(excitationSumR.inputA)
+        synthExciteGainR.output.connect(excitationSumR.inputB)
         
-        // Wire internal signal path
-        // Input → Resonator
-        inputSumLeft.output.connect(resonator.input)
-        // Note: Resonator is mono input, we sum stereo to mono
-        inputSumRight.output.connect(resonator.input) 
+        excitationSumL.output.connect(resonator.input)
+        excitationSumR.output.connect(resonator.input)
         
-        // Resonator → Wet path
-        resonator.output.connect(wetGainLeft.inputA)
-        resonator.output.connect(wetGainRight.inputA)
+        // Bypass path: inverse-gated sources → sum
+        drumBypassGainL.output.connect(bypassSumL.inputA)
+        synthBypassGainL.output.connect(bypassSumL.inputB)
+        drumBypassGainR.output.connect(bypassSumR.inputA)
+        synthBypassGainR.output.connect(bypassSumR.inputB)
         
-        // Input → Dry path (bypass)
-        inputSumLeft.output.connect(dryGainLeft.inputA)
-        inputSumRight.output.connect(dryGainRight.inputA)
+        // Resonator wet/dry: excitationSum → dryGain, resonator → wetGain
+        excitationSumL.output.connect(dryGainL.inputA)
+        excitationSumR.output.connect(dryGainR.inputA)
+        resonator.output.connect(wetGainL.inputA)
+        resonator.output.connect(wetGainR.inputA)
         
-        // Wet + Dry → Mix
-        wetGainLeft.output.connect(mixSumLeft.inputA)
-        dryGainLeft.output.connect(mixSumLeft.inputB)
-        wetGainRight.output.connect(mixSumRight.inputA)
-        dryGainRight.output.connect(mixSumRight.inputB)
+        // Mix wet + dry of resonated signal
+        wetGainL.output.connect(resoMixL.inputA)
+        dryGainL.output.connect(resoMixL.inputB)
+        wetGainR.output.connect(resoMixR.inputA)
+        dryGainR.output.connect(resoMixR.inputB)
+        
+        // Final: resonated mix + bypass
+        resoMixL.output.connect(finalSumL.inputA)
+        bypassSumL.output.connect(finalSumL.inputB)
+        resoMixR.output.connect(finalSumR.inputA)
+        bypassSumR.output.connect(finalSumR.inputB)
         
         // Apply initial settings
         resonator.setEnabled(_enabled)
@@ -107,6 +141,44 @@ class DspResonatorPlugin(
         resonator.setBrightness(_brightness)
         resonator.setDamping(_damping)
         resonator.setPosition(_position)
+        setMix(_mix)
+        applyTargetMixRouting()
+    }
+    
+    private fun applyTargetRouting() {
+        val drumExcite = when (_target) { 0 -> 1.0; 1 -> 1.0; 2 -> 0.0; else -> 1.0 }
+        val synthExcite = when (_target) { 0 -> 0.0; 1 -> 1.0; 2 -> 1.0; else -> 1.0 }
+        val drumBypass = 1.0 - drumExcite
+        val synthBypass = 1.0 - synthExcite
+        
+        drumExciteGainL.inputB.set(drumExcite)
+        drumExciteGainR.inputB.set(drumExcite)
+        synthExciteGainL.inputB.set(synthExcite)
+        synthExciteGainR.inputB.set(synthExcite)
+        drumBypassGainL.inputB.set(drumBypass)
+        drumBypassGainR.inputB.set(drumBypass)
+        synthBypassGainL.inputB.set(synthBypass)
+        synthBypassGainR.inputB.set(synthBypass)
+    }
+    
+    private fun applyTargetMixRouting() {
+        // Fader: 0=Drums to resonator, 1=Synth to resonator
+        // Excitation gains
+        val drumExcite = if (_targetMix <= 0.5f) 1.0 else (1.0 - (_targetMix.toDouble() - 0.5) * 2.0).coerceIn(0.0, 1.0)
+        val synthExcite = if (_targetMix >= 0.5f) 1.0 else (_targetMix.toDouble() * 2.0).coerceIn(0.0, 1.0)
+        
+        // Bypass gains are INVERSE: what's NOT in resonator goes to bypass
+        val drumBypass = 1.0 - drumExcite
+        val synthBypass = 1.0 - synthExcite
+        
+        drumExciteGainL.inputB.set(drumExcite)
+        drumExciteGainR.inputB.set(drumExcite)
+        synthExciteGainL.inputB.set(synthExcite)
+        synthExciteGainR.inputB.set(synthExcite)
+        drumBypassGainL.inputB.set(drumBypass)
+        drumBypassGainR.inputB.set(drumBypass)
+        synthBypassGainL.inputB.set(synthBypass)
+        synthBypassGainR.inputB.set(synthBypass)
     }
     
     fun setEnabled(enabled: Boolean) {
@@ -117,6 +189,16 @@ class DspResonatorPlugin(
     fun setMode(mode: Int) {
         _mode = mode
         resonator.setMode(mode)
+    }
+    
+    fun setTarget(target: Int) {
+        _target = target.coerceIn(0, 2)
+        applyTargetRouting()
+    }
+    
+    fun setTargetMix(targetMix: Float) {
+        _targetMix = targetMix.coerceIn(0f, 1f)
+        applyTargetMixRouting()
     }
     
     fun setStructure(value: Float) {
@@ -144,10 +226,10 @@ class DspResonatorPlugin(
         val wetLevel = _mix.toDouble()
         val dryLevel = (1.0 - _mix).toDouble()
         
-        wetGainLeft.inputB.set(wetLevel)
-        wetGainRight.inputB.set(wetLevel)
-        dryGainLeft.inputB.set(dryLevel)
-        dryGainRight.inputB.set(dryLevel)
+        wetGainL.inputB.set(wetLevel)
+        wetGainR.inputB.set(wetLevel)
+        dryGainL.inputB.set(dryLevel)
+        dryGainR.inputB.set(dryLevel)
     }
     
     fun strum(frequency: Float) {
@@ -157,6 +239,8 @@ class DspResonatorPlugin(
     // Getters for state saving
     fun getEnabled(): Boolean = _enabled
     fun getMode(): Int = _mode
+    fun getTarget(): Int = _target
+    fun getTargetMix(): Float = _targetMix
     fun getStructure(): Float = _structure
     fun getBrightness(): Float = _brightness
     fun getDamping(): Float = _damping

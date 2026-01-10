@@ -184,9 +184,13 @@ class DspSynthEngine(
         stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
         stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
 
-        // Drum outputs → Resonator (Drum excitation)
-        drumPlugin.outputs["outputLeft"]?.connect(resonatorPlugin.inputs["inputLeft"]!!)
-        drumPlugin.outputs["outputRight"]?.connect(resonatorPlugin.inputs["inputRight"]!!)
+        // Drum outputs → Resonator gated inputs (excitation)
+        drumPlugin.outputs["outputLeft"]?.connect(resonatorPlugin.inputs["drumLeft"]!!)
+        drumPlugin.outputs["outputRight"]?.connect(resonatorPlugin.inputs["drumRight"]!!)
+        
+        // Drum outputs → Resonator non-gated inputs (full dry path)
+        drumPlugin.outputs["outputLeft"]?.connect(resonatorPlugin.inputs["fullDrumLeft"]!!)
+        drumPlugin.outputs["outputRight"]?.connect(resonatorPlugin.inputs["fullDrumRight"]!!)
 
         // Wire voices to audio paths
         voices.forEachIndexed { index, voice ->
@@ -228,9 +232,13 @@ class DspSynthEngine(
             voice.output.connect(stereoPlugin.getVoicePanInputLeft(index))
             voice.output.connect(stereoPlugin.getVoicePanInputRight(index))
             
-            // Panned audio goes to Resonator inputs (Stereo Panned -> Resonator L/R)
-            stereoPlugin.getVoicePanOutputLeft(index).connect(resonatorPlugin.inputs["inputLeft"]!!)
-            stereoPlugin.getVoicePanOutputRight(index).connect(resonatorPlugin.inputs["inputRight"]!!)
+            // Panned audio goes to Resonator gated inputs (excitation)
+            stereoPlugin.getVoicePanOutputLeft(index).connect(resonatorPlugin.inputs["synthLeft"]!!)
+            stereoPlugin.getVoicePanOutputRight(index).connect(resonatorPlugin.inputs["synthRight"]!!)
+            
+            // Panned audio goes to Resonator non-gated inputs (full dry path)
+            stereoPlugin.getVoicePanOutputLeft(index).connect(resonatorPlugin.inputs["fullSynthLeft"]!!)
+            stereoPlugin.getVoicePanOutputRight(index).connect(resonatorPlugin.inputs["fullSynthRight"]!!)
         }
 
         // Resonator output goes to Distortion input
@@ -822,6 +830,8 @@ class DspSynthEngine(
     // ═══════════════════════════════════════════════════════════
     override fun setResonatorEnabled(enabled: Boolean) = resonatorPlugin.setEnabled(enabled)
     override fun setResonatorMode(mode: Int) = resonatorPlugin.setMode(mode)
+    override fun setResonatorTarget(target: Int) = resonatorPlugin.setTarget(target)
+    override fun setResonatorTargetMix(targetMix: Float) = resonatorPlugin.setTargetMix(targetMix)
     override fun setResonatorStructure(value: Float) = resonatorPlugin.setStructure(value)
     override fun setResonatorBrightness(value: Float) = resonatorPlugin.setBrightness(value)
     override fun setResonatorDamping(value: Float) = resonatorPlugin.setDamping(value)
@@ -831,6 +841,8 @@ class DspSynthEngine(
     
     override fun getResonatorEnabled(): Boolean = resonatorPlugin.getEnabled()
     override fun getResonatorMode(): Int = resonatorPlugin.getMode()
+    override fun getResonatorTarget(): Int = resonatorPlugin.getTarget()
+    override fun getResonatorTargetMix(): Float = resonatorPlugin.getTargetMix()
     override fun getResonatorStructure(): Float = resonatorPlugin.getStructure()
     override fun getResonatorBrightness(): Float = resonatorPlugin.getBrightness()
     override fun getResonatorDamping(): Float = resonatorPlugin.getDamping()

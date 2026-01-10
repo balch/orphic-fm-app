@@ -177,6 +177,8 @@ open class TestSynthEngine : SynthEngine {
     // Resonator (Rings) stub implementations
     private var _resonatorEnabled = false
     private var _resonatorMode = 0
+    private var _resonatorTarget = 1  // 0=Drums, 1=Both, 2=Synth
+    private var _resonatorTargetMix = 0.5f  // Continuous mix
     private var _resonatorStructure = 0.25f
     private var _resonatorBrightness = 0.5f
     private var _resonatorDamping = 0.3f
@@ -185,6 +187,8 @@ open class TestSynthEngine : SynthEngine {
     
     override fun setResonatorEnabled(enabled: Boolean) { _resonatorEnabled = enabled }
     override fun setResonatorMode(mode: Int) { _resonatorMode = mode }
+    override fun setResonatorTarget(target: Int) { _resonatorTarget = target }
+    override fun setResonatorTargetMix(targetMix: Float) { _resonatorTargetMix = targetMix }
     override fun setResonatorStructure(value: Float) { _resonatorStructure = value }
     override fun setResonatorBrightness(value: Float) { _resonatorBrightness = value }
     override fun setResonatorDamping(value: Float) { _resonatorDamping = value }
@@ -194,6 +198,8 @@ open class TestSynthEngine : SynthEngine {
     
     override fun getResonatorEnabled(): Boolean = _resonatorEnabled
     override fun getResonatorMode(): Int = _resonatorMode
+    override fun getResonatorTarget(): Int = _resonatorTarget
+    override fun getResonatorTargetMix(): Float = _resonatorTargetMix
     override fun getResonatorStructure(): Float = _resonatorStructure
     override fun getResonatorBrightness(): Float = _resonatorBrightness
     override fun getResonatorDamping(): Float = _resonatorDamping

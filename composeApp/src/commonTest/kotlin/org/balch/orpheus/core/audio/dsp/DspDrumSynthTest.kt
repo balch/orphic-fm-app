@@ -109,6 +109,27 @@ class DspDrumSynthTest {
         override fun getStereoMode(): StereoMode = StereoMode.VOICE_PAN
         override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) {}
         override fun clearParameterAutomation(controlId: String) {}
+        
+        // Resonator stubs
+        override fun setResonatorEnabled(enabled: Boolean) {}
+        override fun setResonatorMode(mode: Int) {}
+        override fun setResonatorTarget(target: Int) {}
+        override fun setResonatorTargetMix(targetMix: Float) {}
+        override fun setResonatorStructure(value: Float) {}
+        override fun setResonatorBrightness(value: Float) {}
+        override fun setResonatorDamping(value: Float) {}
+        override fun setResonatorPosition(value: Float) {}
+        override fun setResonatorMix(value: Float) {}
+        override fun strumResonator(frequency: Float) {}
+        override fun getResonatorEnabled(): Boolean = false
+        override fun getResonatorMode(): Int = 0
+        override fun getResonatorTarget(): Int = 1
+        override fun getResonatorTargetMix(): Float = 0.5f
+        override fun getResonatorStructure(): Float = 0.25f
+        override fun getResonatorBrightness(): Float = 0.5f
+        override fun getResonatorDamping(): Float = 0.3f
+        override fun getResonatorPosition(): Float = 0.5f
+        override fun getResonatorMix(): Float = 0.5f
     }
 
     @Test

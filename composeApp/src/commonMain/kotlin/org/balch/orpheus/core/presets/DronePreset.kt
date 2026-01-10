@@ -50,6 +50,26 @@ data class DronePreset(
     val quadGroupHolds: List<Float> = List(3) { 0.0f },
     val quadGroupVolumes: List<Float> = List(3) { 1.0f },
 
+    // Resonator (Rings)
+    val resonatorEnabled: Boolean = false,
+    val resonatorMode: Int = 0,        // 0=Modal, 1=String, 2=Sympathetic
+    val resonatorTargetMix: Float = 0.5f, // 0=Drums only, 0.5=Both, 1=Synth only
+    val resonatorStructure: Float = 0.25f,
+    val resonatorBrightness: Float = 0.5f,
+    val resonatorDamping: Float = 0.3f,
+    val resonatorPosition: Float = 0.5f,
+    val resonatorMix: Float = 0.5f,
+
+    // Drum Beats (Grids-style pattern generator)
+    val beatsX: Float = 0.5f,
+    val beatsY: Float = 0.5f,
+    val beatsDensities: List<Float> = listOf(0.5f, 0.5f, 0.5f),
+    val beatsBpm: Float = 120f,
+    val beatsOutputMode: Int = 0,      // DrumBeatsGenerator.OutputMode ordinal
+    val beatsEuclideanLengths: List<Int> = listOf(16, 16, 16),
+    val beatsRandomness: Float = 0f,
+    val beatsSwing: Float = 0f,
+
     // Metadata
     val createdAt: Long = currentTimeMillis()
 )

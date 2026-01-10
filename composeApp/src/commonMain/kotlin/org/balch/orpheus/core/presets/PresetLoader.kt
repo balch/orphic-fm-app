@@ -45,6 +45,9 @@ class PresetLoader(
 
     /**
      * Capture the current state directly from the Engine.
+     * 
+     * Note: Drum beats are managed by DrumBeatsViewModel and don't have engine getters,
+     * so they will use default values here. ViewModels subscribe to presetFlow for full restore.
      */
     fun currentStateAsPreset(name: String): DronePreset {
         return DronePreset(
@@ -78,7 +81,17 @@ class PresetLoader(
             vibrato = engine.getVibrato(),
             voiceCoupling = engine.getVoiceCoupling(),
             quadGroupPitches = List(3) { i -> engine.getQuadPitch(i) },
-            quadGroupHolds = List(3) { i -> engine.getQuadHold(i) }
+            quadGroupHolds = List(3) { i -> engine.getQuadHold(i) },
+            // Resonator (captured from engine)
+            resonatorEnabled = engine.getResonatorEnabled(),
+            resonatorMode = engine.getResonatorMode(),
+            resonatorTargetMix = engine.getResonatorTargetMix(),
+            resonatorStructure = engine.getResonatorStructure(),
+            resonatorBrightness = engine.getResonatorBrightness(),
+            resonatorDamping = engine.getResonatorDamping(),
+            resonatorPosition = engine.getResonatorPosition(),
+            resonatorMix = engine.getResonatorMix()
+            // Drum beats use defaults - ViewModels handle full restore via presetFlow
         )
     }
 }

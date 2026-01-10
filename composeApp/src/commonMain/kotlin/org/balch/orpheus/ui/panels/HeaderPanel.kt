@@ -82,11 +82,11 @@ fun HeaderPanel(
     val uiState by headerFeature.stateFlow.collectAsState()
     val headerActions = headerFeature.actions
 
-    fun setExpanded(panelId: PanelId, expanded: Boolean) {
-        headerActions.setExpanded(panelId, expanded)
+    fun PanelId.setExpanded(expanded: Boolean) {
+        headerActions.setExpanded(this, expanded)
     }
 
-    fun isExpanded(panelId: PanelId): Boolean = uiState.isExpanded(panelId)
+    fun PanelId.isExpanded(): Boolean = uiState.isExpanded(this)
 
     Row(
         modifier = modifier
@@ -97,86 +97,86 @@ fun HeaderPanel(
     ) {
         PresetsPanel(
             feature = presetsFeature,
-            isExpanded = isExpanded(PanelId.PRESETS),
-            onExpandedChange = { setExpanded(PanelId.PRESETS, it) },
-            modifier = panelModifier(isExpanded(PanelId.PRESETS))
+            isExpanded = PanelId.PRESETS.isExpanded(),
+            onExpandedChange = { PanelId.PRESETS.setExpanded(it) },
+            modifier = panelModifier(PanelId.PRESETS.isExpanded())
         )
         MidiPanel(
             feature = midiFeature,
-            isExpanded = isExpanded(PanelId.MIDI),
-            onExpandedChange = { setExpanded(PanelId.MIDI, it) },
-            modifier = panelModifier(isExpanded(PanelId.MIDI))
+            isExpanded = PanelId.MIDI.isExpanded(),
+            onExpandedChange = { PanelId.MIDI.setExpanded(it) },
+            modifier = panelModifier(PanelId.MIDI.isExpanded(), weight = .5f)
         )
         StereoPanel(
             feature = stereoFeature,
-            isExpanded = isExpanded(PanelId.STEREO),
-            onExpandedChange = { setExpanded(PanelId.STEREO, it) },
-            modifier = panelModifier(isExpanded(PanelId.STEREO))
+            isExpanded = PanelId.STEREO.isExpanded(),
+            onExpandedChange = { PanelId.STEREO.setExpanded(it) },
+            modifier = panelModifier(PanelId.STEREO.isExpanded(), weight = .5f)
         )
         VizPanel(
             feature = vizFeature,
-            isExpanded = isExpanded(PanelId.VIZ),
-            onExpandedChange = { setExpanded(PanelId.VIZ, it) },
-            modifier = panelModifier(isExpanded(PanelId.VIZ))
+            isExpanded = PanelId.VIZ.isExpanded(),
+            onExpandedChange = { PanelId.VIZ.setExpanded(it) },
+            modifier = panelModifier(PanelId.VIZ.isExpanded(), weight = .5f)
         )
         EvoPanel(
             evoFeature = evoFeature,
-            isExpanded = isExpanded(PanelId.EVO),
-            onExpandedChange = { setExpanded(PanelId.EVO, it) },
-            modifier = panelModifier(isExpanded(PanelId.EVO))
+            isExpanded = PanelId.EVO.isExpanded(),
+            onExpandedChange = { PanelId.EVO.setExpanded(it) },
+            modifier = panelModifier(PanelId.EVO.isExpanded(), weight = .5f)
         )
         HyperLfoPanel(
             feature = lfoFeature,
-            isExpanded = isExpanded(PanelId.LFO),
-            onExpandedChange = { setExpanded(PanelId.LFO, it) },
-            modifier = panelModifier(isExpanded(PanelId.LFO))
+            isExpanded = PanelId.LFO.isExpanded(),
+            onExpandedChange = { PanelId.LFO.setExpanded(it) },
+            modifier = panelModifier(PanelId.LFO.isExpanded(), weight = .5f)
         )
         ModDelayPanel(
             feature = delayFeature,
-            isExpanded = isExpanded(PanelId.DELAY),
-            onExpandedChange = { setExpanded(PanelId.DELAY, it) },
-            modifier = panelModifier(isExpanded(PanelId.DELAY))
+            isExpanded = PanelId.DELAY.isExpanded(),
+            onExpandedChange = { PanelId.DELAY.setExpanded(it) },
+            modifier = panelModifier(PanelId.DELAY.isExpanded(), weight = 1.25f)
         )
         DistortionPanel(
             feature = distortionFeature,
-            isExpanded = isExpanded(PanelId.DISTORTION),
-            onExpandedChange = { setExpanded(PanelId.DISTORTION, it) },
-            modifier = panelModifier(isExpanded(PanelId.DISTORTION), maxWidth = 220.dp)
+            isExpanded = PanelId.DISTORTION.isExpanded(),
+            onExpandedChange = { PanelId.DISTORTION.setExpanded(it) },
+            modifier = panelModifier(PanelId.DISTORTION.isExpanded(), weight = .5f, maxWidth = 220.dp)
         )
         // Rings Resonator panel
         ResonatorPanel(
             feature = resonatorFeature,
-            isExpanded = isExpanded(PanelId.RESONATOR),
-            onExpandedChange = { setExpanded(PanelId.RESONATOR, it) },
-            modifier = panelModifier(isExpanded(PanelId.RESONATOR))
+            isExpanded = PanelId.RESONATOR.isExpanded(),
+            onExpandedChange = { PanelId.RESONATOR.setExpanded(it) },
+            modifier = panelModifier(PanelId.RESONATOR.isExpanded())
         )
         // Live Coding panel
         LiveCodePanel(
             feature = liveCodeFeature,
-            isExpanded = isExpanded(PanelId.CODE),
-            onExpandedChange = { setExpanded(PanelId.CODE, it) },
-            modifier = panelModifier(isExpanded(PanelId.CODE))
+            isExpanded = PanelId.CODE.isExpanded(),
+            onExpandedChange = { PanelId.CODE.setExpanded(it) },
+            modifier = panelModifier(PanelId.CODE.isExpanded())
         )
         // Drums panel
         DrumsPanel(
             drumFeature = drumFeature,
-            isExpanded = isExpanded(PanelId.DRUMS),
-            onExpandedChange = { setExpanded(PanelId.DRUMS, it) },
-            modifier = panelModifier(isExpanded(PanelId.DRUMS))
+            isExpanded = PanelId.DRUMS.isExpanded(),
+            onExpandedChange = { PanelId.DRUMS.setExpanded(it) },
+            modifier = panelModifier(PanelId.DRUMS.isExpanded(), weight = 1.25f)
         )
         // Pattern panel
         DrumBeatsPanel(
             drumBeatsFeature = drumBeatsFeature,
-            isExpanded = isExpanded(PanelId.PATTERN),
-            onExpandedChange = { setExpanded(PanelId.PATTERN, it) },
-            modifier = panelModifier(isExpanded(PanelId.PATTERN))
+            isExpanded = PanelId.PATTERN.isExpanded(),
+            onExpandedChange = { PanelId.PATTERN.setExpanded(it) },
+            modifier = panelModifier(PanelId.PATTERN.isExpanded(), weight = 1.25f)
         )
         // AI Options panel
         AiOptionsPanel(
             feature = aiOptionsFeature,
-            isExpanded = isExpanded(PanelId.AI),
-            onExpandedChange = { setExpanded(PanelId.AI, it) },
-            modifier = panelModifier(isExpanded(PanelId.AI), maxWidth = 200.dp)
+            isExpanded = PanelId.AI.isExpanded(),
+            onExpandedChange = { PanelId.AI.setExpanded(it) },
+            modifier = panelModifier(PanelId.AI.isExpanded(), weight = .5f, maxWidth = 200.dp)
         )
     }
 }
@@ -187,9 +187,13 @@ fun HeaderPanel(
  * Collapsed panels use their intrinsic width (just the header).
  */
 @Composable
-private fun RowScope.panelModifier(isExpanded: Boolean, maxWidth: Dp? = null): Modifier {
+private fun RowScope.panelModifier(
+    isExpanded: Boolean,
+    weight: Float = 1f,
+    maxWidth: Dp? = null)
+: Modifier {
     return if (isExpanded) {
-        val base = Modifier.weight(1f).fillMaxHeight()
+        val base = Modifier.weight(weight).fillMaxHeight()
         if (maxWidth != null) base.widthIn(max = maxWidth) else base
     } else {
         Modifier.fillMaxHeight()
