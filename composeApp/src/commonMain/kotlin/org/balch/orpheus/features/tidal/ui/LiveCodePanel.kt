@@ -460,36 +460,6 @@ private fun ExamplesDropdown(
 }
 
 // === Previews ===
-
-@Preview
-@Composable
-private fun LiveCodePanelCollapsedPreview() {
-    OrpheusTheme {
-        Surface(
-            modifier = Modifier.fillMaxWidth().height(300.dp),
-            color = OrpheusColors.darkVoid
-        ) {
-            LiveCodePanelLayout(
-                uiState = LiveCodeUiState(
-                    code = TextFieldValue("")
-                ),
-                actions = LiveCodePanelActions(
-                    onCodeChange = {},
-                    onExecuteBlock = {},
-                    onExecuteLine = {},
-                    onBpmChange = {},
-                    onReplVolumeChange = {},
-                    onExecute = {},
-                    onStop = {},
-                    onLoadExample = {},
-                    onDeleteLine = {}
-                ),
-                isExpanded = false
-            )
-        }
-    }
-}
-
 @Preview
 @Composable
 private fun LiveCodePanelExpandedPreview() {

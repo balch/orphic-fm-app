@@ -14,6 +14,11 @@ interface SynthEngine {
     fun setVoiceEnvelopeSpeed(index: Int, speed: Float) // 0=Fast, 1=Slow (continuous)
     fun setPairSharpness(pairIndex: Int, sharpness: Float) // Waveform (0=tri, 1=sq) per pair
 
+    // specialized Drum Synthesis (808)
+    fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float)
+    fun setDrumTone(type: Int, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float)
+    fun triggerDrum(type: Int, accent: Float)
+
 
     // Group Control (Quad 1-4, 5-8, 9-12)
     fun setQuadPitch(quadIndex: Int, pitch: Float) // 0-1, 0.5=Unity

@@ -64,6 +64,7 @@ actual class AudioEngine actual constructor() {
     actual fun createMaximum(): Maximum = WebAudioMaximum(audioContext)
     actual fun createLinearRamp(): LinearRamp = WebAudioLinearRamp(audioContext)
     actual fun createAutomationPlayer(): AutomationPlayer = WebAudioAutomationPlayer(audioContext)
+    actual fun createDrumUnit(): DrumUnit = WebAudioDrumUnit(audioContext)
     
     actual val lineOutLeft: AudioInput
         get() = WebAudioNodeInput(leftGain, 0, audioContext)

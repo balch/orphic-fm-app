@@ -52,7 +52,6 @@ class CleanPatch : SynthPatch {
         delayModSourceIsLfo = true,
         delayLfoWaveformIsTriangle = true,
         // Overall mix
-        masterVolume = 0.75f,  // Healthy volume
         drive = 0f,       // min distortion by default
         distortionMix = 0.5f,
         fmStructureCrossQuad = false,  // Standard FM routing

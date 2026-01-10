@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -30,12 +31,18 @@ import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.balch.orpheus.features.beats.DrumBeatsFeature
+import org.balch.orpheus.features.beats.DrumBeatsPanel
+import org.balch.orpheus.features.beats.DrumBeatsViewModel
 import org.balch.orpheus.features.delay.DelayFeature
 import org.balch.orpheus.features.delay.DelayViewModel
 import org.balch.orpheus.features.delay.ModDelayPanel
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.distortion.DistortionViewModel
+import org.balch.orpheus.features.drums808.DrumFeature
+import org.balch.orpheus.features.drums808.DrumViewModel
+import org.balch.orpheus.features.drums808.DrumsPanel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
 import org.balch.orpheus.features.evo.EvoViewModel
@@ -88,18 +95,10 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun CompactPortraitScreen(
     modifier: Modifier = Modifier,
-    voiceViewModel: VoiceViewModel = metroViewModel(),
-    presetViewModel: PresetsViewModel = metroViewModel(),
-    vizViewModel: VizViewModel = metroViewModel(),
-    delayViewModel: DelayViewModel = metroViewModel(),
-    distortionViewModel: DistortionViewModel = metroViewModel(),
-
-    evoViewModel: EvoViewModel = metroViewModel(),
-    lfoViewModel: LfoViewModel = metroViewModel(),
-    stereoViewModel: StereoViewModel = metroViewModel(),
     liveCodeViewModel: LiveCodeViewModel = metroViewModel(),
+    voiceViewModel: VoiceViewModel = metroViewModel(),
+    drumViewModel: DrumViewModel = metroViewModel(),
 ) {
-
 
     // Track active highlight ranges for token highlighting (Map of unique ID to range)
     var activeHighlightMap by remember { mutableStateOf(mapOf<Long, IntRange>()) }
@@ -139,23 +138,16 @@ fun CompactPortraitScreen(
 
     CompactPortraitScreenLayout(
         modifier = modifier,
-        presetFeature = presetViewModel,
-        voiceFeature = voiceViewModel,
-        distortionFeature = distortionViewModel,
         liquidState = liquidState,
         effects = effects,
         liveCodeFeature = liveCodeViewModel,
         activeReplHighlights = activeHighlights,
-        delayFeature = delayViewModel,
-        evoFeature = evoViewModel,
-        lfoFeature = lfoViewModel,
-        stereoFeature = stereoViewModel,
-        vizFeature = vizViewModel,
         focusRequester = focusRequester,
         onKeyEvent = { event ->
             SynthKeyboardHandler.handleKeyEvent(
                 keyEvent = event,
                 voiceFeature = voiceViewModel,
+                drumFeature = drumViewModel,
                 isDialogActive = false
             )
         }
@@ -165,20 +157,22 @@ fun CompactPortraitScreen(
 @Composable
 private fun CompactPortraitScreenLayout(
     modifier: Modifier = Modifier,
-    presetFeature: PresetsFeature,
-    voiceFeature: VoicesFeature,
-    distortionFeature: DistortionFeature,
+    presetFeature: PresetsFeature = PresetsViewModel.feature(),
+    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
+    distortionFeature: DistortionFeature = DistortionViewModel.feature(),
     liquidState: LiquidState,
     effects: VisualizationLiquidEffects,
-    liveCodeFeature: LiveCodeFeature,
+    liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
     activeReplHighlights: List<IntRange> = emptyList(),
-    delayFeature: DelayFeature,
-    evoFeature: EvoFeature,
-    lfoFeature: LfoFeature,
-    stereoFeature: StereoFeature,
-    vizFeature: VizFeature,
+    delayFeature: DelayFeature = DelayViewModel.feature(),
+    evoFeature: EvoFeature = EvoViewModel.feature(),
+    lfoFeature: LfoFeature = LfoViewModel.feature(),
+    stereoFeature: StereoFeature = StereoViewModel.feature(),
+    vizFeature: VizFeature = VizViewModel.feature(),
+    drumFeature: DrumFeature = DrumViewModel.feature(),
+    drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
     focusRequester: FocusRequester = remember { FocusRequester() },
-    onKeyEvent: (androidx.compose.ui.input.key.KeyEvent) -> Boolean = { false },
+    onKeyEvent: (KeyEvent) -> Boolean = { false },
 ) {
     // Request focus for keyboard input
     LaunchedEffect(Unit) {
@@ -250,6 +244,8 @@ private fun CompactPortraitScreenLayout(
                                 lfoFeature = lfoFeature,
                                 stereoFeature = stereoFeature,
                                 vizFeature = vizFeature,
+                                drumFeature = drumFeature,
+                                drumBeatsFeature = drumBeatsFeature,
                             )
                         }
                     }
@@ -323,6 +319,8 @@ private fun PanelContent(
     lfoFeature: LfoFeature,
     stereoFeature: StereoFeature,
     vizFeature: VizFeature,
+    drumFeature: DrumFeature,
+    drumBeatsFeature: DrumBeatsFeature,
     modifier: Modifier = Modifier,
 ) {
     val panelModifier = modifier
@@ -341,8 +339,7 @@ private fun PanelContent(
                 activeHighlights = activeReplHighlights,
                 modifier = panelModifier,
                 isExpanded = true,
-                onExpandedChange = null,
-                showCollapsedHeader = false
+                showCollapsedHeader = false,
             )
         }
 
@@ -351,7 +348,6 @@ private fun PanelContent(
                 feature = presetFeature,
                 modifier = panelModifier,
                 isExpanded = true,
-                onExpandedChange = null,
                 showCollapsedHeader = false
             )
         }
@@ -361,7 +357,6 @@ private fun PanelContent(
                 feature = delayFeature,
                 modifier = panelModifier,
                 isExpanded = true,
-                onExpandedChange = null,
                 showCollapsedHeader = false
             )
         }
@@ -371,7 +366,6 @@ private fun PanelContent(
                 feature = distortionFeature,
                 modifier = panelModifier,
                 isExpanded = true,
-                onExpandedChange = null,
                 showCollapsedHeader = false
             )
         }
@@ -381,7 +375,6 @@ private fun PanelContent(
                 evoFeature = evoFeature,
                 modifier = panelModifier,
                 isExpanded = true,
-                onExpandedChange = null,
                 showCollapsedHeader = false
             )
         }
@@ -391,7 +384,6 @@ private fun PanelContent(
                 voiceFeature = voiceFeature,
                 modifier = panelModifier,
                 isExpanded = true,
-                onExpandedChange = null,
                 showCollapsedHeader = false
             )
         }
@@ -401,7 +393,6 @@ private fun PanelContent(
                 feature = lfoFeature,
                 modifier = panelModifier,
                 isExpanded = true,
-                onExpandedChange = null,
                 showCollapsedHeader = false
             )
         }
@@ -411,7 +402,6 @@ private fun PanelContent(
                 feature = stereoFeature,
                 modifier = panelModifier,
                 isExpanded = true,
-                onExpandedChange = null,
                 showCollapsedHeader = false
             )
         }
@@ -421,8 +411,25 @@ private fun PanelContent(
                 feature = vizFeature,
                 modifier = panelModifier,
                 isExpanded = true,
-                onExpandedChange = null,
                 showCollapsedHeader = false
+            )
+        }
+
+        CompactPanelType.DRUMS -> {
+            DrumsPanel(
+                drumFeature = drumFeature,
+                modifier = panelModifier,
+                isExpanded = true,
+                showCollapsedHeader = false,
+            )
+        }
+
+        CompactPanelType.PATTERN -> {
+            DrumBeatsPanel(
+                drumBeatsFeature = drumBeatsFeature,
+                modifier = panelModifier,
+                isExpanded = true,
+                showCollapsedHeader = false,
             )
         }
     }

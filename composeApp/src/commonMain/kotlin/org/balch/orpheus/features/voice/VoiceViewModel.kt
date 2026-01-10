@@ -46,7 +46,7 @@ data class VoiceUiState(
     val totalFeedback: Float = 0.0f,
     val vibrato: Float = 0.0f,
     val voiceCoupling: Float = 0.0f,
-    val masterVolume: Float = 1.0f,
+    val masterVolume: Float = 0.7f,
     val peakLevel: Float = 0.0f,
     val bendPosition: Float = 0.0f // -1 to +1, current bender position for UI display
 ) {

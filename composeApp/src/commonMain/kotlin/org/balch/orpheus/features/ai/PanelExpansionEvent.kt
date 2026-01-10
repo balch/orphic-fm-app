@@ -21,7 +21,9 @@ enum class PanelId(val displayName: String) {
     DELAY("Mod Delay"),
     DISTORTION("Distortion"),
     CODE("Live Code"),
-    AI("AI Options")
+    AI("AI Options"),
+    DRUMS("808 Drums"),
+    PATTERN("Topographic")
 }
 
 /**

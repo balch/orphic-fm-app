@@ -20,10 +20,14 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsViewModel
+import org.balch.orpheus.features.beats.DrumBeatsFeature
+import org.balch.orpheus.features.beats.DrumBeatsViewModel
 import org.balch.orpheus.features.delay.DelayFeature
 import org.balch.orpheus.features.delay.DelayViewModel
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionViewModel
+import org.balch.orpheus.features.drums808.DrumFeature
+import org.balch.orpheus.features.drums808.DrumViewModel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoViewModel
 import org.balch.orpheus.features.lfo.LfoFeature
@@ -73,10 +77,12 @@ fun DesktopSynthScreen(
     distortionFeature: DistortionFeature = DistortionViewModel.feature(),
     liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
     aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
+    drumFeature: DrumFeature = DrumViewModel.feature(),
+    drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
     effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
     isDialogActive: Boolean = false,
     onDialogActiveChange: (Boolean) -> Unit,
-    focusRequester: FocusRequester = remember { FocusRequester() },
+    focusRequester: FocusRequester  = remember { FocusRequester() },
 ) {
     // Request focus for keyboard input handling
     LaunchedEffect(Unit) {
@@ -93,6 +99,7 @@ fun DesktopSynthScreen(
                     SynthKeyboardHandler.handleKeyEvent(
                         keyEvent = event,
                         voiceFeature = voiceFeature,
+                        drumFeature = drumFeature,
                         isDialogActive = isDialogActive
                     )
                 },
@@ -112,6 +119,8 @@ fun DesktopSynthScreen(
                 distortionFeature = distortionFeature,
                 liveCodeFeature = liveCodeFeature,
                 aiOptionsFeature = aiOptionsFeature,
+                drumFeature = drumFeature,
+                drumBeatsFeature = drumBeatsFeature,
                 onDialogActiveChange = onDialogActiveChange,
             )
 
@@ -187,6 +196,8 @@ private fun DesktopSynthScreenPreview(
             distortionFeature = DistortionViewModel.previewFeature(),
             liveCodeFeature = LiveCodeViewModel.previewFeature(),
             aiOptionsFeature = AiOptionsViewModel.previewFeature(),
+            drumFeature = DrumViewModel.previewFeature(),
+            drumBeatsFeature = DrumBeatsViewModel.previewFeature(),
             effects = effects,
             onDialogActiveChange = {},
             focusRequester = FocusRequester()

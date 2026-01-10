@@ -500,7 +500,6 @@ class AiOptionsViewModel(
             // Reset quads (no hold/drone by default)
             quadGroupPitches = List(3) { 0.5f },
             quadGroupHolds = List(3) { 0.0f }
-            // Note: masterVolume not set - it's user-controlled only
         )
     }
 

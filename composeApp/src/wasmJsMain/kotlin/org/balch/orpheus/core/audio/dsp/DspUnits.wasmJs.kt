@@ -396,3 +396,201 @@ class WebAudioAutomationPlayer(private val context: AudioContext) : AutomationPl
         stop()
     }
 }
+
+actual interface DrumUnit : AudioUnit {
+    actual fun trigger(
+        type: Int,
+        accent: Float,
+        frequency: Float,
+        tone: Float,
+        decay: Float,
+        param4: Float,
+        param5: Float
+    )
+    
+    actual fun setParameters(
+        type: Int,
+        frequency: Float,
+        tone: Float,
+        decay: Float,
+        param4: Float,
+        param5: Float
+    )
+
+    actual fun trigger(type: Int, accent: Float)
+}
+
+/**
+ * WASM implementation of DrumUnit.
+ * 
+ * This is a simplified stub - full analog drum synthesis is complex
+ * and would require custom AudioWorklet processors for Web Audio.
+ * For now, this provides a basic noise burst for hi-hats and 
+ * oscillator-based sounds for kick/snare.
+ */
+class WebAudioDrumUnit(private val context: AudioContext) : DrumUnit {
+    private val outputGain = context.createGain().also { it.gain.value = 0.5f }
+    
+    // Per-drum stored parameters
+    private var bdF0 = 55f
+    private var bdTone = 0.5f
+    private var bdDecay = 0.5f
+    private var bdP4 = 0.5f
+    private var bdP5 = 0.5f
+    
+    private var sdF0 = 180f
+    private var sdTone = 0.5f
+    private var sdDecay = 0.5f
+    private var sdP4 = 0.5f
+    
+    private var hhF0 = 400f
+    private var hhTone = 0.5f
+    private var hhDecay = 0.5f
+    private var hhP4 = 0.5f
+    
+    override val output: AudioOutput = WebAudioNodeOutput(outputGain)
+    
+    override fun trigger(
+        type: Int,
+        accent: Float,
+        frequency: Float,
+        tone: Float,
+        decay: Float,
+        param4: Float,
+        param5: Float
+    ) {
+        setParameters(type, frequency, tone, decay, param4, param5)
+        trigger(type, accent)
+    }
+    
+    override fun setParameters(
+        type: Int,
+        frequency: Float,
+        tone: Float,
+        decay: Float,
+        param4: Float,
+        param5: Float
+    ) {
+        when (type) {
+            0 -> { // Bass Drum
+                bdF0 = frequency
+                bdTone = tone
+                bdDecay = decay
+                bdP4 = param4
+                bdP5 = param5
+            }
+            1 -> { // Snare Drum
+                sdF0 = frequency
+                sdTone = tone
+                sdDecay = decay
+                sdP4 = param4
+            }
+            2 -> { // Hi-Hat
+                hhF0 = frequency
+                hhTone = tone
+                hhDecay = decay
+                hhP4 = param4
+            }
+        }
+    }
+    
+    override fun trigger(type: Int, accent: Float) {
+        val now = context.currentTime
+        
+        when (type) {
+            0 -> triggerKick(now, accent)
+            1 -> triggerSnare(now, accent)
+            2 -> triggerHiHat(now, accent)
+        }
+    }
+    
+    private fun triggerKick(now: Double, accent: Float) {
+        // Simple kick: sine oscillator with pitch and amplitude envelope
+        val osc = context.createOscillator()
+        osc.type = "sine"
+        
+        val gain = context.createGain()
+        gain.gain.value = 0f
+        
+        osc.connect(gain)
+        gain.connect(outputGain)
+        
+        // Pitch envelope (pitch drops quickly)
+        val startFreq = bdF0 * (1f + bdP4 * 2f) // Attack FM amount affects start pitch
+        osc.frequency.setValueAtTime(startFreq, now)
+        osc.frequency.exponentialRampToValueAtTime(bdF0.coerceAtLeast(20f), now + 0.05)
+        
+        // Amplitude envelope
+        val decayTime = 0.1 + bdDecay * 0.9
+        gain.gain.setValueAtTime(accent * 0.8f, now)
+        gain.gain.exponentialRampToValueAtTime(0.001f, now + decayTime)
+        
+        osc.start(now)
+        osc.stop(now + decayTime + 0.01)
+    }
+    
+    private fun triggerSnare(now: Double, accent: Float) {
+        // Snare: oscillator + noise
+        val osc = context.createOscillator()
+        osc.type = "triangle"
+        osc.frequency.value = sdF0
+        
+        val oscGain = context.createGain()
+        oscGain.gain.value = 0f
+        
+        osc.connect(oscGain)
+        oscGain.connect(outputGain)
+        
+        val decayTime = 0.05 + sdDecay * 0.3
+        oscGain.gain.setValueAtTime(accent * 0.5f, now)
+        oscGain.gain.exponentialRampToValueAtTime(0.001f, now + decayTime)
+        
+        osc.start(now)
+        osc.stop(now + decayTime + 0.01)
+        
+        // Add noise component (simplified - would need AudioWorklet for proper noise)
+        // For now, use a high-frequency oscillator as pseudo-noise
+        val noise = context.createOscillator()
+        noise.type = "sawtooth"
+        noise.frequency.value = 5000f + sdP4 * 3000f
+        
+        val noiseGain = context.createGain()
+        noiseGain.gain.value = 0f
+        
+        noise.connect(noiseGain)
+        noiseGain.connect(outputGain)
+        
+        noiseGain.gain.setValueAtTime(accent * sdP4 * 0.3f, now)
+        noiseGain.gain.exponentialRampToValueAtTime(0.001f, now + decayTime * 0.7)
+        
+        noise.start(now)
+        noise.stop(now + decayTime)
+    }
+    
+    private fun triggerHiHat(now: Double, accent: Float) {
+        // Hi-hat: high frequency pseudo-noise
+        val osc1 = context.createOscillator()
+        osc1.type = "square"
+        osc1.frequency.value = hhF0 * 10f
+        
+        val osc2 = context.createOscillator()
+        osc2.type = "square"
+        osc2.frequency.value = hhF0 * 10f * 1.414f // Slightly detuned
+        
+        val gain = context.createGain()
+        gain.gain.value = 0f
+        
+        osc1.connect(gain)
+        osc2.connect(gain)
+        gain.connect(outputGain)
+        
+        val decayTime = 0.02 + hhDecay * 0.3
+        gain.gain.setValueAtTime(accent * 0.3f, now)
+        gain.gain.exponentialRampToValueAtTime(0.001f, now + decayTime)
+        
+        osc1.start(now)
+        osc2.start(now)
+        osc1.stop(now + decayTime + 0.01)
+        osc2.stop(now + decayTime + 0.01)
+    }
+}

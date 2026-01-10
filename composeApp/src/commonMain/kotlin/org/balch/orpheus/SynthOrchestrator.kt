@@ -50,7 +50,7 @@ class SynthOrchestrator(
     private var isStarted = false
     private var isPaused = false
     private var isMediaSessionActive = false
-    private var savedMasterVolume = 1f
+    private var savedMasterVolume = 0.7f
     private var currentPlaybackMode = PlaybackMode.USER
 
     init {

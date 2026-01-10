@@ -8,7 +8,8 @@ import androidx.compose.ui.input.key.Key
  */
 object KeyboardInputHandler {
 
-    // Middle row keys → Voice triggers (0-7)
+    // Middle row keys → Voice triggers (0-5)
+    // J, K, L are reassigned to Drums
     private val voiceKeyMap: Map<Key, Int> = mapOf(
         Key.A to 0,  // Voice 1
         Key.S to 1,  // Voice 2
@@ -17,7 +18,14 @@ object KeyboardInputHandler {
         Key.G to 4,  // Voice 5
         Key.H to 5,  // Voice 6
         Key.J to 6,  // Voice 7
-        Key.K to 7   // Voice 8
+        Key.K to 7,  // Voice 8
+    )
+
+    // Drum keys → Drum types (0=BD, 1=SD, 2=HH)
+    private val drumKeyMap: Map<Key, Int> = mapOf(
+        Key.I to 0,  // Bass Drum
+        Key.O to 1,  // Snare Drum
+        Key.P to 2   // Hi-Hat
     )
 
     // Number row keys → Tune adjustments for voices (0-7)
@@ -34,6 +42,7 @@ object KeyboardInputHandler {
 
     // Track which keys are currently pressed (for trigger behavior)
     private val pressedVoiceKeys = mutableSetOf<Int>()
+    private val pressedDrumKeys = mutableSetOf<Int>()
     private val tuneDelta = 0.05f // How much to adjust tune per key press
 
     // Octave shift state
@@ -41,9 +50,14 @@ object KeyboardInputHandler {
         private set
 
     /**
-     * Returns the voice index (0-7) if this key triggers a voice, null otherwise.
+     * Returns the voice index (0-5) if this key triggers a voice, null otherwise.
      */
     fun getVoiceFromKey(key: Key): Int? = voiceKeyMap[key]
+
+    /**
+     * Returns the drum index (0-2) if this key triggers a drum, null otherwise.
+     */
+    fun getDrumFromKey(key: Key): Int? = drumKeyMap[key]
 
     /**
      * Returns the voice index (0-7) if this key adjusts a voice's tune, null otherwise.
@@ -67,6 +81,25 @@ object KeyboardInputHandler {
      */
     fun onVoiceKeyUp(voiceIndex: Int) {
         pressedVoiceKeys.remove(voiceIndex)
+    }
+
+    /**
+     * Check if a drum key is currently pressed.
+     */
+    fun isDrumKeyPressed(drumIndex: Int): Boolean = drumIndex in pressedDrumKeys
+
+    /**
+     * Mark a drum key as pressed.
+     */
+    fun onDrumKeyDown(drumIndex: Int) {
+        pressedDrumKeys.add(drumIndex)
+    }
+
+    /**
+     * Mark a drum key as released.
+     */
+    fun onDrumKeyUp(drumIndex: Int) {
+        pressedDrumKeys.remove(drumIndex)
     }
 
     /**

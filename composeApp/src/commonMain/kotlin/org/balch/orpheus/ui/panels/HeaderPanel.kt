@@ -18,12 +18,18 @@ import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsPanel
 import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.ai.PanelId
+import org.balch.orpheus.features.beats.DrumBeatsFeature
+import org.balch.orpheus.features.beats.DrumBeatsPanel
+import org.balch.orpheus.features.beats.DrumBeatsViewModel
 import org.balch.orpheus.features.delay.DelayFeature
 import org.balch.orpheus.features.delay.DelayViewModel
 import org.balch.orpheus.features.delay.ModDelayPanel
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.distortion.DistortionViewModel
+import org.balch.orpheus.features.drums808.DrumFeature
+import org.balch.orpheus.features.drums808.DrumViewModel
+import org.balch.orpheus.features.drums808.DrumsPanel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
 import org.balch.orpheus.features.evo.EvoViewModel
@@ -64,6 +70,8 @@ fun HeaderPanel(
     distortionFeature: DistortionFeature = DistortionViewModel.feature(),
     liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
     aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
+    drumFeature: DrumFeature = DrumViewModel.feature(),
+    drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
@@ -137,6 +145,20 @@ fun HeaderPanel(
             isExpanded = isExpanded(PanelId.CODE),
             onExpandedChange = { setExpanded(PanelId.CODE, it) },
             modifier = panelModifier(isExpanded(PanelId.CODE))
+        )
+        // Drums panel
+        DrumsPanel(
+            drumFeature = drumFeature,
+            isExpanded = isExpanded(PanelId.DRUMS),
+            onExpandedChange = { setExpanded(PanelId.DRUMS, it) },
+            modifier = panelModifier(isExpanded(PanelId.DRUMS))
+        )
+        // Pattern panel
+        DrumBeatsPanel(
+            drumBeatsFeature = drumBeatsFeature,
+            isExpanded = isExpanded(PanelId.PATTERN),
+            onExpandedChange = { setExpanded(PanelId.PATTERN, it) },
+            modifier = panelModifier(isExpanded(PanelId.PATTERN))
         )
         // AI Options panel
         AiOptionsPanel(

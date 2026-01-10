@@ -35,6 +35,7 @@ expect class AudioEngine() {
     fun createMaximum(): Maximum
     fun createLinearRamp(): LinearRamp
     fun createAutomationPlayer(): AutomationPlayer
+    fun createDrumUnit(): DrumUnit
 
     /** Master output - connect final audio here */
     val lineOutLeft: AudioInput

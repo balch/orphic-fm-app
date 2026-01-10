@@ -284,7 +284,7 @@ class TidalRepl(
                     // Check if this is a bare control command (immediate set, not cycled)
                     // Control commands are recognized by their prefix patterns
                     // Supports both colon syntax (drive:0.4) and space syntax (drive 0.4)
-                    val controlNames = "drive|distortion|vibrato|feedback|delay|delaymix|distmix|volume|" +
+                    val controlNames = "drive|distortion|vibrato|feedback|delay|delaymix|distmix|" +
                         "hold|tune|pan|quadhold|quadpitch|duomod|sharp|envspeed"
                     val isBareControlCommand = trimmed.matches(Regex(
                         "^($controlNames)[:\\s][^$]+$"
@@ -588,12 +588,6 @@ class TidalRepl(
         extractValue(trimmed, "distmix")?.let { value ->
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.DistortionMix(value.coerceIn(0f, 1f), listOf(location)))
-        }
-        
-        // volume:<value> or volume <value> - Master volume (0.0-1.0)
-        extractValue(trimmed, "volume")?.let { value ->
-            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
-            return Pattern.pure(TidalEvent.MasterVolume(value.coerceIn(0f, 1f), listOf(location)))
         }
         
         // pan:<voiceIndex> <value> - Voice pan position (-1.0 to 1.0)

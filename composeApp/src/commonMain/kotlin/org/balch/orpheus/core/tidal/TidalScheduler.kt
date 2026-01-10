@@ -498,8 +498,7 @@ class TidalScheduler(
              is TidalEvent.DistortionMix,
              is TidalEvent.Vibrato,
              is TidalEvent.DelayFeedback,
-             is TidalEvent.DelayMix,
-             is TidalEvent.MasterVolume -> {
+             is TidalEvent.DelayMix -> {
                  if (event.locations.isNotEmpty()) {
                      _triggers.tryEmit(TriggerEvent(0, event.locations))
                  }
@@ -639,15 +638,6 @@ class TidalScheduler(
                     ControlEventOrigin.TIDAL
                 )
                 synthEngine.setVoiceEnvelopeSpeed(event.voiceIndex, event.speed)
-            }
-            
-            is TidalEvent.MasterVolume -> {
-                synthController.emitControlChange(
-                    "master_volume",
-                    event.volume,
-                    ControlEventOrigin.TIDAL
-                )
-                synthEngine.setMasterVolume(event.volume)
             }
             
             is TidalEvent.DuoMod -> {

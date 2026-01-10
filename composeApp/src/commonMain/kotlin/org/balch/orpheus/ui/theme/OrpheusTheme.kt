@@ -18,6 +18,11 @@ private val SoftPurple = Color(0xFF2D1B4E)
 private val WarmGlow = Color(0xFFFF6B35)
 private val SynthGreen = Color(0xFF39FF14)
 private val SynthPink = Color(0xFFFF69B4)
+private val SeahawksNavy = Color(0xFF002244)
+private val SeahawksGreen = Color(0xFF69BE28)
+private val SeahawksGrey = Color(0xFFA5ACAF)
+private val NinersRed = Color(0xFFAA0000)
+private val NinersGold = Color(0xFFB3995D)
 
 private val DarkColorScheme = darkColorScheme(
     primary = NeonCyan,
@@ -89,6 +94,11 @@ object OrpheusColors {
     val warmGlow = WarmGlow
     val synthGreen = SynthGreen
     val synthPink = SynthPink // Added
+    val seahawksNavy = SeahawksNavy
+    val seahawksGreen = SeahawksGreen
+    val seahawksGrey = SeahawksGrey
+    val ninersRed = NinersRed
+    val ninersGold = NinersGold
 
     // Midnight Blue & Silver Palette
     val midnightBlue = Color(0xFF191970) // Deep Midnight Blue
@@ -101,4 +111,5 @@ object OrpheusColors {
     val knobGlow = NeonCyan.copy(alpha = 0.6f)
     val pulseGlow = NeonMagenta.copy(alpha = 0.8f)
     val holdGlow = SynthGreen.copy(alpha = 0.7f)
+    val fadedCyan = Color(0xFF00A0A0)
 }

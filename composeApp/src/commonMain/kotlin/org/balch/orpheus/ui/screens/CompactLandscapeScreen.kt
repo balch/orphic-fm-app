@@ -33,6 +33,8 @@ import org.balch.orpheus.features.draw.DrawSequencerFeature
 import org.balch.orpheus.features.draw.DrawSequencerViewModel
 import org.balch.orpheus.features.draw.ui.CompactTweakSequencerView
 import org.balch.orpheus.features.draw.ui.ExpandedTweakSequencerScreen
+import org.balch.orpheus.features.drums808.DrumFeature
+import org.balch.orpheus.features.drums808.DrumViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.viz.VizFeature
@@ -69,6 +71,7 @@ fun CompactLandscapeScreen(
     presetsFeature: PresetsFeature = PresetsViewModel.feature(),
     vizFeature: VizFeature = VizViewModel.feature(),
     sequencerFeature: DrawSequencerFeature = DrawSequencerViewModel.feature(),
+    drumFeature: DrumFeature = DrumViewModel.feature(),
 ) {
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
@@ -86,6 +89,7 @@ fun CompactLandscapeScreen(
                 SynthKeyboardHandler.handleKeyEvent(
                     keyEvent = event,
                     voiceFeature = voiceFeature,
+                    drumFeature = drumFeature,
                     isDialogActive = isDialogActive
                 )
             }

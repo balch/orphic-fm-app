@@ -168,4 +168,9 @@ open class TestSynthEngine : SynthEngine {
     // Slide bar methods
     override fun setSlideBar(yPosition: Float, xPosition: Float) {}
     override fun releaseSlideBar() {}
+    
+    // Drum trigger
+    override fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {}
+    override fun triggerDrum(type: Int, accent: Float) {}
+    override fun setDrumTone(type: Int, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {}
 }

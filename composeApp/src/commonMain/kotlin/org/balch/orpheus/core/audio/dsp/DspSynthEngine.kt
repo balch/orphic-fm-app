@@ -17,6 +17,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.dsp.plugins.DspBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDelayPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDistortionPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspDrumPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspHyperLfoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPerStringBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
@@ -45,6 +46,7 @@ class DspSynthEngine(
     private val vibratoPlugin = plugins.filterIsInstance<DspVibratoPlugin>().first()
     private val benderPlugin = plugins.filterIsInstance<DspBenderPlugin>().first()
     private val perStringBenderPlugin = plugins.filterIsInstance<DspPerStringBenderPlugin>().first()
+    private val drumPlugin = plugins.filterIsInstance<DspDrumPlugin>().first()
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
@@ -179,6 +181,10 @@ class DspSynthEngine(
         // Stereo outputs → LineOut
         stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
         stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
+
+        // Drum outputs → Stereo sum
+        drumPlugin.outputs["outputLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        drumPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
 
         // Wire voices to audio paths
         voices.forEachIndexed { index, voice ->
@@ -551,6 +557,18 @@ class DspSynthEngine(
         val voiceB = voiceA + 1
         voices[voiceA].sharpness.set(sharpness.toDouble())
         voices[voiceB].sharpness.set(sharpness.toDouble())
+    }
+
+    override fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {
+        drumPlugin.trigger(type, accent, frequency, tone, decay, p4, p5)
+    }
+
+    override fun setDrumTone(type: Int, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {
+        drumPlugin.setParameters(type, frequency, tone, decay, p4, p5)
+    }
+
+    override fun triggerDrum(type: Int, accent: Float) {
+        drumPlugin.trigger(type, accent)
     }
 
     override fun setQuadPitch(quadIndex: Int, pitch: Float) {

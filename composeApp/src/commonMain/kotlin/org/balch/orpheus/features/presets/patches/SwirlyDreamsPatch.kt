@@ -35,7 +35,6 @@ class SwirlyDreamsPatch : SynthPatch {
         delayMix = 0.5f,
         delayModSourceIsLfo = true,
         delayLfoWaveformIsTriangle = true,
-        masterVolume = 0.7f,
         drive = 0.2f,
         distortionMix = 0.25f,
         fmStructureCrossQuad = false,

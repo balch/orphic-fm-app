@@ -122,3 +122,41 @@ expect interface AutomationPlayer : AudioUnit {
     /** Reset to start */
     fun reset()
 }
+
+/**
+ * Specialized drum synthesis unit.
+ */
+expect interface DrumUnit : AudioUnit {
+    /** 
+     * Trigger a drum hit.
+     * @param type 0=Kick, 1=Snare, 2=HiHat
+     * @param frequency f0 in Hz
+     */
+    fun trigger(
+        type: Int,
+        accent: Float,
+        frequency: Float,
+        tone: Float,
+        decay: Float,
+        param4: Float,
+        param5: Float
+    )
+    
+    /**
+     * Set drum parameters without triggering.
+     * @param type 0=Kick, 1=Snare, 2=HiHat
+     */
+    fun setParameters(
+        type: Int,
+        frequency: Float,
+        tone: Float,
+        decay: Float,
+        param4: Float,
+        param5: Float
+    )
+
+    /**
+     * Trigger a drum hit using stored parameters.
+     */
+    fun trigger(type: Int, accent: Float)
+}

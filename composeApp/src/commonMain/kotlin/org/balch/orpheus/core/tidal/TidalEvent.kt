@@ -288,20 +288,6 @@ sealed class TidalEvent {
 
     
     /**
-     * Master volume control.
-     * @param volume Master volume (0.0-1.0)
-     */
-    data class MasterVolume(
-        val volume: Float,
-        override val locations: List<SourceLocation> = emptyList()
-    ) : TidalEvent() {
-        override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
-        override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
-    }
-    
-
-    
-    /**
      * Duo modulation source control.
      * @param duoIndex Duo index (0-3, where duo 0 = voices 0-1, duo 1 = voices 2-3, etc.)
      * @param source Modulation source: "fm" (voice FM), "off", or "lfo"
@@ -438,9 +424,6 @@ object Orpheus {
     
     fun voicePan(voiceIndex: Int, pan: Float): Pattern<TidalEvent> =
         Pattern.pure(TidalEvent.VoicePan(voiceIndex, pan))
-    
-    fun masterVolume(volume: Float): Pattern<TidalEvent> =
-        Pattern.pure(TidalEvent.MasterVolume(volume))
     
     // === Silence ===
     

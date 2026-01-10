@@ -38,7 +38,6 @@ data class DronePreset(
     val delayLfoWaveformIsTriangle: Boolean = true,
 
     // Global
-    val masterVolume: Float = 0.7f,
     val drive: Float = 0.0f,
     val distortionMix: Float = 0.5f,
 

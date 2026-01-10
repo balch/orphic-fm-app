@@ -49,7 +49,9 @@ data class HeaderPanelUiState(
             PanelId.DELAY to true,
             PanelId.DISTORTION to true,
             PanelId.CODE to false,
-            PanelId.AI to false
+            PanelId.AI to false,
+            PanelId.DRUMS to false,
+            PanelId.PATTERN to false
         )
     }
 }

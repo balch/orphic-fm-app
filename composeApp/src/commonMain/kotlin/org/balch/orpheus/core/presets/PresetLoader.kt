@@ -71,7 +71,6 @@ class PresetLoader(
             delayMix = engine.getDelayMix(),
             delayModSourceIsLfo = engine.getDelayModSourceIsLfo(0), // Assumes coupled for UI preset typically
             delayLfoWaveformIsTriangle = engine.getDelayLfoWaveformIsTriangle(),
-            masterVolume = engine.getMasterVolume(),
             drive = engine.getDrive(),
             distortionMix = engine.getDistortionMix(),
             fmStructureCrossQuad = engine.getFmStructureCrossQuad(),

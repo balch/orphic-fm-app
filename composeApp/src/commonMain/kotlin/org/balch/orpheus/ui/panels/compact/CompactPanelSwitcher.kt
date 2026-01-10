@@ -51,6 +51,8 @@ enum class CompactPanelType(val displayName: String, val color: Color) {
     TWEAKS("Tweaks", OrpheusColors.electricBlue), // Mod tweaks panel
     REPL("REPL", OrpheusColors.neonCyan),
     STEREO("Stereo", Color(0xFF008B8B)),
+    DRUMS("Drums", OrpheusColors.neonMagenta),
+    PATTERN("Sequencer", OrpheusColors.neonCyan),
 }
 
 /**

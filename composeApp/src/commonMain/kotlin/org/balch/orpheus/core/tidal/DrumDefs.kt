@@ -12,7 +12,10 @@ data class DrumPatch(
     val sharpness: Float,     // 0.0 = Sine/Tri, 1.0 = Square/Pulse
     val fmDepth: Float = 0.0f,
     val drive: Float = 0.0f,
-    val pan: Float? = null // Optional static pan
+    val pan: Float? = null, // Optional static pan
+    val drumType: Int? = null, // 0=BD808, 1=SD808, 2=HH808
+    val p4: Float = 0.5f,     // extra param (snappy/attackFM)
+    val p5: Float = 0.5f      // extra param (selfFM)
 )
 
 /**
@@ -123,6 +126,30 @@ object DrumDefs {
             envelopeSpeed = 0.4f,
             sharpness = 0.5f,
             fmDepth = 1.0f        // Max FM for bell tones
+        ),
+        
+        // === 808 ENGINES ===
+        "bd808" to DrumPatch(
+            frequency = 55.0f,
+            envelopeSpeed = 0.5f, // Decay
+            sharpness = 0.5f,     // Tone
+            drumType = 0,
+            p4 = 0.5f, // Attack FM
+            p5 = 0.5f  // Self FM
+        ),
+        "sn808" to DrumPatch(
+            frequency = 180.0f,
+            envelopeSpeed = 0.5f, // Decay
+            sharpness = 0.5f,     // Tone
+            drumType = 1,
+            p4 = 0.5f             // Snappy
+        ),
+        "hh808" to DrumPatch(
+            frequency = 400.0f,
+            envelopeSpeed = 0.5f, // Decay
+            sharpness = 0.5f,     // Tone
+            drumType = 2,
+            p4 = 0.2f             // Noisiness
         )
     )
     
@@ -130,6 +157,20 @@ object DrumDefs {
      * Apply a drum patch to a specific voice engine.
      */
     fun apply(synthEngine: SynthEngine, voiceIndex: Int, patch: DrumPatch) {
+        if (patch.drumType != null) {
+            // Trigger specialized drum engine
+            synthEngine.triggerDrum(
+                patch.drumType,
+                1.0f, // accent
+                patch.frequency,
+                patch.sharpness, // TONE mapped to sharpness
+                patch.envelopeSpeed, // DECAY mapped to envelopeSpeed
+                patch.p4,
+                patch.p5
+            )
+            return
+        }
+
         val quadIndex = voiceIndex / 4
         
         // Envelope: Drum sounds are percussive
