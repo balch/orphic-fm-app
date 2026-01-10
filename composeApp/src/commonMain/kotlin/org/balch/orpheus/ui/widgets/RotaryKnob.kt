@@ -113,6 +113,8 @@ fun RotaryKnob(
                 val strokeWidth = size.toPx() * 0.1f
                 val radius = (size.toPx() - strokeWidth) / 2
                 val center = Offset(size.toPx() / 2, size.toPx() / 2)
+                val arcSize = Size(radius * 2, radius * 2)
+                val topLeft = Offset(center.x - radius, center.y - radius)
 
                 // Track (background arc) - darker and deeper
                 val startAngle = 135f
@@ -124,8 +126,8 @@ fun RotaryKnob(
                     startAngle = startAngle,
                     sweepAngle = sweepAngle,
                     useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = Size(radius * 2, radius * 2),
+                    topLeft = topLeft,
+                    size = arcSize,
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
@@ -134,8 +136,8 @@ fun RotaryKnob(
                     startAngle = startAngle,
                     sweepAngle = sweepAngle,
                     useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = Size(radius * 2, radius * 2),
+                    topLeft = topLeft,
+                    size = arcSize,
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
@@ -156,8 +158,8 @@ fun RotaryKnob(
                     startAngle = startAngle,
                     sweepAngle = currentSweep,
                     useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = Size(radius * 2, radius * 2),
+                    topLeft = topLeft,
+                    size = arcSize,
                     style = Stroke(width = strokeWidth * 1.5f, cap = StrokeCap.Round)
                 )
 
@@ -170,8 +172,8 @@ fun RotaryKnob(
                     startAngle = startAngle,
                     sweepAngle = currentSweep,
                     useCenter = false,
-                    topLeft = Offset(center.x - radius, center.y - radius),
-                    size = Size(radius * 2, radius * 2),
+                    topLeft = topLeft,
+                    size = arcSize,
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
@@ -249,14 +251,16 @@ fun RotaryKnob(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 1
             )
         }
         Text(
             text = ((internalValue * 100).roundToInt() / 100.0).toString(),
             style = MaterialTheme.typography.labelMedium,
             color = progressColor,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            maxLines = 1
         )
     }
 }

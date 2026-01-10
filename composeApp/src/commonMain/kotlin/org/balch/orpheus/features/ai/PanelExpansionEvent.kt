@@ -20,6 +20,7 @@ enum class PanelId(val displayName: String) {
     LFO("Hyper LFO"),
     DELAY("Mod Delay"),
     DISTORTION("Distortion"),
+    RESONATOR("Rings Resonator"),
     CODE("Live Code"),
     AI("AI Options"),
     DRUMS("808 Drums"),

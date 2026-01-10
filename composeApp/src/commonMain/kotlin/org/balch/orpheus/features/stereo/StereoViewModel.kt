@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.stereo
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -36,6 +37,7 @@ data class StereoUiState(
     val voicePans: List<Float> = listOf(0f, 0f, -0.3f, -0.3f, 0.3f, 0.3f, -0.7f, 0.7f)
 )
 
+@Immutable
 data class StereoPanelActions(
     val onModeChange: (StereoMode) -> Unit,
     val onMasterPanChange: (Float) -> Unit

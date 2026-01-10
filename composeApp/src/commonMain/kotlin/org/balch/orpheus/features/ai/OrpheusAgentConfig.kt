@@ -103,6 +103,29 @@ class OrpheusAgentConfig @Inject constructor(
         - DUO_MOD_SOURCE_1..4: Mod source (0=VoiceFM, 0.5=Off, 1=LFO)
         - PAIR_SHARPNESS_1..4: Waveform sharpness (0=tri, 1=sq)
         
+        ### RESONATOR (Rings Physical Modeling)
+        Physical modeling resonator for metallic, string-like, and bell tones:
+        - RESONATOR_ENABLED: Turn on/off (0=off, 1=on)
+        - RESONATOR_MODE: 0=Modal (bell/plate), 0.5=String (Karplus-Strong), 1=Sympathetic (sitar)
+        - RESONATOR_STRUCTURE: Harmonic spread/inharmonicity (0-1)
+        - RESONATOR_BRIGHTNESS: High frequency content (0=dark, 1=bright)
+        - RESONATOR_DAMPING: Decay time (0=long sustain, 1=quick decay)
+        - RESONATOR_POSITION: Excitation point (0-1, 0.5=center)
+        - RESONATOR_MIX: Dry/wet blend (0=dry, 1=fully processed)
+        
+        USE RESONATOR FOR:
+        - Metallic percussion: Modal mode with high brightness
+        - Plucked strings: String mode with moderate damping
+        - Exotic textures: Sympathetic mode for sitar-like resonance
+        - Ambient pads: Low mix for subtle harmonic enrichment
+        
+        ⚠️ RESONATOR SAFETY (HIGH PITCH SQUELCH WARNING):
+        - ‼️ DANGER ZONE: HIGH BRIGHTNESS (>0.7) + HIGH STRUCTURE (>0.7) = EXTREME PIERCING SQUELCH.
+        - Avoid setting both BRIGHTNESS and STRUCTURE high simultaneously. 
+        - If BRIGHTNESS is high, keep STRUCTURE low (<0.4). 
+        - Always lower RESONATOR_MIX before changing RESONATOR_MODE to avoid abrupt shifted clicks.
+        - High-pitched metallic sounds cause listener fatigue - keep them brief!
+        
         ## REPL CAPABILITIES (for `repl_execute` tool)
         Use the REPL to create sequences and rhythmic patterns.
         

@@ -42,6 +42,9 @@ import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsPanel
 import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.resonator.ResonatorFeature
+import org.balch.orpheus.features.resonator.ResonatorPanel
+import org.balch.orpheus.features.resonator.ResonatorViewModel
 import org.balch.orpheus.features.stereo.StereoFeature
 import org.balch.orpheus.features.stereo.StereoPanel
 import org.balch.orpheus.features.stereo.StereoViewModel
@@ -68,6 +71,7 @@ fun HeaderPanel(
     lfoFeature: LfoFeature = LfoViewModel.feature(),
     delayFeature: DelayFeature = DelayViewModel.feature(),
     distortionFeature: DistortionFeature = DistortionViewModel.feature(),
+    resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
     liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
     aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
@@ -138,6 +142,13 @@ fun HeaderPanel(
             isExpanded = isExpanded(PanelId.DISTORTION),
             onExpandedChange = { setExpanded(PanelId.DISTORTION, it) },
             modifier = panelModifier(isExpanded(PanelId.DISTORTION), maxWidth = 220.dp)
+        )
+        // Rings Resonator panel
+        ResonatorPanel(
+            feature = resonatorFeature,
+            isExpanded = isExpanded(PanelId.RESONATOR),
+            onExpandedChange = { setExpanded(PanelId.RESONATOR, it) },
+            modifier = panelModifier(isExpanded(PanelId.RESONATOR))
         )
         // Live Coding panel
         LiveCodePanel(

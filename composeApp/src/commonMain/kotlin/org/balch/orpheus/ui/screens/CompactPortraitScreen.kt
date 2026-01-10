@@ -52,6 +52,9 @@ import org.balch.orpheus.features.lfo.LfoViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsPanel
 import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.resonator.ResonatorFeature
+import org.balch.orpheus.features.resonator.ResonatorPanel
+import org.balch.orpheus.features.resonator.ResonatorViewModel
 import org.balch.orpheus.features.stereo.StereoFeature
 import org.balch.orpheus.features.stereo.StereoPanel
 import org.balch.orpheus.features.stereo.StereoViewModel
@@ -171,6 +174,7 @@ private fun CompactPortraitScreenLayout(
     vizFeature: VizFeature = VizViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
     drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
+    resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
     focusRequester: FocusRequester = remember { FocusRequester() },
     onKeyEvent: (KeyEvent) -> Boolean = { false },
 ) {
@@ -246,6 +250,7 @@ private fun CompactPortraitScreenLayout(
                                 vizFeature = vizFeature,
                                 drumFeature = drumFeature,
                                 drumBeatsFeature = drumBeatsFeature,
+                                resonatorFeature = resonatorFeature,
                             )
                         }
                     }
@@ -321,6 +326,7 @@ private fun PanelContent(
     vizFeature: VizFeature,
     drumFeature: DrumFeature,
     drumBeatsFeature: DrumBeatsFeature,
+    resonatorFeature: ResonatorFeature,
     modifier: Modifier = Modifier,
 ) {
     val panelModifier = modifier
@@ -397,15 +403,6 @@ private fun PanelContent(
             )
         }
 
-        CompactPanelType.STEREO -> {
-            StereoPanel(
-                feature = stereoFeature,
-                modifier = panelModifier,
-                isExpanded = true,
-                showCollapsedHeader = false
-            )
-        }
-
         CompactPanelType.VIZ -> {
             VizPanel(
                 feature = vizFeature,
@@ -430,6 +427,23 @@ private fun PanelContent(
                 modifier = panelModifier,
                 isExpanded = true,
                 showCollapsedHeader = false,
+            )
+        }
+        CompactPanelType.STEREO -> {
+            StereoPanel(
+                feature = stereoFeature,
+                modifier = panelModifier,
+                isExpanded = true,
+                showCollapsedHeader = false
+            )
+        }
+        
+        CompactPanelType.RESONATOR -> {
+            ResonatorPanel(
+                feature = resonatorFeature,
+                modifier = panelModifier,
+                isExpanded = true,
+                showCollapsedHeader = false
             )
         }
     }

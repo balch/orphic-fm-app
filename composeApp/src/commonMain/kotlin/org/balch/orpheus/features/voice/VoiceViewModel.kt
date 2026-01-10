@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.voice
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -758,6 +759,7 @@ class VoiceViewModel(
     }
 }
 
+@Immutable
 data class VoicePanelActions(
     val onMasterVolumeChange: (Float) -> Unit,
     val onVibratoChange: (Float) -> Unit,

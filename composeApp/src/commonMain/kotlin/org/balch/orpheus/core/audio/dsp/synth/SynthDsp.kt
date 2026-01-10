@@ -19,6 +19,23 @@ object SynthDsp {
     }
 
     /**
+     * Soft saturation curve to prevent hard clipping.
+     * Linear below 0.5, tanh-like saturation above.
+     */
+    fun softClip(x: Float): Float {
+        val absX = if (x < 0) -x else x
+        return if (absX < 0.5f) {
+            x
+        } else {
+            val sign = if (x < 0) -1f else 1f
+            // Approximated tanh for performance: (x - 0.5) / (1 + (x-0.5)^2) + 0.5
+            val offset = absX - 0.5f
+            val saturated = 0.5f + offset / (1.0f + offset * offset)
+            sign * saturated.coerceAtMost(1.0f)
+        }
+    }
+
+    /**
      * Zero-delay-feedback State Variable Filter.
      * Ported from stmlib/dsp/filter.h
      */
@@ -132,6 +149,69 @@ object SynthDsp {
         fun process(input: Float): Float {
             state += g * (input - state)
             return state
+        }
+    }
+    
+    /**
+     * Damping filter for Karplus-Strong string synthesis.
+     * Ported from rings/dsp/string.h DampingFilter.
+     * 
+     * Uses a simple FIR lowpass for frequency-dependent damping
+     * with interpolated coefficients for smooth parameter changes.
+     */
+    class DampingFilter {
+        private var x_: Float = 0f
+        private var x__: Float = 0f
+        private var brightness: Float = 0f
+        private var brightnessIncrement: Float = 0f
+        private var damping: Float = 0f
+        private var dampingIncrement: Float = 0f
+        
+        fun init() {
+            x_ = 0f
+            x__ = 0f
+            brightness = 0f
+            brightnessIncrement = 0f
+            damping = 0f
+            dampingIncrement = 0f
+        }
+        
+        fun reset() {
+            x_ = 0f
+            x__ = 0f
+        }
+        
+        /**
+         * Configure damping and brightness with optional interpolation.
+         * @param damping Damping coefficient (0-1)
+         * @param brightness Brightness (0-1, affects lowpass cutoff)
+         * @param size Block size for interpolation (0 = immediate)
+         */
+        fun configure(damping: Float, brightness: Float, size: Int = 0) {
+            if (size == 0) {
+                this.damping = damping
+                this.brightness = brightness
+                dampingIncrement = 0f
+                brightnessIncrement = 0f
+            } else {
+                val step = 1f / size.toFloat()
+                dampingIncrement = (damping - this.damping) * step
+                brightnessIncrement = (brightness - this.brightness) * step
+            }
+        }
+        
+        /**
+         * Process one sample through the damping filter.
+         */
+        fun process(x: Float): Float {
+            val h0 = (1f + brightness) * 0.5f
+            val h1 = (1f - brightness) * 0.25f
+            val y = damping * (h0 * x_ + h1 * (x + x__))
+            x__ = x_
+            x_ = x
+            brightness += brightnessIncrement
+            damping += dampingIncrement
+            return y
         }
     }
 }

@@ -112,4 +112,11 @@ object OrpheusColors {
     val pulseGlow = NeonMagenta.copy(alpha = 0.8f)
     val holdGlow = SynthGreen.copy(alpha = 0.7f)
     val fadedCyan = Color(0xFF00A0A0)
+    
+    // LA Lakers Color Palette (for Resonator panel)
+    val lakersPurple = Color(0xFF552583)        // Official Lakers Purple
+    val lakersGold = Color(0xFFFDB927)          // Official Lakers Gold
+    val lakersPurpleDark = Color(0xFF3A1A5C)    // Darker purple for backgrounds
+    val lakersPurpleLight = Color(0xFF7B3FA0)   // Lighter purple for accents
+    val lakersGoldBright = Color(0xFFFFD700)    // Brighter gold for highlights
 }

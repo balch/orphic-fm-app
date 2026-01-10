@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.lfo
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -38,6 +39,7 @@ data class LfoUiState(
     val linkEnabled: Boolean = false
 )
 
+@Immutable
 data class LfoPanelActions(
     val onLfoAChange: (Float) -> Unit,
     val onLfoBChange: (Float) -> Unit,

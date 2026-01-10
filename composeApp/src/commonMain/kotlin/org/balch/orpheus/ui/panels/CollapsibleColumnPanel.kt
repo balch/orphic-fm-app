@@ -160,7 +160,8 @@ fun CollapsibleColumnPanel(
                                 fontWeight = FontWeight.Bold,
                                 color = color,
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                maxLines = 1
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                         }

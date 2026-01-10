@@ -22,10 +22,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.features.midi.MidiUiState
 import org.balch.orpheus.features.midi.MidiViewModel
-import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
@@ -39,7 +40,13 @@ fun DuoPairBox(
     voiceA: Int,
     voiceB: Int,
     color: Color,
-    voiceState: VoiceUiState,
+    voiceStateA: VoiceState,
+    voiceStateB: VoiceState,
+    modDepthA: Float,
+    sharpness: Float,
+    envSpeedA: Float,
+    envSpeedB: Float,
+    duoModSource: ModSource,
     midiState: MidiUiState,
     voiceActions: VoiceActions,
     midiActions: MidiActions,
@@ -78,7 +85,7 @@ fun DuoPairBox(
             val pairIndex = voiceA / 2
 
             HorizontalSwitch3Way(
-                state = voiceState.duoModSources[pairIndex],
+                state = duoModSource,
                 onStateChange = {
                     voiceActions.onDuoModSourceChange(pairIndex, it)
                 },
@@ -104,7 +111,9 @@ fun DuoPairBox(
                     modifier = Modifier.weight(1f),
                     voiceIndex = voiceA,
                     pairIndex = pairIndex,
-                    voiceState = voiceState,
+                    tune = voiceStateA.tune,
+                    modDepth = modDepthA,
+                    envSpeed = envSpeedA,
                     voiceActions = voiceActions
                 )
 
@@ -115,7 +124,7 @@ fun DuoPairBox(
                 ) {
                     TriggerButton(
                         voiceA + 1,
-                        voiceState.voiceStates[voiceA].isHolding,
+                        voiceStateA.isHolding,
                         {
                             voiceActions.onHoldChange(
                                 voiceA,
@@ -137,7 +146,7 @@ fun DuoPairBox(
                         },
                         size = 28.dp,
                         label = "",
-                        isActive = voiceState.voiceStates[voiceA].pulse,
+                        isActive = voiceStateA.pulse,
                         isLearnMode = midiState.isLearnModeActive,
                         isLearning =
                             isVoiceBeingLearned(
@@ -171,7 +180,9 @@ fun DuoPairBox(
                     modifier = Modifier.weight(1f),
                     voiceIndex = voiceB,
                     pairIndex = pairIndex,
-                    voiceState = voiceState,
+                    tune = voiceStateB.tune,
+                    sharpness = sharpness,
+                    envSpeed = envSpeedB,
                     voiceActions = voiceActions
                 )
 
@@ -182,7 +193,7 @@ fun DuoPairBox(
                 ) {
                     TriggerButton(
                         voiceB + 1,
-                        voiceState.voiceStates[voiceB].isHolding,
+                        voiceStateB.isHolding,
                         {
                             voiceActions.onHoldChange(
                             voiceB,
@@ -204,7 +215,7 @@ fun DuoPairBox(
                         },
                         size = 28.dp,
                         label = "",
-                        isActive = voiceState.voiceStates[voiceB].pulse,
+                        isActive = voiceStateB.pulse,
                         isLearnMode = midiState.isLearnModeActive,
                         isLearning =
                             isVoiceBeingLearned(
@@ -223,7 +234,7 @@ fun DuoPairBox(
                     )
                 }
             }
-    }
+        }
 }
 
 }
@@ -243,7 +254,13 @@ fun DuoPairBoxPreview() {
             voiceA = 0,
             voiceB = 1,
             color = Color(0xFFFDBB30),
-            voiceState = voiceState,
+            voiceStateA = voiceState.voiceStates[0],
+            voiceStateB = voiceState.voiceStates[1],
+            modDepthA = voiceState.voiceModDepths[0],
+            sharpness = voiceState.pairSharpness[0],
+            envSpeedA = voiceState.voiceEnvelopeSpeeds[0],
+            envSpeedB = voiceState.voiceEnvelopeSpeeds[1],
+            duoModSource = voiceState.duoModSources[0],
             midiState = midiState,
             voiceActions = voiceActions,
             midiActions = midiActions,

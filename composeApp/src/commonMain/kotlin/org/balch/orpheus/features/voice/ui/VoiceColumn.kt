@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -26,13 +25,11 @@ fun VoiceColumnMod(
     modifier: Modifier = Modifier,
     voiceIndex: Int,
     pairIndex: Int,
-    voiceState: VoiceUiState,
+    tune: Float,
+    modDepth: Float,
+    envSpeed: Float,
     voiceActions: VoiceActions,
 ) {
-    val voiceData = voiceState.voiceStates[voiceIndex]
-    val modDepth = voiceState.voiceModDepths[voiceIndex]
-    val envSpeed = voiceState.voiceEnvelopeSpeeds[voiceIndex]
-
     Column(
         modifier =
             modifier.clip(RoundedCornerShape(4.dp))
@@ -50,7 +47,7 @@ fun VoiceColumnMod(
             progressColor = OrpheusColors.neonMagenta
         )
         RotaryKnob(
-            value = voiceData.tune,
+            value = tune,
             onValueChange = { voiceActions.onVoiceTuneChange(voiceIndex, it) },
             label = "TUNE",
             controlId = ControlIds.voiceTune(voiceIndex),
@@ -72,13 +69,11 @@ fun VoiceColumnSharp(
     modifier: Modifier = Modifier,
     voiceIndex: Int,
     pairIndex: Int,
-    voiceState: VoiceUiState,
+    tune: Float,
+    sharpness: Float,
+    envSpeed: Float,
     voiceActions: VoiceActions,
 ) {
-    val voiceData = voiceState.voiceStates[voiceIndex]
-    val sharpness = voiceState.pairSharpness[pairIndex]
-    val envSpeed = voiceState.voiceEnvelopeSpeeds[voiceIndex]
-
     Column(
         modifier =
             modifier.clip(RoundedCornerShape(4.dp))
@@ -96,7 +91,7 @@ fun VoiceColumnSharp(
             progressColor = OrpheusColors.synthGreen
         )
         RotaryKnob(
-            value = voiceData.tune,
+            value = tune,
             onValueChange = { voiceActions.onVoiceTuneChange(voiceIndex, it) },
             label = "TUNE",
             controlId = ControlIds.voiceTune(voiceIndex),
@@ -124,7 +119,9 @@ fun VoiceColumnModPreview() {
         VoiceColumnMod(
             voiceIndex = 0,
             pairIndex = 0,
-            voiceState = voiceState,
+            tune = voiceState.voiceStates[0].tune,
+            modDepth = voiceState.voiceModDepths[0],
+            envSpeed = voiceState.voiceEnvelopeSpeeds[0],
             voiceActions = voiceActions,
             modifier = Modifier.padding(16.dp)
         )
@@ -142,7 +139,9 @@ fun VoiceColumnSharpPreview() {
         VoiceColumnSharp(
             voiceIndex = 1,
             pairIndex = 0,
-            voiceState = voiceState,
+            tune = voiceState.voiceStates[1].tune,
+            sharpness = voiceState.pairSharpness[0],
+            envSpeed = voiceState.voiceEnvelopeSpeeds[1],
             voiceActions = voiceActions,
             modifier = Modifier.padding(16.dp)
         )

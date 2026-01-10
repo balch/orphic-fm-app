@@ -37,7 +37,8 @@ import kotlin.time.ExperimentalTime
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspPerStringBenderPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val resonatorPlugin: DspResonatorPlugin
 ) : DspPlugin {
 
     companion object {
@@ -53,7 +54,8 @@ class DspPerStringBenderPlugin(
         var voiceMix: Float = 0.5f,      // 0=voice A only, 0.5=both, 1=voice B only
         var isActive: Boolean = false,   // Currently being touched
         var wasActive: Boolean = false,  // Was active in previous call (for envelope triggers)
-        var triggeredVoice: Boolean = false // Did we trigger the voice on pluck?
+        var triggeredVoice: Boolean = false, // Did we trigger the voice on pluck?
+        var baseFrequency: Float = 440f  // Base frequency for this string
     )
     
     private val stringStates = Array(NUM_STRINGS) { StringBenderState() }
@@ -548,8 +550,11 @@ class DspPerStringBenderPlugin(
             val slideSemitones = tensionCurve * MAX_BEND_SEMITONES * 0.5
             val slideMultiplier = 2.0.pow(slideSemitones / 12.0)
             
-            // DISABLED internal pluck sound - relying on main voices to match pad usage
-            // The internal pluck was a simple sine wave that didn't match the rich voice patch
+            // Trigger Rings Resonator Strum
+            val strumFreq = state.baseFrequency * velocityPitchMod * slideMultiplier
+            resonatorPlugin.strum(strumFreq.toFloat())
+            
+            // Legacy internal pluck sound (disabled)
             /*
             pluckOscillators[stringIndex].frequency.set(basePitch * velocityPitchMod * directionMod * slideMultiplier)
             
@@ -612,6 +617,7 @@ class DspPerStringBenderPlugin(
     fun setStringFrequency(stringIndex: Int, frequency: Double) {
         if (stringIndex !in 0 until NUM_STRINGS) return
         pluckOscillators[stringIndex].frequency.set(frequency)
+        stringStates[stringIndex].baseFrequency = frequency.toFloat()
     }
 
     /**

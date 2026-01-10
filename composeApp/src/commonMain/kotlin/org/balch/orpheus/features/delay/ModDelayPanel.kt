@@ -47,99 +47,107 @@ fun ModDelayPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Row 1: MOD 1, MOD 2, LFO/SELF toggle, TRI/SQR toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Top
-            ) {
-                RotaryKnob(
-                    value = uiState.mod1,
-                    onValueChange = actions.onMod1Change,
-                    label = "MOD 1",
-                    controlId = ControlIds.DELAY_MOD_1,
-                    size = 40.dp,
-                    progressColor = OrpheusColors.warmGlow
-                )
-                RotaryKnob(
-                    value = uiState.mod2,
-                    onValueChange = actions.onMod2Change,
-                    label = "MOD 2",
-                    controlId = ControlIds.DELAY_MOD_2,
-                    size = 40.dp,
-                    progressColor = OrpheusColors.warmGlow
-                )
-                // Add top padding to toggles to align with knob centers
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    VerticalToggle(
-                        topLabel = "LFO",
-                        bottomLabel = "SELF",
-                        isTop = uiState.isLfoSource,
-                        onToggle = { actions.onSourceChange(it) },
-                        color = OrpheusColors.warmGlow
-                    )
-                }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    VerticalToggle(
-                        topLabel = "TRI",
-                        bottomLabel = "SQR",
-                        isTop = uiState.isTriangleWave,
-                        onToggle = { actions.onWaveformChange(it) },
-                        color = OrpheusColors.warmGlow
-                    )
-                }
-            }
+        ModDelayPanelContent(uiState, actions)
+    }
+}
 
-            // Row 2: TIME 1, TIME 2, FB, MIX
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+@Composable
+private fun ModDelayPanelContent(
+    uiState: DelayUiState,
+    actions: DelayPanelActions
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        // Row 1: MOD 1, MOD 2, LFO/SELF toggle, TRI/SQR toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Top
+        ) {
+            RotaryKnob(
+                value = uiState.mod1,
+                onValueChange = actions.onMod1Change,
+                label = "MOD 1",
+                controlId = ControlIds.DELAY_MOD_1,
+                size = 40.dp,
+                progressColor = OrpheusColors.warmGlow
+            )
+            RotaryKnob(
+                value = uiState.mod2,
+                onValueChange = actions.onMod2Change,
+                label = "MOD 2",
+                controlId = ControlIds.DELAY_MOD_2,
+                size = 40.dp,
+                progressColor = OrpheusColors.warmGlow
+            )
+            // Add top padding to toggles to align with knob centers
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(top = 8.dp)
             ) {
-                RotaryKnob(
-                    value = uiState.time1,
-                    onValueChange = actions.onTime1Change,
-                    label = "TIME 1",
-                    controlId = ControlIds.DELAY_TIME_1,
-                    size = 40.dp,
-                    progressColor = OrpheusColors.warmGlow
-                )
-                RotaryKnob(
-                    value = uiState.time2,
-                    onValueChange = actions.onTime2Change,
-                    label = "TIME 2",
-                    controlId = ControlIds.DELAY_TIME_2,
-                    size = 40.dp,
-                    progressColor = OrpheusColors.warmGlow
-                )
-                RotaryKnob(
-                    value = uiState.feedback,
-                    onValueChange = actions.onFeedbackChange,
-                    label = "FB",
-                    controlId = ControlIds.DELAY_FEEDBACK,
-                    size = 40.dp,
-                    progressColor = OrpheusColors.warmGlow
-                )
-                RotaryKnob(
-                    value = uiState.mix,
-                    onValueChange = actions.onMixChange,
-                    label = "MIX",
-                    controlId = ControlIds.DELAY_MIX,
-                    size = 40.dp,
-                    progressColor = OrpheusColors.warmGlow
+                VerticalToggle(
+                    topLabel = "LFO",
+                    bottomLabel = "SELF",
+                    isTop = uiState.isLfoSource,
+                    onToggle = { actions.onSourceChange(it) },
+                    color = OrpheusColors.warmGlow
                 )
             }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(top = 8.dp)
+            ) {
+                VerticalToggle(
+                    topLabel = "TRI",
+                    bottomLabel = "SQR",
+                    isTop = uiState.isTriangleWave,
+                    onToggle = { actions.onWaveformChange(it) },
+                    color = OrpheusColors.warmGlow
+                )
+            }
+        }
+
+        // Row 2: TIME 1, TIME 2, FB, MIX
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RotaryKnob(
+                value = uiState.time1,
+                onValueChange = actions.onTime1Change,
+                label = "TIME 1",
+                controlId = ControlIds.DELAY_TIME_1,
+                size = 40.dp,
+                progressColor = OrpheusColors.warmGlow
+            )
+            RotaryKnob(
+                value = uiState.time2,
+                onValueChange = actions.onTime2Change,
+                label = "TIME 2",
+                controlId = ControlIds.DELAY_TIME_2,
+                size = 40.dp,
+                progressColor = OrpheusColors.warmGlow
+            )
+            RotaryKnob(
+                value = uiState.feedback,
+                onValueChange = actions.onFeedbackChange,
+                label = "FB",
+                controlId = ControlIds.DELAY_FEEDBACK,
+                size = 40.dp,
+                progressColor = OrpheusColors.warmGlow
+            )
+            RotaryKnob(
+                value = uiState.mix,
+                onValueChange = actions.onMixChange,
+                label = "MIX",
+                controlId = ControlIds.DELAY_MIX,
+                size = 40.dp,
+                progressColor = OrpheusColors.warmGlow
+            )
         }
     }
 }

@@ -173,4 +173,31 @@ open class TestSynthEngine : SynthEngine {
     override fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {}
     override fun triggerDrum(type: Int, accent: Float) {}
     override fun setDrumTone(type: Int, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {}
+    
+    // Resonator (Rings) stub implementations
+    private var _resonatorEnabled = false
+    private var _resonatorMode = 0
+    private var _resonatorStructure = 0.25f
+    private var _resonatorBrightness = 0.5f
+    private var _resonatorDamping = 0.3f
+    private var _resonatorPosition = 0.5f
+    private var _resonatorMix = 0.5f
+    
+    override fun setResonatorEnabled(enabled: Boolean) { _resonatorEnabled = enabled }
+    override fun setResonatorMode(mode: Int) { _resonatorMode = mode }
+    override fun setResonatorStructure(value: Float) { _resonatorStructure = value }
+    override fun setResonatorBrightness(value: Float) { _resonatorBrightness = value }
+    override fun setResonatorDamping(value: Float) { _resonatorDamping = value }
+    override fun setResonatorPosition(value: Float) { _resonatorPosition = value }
+    override fun setResonatorMix(value: Float) { _resonatorMix = value }
+    override fun strumResonator(frequency: Float) {}
+    
+    override fun getResonatorEnabled(): Boolean = _resonatorEnabled
+    override fun getResonatorMode(): Int = _resonatorMode
+    override fun getResonatorStructure(): Float = _resonatorStructure
+    override fun getResonatorBrightness(): Float = _resonatorBrightness
+    override fun getResonatorDamping(): Float = _resonatorDamping
+    override fun getResonatorPosition(): Float = _resonatorPosition
+    override fun getResonatorMix(): Float = _resonatorMix
 }
+

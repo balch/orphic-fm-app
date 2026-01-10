@@ -594,3 +594,88 @@ class WebAudioDrumUnit(private val context: AudioContext) : DrumUnit {
         osc2.stop(now + decayTime + 0.01)
     }
 }
+
+actual interface ResonatorUnit : AudioUnit {
+    actual val input: AudioInput
+    actual val auxOutput: AudioOutput
+    
+    actual fun setEnabled(enabled: Boolean)
+    actual fun setMode(mode: Int)
+    actual fun setStructure(value: Float)
+    actual fun setBrightness(value: Float)
+    actual fun setDamping(value: Float)
+    actual fun setPosition(value: Float)
+    actual fun strum(frequency: Float)
+}
+
+/**
+ * WASM implementation of ResonatorUnit.
+ * 
+ * This is a simplified stub - full modal synthesis would require
+ * custom AudioWorklet processors. For now, provides a basic
+ * resonant filter implementation.
+ */
+class WebAudioResonatorUnit(private val context: AudioContext) : ResonatorUnit {
+    private val inputGain = context.createGain().also { it.gain.value = 1f }
+    private val outputGain = context.createGain().also { it.gain.value = 1f }
+    private val auxGain = context.createGain().also { it.gain.value = 0f }
+    
+    // Simple resonant filter as placeholder
+    private val filter = context.createBiquadFilter().also {
+        it.type = "bandpass"
+        it.frequency.value = 440f
+        it.Q.value = 10f
+    }
+    
+    private var enabled = false
+    
+    init {
+        inputGain.connect(filter)
+        filter.connect(outputGain)
+        filter.connect(auxGain)
+    }
+    
+    override val input: AudioInput = WebAudioNodeInput(inputGain, 0, context)
+    override val output: AudioOutput = WebAudioNodeOutput(outputGain)
+    override val auxOutput: AudioOutput = WebAudioNodeOutput(auxGain)
+    
+    override fun setEnabled(enabled: Boolean) {
+        this.enabled = enabled
+        outputGain.gain.value = if (enabled) 1f else 0f
+    }
+    
+    override fun setMode(mode: Int) {
+        // Mode affects filter type
+        filter.type = when (mode) {
+            0 -> "bandpass" // Modal
+            1 -> "lowpass"  // String (comb filter not available in Web Audio)
+            else -> "bandpass"
+        }
+    }
+    
+    override fun setStructure(value: Float) {
+        // Structure affects Q / resonance spread
+        filter.Q.value = 5f + value * 20f
+    }
+    
+    override fun setBrightness(value: Float) {
+        // Brightness affects filter frequency
+        filter.frequency.value = 200f + value * 4000f
+    }
+    
+    override fun setDamping(value: Float) {
+        // Damping affects Q (lower Q = more damping)
+        filter.Q.value = filter.Q.value * (1f - value * 0.5f)
+    }
+    
+    override fun setPosition(value: Float) {
+        // Position affects gain balance
+        auxGain.gain.value = value * 0.5f
+    }
+    
+    override fun strum(frequency: Float) {
+        // Set filter to strum frequency and trigger
+        filter.frequency.value = frequency
+    }
+}
+

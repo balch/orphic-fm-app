@@ -70,86 +70,94 @@ fun HyperLfoPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        val learnState = LocalLearnModeState.current
-        val isActive = uiState.mode != HyperLfoMode.OFF
+        HyperLfoPanelContent(uiState, actions)
+    }
+}
 
-        Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+@Composable
+private fun HyperLfoPanelContent(
+    uiState: LfoUiState,
+    actions: LfoPanelActions
+) {
+    val learnState = LocalLearnModeState.current
+    val isActive = uiState.mode != HyperLfoMode.OFF
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Controls Row - knobs and switches aligned
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Controls Row - knobs and switches aligned
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 3-way AND/OFF/OR Switch (Left)
-                Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_MODE, learnState)) {
-                    Vertical3WaySwitch(
-                        topLabel = "AND",
-                        bottomLabel = "OR",
-                        position =
-                            when (uiState.mode) {
-                                HyperLfoMode.AND -> 0
-                                HyperLfoMode.OFF -> 1
-                                HyperLfoMode.OR -> 2
-                            },
-                        onPositionChange = { pos ->
-                            actions.onModeChange(
-                                when (pos) {
-                                    0 -> HyperLfoMode.AND
-                                    1 -> HyperLfoMode.OFF
-                                    else -> HyperLfoMode.OR
-                                }
-                            )
+            // 3-way AND/OFF/OR Switch (Left)
+            Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_MODE, learnState)) {
+                Vertical3WaySwitch(
+                    topLabel = "AND",
+                    bottomLabel = "OR",
+                    position =
+                        when (uiState.mode) {
+                            HyperLfoMode.AND -> 0
+                            HyperLfoMode.OFF -> 1
+                            HyperLfoMode.OR -> 2
                         },
-                        color = OrpheusColors.neonCyan,
-                        enabled = !learnState.isActive
-                    )
-                }
-
-                // Knobs (Medium size - 56dp)
-                RotaryKnob(
-                    value = uiState.lfoA,
-                    onValueChange = actions.onLfoAChange,
-                    label = "FREQ A",
-                    controlId = ControlIds.HYPER_LFO_A,
-                    size = 56.dp,
-                    progressColor =
-                        if (isActive) OrpheusColors.neonCyan
-                        else OrpheusColors.neonCyan.copy(alpha = 0.4f)
+                    onPositionChange = { pos ->
+                        actions.onModeChange(
+                            when (pos) {
+                                0 -> HyperLfoMode.AND
+                                1 -> HyperLfoMode.OFF
+                                else -> HyperLfoMode.OR
+                            }
+                        )
+                    },
+                    color = OrpheusColors.neonCyan,
+                    enabled = !learnState.isActive
                 )
-                RotaryKnob(
-                    value = uiState.lfoB,
-                    onValueChange = actions.onLfoBChange,
-                    label = "FREQ B",
-                    controlId = ControlIds.HYPER_LFO_B,
-                    size = 56.dp,
-                    progressColor =
-                        if (isActive) OrpheusColors.neonCyan
-                        else OrpheusColors.neonCyan.copy(alpha = 0.4f)
-                )
-
-                // LINK Vertical Switch (Right)
-                Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_LINK, learnState)) {
-                    VerticalToggle(
-                        topLabel = "LINK",
-                        bottomLabel = "OFF",
-                        isTop = uiState.linkEnabled,
-                        onToggle = { actions.onLinkChange(it) },
-                        color = OrpheusColors.neonCyan,
-                        enabled = !learnState.isActive
-                    )
-                }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            // Knobs (Medium size - 56dp)
+            RotaryKnob(
+                value = uiState.lfoA,
+                onValueChange = actions.onLfoAChange,
+                label = "FREQ A",
+                controlId = ControlIds.HYPER_LFO_A,
+                size = 56.dp,
+                progressColor =
+                    if (isActive) OrpheusColors.neonCyan
+                    else OrpheusColors.neonCyan.copy(alpha = 0.4f)
+            )
+            RotaryKnob(
+                value = uiState.lfoB,
+                onValueChange = actions.onLfoBChange,
+                label = "FREQ B",
+                controlId = ControlIds.HYPER_LFO_B,
+                size = 56.dp,
+                progressColor =
+                    if (isActive) OrpheusColors.neonCyan
+                    else OrpheusColors.neonCyan.copy(alpha = 0.4f)
+            )
+
+            // LINK Vertical Switch (Right)
+            Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_LINK, learnState)) {
+                VerticalToggle(
+                    topLabel = "LINK",
+                    bottomLabel = "OFF",
+                    isTop = uiState.linkEnabled,
+                    onToggle = { actions.onLinkChange(it) },
+                    color = OrpheusColors.neonCyan,
+                    enabled = !learnState.isActive
+                )
+            }
         }
+
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 

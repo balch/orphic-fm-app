@@ -187,6 +187,25 @@ interface SynthEngine {
     // Automation
     fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int)
     fun clearParameterAutomation(controlId: String)
+    
+    // Rings Resonator
+    fun setResonatorEnabled(enabled: Boolean)
+    fun setResonatorMode(mode: Int)
+    fun setResonatorStructure(value: Float)
+    fun setResonatorBrightness(value: Float)
+    fun setResonatorDamping(value: Float)
+    fun setResonatorPosition(value: Float)
+    fun setResonatorMix(value: Float)
+    fun strumResonator(frequency: Float)
+    
+    // Resonator Getters
+    fun getResonatorEnabled(): Boolean
+    fun getResonatorMode(): Int
+    fun getResonatorStructure(): Float
+    fun getResonatorBrightness(): Float
+    fun getResonatorDamping(): Float
+    fun getResonatorPosition(): Float
+    fun getResonatorMix(): Float
 }
 
 enum class ModSource {

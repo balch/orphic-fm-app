@@ -21,6 +21,7 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspDrumPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspHyperLfoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPerStringBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspResonatorPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspStereoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspVibratoPlugin
 import kotlin.math.pow
@@ -47,6 +48,7 @@ class DspSynthEngine(
     private val benderPlugin = plugins.filterIsInstance<DspBenderPlugin>().first()
     private val perStringBenderPlugin = plugins.filterIsInstance<DspPerStringBenderPlugin>().first()
     private val drumPlugin = plugins.filterIsInstance<DspDrumPlugin>().first()
+    private val resonatorPlugin = plugins.filterIsInstance<DspResonatorPlugin>().first()
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
@@ -182,9 +184,9 @@ class DspSynthEngine(
         stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
         stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
 
-        // Drum outputs → Stereo sum
-        drumPlugin.outputs["outputLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        drumPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        // Drum outputs → Resonator (Drum excitation)
+        drumPlugin.outputs["outputLeft"]?.connect(resonatorPlugin.inputs["inputLeft"]!!)
+        drumPlugin.outputs["outputRight"]?.connect(resonatorPlugin.inputs["inputRight"]!!)
 
         // Wire voices to audio paths
         voices.forEachIndexed { index, voice ->
@@ -226,10 +228,15 @@ class DspSynthEngine(
             voice.output.connect(stereoPlugin.getVoicePanInputLeft(index))
             voice.output.connect(stereoPlugin.getVoicePanInputRight(index))
             
-            // Panned audio goes to distortion (DRY path)
-            stereoPlugin.getVoicePanOutputLeft(index).connect(distortionPlugin.inputs["inputLeft"]!!)
-            stereoPlugin.getVoicePanOutputRight(index).connect(distortionPlugin.inputs["inputRight"]!!)
+            // Panned audio goes to Resonator inputs (Stereo Panned -> Resonator L/R)
+            stereoPlugin.getVoicePanOutputLeft(index).connect(resonatorPlugin.inputs["inputLeft"]!!)
+            stereoPlugin.getVoicePanOutputRight(index).connect(resonatorPlugin.inputs["inputRight"]!!)
         }
+
+        // Resonator output goes to Distortion input
+        resonatorPlugin.outputs["outputLeft"]!!.connect(distortionPlugin.inputs["inputLeft"]!!)
+        resonatorPlugin.outputs["outputRight"]!!.connect(distortionPlugin.inputs["inputRight"]!!)
+
 
         // ═══════════════════════════════════════════════════════════
         // Automation Setup
@@ -809,4 +816,24 @@ class DspSynthEngine(
     override fun getFmStructureCrossQuad(): Boolean = _fmStructureCrossQuad
     override fun getTotalFeedback(): Float = _totalFeedback
     override fun getVoiceCoupling(): Float = _voiceCoupling
+    
+    // ═══════════════════════════════════════════════════════════
+    // Rings Resonator Delegation
+    // ═══════════════════════════════════════════════════════════
+    override fun setResonatorEnabled(enabled: Boolean) = resonatorPlugin.setEnabled(enabled)
+    override fun setResonatorMode(mode: Int) = resonatorPlugin.setMode(mode)
+    override fun setResonatorStructure(value: Float) = resonatorPlugin.setStructure(value)
+    override fun setResonatorBrightness(value: Float) = resonatorPlugin.setBrightness(value)
+    override fun setResonatorDamping(value: Float) = resonatorPlugin.setDamping(value)
+    override fun setResonatorPosition(value: Float) = resonatorPlugin.setPosition(value)
+    override fun setResonatorMix(value: Float) = resonatorPlugin.setMix(value)
+    override fun strumResonator(frequency: Float) = resonatorPlugin.strum(frequency)
+    
+    override fun getResonatorEnabled(): Boolean = resonatorPlugin.getEnabled()
+    override fun getResonatorMode(): Int = resonatorPlugin.getMode()
+    override fun getResonatorStructure(): Float = resonatorPlugin.getStructure()
+    override fun getResonatorBrightness(): Float = resonatorPlugin.getBrightness()
+    override fun getResonatorDamping(): Float = resonatorPlugin.getDamping()
+    override fun getResonatorPosition(): Float = resonatorPlugin.getPosition()
+    override fun getResonatorMix(): Float = resonatorPlugin.getMix()
 }

@@ -108,6 +108,15 @@ data class MidiMappingState(
             
             // Bender - pitch bend with spring-loaded behavior
             const val BENDER = "bender"
+            
+            // Resonator (Rings) controls
+            const val RESONATOR_ENABLED = "resonator_enabled"
+            const val RESONATOR_MODE = "resonator_mode"
+            const val RESONATOR_STRUCTURE = "resonator_structure"
+            const val RESONATOR_BRIGHTNESS = "resonator_brightness"
+            const val RESONATOR_DAMPING = "resonator_damping"
+            const val RESONATOR_POSITION = "resonator_position"
+            const val RESONATOR_MIX = "resonator_mix"
         }
     }
 

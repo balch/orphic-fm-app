@@ -77,6 +77,30 @@ class SynthControlTool @Inject constructor(
         - Sirens: Oscillate between -0.5 and +0.5 at varying speeds
         - Tension/release: Pull to extreme (+1.0 or -1.0), hold, then release to 0.0 for spring sound
         Use BENDER when you want to create organic, gliding pitch movements.
+        
+        RESONATOR (Rings Physical Modeling):
+        Physical modeling resonator ported from Mutable Instruments Rings.
+        Perfect for adding metallic, string-like, or bell tones to your sound:
+        - RESONATOR_ENABLED: 0=off, 1=on
+        - RESONATOR_MODE: 0=Modal (bell/plate), 0.5=String (Karplus-Strong), 1=Sympathetic (sitar-like)
+        - RESONATOR_STRUCTURE: Controls harmonic spread/inharmonicity (0-1)
+        - RESONATOR_BRIGHTNESS: High frequency content (0=dark, 1=bright)
+        - RESONATOR_DAMPING: Decay time (0=long sustain, 1=quick decay)
+        - RESONATOR_POSITION: Excitation point (0=edge, 0.5=center, 1=opposite edge)
+        - RESONATOR_MIX: Dry/wet blend (0=dry, 1=fully resonated)
+        
+        RESONATOR SOUND DESIGN TIPS:
+        - Modal mode: Bell-like tones, struck metal/glass character
+        - String mode: Plucked guitar/harp sounds with realistic decay
+        - Sympathetic: Sitar-like with drone strings that ring in sympathy
+        - Low structure + high brightness = shimmering, crystalline
+        - High structure + low brightness = deep, gong-like rumble
+        
+        ⚠️ RESONATOR MODE CHANGE PROCEDURE:
+        1. Lower RESONATOR_MIX to 0.1 first (avoids jarring transition)
+        2. Change RESONATOR_MODE
+        3. Slowly ramp RESONATOR_MIX back to desired level
+        Avoid sustained high brightness + high structure (causes listener fatigue).
     """.trimIndent()
 ) {
     // Track current values for each control to enable smooth ramping
@@ -134,6 +158,15 @@ class SynthControlTool @Inject constructor(
               Creates organic gliding pitch effects with spring-loaded feel.
               Perfect for whale songs, dolphin clicks, sirens, and tension/release effects.
               Set to 0.0 to release and trigger the spring sound.
+            
+            RESONATOR (Rings Physical Modeling):
+            - RESONATOR_ENABLED: Turn resonator on/off (0=off, 1=on)
+            - RESONATOR_MODE: Synthesis mode (0=Modal/bell, 0.5=String/Karplus-Strong, 1=Sympathetic/sitar)
+            - RESONATOR_STRUCTURE: Harmonic spread/inharmonicity (0-1)
+            - RESONATOR_BRIGHTNESS: High frequency content (0=dark, 1=bright)
+            - RESONATOR_DAMPING: Decay time (0=long sustain, 1=quick decay)
+            - RESONATOR_POSITION: Excitation point (0-1, 0.5=center)
+            - RESONATOR_MIX: Dry/wet blend (0=dry, 1=fully processed)
         """)
         val controlId: String,
 
@@ -198,6 +231,15 @@ class SynthControlTool @Inject constructor(
             "DELAY_MOD_2" -> "delay_mod_2"
             "DELAY_MOD_SOURCE" -> "delay_mod_source"
             "DELAY_LFO_WAVEFORM" -> "delay_lfo_waveform"
+            
+            // Resonator (Rings) controls
+            "RESONATOR_ENABLED" -> "resonator_enabled"
+            "RESONATOR_MODE" -> "resonator_mode"
+            "RESONATOR_STRUCTURE" -> "resonator_structure"
+            "RESONATOR_BRIGHTNESS" -> "resonator_brightness"
+            "RESONATOR_DAMPING" -> "resonator_damping"
+            "RESONATOR_POSITION" -> "resonator_position"
+            "RESONATOR_MIX" -> "resonator_mix"
             
             // Per-voice controls (VOICE_TUNE_1 through VOICE_TUNE_12, etc.)
             else -> {

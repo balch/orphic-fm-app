@@ -41,6 +41,27 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         - Tension/release: Pull to extreme, hold, release to 0.0 for spring sound
         BENDER adds organic, living movement to your drones!
         
+        RESONATOR (Rings Physical Modeling) - PERFECT FOR DRONES:
+        Physical modeling for metallic, string-like, and bell textures:
+        - RESONATOR_ENABLED: Turn on/off (0=off, 1=on)
+        - RESONATOR_MODE: 0=Modal (bell/chime), 0.5=String (sustained), 1=Sympathetic (sitar)
+        - RESONATOR_STRUCTURE: Harmonic spread (0=focused, 1=wide/bell-like)
+        - RESONATOR_BRIGHTNESS: Tone color (0=dark/muted, 1=bright/shimmery)
+        - RESONATOR_DAMPING: Decay time (0=infinite sustain, 1=quick fade)
+        - RESONATOR_POSITION: Excitation point (0.5=center for fundamental)
+        - RESONATOR_MIX: Blend with dry signal (0.2-0.4 for subtle texture, 0.7+ for dominant)
+        
+        RESONATOR DRONE TIPS:
+        - Modal mode + low damping = eternal, singing bell pad
+        - Sympathetic mode = sitar-like drone with harmonic richness
+        - Combine with BENDER for evolving metallic textures
+        
+        ⚠️ RESONATOR SAFETY (STOP THE SQUELCH):
+        - 🚫 AVOID: Setting RESONATOR_BRIGHTNESS > 0.7 AND RESONATOR_STRUCTURE > 0.7 at the same time. This creates "squelching" piercing noise.
+        - If you want bright bell tones, use high brightness but moderate structure.
+        - ALWAYS lower RESONATOR_MIX to 0.1 BEFORE changing RESONATOR_MODE.
+        - Balanced drones have RESONATOR_MIX around 0.3-0.5. Values > 0.8 are very aggressive.
+        
         ## VOLUME BALANCE RULE
         The drone should be a subtle backing layer, NOT the main sound.
         ALWAYS set QUAD_VOLUME_3 between 0.5 and 0.7 to keep drone volume lower than main voices.
@@ -131,6 +152,14 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         "Harmonic series: explore the natural overtones. Let mathematics become music.",
         "Beating frequencies: slight detuning creates pulsing interference patterns. Hypnotic waves.",
         "Feedback loop: carefully controlled feedback creating self-sustaining tones.",
-        "Spectral freeze: hold a moment in time. Let it slowly decay and transform."
+        "Spectral freeze: hold a moment in time. Let it slowly decay and transform.",
+        
+        // Resonator explorations
+        "Temple bells: Enable RESONATOR in Modal mode. High brightness, low damping. Sacred, shimmering tones.",
+        "Singing bowls: Use RESONATOR with low structure, center position. Meditative, pure harmonics.",
+        "Sitar meditation: RESONATOR in Sympathetic mode. Exotic, drone-rich textures with natural resonance.",
+        "Crystal cave: Modal RESONATOR with high structure. Inharmonic, otherworldly bell clusters.",
+        "Aeolian harp: String mode RESONATOR. Wind playing invisible strings. Ethereal and haunting.",
+        "Metallic rain: RESONATOR with quick damping and high brightness. Drops on a tin roof."
     )
 }

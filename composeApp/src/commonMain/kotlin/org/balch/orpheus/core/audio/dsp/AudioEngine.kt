@@ -36,6 +36,7 @@ expect class AudioEngine() {
     fun createLinearRamp(): LinearRamp
     fun createAutomationPlayer(): AutomationPlayer
     fun createDrumUnit(): DrumUnit
+    fun createResonatorUnit(): ResonatorUnit
 
     /** Master output - connect final audio here */
     val lineOutLeft: AudioInput

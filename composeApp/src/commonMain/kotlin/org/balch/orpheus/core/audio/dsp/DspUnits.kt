@@ -160,3 +160,39 @@ expect interface DrumUnit : AudioUnit {
      */
     fun trigger(type: Int, accent: Float)
 }
+
+/**
+ * Modal/String resonator synthesis unit (ported from Mutable Instruments Rings).
+ * 
+ * Processes audio through either modal synthesis (SVF filter bank) or
+ * Karplus-Strong string synthesis.
+ */
+expect interface ResonatorUnit : AudioUnit {
+    /** Audio input for external excitation */
+    val input: AudioInput
+    
+    /** Secondary output (even partials / aux out) */
+    val auxOutput: AudioOutput
+    
+    /** Enable/disable resonator processing */
+    fun setEnabled(enabled: Boolean)
+    
+    /** Set mode: 0=Modal, 1=String, 2=Sympathetic */
+    fun setMode(mode: Int)
+    
+    /** Set structure/inharmonicity (0-1) */
+    fun setStructure(value: Float)
+    
+    /** Set brightness (0-1) */  
+    fun setBrightness(value: Float)
+    
+    /** Set damping/decay (0-1) */
+    fun setDamping(value: Float)
+    
+    /** Set excitation position (0-1) */
+    fun setPosition(value: Float)
+    
+    /** Trigger strum at specific frequency */
+    fun strum(frequency: Float)
+}
+

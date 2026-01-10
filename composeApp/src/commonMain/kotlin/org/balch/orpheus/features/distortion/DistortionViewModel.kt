@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.distortion
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -38,6 +39,7 @@ data class DistortionUiState(
     val peak: Float = 0.0f
 )
 
+@Immutable
 data class DistortionPanelActions(
     val onDriveChange: (Float) -> Unit,
     val onVolumeChange: (Float) -> Unit,
