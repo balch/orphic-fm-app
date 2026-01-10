@@ -31,8 +31,8 @@ import androidx.compose.ui.window.DialogProperties
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.draw.DrawSequencerFeature
 import org.balch.orpheus.features.draw.DrawSequencerViewModel
-import org.balch.orpheus.features.draw.ui.CompactTweakSequencerView
-import org.balch.orpheus.features.draw.ui.ExpandedTweakSequencerScreen
+import org.balch.orpheus.features.draw.ui.CompactDrawSequencerView
+import org.balch.orpheus.features.draw.ui.ExpandedDrawSequencerScreen
 import org.balch.orpheus.features.drums808.DrumFeature
 import org.balch.orpheus.features.drums808.DrumViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
@@ -107,7 +107,7 @@ fun CompactLandscapeScreen(
                     dismissOnClickOutside = true
                 )
             ) {
-                ExpandedTweakSequencerScreen(
+                ExpandedDrawSequencerScreen(
                     sequencerFeature = sequencerFeature,
                     onDismiss = { sequencerActions.onCancel() },
                     modifier = Modifier.fillMaxSize()
@@ -193,7 +193,7 @@ private fun CompactLandscapeLayout(
                 )
             }
 
-            CompactTweakSequencerView(
+            CompactDrawSequencerView(
                 sequencerFeature = sequencerFeature,
                 liquidState = liquidState,
                 effects = effects,

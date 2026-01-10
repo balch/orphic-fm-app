@@ -65,7 +65,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * - Clickable legend for parameter identification
  */
 @Composable
-fun CompactTweakSequencerView(
+fun CompactDrawSequencerView(
     sequencerFeature: DrawSequencerFeature = DrawSequencerViewModel.feature(),
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
@@ -83,7 +83,7 @@ fun CompactTweakSequencerView(
             modifier = Modifier
                 .clip(shape)
                 .fillMaxSize()
-                .background(Color(0xFF1A1A2A).copy(alpha = 0.8f))
+                .background(OrpheusColors.panelBackground.copy(alpha = 0.8f))
                 .border(1.dp, accentColor.copy(alpha = if (isActive) 0.5f else 0.2f), shape)
                 .padding(8.dp),
         ) {
@@ -100,7 +100,7 @@ fun CompactTweakSequencerView(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .background(if (isActive) accentColor.copy(alpha = 0.3f) else Color(0xFF2A2A3A))
+                            .background(if (isActive) accentColor.copy(alpha = 0.3f) else OrpheusColors.panelSurface)
                             .border(1.dp, accentColor.copy(alpha = 0.5f), CircleShape)
                             .clickable(enabled = isActive) { actions.onTogglePlayPause() },
                         contentAlignment = Alignment.Center
@@ -118,7 +118,7 @@ fun CompactTweakSequencerView(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF2A2A3A))
+                            .background(OrpheusColors.panelSurface)
                             .border(1.dp, accentColor.copy(alpha = 0.3f), CircleShape)
                             .clickable(enabled = isActive && (state.isPlaying || state.currentPosition > 0f)) { actions.onStop() },
                         contentAlignment = Alignment.Center
@@ -228,10 +228,10 @@ private fun MultiPathSequencerPreview(
                         liquidState = liquidState,
                         scope = effects.bottom,
                         frostAmount = 4.dp,
-                        color = Color(0xFF0A0A12),
+                        color = OrpheusColors.deepSpaceDark,
                         shape = shape
                     )
-                } else Modifier.background(Color(0xFF0A0A12))
+                } else Modifier.background(OrpheusColors.deepSpaceDark)
             )
             .border(1.dp, OrpheusColors.neonCyan.copy(alpha = if (enabled) 0.3f else 0.1f), shape)
             .clickable { onClick() }  // Always clickable so user can expand to configure
@@ -286,7 +286,7 @@ private fun ParameterLegend(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A2A).copy(alpha = 0.9f))
+            .background(OrpheusColors.panelBackground.copy(alpha = 0.9f))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -349,7 +349,7 @@ private fun CompactTweakSequencerViewPreview() {
         )
     )
 
-    CompactTweakSequencerView(
+    CompactDrawSequencerView(
         sequencerFeature = DrawSequencerViewModel.previewFeature(state),
         liquidState = null,
         effects = VisualizationLiquidEffects(),
@@ -369,7 +369,7 @@ private fun CompactTweakSequencerViewDisabledPreview() {
         )
     )
 
-    CompactTweakSequencerView(
+    CompactDrawSequencerView(
         sequencerFeature = DrawSequencerViewModel.previewFeature(state),
         liquidState = null,
         effects = VisualizationLiquidEffects(),

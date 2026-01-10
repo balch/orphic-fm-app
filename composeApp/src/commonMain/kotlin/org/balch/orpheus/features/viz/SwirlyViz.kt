@@ -158,9 +158,9 @@ class SwirlyViz(
                 // Dynamic Title Effects
                 val lfoShift = (lfoValue + 1f) / 2f
                 val titleColor = if (lfoShift > 0.5f) {
-                    lerpColor(Color(0xFF6B4A8E), Color(0xFFAA5599), (lfoShift - 0.5f) * 2f)
+                    lerpColor(OrpheusColors.swirlyPurple, OrpheusColors.swirlyPinkBright, (lfoShift - 0.5f) * 2f)
                 } else {
-                    lerpColor(Color(0xFF6B4A8E), Color(0xFF5599AA), (0.5f - lfoShift) * 2f)
+                    lerpColor(OrpheusColors.swirlyPurple, OrpheusColors.swirlyLightBlue, (0.5f - lfoShift) * 2f)
                 }
 
                 val currentEffects = Default.copy(
@@ -206,10 +206,10 @@ class SwirlyViz(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color(0xFF000000),          // Pure black center
-                        Color(0xFF050510),          // Very dark
-                        Color(0xFF101020),          // Dark purple tint
-                        Color(0xFF151525)           // Edge color
+                        Color.Black,          // Pure black center
+                        OrpheusColors.fireworksBackground,          // Very dark
+                        OrpheusColors.blackHoleDeep,          // Dark purple tint
+                        OrpheusColors.darkVoid           // Edge color
                     ),
                     center = Offset(cx, cy),
                     radius = maxRadius * 1.2f
@@ -352,8 +352,8 @@ class SwirlyViz(
                     refraction = .25f,
                     curve = .15f,
                 ),
-                titleColor = Color(0xFF6B4A8E), // Deep Purple base
-                borderColor = Color(0xFF6B4A8E).copy(alpha = 0.3f),
+                titleColor = OrpheusColors.swirlyPurple, // Deep Purple base
+                borderColor = OrpheusColors.swirlyPurple.copy(alpha = 0.3f),
                 titleElevation = 4.dp
             )
         )

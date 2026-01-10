@@ -55,7 +55,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * - Drawing Canvas: Draw/edit the selected parameter's path
  */
 @Composable
-fun ExpandedTweakSequencerScreen(
+fun ExpandedDrawSequencerScreen(
     sequencerFeature: DrawSequencerFeature,
     onDismiss: (Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -71,7 +71,7 @@ fun ExpandedTweakSequencerScreen(
     Column(
         modifier = modifier
             .clip(shape)
-            .background(Color(0xFF12121A))
+            .background(OrpheusColors.deepSpaceMid)
             .border(2.dp, accentColor.copy(alpha = 0.4f), shape)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -103,8 +103,8 @@ fun ExpandedTweakSequencerScreen(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF3A2A2A))
-                        .border(1.dp, Color(0xFFFF6B6B).copy(alpha = 0.5f), CircleShape)
+                        .background(OrpheusColors.seqDarkRed)
+                        .border(1.dp, OrpheusColors.seqRed.copy(alpha = 0.5f), CircleShape)
                         .clickable {
                             actions.onCancel()
                             onDismiss(false)
@@ -115,7 +115,7 @@ fun ExpandedTweakSequencerScreen(
                         text = "✕",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFF6B6B),
+                        color = OrpheusColors.seqRed,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -125,8 +125,8 @@ fun ExpandedTweakSequencerScreen(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF2A3A2A))
-                        .border(1.dp, Color(0xFF6BFF6B).copy(alpha = 0.5f), CircleShape)
+                        .background(OrpheusColors.seqDarkGreen)
+                        .border(1.dp, OrpheusColors.seqGreen.copy(alpha = 0.5f), CircleShape)
                         .clickable {
                             actions.onSave()
                             onDismiss(true)
@@ -137,7 +137,7 @@ fun ExpandedTweakSequencerScreen(
                         text = "✓",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6BFF6B),
+                        color = OrpheusColors.seqGreen,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -403,7 +403,7 @@ private fun ExpandedTweakSequencerScreenPreview() {
         override val actions = previewActions
     }
 
-    ExpandedTweakSequencerScreen(
+    ExpandedDrawSequencerScreen(
         sequencerFeature = previewFeature,
         onDismiss = {},
         modifier = Modifier.fillMaxSize().padding(16.dp)

@@ -1,6 +1,5 @@
 package org.balch.orpheus.features.tidal.ui
 
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -28,13 +27,13 @@ class LiveCodeTransformer : VisualTransformation {
     
     // Theme colors - expanded palette for richer highlighting
     private val colorKeyword = OrpheusColors.neonCyan
-    private val colorNumber = Color(0xFFFFB86C) // Orange/Gold
-    private val colorComment = Color(0xFF6272A4) // Greyish Blue
+    private val colorNumber = OrpheusColors.tidalNumber // Orange/Gold
+    private val colorComment = OrpheusColors.tidalComment // Greyish Blue
     private val colorOperator = OrpheusColors.synthPink
-    private val colorBracket = Color(0xFFBD93F9) // Purple for brackets
-    private val colorString = Color(0xFFF1FA8C) // Yellow for strings
-    private val colorSilence = Color(0xFF8BE9FD) // Cyan-ish for silence (~)
-    private val colorHighlight = Color(0xFF00FF88) // Bright green for active tokens
+    private val colorBracket = OrpheusColors.tidalBracket // Purple for brackets
+    private val colorString = OrpheusColors.tidalString // Yellow for strings
+    private val colorSilence = OrpheusColors.tidalSilence // Cyan-ish for silence (~)
+    private val colorHighlight = OrpheusColors.tidalHighlight // Bright green for active tokens
     
     // All supported keywords from TidalParser and LiveCodeViewModel
     private val keywords = setOf(

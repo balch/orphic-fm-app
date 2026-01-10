@@ -38,12 +38,6 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
-// VIZ panel color - lighter lime green for visibility
-private val VizColor = Color(0xFF90EE90)  // Light green
-
-/**
- * VizPanel consuming feature() interface.
- */
 @Composable
 fun VizPanel(
     feature: VizFeature = VizViewModel.feature(),
@@ -59,7 +53,7 @@ fun VizPanel(
 
     CollapsibleColumnPanel(
         title = "VIZ",
-        color = VizColor,
+        color = OrpheusColors.vizGreen,
         expandedTitle = "Background",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
@@ -81,7 +75,7 @@ fun VizPanel(
                 modifier = Modifier
                     .height(32.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.3f))
+                    .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
                     .clickable { expanded = true }
                     .padding(horizontal = 8.dp),
                 contentAlignment = Alignment.CenterStart
@@ -95,12 +89,12 @@ fun VizPanel(
                         text = uiState.selectedViz.name,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (uiState.showKnobs) VizColor else Color.Gray
+                        color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray
                     )
                     Text(
                         text = "▼",
                         fontSize = 12.sp,
-                        color = if (uiState.showKnobs) VizColor else Color.Gray,
+                        color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray,
                     )
                 }
 
@@ -114,7 +108,7 @@ fun VizPanel(
                             text = {
                                 Text(
                                     viz.name,
-                                    color = if (viz.id == uiState.selectedViz.id) VizColor else Color.White
+                                    color = if (viz.id == uiState.selectedViz.id) OrpheusColors.vizGreen else Color.White
                                 )
                             },
                             onClick = {
@@ -143,7 +137,7 @@ fun VizPanel(
                     label = if (uiState.showKnobs) uiState.selectedViz.knob1Label else "-",
                     controlId = "viz_knob1",
                     size = 48.dp,
-                    progressColor = if (uiState.showKnobs) VizColor else Color.Gray.copy(alpha = 0.3f),
+                    progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(alpha = 0.3f),
                     enabled = uiState.showKnobs
                 )
                 RotaryKnob(
@@ -152,7 +146,7 @@ fun VizPanel(
                     label = if (uiState.showKnobs) uiState.selectedViz.knob2Label else "-",
                     controlId = "viz_knob2",
                     size = 48.dp,
-                    progressColor = if (uiState.showKnobs) VizColor else Color.Gray.copy(alpha = 0.3f),
+                    progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(alpha = 0.3f),
                     enabled = uiState.showKnobs
                 )
             }

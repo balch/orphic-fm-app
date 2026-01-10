@@ -130,7 +130,7 @@ fun PresetsPanel(
                         .height(28.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(
-                            if (presetProps.selectedPreset != null) Color(0xFFFF9500).copy(alpha = 0.2f)
+                            if (presetProps.selectedPreset != null) OrpheusColors.patchOrange.copy(alpha = 0.2f)
                             else Color.Gray.copy(alpha = 0.1f)
                         )
                         .then(

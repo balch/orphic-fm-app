@@ -1,17 +1,5 @@
 package org.balch.orpheus.features.evo.strategy
 
-import androidx.compose.ui.graphics.Color
-import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.ContributesIntoSet
-import dev.zacsweers.metro.Inject
-import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
-import org.balch.orpheus.features.evo.AudioEvolutionStrategy
-import kotlin.random.Random
-
 /**
  * Drift Strategy - Random Walk Evolution
  * 
@@ -21,6 +9,18 @@ import kotlin.random.Random
  * SPEED (Knob 1): Controls how often parameters change (tick rate)
  * RANGE (Knob 2): Controls how far parameters can drift per step
  */
+import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.routing.ControlEventOrigin
+import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.features.evo.AudioEvolutionStrategy
+import org.balch.orpheus.ui.theme.OrpheusColors
+import kotlin.random.Random
+
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DriftStrategy(
@@ -31,7 +31,7 @@ class DriftStrategy(
 
     override val id = "drift"
     override val name = "Drift"
-    override val color = Color(0xFF4CAF50) // Green - organic/natural
+    override val color = OrpheusColors.strategyGreen // Green - organic/natural
     override val knob1Label = "SPEED"
     override val knob2Label = "RANGE"
 

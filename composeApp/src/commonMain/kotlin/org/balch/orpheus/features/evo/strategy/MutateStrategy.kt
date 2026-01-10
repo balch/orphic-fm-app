@@ -1,17 +1,5 @@
 package org.balch.orpheus.features.evo.strategy
 
-import androidx.compose.ui.graphics.Color
-import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.ContributesIntoSet
-import dev.zacsweers.metro.Inject
-import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
-import org.balch.orpheus.features.evo.AudioEvolutionStrategy
-import kotlin.random.Random
-
 /**
  * Mutate Strategy - Sudden Parameter Jumps
  * 
@@ -21,6 +9,18 @@ import kotlin.random.Random
  * SPEED (Knob 1): Controls how often mutations occur
  * CHAOS (Knob 2): Controls mutation magnitude and how many parameters change at once
  */
+import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.routing.ControlEventOrigin
+import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.features.evo.AudioEvolutionStrategy
+import org.balch.orpheus.ui.theme.OrpheusColors
+import kotlin.random.Random
+
 @Inject
 @ContributesIntoSet(AppScope::class)
 class MutateStrategy(
@@ -31,7 +31,7 @@ class MutateStrategy(
 
     override val id = "mutate"
     override val name = "Mutate"
-    override val color = Color(0xFFE91E63) // Pink/Magenta - chaotic/energetic
+    override val color = OrpheusColors.strategyMagenta // Pink/Magenta - chaotic/energetic
     override val knob1Label = "SPEED"
     override val knob2Label = "CHAOS"
 

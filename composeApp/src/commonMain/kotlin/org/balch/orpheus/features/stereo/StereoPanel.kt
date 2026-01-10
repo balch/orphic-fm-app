@@ -8,24 +8,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
+import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VerticalToggle
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
-// Darker cyan for PAN panel
-private val PanColor = Color(0xFF008B8B)  // Dark cyan
-
-/**
- * StereoPanel consuming feature() interface.
- */
 @Composable
 fun StereoPanel(
     feature: StereoFeature = StereoViewModel.feature(),
@@ -39,7 +33,7 @@ fun StereoPanel(
 
     CollapsibleColumnPanel(
         title = "PAN",
-        color = PanColor,
+        color = OrpheusColors.stereoCyan,
         expandedTitle = "Stereo",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
@@ -63,7 +57,7 @@ fun StereoPanel(
                         if (isVoicePan) StereoMode.VOICE_PAN else StereoMode.STEREO_DELAYS
                     )
                 },
-                color = PanColor,
+                color = OrpheusColors.stereoCyan,
                 controlId = "stereo_mode",
                 enabled = true
             )
@@ -77,7 +71,7 @@ fun StereoPanel(
                 label = "PAN",
                 controlId = "stereo_pan",
                 size = 64.dp,
-                progressColor = PanColor
+                progressColor = OrpheusColors.stereoCyan
             )
         }
     }

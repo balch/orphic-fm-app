@@ -39,7 +39,11 @@ import kotlin.math.sin
 @Preview
 fun RotaryKnobPreview() {
     OrpheusTheme {
-        RotaryKnob(value = 0.5f, onValueChange = {})
+        RotaryKnob(
+            label = "Volume",
+            value = 0.5f,
+            onValueChange = {}
+        )
     }
 }
 
@@ -62,6 +66,7 @@ fun RotaryKnob(
     progressColor: Color = OrpheusColors.neonCyan,
     knobColor: Color = OrpheusColors.softPurple,
     indicatorColor: Color = OrpheusColors.neonCyan,
+    labelColor: Color = progressColor,
     enabled: Boolean = true
 ) {
     // Sensitivity for drag (pixels per full range)
@@ -197,9 +202,9 @@ fun RotaryKnob(
                 drawCircle(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            OrpheusColors.softPurple.copy(alpha = 0.8f), // Highlight top-left
-                            OrpheusColors.deepPurple,                    // Mid
-                            Color.Black                                // Shadow bottom-right
+                            knobColor.copy(alpha = 0.8f), // Highlight top-left
+                            trackColor,                   // Mid
+                            Color.Black                   // Shadow bottom-right
                         ),
                         start = Offset(center.x - knobRadius, center.y - knobRadius),
                         end = Offset(center.x + knobRadius, center.y + knobRadius)
@@ -250,7 +255,7 @@ fun RotaryKnob(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = labelColor,
                 textAlign = TextAlign.Center,
                 maxLines = 1
             )

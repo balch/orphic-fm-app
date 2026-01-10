@@ -25,12 +25,12 @@ import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
 
 /**
- * Resonator synthesis mode (ported from Mutable Instruments Rings).
+ * Resonator synthesis mode
  */
 enum class ResonatorMode(val displayName: String) {
-    MODAL("Modal"),      // Bell/plate/bar resonance
-    STRING("String"),    // Karplus-Strong string
-    SYMPATHETIC("Sympa") // Sympathetic strings (sitar-like)
+    MODAL("Bar"),
+    STRING("String"),
+    SYMPATHETIC("Sitar")
 }
 
 /**

@@ -1,6 +1,5 @@
 package org.balch.orpheus.features.evo.strategy
 
-import androidx.compose.ui.graphics.Color
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
@@ -19,6 +18,7 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.features.evo.AudioEvolutionStrategy
+import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.abs
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -46,7 +46,7 @@ class ReactStrategy(
 
     override val id = "react"
     override val name = "React"
-    override val color = Color(0xFFFF9800) // Orange - reactive/dynamic
+    override val color = OrpheusColors.strategyOrange // Orange - reactive/dynamic
     override val knob1Label = "SENS"
     override val knob2Label = "FOLLOW"
 

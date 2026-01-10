@@ -90,11 +90,11 @@ fun DebugBottomBarContent(
                 liquidState = liquidState,
                 scope = effects.bottom,
                 frostAmount = effects.frostSmall.dp,
-                color = Color(0xFF1A1A1A),
+                color = OrpheusColors.charcoal,
                 tintAlpha = effects.tintAlpha,
                 shape = shape
             )
-            .border(width = 1.dp, color = Color(0xFF333333).copy(alpha = 0.5f), shape = shape)
+            .border(width = 1.dp, color = OrpheusColors.lightShadow.copy(alpha = 0.5f), shape = shape)
             .animateContentSize()
             .clip(shape)
     ) {
@@ -203,13 +203,13 @@ private fun DebugLogsPanel(
         modifier =
             Modifier.fillMaxWidth()
                 .heightIn(max = 200.dp)
-                .background(Color(0xFF0D0D0D))
+                .background(OrpheusColors.darkVoid)
     ) {
         // Header with Clear button
         Row(
             modifier =
                 Modifier.fillMaxWidth()
-                    .background(Color(0xFF1A1A1A))
+                    .background(OrpheusColors.charcoal)
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically

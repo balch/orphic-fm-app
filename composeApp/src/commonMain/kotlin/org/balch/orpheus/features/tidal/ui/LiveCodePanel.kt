@@ -366,7 +366,7 @@ fun LiveCodePanelLayout(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xFF1E1E2E).copy(alpha = 0.85f)),
+                            .background(OrpheusColors.tidalBackground.copy(alpha = 0.85f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(

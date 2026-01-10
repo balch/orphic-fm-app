@@ -181,6 +181,40 @@ object OrpheusColors {
     val swirlyTeal = Color(0xFF4A7A7A)
     val swirlyPinkPurple = Color(0xFF7A5A7A)
     val swirlyPinkBright = Color(0xFFAA5599)
+    val swirlyLightBlue = Color(0xFF5599AA)
+
+    // BlackHoleSunViz Colors
+    val blackHoleDeep = Color(0xFF0a0515)
+    val blackHoleVoid = Color(0xFF050210)
+    val blackHoleEdge = Color(0xFF020108)
+    val blackHoleDiskPurple = Color(0xFFaa4488)
+    val blackHoleDiskOrange = Color(0xFFff6633)
+    val blackHoleDiskGold = Color(0xFFffaa55)
+    val blackHoleHorizonGold = Color(0xFFffcc88)
+    val blackHoleHorizonOrange = Color(0xFFff8844)
+    val blackHoleParticleOrange = Color(0xFFff8855)
+
+    // Strategy Colors
+    val strategyGreen = Color(0xFF4CAF50)
+    val strategyBlue = Color(0xFF2196F3)
+    val strategyMagenta = Color(0xFFE91E63)
+    val strategyOrange = Color(0xFFFF9800)
+
+    // Live Code / Tidal Colors
+    val tidalNumber = Color(0xFFFFB86C)
+    val tidalComment = Color(0xFF6272A4)
+    val tidalBracket = Color(0xFFBD93F9)
+    val tidalString = Color(0xFFF1FA8C)
+    val tidalSilence = Color(0xFF8BE9FD)
+    val tidalHighlight = Color(0xFF00FF88)
+
+    // Sequencer Colors
+    val seqRed = Color(0xFFFF6B6B)
+    val seqGreen = Color(0xFF6BFF6B)
+    val seqDarkRed = Color(0xFF3A2A2A)
+    val seqDarkGreen = Color(0xFF2A3A2A)
+    val seqDelayBlue = Color(0xFF4080FF)
+    val seqDelayLightBlue = Color(0xFF6090FF)
 
     // Midnight Blue & Silver Palette
     val midnightBlue = Color(0xFF191970) // Deep Midnight Blue

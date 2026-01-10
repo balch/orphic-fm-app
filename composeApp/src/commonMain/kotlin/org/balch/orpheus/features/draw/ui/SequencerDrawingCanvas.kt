@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import org.balch.orpheus.features.draw.DrawSequencerParameter
 import org.balch.orpheus.features.draw.SequencerPath
 import org.balch.orpheus.features.draw.SequencerPoint
+import org.balch.orpheus.ui.theme.OrpheusColors
 
 /**
  * Canvas for drawing sequencer automation paths.
@@ -74,7 +75,7 @@ fun SequencerDrawingCanvas(
     Box(
         modifier = modifier
             .clip(shape)
-            .background(Color(0xFF0A0A12))
+            .background(OrpheusColors.deepSpaceDark)
             .border(1.dp, activeColor.copy(alpha = 0.3f), shape)
     ) {
         // Y-Axis Labels inside the box (Max at top, Min at bottom)

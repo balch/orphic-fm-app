@@ -21,8 +21,8 @@ enum class DrawSequencerParameter(
     DELAY_TIME_2("Time 2", "Delay", OrpheusColors.electricBlue.copy(alpha = 0.7f)),
     DELAY_MOD_1("Mod 1", "Delay", OrpheusColors.electricBlue.copy(alpha = 0.55f)),
     DELAY_MOD_2("Mod 2", "Delay", OrpheusColors.electricBlue.copy(alpha = 0.45f)),
-    DELAY_FEEDBACK("Feedback", "Delay", Color(0xFF4080FF).copy(alpha = 0.8f)),
-    DELAY_MIX("Mix", "Delay", Color(0xFF6090FF).copy(alpha = 0.75f)),
+    DELAY_FEEDBACK("Feedback", "Delay", OrpheusColors.seqDelayBlue.copy(alpha = 0.8f)),
+    DELAY_MIX("Mix", "Delay", OrpheusColors.seqDelayLightBlue.copy(alpha = 0.75f)),
 
     // Volume/Distortion parameters (Orange spectrum)
     DIST_DRIVE("Drive", "Vol", OrpheusColors.warmGlow.copy(alpha = 0.9f)),

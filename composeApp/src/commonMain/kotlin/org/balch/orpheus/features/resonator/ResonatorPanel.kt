@@ -26,10 +26,9 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
  * LA Lakers color scheme for Rings resonator panel
- * Gold background with purple accents
+ * Gold theme throughout
  */
-private val RingsPanelColor = OrpheusColors.lakersGold      // Gold for panel header
-private val RingsKnobColor = OrpheusColors.lakersPurpleLight // Lighter purple stands out more
+private val RingsPanelColor = OrpheusColors.lakersGold      // Gold for panel header and accents
 
 /**
  * Resonator panel (Rings port) with controls for:
@@ -84,18 +83,23 @@ private fun ResonatorPanelContent(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val segColors = SegmentedButtonDefaults.colors(
+                    activeContainerColor = RingsPanelColor,
+                    activeContentColor = OrpheusColors.lakersPurple,
+                    inactiveContentColor = OrpheusColors.lakersGold,
+                    inactiveContainerColor = OrpheusColors.lakersPurpleDark
+                )
                 SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                    modifier = Modifier.fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+
                 ) {
                     // "Off" option
                     SegmentedButton(
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 4),
                         onClick = { actions.setEnabled(false) },
                         selected = !state.enabled,
-                        colors = SegmentedButtonDefaults.colors(
-                            activeContainerColor = RingsPanelColor,
-                            activeContentColor = RingsKnobColor
-                        ),
+                        colors = segColors,
                         icon = {}
                     ) {
                         Text(
@@ -115,10 +119,7 @@ private fun ResonatorPanelContent(
                                 actions.setMode(mode) 
                             },
                             selected = state.enabled && state.mode == mode,
-                            colors = SegmentedButtonDefaults.colors(
-                                activeContainerColor = RingsPanelColor,
-                                activeContentColor = RingsKnobColor
-                            ),
+                            colors = segColors,
                             icon = {}
                         ) {
                             Text(
@@ -142,35 +143,50 @@ private fun ResonatorPanelContent(
                     onValueChange = actions.setStructure,
                     label = "STRUCT",
                     size = 40.dp,
-                    progressColor = RingsKnobColor
+                    trackColor = OrpheusColors.lakersPurpleDark,
+                    progressColor = RingsPanelColor,
+                    knobColor = OrpheusColors.lakersGold,
+                    labelColor = RingsPanelColor
                 )
                 RotaryKnob(
                     value = state.brightness,
                     onValueChange = actions.setBrightness,
                     label = "BRIGHT",
                     size = 40.dp,
-                    progressColor = RingsKnobColor
+                    trackColor = OrpheusColors.lakersPurpleDark,
+                    progressColor = RingsPanelColor,
+                    knobColor = OrpheusColors.lakersGold,
+                    labelColor = RingsPanelColor
                 )
                 RotaryKnob(
                     value = state.damping,
                     onValueChange = actions.setDamping,
                     label = "DAMP",
                     size = 40.dp,
-                    progressColor = RingsKnobColor
+                    trackColor = OrpheusColors.lakersPurpleDark,
+                    progressColor = RingsPanelColor,
+                    knobColor = OrpheusColors.lakersGold,
+                    labelColor = RingsPanelColor
                 )
                 RotaryKnob(
                     value = state.position,
                     onValueChange = actions.setPosition,
                     label = "POSN",
                     size = 40.dp,
-                    progressColor = RingsKnobColor
+                    trackColor = OrpheusColors.lakersPurpleDark,
+                    progressColor = RingsPanelColor,
+                    knobColor = OrpheusColors.lakersGold,
+                    labelColor = RingsPanelColor
                 )
                 RotaryKnob(
                     value = state.mix,
                     onValueChange = actions.setMix,
                     label = "MIX",
                     size = 40.dp,
-                    progressColor = RingsKnobColor
+                    trackColor = OrpheusColors.lakersPurpleDark,
+                    progressColor = RingsPanelColor,
+                    knobColor = OrpheusColors.lakersGold,
+                    labelColor = RingsPanelColor
                 )
             }
         }

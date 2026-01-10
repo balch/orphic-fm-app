@@ -452,9 +452,9 @@ class BlackHoleSunViz(
         drawRect(
             brush = Brush.radialGradient(
                 colorStops = arrayOf(
-                    0f to Color(0xFF0a0515),
-                    0.5f to Color(0xFF050210),
-                    1f to Color(0xFF020108)
+                    0f to OrpheusColors.blackHoleDeep,
+                    0.5f to OrpheusColors.blackHoleVoid,
+                    1f to OrpheusColors.blackHoleEdge
                 ),
                 center = Offset(cx, cy),
                 radius = scale * 1.5f
@@ -477,9 +477,9 @@ class BlackHoleSunViz(
                     colorStops = arrayOf(
                         0f to Color.Transparent,
                         0.5f to Color.Transparent,
-                        0.7f to Color(0xFFaa4488).copy(alpha = diskIntensity * 0.3f),
-                        0.85f to Color(0xFFff6633).copy(alpha = diskIntensity * 0.4f),
-                        0.95f to Color(0xFFffaa55).copy(alpha = diskIntensity * 0.2f),
+                        0.7f to OrpheusColors.blackHoleDiskPurple.copy(alpha = diskIntensity * 0.3f),
+                        0.85f to OrpheusColors.blackHoleDiskOrange.copy(alpha = diskIntensity * 0.4f),
+                        0.95f to OrpheusColors.blackHoleDiskGold.copy(alpha = diskIntensity * 0.2f),
                         1f to Color.Transparent
                     ),
                     center = Offset(cx, cy),
@@ -499,8 +499,8 @@ class BlackHoleSunViz(
                     colorStops = arrayOf(
                         0f to Color.Transparent,
                         0.6f to Color.Transparent,
-                        0.8f to Color(0xFFffcc88).copy(alpha = horizonGlow * 0.4f),
-                        0.95f to Color(0xFFff8844).copy(alpha = horizonGlow * 0.25f),
+                        0.8f to OrpheusColors.blackHoleHorizonGold.copy(alpha = horizonGlow * 0.4f),
+                        0.95f to OrpheusColors.blackHoleHorizonOrange.copy(alpha = horizonGlow * 0.25f),
                         1f to Color.Transparent
                     ),
                     center = Offset(cx, cy),
@@ -518,7 +518,7 @@ class BlackHoleSunViz(
                 colorStops = arrayOf(
                     0f to Color.Black,
                     0.85f to Color.Black,
-                    1f to Color(0xFF110511)
+                    1f to OrpheusColors.blackHoleEdge
                 ),
                 center = Offset(cx, cy),
                 radius = scale * blackHoleRadius
@@ -547,7 +547,7 @@ class BlackHoleSunViz(
             val glowColor = when (p.type) {
                 AccretionParticleType.ABSORBED -> {
                     // Shift toward hot orange as particle is absorbed
-                    lerpColor(p.color, Color(0xFFff8855), 1f - p.life)
+                    lerpColor(p.color, OrpheusColors.blackHoleParticleOrange, 1f - p.life)
                 }
                 else -> p.color
             }

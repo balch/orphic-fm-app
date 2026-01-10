@@ -1,18 +1,5 @@
 package org.balch.orpheus.features.evo.strategy
 
-import androidx.compose.ui.graphics.Color
-import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.ContributesIntoSet
-import dev.zacsweers.metro.Inject
-import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
-import org.balch.orpheus.features.evo.AudioEvolutionStrategy
-import kotlin.math.PI
-import kotlin.math.sin
-
 /**
  * Breathe Strategy - Cyclic Oscillation
  * 
@@ -22,6 +9,19 @@ import kotlin.math.sin
  * SPEED (Knob 1): Controls oscillation frequency
  * DEPTH (Knob 2): Controls modulation amplitude (how much parameters change)
  */
+import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
+import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.routing.ControlEventOrigin
+import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.features.evo.AudioEvolutionStrategy
+import org.balch.orpheus.ui.theme.OrpheusColors
+import kotlin.math.PI
+import kotlin.math.sin
+
 @Inject
 @ContributesIntoSet(AppScope::class)
 class BreatheStrategy(
@@ -32,7 +32,7 @@ class BreatheStrategy(
 
     override val id = "breathe"
     override val name = "Breathe"
-    override val color = Color(0xFF2196F3) // Blue - calm/rhythmic
+    override val color = OrpheusColors.strategyBlue // Blue - calm/rhythmic
     override val knob1Label = "SPEED"
     override val knob2Label = "DEPTH"
 
