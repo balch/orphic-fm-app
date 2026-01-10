@@ -52,7 +52,7 @@ private val PatchesColor = Color(0xFFFFAB40)  // Light orange/amber
  */
 @Composable
 fun PresetsPanel(
-    feature: PresetsFeature,
+    feature: PresetsFeature = PresetsViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

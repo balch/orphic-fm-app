@@ -27,7 +27,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         ESSENTIAL CONTROLS for drones:
         - QUAD_VOLUME_3: Volume of drone voices (IMPORTANT: keep at 0.5-0.7 to stay below main volume). Do NOT use MASTER_VOLUME.
         - QUAD_PITCH_3: Pitch of the drone layers (0.5 = unity).
-        - QUAD_HOLD_3: Sustain level of drone layers.
+        - QUAD_HOLD_3: Sustain level. (Note: Only effective when ENV_SPEED is high/slow).
         - VIBRATO: LFO modulation depth (0.2-0.7).
         - DELAY_FEEDBACK: Echo repeats (0.3-0.8).
         - VOICE_COUPLING: FM modulation brightness (0.1-0.5).
@@ -53,10 +53,13 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         Use `#` to combine patterns. For example, to set per-voice hold levels:
         - `d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"` -> each voice gets its corresponding hold value
         
-        **IMPORTANT - envspeed requires hold:**
-        When using `envspeed` (slow envelope), you MUST also set `hold` or the note won't be heard!
-        - WRONG: `d1 $ voices "1" # envspeed "0.7"` -> note may be inaudible
-        - CORRECT: `d5 $ voices "9" # hold "0.8" # envspeed "0.7"` -> sustained with slow envelope
+        **ENVELOPE SPEED & HOLD (The "Drone Secret"):**
+        - FAST ENV (`envspeed` = 0): Aggressive ease-in (exp=4). Low hold values produce almost nothing.
+          hold=0.35 → ~0.008, hold=0.5 → ~0.03, hold=0.7 → ~0.12, hold=0.85 → ~0.26
+        - SLOW ENV (`envspeed` = 1): Linear response with 2x gain. Even hold=0.2 produces 0.4 output!
+        - TECHNIQUE: For "Cool Drones", use SLOW `envspeed` (0.7-1.0) with moderate `hold` (0.3-0.5). 
+          The slow envelope flattens the curve and amplifies hold, letting voices bloom and sustain.
+        - IMPORTANT: At FAST envspeed, hold needs to be ~0.7+ to be noticeable.
         
         ## DRONE SOUND DESIGN TIPS
         1. Small changes to QUAD_PITCH_3 create detuned beating textures.

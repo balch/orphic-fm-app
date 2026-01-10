@@ -29,7 +29,8 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         Each voice can be shaped independently:
         - VOICE_TUNE_1 through VOICE_TUNE_8: Pitch (0.5=A3/220Hz, see TUNING below)
         - VOICE_FM_DEPTH_1 through VOICE_FM_DEPTH_8: FM modulation depth
-        - VOICE_ENV_SPEED_1 through VOICE_ENV_SPEED_8: Envelope (0=fast attack, 1=slow pad)
+        - VOICE_ENV_SPEED_1 through VOICE_ENV_SPEED_8: Envelope (0=fast/percussive, 1=slow/drone).
+          Note: HOLD is suppressed at fast speeds and magnified at slow speeds.
         
         TUNING TO MUSICAL NOTES:
         Formula: tuneValue = 0.5 + (semitones from A3 / 48.0)
@@ -41,15 +42,15 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         
         **QUAD 1 (Voices 1-4):**
         - QUAD_PITCH_1: Group pitch. SLOWLY RAMP up/down over time!
-        - QUAD_HOLD_1: Sustain level. SLOWLY RAMP for swelling/fading!
+        - QUAD_HOLD_1: Sustain level. (Note: Requires SLOW envspeed to "kick in").
         
         **QUAD 2 (Voices 5-8):**
         - QUAD_PITCH_2: Group pitch. SLOWLY RAMP differently than Quad 1!
-        - QUAD_HOLD_2: Sustain level. SLOWLY RAMP in counterpoint to Quad 1!
+        - QUAD_HOLD_2: Sustain level. (Note: Only kicks in at high ENV_SPEED).
         
         **QUAD 3 (Voices 9-12) - Your Drone Foundation:**
         - QUAD_PITCH_3: Group pitch. Even this should drift slowly!
-        - QUAD_HOLD_3: Sustain level. Keep LOW (0.2-0.5) but still moving!
+        - QUAD_HOLD_3: Sustain level. (Note: Only kicks in at high ENV_SPEED).
         - QUAD_VOLUME_3: Keep LOW (0.2-0.35) - foundation, not dominant!
         
         ### PAIRS/DUOS 1-4 (Voice Pair Shaping)
@@ -95,10 +96,13 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         Use `#` to combine patterns. For example, to set per-voice hold levels:
         - `d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"` -> each voice gets its corresponding hold value
         
-        **IMPORTANT - envspeed requires hold:**
-        When using `envspeed` (slow envelope), you MUST also set `hold` or the note won't be heard!
-        - WRONG: `d1 $ voices "1" # envspeed "0.7"` -> note may be inaudible
-        - CORRECT: `d1 $ voices "1" # hold "0.8" # envspeed "0.7"` -> sustained with slow envelope
+        **ENVELOPE SPEED & HOLD (The "Drone Secret"):**
+        - FAST ENV (`envspeed` = 0): Aggressive ease-in (exp=4). Low hold values produce almost nothing.
+          hold=0.35 → ~0.008, hold=0.5 → ~0.03, hold=0.7 → ~0.12, hold=0.85 → ~0.26
+        - SLOW ENV (`envspeed` = 1): Linear response with 2x gain. Even hold=0.2 produces 0.4 output!
+        - TECHNIQUE: For "Cool Drones", use SLOW `envspeed` (0.7-1.0) with moderate `hold` (0.3-0.5). 
+          The slow envelope flattens the curve and amplifies hold, letting voices bloom and sustain.
+        - IMPORTANT: At FAST envspeed, hold needs to be ~0.7+ to be noticeable.
         
         **CRITICAL: NEVER use "hush"!** The sound must be CONTINUOUS. To change patterns,
         simply send new patterns to the same slot (d1, d2, etc.) - they will replace the old ones.

@@ -45,7 +45,7 @@ data class MidiProps(
  */
 @Composable
 fun MidiPanel(
-    feature: MidiFeature,
+    feature: MidiFeature = MidiViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

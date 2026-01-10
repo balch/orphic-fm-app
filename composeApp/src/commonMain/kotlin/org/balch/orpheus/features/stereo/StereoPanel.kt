@@ -28,7 +28,7 @@ private val PanColor = Color(0xFF008B8B)  // Dark cyan
  */
 @Composable
 fun StereoPanel(
-    feature: StereoFeature,
+    feature: StereoFeature = StereoViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

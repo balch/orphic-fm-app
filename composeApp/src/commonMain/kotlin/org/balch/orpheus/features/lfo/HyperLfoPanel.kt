@@ -51,7 +51,7 @@ enum class HyperLfoMode {
  */
 @Composable
 fun HyperLfoPanel(
-    feature: LfoFeature,
+    feature: LfoFeature = LfoViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

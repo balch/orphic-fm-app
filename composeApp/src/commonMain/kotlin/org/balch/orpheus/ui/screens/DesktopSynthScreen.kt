@@ -61,67 +61,22 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
  */
 @Composable
 fun DesktopSynthScreen(
-    isDialogActive: Boolean,
-    onDialogActiveChange: (Boolean) -> Unit,
-) {
-    // Create focus requester locally - layout will request focus
-    val focusRequester = remember { FocusRequester() }
-    
-    // Inject all ViewModels internally via their factory methods
-    val voiceFeature = VoiceViewModel.feature()
-    val evoFeature = EvoViewModel.feature()
-    val headerFeature = HeaderViewModel.feature()
-    val presetsFeature = PresetsViewModel.feature()
-    val midiFeature = MidiViewModel.feature()
-    val stereoFeature = StereoViewModel.feature()
-    val vizFeature = VizViewModel.feature()
-    val lfoFeature = LfoViewModel.feature()
-    val delayFeature = DelayViewModel.feature()
-    val distortionFeature = DistortionViewModel.feature()
-    val liveCodeFeature = LiveCodeViewModel.feature()
-    val aiOptionsFeature = AiOptionsViewModel.feature()
-
-    DesktopSynthScreenLayout(
-        voiceFeature = voiceFeature,
-        evoFeature = evoFeature,
-        headerFeature = headerFeature,
-        presetsFeature = presetsFeature,
-        midiFeature = midiFeature,
-        stereoFeature = stereoFeature,
-        vizFeature = vizFeature,
-        lfoFeature = lfoFeature,
-        delayFeature = delayFeature,
-        distortionFeature = distortionFeature,
-        liveCodeFeature = liveCodeFeature,
-        aiOptionsFeature = aiOptionsFeature,
-        effects = LocalLiquidEffects.current,
-        isDialogActive = isDialogActive,
-        onDialogActiveChange = onDialogActiveChange,
-        focusRequester = focusRequester,
-    )
-}
-
-/**
- * Layout function for previews - uses Layout composables that accept state/actions
- */
-@Composable
-fun DesktopSynthScreenLayout(
-    voiceFeature: VoicesFeature,
-    evoFeature: EvoFeature,
-    headerFeature: HeaderFeature,
-    presetsFeature: PresetsFeature,
-    midiFeature: MidiFeature,
-    stereoFeature: StereoFeature,
-    vizFeature: VizFeature,
-    lfoFeature: LfoFeature,
-    delayFeature: DelayFeature,
-    distortionFeature: DistortionFeature,
-    liveCodeFeature: LiveCodeFeature,
-    aiOptionsFeature: AiOptionsFeature,
-    effects: VisualizationLiquidEffects,
+    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
+    evoFeature: EvoFeature = EvoViewModel.feature(),
+    headerFeature: HeaderFeature = HeaderViewModel.feature(),
+    presetsFeature: PresetsFeature= PresetsViewModel.feature(),
+    midiFeature: MidiFeature = MidiViewModel.feature(),
+    stereoFeature: StereoFeature = StereoViewModel.feature(),
+    vizFeature: VizFeature = VizViewModel.feature(),
+    lfoFeature: LfoFeature = LfoViewModel.feature(),
+    delayFeature: DelayFeature = DelayViewModel.feature(),
+    distortionFeature: DistortionFeature = DistortionViewModel.feature(),
+    liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
+    aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
+    effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
     isDialogActive: Boolean = false,
     onDialogActiveChange: (Boolean) -> Unit,
-    focusRequester: FocusRequester,
+    focusRequester: FocusRequester = remember { FocusRequester() },
 ) {
     // Request focus for keyboard input handling
     LaunchedEffect(Unit) {
@@ -219,7 +174,7 @@ private fun DesktopSynthScreenPreview(
         effects = effects,
         modifier = Modifier.fillMaxSize()
     ) {
-        DesktopSynthScreenLayout(
+        DesktopSynthScreen(
             voiceFeature = VoiceViewModel.previewFeature(),
             evoFeature = EvoViewModel.previewFeature(),
             headerFeature = HeaderViewModel.previewFeature(),

@@ -66,7 +66,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  */
 @Composable
 fun CompactTweakSequencerView(
-    sequencerFeature: DrawSequencerFeature,
+    sequencerFeature: DrawSequencerFeature = DrawSequencerViewModel.feature(),
     liquidState: LiquidState?,
     effects: VisualizationLiquidEffects,
     modifier: Modifier = Modifier

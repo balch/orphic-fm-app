@@ -37,7 +37,7 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun DistortionPanel(
-    feature: DistortionFeature,
+    feature: DistortionFeature = DistortionViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

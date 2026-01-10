@@ -49,7 +49,7 @@ private val CavsGold = Color(0xFFFDBB30)
 @Composable
 fun EvoPanel(
     modifier: Modifier = Modifier,
-    evoFeature: EvoFeature,
+    evoFeature: EvoFeature = EvoViewModel.feature(),
     isExpanded: Boolean,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,

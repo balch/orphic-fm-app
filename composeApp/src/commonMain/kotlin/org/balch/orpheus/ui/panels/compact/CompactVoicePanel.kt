@@ -16,10 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.HoldSwitch
@@ -35,7 +34,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun CompactVoicePanel(
     voiceIndex: Int,
-    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
+    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
     color: Color,
     modifier: Modifier = Modifier
 ) {

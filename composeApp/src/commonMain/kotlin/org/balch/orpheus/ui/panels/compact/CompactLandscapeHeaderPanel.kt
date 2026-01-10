@@ -27,16 +27,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.features.presets.PresetPanelActions
 import org.balch.orpheus.features.presets.PresetUiState
+import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.viz.VizPanelActions
-import org.balch.orpheus.features.viz.VizUiState
+import org.balch.orpheus.features.viz.VizFeature
 import org.balch.orpheus.features.viz.VizViewModel
-import org.balch.orpheus.features.voice.VoicePanelActions
-import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
@@ -45,17 +42,16 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-
 fun CompactLandscapeHeaderPanel(
-    presetFeature: SynthFeature<PresetUiState, PresetPanelActions>,
-    vizFeature: SynthFeature<VizUiState, VizPanelActions>,
-    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
-    presetDropdownExpanded: Boolean,
-    onPresetDropdownExpandedChange: (Boolean) -> Unit,
-    vizDropdownExpanded: Boolean,
-    onVizDropdownExpandedChange: (Boolean) -> Unit,
-    liquidState: LiquidState?,
-    effects: VisualizationLiquidEffects,
+    presetFeature: PresetsFeature = PresetsViewModel.feature(),
+    vizFeature: VizFeature = VizViewModel.feature(),
+    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
+    presetDropdownExpanded: Boolean = false,
+    onPresetDropdownExpandedChange: (Boolean) -> Unit = {},
+    vizDropdownExpanded: Boolean = false,
+    onVizDropdownExpandedChange: (Boolean) -> Unit = {},
+    liquidState: LiquidState? = null,
+    effects: VisualizationLiquidEffects = VisualizationLiquidEffects(),
     modifier: Modifier = Modifier
 ) {
     val presetState by presetFeature.stateFlow.collectAsState()

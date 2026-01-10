@@ -46,7 +46,7 @@ private val VizColor = Color(0xFF90EE90)  // Light green
  */
 @Composable
 fun VizPanel(
-    feature: VizFeature,
+    feature: VizFeature = VizViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

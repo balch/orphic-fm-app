@@ -16,25 +16,35 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsPanel
+import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.ai.PanelId
 import org.balch.orpheus.features.delay.DelayFeature
+import org.balch.orpheus.features.delay.DelayViewModel
 import org.balch.orpheus.features.delay.ModDelayPanel
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionPanel
+import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
+import org.balch.orpheus.features.evo.EvoViewModel
 import org.balch.orpheus.features.lfo.HyperLfoPanel
 import org.balch.orpheus.features.lfo.LfoFeature
+import org.balch.orpheus.features.lfo.LfoViewModel
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiPanel
+import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsPanel
+import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.stereo.StereoFeature
 import org.balch.orpheus.features.stereo.StereoPanel
+import org.balch.orpheus.features.stereo.StereoViewModel
+import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
 import org.balch.orpheus.features.tidal.ui.LiveCodePanel
 import org.balch.orpheus.features.viz.VizFeature
 import org.balch.orpheus.features.viz.VizPanel
+import org.balch.orpheus.features.viz.VizViewModel
 
 /**
  * A container for the top header panel row that manages expansion state
@@ -43,17 +53,17 @@ import org.balch.orpheus.features.viz.VizPanel
 @Composable
 fun HeaderPanel(
     modifier: Modifier = Modifier,
-    headerFeature: HeaderFeature,
-    presetsFeature: PresetsFeature,
-    midiFeature: MidiFeature,
-    stereoFeature: StereoFeature,
-    vizFeature: VizFeature,
-    evoFeature: EvoFeature,
-    lfoFeature: LfoFeature,
-    delayFeature: DelayFeature,
-    distortionFeature: DistortionFeature,
-    liveCodeFeature: LiveCodeFeature,
-    aiOptionsFeature: AiOptionsFeature,
+    headerFeature: HeaderFeature = HeaderViewModel.feature(),
+    presetsFeature: PresetsFeature = PresetsViewModel.feature(),
+    midiFeature: MidiFeature = MidiViewModel.feature(),
+    stereoFeature: StereoFeature = StereoViewModel.feature(),
+    vizFeature: VizFeature = VizViewModel.feature(),
+    evoFeature: EvoFeature = EvoViewModel.feature(),
+    lfoFeature: LfoFeature = LfoViewModel.feature(),
+    delayFeature: DelayFeature = DelayViewModel.feature(),
+    distortionFeature: DistortionFeature = DistortionViewModel.feature(),
+    liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
+    aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {

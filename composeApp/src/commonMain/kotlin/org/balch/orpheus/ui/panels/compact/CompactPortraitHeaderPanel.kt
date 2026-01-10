@@ -22,8 +22,10 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionPanelActions
 import org.balch.orpheus.features.distortion.DistortionUiState
+import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
@@ -43,9 +45,9 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompactPortraitHeaderPanel(
-    distortionFeature: SynthFeature<DistortionUiState, DistortionPanelActions>,
-    liquidState: LiquidState,
-    effects: VisualizationLiquidEffects,
+    distortionFeature: DistortionFeature = DistortionViewModel.feature(),
+    liquidState: LiquidState = rememberLiquidState(),
+    effects: VisualizationLiquidEffects = VisualizationLiquidEffects(),
     modifier: Modifier = Modifier
 ) {
     val state by distortionFeature.stateFlow.collectAsState()

@@ -28,7 +28,7 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
  */
 @Composable
 fun ModDelayPanel(
-    feature: DelayFeature,
+    feature: DelayFeature = DelayViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

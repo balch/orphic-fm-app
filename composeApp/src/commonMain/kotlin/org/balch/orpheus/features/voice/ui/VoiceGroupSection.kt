@@ -36,8 +36,8 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun VoiceGroupSection(
-    voiceFeature: VoicesFeature,
-    midiFeature: MidiFeature,
+    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
+    midiFeature: MidiFeature = MidiViewModel.feature(),
     quadLabel: String,
     quadColor: Color,
     voiceStartIndex: Int,

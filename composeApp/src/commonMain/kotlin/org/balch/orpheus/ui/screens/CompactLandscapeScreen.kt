@@ -23,11 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.draw.DrawSequencerFeature
 import org.balch.orpheus.features.draw.DrawSequencerViewModel
@@ -65,10 +65,10 @@ import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 @Composable
 fun CompactLandscapeScreen(
     modifier: Modifier = Modifier,
-    voiceViewModel: VoiceViewModel = metroViewModel(),
-    presetViewModel: PresetsViewModel = metroViewModel(),
-    vizViewModel: VizViewModel = metroViewModel(),
-    sequencerViewModel: DrawSequencerViewModel = metroViewModel(),
+    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
+    presetsFeature: PresetsFeature = PresetsViewModel.feature(),
+    vizFeature: VizFeature = VizViewModel.feature(),
+    sequencerFeature: DrawSequencerFeature = DrawSequencerViewModel.feature(),
 ) {
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
@@ -76,27 +76,24 @@ fun CompactLandscapeScreen(
     Box(modifier = modifier.fillMaxSize()) {
         CompactLandscapeLayout(
             modifier = Modifier.fillMaxSize(),
-            presetFeature = presetViewModel,
-            voiceFeature = voiceViewModel,
-            vizFeature = vizViewModel,
-            sequencerFeature = sequencerViewModel,
+            presetFeature = presetsFeature,
+            voiceFeature = voiceFeature,
+            vizFeature = vizFeature,
+            sequencerFeature = sequencerFeature,
             liquidState = liquidState,
             effects = effects,
             onKeyEvent = { event, isDialogActive ->
-                // Still using ViewModel instance here as SynthKeyboardHandler expects it.
-                // Ideally SynthKeyboardHandler should be refactored too, but for now this works 
-                // as the ViewModel is available in the screen scope.
                 SynthKeyboardHandler.handleKeyEvent(
                     keyEvent = event,
-                    voiceFeature = voiceViewModel,
+                    voiceFeature = voiceFeature,
                     isDialogActive = isDialogActive
                 )
             }
         )
         
         // Expanded Sequencer Screen Overlay
-        val sequencerState by sequencerViewModel.stateFlow.collectAsState()
-        val sequencerActions = sequencerViewModel.actions
+        val sequencerState by sequencerFeature.stateFlow.collectAsState()
+        val sequencerActions = sequencerFeature.actions
         if (sequencerState.isExpanded) {
             Dialog(
                 onDismissRequest = { sequencerActions.onCancel() },
@@ -107,7 +104,7 @@ fun CompactLandscapeScreen(
                 )
             ) {
                 ExpandedTweakSequencerScreen(
-                    sequencerFeature = sequencerViewModel,
+                    sequencerFeature = sequencerFeature,
                     onDismiss = { sequencerActions.onCancel() },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -120,13 +117,13 @@ fun CompactLandscapeScreen(
 @Composable
 private fun CompactLandscapeLayout(
     modifier: Modifier = Modifier,
-    presetFeature: PresetsFeature,
-    voiceFeature: VoicesFeature,
-    vizFeature: VizFeature,
-    sequencerFeature: DrawSequencerFeature,
-    liquidState: LiquidState?,
-    effects: VisualizationLiquidEffects,
-    onKeyEvent: (androidx.compose.ui.input.key.KeyEvent, Boolean) -> Boolean,
+    presetFeature: PresetsFeature = PresetsViewModel.feature(),
+    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
+    vizFeature: VizFeature = VizViewModel.feature(),
+    sequencerFeature: DrawSequencerFeature = DrawSequencerViewModel.feature(),
+    liquidState: LiquidState? = null,
+    effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
+    onKeyEvent: (KeyEvent, Boolean) -> Boolean = { _, _ -> false },
 ) {
     // Focus handling for keyboard input
     val focusRequester = remember { FocusRequester() }

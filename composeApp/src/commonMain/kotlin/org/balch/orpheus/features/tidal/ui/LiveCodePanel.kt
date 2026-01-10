@@ -86,7 +86,7 @@ interface LiveCodeFeature : SynthFeature<LiveCodeUiState, LiveCodePanelActions> 
  */
 @Composable
 fun LiveCodePanel(
-    feature: LiveCodeFeature,
+    feature: LiveCodeFeature = LiveCodeViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
