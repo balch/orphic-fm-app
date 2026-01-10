@@ -116,9 +116,9 @@ class GalaxyViz(
     }
 
     // Galaxy colors - warm core to cool rim
-    private val coreColor = Color(0xFFFF6030)      // Warm orange
-    private val midColor = Color(0xFFAA40AA)       // Purple transition
-    private val rimColor = Color(0xFF1B3984)       // Cool blue
+    private val coreColor = OrpheusColors.galaxyCore      // Warm orange
+    private val midColor = OrpheusColors.galaxyMid       // Purple transition
+    private val rimColor = OrpheusColors.galaxyRim       // Cool blue
 
     private val _uiState = MutableStateFlow(GalaxyUiState())
     val uiState: StateFlow<GalaxyUiState> = _uiState.asStateFlow()
@@ -243,7 +243,7 @@ class GalaxyViz(
             val baseIntensity = 0.8f + energy * 0.2f  // 0.8-1.0 range
 
             // Deep space background
-            drawRect(Color(0xFF000008))
+            drawRect(OrpheusColors.galaxyBackground)
 
             // Draw stars - SIMPLE CIRCLES, no gradients per star
             for (star in stars) {
@@ -271,10 +271,10 @@ class GalaxyViz(
                 val lfoColorShift = (lfo + 1f) / 2f  // 0-1 range
                 val shiftedColor = if (lfoColorShift > 0.5f) {
                     // Shift toward cyan/white
-                    lerpColor(star.color, Color(0xFF80C0FF), (lfoColorShift - 0.5f) * 0.3f)
+                    lerpColor(star.color, OrpheusColors.galaxyStarBlue, (lfoColorShift - 0.5f) * 0.3f)
                 } else {
                     // Shift toward magenta
-                    lerpColor(star.color, Color(0xFFFF80C0), (0.5f - lfoColorShift) * 0.3f)
+                    lerpColor(star.color, OrpheusColors.galaxyStarPink, (0.5f - lfoColorShift) * 0.3f)
                 }
 
                 // Use shifted color
@@ -336,8 +336,8 @@ class GalaxyViz(
             ),
             title = CenterPanelStyle(
                 scope = VisualizationLiquidScope(contrast = 1.3f, saturation = 1.0f),
-                titleColor = Color(0xFF1B3984), // Cool blue default
-                borderColor = Color(0xFF1B3984).copy(alpha = 0.4f),
+                titleColor = OrpheusColors.galaxyRim, // Cool blue default
+                borderColor = OrpheusColors.galaxyRim.copy(alpha = 0.4f),
                 titleElevation = 6.dp
             )
         )

@@ -12,11 +12,14 @@ import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -69,7 +72,8 @@ typealias ResonatorFeature = SynthFeature<ResonatorUiState, ResonatorPanelAction
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class ResonatorViewModel(
     private val synthEngine: SynthEngine,
-    private val synthController: SynthController
+    synthController: SynthController,
+    private val dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), ResonatorFeature {
 
     private val _uiState = MutableStateFlow(ResonatorUiState())
@@ -78,47 +82,65 @@ class ResonatorViewModel(
     override val actions = ResonatorPanelActions(
         setEnabled = { enabled ->
             _uiState.update { it.copy(enabled = enabled) }
-            synthEngine.setResonatorEnabled(enabled)
+            viewModelScope.launch(dispatcherProvider.default) { // Move to BG
+                synthEngine.setResonatorEnabled(enabled)
+            }
         },
         setMode = { mode ->
             _uiState.update { it.copy(mode = mode) }
-            synthEngine.setResonatorMode(mode.ordinal)
+            viewModelScope.launch(dispatcherProvider.default) { // Move to BG
+                synthEngine.setResonatorMode(mode.ordinal)
+            }
         },
         setStructure = { structure ->
             _uiState.update { it.copy(structure = structure) }
-            synthEngine.setResonatorStructure(structure)
+            viewModelScope.launch(dispatcherProvider.default) { // Move to BG
+                synthEngine.setResonatorStructure(structure)
+            }
         },
         setBrightness = { brightness ->
             _uiState.update { it.copy(brightness = brightness) }
-            synthEngine.setResonatorBrightness(brightness)
+            viewModelScope.launch(dispatcherProvider.default) { // Move to BG
+                synthEngine.setResonatorBrightness(brightness)
+            }
         },
         setDamping = { damping ->
             _uiState.update { it.copy(damping = damping) }
-            synthEngine.setResonatorDamping(damping)
+            viewModelScope.launch(dispatcherProvider.default) { // Move to BG
+                synthEngine.setResonatorDamping(damping)
+            }
         },
         setPosition = { position ->
             _uiState.update { it.copy(position = position) }
-            synthEngine.setResonatorPosition(position)
+            viewModelScope.launch(dispatcherProvider.default) { // Move to BG
+                synthEngine.setResonatorPosition(position)
+            }
         },
         setMix = { mix ->
             _uiState.update { it.copy(mix = mix) }
-            synthEngine.setResonatorMix(mix)
+            viewModelScope.launch(dispatcherProvider.default) { // Move to BG
+                synthEngine.setResonatorMix(mix)
+            }
         }
     )
 
     init {
-        // Initialize engine with default values
-        synthEngine.setResonatorEnabled(_uiState.value.enabled)
-        synthEngine.setResonatorMode(_uiState.value.mode.ordinal)
-        synthEngine.setResonatorStructure(_uiState.value.structure)
-        synthEngine.setResonatorBrightness(_uiState.value.brightness)
-        synthEngine.setResonatorDamping(_uiState.value.damping)
-        synthEngine.setResonatorPosition(_uiState.value.position)
-        synthEngine.setResonatorMix(_uiState.value.mix)
+        // Initialize engine with default values (on background thread)
+        viewModelScope.launch(dispatcherProvider.default) {
+            val state = _uiState.value
+            synthEngine.setResonatorEnabled(state.enabled)
+            synthEngine.setResonatorMode(state.mode.ordinal)
+            synthEngine.setResonatorStructure(state.structure)
+            synthEngine.setResonatorBrightness(state.brightness)
+            synthEngine.setResonatorDamping(state.damping)
+            synthEngine.setResonatorPosition(state.position)
+            synthEngine.setResonatorMix(state.mix)
+        }
         
         // Subscribe to SynthController events for AI/MIDI control
         synthController.onControlChange
             .onEach { event ->
+                // ... (existing processing)
                 when (event.controlId) {
                     ControlIds.RESONATOR_ENABLED -> {
                         val enabled = event.value >= 0.5f
@@ -157,6 +179,7 @@ class ResonatorViewModel(
                     }
                 }
             }
+            .flowOn(dispatcherProvider.default)
             .launchIn(viewModelScope)
     }
 

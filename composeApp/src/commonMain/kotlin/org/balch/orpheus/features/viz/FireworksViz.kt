@@ -420,7 +420,7 @@ class FireworksViz(
             val scaleX = size.width / 1000f
             val scaleY = size.height / 1000f
             
-            drawRect(Color(0xFF050510)) 
+            drawRect(OrpheusColors.fireworksBackground) 
             
             if (state.flashIntensity > 0.01f) {
                 drawRect(

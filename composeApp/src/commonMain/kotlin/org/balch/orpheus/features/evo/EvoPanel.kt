@@ -36,15 +36,12 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
+import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VerticalToggle
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
-
-// Cavs Colors
-private val CavsWine = Color(0xFF860038)
-private val CavsGold = Color(0xFFFDBB30)
 
 @Composable
 fun EvoPanel(
@@ -60,7 +57,7 @@ fun EvoPanel(
 
     CollapsibleColumnPanel(
         title = "EVO",
-        color = CavsGold,
+        color = OrpheusColors.evoGold,
         expandedTitle = "Audio Evolution",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
@@ -149,7 +146,7 @@ private fun StrategyDropdown(
         modifier = modifier
             .height(42.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color.Black.copy(alpha = 0.5f))
+            .background(OrpheusColors.darkVoid.copy(alpha = 0.5f))
             .clickable { expanded = true }
             .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart
@@ -177,7 +174,7 @@ private fun StrategyDropdown(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(Color(0xFF2A1010)) // Dark wine background
+            modifier = Modifier.background(OrpheusColors.cavsWineDark) // Dark wine background
         ) {
             strategies.forEach { strategy ->
                 DropdownMenuItem(

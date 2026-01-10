@@ -27,7 +27,10 @@ import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.VizBackground
 
 @Composable
-fun App(graph: OrpheusGraph) {
+fun App(
+    graph: OrpheusGraph,
+    onFullyDrawn: () -> Unit = {}
+) {
     CompositionLocalProvider(LocalMetroViewModelFactory provides graph.metroViewModelFactory) {
         val vizViewModel: VizViewModel = metroViewModel()
         val vizState by vizViewModel.stateFlow.collectAsState()
@@ -70,7 +73,10 @@ fun App(graph: OrpheusGraph) {
                         Column(modifier = Modifier.fillMaxSize()) {
                             // Main Content
                             Box(modifier = Modifier.weight(1f)) {
-                                SynthScreen(orchestrator = graph.synthOrchestrator)
+                                SynthScreen(
+                                    orchestrator = graph.synthOrchestrator,
+                                    onFullyDrawn = onFullyDrawn
+                                )
                             }
 
                             // Persistent Debug Bar

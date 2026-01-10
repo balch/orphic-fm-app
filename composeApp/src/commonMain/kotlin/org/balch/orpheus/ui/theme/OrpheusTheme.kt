@@ -39,17 +39,17 @@ private val DarkColorScheme = darkColorScheme(
     onTertiaryContainer = ElectricBlue,
     error = WarmGlow,
     onError = DarkVoid,
-    errorContainer = Color(0xFF4A1F1F),
+    errorContainer = OrpheusColors.errorContainerDark,
     onErrorContainer = WarmGlow,
     background = DarkVoid,
-    onBackground = Color(0xFFE0E0E0),
+    onBackground = OrpheusColors.onSurfaceDark,
     surface = DeepPurple,
-    onSurface = Color(0xFFE0E0E0),
+    onSurface = OrpheusColors.onSurfaceDark,
     surfaceVariant = SoftPurple,
-    onSurfaceVariant = Color(0xFFB0B0B0),
-    outline = Color(0xFF4A4A6A),
-    outlineVariant = Color(0xFF2A2A4A),
-    inverseSurface = Color(0xFFE0E0E0),
+    onSurfaceVariant = OrpheusColors.onSurfaceVariantDark,
+    outline = OrpheusColors.outlineDark,
+    outlineVariant = OrpheusColors.outlineVariantDark,
+    inverseSurface = OrpheusColors.onSurfaceDark,
     inverseOnSurface = DarkVoid,
     inversePrimary = DeepPurple,
     surfaceTint = NeonCyan,
@@ -59,14 +59,14 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = ElectricBlue,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD0E4FF),
+    primaryContainer = OrpheusColors.primaryContainerLight,
     onPrimaryContainer = ElectricBlue,
-    secondary = Color(0xFF8B008B),
+    secondary = OrpheusColors.secondaryLight,
     onSecondary = Color.White,
-    background = Color(0xFFF5F5F5),
-    onBackground = Color(0xFF1A1A1A),
+    background = OrpheusColors.backgroundLight,
+    onBackground = OrpheusColors.onBackgroundLight,
     surface = Color.White,
-    onSurface = Color(0xFF1A1A1A),
+    onSurface = OrpheusColors.onBackgroundLight,
 )
 
 @Composable
@@ -99,6 +99,88 @@ object OrpheusColors {
     val seahawksGrey = SeahawksGrey
     val ninersRed = NinersRed
     val ninersGold = NinersGold
+
+    // Material Theme Defaults
+    val errorContainerDark = Color(0xFF4A1F1F)
+    val onSurfaceDark = Color(0xFFE0E0E0)
+    val onSurfaceVariantDark = Color(0xFFB0B0B0)
+    val outlineDark = Color(0xFF4A4A6A)
+    val outlineVariantDark = Color(0xFF2A2A4A)
+
+    val primaryContainerLight = Color(0xFFD0E4FF)
+    val secondaryLight = Color(0xFF8B008B)
+    val backgroundLight = Color(0xFFF5F5F5)
+    val onBackgroundLight = Color(0xFF1A1A1A)
+
+    // UI Panel & Widget Colors
+    val panelBackground = Color(0xFF1A1A2A)
+    val panelSurface = Color(0xFF2A2A3A)
+    val panelSurfaceDark = Color(0xFF1A1A2A)
+    val charcoal = Color(0xFF1A1A1A)
+    val darkGrey = Color(0xFF2A2A2A)
+    val mediumGrey = Color(0xFF3A3A3A)
+    val lightGrey = Color(0xFF555555)
+    val greyShadow = Color(0xFF505050)
+    val brightSilver = Color(0xFFE0E0E0)
+    val steelGrey = Color(0xFFA0A0A0)
+    val silverGrey = Color(0xFFAAAAAA)
+    val slateGrey = Color(0xFF808080)
+    val darkShadow = Color(0xFF111111)
+    val mediumShadow = Color(0xFF222222)
+    val lightShadow = Color(0xFF333333)
+    val greyHighlight = Color(0xFF383838)
+    val metallicHighlight = Color(0xFF505060)
+    val metallicSurface = Color(0xFF404050)
+    val metallicShadow = Color(0xFF353545)
+    val metallicDark = Color(0xFF252530)
+    val lightSteel = Color(0xFFD0D0D0)
+    val deepCharcoal = Color(0xFF202020)
+    val almostBlack = Color(0xFF101010)
+    val pureWhite = Color(0xFFFFFFFF)
+
+    // AI & Mode Colors
+    val aiDrone = Color(0xFF4FC3F7)
+    val aiSolo = Color(0xFFFFB74D)
+    val aiRepl = Color(0xFF81C784)
+    val aiChat = Color(0xFFBA68C8)
+
+    // Section/Feature Colors
+    val evoGold = Color(0xFFFDBB30)
+    val presetOrange = Color(0xFFFFAB40)
+    val vizGreen = Color(0xFF90EE90)
+    val stereoCyan = Color(0xFF008B8B)
+    val vizBackground = Color(0xFF151020)
+    val neonCyanBright = Color(0xFF00E5FF)
+
+    // Specific Feature & Section Colors
+    val cavsWine = Color(0xFF860038)
+    val cavsWineDark = Color(0xFF2A1010)
+    val patchOrange = Color(0xFFFF9500)
+    val lfoBackground = Color(0xFF4A4A5A)
+    val greyText = Color(0xFF888888)
+    val tidalBackground = Color(0xFF1E1E2E)
+    val galaxyBackground = Color(0xFF000008)
+    val fireworksBackground = Color(0xFF050510)
+    val blackHoleBackground = Color(0xFF0a0515)
+    val deepSpaceDark = Color(0xFF0A0A12)
+    val deepSpaceMid = Color(0xFF12121A)
+    val deepSpaceGrey = Color(0xFF0D0D0D)
+
+    // GalaxyViz Colors
+    val galaxyCore = Color(0xFFFF6030)
+    val galaxyMid = Color(0xFFAA40AA)
+    val galaxyRim = Color(0xFF1B3984)
+    val galaxyStarBlue = Color(0xFF80C0FF)
+    val galaxyStarPink = Color(0xFFFF80C0)
+
+    // SwirlyViz Colors
+    val swirlyPurple = Color(0xFF6B4A8E)
+    val swirlyBluePurple = Color(0xFF4A6B8E)
+    val swirlyTealBlue = Color(0xFF3D7A8E)
+    val swirlyMutedPurple = Color(0xFF5A5A8E)
+    val swirlyTeal = Color(0xFF4A7A7A)
+    val swirlyPinkPurple = Color(0xFF7A5A7A)
+    val swirlyPinkBright = Color(0xFFAA5599)
 
     // Midnight Blue & Silver Palette
     val midnightBlue = Color(0xFF191970) // Deep Midnight Blue

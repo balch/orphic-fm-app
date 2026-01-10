@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,15 +46,15 @@ fun TriggerButton(
                         colors =
                             if (isHolding) {
                                 listOf(
-                                    Color(0xFFD0D0D0),
-                                    Color(0xFFFFFFFFF),
-                                    Color(0xFFD0D0D0)
+                                    OrpheusColors.lightSteel,
+                                    OrpheusColors.pureWhite,
+                                    OrpheusColors.lightSteel
                                 ) // Bright "Lit" Metal
                             } else {
                                 listOf(
-                                    Color(0xFF808080),
-                                    Color(0xFF505050),
-                                    Color(0xFF303030)
+                                    OrpheusColors.slateGrey,
+                                    OrpheusColors.greyShadow,
+                                    OrpheusColors.mediumGrey
                                 ) // Dark Metal
                             }
                     )
@@ -66,8 +65,8 @@ fun TriggerButton(
                         Brush.verticalGradient(
                             colors =
                                 listOf(
-                                    Color(0xFFE0E0E0),
-                                    Color(0xFF202020)
+                                    OrpheusColors.brightSilver,
+                                    OrpheusColors.deepCharcoal
                                 )
                         ),
                     shape = RoundedCornerShape(4.dp)
@@ -82,7 +81,7 @@ fun TriggerButton(
             text = "$num",
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            color = if (isHolding) Color(0xFF101010) else Color(0xFFAAAAAA)
+            color = if (isHolding) OrpheusColors.almostBlack else OrpheusColors.silverGrey
         )
 
         // Active Indicator (LED style)

@@ -29,6 +29,7 @@ import org.balch.orpheus.features.midi.MidiUiState
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
+import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -253,7 +254,7 @@ fun DuoPairBoxPreview() {
         DuoPairBox(
             voiceA = 0,
             voiceB = 1,
-            color = Color(0xFFFDBB30),
+            color = OrpheusColors.evoGold,
             voiceStateA = voiceState.voiceStates[0],
             voiceStateB = voiceState.voiceStates[1],
             modDepthA = voiceState.voiceModDepths[0],

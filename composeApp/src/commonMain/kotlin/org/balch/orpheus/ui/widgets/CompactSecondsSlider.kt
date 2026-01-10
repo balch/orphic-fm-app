@@ -66,7 +66,7 @@ fun CompactSecondsSlider(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(Color(0xFF1A1A2A))
+            .background(OrpheusColors.panelBackground)
             .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
             .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -155,7 +155,7 @@ fun CompactSecondsSlider(
 @Composable
 private fun CompactSecondsSliderPreview() {
     Column(
-        modifier = Modifier.background(Color.Black).padding(16.dp),
+        modifier = Modifier.background(OrpheusColors.darkVoid).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         CompactSecondsSlider(

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.routing.SynthController
@@ -62,6 +63,7 @@ class VizViewModel(
     visualizations: Set<Visualization>,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val synthController: SynthController,
+    private val dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), VizFeature {
 
     override val actions = VizPanelActions(
@@ -91,10 +93,12 @@ class VizViewModel(
     init {
         // Activate initial visualization if it's not off (likely is off initially)
         if (_currentViz.value.id != "off") {
-            _currentViz.value.onActivate()
+            viewModelScope.launch(dispatcherProvider.default) {
+                _currentViz.value.onActivate()
+            }
         }
 
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             val prefs = appPreferencesRepository.load()
             prefs.lastVizId?.let { id ->
                 sortedVisualizations.find { it.id == id }?.let { viz ->
@@ -104,7 +108,7 @@ class VizViewModel(
         }
         
         // Subscribe to control changes for viz knobs
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             synthController.onControlChange.collect { event ->
                 when (event.controlId) {
                     ControlIds.VIZ_KNOB_1 -> onKnob1Change(event.value)
@@ -125,28 +129,28 @@ class VizViewModel(
     fun selectVisualization(viz: Visualization, save: Boolean = true) {
         if (_currentViz.value == viz) return
 
-        // Deactivate old
-        _currentViz.value.onDeactivate()
-        dynamicEffectsJob?.cancel()
-        dynamicEffectsJob = null
+        viewModelScope.launch(dispatcherProvider.default) {
+            // Perform activation/deactivation on background thread
+            _currentViz.value.onDeactivate()
+            viz.onActivate()
 
-        // Activate new
-        viz.onActivate()
-        _currentViz.value = viz
+            dynamicEffectsJob?.cancel()
+            dynamicEffectsJob = null
+            
+            _currentViz.value = viz
 
-        // Handle dynamic effects
-        if (viz is DynamicVisualization) {
-            dynamicEffectsJob = viewModelScope.launch {
-                viz.liquidEffectsFlow.collect { effects ->
-                     _uiState.value = _uiState.value.copy(liquidEffects = effects)
+            // Handle dynamic effects
+            if (viz is DynamicVisualization) {
+                dynamicEffectsJob = viewModelScope.launch {
+                    viz.liquidEffectsFlow.collect { effects ->
+                         _uiState.value = _uiState.value.copy(liquidEffects = effects)
+                    }
                 }
             }
-        }
 
-        updateState()
+            updateState()
 
-        if (save) {
-            viewModelScope.launch {
+            if (save) {
                 val prefs = appPreferencesRepository.load().copy(lastVizId = viz.id)
                 appPreferencesRepository.save(prefs)
             }

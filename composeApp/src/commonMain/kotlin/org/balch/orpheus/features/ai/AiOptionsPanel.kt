@@ -25,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,16 +36,6 @@ import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
-
-/**
- * Unique colors for each AI button.
- */
-object AiButtonColors {
-    val drone = Color(0xFF4FC3F7)    // Light blue
-    val solo = Color(0xFFFFB74D)     // Orange
-    val repl = Color(0xFF81C784)     // Green
-    val chat = Color(0xFFBA68C8)     // Purple
-}
 
 /**
  * AI Options panel with 4 feature buttons.
@@ -104,13 +93,13 @@ fun AiOptionsPanel(
                     ) {
                         AiButton(
                             label = "Drone",
-                            color = AiButtonColors.drone,
+                            color = OrpheusColors.aiDrone,
                             isActive = uiState.isDroneActive,
                             onClick = { actions.onToggleDrone(true) }
                         )
                         AiButton(
                             label = "Solo",
-                            color = AiButtonColors.solo,
+                            color = OrpheusColors.aiSolo,
                             isActive = uiState.isSoloActive,
                             onClick = { actions.onToggleSolo(true) }
                         )
@@ -122,13 +111,13 @@ fun AiOptionsPanel(
                     ) {
                         AiButton(
                             label = "Tidal",
-                            color = AiButtonColors.repl,
+                            color = OrpheusColors.aiRepl,
                             isActive = uiState.isReplActive,
                             onClick = { actions.onToggleRepl(true) }
                         )
                         AiButton(
                             label = "AI",
-                            color = AiButtonColors.chat,
+                            color = OrpheusColors.aiChat,
                             isActive = uiState.showChatDialog,
                             onClick = { actions.onToggleChatDialog() }
                         )

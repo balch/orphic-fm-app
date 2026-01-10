@@ -10,6 +10,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.diamondedge.logging.logging
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.balch.orpheus.ui.screens.CompactLandscapeScreen
 import org.balch.orpheus.ui.screens.CompactPortraitScreen
 import org.balch.orpheus.ui.screens.DesktopSynthScreen
@@ -46,11 +48,16 @@ private fun determineLayoutMode(widthDp: Float, heightDp: Float): LayoutMode {
 @Composable
 fun SynthScreen(
     orchestrator: SynthOrchestrator,
+    onFullyDrawn: () -> Unit = {}
 ) {
     LaunchedEffect(Unit) {
         val log = logging("SynthScreen")
-        orchestrator.start()
+        // Start audio engine on background thread to avoid blocking UI
+        withContext(Dispatchers.Default) {
+            orchestrator.start()
+        }
         log.info { "Orpheus Ready \u2713" }
+        onFullyDrawn()
     }
 
     var isDialogActive by remember { mutableStateOf(false) }

@@ -92,7 +92,7 @@ private fun PeakLed(level: Float) {
                 when {
                     clipping -> Color.Red
                     active -> OrpheusColors.neonCyan.copy(alpha = 0.5f + (level * 0.5f))
-                    else -> Color(0xFF1A1A2A)
+                    else -> OrpheusColors.panelBackground
                 }
             )
             .border(

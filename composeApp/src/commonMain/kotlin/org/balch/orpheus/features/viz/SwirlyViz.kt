@@ -105,12 +105,12 @@ class SwirlyViz(
 
     // Pre-computed spiral colors - muted purples/blues
     private val spiralColors = listOf(
-        Color(0xFF6B4A8E),  // Purple
-        Color(0xFF4A6B8E),  // Blue-purple
-        Color(0xFF3D7A8E),  // Teal-blue
-        Color(0xFF5A5A8E),  // Muted purple
-        Color(0xFF4A7A7A),  // Teal
-        Color(0xFF7A5A7A),  // Pink-purple
+        OrpheusColors.swirlyPurple,  // Purple
+        OrpheusColors.swirlyBluePurple,  // Blue-purple
+        OrpheusColors.swirlyTealBlue,  // Teal-blue
+        OrpheusColors.swirlyMutedPurple,  // Muted purple
+        OrpheusColors.swirlyTeal,  // Teal
+        OrpheusColors.swirlyPinkPurple   // Pink-purple
     )
 
     private val _uiState = MutableStateFlow(SwirlyUiState())

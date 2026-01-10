@@ -48,7 +48,7 @@ fun VizBackground(
             brush = Brush.verticalGradient(
                 colors = listOf(
                     OrpheusColors.darkVoid,
-                    Color(0xFF151020)
+                    OrpheusColors.vizBackground
                 )
             )
         )

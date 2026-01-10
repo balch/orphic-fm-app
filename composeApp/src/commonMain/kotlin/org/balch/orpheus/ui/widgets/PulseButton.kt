@@ -3,14 +3,12 @@ package org.balch.orpheus.ui.widgets
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -164,9 +162,9 @@ fun PulseButton(
                     // Silver/Steel look
                     val metalGradient = Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFFE0E0E0), // Bright Silver
-                            Color(0xFFA0A0A0), // Standard Steel
-                            Color(0xFF505050)  // Dark Shadow
+                            OrpheusColors.brightSilver, // Bright Silver
+                            OrpheusColors.steelGrey, // Standard Steel
+                            OrpheusColors.greyShadow  // Dark Shadow
                         ),
                         start = Offset(center.x - radius, center.y - radius),
                         end = Offset(center.x + radius, center.y + radius)

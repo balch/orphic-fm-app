@@ -15,6 +15,7 @@ import io.github.fletchmckee.liquid.LiquidScope
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
 import kotlinx.coroutines.flow.Flow
+import org.balch.orpheus.ui.theme.OrpheusColors
 
 
 data class VisualizationLiquidScope(
@@ -29,7 +30,7 @@ data class VisualizationLiquidScope(
 data class CenterPanelStyle(
     val scope: VisualizationLiquidScope = VisualizationLiquidScope(contrast = 1.3f, saturation = 0.9f),
     val titleSize: TextUnit = 22.sp, // Prominent default
-    val titleColor: Color = Color(0xFF00E5FF), // Neon Cyan
+    val titleColor: Color = OrpheusColors.neonCyanBright, // Neon Cyan
     val borderColor: Color = Color.White.copy(alpha = 0.3f),
     val borderWidth: Dp = 1.dp,
     val titleElevation: Dp = 8.dp

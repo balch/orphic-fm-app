@@ -174,11 +174,11 @@ private fun ModeToggleButton(
             modifier.clip(RoundedCornerShape(6.dp))
                 .background(
                     if (isSelected) activeColor.copy(alpha = 0.8f)
-                    else Color(0xFF2A2A3A)
+                    else OrpheusColors.panelSurface
                 )
                 .border(
                     width = 1.dp,
-                    color = if (isSelected) activeColor else Color(0xFF4A4A5A),
+                    color = if (isSelected) activeColor else OrpheusColors.lfoBackground,
                     shape = RoundedCornerShape(6.dp)
                 )
                 .clickable(onClick = onClick)
@@ -189,7 +189,7 @@ private fun ModeToggleButton(
             text = text,
             fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,
-            color = if (isSelected) Color.White else Color(0xFF888888)
+            color = if (isSelected) Color.White else OrpheusColors.greyText
         )
     }
 }
@@ -206,7 +206,7 @@ private fun VerticalToggle(
     Column(
         modifier =
             Modifier.clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF1A1A2A))
+                .background(OrpheusColors.panelBackground)
                 .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
                 .padding(
                     horizontal = 6.dp,
@@ -272,7 +272,7 @@ private fun Vertical3WaySwitch(
     Column(
         modifier =
             Modifier.clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF1A1A2A))
+                .background(OrpheusColors.panelBackground)
                 .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
                 .padding(
                     horizontal = 6.dp,

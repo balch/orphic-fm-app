@@ -98,10 +98,10 @@ fun CompactLandscapeHeaderPanel(
                                     liquidState = liquidState,
                                     scope = effects.top,
                                     frostAmount = 4.dp,
-                                    color = Color(0xFF2A2A3A),
+                                    color = OrpheusColors.panelSurface,
                                     shape = RoundedCornerShape(8.dp)
                                 )
-                            } else Modifier.background(Color(0xFF2A2A3A))
+                            } else Modifier.background(OrpheusColors.panelSurface)
                         )
                         .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                         .clickable { onPresetDropdownExpandedChange(!presetDropdownExpanded) }
@@ -131,10 +131,10 @@ fun CompactLandscapeHeaderPanel(
                             liquidState = liquidState,
                             scope = effects.top,
                             frostAmount = 8.dp,
-                            color = Color(0xFF2A2A3A),
+                            color = OrpheusColors.panelSurface,
                             shape = RoundedCornerShape(8.dp)
                         )
-                    } else Modifier.background(Color(0xFF2A2A3A))
+                    } else Modifier.background(OrpheusColors.panelSurface)
                 ) {
                     loadedPresetState?.presets?.forEach { preset ->
                         DropdownMenuItem(
@@ -165,10 +165,10 @@ fun CompactLandscapeHeaderPanel(
                                     liquidState = liquidState,
                                     scope = effects.top,
                                     frostAmount = 4.dp,
-                                    color = Color(0xFF2A2A3A),
+                                    color = OrpheusColors.panelSurface,
                                     shape = RoundedCornerShape(8.dp)
                                 )
-                            } else Modifier.background(Color(0xFF2A2A3A))
+                            } else Modifier.background(OrpheusColors.panelSurface)
                         )
                         .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
                         .clickable { onVizDropdownExpandedChange(!vizDropdownExpanded) }
@@ -198,10 +198,10 @@ fun CompactLandscapeHeaderPanel(
                             liquidState = liquidState,
                             scope = effects.top,
                             frostAmount = 8.dp,
-                            color = Color(0xFF2A2A3A),
+                            color = OrpheusColors.panelSurface,
                             shape = RoundedCornerShape(8.dp)
                         )
-                    } else Modifier.background(Color(0xFF2A2A3A))
+                    } else Modifier.background(OrpheusColors.panelSurface)
                 ) {
                     vizState.visualizations.forEach { viz ->
                         DropdownMenuItem(
@@ -244,7 +244,7 @@ private fun PeakLed(level: Float) {
                 when {
                     clipping -> Color.Red
                     active -> OrpheusColors.neonCyan.copy(alpha = 0.5f + (level * 0.5f))
-                    else -> Color(0xFF1A1A2A)
+                    else -> OrpheusColors.panelBackground
                 }
             )
             .border(

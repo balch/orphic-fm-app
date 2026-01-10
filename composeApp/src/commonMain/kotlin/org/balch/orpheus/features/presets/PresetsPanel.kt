@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.dialogs.ConfirmDialog
 import org.balch.orpheus.ui.widgets.dialogs.PresetNameDialog
 
@@ -43,9 +44,6 @@ data class PresetProps(
     val selectedPreset: DronePreset?,
     val presetActions: PresetPanelActions,
 )
-
-// Lighter orange for PATCHES panel
-private val PatchesColor = Color(0xFFFFAB40)  // Light orange/amber
 
 /**
  * PresetsPanel consuming feature() interface.
@@ -81,7 +79,7 @@ fun PresetsPanel(
 
     CollapsibleColumnPanel(
         title = "PATCH",
-        color = PatchesColor,
+        color = OrpheusColors.presetOrange,
         expandedTitle = "Presets",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
@@ -110,7 +108,7 @@ fun PresetsPanel(
                         .weight(1f)
                         .height(28.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(PatchesColor.copy(alpha = 0.2f))
+                        .background(OrpheusColors.presetOrange.copy(alpha = 0.2f))
                         .clickable {
                             showNewDialog = true
                             presetProps.presetActions.onDialogActiveChange(true)
@@ -121,7 +119,7 @@ fun PresetsPanel(
                         "NEW",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = PatchesColor
+                        color = OrpheusColors.presetOrange
                     )
                 }
 
@@ -188,8 +186,8 @@ fun PresetsPanel(
                     .weight(1f)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
-                    .border(1.dp, PatchesColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.3f))
+                    .border(1.dp, OrpheusColors.presetOrange.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                    .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
             ) {
                 Column(
                     modifier = Modifier
@@ -205,7 +203,7 @@ fun PresetsPanel(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(
-                                    if (isSelected) PatchesColor.copy(alpha = 0.2f)
+                                    if (isSelected) OrpheusColors.presetOrange.copy(alpha = 0.2f)
                                     else Color.Transparent
                                 )
                                 .clickable {
@@ -217,7 +215,7 @@ fun PresetsPanel(
                             Text(
                                 preset.name,
                                 fontSize = 10.sp,
-                                color = if (isSelected) PatchesColor else Color.White.copy(
+                                color = if (isSelected) OrpheusColors.presetOrange else Color.White.copy(
                                     alpha = 0.7f
                                 ),
                                 maxLines = 1,

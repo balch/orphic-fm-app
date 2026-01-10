@@ -26,7 +26,7 @@ fun CrossModSelector(isCrossQuad: Boolean = false, onToggle: (Boolean) -> Unit =
             Modifier.clip(RoundedCornerShape(4.dp))
                 .background(
                     if (isCrossQuad) OrpheusColors.neonCyan.copy(alpha = 0.2f)
-                    else Color(0xFF1A1A2A)
+                    else OrpheusColors.panelBackground
                 )
                 .border(1.dp, activeColor, RoundedCornerShape(4.dp))
                 .clickable { onToggle(!isCrossQuad) }

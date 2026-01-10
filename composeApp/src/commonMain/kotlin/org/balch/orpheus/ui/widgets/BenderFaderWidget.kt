@@ -221,10 +221,10 @@ fun BenderFaderWidget(
                     .background(
                         Brush.horizontalGradient(
                             colors = listOf(
-                                Color(0xFF1A1A1A),
-                                Color(0xFF3A3A3A),
-                                Color(0xFF2A2A2A),
-                                Color(0xFF1A1A1A)
+                                OrpheusColors.charcoal,
+                                OrpheusColors.mediumGrey,
+                                OrpheusColors.darkGrey,
+                                OrpheusColors.charcoal
                             )
                         )
                     )
@@ -282,10 +282,10 @@ fun BenderFaderWidget(
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color(0xFF505060), // Metallic top highlight
-                                Color(0xFF404050),
-                                Color(0xFF353545),
-                                Color(0xFF252530)  // Darker bottom
+                                OrpheusColors.metallicHighlight, // Metallic top highlight
+                                OrpheusColors.metallicSurface,
+                                OrpheusColors.metallicShadow,
+                                OrpheusColors.metallicDark  // Darker bottom
                             )
                         )
                     )

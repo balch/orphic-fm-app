@@ -48,6 +48,7 @@ kotlin {
             implementation(libs.jsyn)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.androidx.media)
+            implementation(libs.androidx.profileinstaller)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -128,6 +129,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {

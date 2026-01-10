@@ -29,9 +29,16 @@ class MainActivity : ComponentActivity() {
 
         // Get the DI graph from Application (survives configuration changes)
         val graph = (application as OrpheusApplication).graph
-
+        
         setContent {
-            App(graph)
+            App(
+                graph = graph,
+                onFullyDrawn = {
+                    // Report to benchmarking library that the app is fully drawn
+                    // This is required for Macrobenchmark to detect startup completion
+                    reportFullyDrawn()
+                }
+            )
         }
     }
 }

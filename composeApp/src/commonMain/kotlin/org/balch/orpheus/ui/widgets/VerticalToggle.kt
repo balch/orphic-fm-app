@@ -50,7 +50,7 @@ fun VerticalToggle(
     Box(
         modifier = finalModifier
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF1A1A2A))
+            .background(OrpheusColors.panelBackground)
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
             .let {
                 if (enabled && !isActive) {

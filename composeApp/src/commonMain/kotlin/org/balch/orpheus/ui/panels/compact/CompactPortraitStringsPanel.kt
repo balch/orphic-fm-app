@@ -530,7 +530,7 @@ private fun BenderStringsCanvas(
         // ═══════════════════════════════════════════════════════════
         // Dark metallic finish for the bridge area
         drawRect(
-            color = Color(0xFF1A1A1A),
+            color = OrpheusColors.charcoal,
             topLeft = Offset(0f, 0f),
             size = androidx.compose.ui.geometry.Size(totalWidth, bridgeHeight)
         )
@@ -582,7 +582,7 @@ private fun BenderStringsCanvas(
 
             // Outer Chrome Rim (to define edge against dark bg)
             drawRoundRect(
-                color = Color(0xFF555555),
+                color = OrpheusColors.lightGrey,
                 topLeft = Offset(stringCenterX - saddleWidth/2 - 2f, saddleTop - 2f),
                 size = androidx.compose.ui.geometry.Size(saddleWidth + 4f, saddleHeight + 4f),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx()),
@@ -592,9 +592,9 @@ private fun BenderStringsCanvas(
             // Saddle Main Body (Dark Metal Gradient)
             val saddleGradient = Brush.verticalGradient(
                 colors = listOf(
-                    Color(0xFF383838), // Top highlight
-                    Color(0xFF222222), // Middle
-                    Color(0xFF111111)  // Bottom shadow
+                    OrpheusColors.greyHighlight, // Top highlight
+                    OrpheusColors.mediumShadow, // Middle
+                    OrpheusColors.darkShadow  // Bottom shadow
                 ),
                 startY = saddleTop,
                 endY = saddleTop + saddleHeight
@@ -651,7 +651,7 @@ private fun BenderStringsCanvas(
             val screwY = saddleTop + saddleHeight - 14f
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFF111111), Color(0xFF333333)),
+                    colors = listOf(OrpheusColors.darkShadow, OrpheusColors.lightShadow),
                     center = Offset(stringCenterX, screwY),
                     radius = 8f
                 ),
@@ -660,7 +660,7 @@ private fun BenderStringsCanvas(
             )
             // Screw slot
              drawLine(
-                color = Color(0xFF555555),
+                color = OrpheusColors.lightGrey,
                 start = Offset(stringCenterX - 4f, screwY),
                 end = Offset(stringCenterX + 4f, screwY),
                 strokeWidth = 2f,

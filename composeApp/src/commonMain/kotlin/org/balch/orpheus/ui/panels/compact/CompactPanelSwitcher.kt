@@ -42,9 +42,9 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
  * Enum representing available compact panels for portrait mode.
  */
 enum class CompactPanelType(val displayName: String, val color: Color) {
-    EVO("Evo", Color(0xFFFDBB30)), // Cavs Gold
-    PRESET("Preset", Color(0xFFFFAB40)), // Patches Color
-    VIZ("Viz", Color(0xFF90EE90)),
+    EVO("Evo", OrpheusColors.evoGold),
+    PRESET("Preset", OrpheusColors.presetOrange),
+    VIZ("Viz", OrpheusColors.vizGreen),
     DISTORTION("Distortion", OrpheusColors.neonMagenta),
     TWEAKS("Tweaks", OrpheusColors.electricBlue), // Mod tweaks panel
     RESONATOR("Rezo", OrpheusColors.lakersGold), // Lakers-themed Resonator
@@ -53,7 +53,7 @@ enum class CompactPanelType(val displayName: String, val color: Color) {
     REPL("REPL", OrpheusColors.neonCyan),
     DRUMS("Drums", OrpheusColors.neonMagenta),
     PATTERN("Sequencer", OrpheusColors.neonCyan),
-    STEREO("Stereo", Color(0xFF008B8B)),
+    STEREO("Stereo", OrpheusColors.stereoCyan),
 }
 
 /**

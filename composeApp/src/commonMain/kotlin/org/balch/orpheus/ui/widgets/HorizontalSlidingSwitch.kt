@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Composable
 fun HorizontalSlidingSwitch(
@@ -32,7 +33,7 @@ fun HorizontalSlidingSwitch(
     leftLabel: String,
     rightLabel: String,
     activeColor: Color,
-    inactiveColor: Color = Color(0xFF1A1A2A),
+    inactiveColor: Color = OrpheusColors.panelBackground,
     width: Dp = 46.dp,
     height: Dp = 18.dp,
     modifier: Modifier = Modifier
