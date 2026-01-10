@@ -48,6 +48,13 @@ class DspDrumPlugin(
      * Trigger a drum sound.
      * @param type 0=BD, 1=SD, 2=HH
      */
+    // State duplication for persistence
+    private val frequencies = FloatArray(3) { 0.5f }
+    private val tones = FloatArray(3) { 0.5f }
+    private val decays = FloatArray(3) { 0.5f }
+    private val p4s = FloatArray(3) { 0.5f }
+    private val p5s = FloatArray(3) { 0.5f }
+
     fun trigger(
         type: Int,
         accent: Float,
@@ -57,6 +64,14 @@ class DspDrumPlugin(
         p4: Float = 0.5f,
         p5: Float = 0.5f
     ) {
+        // Cache state
+        if (type in 0..2) {
+            frequencies[type] = frequency
+            tones[type] = tone
+            decays[type] = decay
+            p4s[type] = p4
+            p5s[type] = p5
+        }
         drumUnit.trigger(type, accent, frequency, tone, decay, p4, p5)
     }
 
@@ -68,10 +83,25 @@ class DspDrumPlugin(
         p4: Float,
         p5: Float
     ) {
+        // Cache state
+        if (type in 0..2) {
+            frequencies[type] = frequency
+            tones[type] = tone
+            decays[type] = decay
+            p4s[type] = p4
+            p5s[type] = p5
+        }
         drumUnit.setParameters(type, frequency, tone, decay, p4, p5)
     }
 
     fun trigger(type: Int, accent: Float) {
         drumUnit.trigger(type, accent)
     }
+    
+    // Getters for persistence
+    fun getFrequency(type: Int) = frequencies.getOrElse(type) { 0.5f }
+    fun getTone(type: Int) = tones.getOrElse(type) { 0.5f }
+    fun getDecay(type: Int) = decays.getOrElse(type) { 0.5f }
+    fun getP4(type: Int) = p4s.getOrElse(type) { 0.5f }
+    fun getP5(type: Int) = p5s.getOrElse(type) { 0.5f }
 }

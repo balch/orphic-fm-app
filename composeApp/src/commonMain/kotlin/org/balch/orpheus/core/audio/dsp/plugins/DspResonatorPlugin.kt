@@ -246,4 +246,11 @@ class DspResonatorPlugin(
     fun getDamping(): Float = _damping
     fun getPosition(): Float = _position
     fun getMix(): Float = _mix
+    fun getSnapBack(): Boolean = _snapBack
+    
+    // UI State persistence only (doesn't affect DSP)
+    private var _snapBack = false
+    fun setSnapBack(enabled: Boolean) {
+        _snapBack = enabled
+    }
 }

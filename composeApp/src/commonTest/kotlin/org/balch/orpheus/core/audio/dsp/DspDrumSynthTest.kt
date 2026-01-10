@@ -130,6 +130,31 @@ class DspDrumSynthTest {
         override fun getResonatorDamping(): Float = 0.3f
         override fun getResonatorPosition(): Float = 0.5f
         override fun getResonatorMix(): Float = 0.5f
+        
+        // New Stubs
+        override fun getResonatorSnapBack(): Boolean = false
+        override fun setResonatorSnapBack(enabled: Boolean) {}
+        override fun getDrumFrequency(type: Int): Float = 0f
+        override fun getDrumTone(type: Int): Float = 0f
+        override fun getDrumDecay(type: Int): Float = 0f
+        override fun getDrumP4(type: Int): Float = 0f
+        override fun getDrumP5(type: Int): Float = 0f
+        override fun setBeatsX(x: Float) {}
+        override fun getBeatsX(): Float = 0.5f
+        override fun setBeatsY(y: Float) {}
+        override fun getBeatsY(): Float = 0.5f
+        override fun setBeatsDensity(index: Int, density: Float) {}
+        override fun getBeatsDensity(index: Int): Float = 0.5f
+        override fun setBeatsBpm(bpm: Float) {}
+        override fun getBeatsBpm(): Float = 120f
+        override fun setBeatsOutputMode(mode: Int) {}
+        override fun getBeatsOutputMode(): Int = 0
+        override fun setBeatsEuclideanLength(index: Int, length: Int) {}
+        override fun getBeatsEuclideanLength(index: Int): Int = 16
+        override fun setBeatsRandomness(randomness: Float) {}
+        override fun getBeatsRandomness(): Float = 0f
+        override fun setBeatsSwing(swing: Float) {}
+        override fun getBeatsSwing(): Float = 0f
     }
 
     @Test

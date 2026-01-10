@@ -210,6 +210,33 @@ interface SynthEngine {
     fun getResonatorDamping(): Float
     fun getResonatorPosition(): Float
     fun getResonatorMix(): Float
+    fun getResonatorSnapBack(): Boolean
+    fun setResonatorSnapBack(enabled: Boolean)
+
+    // Drum getters for persistence
+    fun getDrumFrequency(type: Int): Float
+    fun getDrumTone(type: Int): Float
+    fun getDrumDecay(type: Int): Float
+    fun getDrumP4(type: Int): Float
+    fun getDrumP5(type: Int): Float
+
+    // Beat Sequencer (Grids)
+    fun setBeatsX(x: Float)
+    fun getBeatsX(): Float
+    fun setBeatsY(y: Float)
+    fun getBeatsY(): Float
+    fun setBeatsDensity(index: Int, density: Float)
+    fun getBeatsDensity(index: Int): Float
+    fun setBeatsBpm(bpm: Float)
+    fun getBeatsBpm(): Float
+    fun setBeatsOutputMode(mode: Int)
+    fun getBeatsOutputMode(): Int
+    fun setBeatsEuclideanLength(index: Int, length: Int)
+    fun getBeatsEuclideanLength(index: Int): Int
+    fun setBeatsRandomness(randomness: Float)
+    fun getBeatsRandomness(): Float
+    fun setBeatsSwing(swing: Float)
+    fun getBeatsSwing(): Float
 }
 
 enum class ModSource {

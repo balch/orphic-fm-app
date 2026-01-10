@@ -90,8 +90,35 @@ class PresetLoader(
             resonatorBrightness = engine.getResonatorBrightness(),
             resonatorDamping = engine.getResonatorDamping(),
             resonatorPosition = engine.getResonatorPosition(),
-            resonatorMix = engine.getResonatorMix()
-            // Drum beats use defaults - ViewModels handle full restore via presetFlow
+            resonatorMix = engine.getResonatorMix(),
+            resonatorSnapBack = engine.getResonatorSnapBack(),
+            
+            // Drums
+            drumBdFrequency = engine.getDrumFrequency(0),
+            drumBdTone = engine.getDrumTone(0),
+            drumBdDecay = engine.getDrumDecay(0),
+            drumBdP4 = engine.getDrumP4(0),
+            drumBdP5 = engine.getDrumP5(0),
+            
+            drumSdFrequency = engine.getDrumFrequency(1),
+            drumSdTone = engine.getDrumTone(1),
+            drumSdDecay = engine.getDrumDecay(1),
+            drumSdP4 = engine.getDrumP4(1),
+
+            drumHhFrequency = engine.getDrumFrequency(2),
+            drumHhTone = engine.getDrumTone(2),
+            drumHhDecay = engine.getDrumDecay(2),
+            drumHhP4 = engine.getDrumP4(2),
+
+            // Drum Beats (Grids)
+            beatsX = engine.getBeatsX(),
+            beatsY = engine.getBeatsY(),
+            beatsDensities = List(3) { i -> engine.getBeatsDensity(i) },
+            beatsBpm = engine.getBeatsBpm(),
+            beatsOutputMode = engine.getBeatsOutputMode(),
+            beatsEuclideanLengths = List(3) { i -> engine.getBeatsEuclideanLength(i) },
+            beatsRandomness = engine.getBeatsRandomness(),
+            beatsSwing = engine.getBeatsSwing()
         )
     }
 }

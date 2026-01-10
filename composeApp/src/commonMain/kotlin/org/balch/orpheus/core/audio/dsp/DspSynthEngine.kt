@@ -848,4 +848,50 @@ class DspSynthEngine(
     override fun getResonatorDamping(): Float = resonatorPlugin.getDamping()
     override fun getResonatorPosition(): Float = resonatorPlugin.getPosition()
     override fun getResonatorMix(): Float = resonatorPlugin.getMix()
+    override fun getResonatorSnapBack(): Boolean = resonatorPlugin.getSnapBack()
+    override fun setResonatorSnapBack(enabled: Boolean) = resonatorPlugin.setSnapBack(enabled)
+
+    override fun getDrumFrequency(type: Int): Float = drumPlugin.getFrequency(type)
+    override fun getDrumTone(type: Int): Float = drumPlugin.getTone(type)
+    override fun getDrumDecay(type: Int): Float = drumPlugin.getDecay(type)
+    override fun getDrumP4(type: Int): Float = drumPlugin.getP4(type)
+    override fun getDrumP5(type: Int): Float = drumPlugin.getP5(type)
+    
+    // Beat Sequencer Storage (State only)
+    private var _beatsX = 0.5f
+    private var _beatsY = 0.5f
+    private val _beatsDensities = FloatArray(3) { 0.5f }
+    private var _beatsBpm = 120f
+    private var _beatsMode = 0
+    private val _beatsEuclideanLengths = IntArray(3) { 16 }
+    private var _beatsRandomness = 0f
+    private var _beatsSwing = 0f
+
+    override fun setBeatsX(x: Float) { _beatsX = x }
+    override fun getBeatsX(): Float = _beatsX
+    
+    override fun setBeatsY(y: Float) { _beatsY = y }
+    override fun getBeatsY(): Float = _beatsY
+    
+    override fun setBeatsDensity(index: Int, density: Float) { 
+        if (index in 0..2) _beatsDensities[index] = density 
+    }
+    override fun getBeatsDensity(index: Int): Float = _beatsDensities.getOrElse(index) { 0.5f }
+    
+    override fun setBeatsBpm(bpm: Float) { _beatsBpm = bpm }
+    override fun getBeatsBpm(): Float = _beatsBpm
+    
+    override fun setBeatsOutputMode(mode: Int) { _beatsMode = mode }
+    override fun getBeatsOutputMode(): Int = _beatsMode
+    
+    override fun setBeatsEuclideanLength(index: Int, length: Int) {
+        if (index in 0..2) _beatsEuclideanLengths[index] = length
+    }
+    override fun getBeatsEuclideanLength(index: Int): Int = _beatsEuclideanLengths.getOrElse(index) { 16 }
+    
+    override fun setBeatsRandomness(randomness: Float) { _beatsRandomness = randomness }
+    override fun getBeatsRandomness(): Float = _beatsRandomness
+    
+    override fun setBeatsSwing(swing: Float) { _beatsSwing = swing }
+    override fun getBeatsSwing(): Float = _beatsSwing
 }

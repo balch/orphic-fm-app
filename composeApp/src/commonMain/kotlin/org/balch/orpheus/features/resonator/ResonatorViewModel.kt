@@ -103,6 +103,7 @@ class ResonatorViewModel(
         },
         setSnapBack = { snapBack ->
             _uiState.update { it.copy(snapBack = snapBack) }
+            synthEngine.setResonatorSnapBack(snapBack)
         },
         setStructure = { structure ->
             _uiState.update { it.copy(structure = structure) }
@@ -208,6 +209,7 @@ class ResonatorViewModel(
                         enabled = preset.resonatorEnabled,
                         mode = mode,
                         targetMix = preset.resonatorTargetMix,
+                        snapBack = preset.resonatorSnapBack,
                         structure = preset.resonatorStructure,
                         brightness = preset.resonatorBrightness,
                         damping = preset.resonatorDamping,
@@ -219,6 +221,7 @@ class ResonatorViewModel(
                 synthEngine.setResonatorEnabled(preset.resonatorEnabled)
                 synthEngine.setResonatorMode(preset.resonatorMode)
                 synthEngine.setResonatorTargetMix(preset.resonatorTargetMix)
+                synthEngine.setResonatorSnapBack(preset.resonatorSnapBack)
                 synthEngine.setResonatorStructure(preset.resonatorStructure)
                 synthEngine.setResonatorBrightness(preset.resonatorBrightness)
                 synthEngine.setResonatorDamping(preset.resonatorDamping)

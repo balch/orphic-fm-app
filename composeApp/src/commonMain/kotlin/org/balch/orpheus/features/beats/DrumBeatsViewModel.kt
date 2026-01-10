@@ -21,6 +21,7 @@ import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.dsp.synth.DrumBeatsGenerator
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.synthViewModel
 
 @Immutable
@@ -55,10 +56,12 @@ data class DrumBeatsPanelActions(
 
 typealias DrumBeatsFeature = SynthFeature<BeatsUiState, DrumBeatsPanelActions>
 
+
 @ViewModelKey(DrumBeatsViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class DrumBeatsViewModel @Inject constructor(
-    synthEngine: SynthEngine,
+    private val synthEngine: SynthEngine, // Captured as property
+    private val presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), DrumBeatsFeature {
 
@@ -69,16 +72,16 @@ class DrumBeatsViewModel @Inject constructor(
     
     private var clockJob: Job? = null
     
-    // Tap Tempo state removed
-
     override val actions = DrumBeatsPanelActions(
         setX = { v -> 
             _uiState.update { it.copy(x = v) }
             patternGenerator.setX(v)
+            synthEngine.setBeatsX(v)
         },
         setY = { v -> 
             _uiState.update { it.copy(y = v) }
             patternGenerator.setY(v)
+            synthEngine.setBeatsY(v)
         },
         setDensity = { i, v -> 
             _uiState.update { s -> 
@@ -87,6 +90,7 @@ class DrumBeatsViewModel @Inject constructor(
                 s.copy(densities = newD) 
             }
             patternGenerator.setDensity(i, v)
+            synthEngine.setBeatsDensity(i, v)
         },
         setRunning = { running -> 
             _uiState.update { it.copy(isRunning = running) }
@@ -97,11 +101,14 @@ class DrumBeatsViewModel @Inject constructor(
             }
         },
         setBpm = { bpm ->
-            _uiState.update { it.copy(bpm = bpm.coerceIn(60f, 200f)) }
+            val clamped = bpm.coerceIn(60f, 200f)
+            _uiState.update { it.copy(bpm = clamped) }
+            synthEngine.setBeatsBpm(clamped)
         },
         setOutputMode = { mode ->
             _uiState.update { it.copy(outputMode = mode) }
             patternGenerator.outputMode = mode
+            synthEngine.setBeatsOutputMode(mode.ordinal)
         },
         setEuclideanLength = { i, len ->
             _uiState.update { s ->
@@ -110,16 +117,70 @@ class DrumBeatsViewModel @Inject constructor(
                 s.copy(euclideanLengths = newL)
             }
             patternGenerator.setEuclideanLength(i, len)
+            synthEngine.setBeatsEuclideanLength(i, len)
         },
         setRandomness = { v ->
             _uiState.update { it.copy(randomness = v) }
             patternGenerator.setRandomness(v)
+            synthEngine.setBeatsRandomness(v)
         },
         setSwing = { v ->
             _uiState.update { it.copy(swing = v) }
+            synthEngine.setBeatsSwing(v)
         }
     )
     
+    init {
+        // Sync initial state to engine (so saving immediately works)
+        val s = _uiState.value
+        synthEngine.setBeatsX(s.x)
+        synthEngine.setBeatsY(s.y)
+        s.densities.forEachIndexed { i, v -> synthEngine.setBeatsDensity(i, v) }
+        synthEngine.setBeatsBpm(s.bpm)
+        synthEngine.setBeatsOutputMode(s.outputMode.ordinal)
+        s.euclideanLengths.forEachIndexed { i, v -> synthEngine.setBeatsEuclideanLength(i, v) }
+        synthEngine.setBeatsRandomness(s.randomness)
+        synthEngine.setBeatsSwing(s.swing)
+
+        // Subscribe to presets
+        viewModelScope.launch(dispatcherProvider.default) {
+            presetLoader.presetFlow.collect { preset ->
+                val outputMode = DrumBeatsGenerator.OutputMode.entries.getOrElse(preset.beatsOutputMode) { DrumBeatsGenerator.OutputMode.DRUMS }
+                
+                _uiState.update {
+                    it.copy(
+                        x = preset.beatsX,
+                        y = preset.beatsY,
+                        densities = preset.beatsDensities,
+                        bpm = preset.beatsBpm,
+                        outputMode = outputMode,
+                        euclideanLengths = preset.beatsEuclideanLengths,
+                        randomness = preset.beatsRandomness,
+                        swing = preset.beatsSwing
+                    )
+                }
+                
+                // Update Pattern Generator
+                patternGenerator.setX(preset.beatsX)
+                patternGenerator.setY(preset.beatsY)
+                preset.beatsDensities.forEachIndexed { i, d -> patternGenerator.setDensity(i, d) }
+                patternGenerator.outputMode = outputMode
+                preset.beatsEuclideanLengths.forEachIndexed { i, l -> patternGenerator.setEuclideanLength(i, l) }
+                patternGenerator.setRandomness(preset.beatsRandomness)
+
+                // Sync to Engine
+                synthEngine.setBeatsX(preset.beatsX)
+                synthEngine.setBeatsY(preset.beatsY)
+                preset.beatsDensities.forEachIndexed { i, d -> synthEngine.setBeatsDensity(i, d) }
+                synthEngine.setBeatsBpm(preset.beatsBpm)
+                synthEngine.setBeatsOutputMode(preset.beatsOutputMode)
+                preset.beatsEuclideanLengths.forEachIndexed { i, l -> synthEngine.setBeatsEuclideanLength(i, l) }
+                synthEngine.setBeatsRandomness(preset.beatsRandomness)
+                synthEngine.setBeatsSwing(preset.beatsSwing)
+            }
+        }
+    }
+
     private fun startClock() {
         clockJob?.cancel()
         clockJob = viewModelScope.launch(dispatcherProvider.io) {

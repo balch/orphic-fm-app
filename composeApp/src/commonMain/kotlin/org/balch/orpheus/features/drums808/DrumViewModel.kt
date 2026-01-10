@@ -3,6 +3,7 @@ package org.balch.orpheus.features.drums808
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -12,8 +13,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.synthViewModel
 
 @Immutable
@@ -83,7 +87,9 @@ typealias DrumFeature = SynthFeature<DrumUiState, DrumPanelActions>
 @ViewModelKey(DrumViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class DrumViewModel(
-    private val synthEngine: SynthEngine
+    private val synthEngine: SynthEngine,
+    presetLoader: PresetLoader,
+    private val dispatcherProvider: DispatcherProvider
 ) : ViewModel(), DrumFeature {
 
     private val _uiState = MutableStateFlow(DrumUiState())
@@ -187,6 +193,36 @@ class DrumViewModel(
         updateBdParams(_uiState.value)
         updateSdParams(_uiState.value)
         updateHhParams(_uiState.value)
+        
+        // Subscribe to presets
+        viewModelScope.launch(dispatcherProvider.default) {
+            presetLoader.presetFlow.collect { preset ->
+                _uiState.update {
+                    it.copy(
+                        bdFrequency = preset.drumBdFrequency,
+                        bdTone = preset.drumBdTone,
+                        bdDecay = preset.drumBdDecay,
+                        bdP4 = preset.drumBdP4,
+                        bdP5 = preset.drumBdP5,
+                        
+                        sdFrequency = preset.drumSdFrequency,
+                        sdTone = preset.drumSdTone,
+                        sdDecay = preset.drumSdDecay,
+                        sdP4 = preset.drumSdP4,
+                        
+                        hhFrequency = preset.drumHhFrequency,
+                        hhTone = preset.drumHhTone,
+                        hhDecay = preset.drumHhDecay,
+                        hhP4 = preset.drumHhP4
+                    )
+                }
+                // Push to engine
+                val s = _uiState.value
+                updateBdParams(s)
+                updateSdParams(s)
+                updateHhParams(s)
+            }
+        }
     }
 
     companion object {

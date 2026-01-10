@@ -59,6 +59,24 @@ data class DronePreset(
     val resonatorDamping: Float = 0.3f,
     val resonatorPosition: Float = 0.5f,
     val resonatorMix: Float = 0.5f,
+    val resonatorSnapBack: Boolean = false,
+
+    // Drums (808-style sound params)
+    val drumBdFrequency: Float = 0.3f,
+    val drumBdTone: Float = 0.5f,
+    val drumBdDecay: Float = 0.5f,
+    val drumBdP4: Float = 0.5f,
+    val drumBdP5: Float = 0.5f,
+    
+    val drumSdFrequency: Float = 0.4f,
+    val drumSdTone: Float = 0.5f,
+    val drumSdDecay: Float = 0.5f,
+    val drumSdP4: Float = 0.5f,
+
+    val drumHhFrequency: Float = 0.6f,
+    val drumHhTone: Float = 0.5f,
+    val drumHhDecay: Float = 0.5f,
+    val drumHhP4: Float = 0.5f,
 
     // Drum Beats (Grids-style pattern generator)
     val beatsX: Float = 0.5f,
