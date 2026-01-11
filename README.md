@@ -62,6 +62,15 @@ Install and run on a connected device or emulator:
 ./gradlew :composeApp:installDebug
 ```
 
+### Release Builds
+
+#### Desktop (JVM)
+Build dmg (macOS), msi (Windows), or deb (Linux) depending on your OS:
+```bash
+./gradlew :composeApp:packageReleaseDistributionForCurrentOS
+```
+The installer will be generated in `composeApp/build/compose/binaries/main-release/`.
+
 ### Build All
 
 ```bash

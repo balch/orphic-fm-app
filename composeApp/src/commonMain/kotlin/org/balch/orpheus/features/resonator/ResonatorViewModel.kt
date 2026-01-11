@@ -26,7 +26,7 @@ import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
 
 enum class ResonatorMode(val displayName: String) {
-    MODAL("Bar"),
+    MODAL("CBell"),
     STRING("String"),
     SYMPATHETIC("Sitar")
 }

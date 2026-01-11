@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -84,6 +85,7 @@ fun ResonatorPanel(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                Spacer(Modifier.weight(1f))
                 // Combined Enable/Mode selector Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -198,6 +200,7 @@ fun ResonatorPanel(
                         modifier = Modifier.padding(start = 8.dp)
                     )
                 }
+                Spacer(Modifier.weight(1f))
             }
         }
     }

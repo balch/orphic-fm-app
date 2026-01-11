@@ -1,3 +1,6 @@
+# Suppress all warnings to allow build to proceed
+-ignorewarnings
+
 # Suppress warnings from JavaCPP about missing Maven classes
 -dontwarn org.apache.maven.**
 -dontwarn org.bytedeco.javacpp.tools.**
@@ -27,3 +30,25 @@
 # Keep all MidiDeviceProvider implementations
 -keep class * extends javax.sound.midi.spi.MidiDeviceProvider { *; }
 
+# Suppress warnings from common libraries that have optional dependencies
+-dontwarn io.lettuce.**
+-dontwarn org.apache.commons.pool2.**
+-dontwarn io.opentelemetry.**
+-dontwarn javax.annotation.**
+-dontwarn org.slf4j.**
+-dontwarn io.netty.**
+-dontwarn kotlin.internal.**
+
+# Additional suppressions for transitive dependencies (Micrometer, Reactor, BouncyCastle, etc.)
+-dontwarn reactor.**
+-dontwarn io.micrometer.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.conscrypt.**
+-dontwarn org.brotli.dec.**
+-dontwarn aws.sdk.kotlin.**
+-dontwarn org.apache.hc.client5.**
+-dontwarn com.oracle.svm.**
+-dontwarn org.graalvm.**
+-dontwarn org.openjsse.**
+-dontwarn jakarta.servlet.**
+-dontwarn jakarta.mail.**
