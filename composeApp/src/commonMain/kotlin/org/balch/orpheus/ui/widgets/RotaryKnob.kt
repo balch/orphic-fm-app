@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.theme.lighten
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.PI
 import kotlin.math.cos
@@ -263,7 +264,7 @@ fun RotaryKnob(
         Text(
             text = ((internalValue * 100).roundToInt() / 100.0).toString(),
             style = MaterialTheme.typography.labelMedium,
-            color = progressColor,
+            color = progressColor.lighten(0.3f),
             textAlign = TextAlign.Center,
             maxLines = 1
         )

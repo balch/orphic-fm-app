@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.ui.theme.lighten
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
 
@@ -130,7 +131,7 @@ fun CollapsibleColumnPanel(
                         text = title.toList().joinToString("\n"),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (effectiveExpanded) color else color.copy(alpha = 0.7f),
+                        color = if (effectiveExpanded) color else color.lighten(),
                         lineHeight = 12.sp,
                         textAlign = TextAlign.Center
                     )

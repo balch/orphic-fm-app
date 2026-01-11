@@ -438,7 +438,8 @@ private fun ExamplesDropdown(
         
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(OrpheusColors.panelSurface)
         ) {
             LiveCodeViewModel.EXAMPLES.keys.forEach { name ->
                 DropdownMenuItem(
@@ -446,7 +447,8 @@ private fun ExamplesDropdown(
                         Text(
                             name.replaceFirstChar { it.uppercase() },
                             fontSize = 12.sp,
-                            fontWeight = if (name == selectedExample) FontWeight.Bold else FontWeight.Normal
+                            fontWeight = if (name == selectedExample) FontWeight.Bold else FontWeight.Normal,
+                            color = Color.White
                         ) 
                     },
                     onClick = {

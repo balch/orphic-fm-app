@@ -126,7 +126,7 @@ fun CompactLandscapeHeaderPanel(
                 ExposedDropdownMenu(
                     expanded = presetDropdownExpanded,
                     onDismissRequest = { onPresetDropdownExpandedChange(false) },
-                    modifier = if (liquidState != null) {
+                    modifier = (if (liquidState != null) {
                         Modifier.liquidVizEffects(
                             liquidState = liquidState,
                             scope = effects.top,
@@ -134,11 +134,11 @@ fun CompactLandscapeHeaderPanel(
                             color = OrpheusColors.panelSurface,
                             shape = RoundedCornerShape(8.dp)
                         )
-                    } else Modifier.background(OrpheusColors.panelSurface)
+                    } else Modifier.background(OrpheusColors.panelSurface)).background(OrpheusColors.panelSurface)
                 ) {
                     loadedPresetState?.presets?.forEach { preset ->
                         DropdownMenuItem(
-                            text = { Text(preset.name, style = MaterialTheme.typography.bodySmall) },
+                            text = { Text(preset.name, style = MaterialTheme.typography.bodySmall, color = Color.White) },
                             onClick = {
                                 presetActions.onApply(preset)
                                 onPresetDropdownExpandedChange(false)
@@ -193,7 +193,7 @@ fun CompactLandscapeHeaderPanel(
                 ExposedDropdownMenu(
                     expanded = vizDropdownExpanded,
                     onDismissRequest = { onVizDropdownExpandedChange(false) },
-                    modifier = if (liquidState != null) {
+                    modifier = (if (liquidState != null) {
                         Modifier.liquidVizEffects(
                             liquidState = liquidState,
                             scope = effects.top,
@@ -201,11 +201,11 @@ fun CompactLandscapeHeaderPanel(
                             color = OrpheusColors.panelSurface,
                             shape = RoundedCornerShape(8.dp)
                         )
-                    } else Modifier.background(OrpheusColors.panelSurface)
+                    } else Modifier.background(OrpheusColors.panelSurface)).background(OrpheusColors.panelSurface)
                 ) {
                     vizState.visualizations.forEach { viz ->
                         DropdownMenuItem(
-                            text = { Text(viz.name, style = MaterialTheme.typography.bodySmall) },
+                            text = { Text(viz.name, style = MaterialTheme.typography.bodySmall, color = Color.White) },
                             onClick = {
                                 vizActions.onSelectViz(viz)
                                 onVizDropdownExpandedChange(false)

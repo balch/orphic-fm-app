@@ -21,8 +21,8 @@ private val SynthPink = Color(0xFFFF69B4)
 private val SeahawksNavy = Color(0xFF002244)
 private val SeahawksGreen = Color(0xFF69BE28)
 private val SeahawksGrey = Color(0xFFA5ACAF)
-private val NinersRed = Color(0xFFAA0000)
-private val NinersGold = Color(0xFFB3995D)
+private val NinersRed = Color(0xFFFF5252)
+private val NinersGold = Color(0xFFFFD740)
 
 private val DarkColorScheme = darkColorScheme(
     primary = NeonCyan,
@@ -102,8 +102,8 @@ object OrpheusColors {
 
     // Material Theme Defaults
     val errorContainerDark = Color(0xFF4A1F1F)
-    val onSurfaceDark = Color(0xFFE0E0E0)
-    val onSurfaceVariantDark = Color(0xFFB0B0B0)
+    val onSurfaceDark = Color(0xFFF0F0F0)
+    val onSurfaceVariantDark = Color(0xFFDCDCDC)
     val outlineDark = Color(0xFF4A4A6A)
     val outlineVariantDark = Color(0xFF2A2A4A)
 
@@ -113,8 +113,8 @@ object OrpheusColors {
     val onBackgroundLight = Color(0xFF1A1A1A)
 
     // UI Panel & Widget Colors
-    val panelBackground = Color(0xFF1A1A2A)
-    val panelSurface = Color(0xFF2A2A3A)
+    val panelBackground = Color(0xFF1E1E2E)
+    val panelSurface = Color(0xFF32324A)
     val panelSurfaceDark = Color(0xFF1A1A2A)
     val charcoal = Color(0xFF1A1A1A)
     val darkGrey = Color(0xFF2A2A2A)

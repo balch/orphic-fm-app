@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -219,14 +220,16 @@ fun ModelSelector(
         // Dropdown menu
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(OrpheusColors.panelSurface)
         ) {
             availableModels.forEach { model ->
                 DropdownMenuItem(
                     text = {
                         Text(
                             text = model.displayName,
-                            fontSize = 12.sp
+                            fontSize = 12.sp,
+                            color = Color.White
                         )
                     },
                     onClick = {

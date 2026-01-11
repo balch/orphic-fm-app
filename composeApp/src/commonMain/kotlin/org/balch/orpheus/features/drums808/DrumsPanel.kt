@@ -147,7 +147,7 @@ private fun LabelHeader(text: String, modifier: Modifier) {
             text = text,
             style = MaterialTheme.typography.labelSmall,
             fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = OrpheusColors.warmGlow,
             maxLines = 1,
         )
     }
@@ -234,7 +234,8 @@ private fun KnobGroup(
             value = value,
             onValueChange = onValueChange,
             size = 32.dp,
-            progressColor = color
+            progressColor = color,
+            label = bottomLabel
         )
     }
 }

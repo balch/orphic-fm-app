@@ -174,7 +174,7 @@ private fun StrategyDropdown(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(OrpheusColors.cavsWineDark) // Dark wine background
+            modifier = Modifier.background(OrpheusColors.panelSurface) // Consistent background
         ) {
             strategies.forEach { strategy ->
                 DropdownMenuItem(
