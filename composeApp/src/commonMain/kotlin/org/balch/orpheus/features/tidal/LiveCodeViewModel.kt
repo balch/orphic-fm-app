@@ -34,7 +34,6 @@ import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.core.tidal.TidalSchedulerState
 import org.balch.orpheus.features.ai.ReplCodeEvent
 import org.balch.orpheus.features.ai.ReplCodeEventBus
-import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
 
 
 /**

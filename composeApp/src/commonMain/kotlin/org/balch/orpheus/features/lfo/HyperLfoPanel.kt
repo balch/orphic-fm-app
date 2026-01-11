@@ -63,7 +63,7 @@ fun HyperLfoPanel(
     CollapsibleColumnPanel(
         title = "LFO",
         color = OrpheusColors.neonCyan,
-        expandedTitle = "Hyper LFO",
+        expandedTitle = "Pong Bounce",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,

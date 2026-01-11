@@ -34,7 +34,7 @@ fun StereoPanel(
     CollapsibleColumnPanel(
         title = "PAN",
         color = OrpheusColors.stereoCyan,
-        expandedTitle = "Stereo",
+        expandedTitle = "Sound Field",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

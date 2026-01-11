@@ -63,7 +63,7 @@ fun DrumBeatsPanel(
     CollapsibleColumnPanel(
         title = "BEATS",
         color = OrpheusColors.seahawksGreen,
-        expandedTitle = "Groove",
+        expandedTitle = "Drums & Space",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,7 +40,7 @@ fun DrumsPanel(
     CollapsibleColumnPanel(
         title = "808",
         color = OrpheusColors.ninersRed,
-        expandedTitle = "Drum Pads",
+        expandedTitle = "Percussion Pads",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
@@ -63,13 +62,11 @@ fun DrumsPanel(
                 // BD Row (Red) - I key
                 DrumRow(
                     label = "BD",
-                    keyHint = "I",
                     color = OrpheusColors.ninersRed,
                     frequency = state.bdFrequency,
                     tone = state.bdTone,
                     decay = state.bdDecay,
                     p4 = state.bdP4,
-                    p4Label = "AFM",
                     isActive = state.isBdActive,
                     onFrequencyChange = actions.setBdFrequency,
                     onToneChange = actions.setBdTone,
@@ -84,13 +81,11 @@ fun DrumsPanel(
                 // SD Row (Gold) - O key
                 DrumRow(
                     label = "SD",
-                    keyHint = "O",
                     color = OrpheusColors.ninersGold,
                     frequency = state.sdFrequency,
                     tone = state.sdTone,
                     decay = state.sdDecay,
                     p4 = state.sdP4,
-                    p4Label = "SNAP",
                     isActive = state.isSdActive,
                     onFrequencyChange = actions.setSdFrequency,
                     onToneChange = actions.setSdTone,
@@ -105,13 +100,11 @@ fun DrumsPanel(
                 // HH Row (White) - P key
                 DrumRow(
                     label = "HH",
-                    keyHint = "P",
                     color = Color.White,
                     frequency = state.hhFrequency,
                     tone = state.hhTone,
                     decay = state.hhDecay,
                     p4 = state.hhP4,
-                    p4Label = "NOISE",
                     isActive = state.isHhActive,
                     onFrequencyChange = actions.setHhFrequency,
                     onToneChange = actions.setHhTone,
@@ -128,10 +121,11 @@ fun DrumsPanel(
 @Composable
 private fun HeaderRow() {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 56.dp), // Align with columns
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Spacer(modifier = Modifier.weight(.6f))
         LabelHeader("TUNE", Modifier.weight(1f))
         LabelHeader("TONE", Modifier.weight(1f))
         LabelHeader("DECAY", Modifier.weight(1f))
@@ -156,13 +150,11 @@ private fun LabelHeader(text: String, modifier: Modifier) {
 @Composable
 private fun DrumRow(
     label: String,
-    keyHint: String,
     color: Color,
     frequency: Float,
     tone: Float,
     decay: Float,
     p4: Float,
-    p4Label: String,
     isActive: Boolean,
     onFrequencyChange: (Float) -> Unit,
     onToneChange: (Float) -> Unit,
@@ -176,24 +168,44 @@ private fun DrumRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Label with key hint
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.width(40.dp)
-        ) {
-            Text(label, style = MaterialTheme.typography.labelLarge, color = color)
-            Text("[$keyHint]", style = MaterialTheme.typography.labelSmall, color = color.copy(alpha = 0.5f))
-        }
 
         // Parameter + Trigger Columns
         Row(
             modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            KnobGroup(frequency, onFrequencyChange, color, Modifier.weight(1f))
-            KnobGroup(tone, onToneChange, color, Modifier.weight(1f))
-            KnobGroup(decay, onDecayChange, color, Modifier.weight(1f))
-            KnobGroup(p4, onP4Change, color, Modifier.weight(1f), p4Label)
+            Text(
+                modifier = Modifier.weight(.6f),
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = color
+            )
+
+            KnobGroup(
+                value = frequency,
+                onValueChange = onFrequencyChange,
+                color = color,
+                modifier = Modifier.weight(1f)
+            )
+            KnobGroup(
+                value = tone,
+                onValueChange = onToneChange,
+                color = color,
+                modifier = Modifier.weight(1f)
+            )
+            KnobGroup(
+                value = decay,
+                onValueChange = onDecayChange,
+                color = color,
+                modifier = Modifier.weight(1f)
+            )
+            KnobGroup(
+                value = p4,
+                onValueChange = onP4Change,
+                color = color,
+                modifier = Modifier.weight(1f),
+            )
 
             // Trigger Pad aligned as a 5th column
             Column(
@@ -209,10 +221,6 @@ private fun DrumRow(
                     onPulseEnd = onTriggerEnd,
                     activeColor = color
                 )
-                // Spacer matches the possible label under MOD knob to keep button centered
-                if (p4Label != "MOD") {
-                    Spacer(Modifier.height(18.dp))
-                }
             }
         }
     }

@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.viz
+package org.balch.orpheus.features.visualizations
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

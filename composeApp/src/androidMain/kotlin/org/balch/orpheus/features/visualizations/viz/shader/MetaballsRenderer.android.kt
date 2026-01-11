@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.viz.shader
+package org.balch.orpheus.features.visualizations.viz.shader
 
 import android.graphics.RuntimeShader
 import android.os.Build
@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
-import org.balch.orpheus.features.viz.Blob
+import org.balch.orpheus.features.visualizations.viz.Blob
 
 /**
  * Android implementation using AGSL RuntimeShader (API 33+).

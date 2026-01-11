@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.viz
+package org.balch.orpheus.features.visualizations.viz
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -20,8 +20,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.features.viz.shader.MetaballsCanvas
-import org.balch.orpheus.features.viz.shader.MetaballsConfig
+import org.balch.orpheus.features.visualizations.viz.shader.MetaballsCanvas
+import org.balch.orpheus.features.visualizations.viz.shader.MetaballsConfig
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.CenterPanelStyle
 import org.balch.orpheus.ui.viz.Visualization

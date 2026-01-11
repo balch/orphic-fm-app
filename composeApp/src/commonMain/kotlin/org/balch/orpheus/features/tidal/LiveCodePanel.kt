@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.tidal.ui
+package org.balch.orpheus.features.tidal
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -55,13 +55,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.tidal.TidalScheduler
-import org.balch.orpheus.features.tidal.LiveCodePanelActions
-import org.balch.orpheus.features.tidal.LiveCodeUiState
-import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
@@ -116,7 +114,7 @@ fun LiveCodePanel(
             // Launch coroutine to clear these specific highlights after duration
             val idsToRemove = newHighlights.keys
             scope.launch {
-                kotlinx.coroutines.delay(triggerEvent.durationMs)
+                delay(triggerEvent.durationMs)
                 activeHighlightMap = activeHighlightMap - idsToRemove
             }
         }
@@ -156,7 +154,7 @@ fun LiveCodePanelLayout(
     CollapsibleColumnPanel(
         title = "CODE",
         color = OrpheusColors.neonCyan,
-        expandedTitle = "Tidal Live Coding",
+        expandedTitle = "Tidal Live",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,  // Closed by default

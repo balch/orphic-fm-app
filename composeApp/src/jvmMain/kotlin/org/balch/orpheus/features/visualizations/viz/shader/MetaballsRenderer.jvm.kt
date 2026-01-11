@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.viz.shader
+package org.balch.orpheus.features.visualizations.viz.shader
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,13 +11,12 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
-import org.balch.orpheus.features.viz.Blob
+import org.balch.orpheus.features.visualizations.viz.Blob
 import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 
 /**
- * WASM/JS implementation using Skiko's RuntimeShaderBuilder.
- * Similar to JVM implementation since both use Skiko.
+ * JVM/Desktop implementation using Skiko's RuntimeShaderBuilder.
  */
 actual class MetaballsRenderer {
     private var runtimeEffect: RuntimeEffect? = null
@@ -28,6 +27,7 @@ actual class MetaballsRenderer {
             runtimeEffect = RuntimeEffect.makeForShader(MetaballsShaderSource.SKSL_SOURCE)
             shaderBuilder = runtimeEffect?.let { RuntimeShaderBuilder(it) }
         } catch (e: Exception) {
+            // Shader compilation failed - will fall back to Canvas
             println("[Orpheus] WARNING: Metaballs shader compilation failed: ${e.message}")
         }
     }
@@ -51,6 +51,7 @@ actual class MetaballsRenderer {
     ): ShaderBrush? {
         val builder = shaderBuilder ?: return null
         
+        // Set resolution
         builder.uniform("resolution", width, height)
         builder.uniform("time", time)
         builder.uniform("ballCount", minOf(blobs.size, config.maxBalls))
@@ -59,6 +60,7 @@ actual class MetaballsRenderer {
         builder.uniform("lfoMod", lfoModulation)
         builder.uniform("masterEnergy", masterEnergy)
         
+        // Pack balls data: x, y, radius, energy (4 floats per ball)
         val ballsData = FloatArray(16 * 4)
         val colorsData = FloatArray(16 * 4)
         
@@ -84,7 +86,7 @@ actual class MetaballsRenderer {
 }
 
 /**
- * WASM MetaballsCanvas implementation.
+ * JVM/Desktop MetaballsCanvas implementation.
  */
 @Composable
 actual fun MetaballsCanvas(
@@ -102,6 +104,7 @@ actual fun MetaballsCanvas(
     }
     
     if (renderer.isSupported()) {
+        // Shader-based rendering
         Canvas(modifier = modifier.fillMaxSize()) {
             val brush = renderer.getShaderBrush(
                 width = size.width,
@@ -118,6 +121,7 @@ actual fun MetaballsCanvas(
             }
         }
     } else {
+        // Fallback to Canvas-based rendering
         MetaballsCanvasFallback(
             modifier = modifier,
             blobs = blobs,
@@ -128,7 +132,7 @@ actual fun MetaballsCanvas(
 }
 
 /**
- * Canvas-based fallback for WASM when shaders aren't available.
+ * Canvas-based fallback rendering (same as current VizBackground approach).
  */
 @Composable
 private fun MetaballsCanvasFallback(
@@ -141,6 +145,7 @@ private fun MetaballsCanvasFallback(
         val width = size.width
         val height = size.height
         
+        // Draw each blob with radial gradient
         blobs.forEach { blob ->
             val screenX = blob.x * width
             val screenY = (1f - blob.y) * height

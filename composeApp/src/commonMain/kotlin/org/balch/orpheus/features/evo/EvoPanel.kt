@@ -58,7 +58,7 @@ fun EvoPanel(
     CollapsibleColumnPanel(
         title = "EVO",
         color = OrpheusColors.evoGold,
-        expandedTitle = "Audio Evolution",
+        expandedTitle = "Audio Darwinism",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

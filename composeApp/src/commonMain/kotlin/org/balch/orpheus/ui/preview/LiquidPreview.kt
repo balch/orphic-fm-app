@@ -12,9 +12,9 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
-import org.balch.orpheus.features.viz.GalaxyViz
-import org.balch.orpheus.features.viz.LavaLampViz
-import org.balch.orpheus.features.viz.SwirlyViz
+import org.balch.orpheus.features.visualizations.viz.GalaxyViz
+import org.balch.orpheus.features.visualizations.viz.LavaLampViz
+import org.balch.orpheus.features.visualizations.viz.SwirlyViz
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors

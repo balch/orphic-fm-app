@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.viz
+package org.balch.orpheus.features.visualizations.viz
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState

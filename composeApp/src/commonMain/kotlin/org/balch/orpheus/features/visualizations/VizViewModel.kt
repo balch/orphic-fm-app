@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.viz
+package org.balch.orpheus.features.visualizations
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
@@ -19,6 +19,7 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.features.visualizations.viz.OffViz
 import org.balch.orpheus.ui.viz.DynamicVisualization
 import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects

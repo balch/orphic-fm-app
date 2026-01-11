@@ -48,7 +48,7 @@ fun ModTweaksPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        expandedTitle = "Mod Tweaks",
+        expandedTitle = "System Tweaker",
         showCollapsedHeader = showCollapsedHeader,
         fillMaxHeight = true
     ) {

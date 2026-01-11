@@ -1,8 +1,8 @@
-package org.balch.orpheus.features.viz.shader
+package org.balch.orpheus.features.visualizations.viz.shader
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import org.balch.orpheus.features.viz.Blob
+import org.balch.orpheus.features.visualizations.viz.Blob
 
 /**
  * Platform-specific metaballs renderer.

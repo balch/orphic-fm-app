@@ -37,8 +37,8 @@ import org.balch.orpheus.features.drums808.DrumFeature
 import org.balch.orpheus.features.drums808.DrumViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.viz.VizFeature
-import org.balch.orpheus.features.viz.VizViewModel
+import org.balch.orpheus.features.visualizations.VizFeature
+import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature

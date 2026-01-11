@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.tidal.ui
+package org.balch.orpheus.features.tidal
 
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle

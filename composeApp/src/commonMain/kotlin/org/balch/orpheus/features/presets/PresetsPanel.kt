@@ -80,7 +80,7 @@ fun PresetsPanel(
     CollapsibleColumnPanel(
         title = "PATCH",
         color = OrpheusColors.presetOrange,
-        expandedTitle = "Presets",
+        expandedTitle = "Memento Presets",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

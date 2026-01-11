@@ -38,11 +38,11 @@ import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.stereo.StereoFeature
 import org.balch.orpheus.features.stereo.StereoViewModel
+import org.balch.orpheus.features.tidal.LiveCodeFeature
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
-import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
 import org.balch.orpheus.features.tweaks.CenterControlSection
-import org.balch.orpheus.features.viz.VizFeature
-import org.balch.orpheus.features.viz.VizViewModel
+import org.balch.orpheus.features.visualizations.VizFeature
+import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
@@ -92,7 +92,6 @@ fun DesktopSynthScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
                 .focusRequester(focusRequester)
                 .focusable()
                 .onPreviewKeyEvent { event ->
@@ -108,6 +107,8 @@ fun DesktopSynthScreen(
         ) {
             // Header panel
             HeaderPanel(
+                modifier = Modifier.fillMaxWidth()
+                    .weight(0.75f),
                 headerFeature = headerFeature,
                 presetsFeature = presetsFeature,
                 midiFeature = midiFeature,

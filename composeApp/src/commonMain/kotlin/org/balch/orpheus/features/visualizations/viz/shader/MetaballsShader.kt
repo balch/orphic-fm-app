@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.viz.shader
+package org.balch.orpheus.features.visualizations.viz.shader
 
 import androidx.compose.ui.graphics.Color
 

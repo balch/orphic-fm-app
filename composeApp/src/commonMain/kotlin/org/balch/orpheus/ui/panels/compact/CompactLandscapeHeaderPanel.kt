@@ -30,8 +30,8 @@ import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.presets.PresetUiState
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.viz.VizFeature
-import org.balch.orpheus.features.viz.VizViewModel
+import org.balch.orpheus.features.visualizations.VizFeature
+import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.theme.OrpheusColors

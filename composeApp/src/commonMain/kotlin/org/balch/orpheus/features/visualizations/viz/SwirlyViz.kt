@@ -1,4 +1,4 @@
-package org.balch.orpheus.features.viz
+package org.balch.orpheus.features.visualizations.viz
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize

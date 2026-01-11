@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,10 +25,10 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 /**
- * ModDelayPanel consuming feature() interface.
+ * DelayFeedbackPanel consuming feature() interface.
  */
 @Composable
-fun ModDelayPanel(
+fun DelayFeedbackPanel(
     feature: DelayFeature = DelayViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
@@ -40,7 +41,7 @@ fun ModDelayPanel(
     CollapsibleColumnPanel(
         title = "DELAY",
         color = OrpheusColors.warmGlow,
-        expandedTitle = "Mod Delay",
+        expandedTitle = "Delayed Feedback",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
@@ -63,9 +64,9 @@ private fun ModDelayPanelContent(
     ) {
         // Row 1: MOD 1, MOD 2, LFO/SELF toggle, TRI/SQR toggle
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.Top
+            verticalAlignment = Alignment.CenterVertically
         ) {
             RotaryKnob(
                 value = uiState.mod1,
@@ -83,31 +84,26 @@ private fun ModDelayPanelContent(
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )
-            // Add top padding to toggles to align with knob centers
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 8.dp)
-            ) {
-                VerticalToggle(
-                    topLabel = "LFO",
-                    bottomLabel = "SELF",
-                    isTop = uiState.isLfoSource,
-                    onToggle = { actions.onSourceChange(it) },
-                    color = OrpheusColors.warmGlow
-                )
-            }
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 8.dp)
-            ) {
-                VerticalToggle(
-                    topLabel = "TRI",
-                    bottomLabel = "SQR",
-                    isTop = uiState.isTriangleWave,
-                    onToggle = { actions.onWaveformChange(it) },
-                    color = OrpheusColors.warmGlow
-                )
-            }
+            VerticalToggle(
+                modifier = Modifier
+                    .padding(bottom = 6.dp)
+                    .width(32.dp),
+                topLabel = "LFO",
+                bottomLabel = "SELF",
+                isTop = uiState.isLfoSource,
+                onToggle = { actions.onSourceChange(it) },
+                color = OrpheusColors.warmGlow
+            )
+            VerticalToggle(
+                modifier = Modifier
+                    .padding(bottom = 6.dp)
+                    .width(32.dp),
+                topLabel = "TRI",
+                bottomLabel = "SQR",
+                isTop = uiState.isTriangleWave,
+                onToggle = { actions.onWaveformChange(it) },
+                color = OrpheusColors.warmGlow
+            )
         }
 
         // Row 2: TIME 1, TIME 2, FB, MIX
@@ -158,7 +154,7 @@ fun ModDelayPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        ModDelayPanel(
+        DelayFeedbackPanel(
             feature = DelayViewModel.previewFeature()
         )
     }

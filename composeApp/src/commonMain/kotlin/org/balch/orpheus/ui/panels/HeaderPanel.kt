@@ -22,8 +22,8 @@ import org.balch.orpheus.features.beats.DrumBeatsFeature
 import org.balch.orpheus.features.beats.DrumBeatsPanel
 import org.balch.orpheus.features.beats.DrumBeatsViewModel
 import org.balch.orpheus.features.delay.DelayFeature
+import org.balch.orpheus.features.delay.DelayFeedbackPanel
 import org.balch.orpheus.features.delay.DelayViewModel
-import org.balch.orpheus.features.delay.ModDelayPanel
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.distortion.DistortionViewModel
@@ -48,12 +48,12 @@ import org.balch.orpheus.features.resonator.ResonatorViewModel
 import org.balch.orpheus.features.stereo.StereoFeature
 import org.balch.orpheus.features.stereo.StereoPanel
 import org.balch.orpheus.features.stereo.StereoViewModel
+import org.balch.orpheus.features.tidal.LiveCodeFeature
+import org.balch.orpheus.features.tidal.LiveCodePanel
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
-import org.balch.orpheus.features.tidal.ui.LiveCodeFeature
-import org.balch.orpheus.features.tidal.ui.LiveCodePanel
-import org.balch.orpheus.features.viz.VizFeature
-import org.balch.orpheus.features.viz.VizPanel
-import org.balch.orpheus.features.viz.VizViewModel
+import org.balch.orpheus.features.visualizations.VizFeature
+import org.balch.orpheus.features.visualizations.VizPanel
+import org.balch.orpheus.features.visualizations.VizViewModel
 
 /**
  * A container for the top header panel row that manages expansion state
@@ -131,7 +131,7 @@ fun HeaderPanel(
             onExpandedChange = { PanelId.LFO.setExpanded(it) },
             modifier = panelModifier(PanelId.LFO.isExpanded(), weight = .5f)
         )
-        ModDelayPanel(
+        DelayFeedbackPanel(
             feature = delayFeature,
             isExpanded = PanelId.DELAY.isExpanded(),
             onExpandedChange = { PanelId.DELAY.setExpanded(it) },
