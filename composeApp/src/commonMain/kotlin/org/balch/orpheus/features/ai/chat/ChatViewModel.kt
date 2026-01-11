@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.features.ai.AgentState
 import org.balch.orpheus.features.ai.OrpheusAgent
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
@@ -81,7 +82,7 @@ class ChatViewModel(
      * Whether the agent is currently processing.
      */
     val isLoading: StateFlow<Boolean> = agent.agentFlow
-        .map { it is OrpheusAgent.AgentState.Loading || it.messages.lastOrNull()?.type == ChatMessageType.Loading }
+        .map { it is AgentState.Loading || it.messages.lastOrNull()?.type == ChatMessageType.Loading }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

@@ -12,25 +12,25 @@ import dev.zacsweers.metro.SingleIn
 // and need explicit return types
 
 private fun jsSetPlaybackState(isPlaying: Boolean): Unit = js(
-    "if ('mediaSession' in navigator) { navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'; }"
+    "{ if ('mediaSession' in navigator) { navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'; } }"
 )
 
 private fun jsUpdateMetadata(title: String, artist: String, album: String): Unit = js(
-    "if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: title, artist: artist, album: album }); }"
+    "{ if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: title, artist: artist, album: album }); } }"
 )
 
 private fun jsSetupInitialMetadata(): Unit = js(
-    "if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: 'Orpheus Synthesizer', artist: 'Playing', album: 'Live Session' }); }"
+    "{ if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: 'Orpheus Synthesizer', artist: 'Playing', album: 'Live Session' }); } }"
 )
 
-private fun jsClearMediaSession(): Unit = js("""
+private fun jsClearMediaSession(): Unit = js("""{
     if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = null;
         navigator.mediaSession.setActionHandler('play', null);
         navigator.mediaSession.setActionHandler('pause', null);
         navigator.mediaSession.setActionHandler('stop', null);
     }
-""")
+}""")
 
 private fun jsHasMediaSession(): Boolean = js("('mediaSession' in navigator)")
 

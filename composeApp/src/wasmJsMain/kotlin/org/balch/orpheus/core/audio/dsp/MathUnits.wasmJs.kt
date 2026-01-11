@@ -107,7 +107,7 @@ abstract class WebAudioOscillatorBase(
 ) : AudioUnit {
     protected val oscillator = context.createOscillator().also {
         it.type = oscType
-        it.frequency.value = 440f
+        it.frequency.value = 0f
         it.start()
     }
     
@@ -178,8 +178,8 @@ class WebAudioMinimum(private val context: AudioContext) : Minimum {
     // Sum: a + b
     private val sumGain = context.createGain().also { it.gain.value = 1f }
     
-    // Diff: a - b
-    private val diffGain = context.createGain().also { it.gain.value = 1f }
+    // Diff: a - b (scaled by 0.5 to keep in WaveShaper range)
+    private val diffGain = context.createGain().also { it.gain.value = 0.5f }
     
     // Absolute value of difference using WaveShaper
     private val absShaper = context.createWaveShaper().apply {
@@ -187,15 +187,15 @@ class WebAudioMinimum(private val context: AudioContext) : Minimum {
         val curve = Float32Array(samples)
         for (i in 0 until samples) {
             val x = (i.toFloat() / (samples - 1)) * 2 - 1  // -1 to 1
-            curve[i] = kotlin.math.abs(x)
+            curve[i] = kotlin.math.abs(x).toFloat()
         }
         this.curve = curve
-        this.oversample = "none"
+        this.oversample = "4x"
     }
     
-    // Scale sum and abs(diff) by 0.5
+    // Scale sum by 0.5 and absDiff by -1.0 (since it was already scaled by 0.5)
     private val sumScaled = context.createGain().also { it.gain.value = 0.5f }
-    private val absDiffScaled = context.createGain().also { it.gain.value = -0.5f } // Negative for subtraction
+    private val absDiffScaled = context.createGain().also { it.gain.value = -1.0f } // Negative for subtraction
     
     // Final result: 0.5*(a+b) - 0.5*|a-b|
     private val resultGain = context.createGain().also { it.gain.value = 1f }
@@ -261,8 +261,8 @@ class WebAudioMaximum(private val context: AudioContext) : Maximum {
     // Sum: a + b
     private val sumGain = context.createGain().also { it.gain.value = 1f }
     
-    // Diff: a - b
-    private val diffGain = context.createGain().also { it.gain.value = 1f }
+    // Diff: a - b (scaled by 0.5 to keep in WaveShaper range)
+    private val diffGain = context.createGain().also { it.gain.value = 0.5f }
     
     // Absolute value of difference using WaveShaper
     private val absShaper = context.createWaveShaper().apply {
@@ -270,15 +270,15 @@ class WebAudioMaximum(private val context: AudioContext) : Maximum {
         val curve = Float32Array(samples)
         for (i in 0 until samples) {
             val x = (i.toFloat() / (samples - 1)) * 2 - 1  // -1 to 1
-            curve[i] = kotlin.math.abs(x)
+            curve[i] = kotlin.math.abs(x).toFloat()
         }
         this.curve = curve
-        this.oversample = "none"
+        this.oversample = "4x"
     }
     
-    // Scale sum and abs(diff) by 0.5
+    // Scale sum by 0.5 and absDiff by 1.0 (since it was already scaled by 0.5)
     private val sumScaled = context.createGain().also { it.gain.value = 0.5f }
-    private val absDiffScaled = context.createGain().also { it.gain.value = 0.5f } // Positive for addition
+    private val absDiffScaled = context.createGain().also { it.gain.value = 1.0f }
     
     // Final result: 0.5*(a+b) + 0.5*|a-b|
     private val resultGain = context.createGain().also { it.gain.value = 1f }

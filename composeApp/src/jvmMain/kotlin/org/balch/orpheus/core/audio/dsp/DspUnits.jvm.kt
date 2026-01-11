@@ -129,6 +129,10 @@ class JsynAutomationPlayer : AutomationPlayer {
     
     private var durationSeconds: Float = 1.0f
     private var mode: Int = 0 // 0=Once, 1=Loop, 2=PingPong
+    
+    private var lastTimes: FloatArray? = null
+    private var lastValues: FloatArray? = null
+    private var lastCount: Int = 0
 
     override val output: AudioOutput = JsynAudioOutput(reader.output)
 
@@ -137,25 +141,38 @@ class JsynAutomationPlayer : AutomationPlayer {
             reader.dataQueue.clear()
             return
         }
+        this.lastTimes = times.copyOf()
+        this.lastValues = values.copyOf()
+        this.lastCount = count
+        
+        if (durationSeconds > 0) {
+            bake()
+        }
+    }
+    
+    private fun bake() {
+        val times = lastTimes ?: return
+        val values = lastValues ?: return
+        val count = lastCount
+        val duration = durationSeconds
 
         // Bake the path into a FloatSample
         val floatData = FloatArray(BUFFER_SIZE)
         
         // Helper to get value at time t (0..1)
-        fun getValueAt(t: Float): Float {
+        fun getValueAt(s: Float): Float {
             // Find segment
-            // This is linear search, fine for baking 1024 points once
-            if (t <= times[0]) return values[0]
-            if (t >= times[count - 1]) return values[count - 1]
+            if (s <= times[0]) return values[0]
+            if (s >= times[count - 1]) return values[count - 1]
             
             for (i in 0 until count - 1) {
-                if (t >= times[i] && t <= times[i+1]) {
+                if (s >= times[i] && s <= times[i+1]) {
                     val t1 = times[i]
                     val t2 = times[i+1]
                     val v1 = values[i]
                     val v2 = values[i+1]
                     if (t2 == t1) return v1
-                    val fraction = (t - t1) / (t2 - t1)
+                    val fraction = (s - t1) / (t2 - t1)
                     return v1 + fraction * (v2 - v1)
                 }
             }
@@ -163,8 +180,8 @@ class JsynAutomationPlayer : AutomationPlayer {
         }
 
         for (i in 0 until BUFFER_SIZE) {
-            val t = i.toFloat() / (BUFFER_SIZE - 1)
-            floatData[i] = getValueAt(t)
+            val s = (i.toFloat() / (BUFFER_SIZE - 1)) * duration
+            floatData[i] = getValueAt(s)
         }
 
         val newSample = com.jsyn.data.FloatSample(floatData)
@@ -176,6 +193,9 @@ class JsynAutomationPlayer : AutomationPlayer {
 
     override fun setDuration(seconds: Float) {
         this.durationSeconds = seconds
+        if (lastTimes != null) {
+            bake()
+        }
         updateRate()
     }
     

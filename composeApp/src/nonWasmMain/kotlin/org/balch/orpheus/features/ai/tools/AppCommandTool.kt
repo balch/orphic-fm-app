@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
+import org.balch.orpheus.core.ai.currentKoogModel
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.tidal.TidalRepl
 

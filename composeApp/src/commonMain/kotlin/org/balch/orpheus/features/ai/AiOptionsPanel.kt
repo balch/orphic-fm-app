@@ -1,5 +1,5 @@
 package org.balch.orpheus.features.ai
-
+ 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,7 +67,15 @@ fun AiOptionsPanel(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            if (!uiState.isApiKeySet) {
+            if (!isAiSupported) {
+                Text(
+                    text = "AI Not Available on Web",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = OrpheusColors.warmGlow.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(16.dp)
+                )
+            } else if (!uiState.isApiKeySet) {
                 // Key entry UI
                 ApiKeyEntryCompact(
                     onSubmit = actions.onSaveApiKey,

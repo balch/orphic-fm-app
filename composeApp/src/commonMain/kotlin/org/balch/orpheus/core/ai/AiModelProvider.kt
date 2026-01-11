@@ -1,9 +1,5 @@
 package org.balch.orpheus.core.ai
 
-import ai.koog.prompt.executor.clients.google.GoogleModels
-import ai.koog.prompt.llm.LLMCapability
-import ai.koog.prompt.llm.LLMProvider
-import ai.koog.prompt.llm.LLModel
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
@@ -20,34 +16,16 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 
-
-val Gemini3_Flash_Preview: LLModel = LLModel(
-    provider = LLMProvider.Google,
-    id = "gemini-3-flash-preview",
-    capabilities = listOf(
-        LLMCapability.Temperature,
-        LLMCapability.Completion,
-        LLMCapability.MultipleChoices,
-        LLMCapability.Tools,
-        LLMCapability.ToolChoice,
-        LLMCapability.Schema.JSON.Basic,
-        LLMCapability.Schema.JSON.Standard,
-    ),
-    contextLength = 1_048_576,
-    maxOutputTokens = 65_536,
-)
-
 /**
  * Available AI models for the application.
  */
 enum class AiModel(
     val id: String,
     val displayName: String,
-    val koogModel: LLModel,
 ) {
-    FLASH_25("flash_25", "Flash 2.5", GoogleModels.Gemini2_5Flash),
-    PRO_25("pro_25", "Pro 2.5", GoogleModels.Gemini2_5Pro),
-    FLASH_30("flash_30", "Flash 3.0 - Preview", Gemini3_Flash_Preview);
+    FLASH_25("flash_25", "Flash 2.5"),
+    PRO_25("pro_25", "Pro 2.5"),
+    FLASH_30("flash_30", "Flash 3.0 - Preview");
     companion object {
         val DEFAULT = FLASH_30
         
@@ -71,9 +49,6 @@ class AiModelProvider @Inject constructor(
     /** Reactive state for the current model */
     private val _selectedModel = MutableStateFlow(AiModel.DEFAULT)
     val selectedModel: StateFlow<AiModel> = _selectedModel.asStateFlow()
-
-    /** Current Koog LLM model */
-    val currentKoogModel: LLModel get() = _selectedModel.value.koogModel
 
     /** List of available models */
     val availableModels: List<AiModel> = AiModel.entries

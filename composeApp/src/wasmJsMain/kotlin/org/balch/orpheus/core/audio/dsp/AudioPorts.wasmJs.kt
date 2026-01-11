@@ -1,4 +1,5 @@
 package org.balch.orpheus.core.audio.dsp
+import org.khronos.webgl.get
 
 /**
  * WASM implementation of AudioInput.
@@ -101,6 +102,58 @@ class WebAudioNodeInput(
 }
 
 /**
+ * AudioInput that handles manual sets and node connections via a ScriptProcessorNode bridge.
+ * Useful for parameters that need to trigger Kotlin logic (like Envelope gate).
+ */
+class WebAudioManualInput(
+    private val context: AudioContext,
+    private val onValueChange: (Double) -> Unit
+) : AudioInput {
+    private var scriptNode: ScriptProcessorNode? = null
+    private var currentValue = 0.0
+
+    override fun set(value: Double) {
+        currentValue = value
+        onValueChange(value)
+    }
+
+    override fun disconnectAll() {
+        scriptNode?.disconnect()
+        scriptNode = null
+    }
+
+    fun connectFrom(source: AudioNode, outputIndex: Int = 0) {
+        if (scriptNode == null) {
+            // Smaller buffer for better responsiveness (256 samples ~= 5.8ms @ 44.1kHz)
+            scriptNode = context.createScriptProcessor(256, 1, 1)
+            scriptNode!!.onaudioprocess = { event ->
+                val data = event.inputBuffer.getChannelData(0)
+                if (data.length > 0) {
+                    // Check for transitions within the buffer for better gate detection
+                    // For parameters, just taking the first value is often enough, 
+                    // but for gates, we want to see if it crossed the 0.5 threshold anywhere.
+                    var foundValue = data[0].toDouble()
+                    for (i in 0 until data.length) {
+                        val v = data[i].toDouble()
+                        if ((v > 0.5 && currentValue <= 0.5) || (v <= 0.5 && currentValue > 0.5)) {
+                            foundValue = v
+                            break
+                        }
+                    }
+                    
+                    if (foundValue != currentValue) {
+                        currentValue = foundValue
+                        onValueChange(foundValue)
+                    }
+                }
+            }
+            scriptNode!!.connect(context.destination)
+        }
+        source.connect(scriptNode!!, outputIndex, 0)
+    }
+}
+
+/**
  * WASM implementation of AudioOutput.
  */
 actual interface AudioOutput : AudioPort {
@@ -119,6 +172,7 @@ class WebAudioNodeOutput(
         when (input) {
             is WebAudioParamInput -> input.connectFrom(node)
             is WebAudioNodeInput -> input.connectFrom(node, outputIndex)
+            is WebAudioManualInput -> input.connectFrom(node, outputIndex)
         }
     }
     
@@ -126,6 +180,7 @@ class WebAudioNodeOutput(
         when (input) {
             is WebAudioParamInput -> input.connectFrom(node)
             is WebAudioNodeInput -> input.connectFrom(node, channel)
+            is WebAudioManualInput -> input.connectFrom(node, channel)
         }
     }
     

@@ -26,6 +26,13 @@ actual class AudioEngine actual constructor() {
         leftGain.connect(merger, 0, 0)
         rightGain.connect(merger, 0, 1)
         merger.connect(audioContext.destination)
+        
+        // Sync with page background
+        try {
+            OrphicFM.syncNode(merger)
+        } catch (e: Throwable) {
+            // Ignore if OrphicFM is not available (e.g. standalone app)
+        }
     }
     
     actual fun start() {

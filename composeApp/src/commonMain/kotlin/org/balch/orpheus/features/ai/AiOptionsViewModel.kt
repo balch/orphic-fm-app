@@ -9,7 +9,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import io.ktor.utils.io.CancellationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -47,6 +47,7 @@ import org.balch.orpheus.features.ai.generative.AiStatusMessage
 import org.balch.orpheus.features.ai.generative.DroneAgentConfig
 import org.balch.orpheus.features.ai.generative.SoloAgentConfig
 import org.balch.orpheus.features.ai.generative.SynthControlAgent
+import org.balch.orpheus.features.ai.tools.ReplExecuteArgs
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -199,7 +200,7 @@ class AiOptionsViewModel(
             viewModelScope.launch {
                 try {
                     replExecuteTool.execute(
-                        ReplExecuteTool.Args(code = "hush")
+                        ReplExecuteArgs(code = "hush")
                     )
                 } catch (e: Exception) {
                     log.warn { "Failed to hush REPL: ${e.message}" }
@@ -292,7 +293,7 @@ class AiOptionsViewModel(
             _isReplActive.value = false
             viewModelScope.launch {
                 try {
-                    replExecuteTool.execute(ReplExecuteTool.Args(code = "hush"))
+                    replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
                 } catch (e: Exception) {
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
@@ -376,7 +377,7 @@ class AiOptionsViewModel(
             _isReplActive.value = false
             viewModelScope.launch {
                 try {
-                    replExecuteTool.execute(ReplExecuteTool.Args(code = "hush"))
+                    replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
                 } catch (e: Exception) {
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
@@ -640,7 +641,7 @@ class AiOptionsViewModel(
                     delay((fadeDuration * 1000).toLong())
                     
                     replExecuteTool.execute(
-                        ReplExecuteTool.Args(code = "hush")
+                        ReplExecuteArgs(code = "hush")
                     )
                     log.debug { "Hushed REPL patterns" }
                     
@@ -654,7 +655,7 @@ class AiOptionsViewModel(
                     log.warn { "Failed to hush REPL patterns gracefully: ${e.message}" }
                     // Fallback
                     replExecuteTool.execute(
-                        ReplExecuteTool.Args(code = "hush")
+                        ReplExecuteArgs(code = "hush")
                     )
                 }
             }

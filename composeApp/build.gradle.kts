@@ -42,6 +42,18 @@ kotlin {
     }
 
     sourceSets {
+        val nonWasmMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.koog.agents)
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.serialization.json)
+                implementation(libs.ktor.client.content.negotiation)
+            }
+        }
+        androidMain.get().dependsOn(nonWasmMain)
+        jvmMain.get().dependsOn(nonWasmMain)
+
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
@@ -67,11 +79,7 @@ kotlin {
             implementation(libs.kotlinx.collections.immutable)
             implementation(libs.ktmidi)
             implementation(libs.metrox.viewmodel.compose)
-            // AI/koog
-            implementation(libs.koog.agents)
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.serialization.json)
-            implementation(libs.ktor.client.content.negotiation)
+            
             // Markdown rendering (core + Material 3 theme)
             implementation(libs.markdown)
             implementation(libs.markdown.m3)

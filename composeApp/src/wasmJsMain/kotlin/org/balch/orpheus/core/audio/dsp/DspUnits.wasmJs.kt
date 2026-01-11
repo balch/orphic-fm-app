@@ -50,21 +50,15 @@ class WebAudioEnvelope(private val context: AudioContext) : Envelope {
         it.start()
     }
     
-    override val input: AudioInput = object : AudioInput {
-        override fun set(value: Double) {
-            val wasOpen = lastGateValue > 0.5
-            val isOpen = value > 0.5
-            lastGateValue = value
-            
-            if (isOpen && !wasOpen) {
-                triggerAttack()
-            } else if (!isOpen && wasOpen) {
-                triggerRelease()
-            }
-        }
+    override val input: AudioInput = WebAudioManualInput(context) { value ->
+        val wasOpen = lastGateValue > 0.5
+        val isOpen = value > 0.5
+        lastGateValue = value
         
-        override fun disconnectAll() {
-            // Gate input doesn't have audio connections
+        if (isOpen && !wasOpen) {
+            triggerAttack()
+        } else if (!isOpen && wasOpen) {
+            triggerRelease()
         }
     }
     
@@ -157,26 +151,48 @@ class WebAudioPeakFollower(private val context: AudioContext) : PeakFollower {
         it.maxDecibels = 0f
     }
     
+    // Envelope path for audio-rate modulation
+    private val absShaper = context.createWaveShaper().apply {
+        val samples = 1024
+        val curve = Float32Array(samples)
+        for (i in 0 until samples) {
+            val x = (i.toFloat() / (samples - 1)) * 2 - 1  // -1 to 1
+            curve[i] = abs(x).toFloat()
+        }
+        this.curve = curve
+    }
+    
+    private val followerFilter = context.createBiquadFilter().apply {
+        type = "lowpass"
+        frequency.value = 10f // Default cutoff (~100ms response)
+    }
+
     // Buffer for time domain data - use Float32Array for Web Audio API
     private val dataArray = Float32Array(2048)
     
     override val input: AudioInput = WebAudioNodeInput(analyser, 0, context)
     
-    // PeakFollower output is passthrough (maintains signal flow)
-    private val passThrough = context.createGain().also { it.gain.value = 1f }
-    override val output: AudioOutput = WebAudioNodeOutput(passThrough)
+    // PeakFollower output is the envelope (peak level)
+    override val output: AudioOutput = WebAudioNodeOutput(followerFilter)
     
-    // Manual peak tracking with exponential decay
+    // Manual peak tracking with exponential decay for UI
     private var currentPeak = 0.0
     private var halfLifeSeconds = 0.1
     
     init {
-        // Route input through to output
-        analyser.connect(passThrough)
+        // Wire envelope path
+        analyser.connect(absShaper)
+        absShaper.connect(followerFilter)
     }
     
     override fun setHalfLife(seconds: Double) {
         halfLifeSeconds = seconds.coerceAtLeast(0.001)
+        
+        // Map half-life to lowpass cutoff for the audio-rate output
+        // fc = 1 / (2 * pi * tau), where tau = halfLife / ln(2)
+        val tau = halfLifeSeconds / 0.69314718056
+        val cutoff = 1.0 / (2.0 * 3.14159265359 * tau)
+        followerFilter.frequency.value = cutoff.toFloat().coerceIn(0.1f, 1000f)
     }
     
     override fun getCurrent(): Double {
@@ -223,10 +239,12 @@ actual interface Limiter : AudioUnit {
 class WebAudioLimiter(private val context: AudioContext) : Limiter {
     private val shaper = context.createWaveShaper()
     private val driveGain = context.createGain().also { it.gain.value = 1f }
+    private val postGain = context.createGain().also { it.gain.value = 1f }
     
     init {
-        // Connect drive gain -> waveshaper
+        // Connect drive gain -> waveshaper -> postGain
         driveGain.connect(shaper)
+        shaper.connect(postGain)
         
         // Create tanh curve for soft limiting
         updateCurve(1.0f)
@@ -241,24 +259,23 @@ class WebAudioLimiter(private val context: AudioContext) : Limiter {
         }
         shaper.curve = curve
         shaper.oversample = "2x"
+
+        // Volume compensation like in JVM TanhLimiter
+        val drv = drive.toDouble().coerceIn(1.0, 50.0)
+        val compensation = 1.0 / tanh(drv.coerceAtMost(3.0))
+        postGain.gain.value = compensation.coerceAtMost(1.5).toFloat()
     }
     
     override val input: AudioInput = WebAudioNodeInput(driveGain, 0, context)
     
-    override val drive: AudioInput = object : AudioInput {
-        override fun set(value: Double) {
-            // Map drive 0-1 to gain multiplier
-            val driveAmount = (1.0 + value * 4.0).toFloat()
-            driveGain.gain.value = driveAmount
-            updateCurve(driveAmount)
-        }
-        
-        override fun disconnectAll() {
-            // Drive is typically a constant, not modulated
-        }
+    override val drive: AudioInput = WebAudioManualInput(context) { value ->
+        // value is already mapped by DspDistortionPlugin (typically 1..15)
+        val driveAmount = value.toFloat()
+        // driveGain should stay 1.0 to let shaper curve handle the drive
+        updateCurve(driveAmount)
     }
     
-    override val output: AudioOutput = WebAudioNodeOutput(shaper)
+    override val output: AudioOutput = WebAudioNodeOutput(postGain)
 }
 
 actual interface LinearRamp : AudioUnit {
@@ -274,21 +291,15 @@ class WebAudioLinearRamp(private val context: AudioContext) : LinearRamp {
     
     private var rampTime = 0.02
 
-    override val input: AudioInput = object : AudioInput {
-        override fun set(value: Double) {
-             val now = context.currentTime
-             source.offset.cancelScheduledValues(now)
-             source.offset.setValueAtTime(source.offset.value, now)
-             source.offset.linearRampToValueAtTime(value.toFloat(), now + rampTime)
-        }
-        override fun disconnectAll() {}
+    override val input: AudioInput = WebAudioManualInput(context) { value ->
+         val now = context.currentTime
+         source.offset.cancelScheduledValues(now)
+         source.offset.setValueAtTime(source.offset.value, now)
+         source.offset.linearRampToValueAtTime(value.toFloat(), now + rampTime)
     }
     
-    override val time: AudioInput = object : AudioInput {
-        override fun set(value: Double) {
-            rampTime = value.coerceAtLeast(0.001)
-        }
-        override fun disconnectAll() {}
+    override val time: AudioInput = WebAudioManualInput(context) { value ->
+        rampTime = value.coerceAtLeast(0.001)
     }
     
     override val output: AudioOutput = WebAudioNodeOutput(source)
@@ -313,26 +324,44 @@ class WebAudioAutomationPlayer(private val context: AudioContext) : AutomationPl
     private var durationSeconds = 1.0f
     private var mode = 0
     
+    private var lastTimes: FloatArray? = null
+    private var lastValues: FloatArray? = null
+    private var lastCount: Int = 0
+
     override val output: AudioOutput = WebAudioNodeOutput(outputGain)
     
     override fun setPath(times: FloatArray, values: FloatArray, count: Int) {
          if (count < 2) return
+         this.lastTimes = times.copyOf()
+         this.lastValues = values.copyOf()
+         this.lastCount = count
          
-         val newBuffer = context.createBuffer(1, BUFFER_SIZE, context.sampleRate.toFloat())
-         val channelData = newBuffer.getChannelData(0)
-         
-        fun getValueAt(t: Float): Float {
-            if (t <= times[0]) return values[0]
-            if (t >= times[count - 1]) return values[count - 1]
+         if (durationSeconds > 0) {
+             bake()
+         }
+    }
+    
+    private fun bake() {
+        val times = lastTimes ?: return
+        val values = lastValues ?: return
+        val count = lastCount
+        val duration = durationSeconds
+        
+        val newBuffer = context.createBuffer(1, BUFFER_SIZE, context.sampleRate.toFloat())
+        val channelData = newBuffer.getChannelData(0)
+        
+        fun getValueAt(s: Float): Float {
+            if (s <= times[0]) return values[0]
+            if (s >= times[count - 1]) return values[count - 1]
             
             for (i in 0 until count - 1) {
-                if (t >= times[i] && t <= times[i+1]) {
+                if (s >= times[i] && s <= times[i+1]) {
                     val t1 = times[i]
                     val t2 = times[i+1]
                     val v1 = values[i]
                     val v2 = values[i+1]
                     if (t2 == t1) return v1
-                    val fraction = (t - t1) / (t2 - t1)
+                    val fraction = (s - t1) / (t2 - t1)
                     return v1 + fraction * (v2 - v1)
                 }
             }
@@ -340,8 +369,8 @@ class WebAudioAutomationPlayer(private val context: AudioContext) : AutomationPl
         }
          
          for (i in 0 until BUFFER_SIZE) {
-             val t = i.toFloat() / (BUFFER_SIZE - 1)
-             channelData[i] = getValueAt(t)
+             val s = (i.toFloat() / (BUFFER_SIZE - 1)) * duration
+             channelData[i] = getValueAt(s)
          }
          
          this.buffer = newBuffer
@@ -349,6 +378,9 @@ class WebAudioAutomationPlayer(private val context: AudioContext) : AutomationPl
     
     override fun setDuration(seconds: Float) {
         this.durationSeconds = seconds
+        if (lastTimes != null) {
+            bake()
+        }
         updateRate()
     }
     

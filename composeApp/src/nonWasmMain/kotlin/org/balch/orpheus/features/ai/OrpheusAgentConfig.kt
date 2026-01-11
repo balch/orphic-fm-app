@@ -17,6 +17,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.ai.AiModelProvider
+import org.balch.orpheus.core.ai.currentKoogModel
 import org.balch.orpheus.core.config.AppConfig
 import kotlin.time.ExperimentalTime
 

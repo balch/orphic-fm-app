@@ -1,5 +1,5 @@
 package org.balch.orpheus.features.ai.chat
-
+ 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +27,7 @@ import org.balch.orpheus.features.ai.chat.widgets.ChatMessageBubble
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
 import org.balch.orpheus.features.ai.generative.AiDashboard
 import org.balch.orpheus.features.ai.generative.AiStatusMessage
+import org.balch.orpheus.features.ai.isAiSupported
 import org.balch.orpheus.features.ai.widgets.ApiKeyEntryScreen
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.dialogs.DraggableDialog
@@ -137,7 +138,9 @@ fun ChatDialogContent(
         modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (!isApiKeySet) {
+        if (!isAiSupported) {
+            ChatNotAvailableScreen()
+        } else if (!isApiKeySet) {
             // API Key entry screen
             Box(
                 modifier = Modifier.weight(1f).fillMaxWidth(),

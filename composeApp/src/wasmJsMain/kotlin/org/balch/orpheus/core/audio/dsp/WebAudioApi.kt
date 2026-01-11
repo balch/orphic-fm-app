@@ -1,5 +1,4 @@
 @file:Suppress("NOTHING_TO_INLINE")
-@file:OptIn(ExperimentalWasmJsInterop::class)
 
 package org.balch.orpheus.core.audio.dsp
 
@@ -28,6 +27,8 @@ external class AudioContext {
     fun createConstantSource(): ConstantSourceNode
     fun createBuffer(numberOfChannels: Int, length: Int, sampleRate: Float): AudioBuffer
     fun createBufferSource(): AudioBufferSourceNode
+    fun createBiquadFilter(): BiquadFilterNode
+    fun createScriptProcessor(bufferSize: Int, numberOfInputChannels: Int, numberOfOutputChannels: Int): ScriptProcessorNode
     
     fun resume(): JsAny  // Returns Promise
     fun suspend(): JsAny // Returns Promise
@@ -76,6 +77,14 @@ external interface GainNode : AudioNode {
     val gain: AudioParam
 }
 
+external interface BiquadFilterNode : AudioNode {
+    val frequency: AudioParam
+    val detune: AudioParam
+    val Q: AudioParam
+    val gain: AudioParam
+    var type: String // "lowpass", "highpass", "bandpass", "lowshelf", "highshelf", "peaking", "notch", "allpass"
+}
+
 external interface DelayNode : AudioNode {
     val delayTime: AudioParam
 }
@@ -107,6 +116,15 @@ external interface ConstantSourceNode : AudioNode {
     fun stop(time: Double = definedExternally)
 }
 
+external interface ScriptProcessorNode : AudioNode {
+    var onaudioprocess: (AudioProcessingEvent) -> Unit
+}
+
+external interface AudioProcessingEvent : JsAny {
+    val inputBuffer: AudioBuffer
+    val outputBuffer: AudioBuffer
+}
+
 external interface AudioBuffer : JsAny {
     val sampleRate: Float
     val length: Int
@@ -127,5 +145,10 @@ external interface AudioBufferSourceNode : AudioNode {
 }
 
 // Helper to create AudioContext - not inline for WASM compatibility
-@JsFun("() => new AudioContext()")
-external fun createAudioContext(): AudioContext
+fun createAudioContext(): AudioContext = js("new AudioContext()")
+
+@JsName("OrphicFM")
+external object OrphicFM {
+    @JsName("syncNode")
+    fun syncNode(node: AudioNode)
+}
