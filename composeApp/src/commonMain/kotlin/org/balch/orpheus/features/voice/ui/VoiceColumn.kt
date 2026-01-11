@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -41,7 +42,8 @@ fun VoiceColumnMod(
         RotaryKnob(
             value = modDepth,
             onValueChange = { voiceActions.onDuoModDepthChange(pairIndex, it) },
-            label = "MOD",
+            label = "\u0394",  // delta
+            labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.voiceFmDepth(voiceIndex),
             size = 28.dp,
             progressColor = OrpheusColors.neonMagenta
@@ -49,9 +51,10 @@ fun VoiceColumnMod(
         RotaryKnob(
             value = tune,
             onValueChange = { voiceActions.onVoiceTuneChange(voiceIndex, it) },
-            label = "TUNE",
+            label = "\u266B", // eighth notes
+            labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.voiceTune(voiceIndex),
-            size = 32.dp,
+            size = 28.dp,
             progressColor = OrpheusColors.neonCyan
         )
         // Envelope Speed Slider
@@ -85,7 +88,8 @@ fun VoiceColumnSharp(
         RotaryKnob(
             value = sharpness,
             onValueChange = { voiceActions.onPairSharpnessChange(pairIndex, it) },
-            label = "SHARP",
+            label = "\u266F", // sharp
+            labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.pairSharpness(pairIndex),
             size = 28.dp,
             progressColor = OrpheusColors.synthGreen
@@ -93,9 +97,10 @@ fun VoiceColumnSharp(
         RotaryKnob(
             value = tune,
             onValueChange = { voiceActions.onVoiceTuneChange(voiceIndex, it) },
-            label = "TUNE",
+            label = "\u266B", // eighth notes
+            labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.voiceTune(voiceIndex),
-            size = 32.dp,
+            size = 28.dp,
             progressColor = OrpheusColors.neonCyan
         )
         // Envelope Speed Slider

@@ -71,7 +71,7 @@ private fun ModDelayPanelContent(
             RotaryKnob(
                 value = uiState.mod1,
                 onValueChange = actions.onMod1Change,
-                label = "MOD 1",
+                label = "DELAY A",
                 controlId = ControlIds.DELAY_MOD_1,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
@@ -79,7 +79,7 @@ private fun ModDelayPanelContent(
             RotaryKnob(
                 value = uiState.mod2,
                 onValueChange = actions.onMod2Change,
-                label = "MOD 2",
+                label = "DELAY B",
                 controlId = ControlIds.DELAY_MOD_2,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
@@ -115,7 +115,7 @@ private fun ModDelayPanelContent(
             RotaryKnob(
                 value = uiState.time1,
                 onValueChange = actions.onTime1Change,
-                label = "TIME 1",
+                label = "TIME A",
                 controlId = ControlIds.DELAY_TIME_1,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
@@ -123,7 +123,7 @@ private fun ModDelayPanelContent(
             RotaryKnob(
                 value = uiState.time2,
                 onValueChange = actions.onTime2Change,
-                label = "TIME 2",
+                label = "TIME B",
                 controlId = ControlIds.DELAY_TIME_2,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
@@ -131,7 +131,7 @@ private fun ModDelayPanelContent(
             RotaryKnob(
                 value = uiState.feedback,
                 onValueChange = actions.onFeedbackChange,
-                label = "FB",
+                label = "\u221E", // infinity
                 controlId = ControlIds.DELAY_FEEDBACK,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow

@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -60,6 +61,7 @@ fun RotaryKnob(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
     label: String? = null,
+    labelStyle: TextStyle = MaterialTheme.typography.labelSmall,
     controlId: String? = null,
     range: ClosedFloatingPointRange<Float> = 0f..1f,
     size: Dp = 64.dp,
@@ -255,7 +257,7 @@ fun RotaryKnob(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                style = labelStyle,
                 color = labelColor,
                 textAlign = TextAlign.Center,
                 maxLines = 1

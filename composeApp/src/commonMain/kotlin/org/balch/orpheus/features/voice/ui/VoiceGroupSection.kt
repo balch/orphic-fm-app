@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -140,7 +141,9 @@ fun VoiceGroupSectionLayout(
                 onValueChange = {
                     voiceActions.onQuadPitchChange(quadIndex, it)
                 },
-                label = "PITCH",
+                label = "\u266B", // eighth notes
+                labelStyle = MaterialTheme.typography.labelLarge,
+                labelColor = quadColor,
                 controlId = ControlIds.quadPitch(quadIndex),
                 size = 36.dp,
                 progressColor = quadColor
@@ -150,7 +153,8 @@ fun VoiceGroupSectionLayout(
                 onValueChange = {
                     voiceActions.onQuadHoldChange(quadIndex, it)
                 },
-                label = "HOLD",
+                label = "\u25AC", // tenuto
+                labelStyle = MaterialTheme.typography.labelLarge,
                 controlId = ControlIds.quadHold(quadIndex),
                 size = 36.dp,
                 progressColor = OrpheusColors.warmGlow

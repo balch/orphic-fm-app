@@ -126,7 +126,7 @@ private fun HyperLfoPanelContent(
             RotaryKnob(
                 value = uiState.lfoA,
                 onValueChange = actions.onLfoAChange,
-                label = "FREQ A",
+                label = "RATE 1",
                 controlId = ControlIds.HYPER_LFO_A,
                 size = 56.dp,
                 progressColor =
@@ -136,7 +136,7 @@ private fun HyperLfoPanelContent(
             RotaryKnob(
                 value = uiState.lfoB,
                 onValueChange = actions.onLfoBChange,
-                label = "FREQ B",
+                label = "RATE 2",
                 controlId = ControlIds.HYPER_LFO_B,
                 size = 56.dp,
                 progressColor =

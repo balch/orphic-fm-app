@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -66,7 +67,8 @@ fun CenterControlSection(
         RotaryKnob(
             value = voiceState.totalFeedback,
             onValueChange = actions.onTotalFeedbackChange,
-            label = "TOTAL FB",
+            label = "\u221E\u221E", // infinity",
+            labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.TOTAL_FEEDBACK,
             size = 32.dp,
             progressColor = OrpheusColors.neonCyan
@@ -75,7 +77,8 @@ fun CenterControlSection(
         RotaryKnob(
             value = voiceState.vibrato,
             onValueChange = actions.onVibratoChange,
-            label = "VIB",
+            label = "\u2307",
+            labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.VIBRATO,
             size = 32.dp,
             progressColor = OrpheusColors.neonMagenta
@@ -84,7 +87,8 @@ fun CenterControlSection(
         RotaryKnob(
             value = voiceState.voiceCoupling,
             onValueChange = actions.onVoiceCouplingChange,
-            label = "COUPLING",
+            label = "\u2A1D",  // join
+            labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.VOICE_COUPLING,
             size = 32.dp,
             progressColor = OrpheusColors.warmGlow

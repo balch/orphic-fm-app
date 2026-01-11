@@ -53,63 +53,58 @@ fun DistortionPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        modifier = modifier,
+        modifier = modifier.fillMaxSize(),
         showCollapsedHeader = showCollapsedHeader
     ) {
-        DistortionPanelContent(uiState, actions)
-    }
-}
-
-@Composable
-private fun DistortionPanelContent(
-    uiState: DistortionUiState,
-    actions: DistortionPanelActions
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        // Top Row: Drive, Volume
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            RotaryKnob(
-                value = uiState.drive,
-                onValueChange = actions.onDriveChange,
-                label = "DRIVE",
-                controlId = ControlIds.DRIVE,
-                size = 56.dp,
-                progressColor = OrpheusColors.neonMagenta
-            )
-            RotaryKnob(
-                value = uiState.volume,
-                onValueChange = actions.onVolumeChange,
-                label = "VOL",
-                controlId = ControlIds.MASTER_VOLUME,
-                size = 56.dp,
-                progressColor = OrpheusColors.neonMagenta
-            )
-        }
+            Spacer(modifier = Modifier.weight(1f))
+            // Top Row: Drive, Volume
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                RotaryKnob(
+                    value = uiState.drive,
+                    onValueChange = actions.onDriveChange,
+                    label = "DISTORTION",
+                    controlId = ControlIds.DRIVE,
+                    size = 56.dp,
+                    progressColor = OrpheusColors.neonMagenta
+                )
+                RotaryKnob(
+                    value = uiState.volume,
+                    onValueChange = actions.onVolumeChange,
+                    label = "VOL",
+                    controlId = ControlIds.MASTER_VOLUME,
+                    size = 56.dp,
+                    progressColor = OrpheusColors.neonMagenta
+                )
+            }
 
-        // Bottom Row: Mix, Peak LED
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            RotaryKnob(
-                value = uiState.mix,
-                onValueChange = actions.onMixChange,
-                label = "MIX",
-                controlId = ControlIds.DISTORTION_MIX,
-                size = 56.dp,
-                progressColor = OrpheusColors.neonMagenta
-            )
+            // Bottom Row: Mix, Peak LED
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RotaryKnob(
+                    value = uiState.mix,
+                    onValueChange = actions.onMixChange,
+                    label = "MIX",
+                    controlId = ControlIds.DISTORTION_MIX,
+                    size = 56.dp,
+                    progressColor = OrpheusColors.neonMagenta
+                )
 
-            // Peak LED indicator
-            PeakLed(peak = uiState.peak)
+                // Peak LED indicator
+                PeakLed(peak = uiState.peak)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+
         }
     }
 }
@@ -162,7 +157,7 @@ private fun PeakLed(peak: Float, modifier: Modifier = Modifier) {
     }
 }
 
-@Preview(widthDp = 240, heightDp = 200)
+@Preview(widthDp = 240, heightDp = 480)
 @Composable
 fun DistortionPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,

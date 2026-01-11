@@ -88,7 +88,7 @@ private fun ModTweaksContent(
             RotaryKnob(
                 value = voiceState.totalFeedback,
                 onValueChange = actions.onTotalFeedbackChange,
-                label = "TOTAL FB",
+                label = "\u221E\u221E", // infinity",
                 controlId = ControlIds.TOTAL_FEEDBACK,
                 size = 52.dp,
                 progressColor = OrpheusColors.neonCyan

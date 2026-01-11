@@ -40,7 +40,7 @@ fun DrumsPanel(
     CollapsibleColumnPanel(
         title = "808",
         color = OrpheusColors.ninersRed,
-        expandedTitle = "Percussion Pads",
+        expandedTitle = "Kit Tuner",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
