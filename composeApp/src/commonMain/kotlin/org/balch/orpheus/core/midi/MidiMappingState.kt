@@ -117,6 +117,26 @@ data class MidiMappingState(
             const val RESONATOR_DAMPING = "resonator_damping"
             const val RESONATOR_POSITION = "resonator_position"
             const val RESONATOR_MIX = "resonator_mix"
+
+            // Drum controls
+            const val DRUM_BD_FREQ = "drum_bd_freq"
+            const val DRUM_BD_TONE = "drum_bd_tone"
+            const val DRUM_BD_DECAY = "drum_bd_decay"
+            const val DRUM_BD_AFM = "drum_bd_afm"
+            const val DRUM_BD_SFM = "drum_bd_sfm"
+            const val DRUM_BD_TRIGGER = "drum_bd_trigger"
+
+            const val DRUM_SD_FREQ = "drum_sd_freq"
+            const val DRUM_SD_TONE = "drum_sd_tone"
+            const val DRUM_SD_DECAY = "drum_sd_decay"
+            const val DRUM_SD_SNAPPY = "drum_sd_snappy"
+            const val DRUM_SD_TRIGGER = "drum_sd_trigger"
+
+            const val DRUM_HH_FREQ = "drum_hh_freq"
+            const val DRUM_HH_TONE = "drum_hh_tone"
+            const val DRUM_HH_DECAY = "drum_hh_decay"
+            const val DRUM_HH_NOISY = "drum_hh_noisy"
+            const val DRUM_HH_TRIGGER = "drum_hh_trigger"
         }
     }
 

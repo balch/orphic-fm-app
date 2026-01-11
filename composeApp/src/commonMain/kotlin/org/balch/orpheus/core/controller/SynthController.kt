@@ -7,6 +7,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import org.balch.orpheus.core.controller.SynthControllerPlugin
 
 /**
  * Origin of a control event.
@@ -40,8 +41,9 @@ data class ControlEvent(
  * needing to know about specific protocols like MIDI or OSC.
  */
 @SingleIn(AppScope::class)
-@Inject
-class SynthController {
+class SynthController @Inject constructor(
+    private val plugins: Set<SynthControllerPlugin> = emptySet()
+) {
 
     // Private mutable flows
     private val _onPulseStart = MutableSharedFlow<Int>(
@@ -80,6 +82,7 @@ class SynthController {
      */
     fun emitPulseStart(voiceIndex: Int) {
         _onPulseStart.tryEmit(voiceIndex)
+        plugins.forEach { it.onPulseStart(voiceIndex) }
     }
 
     /**
@@ -88,6 +91,7 @@ class SynthController {
      */
     fun emitPulseEnd(voiceIndex: Int) {
         _onPulseEnd.tryEmit(voiceIndex)
+        plugins.forEach { it.onPulseEnd(voiceIndex) }
     }
 
     /**
@@ -99,7 +103,12 @@ class SynthController {
         value: Float, 
         origin: ControlEventOrigin = ControlEventOrigin.UI
     ) {
-        _onControlChange.tryEmit(ControlEvent(controlId, value, origin))
+        val event = ControlEvent(controlId, value, origin)
+        _onControlChange.tryEmit(event)
+        
+        // Delegate to plugins. First handler wins (or all can handle if we want).
+        // For now, we allow all plugins to observe, but they can return 'true' to signal intent.
+        plugins.forEach { it.onControlChange(event) }
     }
 
     /**

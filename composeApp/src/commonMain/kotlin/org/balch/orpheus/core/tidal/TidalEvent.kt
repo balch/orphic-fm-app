@@ -317,6 +317,20 @@ sealed class TidalEvent {
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
     
+    /**
+     * Generic control event for any synthesis parameter.
+     * @param controlId Internal ID of the control (e.g. "drum_bd_trigger")
+     * @param value Normalized value (0.0-1.0)
+     */
+    data class Control(
+        val controlId: String,
+        val value: Float,
+        override val locations: List<SourceLocation> = emptyList()
+    ) : TidalEvent() {
+        override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
+        override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
+    }
+    
 
 }
 
@@ -425,6 +439,17 @@ object Orpheus {
     fun voicePan(voiceIndex: Int, pan: Float): Pattern<TidalEvent> =
         Pattern.pure(TidalEvent.VoicePan(voiceIndex, pan))
     
+    // === Generic Control ===
+    
+    fun control(id: String, value: Float): Pattern<TidalEvent> =
+        Pattern.pure(TidalEvent.Control(id, value))
+
+    /**
+     * Create a sequence of control values.
+     */
+    fun controlSeq(id: String, vararg values: Float): Pattern<TidalEvent> =
+        Pattern.fastcat(values.map { control(id, it) })
+
     // === Silence ===
     
     fun silence(): Pattern<TidalEvent> = Pattern.silence()

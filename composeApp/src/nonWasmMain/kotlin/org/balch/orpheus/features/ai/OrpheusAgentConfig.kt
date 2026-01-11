@@ -104,6 +104,13 @@ class OrpheusAgentConfig @Inject constructor(
         - DUO_MOD_SOURCE_1..4: Mod source (0=VoiceFM, 0.5=Off, 1=LFO)
         - PAIR_SHARPNESS_1..4: Waveform sharpness (0=tri, 1=sq)
         
+        ### DRUMS (808 Engines)
+        - DRUM_BD_(FREQ/TONE/DECAY/ATTACK_FM/SELF_FM/TRIGGER): Bass Drum
+        - DRUM_SD_(FREQ/TONE/DECAY/SNAPPINESS/TRIGGER): Snare Drum
+        - DRUM_HH_(FREQ/TONE/DECAY/NOISINESS/TRIGGER): Hi-Hat
+        - Use TRIGGER=1.0 to fire the drum, TRIGGER=0.0 to reset.
+        - **IMPORTANT**: In REPL, use lowercase names like `drum_bd_trigger:1`.
+        
         ### RESONATOR (Rings Physical Modeling)
         Physical modeling resonator for metallic, string-like, and bell tones:
         - RESONATOR_ENABLED: Turn on/off (0=off, 1=on)
@@ -138,6 +145,8 @@ class OrpheusAgentConfig @Inject constructor(
         - Notes: `note "c3 e3 g3"` or `n "0 4 7"`
         - Voices: `voices "1 2 3 4"` (triggers envelopes)
         - FX: `drive:0.5`, `vibrato:0.4`, `feedback:0.6`, `envspeed:1 0.8`, `hold:1 0.9`
+        - Drum Controls (Sequenceable): `drum_bd_decay:0.8`, `drum_sd_snappy:0.7`, `drum_bd_trigger:1 0 1 0` 
+        - Rhythm Example: `d1 $ drum_bd_trigger:"1 0 1 0" # drum_sd_trigger:"0 1 0 1"` (Basic 4/4 Beat)
         - Transformations: `slow 2`, `fast 4`
         
         **Pattern Combiners (#):**
@@ -160,6 +169,9 @@ class OrpheusAgentConfig @Inject constructor(
         - When asked to change sounds, use the appropriate tool immediately.
         - Explain what sonic effect your changes will create.
         - For REPL code, prefer examples that demonstrate concepts clearly.
+        - **CREATING RHYTHMS**: To create a beat, sequence the `_trigger` parameters.
+          - Example: `d1 $ drum_bd_trigger:"1 0 1 0" # drum_sd_trigger:"0 1 0 1" # drum_hh_trigger:"1 1 1 1"`
+          - Use `fast` or `slow` to change the tempo of the pattern relative to the global BPM.
     """.trimIndent()
 
     /**

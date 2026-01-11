@@ -159,6 +159,26 @@ actual class SynthControlTool @Inject constructor(
             "DELAY_MOD_2" -> "delay_mod_2"
             "DELAY_MOD_SOURCE" -> "delay_mod_source"
             "DELAY_LFO_WAVEFORM" -> "delay_lfo_waveform"
+
+            // Drum controls
+            "DRUM_BD_FREQ" -> "drum_bd_freq"
+            "DRUM_BD_TONE" -> "drum_bd_tone"
+            "DRUM_BD_DECAY" -> "drum_bd_decay"
+            "DRUM_BD_AFM", "DRUM_BD_ATTACK_FM" -> "drum_bd_afm"
+            "DRUM_BD_SFM", "DRUM_BD_SELF_FM" -> "drum_bd_sfm"
+            "DRUM_BD_TRIGGER" -> "drum_bd_trigger"
+
+            "DRUM_SD_FREQ" -> "drum_sd_freq"
+            "DRUM_SD_TONE" -> "drum_sd_tone"
+            "DRUM_SD_DECAY" -> "drum_sd_decay"
+            "DRUM_SD_SNAPPY", "DRUM_SD_SNAPPINESS" -> "drum_sd_snappy"
+            "DRUM_SD_TRIGGER" -> "drum_sd_trigger"
+
+            "DRUM_HH_FREQ" -> "drum_hh_freq"
+            "DRUM_HH_TONE" -> "drum_hh_tone"
+            "DRUM_HH_DECAY" -> "drum_hh_decay"
+            "DRUM_HH_NOISY", "DRUM_HH_NOISINESS" -> "drum_hh_noisy"
+            "DRUM_HH_TRIGGER" -> "drum_hh_trigger"
             
             // Resonator (Rings) controls
             "RESONATOR_ENABLED" -> "resonator_enabled"

@@ -285,9 +285,9 @@ class TidalRepl(
                     // Control commands are recognized by their prefix patterns
                     // Supports both colon syntax (drive:0.4) and space syntax (drive 0.4)
                     val controlNames = "drive|distortion|vibrato|feedback|delay|delaymix|distmix|" +
-                        "hold|tune|pan|quadhold|quadpitch|duomod|sharp|envspeed"
+                        "hold|tune|pan|quadhold|quadpitch|duomod|sharp|envspeed|drum_|resonator_"
                     val isBareControlCommand = trimmed.matches(Regex(
-                        "^($controlNames)[:\\s][^$]+$"
+                        "^($controlNames|[a-z0-9_]+)[:\\s][^$]+$"
                     ))
                     
                     if (isBareControlCommand) {
@@ -637,6 +637,7 @@ class TidalRepl(
                 }
             }
         }
+        
         // Handle quoted duomod "1 fm"
         Regex("^duomod\\s*\"([^\"]+)\"$").find(trimmed)?.let { match ->
             val content = match.groupValues[1].trim()
@@ -654,6 +655,7 @@ class TidalRepl(
                 }
             }
         }
+
         
         // sharp:<pairIndex> <value> - Pair waveform sharpness (0.0 = tri, 1.0 = sq)
         extractVoiceParam(trimmed, "sharp")?.let { (pairIndex, value) ->
@@ -685,6 +687,35 @@ class TidalRepl(
         // Check for slowcat function: slowcat [ ... ]
         if (isFunctionCall(trimmed, "slowcat")) {
             return parseListFunction("slowcat", trimmed, lineNum, trimOffset, Pattern.Companion::slowcat)
+        }
+
+        // ============================================================
+        // GENERIC CONTROL FALLBACK
+        // ============================================================
+
+        // Matches any "control_id:value" or "control_id value"
+        // Also supports quoted "val1 val2" sequence for the control
+        val genericControlMatch = Regex("^([a-z0-9_]+)[:\\s](.+)$").find(trimmed)
+        if (genericControlMatch != null) {
+            val controlId = genericControlMatch.groupValues[1]
+            val content = genericControlMatch.groupValues[2].trim()
+            val hasQuotes = content.startsWith("\"") && content.endsWith("\"")
+            val cleanContent = if (hasQuotes) content.removeSurrounding("\"") else content
+
+            val parts = cleanContent.split(Regex("\\s+"))
+            val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+
+            return if (parts.size > 1) {
+                // Sequence of values
+                Pattern.fastcat(parts.map { p ->
+                    val v = p.toFloatOrNull() ?: 0f
+                    Pattern.pure(TidalEvent.Control(controlId, v, listOf(location)))
+                })
+            } else {
+                // Single value
+                val v = cleanContent.toFloatOrNull() ?: 0f
+                Pattern.pure(TidalEvent.Control(controlId, v, listOf(location)))
+            }
         }
         
         // Default: try as gate pattern (just numbers)

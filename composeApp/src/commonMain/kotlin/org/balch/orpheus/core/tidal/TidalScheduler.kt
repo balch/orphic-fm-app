@@ -652,6 +652,16 @@ class TidalScheduler(
             is TidalEvent.PairSharp -> {
                 synthEngine.setPairSharpness(event.pairIndex, event.sharpness)
             }
+            
+            is TidalEvent.Control -> {
+                synthController.emitControlChange(
+                    event.controlId,
+                    event.value,
+                    ControlEventOrigin.TIDAL
+                )
+                // We don't call engine directly here as we don't know the mapping,
+                // the ViewModels or SynthControllerPlugins will handle it.
+            }
         }
     }
     

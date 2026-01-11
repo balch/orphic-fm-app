@@ -17,7 +17,9 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
 
 @Immutable
@@ -89,6 +91,7 @@ typealias DrumFeature = SynthFeature<DrumUiState, DrumPanelActions>
 class DrumViewModel(
     private val synthEngine: SynthEngine,
     presetLoader: PresetLoader,
+    private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider
 ) : ViewModel(), DrumFeature {
 
@@ -218,6 +221,31 @@ class DrumViewModel(
                 updateBdParams(s)
                 updateSdParams(s)
                 updateHhParams(s)
+            }
+        }
+
+        // Subscribe to controller events
+        viewModelScope.launch(dispatcherProvider.default) {
+            synthController.onControlChange.collect { event ->
+                when (event.controlId) {
+                    ControlIds.DRUM_BD_FREQ -> actions.setBdFrequency(event.value)
+                    ControlIds.DRUM_BD_TONE -> actions.setBdTone(event.value)
+                    ControlIds.DRUM_BD_DECAY -> actions.setBdDecay(event.value)
+                    ControlIds.DRUM_BD_AFM -> actions.setBdP4(event.value)
+                    ControlIds.DRUM_BD_TRIGGER -> if (event.value >= 0.5f) actions.startBdTrigger() else actions.stopBdTrigger()
+
+                    ControlIds.DRUM_SD_FREQ -> actions.setSdFrequency(event.value)
+                    ControlIds.DRUM_SD_TONE -> actions.setSdTone(event.value)
+                    ControlIds.DRUM_SD_DECAY -> actions.setSdDecay(event.value)
+                    ControlIds.DRUM_SD_SNAPPY -> actions.setSdP4(event.value)
+                    ControlIds.DRUM_SD_TRIGGER -> if (event.value >= 0.5f) actions.startSdTrigger() else actions.stopSdTrigger()
+
+                    ControlIds.DRUM_HH_FREQ -> actions.setHhFrequency(event.value)
+                    ControlIds.DRUM_HH_TONE -> actions.setHhTone(event.value)
+                    ControlIds.DRUM_HH_DECAY -> actions.setHhDecay(event.value)
+                    ControlIds.DRUM_HH_NOISY -> actions.setHhP4(event.value)
+                    ControlIds.DRUM_HH_TRIGGER -> if (event.value >= 0.5f) actions.startHhTrigger() else actions.stopHhTrigger()
+                }
             }
         }
     }
