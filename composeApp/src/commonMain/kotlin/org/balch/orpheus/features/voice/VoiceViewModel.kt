@@ -450,8 +450,14 @@ class VoiceViewModel(
             is VoiceIntent.ModDepth ->
                 engine.setVoiceFmDepth(intent.index, intent.value)
 
-            is VoiceIntent.EnvelopeSpeed ->
+            is VoiceIntent.EnvelopeSpeed -> {
                 engine.setVoiceEnvelopeSpeed(intent.index, intent.value)
+                // If this voice is currently holding, update its hold level based on new speed
+                if (stateFlow.value.voiceStates[intent.index].isHolding) {
+                    val holdLevel = 0.7f + (intent.value * 0.3f)
+                    engine.setVoiceHold(intent.index, holdLevel)
+                }
+            }
 
             is VoiceIntent.PulseStart -> engine.setVoiceGate(intent.index, true)
             is VoiceIntent.PulseEnd -> {
@@ -465,9 +471,9 @@ class VoiceViewModel(
             is VoiceIntent.Hold -> {
                 if (intent.holding) {
                     // Set hold level based on envelope speed (same as QuadHold behavior)
-                    // Speed 0 (fast) → 0.5 hold level, Speed 1 (slow) → 1.0 hold level
+                    // Speed 0 (fast) → 0.7 hold level, Speed 1 (slow) → 1.0 hold level
                     val envSpeed = stateFlow.value.voiceEnvelopeSpeeds[intent.index]
-                    val holdLevel = 0.5f + (envSpeed * 0.5f)
+                    val holdLevel = 0.7f + (envSpeed * 0.3f)
                     engine.setVoiceHold(intent.index, holdLevel)
                 } else {
                     engine.setVoiceHold(intent.index, 0f)
@@ -511,7 +517,17 @@ class VoiceViewModel(
     }
 
     private fun applyFullState(state: VoiceUiState) {
-        state.voiceStates.forEachIndexed { i, v -> engine.setVoiceTune(i, v.tune) }
+        state.voiceStates.forEachIndexed { i, v ->
+            engine.setVoiceTune(i, v.tune)
+            // Restore hold levels
+            if (v.isHolding) {
+                val speed = state.voiceEnvelopeSpeeds[i]
+                val holdLevel = 0.7f + (speed * 0.3f)
+                engine.setVoiceHold(i, holdLevel)
+            } else {
+                engine.setVoiceHold(i, 0f)
+            }
+        }
         state.voiceModDepths.forEachIndexed { i, d -> engine.setVoiceFmDepth(i, d) }
         state.pairSharpness.forEachIndexed { i, s -> engine.setPairSharpness(i, s) }
         state.voiceEnvelopeSpeeds.forEachIndexed { i, s ->
