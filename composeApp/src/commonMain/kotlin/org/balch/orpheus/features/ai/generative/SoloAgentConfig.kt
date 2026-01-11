@@ -17,8 +17,12 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         You are a Solo Composer AI for the ${AppConfig.APP_DISPLAY_NAME} synthesizer. Your mission is to create 
         COMPLETE, LONG-LASTING compositions with atmospheric, cinematic qualities.
         
-        Think: whale song echoing through ocean depths, distant thunder rolling across vast 
-        landscapes, celestial bodies drifting through space, cathedral reverberations.
+        ## CRITICAL RULES - FOLLOW THESE STRICTLY
+        1. **ENSURE VOLUME**: Immediately set `QUAD_VOLUME_1`, `QUAD_VOLUME_2`, and `QUAD_VOLUME_3` to **0.7**. If these are 0, there is NO SOUND.
+        2. **START SOFTLY (NOT SILENT)**: Start with a soft texture. Use LOW `hold` (0.3) and SLOW `envspeed` (0.9). Do NOT start with silence.
+        3. **FADE IN**: From the soft start (hold=0.3), gradually increase `hold` to 0.8 over time to build intensity.
+        **CRITICAL: YOUR FIRST TURN MUST ESTABLISH SOUND.** 
+        Set volumes and a REPL pattern immediately in your very first response.
         
         CRITICAL: The sound must ALWAYS be EVOLVING. Static drones get tiring quickly!
         Every evolution cycle, change SOMETHING - pitch, hold, effects, patterns.
@@ -71,7 +75,8 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - DELAY_MOD_SOURCE: Modulation source (0=self, 1=LFO)
         - DELAY_LFO_WAVEFORM: Mod shape (0=triangle, 1=square)
         
-        ### GLOBAL EFFECTS (Do NOT use MASTER_VOLUME)
+        ### GLOBAL EFFECTS (DO NOT USE MASTER_VOLUME)
+        - **MASTER_VOLUME is DISABLED for AI**. Do not attempt to use it. Use Quad Volumes or Envelope Hold to control levels.
         - DRIVE: Saturation warmth (0.1-0.3 for gentle, 0.4+ for gritty)
         - DISTORTION_MIX: Distortion wet/dry
         - VIBRATO: LFO modulation depth (0.15-0.4)
@@ -120,13 +125,13 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         Use `#` to combine patterns. For example, to set per-voice hold levels:
         - `d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"` -> each voice gets its corresponding hold value
         
-        **ENVELOPE SPEED & HOLD (The "Drone Secret"):**
+        **ENVELOPE SPEED & HOLD (The "Drone Secret" - IMPORTANT):**
         - FAST ENV (`envspeed` = 0): Aggressive ease-in (exp=4). Low hold values produce almost nothing.
           hold=0.35 → ~0.008, hold=0.5 → ~0.03, hold=0.7 → ~0.12, hold=0.85 → ~0.26
         - SLOW ENV (`envspeed` = 1): Linear response with 2x gain. Even hold=0.2 produces 0.4 output!
         - TECHNIQUE: For "Cool Drones", use SLOW `envspeed` (0.7-1.0) with moderate `hold` (0.3-0.5). 
           The slow envelope flattens the curve and amplifies hold, letting voices bloom and sustain.
-        - IMPORTANT: At FAST envspeed, hold needs to be ~0.7+ to be noticeable.
+        - **WARNING**: At FAST envspeed, if `hold` is low, there will be NO SOUND. `hold` needs to be ~0.7+ to be noticeable.
         
         **CRITICAL: NEVER use "hush"!** The sound must be CONTINUOUS. To change patterns,
         simply send new patterns to the same slot (d1, d2, etc.) - they will replace the old ones.
@@ -140,14 +145,12 @@ data object SoloAgentConfig : SynthControlAgentConfig {
     """.trimIndent()
 
     override val initialPrompt = """
-        IMPORTANT
-           - Ramp up quad volumes and drive mix slowly and gradually when the composition sound starts in the composition
-           - Never let the sound become static. 
-           - Use REPL to create melodic solos and patterns.
-           - Be Creative!!
-
-        Create the soundscape described below. 
-
+        IMPORTANT - STARTUP SEQUENCE (TURN 1):
+           1. **SET VOLUMES**: Set `QUAD_VOLUME_1`, `QUAD_VOLUME_2`, `QUAD_VOLUME_3` to 0.7 immediately.
+           2. **SOFT START**: Set `envspeed` to 0.9 (SLOW) and `hold` to 0.4.
+           3. **START MELODY**: Create a REPL pattern (d1) now.
+           
+        Create the following soundscape:
     """.trimIndent()
 
     override val initialMoodPrompts = emptyList<String>()
@@ -219,7 +222,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         ),
         Mood(
             name = "Submarine Resonances",
-            initialPrompt = "Start with the 'Ping'. A single, high-pitched note with massive delay (DELAY_TIME=0.7, FEEDBACK=0.8). Silence in between.",
+            initialPrompt = "Start with the 'Ping'. A single, high-pitched note with massive delay (DELAY_TIME=0.7, FEEDBACK=0.8). Ensure Quad volumes are set to 0.7.",
             evolutionPrompts = listOf(
                 "Begin to introduce a slow, C# minor swelling pad underneath the pings.",
                 "Transition into a 'funk' groove using rhythmic chopping on Quad 1.",

@@ -159,9 +159,10 @@ actual class SynthControlAgent(
                 val code = action.details.getOrNull(0) ?: return
                 
                 // Block hush commands - the agent should maintain continuous sound
-                if (code.equals("hush", ignoreCase = true)) {
-                    log.warn { "Blocked 'hush' command - continuous playback required" }
-                    emitControl("(hush blocked - maintaining flow)", isError = false)
+                // User requirement: "filter the hush tag if a song is playing"
+                if (code.trim().equals("hush", ignoreCase = true) || code.contains("hush", ignoreCase = true)) {
+                    log.warn { "Blocked 'hush' command from AI - continuous playback required" }
+                    emitControl("Blocked explicit silence (hush)", isError = false)
                     return
                 }
 

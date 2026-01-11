@@ -123,8 +123,8 @@ fun parseSynthActions(stream: Flow<StreamFrame>): Flow<AgentAction> {
                 is StreamFrame.Append -> textChannel.send(frame)
                 is StreamFrame.ToolCall -> {
                     try {
-                        when (frame.name) {
-                            "synth_control" -> {
+                        when (frame.name.lowercase()) {
+                            "synth_control", "synthcontrol" -> {
                                 val args = json.decodeFromString<JsonObject>(frame.content)
                                 val id = args["controlId"]?.jsonPrimitive?.content
                                 val value = args["value"]?.jsonPrimitive?.float
@@ -133,7 +133,7 @@ fun parseSynthActions(stream: Flow<StreamFrame>): Flow<AgentAction> {
                                     send(AgentAction(ActionType.CONTROL, details = listOf(id, value.toString())))
                                 }
                             }
-                            "repl_execute" -> {
+                            "repl_execute", "replexecute" -> {
                                 val args = json.decodeFromString<JsonObject>(frame.content)
                                 val code = args["code"]?.jsonPrimitive?.content
                                 if (code != null) {
