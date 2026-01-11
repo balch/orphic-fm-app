@@ -141,7 +141,7 @@ fun HeaderPanel(
             feature = distortionFeature,
             isExpanded = PanelId.DISTORTION.isExpanded(),
             onExpandedChange = { PanelId.DISTORTION.setExpanded(it) },
-            modifier = panelModifier(PanelId.DISTORTION.isExpanded(), weight = .5f, maxWidth = 220.dp)
+            modifier = panelModifier(PanelId.DISTORTION.isExpanded(), weight = .5f, minWidth = 220.dp)
         )
         // Rings Resonator panel
         ResonatorPanel(
@@ -162,7 +162,7 @@ fun HeaderPanel(
             drumFeature = drumFeature,
             isExpanded = PanelId.DRUMS.isExpanded(),
             onExpandedChange = { PanelId.DRUMS.setExpanded(it) },
-            modifier = panelModifier(PanelId.DRUMS.isExpanded(), weight = 1.25f)
+            modifier = panelModifier(PanelId.DRUMS.isExpanded(), weight = 1.15f)
         )
         // Pattern panel
         DrumBeatsPanel(
@@ -176,7 +176,11 @@ fun HeaderPanel(
             feature = aiOptionsFeature,
             isExpanded = PanelId.AI.isExpanded(),
             onExpandedChange = { PanelId.AI.setExpanded(it) },
-            modifier = panelModifier(PanelId.AI.isExpanded(), weight = .5f, maxWidth = 200.dp)
+            modifier = panelModifier(
+                isExpanded = PanelId.AI.isExpanded(),
+                weight = .4f,
+                minWidth = 200.dp
+            )
         )
     }
 }
@@ -190,11 +194,13 @@ fun HeaderPanel(
 private fun RowScope.panelModifier(
     isExpanded: Boolean,
     weight: Float = 1f,
-    maxWidth: Dp? = null)
+    minWidth: Dp = 200.dp)
 : Modifier {
     return if (isExpanded) {
-        val base = Modifier.weight(weight).fillMaxHeight()
-        if (maxWidth != null) base.widthIn(max = maxWidth) else base
+        Modifier
+            .fillMaxHeight()
+            .weight(weight)
+            .widthIn(min = minWidth)
     } else {
         Modifier.fillMaxHeight()
     }

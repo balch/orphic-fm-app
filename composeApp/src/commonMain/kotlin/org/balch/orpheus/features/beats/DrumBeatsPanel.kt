@@ -164,8 +164,8 @@ fun DrumBeatsPanel(
 
                 // RIGHT: Controls + Transport
                 Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp) // Reduced spacing
+                    modifier = Modifier.fillMaxHeight(),
+                    verticalArrangement = Arrangement.Center
                 ) {
                     // Row 1: BD, SD, HH
                     Row(
@@ -173,41 +173,39 @@ fun DrumBeatsPanel(
                         horizontalArrangement = Arrangement.SpaceBetween 
                     ) {
                          KnobControlTopLabel(
+                            modifier = Modifier.padding(top = 4.dp),
                             label = "BD",
                             value = state.densities[0],
                             onValueChange = { actions.setDensity(0, it) },
                             color = OrpheusColors.seahawksGreen
                         )
                         KnobControlTopLabel(
-                            label = "SD",
-                            value = state.densities[1],
-                            onValueChange = { actions.setDensity(1, it) },
-                            color = OrpheusColors.seahawksGrey
-                        )
-                        KnobControlTopLabel(
-                            label = "HH",
-                            value = state.densities[2],
-                            onValueChange = { actions.setDensity(2, it) },
-                            color = Color.White
-                        )
-                    }
-
-                    // Row 2: Chaos, Swing
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        KnobControlTopLabel(
+                            modifier = Modifier.padding(top = 42.dp),
                             label = "CHAOS",
                             value = state.randomness,
                             onValueChange = { actions.setRandomness(it) },
                             color = OrpheusColors.seahawksGreen
                         )
                         KnobControlTopLabel(
+                            modifier = Modifier.padding(top = 4.dp),
+                            label = "SD",
+                            value = state.densities[1],
+                            onValueChange = { actions.setDensity(1, it) },
+                            color = OrpheusColors.seahawksGrey
+                        )
+                        KnobControlTopLabel(
+                            modifier = Modifier.padding(top = 42.dp),
                             label = "SWING",
                             value = state.swing,
                             onValueChange = { actions.setSwing(it) },
                             color = OrpheusColors.seahawksGreen
+                        )
+                        KnobControlTopLabel(
+                            modifier = Modifier.padding(top = 4.dp),
+                            label = "HH",
+                            value = state.densities[2],
+                            onValueChange = { actions.setDensity(2, it) },
+                            color = Color.White
                         )
                     }
 
@@ -223,13 +221,6 @@ fun DrumBeatsPanel(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.weight(1.2f)
                         ) {
-                            Text(
-                                text = "BPM",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 9.sp
-                            )
-
                             HorizontalMiniSlider(
                                 trackWidth = 80,
                                 value = ((state.bpm - 40) / 200).coerceIn(0f, 1f),
@@ -239,7 +230,7 @@ fun DrumBeatsPanel(
                                 color = OrpheusColors.seahawksGreen
                             )
                             Text(
-                                text = "${state.bpm.toInt()}",
+                                text = "${state.bpm.toInt()}bmp",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = OrpheusColors.seahawksGreen,
                                 fontSize = 9.sp,
@@ -337,7 +328,7 @@ private fun KnobControlTopLabel(
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp) // Tighter spacing
+        verticalArrangement = Arrangement.Top
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold)
         RotaryKnob(

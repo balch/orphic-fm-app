@@ -3,13 +3,12 @@ package org.balch.orpheus.features.ai
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
@@ -85,6 +84,7 @@ fun AiOptionsPanel(
             } else {
                 // 2x2 Button Grid
                 Column(
+                    modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -131,13 +131,14 @@ fun AiOptionsPanel(
                             onClick = { actions.onToggleChatDialog() }
                         )
                     }
-                    
                     // Model Selector
                     ModelSelector(
                         selectedModel = uiState.selectedModel ?: AiModel.DEFAULT,
                         availableModels = uiState.availableModels,
                         onSelectModel = actions.onSelectModel,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier
+                            .wrapContentWidth()
+                            .padding(top = 8.dp)
                     )
                 }
             }
@@ -186,58 +187,53 @@ fun ModelSelector(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    
-    Box(modifier = modifier) {
-        // Current selection button
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    OrpheusColors.midnightBlue.copy(alpha = 0.4f),
-                    shape = MaterialTheme.shapes.small
-                )
-                .clickable { expanded = true }
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween // Text left, arrow right
-        ) {
-            Text(
-                text = selectedModel.displayName,
-                color = OrpheusColors.sterlingSilver,
-                fontSize = 11.sp,
-                textAlign = TextAlign.Start,
-                modifier = Modifier.weight(1f)
+
+    Row(
+        modifier = modifier
+            .background(
+                OrpheusColors.midnightBlue.copy(alpha = 0.4f),
+                shape = MaterialTheme.shapes.small
             )
-            
-            Icon(
-                imageVector = Icons.Rounded.ArrowDropDown,
-                contentDescription = "Select",
-                tint = OrpheusColors.sterlingSilver.copy(alpha = 0.7f),
-                modifier = Modifier.size(20.dp)
+            .clickable { expanded = true }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween // Text left, arrow right
+    ) {
+        Text(
+            text = selectedModel.displayName,
+            color = OrpheusColors.sterlingSilver,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Start,
+        )
+
+        Icon(
+            imageVector = Icons.Rounded.ArrowDropDown,
+            contentDescription = "Select",
+            tint = OrpheusColors.sterlingSilver.copy(alpha = 0.7f),
+            modifier = Modifier.size(20.dp)
+        )
+    }
+
+    // Dropdown menu
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = { expanded = false },
+        modifier = Modifier.background(OrpheusColors.panelSurface)
+    ) {
+        availableModels.forEach { model ->
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = model.displayName,
+                        fontSize = 12.sp,
+                        color = Color.White
+                    )
+                },
+                onClick = {
+                    onSelectModel(model)
+                    expanded = false
+                }
             )
-        }
-        
-        // Dropdown menu
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.background(OrpheusColors.panelSurface)
-        ) {
-            availableModels.forEach { model ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = model.displayName,
-                            fontSize = 12.sp,
-                            color = Color.White
-                        )
-                    },
-                    onClick = {
-                        onSelectModel(model)
-                        expanded = false
-                    }
-                )
-            }
         }
     }
 }
