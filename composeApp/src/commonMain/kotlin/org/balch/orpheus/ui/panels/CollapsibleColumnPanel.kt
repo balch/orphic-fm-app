@@ -3,6 +3,7 @@ package org.balch.orpheus.ui.panels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -167,9 +168,9 @@ fun CollapsibleColumnPanel(
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
-                        Box(
+                        Column(
                             modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.TopCenter
+                            verticalArrangement = Arrangement.SpaceBetween
                         ) {
                             content()
                         }

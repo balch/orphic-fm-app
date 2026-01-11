@@ -50,7 +50,7 @@ enum class HyperLfoMode {
  * HyperLfoPanel consuming feature() interface.
  */
 @Composable
-fun HyperLfoPanel(
+fun DuoLfoPanel(
     feature: LfoFeature = LfoViewModel.feature(),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
@@ -70,12 +70,12 @@ fun HyperLfoPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        HyperLfoPanelContent(uiState, actions)
+        DuoLfoPanelContent(uiState, actions)
     }
 }
 
 @Composable
-private fun HyperLfoPanelContent(
+private fun DuoLfoPanelContent(
     uiState: LfoUiState,
     actions: LfoPanelActions
 ) {
@@ -87,10 +87,7 @@ private fun HyperLfoPanelContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Spacer(modifier = Modifier.height(4.dp))
-
+        Spacer(modifier = Modifier.weight(1f))
         // Controls Row - knobs and switches aligned
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -98,7 +95,9 @@ private fun HyperLfoPanelContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 3-way AND/OFF/OR Switch (Left)
-            Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_MODE, learnState)) {
+            Box(modifier =
+                Modifier
+                    .learnable(ControlIds.HYPER_LFO_MODE, learnState)) {
                 Vertical3WaySwitch(
                     topLabel = "AND",
                     bottomLabel = "OR",
@@ -128,7 +127,7 @@ private fun HyperLfoPanelContent(
                 onValueChange = actions.onLfoAChange,
                 label = "RATE 1",
                 controlId = ControlIds.HYPER_LFO_A,
-                size = 56.dp,
+                size = 64.dp,
                 progressColor =
                     if (isActive) OrpheusColors.neonCyan
                     else OrpheusColors.neonCyan.copy(alpha = 0.4f)
@@ -138,7 +137,7 @@ private fun HyperLfoPanelContent(
                 onValueChange = actions.onLfoBChange,
                 label = "RATE 2",
                 controlId = ControlIds.HYPER_LFO_B,
-                size = 56.dp,
+                size = 64.dp,
                 progressColor =
                     if (isActive) OrpheusColors.neonCyan
                     else OrpheusColors.neonCyan.copy(alpha = 0.4f)
@@ -363,7 +362,7 @@ fun HyperLfoPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
-        HyperLfoPanel(
+        DuoLfoPanel(
             feature = LfoViewModel.previewFeature()
         )
     }

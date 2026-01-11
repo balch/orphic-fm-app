@@ -66,7 +66,6 @@ fun VizPanel(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
 
             // Visualization Dropdown
             var expanded by remember { mutableStateOf(false) }
@@ -136,7 +135,7 @@ fun VizPanel(
                     onValueChange = actions.onKnob1Change,
                     label = if (uiState.showKnobs) uiState.selectedViz.knob1Label else "-",
                     controlId = "viz_knob1",
-                    size = 48.dp,
+                    size = 64.dp,
                     progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(alpha = 0.3f),
                     enabled = uiState.showKnobs
                 )
@@ -145,7 +144,7 @@ fun VizPanel(
                     onValueChange = actions.onKnob2Change,
                     label = if (uiState.showKnobs) uiState.selectedViz.knob2Label else "-",
                     controlId = "viz_knob2",
-                    size = 48.dp,
+                    size = 64.dp,
                     progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(alpha = 0.3f),
                     enabled = uiState.showKnobs
                 )

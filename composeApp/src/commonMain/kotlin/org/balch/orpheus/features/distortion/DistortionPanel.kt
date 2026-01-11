@@ -104,7 +104,6 @@ fun DistortionPanel(
                 PeakLed(peak = uiState.peak)
             }
             Spacer(modifier = Modifier.weight(1f))
-
         }
     }
 }

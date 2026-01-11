@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -36,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,7 +71,10 @@ fun DrumBeatsPanel(
         showCollapsedHeader = showCollapsedHeader
     ) {
         // Center and constrain width
-        Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
             Row(
                 modifier = Modifier
                     .widthIn(max = 600.dp)
@@ -81,9 +84,11 @@ fun DrumBeatsPanel(
             ) {
                 // LEFT: Mode Switcher + Visualization
                 Column(
-                    modifier = Modifier.width(140.dp),
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(140.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.Center
                 ) {
                     // Two-state toggle: Grids | Euclid
                     ModeToggle(
@@ -181,7 +186,8 @@ fun DrumBeatsPanel(
                         )
                         KnobControlTopLabel(
                             modifier = Modifier.padding(top = 42.dp),
-                            label = "CHAOS",
+                            label = "\u221E\u221E", // infinity,
+                            labelStyle = MaterialTheme.typography.labelMedium,
                             value = state.randomness,
                             onValueChange = { actions.setRandomness(it) },
                             color = OrpheusColors.seahawksGreen
@@ -195,7 +201,8 @@ fun DrumBeatsPanel(
                         )
                         KnobControlTopLabel(
                             modifier = Modifier.padding(top = 42.dp),
-                            label = "SWING",
+                            label = "\u2053",
+                            labelStyle = MaterialTheme.typography.labelMedium,
                             value = state.swing,
                             onValueChange = { actions.setSwing(it) },
                             color = OrpheusColors.seahawksGreen
@@ -211,15 +218,14 @@ fun DrumBeatsPanel(
 
                     // Row 3: Transport (Start/Stop, Tap Tempo)
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.Start,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // BPM Control
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.weight(1.2f)
+                            horizontalArrangement = Arrangement.Start,
                         ) {
                             HorizontalMiniSlider(
                                 trackWidth = 80,
@@ -242,8 +248,10 @@ fun DrumBeatsPanel(
                         IconButton(
                             onClick = { actions.setRunning(!state.isRunning) },
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
+                                .padding(start = 8.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .width(40.dp)
+                                .height(25.dp)
                                 .background(
                                     if (state.isRunning) OrpheusColors.seahawksGreen else Color.White.copy(alpha = 0.2f)
                                 )
@@ -252,7 +260,7 @@ fun DrumBeatsPanel(
                                 imageVector = if (state.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
                                 contentDescription = if (state.isRunning) "Stop" else "Start",
                                 tint = if (state.isRunning) Color.Black else Color.White,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -270,6 +278,7 @@ private fun ModeToggle(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(bottom = 8.dp)
             .height(32.dp)
             .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
@@ -320,6 +329,7 @@ private fun ModeToggle(
 @Composable
 private fun KnobControlTopLabel(
     label: String,
+    labelStyle: TextStyle = MaterialTheme.typography.labelSmall,
     value: Float,
     onValueChange: (Float) -> Unit,
     color: Color,
@@ -330,7 +340,12 @@ private fun KnobControlTopLabel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = color, fontWeight = FontWeight.Bold)
+        Text(
+            text = label,
+            style = labelStyle,
+            color = color,
+            fontWeight = FontWeight.Bold
+        )
         RotaryKnob(
             value = value,
             onValueChange = onValueChange,

@@ -46,7 +46,7 @@ import org.balch.orpheus.features.drums808.DrumsPanel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
 import org.balch.orpheus.features.evo.EvoViewModel
-import org.balch.orpheus.features.lfo.HyperLfoPanel
+import org.balch.orpheus.features.lfo.DuoLfoPanel
 import org.balch.orpheus.features.lfo.LfoFeature
 import org.balch.orpheus.features.lfo.LfoViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
@@ -395,7 +395,7 @@ private fun PanelContent(
         }
 
         CompactPanelType.LFO -> {
-            HyperLfoPanel(
+            DuoLfoPanel(
                 feature = lfoFeature,
                 modifier = panelModifier,
                 isExpanded = true,

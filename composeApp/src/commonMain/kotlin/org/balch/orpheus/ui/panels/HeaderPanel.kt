@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,7 +32,7 @@ import org.balch.orpheus.features.drums808.DrumsPanel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
 import org.balch.orpheus.features.evo.EvoViewModel
-import org.balch.orpheus.features.lfo.HyperLfoPanel
+import org.balch.orpheus.features.lfo.DuoLfoPanel
 import org.balch.orpheus.features.lfo.LfoFeature
 import org.balch.orpheus.features.lfo.LfoViewModel
 import org.balch.orpheus.features.midi.MidiFeature
@@ -125,7 +124,7 @@ fun HeaderPanel(
             onExpandedChange = { PanelId.EVO.setExpanded(it) },
             modifier = panelModifier(PanelId.EVO.isExpanded(), weight = .5f)
         )
-        HyperLfoPanel(
+        DuoLfoPanel(
             feature = lfoFeature,
             isExpanded = PanelId.LFO.isExpanded(),
             onExpandedChange = { PanelId.LFO.setExpanded(it) },
@@ -141,7 +140,7 @@ fun HeaderPanel(
             feature = distortionFeature,
             isExpanded = PanelId.DISTORTION.isExpanded(),
             onExpandedChange = { PanelId.DISTORTION.setExpanded(it) },
-            modifier = panelModifier(PanelId.DISTORTION.isExpanded(), weight = .5f, minWidth = 220.dp)
+            modifier = panelModifier(PanelId.DISTORTION.isExpanded(), weight = .5f)
         )
         // Rings Resonator panel
         ResonatorPanel(
@@ -179,7 +178,6 @@ fun HeaderPanel(
             modifier = panelModifier(
                 isExpanded = PanelId.AI.isExpanded(),
                 weight = .4f,
-                minWidth = 200.dp
             )
         )
     }
@@ -193,14 +191,12 @@ fun HeaderPanel(
 @Composable
 private fun RowScope.panelModifier(
     isExpanded: Boolean,
-    weight: Float = 1f,
-    minWidth: Dp = 200.dp)
-: Modifier {
+    weight: Float = 1f
+): Modifier {
     return if (isExpanded) {
         Modifier
             .fillMaxHeight()
             .weight(weight)
-            .widthIn(min = minWidth)
     } else {
         Modifier.fillMaxHeight()
     }

@@ -9,7 +9,7 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 
 /**
- * Shared HyperLFO implementation using DSP primitive interfaces.
+ * Shared DuoLFO implementation using DSP primitive interfaces.
  * Two Oscillators (A & B) with logical AND/OR combination.
  * Supports both Square and Triangle waveforms with AND/OR modes.
  *
@@ -25,7 +25,7 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 // Rename to DspHyperLfo
 @Inject
 @ContributesIntoSet(AppScope::class)
-class DspHyperLfoPlugin(
+class DspDuoLfoPlugin(
     private val audioEngine: AudioEngine
 ): DspPlugin {
     // Interface Units (Proxies)

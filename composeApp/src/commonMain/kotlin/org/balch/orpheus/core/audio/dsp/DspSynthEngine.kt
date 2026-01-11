@@ -18,7 +18,7 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDelayPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDistortionPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDrumPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspHyperLfoPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspDuoLfoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPerStringBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspResonatorPlugin
@@ -40,7 +40,7 @@ class DspSynthEngine(
     private val log = logging("DspSynthEngine")
 
     // Extract plugins by type
-    private val hyperLfo = plugins.filterIsInstance<DspHyperLfoPlugin>().first()
+    private val hyperLfo = plugins.filterIsInstance<DspDuoLfoPlugin>().first()
     private val delayPlugin = plugins.filterIsInstance<DspDelayPlugin>().first()
     private val distortionPlugin = plugins.filterIsInstance<DspDistortionPlugin>().first()
     private val stereoPlugin = plugins.filterIsInstance<DspStereoPlugin>().first()
