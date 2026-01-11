@@ -15,7 +15,9 @@ interface SynthEngine {
     fun setPairSharpness(pairIndex: Int, sharpness: Float) // Waveform (0=tri, 1=sq) per pair
 
     // specialized Drum Synthesis (808)
+    /** Trigger a specialized 808-style drum. Parameters are normalized 0..1. */
     fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float)
+    /** Set specialized 808-style drum parameters. Parameters are normalized 0..1. */
     fun setDrumTone(type: Int, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float)
     fun triggerDrum(type: Int, accent: Float)
 

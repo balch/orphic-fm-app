@@ -130,7 +130,7 @@ object DrumDefs {
         
         // === 808 ENGINES ===
         "bd808" to DrumPatch(
-            frequency = 55.0f,
+            frequency = 0.1944f, // 55Hz normalized: (55-20)/180
             envelopeSpeed = 0.5f, // Decay
             sharpness = 0.5f,     // Tone
             drumType = 0,
@@ -138,14 +138,14 @@ object DrumDefs {
             p5 = 0.5f  // Self FM
         ),
         "sn808" to DrumPatch(
-            frequency = 180.0f,
+            frequency = 0.2f, // 180Hz normalized: (180-100)/400
             envelopeSpeed = 0.5f, // Decay
             sharpness = 0.5f,     // Tone
             drumType = 1,
             p4 = 0.5f             // Snappy
         ),
         "hh808" to DrumPatch(
-            frequency = 400.0f,
+            frequency = 0.1428f, // 400Hz normalized: (400-300)/700
             envelopeSpeed = 0.5f, // Decay
             sharpness = 0.5f,     // Tone
             drumType = 2,

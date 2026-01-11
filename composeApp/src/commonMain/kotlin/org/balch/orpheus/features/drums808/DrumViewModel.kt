@@ -174,18 +174,15 @@ class DrumViewModel(
     
     // Helper to send params to engine
     private fun updateBdParams(s: DrumUiState) {
-        val freq = 20f + s.bdFrequency * 180f
-        synthEngine.setDrumTone(0, freq, s.bdTone, s.bdDecay, s.bdP4, s.bdP5)
+        synthEngine.setDrumTone(0, s.bdFrequency, s.bdTone, s.bdDecay, s.bdP4, s.bdP5)
     }
     
     private fun updateSdParams(s: DrumUiState) {
-        val freq = 100f + s.sdFrequency * 400f
-        synthEngine.setDrumTone(1, freq, s.sdTone, s.sdDecay, s.sdP4, 0.5f)
+        synthEngine.setDrumTone(1, s.sdFrequency, s.sdTone, s.sdDecay, s.sdP4, 0.5f)
     }
     
     private fun updateHhParams(s: DrumUiState) {
-        val freq = 300f + s.hhFrequency * 700f
-        synthEngine.setDrumTone(2, freq, s.hhTone, s.hhDecay, s.hhP4, 0.5f)
+        synthEngine.setDrumTone(2, s.hhFrequency, s.hhTone, s.hhDecay, s.hhP4, 0.5f)
     }
 
     init {

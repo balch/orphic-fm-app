@@ -64,7 +64,7 @@ class DspDrumPlugin(
         p4: Float = 0.5f,
         p5: Float = 0.5f
     ) {
-        // Cache state
+        // Cache normalized state
         if (type in 0..2) {
             frequencies[type] = frequency
             tones[type] = tone
@@ -72,7 +72,13 @@ class DspDrumPlugin(
             p4s[type] = p4
             p5s[type] = p5
         }
-        drumUnit.trigger(type, accent, frequency, tone, decay, p4, p5)
+        val scaledFreq = when(type) {
+            0 -> 20f + frequency * 180f
+            1 -> 100f + frequency * 400f
+            2 -> 300f + frequency * 700f
+            else -> frequency
+        }
+        drumUnit.trigger(type, accent, scaledFreq, tone, decay, p4, p5)
     }
 
     fun setParameters(
@@ -83,7 +89,7 @@ class DspDrumPlugin(
         p4: Float,
         p5: Float
     ) {
-        // Cache state
+        // Cache normalized state
         if (type in 0..2) {
             frequencies[type] = frequency
             tones[type] = tone
@@ -91,7 +97,13 @@ class DspDrumPlugin(
             p4s[type] = p4
             p5s[type] = p5
         }
-        drumUnit.setParameters(type, frequency, tone, decay, p4, p5)
+        val scaledFreq = when(type) {
+            0 -> 20f + frequency * 180f
+            1 -> 100f + frequency * 400f
+            2 -> 300f + frequency * 700f
+            else -> frequency
+        }
+        drumUnit.setParameters(type, scaledFreq, tone, decay, p4, p5)
     }
 
     fun trigger(type: Int, accent: Float) {
