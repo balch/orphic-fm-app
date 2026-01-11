@@ -51,7 +51,10 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.widgets.Learnable
+import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.balch.orpheus.ui.widgets.learnable
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.roundToInt
 
@@ -98,46 +101,50 @@ fun ResonatorPanel(
                         inactiveContentColor = OrpheusColors.lakersGold,
                         inactiveContainerColor = OrpheusColors.lakersPurpleDark
                     )
-                    SingleChoiceSegmentedButtonRow(
-                        modifier = Modifier.fillMaxWidth()
-                            .padding(horizontal = 8.dp),
+                    Learnable(
+                        controlId = "resonator_mode",
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                     ) {
-                        // "Off" option
-                        SegmentedButton(
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 4),
-                            onClick = { actions.setEnabled(false) },
-                            selected = !state.enabled,
-                            colors = segColors,
-                            icon = {}
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(
-                                text = "Off",
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1
-                            )
-                        }
-
-                        // Regular modes
-                        ResonatorMode.entries.forEachIndexed { index, mode ->
-                            val buttonIndex = index + 1
+                            // "Off" option
                             SegmentedButton(
-                                shape = SegmentedButtonDefaults.itemShape(
-                                    index = buttonIndex,
-                                    count = 4
-                                ),
-                                onClick = {
-                                    actions.setEnabled(true)
-                                    actions.setMode(mode)
-                                },
-                                selected = state.enabled && state.mode == mode,
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 4),
+                                onClick = { actions.setEnabled(false) },
+                                selected = !state.enabled,
                                 colors = segColors,
                                 icon = {}
                             ) {
                                 Text(
-                                    text = mode.displayName,
+                                    text = "Off",
                                     style = MaterialTheme.typography.labelSmall,
                                     maxLines = 1
                                 )
+                            }
+
+                            // Regular modes
+                            ResonatorMode.entries.forEachIndexed { index, mode ->
+                                val buttonIndex = index + 1
+                                SegmentedButton(
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = buttonIndex,
+                                        count = 4
+                                    ),
+                                    onClick = {
+                                        actions.setEnabled(true)
+                                        actions.setMode(mode)
+                                    },
+                                    selected = state.enabled && state.mode == mode,
+                                    colors = segColors,
+                                    icon = {}
+                                ) {
+                                    Text(
+                                        text = mode.displayName,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }
@@ -153,11 +160,11 @@ fun ResonatorPanel(
                     val knobColor = OrpheusColors.lakersGold
                     val labelColor = RingsPanelColor
 
-                    RotaryKnob(state.structure, actions.setStructure, label = "STRUCT", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor)
-                    RotaryKnob(state.brightness, actions.setBrightness, label = "BRIGHT", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor)
-                    RotaryKnob(state.damping, actions.setDamping, label = "DAMP", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor)
-                    RotaryKnob(state.position, actions.setPosition, label = "POS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor)
-                    RotaryKnob(state.mix, actions.setMix, label = "MIX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor)
+                    RotaryKnob(state.structure, actions.setStructure, label = "STRUCT", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "resonator_structure")
+                    RotaryKnob(state.brightness, actions.setBrightness, label = "BRIGHT", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "resonator_brightness")
+                    RotaryKnob(state.damping, actions.setDamping, label = "DAMP", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "resonator_damping")
+                    RotaryKnob(state.position, actions.setPosition, label = "POS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "resonator_position")
+                    RotaryKnob(state.mix, actions.setMix, label = "MIX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "resonator_mix")
                 }
 
                 // Target mix fader section
@@ -182,13 +189,15 @@ fun ResonatorPanel(
                             value = state.targetMix,
                             onValueChange = actions.setTargetMix,
                             snapBack = state.snapBack,
-                            accentColor = RingsPanelColor
+                            accentColor = RingsPanelColor,
+                            controlId = "resonator_target_mix"
                         )
 
                         SnapBackButton(
                             enabled = state.snapBack,
                             onClick = { actions.setSnapBack(!state.snapBack) },
-                            accentColor = RingsPanelColor
+                            accentColor = RingsPanelColor,
+                            controlId = "resonator_snap_back"
                         )
                     }
 
@@ -212,8 +221,11 @@ private fun HorizontalTargetMixFader(
     onValueChange: (Float) -> Unit,
     snapBack: Boolean,
     modifier: Modifier = Modifier,
-    accentColor: Color = OrpheusColors.lakersGold
+    accentColor: Color = OrpheusColors.lakersGold,
+    controlId: String? = null
 ) {
+    val learnState = LocalLearnModeState.current
+    val isLearning = controlId != null && learnState.isLearning(controlId)
     val density = LocalDensity.current
     val trackWidth = 160.dp
     val thumbWidth = 24.dp
@@ -236,7 +248,15 @@ private fun HorizontalTargetMixFader(
     Box(
         modifier = modifier
             .size(trackWidth, 24.dp)
-            .pointerInput(snapBack) {
+            .then(
+                if (controlId != null) {
+                    Modifier.learnable(controlId, learnState)
+                } else {
+                    Modifier
+                }
+            )
+            .pointerInput(snapBack, isLearning) {
+                if (isLearning) return@pointerInput
                 detectDragGestures(
                     onDragStart = { isDragging = true },
                     onDrag = { change, dragAmount ->
@@ -325,14 +345,26 @@ private fun SnapBackButton(
     enabled: Boolean,
     onClick: () -> Unit,
     accentColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    controlId: String? = null
 ) {
+    val learnState = LocalLearnModeState.current
+    val isLearning = controlId != null && learnState.isLearning(controlId)
+
     Box(
-        modifier = modifier.size(24.dp).shadow(if (enabled) 1.dp else 4.dp, CircleShape, ambientColor = if (enabled) accentColor else Color.Black)
+        modifier = modifier.size(24.dp)
+            .then(
+                if (controlId != null) {
+                    Modifier.learnable(controlId, learnState)
+                } else {
+                    Modifier
+                }
+            )
+            .shadow(if (enabled) 1.dp else 4.dp, CircleShape, ambientColor = if (enabled) accentColor else Color.Black)
             .clip(CircleShape)
             .background(Brush.verticalGradient(if (enabled) listOf(OrpheusColors.lakersPurple, OrpheusColors.lakersPurpleDark) else listOf(OrpheusColors.metallicSurface, OrpheusColors.metallicShadow)))
             .border(1.5.dp, if (enabled) accentColor else accentColor.copy(alpha = 0.4f), CircleShape)
-            .clickable { onClick() },
+            .clickable(enabled = !isLearning) { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(if (enabled) accentColor else OrpheusColors.charcoal).border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape))

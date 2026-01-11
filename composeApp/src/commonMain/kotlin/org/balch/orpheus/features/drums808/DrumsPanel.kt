@@ -62,6 +62,7 @@ fun DrumsPanel(
                 // BD Row (Red) - I key
                 DrumRow(
                     label = "BD",
+                    tag = "bd",
                     color = OrpheusColors.ninersRed,
                     frequency = state.bdFrequency,
                     tone = state.bdTone,
@@ -81,6 +82,7 @@ fun DrumsPanel(
                 // SD Row (Gold) - O key
                 DrumRow(
                     label = "SD",
+                    tag = "sd",
                     color = OrpheusColors.ninersGold,
                     frequency = state.sdFrequency,
                     tone = state.sdTone,
@@ -100,6 +102,7 @@ fun DrumsPanel(
                 // HH Row (White) - P key
                 DrumRow(
                     label = "HH",
+                    tag = "hh",
                     color = Color.White,
                     frequency = state.hhFrequency,
                     tone = state.hhTone,
@@ -150,6 +153,7 @@ private fun LabelHeader(text: String, modifier: Modifier) {
 @Composable
 private fun DrumRow(
     label: String,
+    tag: String,
     color: Color,
     frequency: Float,
     tone: Float,
@@ -163,6 +167,10 @@ private fun DrumRow(
     onTriggerStart: () -> Unit,
     onTriggerEnd: () -> Unit
 ) {
+    val learnState = org.balch.orpheus.ui.widgets.LocalLearnModeState.current
+    val triggerId = "drums_${tag}_trig"
+    val isLearningTrigger = learnState.isLearning(triggerId)
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -186,25 +194,29 @@ private fun DrumRow(
                 value = frequency,
                 onValueChange = onFrequencyChange,
                 color = color,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                controlId = "drums_${tag}_tune"
             )
             KnobGroup(
                 value = tone,
                 onValueChange = onToneChange,
                 color = color,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                controlId = "drums_${tag}_tone"
             )
             KnobGroup(
                 value = decay,
                 onValueChange = onDecayChange,
                 color = color,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                controlId = "drums_${tag}_decay"
             )
             KnobGroup(
                 value = p4,
                 onValueChange = onP4Change,
                 color = color,
                 modifier = Modifier.weight(1f),
+                controlId = "drums_${tag}_mod"
             )
 
             // Trigger Pad aligned as a 5th column
@@ -219,7 +231,10 @@ private fun DrumRow(
                     isActive = isActive,
                     onPulseStart = onTriggerStart,
                     onPulseEnd = onTriggerEnd,
-                    activeColor = color
+                    activeColor = color,
+                    isLearnMode = learnState.isActive,
+                    isLearning = isLearningTrigger,
+                    onLearnSelect = { learnState.onSelectControl(triggerId) }
                 )
             }
         }
@@ -232,7 +247,8 @@ private fun KnobGroup(
     onValueChange: (Float) -> Unit,
     color: Color,
     modifier: Modifier = Modifier,
-    bottomLabel: String? = null
+    bottomLabel: String? = null,
+    controlId: String? = null
 ) {
     Column(
         modifier = modifier,
@@ -243,7 +259,8 @@ private fun KnobGroup(
             onValueChange = onValueChange,
             size = 32.dp,
             progressColor = color,
-            label = bottomLabel
+            label = bottomLabel,
+            controlId = controlId
         )
     }
 }

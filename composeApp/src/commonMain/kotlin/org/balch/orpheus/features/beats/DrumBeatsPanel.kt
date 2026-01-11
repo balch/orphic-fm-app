@@ -44,6 +44,8 @@ import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
+import org.balch.orpheus.ui.widgets.Learnable
+import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -57,6 +59,7 @@ fun DrumBeatsPanel(
 ) {
     val state by drumBeatsFeature.stateFlow.collectAsState()
     val actions = drumBeatsFeature.actions
+    val learnState = LocalLearnModeState.current
 
     val outputMode = state.outputMode
 
@@ -91,10 +94,12 @@ fun DrumBeatsPanel(
                     verticalArrangement = Arrangement.Center
                 ) {
                     // Two-state toggle: Grids | Euclid
-                    ModeToggle(
-                        currentMode = outputMode,
-                        onModeSelected = actions.setOutputMode
-                    )
+                    Learnable(controlId = "beats_mode") {
+                        ModeToggle(
+                            currentMode = outputMode,
+                            onModeSelected = actions.setOutputMode
+                        )
+                    }
 
                     // X/Y Pad or Lengths visualization
                     Box(
@@ -110,13 +115,15 @@ fun DrumBeatsPanel(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .pointerInput(Unit) {
+                                    .pointerInput(Unit, learnState.isActive) {
+                                        if (learnState.isActive) return@pointerInput
                                         detectTapGestures { offset ->
                                             actions.setX(offset.x / size.width)
                                             actions.setY(offset.y / size.height)
                                         }
                                     }
-                                    .pointerInput(Unit) {
+                                    .pointerInput(Unit, learnState.isActive) {
+                                        if (learnState.isActive) return@pointerInput
                                         detectDragGestures { change, _ ->
                                             actions.setX(change.position.x / size.width)
                                             actions.setY(change.position.y / size.height)
@@ -157,7 +164,8 @@ fun DrumBeatsPanel(
                                             value = len / 32f,
                                             onValueChange = { actions.setEuclideanLength(index, (it * 32).toInt()) },
                                             size = 24.dp,
-                                            progressColor = colors[index]
+                                            progressColor = colors[index],
+                                            controlId = "beats_euclid_len_$index"
                                          )
                                          Text("$len", style = MaterialTheme.typography.labelSmall, color = Color.White)
                                     }
@@ -182,7 +190,8 @@ fun DrumBeatsPanel(
                             label = "BD",
                             value = state.densities[0],
                             onValueChange = { actions.setDensity(0, it) },
-                            color = OrpheusColors.seahawksGreen
+                            color = OrpheusColors.seahawksGreen,
+                            controlId = "beats_bd_density"
                         )
                         KnobControlTopLabel(
                             modifier = Modifier.padding(top = 42.dp),
@@ -190,14 +199,16 @@ fun DrumBeatsPanel(
                             labelStyle = MaterialTheme.typography.labelMedium,
                             value = state.randomness,
                             onValueChange = { actions.setRandomness(it) },
-                            color = OrpheusColors.seahawksGreen
+                            color = OrpheusColors.seahawksGreen,
+                            controlId = "beats_randomness"
                         )
                         KnobControlTopLabel(
                             modifier = Modifier.padding(top = 4.dp),
                             label = "SD",
                             value = state.densities[1],
                             onValueChange = { actions.setDensity(1, it) },
-                            color = OrpheusColors.seahawksGrey
+                            color = OrpheusColors.seahawksGrey,
+                            controlId = "beats_sd_density"
                         )
                         KnobControlTopLabel(
                             modifier = Modifier.padding(top = 42.dp),
@@ -205,14 +216,16 @@ fun DrumBeatsPanel(
                             labelStyle = MaterialTheme.typography.labelMedium,
                             value = state.swing,
                             onValueChange = { actions.setSwing(it) },
-                            color = OrpheusColors.seahawksGreen
+                            color = OrpheusColors.seahawksGreen,
+                            controlId = "beats_swing"
                         )
                         KnobControlTopLabel(
                             modifier = Modifier.padding(top = 4.dp),
                             label = "HH",
                             value = state.densities[2],
                             onValueChange = { actions.setDensity(2, it) },
-                            color = Color.White
+                            color = Color.White,
+                            controlId = "beats_hh_density"
                         )
                     }
 
@@ -233,7 +246,8 @@ fun DrumBeatsPanel(
                                 onValueChange = { frac ->
                                     actions.setBpm(40f + (frac * 200f))
                                 },
-                                color = OrpheusColors.seahawksGreen
+                                color = OrpheusColors.seahawksGreen,
+                                controlId = "beats_bpm"
                             )
                             Text(
                                 text = "${state.bpm.toInt()}bmp",
@@ -245,23 +259,25 @@ fun DrumBeatsPanel(
                         }
 
                         // RUN/STOP
-                        IconButton(
-                            onClick = { actions.setRunning(!state.isRunning) },
-                            modifier = Modifier
-                                .padding(start = 8.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                                .width(40.dp)
-                                .height(25.dp)
-                                .background(
-                                    if (state.isRunning) OrpheusColors.seahawksGreen else Color.White.copy(alpha = 0.2f)
+                        Learnable(controlId = "beats_run") {
+                            IconButton(
+                                onClick = { actions.setRunning(!state.isRunning) },
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .width(40.dp)
+                                    .height(25.dp)
+                                    .background(
+                                        if (state.isRunning) OrpheusColors.seahawksGreen else Color.White.copy(alpha = 0.2f)
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = if (state.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                    contentDescription = if (state.isRunning) "Stop" else "Start",
+                                    tint = if (state.isRunning) Color.Black else Color.White,
+                                    modifier = Modifier.size(16.dp)
                                 )
-                        ) {
-                            Icon(
-                                imageVector = if (state.isRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                contentDescription = if (state.isRunning) "Stop" else "Start",
-                                tint = if (state.isRunning) Color.Black else Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            }
                         }
                     }
                 }
@@ -333,7 +349,8 @@ private fun KnobControlTopLabel(
     value: Float,
     onValueChange: (Float) -> Unit,
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    controlId: String? = null
 ) {
     Column(
         modifier = modifier,
@@ -350,7 +367,8 @@ private fun KnobControlTopLabel(
             value = value,
             onValueChange = onValueChange,
             size = 32.dp, // Reduced size
-            progressColor = color
+            progressColor = color,
+            controlId = controlId
         )
     }
 }
