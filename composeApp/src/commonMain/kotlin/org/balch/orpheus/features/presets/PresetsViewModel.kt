@@ -14,8 +14,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
@@ -103,24 +101,38 @@ class PresetsViewModel(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    override val stateFlow: StateFlow<PresetUiState> =
-        flow<PresetUiState> {
+    init {
+        viewModelScope.launch(dispatcherProvider.io) {
             val initial = loadPresets()
+            // Session restore: Apply last selected preset once when the ViewModel is first created.
+            // This avoids re-applying presets and interrupting audio when swiping panels in compact mode.
             initial.selectedPreset?.let { presetLoader.applyPreset(it) }
-            emit(initial)
-            
-            emitAll(
-                _userIntents
-                    .onEach { handleSideEffects(it) }
-                    .scan(initial as PresetUiState) { state, intent -> reduce(state, intent) }
-            )
+            _userIntents.emit(PresetIntent.RefreshPresets(initial.presets, initial.selectedPreset?.name))
         }
-        .flowOn(dispatcherProvider.io)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = PresetUiState.Loading
-        )
+    }
+
+    override val stateFlow: StateFlow<PresetUiState> =
+        _userIntents
+            .onEach { handleSideEffects(it) }
+            .scan(PresetUiState.Loading as PresetUiState) { state, intent ->
+                if (state is PresetUiState.Loading && intent is PresetIntent.RefreshPresets) {
+                    PresetUiState.Loaded(
+                        presets = intent.presets,
+                        selectedPreset = intent.presets.find { it.name == intent.selectName },
+                        factoryPresetNames = presetsRepository.getFactoryPresetNames()
+                    )
+                } else if (state is PresetUiState.Loaded) {
+                    reduce(state, intent)
+                } else {
+                    state
+                }
+            }
+            .flowOn(dispatcherProvider.io)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = PresetUiState.Loading
+            )
 
 
     // ═══════════════════════════════════════════════════════════
