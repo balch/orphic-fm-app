@@ -53,7 +53,7 @@ fun DistortionPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
         Column(
