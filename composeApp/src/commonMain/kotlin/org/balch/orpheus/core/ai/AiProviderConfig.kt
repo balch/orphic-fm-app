@@ -1,18 +1,24 @@
 package org.balch.orpheus.core.ai
 
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.BuildKonfig
 
 /**
  * Supported AI providers.
  */
-enum class AiProvider(val id: String, val displayName: String) {
-    GOOGLE("google", "Google Gemini"),
-    OPENAI("openai", "OpenAI"),
-    ANTHROPIC("anthropic", "Anthropic Claude");
-    
-    companion object {
-        fun fromId(id: String) = entries.find { it.id == id } ?: GOOGLE
+sealed class AiProvider(
+    val id: String,
+    val displayName: String,
+    private val keyCallback: (() -> String?)? = null,
+) {
+    fun defaultKey():String? {
+        return keyCallback?.invoke()
+            ?.takeIf { validateKeyFormat(it) }
     }
+
+    data object Google : AiProvider("google", "Google Gemini", { BuildKonfig.GEMINI_API_KEY })
+    data object OpenAI : AiProvider("openai", "OpenAI")
+    data object Anthropic : AiProvider("anthropic", "Anthropic Claude", { BuildKonfig.ANTHROPIC_API_KEY })
 }
 
 /**
@@ -30,8 +36,17 @@ data class UserApiKeyConfig(
 fun AiProvider.validateKeyFormat(key: String): Boolean {
     if (key.isBlank()) return false
     return when (this) {
-        AiProvider.GOOGLE -> key.length >= 30 // Gemini keys are ~39 chars
-        AiProvider.OPENAI -> key.startsWith("sk-") && key.length >= 40
-        AiProvider.ANTHROPIC -> key.startsWith("sk-ant-") && key.length >= 40
+        AiProvider.Google -> key.length >= 30 // Gemini keys are ~39 chars
+        AiProvider.OpenAI -> key.startsWith("sk-") && key.length >= 40
+        AiProvider.Anthropic -> key.startsWith("sk-ant-") && key.length >= 40
+    }
+}
+fun deriveAiProviderFromKey(key: String): AiProvider? {
+    if (key.isBlank()) return null
+    return when  {
+        AiProvider.Anthropic.validateKeyFormat(key) -> AiProvider.Anthropic
+        AiProvider.OpenAI.validateKeyFormat(key) -> AiProvider.OpenAI
+        AiProvider.Google.validateKeyFormat(key) -> AiProvider.Google
+        else -> null
     }
 }

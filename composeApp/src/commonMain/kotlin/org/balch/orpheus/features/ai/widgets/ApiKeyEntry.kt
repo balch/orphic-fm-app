@@ -40,7 +40,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.ai.AiProvider
-import org.balch.orpheus.core.ai.validateKeyFormat
+import org.balch.orpheus.core.ai.deriveAiProviderFromKey
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 /**
@@ -48,7 +48,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
  */
 @Composable
 fun ApiKeyEntryCompact(
-    onSubmit: (String) -> Unit,
+    onSubmit: (AiProvider, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var key by remember { mutableStateOf("") }
@@ -57,9 +57,10 @@ fun ApiKeyEntryCompact(
     val uriHandler = LocalUriHandler.current
 
     val submit = {
-        if (AiProvider.GOOGLE.validateKeyFormat(key)) {
+        val aiProvider = deriveAiProviderFromKey(key)
+        if (aiProvider != null) {
             error = null
-            onSubmit(key)
+            onSubmit(aiProvider, key)
         } else {
             error = "Invalid key format"
         }
@@ -171,7 +172,7 @@ fun ApiKeyEntryCompact(
  */
 @Composable
 fun ApiKeyEntryScreen(
-    onSubmit: (String) -> Unit,
+    onSubmit: (AiProvider, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var key by remember { mutableStateOf("") }
@@ -180,11 +181,12 @@ fun ApiKeyEntryScreen(
     val uriHandler = LocalUriHandler.current
 
     val submit = {
-        if (AiProvider.GOOGLE.validateKeyFormat(key)) {
+        val aiProvider = deriveAiProviderFromKey(key)
+        if (aiProvider != null) {
             error = null
-            onSubmit(key)
+            onSubmit(aiProvider, key)
         } else {
-            error = "Please enter a valid Gemini API key (30+ characters)"
+            error = "Invalid key format"
         }
     }
 
@@ -322,7 +324,8 @@ fun ApiKeyEntryScreen(
  */
 @Composable
 fun UserKeyIndicator(
-    onRemove: () -> Unit,
+    aiProvider: AiProvider,
+    onRemove: (AiProvider) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -343,7 +346,7 @@ fun UserKeyIndicator(
             color = OrpheusColors.metallicBlue
         )
         IconButton(
-            onClick = onRemove,
+            onClick = { onRemove(aiProvider) },
             modifier = Modifier.size(16.dp)
         ) {
             Text("✕", fontSize = 10.sp, color = OrpheusColors.sterlingSilver.copy(alpha = 0.7f))

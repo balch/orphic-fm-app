@@ -7,8 +7,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModelProvider
-import org.balch.orpheus.core.ai.GeminiKeyProvider
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
@@ -30,7 +30,7 @@ actual class SynthControlAgent(
 
     @Inject
     actual class Factory(
-        private val geminiKeyProvider: GeminiKeyProvider,
+        private val aiKeyRepository: AiKeyRepository,
         private val aiModelProvider: AiModelProvider,
         private val synthControlTool: SynthControlTool,
         private val replExecuteTool: ReplExecuteTool,

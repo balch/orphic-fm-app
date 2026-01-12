@@ -91,6 +91,7 @@ fun AiOptionsPanel(
                     // User key indicator (if applicable)
                     if (uiState.isUserProvidedKey) {
                         UserKeyIndicator(
+                            aiProvider = (uiState.selectedModel ?: AiModel.DEFAULT).aiProvider,
                             onRemove = actions.onClearApiKey,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )

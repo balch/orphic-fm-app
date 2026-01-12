@@ -22,18 +22,21 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
-import org.balch.orpheus.core.ai.GeminiKeyProvider
+import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -82,8 +85,8 @@ data class AiOptionsPanelActions(
     val onToggleRepl: (Boolean) -> Unit,
     val onToggleChatDialog: () -> Unit,
     val onSendSoloInfluence: (String) -> Unit,
-    val onSaveApiKey: (String) -> Unit,
-    val onClearApiKey: () -> Unit,
+    val onSaveApiKey: (AiProvider, String) -> Unit,
+    val onClearApiKey: (AiProvider) -> Unit,
     val onSelectModel: (AiModel) -> Unit
 ) {
     companion object {
@@ -93,7 +96,7 @@ data class AiOptionsPanelActions(
             onToggleRepl = {},
             onToggleChatDialog = {},
             onSendSoloInfluence = {},
-            onSaveApiKey = {},
+            onSaveApiKey = { _, _ -> },
             onClearApiKey = {},
             onSelectModel = {}
         )
@@ -111,6 +114,7 @@ typealias AiOptionsFeature = SynthFeature<AiOptionsUiState, AiOptionsPanelAction
  * - REPL: Generate Tidal code patterns
  * - Chat: Open chat dialog
  */
+@Suppress("UNCHECKED_CAST")
 @Inject
 @ViewModelKey(AiOptionsViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
@@ -123,7 +127,7 @@ class AiOptionsViewModel(
     private val replCodeEventBus: ReplCodeEventBus,
     private val panelExpansionEventBus: PanelExpansionEventBus,
     private val synthEngine: SynthEngine,
-    private val geminiKeyProvider: GeminiKeyProvider,
+    private val aiKeyRepository: AiKeyRepository,
     private val aiModelProvider: AiModelProvider,
     private val dispatcherProvider: DispatcherProvider,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
@@ -213,16 +217,11 @@ class AiOptionsViewModel(
     }
 
     /**
-     * Whether the current key is user-provided (vs build-time).
-     */
-    private val isUserProvidedKey: StateFlow<Boolean> = geminiKeyProvider.isUserProvidedKey
-
-    /**
      * Save a user-provided API key.
      */
-    private fun saveApiKey(key: String) {
-        viewModelScope.launch {
-            val success = geminiKeyProvider.saveApiKey(key)
+    private fun saveApiKey(aiProvider: AiProvider, key: String) {
+        viewModelScope.launch(dispatcherProvider.io) {
+            val success = aiKeyRepository.setKey(aiProvider, key)
             if (success) {
                 log.debug { "API key saved successfully" }
             } else {
@@ -234,9 +233,9 @@ class AiOptionsViewModel(
     /**
      * Clear the user-provided API key.
      */
-    private fun clearApiKey() {
-        viewModelScope.launch {
-            geminiKeyProvider.clearApiKey()
+    private fun clearApiKey(aiProvider: AiProvider) {
+        viewModelScope.launch(dispatcherProvider.io) {
+            aiKeyRepository.clearApiKey(aiProvider)
             log.debug { "API key cleared" }
         }
     }
@@ -291,10 +290,10 @@ class AiOptionsViewModel(
         val wasReplActive = _isReplActive.value
         if (wasReplActive && !wasActive) {
             _isReplActive.value = false
-            viewModelScope.launch {
-                try {
+            viewModelScope.launch(dispatcherProvider.io) {
+                runCatchingSuspend {
                     replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
-                } catch (e: Exception) {
+                }.onFailure { e ->
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
             }
@@ -710,17 +709,6 @@ class AiOptionsViewModel(
     // API Key Management
     // ============================================================
 
-    /**
-     * Reactive API key state - true when any key is configured.
-     */
-    private val apiKeyState: StateFlow<Boolean> = geminiKeyProvider.apiKeyState
-        .map { !it.isNullOrEmpty() }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = geminiKeyProvider.isApiKeySet
-        )
-
     private val _dialogPosition = MutableStateFlow(0f to 0f)
     private val _dialogSize = MutableStateFlow(420f to 550f)
 
@@ -754,30 +742,48 @@ class AiOptionsViewModel(
     }
 
     override val stateFlow: StateFlow<AiOptionsUiState> = combine(
-        combine(
+            listOf(
             _isDroneActive,
             _isSoloActive,
             _isReplActive,
-            _showChatDialog
-        ) { drone, solo, repl, chat ->
-            listOf(drone, solo, repl, chat)
-        },
-        combine(
+            _showChatDialog,
             _sessionId,
-            apiKeyState,
-            isUserProvidedKey,
-            selectedModel,
-            messages
-        ) { sessionId, apiKeySet, userKey, model, msgs ->
-            Triple(sessionId, apiKeySet, userKey) to (model to msgs)
-        },
-        combine(
+            messages,
             _dialogPosition,
             _dialogSize
-        ) { pos, size ->
-            pos to size
-        }
-    ) { flags, session, layout ->
+            )
+        ) { results ->
+        AiOptionsUiState(
+            isDroneActive = results[0] as Boolean,
+            isSoloActive = results[1] as Boolean,
+            isReplActive = results[2] as Boolean,
+            showChatDialog = results[3] as Boolean,
+            sessionId = results[4] as Int,
+            messages = results[5] as List<ChatMessage>,
+            dialogPosition = results[6] as Pair<Float, Float>,
+            dialogSize = results[7] as Pair<Float, Float>,
+            availableModels = availableModels,
+            aiStatusMessages = aiStatusMessages,
+            aiInputLog = aiInputLog,
+            aiControlLog = aiControlLog,
+            isApiKeySet = aiKeyRepository.isApiKeySet,
+            isUserProvidedKey = aiKeyRepository.isUserProvidedKey,
+            selectedModel = aiModelProvider.selectedModel.value
+        )
+
+    }
+        .mapNotNull { it
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = AiOptionsUiState(
+                availableModels = availableModels,
+                aiStatusMessages = aiStatusMessages,
+                aiInputLog = aiInputLog,
+                aiControlLog = aiControlLog
+            )
+        )
+/*
         val (drone, solo, repl, chat) = flags
         val (sessionInfo, modelData) = session
         val (sessionId, apiKeySet, userKey) = sessionInfo
@@ -810,7 +816,8 @@ class AiOptionsViewModel(
             aiInputLog = aiInputLog,
             aiControlLog = aiControlLog
         )
-    )
+
+ */
 
     companion object {
         fun previewFeature(state: AiOptionsUiState = AiOptionsUiState()): AiOptionsFeature =

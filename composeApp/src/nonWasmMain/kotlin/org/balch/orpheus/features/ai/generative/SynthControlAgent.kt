@@ -6,6 +6,8 @@ import ai.koog.agents.core.dsl.builder.forwardTo
 import ai.koog.agents.core.dsl.builder.strategy
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.dsl.prompt
+import ai.koog.prompt.executor.clients.LLMClient
+import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.google.GoogleLLMClient
 import ai.koog.prompt.executor.llms.SingleLLMPromptExecutor
 import ai.koog.prompt.streaming.StreamFrame
@@ -34,8 +36,9 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModelProvider
-import org.balch.orpheus.core.ai.GeminiKeyProvider
+import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.ai.currentKoogModel
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
@@ -72,7 +75,7 @@ private fun Float.format(digits: Int): String {
 @OptIn(ExperimentalTime::class)
 actual class SynthControlAgent(
     private val config: SynthControlAgentConfig,
-    private val geminiKeyProvider: GeminiKeyProvider,
+    private val aiKeyRepository: AiKeyRepository,
     private val aiModelProvider: AiModelProvider,
     private val synthControlTool: SynthControlTool,
     private val replExecuteTool: ReplExecuteTool,
@@ -188,11 +191,6 @@ actual class SynthControlAgent(
      */
     @OptIn(FlowPreview::class)
     actual fun start() {
-        if (!geminiKeyProvider.isApiKeySet) {
-            _state.value = SynthAgentState.Error("No API key configured")
-            return
-        }
-
         if (agentJob?.isActive == true) {
             log.debug { "${config.name} already running" }
             return
@@ -200,9 +198,16 @@ actual class SynthControlAgent(
 
         log.debug { "Starting ${config.name}" }
         _state.value = SynthAgentState.Starting
-        val apiKey = geminiKeyProvider.apiKey ?: return
 
         agentJob = scope.launch {
+            // Get API key for the current model's provider
+            val aiProvider = aiModelProvider.selectedModel.value.aiProvider
+            val keyResult = aiKeyRepository.getKey(aiProvider)
+            if (keyResult == null) {
+                _state.value = SynthAgentState.Error("No API key configured for ${aiProvider.displayName}")
+                return@launch
+            }
+            val (apiKey, _) = keyResult
             try {
                 val selectedMood = if (config.moods.isNotEmpty()) config.moods.random() else null
 
@@ -336,7 +341,13 @@ actual class SynthControlAgent(
                     edge(loopNode forwardTo nodeFinish)
                 }
 
-                val llmClient = GoogleLLMClient(apiKey)
+                val aiProvider = aiModelProvider.selectedModel.value.aiProvider
+
+                val llmClient: LLMClient = when (aiProvider) {
+                    AiProvider.Google -> GoogleLLMClient(apiKey)
+                    AiProvider.Anthropic -> AnthropicLLMClient(apiKey)
+                    else -> throw IllegalStateException("Unsupported AI provider: $aiProvider")
+                }
                 val executor = SingleLLMPromptExecutor(llmClient)
                 // Tools are manually invoked, so registry can be empty or contain them for metadata (optional)
                 val toolRegistry = ToolRegistry {
@@ -416,7 +427,7 @@ actual class SynthControlAgent(
 
     @Inject
     actual class Factory(
-        private val geminiKeyProvider: GeminiKeyProvider,
+        private val aiKeyRepository: AiKeyRepository,
         private val aiModelProvider: AiModelProvider,
         private val synthControlTool: SynthControlTool,
         private val replExecuteTool: ReplExecuteTool,
@@ -426,7 +437,7 @@ actual class SynthControlAgent(
         actual fun create(config: SynthControlAgentConfig): SynthControlAgent {
             return SynthControlAgent(
                 config = config,
-                geminiKeyProvider = geminiKeyProvider,
+                aiKeyRepository = aiKeyRepository,
                 aiModelProvider = aiModelProvider,
                 synthControlTool = synthControlTool,
                 replExecuteTool = replExecuteTool,

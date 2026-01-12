@@ -22,10 +22,12 @@ import org.balch.orpheus.core.preferences.AppPreferencesRepository
 enum class AiModel(
     val id: String,
     val displayName: String,
+    val aiProvider: AiProvider,
 ) {
-    FLASH_25("flash_25", "Flash 2.5"),
-    PRO_25("pro_25", "Pro 2.5"),
-    FLASH_30("flash_30", "Flash 3.0 - Preview");
+    OPUS("opus", "Opus", AiProvider.Anthropic),
+    FLASH_25("flash_25", "Flash 2.5", AiProvider.Google),
+    PRO_25("pro_25", "Pro 2.5", AiProvider.Google),
+    FLASH_30("flash_30", "Flash 3.0 - Preview", AiProvider.Google);
     companion object {
         val DEFAULT = FLASH_30
         

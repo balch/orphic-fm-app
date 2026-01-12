@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.ai
 
+import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
 import ai.koog.prompt.executor.clients.google.GoogleModels
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLMProvider
@@ -23,6 +24,7 @@ val Gemini3_Flash_Preview: LLModel = LLModel(
 
 val AiModel.koogModel: LLModel
     get() = when (this) {
+        AiModel.OPUS -> AnthropicModels.Opus_4_5
         AiModel.FLASH_25 -> GoogleModels.Gemini2_5Flash
         AiModel.PRO_25 -> GoogleModels.Gemini2_5Pro
         AiModel.FLASH_30 -> Gemini3_Flash_Preview

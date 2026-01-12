@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import kotlinx.coroutines.flow.MutableSharedFlow
+import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.config.AppConfig
 import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.ai.chat.widgets.ChatInputField
@@ -122,7 +123,7 @@ fun ChatDialogContent(
     isLoading: Boolean,
     isApiKeySet: Boolean,
     onSendMessage: (String) -> Unit,
-    onSaveApiKey: (String) -> Unit = {},
+    onSaveApiKey: (AiProvider, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val listState = rememberLazyListState()

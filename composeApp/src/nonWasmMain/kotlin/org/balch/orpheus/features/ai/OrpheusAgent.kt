@@ -6,6 +6,8 @@ import ai.koog.agents.core.agent.config.AIAgentConfig
 import ai.koog.agents.core.agent.entity.AIAgentGraphStrategy
 import ai.koog.agents.features.eventHandler.feature.handleEvents
 import ai.koog.prompt.dsl.prompt
+import ai.koog.prompt.executor.clients.LLMClient
+import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.google.GoogleLLMClient
 import ai.koog.prompt.executor.llms.SingleLLMPromptExecutor
 import com.diamondedge.logging.logging
@@ -33,7 +35,11 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.ai.GeminiKeyProvider
+import org.balch.orpheus.core.ai.AiKeyRepository
+import org.balch.orpheus.core.ai.AiModelProvider
+import org.balch.orpheus.core.ai.AiProvider
+import org.balch.orpheus.core.ai.deriveAiProviderFromKey
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
 import org.balch.orpheus.features.ai.generative.AiStatusMessage
@@ -48,10 +54,12 @@ import kotlin.time.ExperimentalTime
 @SingleIn(AppScope::class)
 actual class OrpheusAgent @Inject constructor(
     private val config: OrpheusAgentConfig,
-    private val geminiKeyProvider: GeminiKeyProvider,
+    private val aiKeyRepository: AiKeyRepository,
+    private val aiModelProvider: AiModelProvider,
     private val replCodeEventBus: ReplCodeEventBus,
+    private val dispatcherProvider: DispatcherProvider,
 ) {
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val agentScope= CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val logger = logging("OrpheusAgent")
 
     private val userIntent = MutableSharedFlow<PromptIntent>(
@@ -129,7 +137,11 @@ actual class OrpheusAgent @Inject constructor(
     private val initialMessage = ChatMessage(text = "Awakening...", type = ChatMessageType.Loading)
     private val messages = mutableListOf(initialMessage)
 
-    actual val isApiKeySet: Boolean get() = geminiKeyProvider.isApiKeySet
+    // Check if current provider has a default key (sync check for UI state)
+    actual val isApiKeySet: Boolean
+        get() = aiModelProvider.selectedModel.value
+            .aiProvider
+            .defaultKey() != null
 
     private val _agentState = MutableStateFlow<AgentState>(AgentState.Loading(messages.toList()))
     
@@ -138,7 +150,7 @@ actual class OrpheusAgent @Inject constructor(
     actual val agentFlow: StateFlow<AgentState> = _agentState.asStateFlow()
 
     init {
-        applicationScope.launch {
+        agentScope.launch(dispatcherProvider.io) {
             replCodeEventBus.events.collect { event ->
                 when (event) {
                     is ReplCodeEvent.Generating -> emitStatus("Generating code...", isLoading = true)
@@ -155,19 +167,23 @@ actual class OrpheusAgent @Inject constructor(
     }
     
     private fun startAgentIfNeeded() {
-        if (!geminiKeyProvider.isApiKeySet) {
-            _agentState.value = AgentState.Error(
-                IllegalStateException("No API key"),
-                listOf(ChatMessage(
-                    text = "Orpheus awaits... but no API key is configured.\n\nAdd GEMINI_API_KEY to local.properties to awaken.",
-                    type = ChatMessageType.Error
-                ))
-            )
-            return
-        }
-        
-        currentAgentJob = applicationScope.launch {
-            runAgent(config.initialAgentPrompt())
+        currentAgentJob = agentScope.launch(dispatcherProvider.io) {
+            // Get API key for the current model's provider
+            val aiProvider = aiModelProvider.selectedModel.value.aiProvider
+            val keyResult = aiKeyRepository.getKey(aiProvider)
+            if (keyResult == null) {
+                _agentState.value = AgentState.Error(
+                    IllegalStateException("No API key"),
+                    listOf(ChatMessage(
+                        text = "Orpheus awaits... but no API key is configured for ${aiProvider.displayName}.\n\nAdd an API key to local.properties to awaken.",
+                        type = ChatMessageType.Error
+                    ))
+                )
+                return@launch
+            }
+            val (apiKey, _) = keyResult
+            
+            runAgent(config.initialAgentPrompt(), apiKey)
                 .flowOn(Dispatchers.Default)
                 .catch { throwable ->
                     logger.error(throwable) { "Unhandled exception in agent flow" }
@@ -194,10 +210,25 @@ actual class OrpheusAgent @Inject constructor(
         messages.add(ChatMessage(text = "Switching to $modelName...", type = ChatMessageType.Loading))
         _agentState.value = AgentState.Loading(messages.toList())
         
-        currentAgentJob = applicationScope.launch {
+        currentAgentJob = agentScope.launch(dispatcherProvider.io) {
+            // Get API key for the current model's provider
+            val aiProvider = aiModelProvider.selectedModel.value.aiProvider
+            val keyResult = aiKeyRepository.getKey(aiProvider)
+            if (keyResult == null) {
+                _agentState.value = AgentState.Error(
+                    IllegalStateException("No API key"),
+                    listOf(ChatMessage(
+                        text = "Cannot restart - no API key configured for ${aiProvider.displayName}.",
+                        type = ChatMessageType.Error
+                    ))
+                )
+                return@launch
+            }
+            val (apiKey, _) = keyResult
+            
             runAgent("You just switched to a new AI model ($modelName). " +
                     "Briefly greet the user as Orpheus and mention you're now using $modelName. " +
-                    "Be concise - one sentence is enough. Then wait for the user's next message.")
+                    "Be concise - one sentence is enough. Then wait for the user's next message.", apiKey)
                 .flowOn(Dispatchers.Default)
                 .catch { throwable ->
                     logger.error(throwable) { "Unhandled exception in agent flow after restart" }
@@ -210,7 +241,7 @@ actual class OrpheusAgent @Inject constructor(
     }
 
     @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
-    private fun runAgent(prompt: String): Flow<AgentState> = channelFlow {
+    private fun runAgent(prompt: String, apiKey: String): Flow<AgentState> = channelFlow {
         val strategy = config.agentStrategy(
             name = "OrpheusAgent",
             onAssistantMessage = { message ->
@@ -222,7 +253,7 @@ actual class OrpheusAgent @Inject constructor(
             }
         )
 
-        createAgent(strategy) {
+        createAgent(strategy, apiKey) {
             handleEvents {
                 onAgentStarting { _ -> logger.d { "Agent starting" } }
                 onAgentCompleted { _ -> logger.d { "Agent completed" } }
@@ -280,9 +311,15 @@ actual class OrpheusAgent @Inject constructor(
     @OptIn(ExperimentalTime::class)
     private fun createAgent(
         strategy: AIAgentGraphStrategy<String, String>,
+        apiKey: String,
         installFeatures: FeatureContext.() -> Unit = {},
     ): AIAgent<String, String> {
-        val llmClient = GoogleLLMClient(geminiKeyProvider.apiKey!!)
+        val aiProvider = deriveAiProviderFromKey(key = apiKey)
+        val llmClient: LLMClient = when (aiProvider) {
+            AiProvider.Google -> GoogleLLMClient(apiKey)
+            AiProvider.Anthropic -> AnthropicLLMClient(apiKey)
+            else -> throw IllegalStateException("Unsupported AI provider: $aiProvider")
+        }
         val executor = SingleLLMPromptExecutor(llmClient)
 
         val agentConfig = AIAgentConfig(

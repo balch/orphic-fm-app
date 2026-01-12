@@ -1,3 +1,4 @@
+import com.codingfeline.buildkonfig.compiler.FieldSpec
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.FileInputStream
@@ -183,7 +184,12 @@ buildkonfig {
     packageName = "org.balch.orpheus"
 
     defaultConfigs {
-        val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
-        buildConfigField(com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING, "GEMINI_API_KEY", geminiApiKey)
+        val geminiKey = "GEMINI_API_KEY"
+        val geminiApiKey = localProperties.getProperty(geminiKey) ?: ""
+        buildConfigField(FieldSpec.Type.STRING, geminiKey, geminiApiKey)
+
+        val anthropicKey = "ANTHROPIC_API_KEY"
+        val anthropicApiKey = localProperties.getProperty(anthropicKey) ?: ""
+        buildConfigField(FieldSpec.Type.STRING, anthropicKey, anthropicApiKey)
     }
 }
