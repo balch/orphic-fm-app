@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,8 +36,8 @@ import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
+import org.balch.orpheus.ui.widgets.HorizontalToggle
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.balch.orpheus.ui.widgets.VerticalToggle
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
@@ -66,11 +64,10 @@ fun EvoPanel(
         showCollapsedHeader = showCollapsedHeader
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
             // 1. Top Row: Strategy Dropdown + Enable Toggle
             Row(
@@ -85,15 +82,6 @@ fun EvoPanel(
                     color = accentColor,
                 )
 
-                // Enable Toggle (Mini Vertical Switch)
-                VerticalToggle(
-                    topLabel = "ON",
-                    bottomLabel = "OFF",
-                    isTop = uiState.isEnabled,
-                    onToggle = evoFeature.actions.onEnabledChange,
-                    color = accentColor,
-                    modifier = Modifier.height(60.dp) 
-                )
             }
 
             // 2. Controls Row - Dynamic labels from selected strategy
@@ -127,6 +115,14 @@ fun EvoPanel(
                 )
             }
 
+            // Enable Toggle (Mini Vertical Switch)
+            HorizontalToggle(
+                rightLabel = "OFF",
+                leftLabel = "ON",
+                isLeft = uiState.isEnabled,
+                onToggle = evoFeature.actions.onEnabledChange,
+                color = accentColor,
+            )
             Spacer(modifier = Modifier.weight(1f))
         }
     }
@@ -144,11 +140,10 @@ private fun StrategyDropdown(
 
     Box(
         modifier = modifier
-            .height(42.dp)
+            .clickable { expanded = true }
             .clip(RoundedCornerShape(8.dp))
             .background(OrpheusColors.darkVoid.copy(alpha = 0.5f))
-            .clickable { expanded = true }
-            .padding(horizontal = 12.dp),
+            .padding(6.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Row(
