@@ -250,5 +250,9 @@ open class TestSynthEngine : SynthEngine {
     override fun getBeatsRandomness(): Float = _beatsRandomness
     override fun setBeatsSwing(swing: Float) { _beatsSwing = swing }
     override fun getBeatsSwing(): Float = _beatsSwing
+    
+    private var _beatsMix = 0.7f
+    override fun setBeatsMix(mix: Float) { _beatsMix = mix }
+    override fun getBeatsMix(): Float = _beatsMix
 }
 

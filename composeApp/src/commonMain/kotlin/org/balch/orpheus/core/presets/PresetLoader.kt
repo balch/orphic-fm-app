@@ -118,7 +118,8 @@ class PresetLoader(
             beatsOutputMode = engine.getBeatsOutputMode(),
             beatsEuclideanLengths = List(3) { i -> engine.getBeatsEuclideanLength(i) },
             beatsRandomness = engine.getBeatsRandomness(),
-            beatsSwing = engine.getBeatsSwing()
+            beatsSwing = engine.getBeatsSwing(),
+            beatsMix = engine.getBeatsMix()
         )
     }
 }

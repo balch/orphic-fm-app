@@ -40,8 +40,24 @@ class DspDrumPlugin(
         drumUnit.output.connect(drumGainRight.inputA)
         
         // Default gains - calibrated to sit just below synth pad volume
-        drumGainLeft.inputB.set(1.6)
-        drumGainRight.inputB.set(1.6)
+        // Default gains - calibrated to sit just below synth pad volume
+        updateGains()
+    }
+    
+    private var mix = 0.7f
+    
+    fun setMix(value: Float) {
+        mix = value.coerceIn(0f, 1f)
+        updateGains()
+    }
+    
+    fun getMix(): Float = mix
+    
+    private fun updateGains() {
+        val baseGain = 1.6f
+        val finalGain = baseGain * mix
+        drumGainLeft.inputB.set(finalGain.toDouble())
+        drumGainRight.inputB.set(finalGain.toDouble())
     }
 
     /**

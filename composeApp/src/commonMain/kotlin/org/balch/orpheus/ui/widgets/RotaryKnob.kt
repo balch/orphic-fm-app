@@ -268,7 +268,22 @@ fun RotaryKnob(
             style = MaterialTheme.typography.labelMedium,
             color = progressColor.lighten(0.3f),
             textAlign = TextAlign.Center,
-            maxLines = 1
+            maxLines = 1,
+            modifier = Modifier.pointerInput(range, sensitivity) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        // Fine tune: 10x slower
+                        val fineSensitivity = sensitivity * 10f
+                        val delta = (-dragAmount) * (range.endInclusive - range.start) / fineSensitivity
+                        val newValue = (internalValue + delta).coerceIn(range)
+                        if (newValue != internalValue) {
+                            internalValue = newValue
+                            onValueChange(newValue)
+                        }
+                    }
+                )
+            }
         )
     }
 }

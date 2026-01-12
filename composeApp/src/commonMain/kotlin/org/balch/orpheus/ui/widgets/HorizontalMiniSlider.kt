@@ -3,6 +3,7 @@ package org.balch.orpheus.ui.widgets
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -111,25 +112,33 @@ fun HorizontalMiniSlider(
                     )
                 )
                 .pointerHoverIcon(PointerIcon.Hand)
-                .pointerInput(Unit) {
+                .pointerInput(usableRange) {
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent()
                             val position = event.changes.firstOrNull()?.position ?: continue
-
-                            when (event.type) {
-                                PointerEventType.Press, PointerEventType.Move -> {
-                                    if (event.changes.any { it.pressed }) {
-                                        val newOffset =
-                                            (position.x - thumbSizePx / 2).coerceIn(0f, usableRange)
-                                        offsetX = newOffset
-                                        onValueChange(newOffset / usableRange)
-                                        event.changes.forEach { it.consume() }
-                                    }
+                            
+                            // Handle drag
+                            if (event.type == PointerEventType.Press || event.type == PointerEventType.Move) {
+                                if (event.changes.any { it.pressed }) {
+                                    val newOffset = (position.x - thumbSizePx / 2).coerceIn(0f, usableRange)
+                                    offsetX = newOffset
+                                    onValueChange(newOffset / usableRange)
+                                    event.changes.forEach { it.consume() }
                                 }
                             }
                         }
                     }
+                }
+                .pointerInput(usableRange) {
+                    detectTapGestures(
+                        onTap = { offset ->
+                            // Single tap: Jump to position
+                            val newOffset = (offset.x - thumbSizePx / 2).coerceIn(0f, usableRange)
+                            offsetX = newOffset
+                            onValueChange(newOffset / usableRange)
+                        }
+                    )
                 }
         ) {
             // Thumb

@@ -444,6 +444,12 @@ class DspSynthEngine(
     override fun getDelayModSourceIsLfo(index: Int): Boolean = delayPlugin.getModSourceIsLfo(index)
     override fun getDelayLfoWaveformIsTriangle(): Boolean = true // Default to triangle
 
+    // Beats Mix delegation
+    override fun setBeatsMix(mix: Float) {
+        drumPlugin.setMix(mix)
+    }
+    override fun getBeatsMix(): Float = drumPlugin.getMix()
+
     // HyperLFO delegations
     override fun setHyperLfoFreq(index: Int, frequency: Float) = hyperLfo.setFreq(index, frequency)
     override fun setHyperLfoMode(mode: Int) = hyperLfo.setMode(mode)

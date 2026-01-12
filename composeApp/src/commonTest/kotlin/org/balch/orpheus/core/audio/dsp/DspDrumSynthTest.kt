@@ -155,6 +155,9 @@ class DspDrumSynthTest {
         override fun getBeatsRandomness(): Float = 0f
         override fun setBeatsSwing(swing: Float) {}
         override fun getBeatsSwing(): Float = 0f
+        
+        override fun setBeatsMix(mix: Float) {}
+        override fun getBeatsMix(): Float = 0.7f
     }
 
     @Test

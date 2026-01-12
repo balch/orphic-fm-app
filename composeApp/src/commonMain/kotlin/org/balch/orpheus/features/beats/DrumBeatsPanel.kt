@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.audio.dsp.synth.DrumBeatsGenerator
@@ -82,7 +83,7 @@ fun DrumBeatsPanel(
                 modifier = Modifier
                     .widthIn(max = 600.dp)
                     .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top
             ) {
                 // LEFT: Mode Switcher + Visualization
@@ -231,41 +232,17 @@ fun DrumBeatsPanel(
 
                     // Row 3: Transport (Start/Stop, Tap Tempo)
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.Start,
+                        modifier = Modifier.padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // BPM Control
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start,
-                        ) {
-                            HorizontalMiniSlider(
-                                trackWidth = 80,
-                                value = ((state.bpm - 40) / 200).coerceIn(0f, 1f),
-                                onValueChange = { frac ->
-                                    actions.setBpm(40f + (frac * 200f))
-                                },
-                                color = OrpheusColors.seahawksGreen,
-                                controlId = "beats_bpm"
-                            )
-                            Text(
-                                text = "${state.bpm.toInt()}bmp",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = OrpheusColors.seahawksGreen,
-                                fontSize = 9.sp,
-                                maxLines = 1,
-                            )
-                        }
-
                         // RUN/STOP
                         Learnable(controlId = "beats_run") {
                             IconButton(
                                 onClick = { actions.setRunning(!state.isRunning) },
                                 modifier = Modifier
-                                    .padding(start = 8.dp)
+                                    .width(46.dp)
                                     .clip(RoundedCornerShape(20.dp))
-                                    .width(40.dp)
                                     .height(25.dp)
                                     .background(
                                         if (state.isRunning) OrpheusColors.seahawksGreen else Color.White.copy(alpha = 0.2f)
@@ -278,7 +255,69 @@ fun DrumBeatsPanel(
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
+
                         }
+
+                        // BPM Control
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Start,
+                        ) {
+                            HorizontalMiniSlider(
+                                trackWidth = 70,
+                                value = ((state.bpm - 40) / 200).coerceIn(0f, 1f),
+                                onValueChange = { frac ->
+                                    actions.setBpm(40f + (frac * 200f))
+                                },
+                                color = OrpheusColors.seahawksGreen,
+                                controlId = "beats_bpm"
+                            )
+                        }
+
+                        HorizontalMiniSlider(
+                            trackWidth = 70,
+                            value = state.mix,
+                            onValueChange = { actions.setMix(it) },
+                            color = OrpheusColors.seahawksGreen,
+                            controlId = "beats_mix"
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.padding(top = 8.dp),
+                        horizontalArrangement = Arrangement.Start,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            modifier = Modifier.width(46.dp),
+                            textAlign = TextAlign.Center,
+                            text = if (state.isRunning) "Stop" else "Play",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = OrpheusColors.seahawksGreen,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                        )
+
+                        Text(
+                            modifier = Modifier.width(78.dp),
+                            textAlign = TextAlign.Center,
+                            text = "${state.bpm.toInt()}bmp",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = OrpheusColors.seahawksGreen,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                        )
+
+                        Text(
+                            modifier = Modifier.width(85.dp),
+                            textAlign = TextAlign.Center,
+                            text = "Mix",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = OrpheusColors.seahawksGreen,
+                            fontSize = 12.sp,
+                        )
+
+
                     }
                 }
             }
@@ -373,7 +412,7 @@ private fun KnobControlTopLabel(
     }
 }
 
-@Preview(heightDp = 280, widthDp = 420)
+@Preview(heightDp = 280, widthDp = 720)
 @Composable
 fun PatternPanelPreview() {
     OrpheusTheme {

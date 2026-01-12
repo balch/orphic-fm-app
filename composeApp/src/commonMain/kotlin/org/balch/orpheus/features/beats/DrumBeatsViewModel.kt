@@ -35,7 +35,8 @@ data class BeatsUiState(
     val outputMode: DrumBeatsGenerator.OutputMode = DrumBeatsGenerator.OutputMode.DRUMS,
     val euclideanLengths: List<Int> = listOf(16, 16, 16),
     val randomness: Float = 0f,
-    val swing: Float = 0f
+    val swing: Float = 0f,
+    val mix: Float = 0.7f
 )
 
 data class DrumBeatsPanelActions(
@@ -47,10 +48,11 @@ data class DrumBeatsPanelActions(
     val setOutputMode: (DrumBeatsGenerator.OutputMode) -> Unit,
     val setEuclideanLength: (Int, Int) -> Unit,
     val setRandomness: (Float) -> Unit,
-    val setSwing: (Float) -> Unit
+    val setSwing: (Float) -> Unit,
+    val setMix: (Float) -> Unit
 ) {
     companion object Companion {
-        val EMPTY = DrumBeatsPanelActions({}, {}, { _, _ -> }, {}, {}, {}, { _, _ -> }, {}, {})
+        val EMPTY = DrumBeatsPanelActions({}, {}, { _, _ -> }, {}, {}, {}, { _, _ -> }, {}, {}, {})
     }
 }
 
@@ -127,6 +129,10 @@ class DrumBeatsViewModel @Inject constructor(
         setSwing = { v ->
             _uiState.update { it.copy(swing = v) }
             synthEngine.setBeatsSwing(v)
+        },
+        setMix = { v ->
+            _uiState.update { it.copy(mix = v) }
+            synthEngine.setBeatsMix(v)
         }
     )
     
@@ -141,6 +147,7 @@ class DrumBeatsViewModel @Inject constructor(
         s.euclideanLengths.forEachIndexed { i, v -> synthEngine.setBeatsEuclideanLength(i, v) }
         synthEngine.setBeatsRandomness(s.randomness)
         synthEngine.setBeatsSwing(s.swing)
+        synthEngine.setBeatsMix(s.mix)
 
         // Subscribe to presets
         viewModelScope.launch(dispatcherProvider.default) {
@@ -156,7 +163,8 @@ class DrumBeatsViewModel @Inject constructor(
                         outputMode = outputMode,
                         euclideanLengths = preset.beatsEuclideanLengths,
                         randomness = preset.beatsRandomness,
-                        swing = preset.beatsSwing
+                        swing = preset.beatsSwing,
+                        mix = preset.beatsMix
                     )
                 }
                 
@@ -177,6 +185,8 @@ class DrumBeatsViewModel @Inject constructor(
                 preset.beatsEuclideanLengths.forEachIndexed { i, l -> synthEngine.setBeatsEuclideanLength(i, l) }
                 synthEngine.setBeatsRandomness(preset.beatsRandomness)
                 synthEngine.setBeatsSwing(preset.beatsSwing)
+                // Use preset value, which defaults to 0.7f in DronePreset now
+                synthEngine.setBeatsMix(preset.beatsMix)
             }
         }
     }

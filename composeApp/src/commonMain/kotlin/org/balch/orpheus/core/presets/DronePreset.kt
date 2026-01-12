@@ -87,6 +87,7 @@ data class DronePreset(
     val beatsEuclideanLengths: List<Int> = listOf(16, 16, 16),
     val beatsRandomness: Float = 0f,
     val beatsSwing: Float = 0f,
+    val beatsMix: Float = 0.7f,
 
     // Metadata
     val createdAt: Long = currentTimeMillis()

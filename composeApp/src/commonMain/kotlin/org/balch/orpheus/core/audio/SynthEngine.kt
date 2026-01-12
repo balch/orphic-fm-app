@@ -239,6 +239,8 @@ interface SynthEngine {
     fun getBeatsRandomness(): Float
     fun setBeatsSwing(swing: Float)
     fun getBeatsSwing(): Float
+    fun setBeatsMix(mix: Float)
+    fun getBeatsMix(): Float
 }
 
 enum class ModSource {
