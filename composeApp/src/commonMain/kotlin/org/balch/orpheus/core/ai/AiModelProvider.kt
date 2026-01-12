@@ -24,6 +24,7 @@ enum class AiModel(
     val displayName: String,
     val aiProvider: AiProvider,
 ) {
+    HAIKU3("Haiku_3", "Haiku 3", AiProvider.Anthropic),
     OPUS("opus", "Opus", AiProvider.Anthropic),
     FLASH_25("flash_25", "Flash 2.5", AiProvider.Google),
     PRO_25("pro_25", "Pro 2.5", AiProvider.Google),

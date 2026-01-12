@@ -24,6 +24,7 @@ val Gemini3_Flash_Preview: LLModel = LLModel(
 
 val AiModel.koogModel: LLModel
     get() = when (this) {
+        AiModel.HAIKU3 -> AnthropicModels.Haiku_3
         AiModel.OPUS -> AnthropicModels.Opus_4_5
         AiModel.FLASH_25 -> GoogleModels.Gemini2_5Flash
         AiModel.PRO_25 -> GoogleModels.Gemini2_5Pro
