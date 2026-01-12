@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -88,6 +89,7 @@ fun AiOptionsPanel(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    Spacer(modifier = Modifier.weight(1f))
                     // User key indicator (if applicable)
                     if (uiState.isUserProvidedKey) {
                         UserKeyIndicator(
@@ -141,6 +143,7 @@ fun AiOptionsPanel(
                             .wrapContentWidth()
                             .padding(top = 8.dp)
                     )
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -148,7 +151,7 @@ fun AiOptionsPanel(
 }
 
 @Composable
-@Preview
+@Preview(heightDp = 300)
 fun AiOptionsLayoutPreview() {
     OrpheusTheme {
         AiOptionsPanel(

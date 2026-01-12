@@ -110,17 +110,17 @@ actual class SynthControlAgent(
     private var lastActionTime: Instant = Instant.DISTANT_PAST
     private var lastAgentActionTime: Instant = Instant.DISTANT_PAST
     
-    // User influence prompts (for Solo mode)
+    // User influence prompts (for Drone/Solo modes)
     private val _userPrompts = MutableSharedFlow<String>(extraBufferCapacity = 5)
-    
+
     // Completion signal (emits when all evolution prompts are finished)
     private val _completed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     /** Emits when the agent has completed all evolution prompts (Solo mode) */
     actual val completed: SharedFlow<Unit> = _completed.asSharedFlow()
-    
+
     /**
      * Inject a user prompt into the agent's input stream.
-     * Used by Solo mode to let users influence the composition.
+     * Used by Drone/Solo modes to let users influence the composition.
      */
     actual fun injectUserPrompt(text: String) {
         log.debug { "User influence: $text" }

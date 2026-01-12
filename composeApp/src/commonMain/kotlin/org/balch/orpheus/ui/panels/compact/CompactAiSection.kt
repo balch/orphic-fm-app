@@ -125,7 +125,7 @@ fun CompactAiSectionLayout(
                 isActive = true,
                 isSoloMode = aiOptionsState.isSoloActive,
                 sessionId = aiOptionsState.sessionId,
-                onSendInfluence = aiOptionsActions.onSendSoloInfluence,
+                onSendInfluence = aiOptionsActions.onSendInfluence,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)

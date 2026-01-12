@@ -90,7 +90,7 @@ fun ChatDialog(
                     isActive = true,
                     isSoloMode = isSoloActive,
                     sessionId = aiState.sessionId,
-                    onSendInfluence = { aiViewModel.actions.onSendSoloInfluence(it) },
+                    onSendInfluence = { aiViewModel.actions.onSendInfluence(it) },
                     // Give it full space but respect layout
                     modifier = Modifier
                         .fillMaxWidth()

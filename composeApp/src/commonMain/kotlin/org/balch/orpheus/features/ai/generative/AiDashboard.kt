@@ -79,6 +79,7 @@ fun AiDashboard(
         ChatInputField(
             isEnabled = true,
             onSendMessage = onSendInfluence,
+            placeholder = if (isSoloMode) "Influence Solo..." else "Influence Drone...",
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp)

@@ -84,7 +84,7 @@ data class AiOptionsPanelActions(
     val onToggleSolo: (Boolean) -> Unit,
     val onToggleRepl: (Boolean) -> Unit,
     val onToggleChatDialog: () -> Unit,
-    val onSendSoloInfluence: (String) -> Unit,
+    val onSendInfluence: (String) -> Unit,
     val onSaveApiKey: (AiProvider, String) -> Unit,
     val onClearApiKey: (AiProvider) -> Unit,
     val onSelectModel: (AiModel) -> Unit
@@ -95,7 +95,7 @@ data class AiOptionsPanelActions(
             onToggleSolo = {},
             onToggleRepl = {},
             onToggleChatDialog = {},
-            onSendSoloInfluence = {},
+            onSendInfluence = {},
             onSaveApiKey = { _, _ -> },
             onClearApiKey = {},
             onSelectModel = {}
@@ -535,10 +535,11 @@ class AiOptionsViewModel(
     }
 
     /**
-     * Send a user influence prompt to the Solo agent.
+     * Send a user influence prompt to the active agent (Drone or Solo).
      */
-    private fun sendSoloInfluence(text: String) {
-        log.debug { "Sending solo influence: $text" }
+    private fun sendInfluence(text: String) {
+        log.debug { "Sending influence prompt: $text" }
+        _droneAgent.value?.injectUserPrompt(text)
         _soloAgent.value?.injectUserPrompt(text)
     }
 
@@ -727,7 +728,7 @@ class AiOptionsViewModel(
         onToggleSolo = { toggleSolo(it) },
         onToggleRepl = { toggleRepl(it) },
         onToggleChatDialog = ::toggleChatDialog,
-        onSendSoloInfluence = ::sendSoloInfluence,
+        onSendInfluence = ::sendInfluence,
         onSaveApiKey = ::saveApiKey,
         onClearApiKey = ::clearApiKey,
         onSelectModel = ::selectModel

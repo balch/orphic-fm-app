@@ -39,6 +39,7 @@ fun ChatInputField(
     isEnabled: Boolean,
     onSendMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
+    placeholder: String? = null
 ) {
     var message by remember { mutableStateOf("") }
     val sendMessage = {
@@ -74,7 +75,7 @@ fun ChatInputField(
                 },
             placeholder = {
                 Text(
-                    if (isEnabled) "Ask Orpheus..." else "Thinking...",
+                    placeholder ?: if (isEnabled) "Ask Orpheus..." else "Thinking...",
                     style = typography.bodySmall,
                     fontSize = 11.sp,
                     color = OrpheusColors.sterlingSilver.copy(alpha = 0.5f)
