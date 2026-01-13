@@ -1,3 +1,3 @@
 package org.balch.orpheus.features.ai
 
-expect val isAiSupported: Boolean
+val isAiSupported: Boolean = true

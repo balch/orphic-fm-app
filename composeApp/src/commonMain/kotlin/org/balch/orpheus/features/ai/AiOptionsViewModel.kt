@@ -203,9 +203,7 @@ class AiOptionsViewModel(
             _isReplActive.value = false
             viewModelScope.launch {
                 try {
-                    replExecuteTool.execute(
-                        ReplExecuteArgs(code = "hush")
-                    )
+                    replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
                 } catch (e: Exception) {
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
