@@ -50,7 +50,6 @@ fun ModTweaksPanel(
         initialExpanded = true,
         expandedTitle = "System Tweaker",
         showCollapsedHeader = showCollapsedHeader,
-        fillMaxHeight = true
     ) {
         ModTweaksContent(voiceFeature = voiceFeature)
     }

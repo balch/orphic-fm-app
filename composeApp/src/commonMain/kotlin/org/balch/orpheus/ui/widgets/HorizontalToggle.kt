@@ -29,12 +29,14 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun HorizontalToggle(
     modifier: Modifier = Modifier,
-    leftLabel: String,
-    rightLabel: String,
-    isLeft: Boolean = true,
+    startLabel: String,
+    endLabel: String,
+    isStart: Boolean = true,
     onToggle: (Boolean) -> Unit,
     color: Color = OrpheusColors.warmGlow,
 ) {
+    val maxChars = listOf(startLabel, endLabel).maxOf { it.length }
+
     // Outer Box for robust click handling and touch target size
     Box(
         modifier = modifier
@@ -42,8 +44,8 @@ fun HorizontalToggle(
             .background(OrpheusColors.panelBackground)
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
             .clickable {
-                println("[HorizontalToggle] Clicked! Current isLeft=$isLeft -> New: ${!isLeft}")
-                onToggle(!isLeft)
+                println("[HorizontalToggle] Clicked! Current isLeft=$isStart -> New: ${!isStart}")
+                onToggle(!isStart)
             }
             .padding(horizontal = 6.dp, vertical = 6.dp), // Padding inside container
         contentAlignment = Alignment.Center
@@ -54,10 +56,10 @@ fun HorizontalToggle(
         ) {
             // Left label
             Text(
-                leftLabel,
+                startLabel.padStart(maxChars),
                 fontSize = 7.sp,
-                color = if (isLeft) color else color.copy(alpha = 0.5f),
-                fontWeight = if (isLeft) FontWeight.Bold else FontWeight.Normal,
+                color = if (isStart) color else color.copy(alpha = 0.5f),
+                fontWeight = if (isStart) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = 9.sp
             )
 
@@ -68,7 +70,7 @@ fun HorizontalToggle(
                     .height(12.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(color.copy(alpha = 0.2f)),
-                contentAlignment = if (isLeft) Alignment.CenterStart else Alignment.CenterEnd
+                contentAlignment = if (isStart) Alignment.CenterStart else Alignment.CenterEnd
             ) {
                 // Switch thumb
                 Box(
@@ -83,10 +85,10 @@ fun HorizontalToggle(
 
             // Right label
             Text(
-                rightLabel,
+                endLabel.padEnd(maxChars),
                 fontSize = 7.sp,
-                color = if (!isLeft) color else color.copy(alpha = 0.5f),
-                fontWeight = if (!isLeft) FontWeight.Bold else FontWeight.Normal,
+                color = if (!isStart) color else color.copy(alpha = 0.5f),
+                fontWeight = if (!isStart) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = 9.sp
             )
         }
@@ -99,16 +101,16 @@ fun HorizontalTogglePreview() {
     OrpheusTheme {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             HorizontalToggle(
-                leftLabel = "F",
-                rightLabel = "S",
-                isLeft = true,
+                startLabel = "F",
+                endLabel = "S",
+                isStart = true,
                 onToggle = {},
                 color = OrpheusColors.neonCyan
             )
             HorizontalToggle(
-                leftLabel = "LFO",
-                rightLabel = "OFF",
-                isLeft = false,
+                startLabel = "LFO",
+                endLabel = "OFF",
+                isStart = false,
                 onToggle = {},
                 color = OrpheusColors.warmGlow
             )

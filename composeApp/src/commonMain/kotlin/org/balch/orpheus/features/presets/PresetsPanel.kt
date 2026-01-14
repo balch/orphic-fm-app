@@ -85,7 +85,6 @@ fun PresetsPanel(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         modifier = modifier,
-        fillMaxHeight = fillMaxHeight,
         showCollapsedHeader = showCollapsedHeader
     ) {
         Column(

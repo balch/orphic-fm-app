@@ -25,19 +25,25 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
+enum class Switch3WayState {
+    START, MIDDLE, END
+}
+
 @Composable
 fun HorizontalSwitch3Way(
     modifier: Modifier = Modifier,
-    state: ModSource,
-    onStateChange: (ModSource) -> Unit,
+    state: Switch3WayState,
+    startText: String,
+    endText: String,
+    onStateChange: (Switch3WayState) -> Unit,
     color: Color = OrpheusColors.warmGlow,
-    controlId: String? = null
+    controlId: String? = null,
 ) {
+    val maxChars = listOf(startText, endText).maxOf { it.length }
     val learnState = LocalLearnModeState.current
     val isActive = learnState.isActive
 
@@ -64,9 +70,9 @@ fun HorizontalSwitch3Way(
                     val fraction = offset.x / width.toFloat()
 
                     val newState = when {
-                        fraction < 0.42f -> ModSource.LFO
-                        fraction < 0.58f -> ModSource.OFF
-                        else -> ModSource.VOICE_FM
+                        fraction < 0.42f -> Switch3WayState.START
+                        fraction < 0.58f -> Switch3WayState.MIDDLE
+                        else -> Switch3WayState.END
                     }
                     onStateChange(newState)
                 }
@@ -80,10 +86,10 @@ fun HorizontalSwitch3Way(
         ) {
             // Left Label (LFO)
             Text(
-                "LFO",
+                startText.padStart(maxChars),
                 fontSize = 7.sp,
-                color = if (state == ModSource.LFO) color else color.copy(alpha = 0.5f),
-                fontWeight = if (state == ModSource.LFO) FontWeight.Bold else FontWeight.Normal,
+                color = if (state == Switch3WayState.START) color else color.copy(alpha = 0.5f),
+                fontWeight = if (state == Switch3WayState.START) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = 9.sp
             )
 
@@ -109,9 +115,9 @@ fun HorizontalSwitch3Way(
                 // FM (Right) = 40 - 13 = 27.dp
 
                 val targetOffset = when (state) {
-                    ModSource.LFO -> 0.dp
-                    ModSource.OFF -> (trackWidth - thumbWidth) / 2
-                    ModSource.VOICE_FM -> trackWidth - thumbWidth
+                    Switch3WayState.START -> 0.dp
+                    Switch3WayState.MIDDLE -> (trackWidth - thumbWidth) / 2
+                    Switch3WayState.END -> trackWidth - thumbWidth
                 }
 
                 val animatedOffset by animateDpAsState(targetOffset)
@@ -128,12 +134,11 @@ fun HorizontalSwitch3Way(
                 )
             }
 
-            // Right Label (FM)
             Text(
-                "FM",
+                endText.padEnd(maxChars),
                 fontSize = 7.sp,
-                color = if (state == ModSource.VOICE_FM) color else color.copy(alpha = 0.5f),
-                fontWeight = if (state == ModSource.VOICE_FM) FontWeight.Bold else FontWeight.Normal,
+                color = if (state == Switch3WayState.END) color else color.copy(alpha = 0.5f),
+                fontWeight = if (state == Switch3WayState.END) FontWeight.Bold else FontWeight.Normal,
                 lineHeight = 9.sp
             )
         }
@@ -146,19 +151,25 @@ fun HorizontalSwitch3WayPreview() {
     OrpheusTheme {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             HorizontalSwitch3Way(
-                state = ModSource.OFF,
+                state = Switch3WayState.MIDDLE,
                 onStateChange = {},
-                color = OrpheusColors.neonMagenta
+                color = OrpheusColors.neonMagenta,
+                startText = "LFO",
+                endText = "FM",
             )
             HorizontalSwitch3Way(
-                state = ModSource.VOICE_FM,
+                state = Switch3WayState.END,
                 onStateChange = {},
-                color = OrpheusColors.neonMagenta
+                color = OrpheusColors.neonMagenta,
+                startText = "LFO",
+                endText = "FM",
             )
             HorizontalSwitch3Way(
-                state = ModSource.LFO,
+                state = Switch3WayState.START,
                 onStateChange = {},
-                color = OrpheusColors.neonMagenta
+                color = OrpheusColors.neonMagenta,
+                startText = "LFO",
+                endText = "FM",
             )
         }
     }

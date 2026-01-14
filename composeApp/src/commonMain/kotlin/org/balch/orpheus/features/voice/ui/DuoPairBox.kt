@@ -32,6 +32,7 @@ import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
 import org.balch.orpheus.ui.widgets.PulseButton
+import org.balch.orpheus.ui.widgets.Switch3WayState
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 
@@ -86,11 +87,22 @@ fun DuoPairBox(
             val pairIndex = voiceA / 2
 
             HorizontalSwitch3Way(
-                state = duoModSource,
-                onStateChange = {
-                    voiceActions.onDuoModSourceChange(pairIndex, it)
+                state = when (duoModSource) {
+                    ModSource.OFF -> Switch3WayState.MIDDLE
+                    ModSource.VOICE_FM -> Switch3WayState.END
+                    ModSource.LFO -> Switch3WayState.START
+                },
+                onStateChange = { state ->
+                    val modSource = when (state) {
+                        Switch3WayState.START -> ModSource.LFO
+                        Switch3WayState.MIDDLE -> ModSource.OFF
+                        Switch3WayState.END -> ModSource.VOICE_FM
+                    }
+                    voiceActions.onDuoModSourceChange(pairIndex, modSource)
                 },
                 color = color,
+                startText = "LFO",
+                endText = "FM",
                 controlId = ControlIds.duoModSource(pairIndex)
             )
         }
