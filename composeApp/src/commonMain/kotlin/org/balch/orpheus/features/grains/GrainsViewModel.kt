@@ -12,12 +12,16 @@ import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.dsp.synth.grains.GrainsMode
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.synthViewModel
 
 @Immutable
@@ -27,7 +31,7 @@ data class GrainsUiState(
     val pitch: Float = 0.0f,     // Pitch Shifting (semitones/ratio)
     val density: Float = 0.5f,   // Feedback / Grain Overlap
     val texture: Float = 0.5f,   // Filter (LP/HP)
-    val dryWet: Float = 0.0f,    // Mix
+    val dryWet: Float = 0.5f,    // Mix (0=dry, 1=wet, 0.5=50/50)
     val freeze: Boolean = false, // Loop/Freeze
     val trigger: Boolean = false, // Trigger
     val mode: GrainsMode = GrainsMode.GRANULAR // Processing mode
@@ -57,6 +61,7 @@ typealias GrainsFeature = SynthFeature<GrainsUiState, GrainsPanelActions>
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class GrainsViewModel(
     private val synthEngine: SynthEngine,
+    presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), GrainsFeature {
 
@@ -134,6 +139,39 @@ class GrainsViewModel(
             synthEngine.setGrainsFreeze(state.freeze)
             synthEngine.setGrainsMode(state.mode.ordinal)
         }
+        
+        // Subscribe to preset changes for state restore
+        presetLoader.presetFlow
+            .onEach { preset ->
+                val mode = try {
+                    GrainsMode.entries[preset.grainsMode]
+                } catch (e: Exception) {
+                    GrainsMode.GRANULAR
+                }
+                _uiState.update {
+                    it.copy(
+                        position = preset.grainsPosition,
+                        size = preset.grainsSize,
+                        pitch = preset.grainsPitch,
+                        density = preset.grainsDensity,
+                        texture = preset.grainsTexture,
+                        dryWet = preset.grainsDryWet,
+                        freeze = preset.grainsFreeze,
+                        mode = mode
+                    )
+                }
+                // Apply to engine
+                synthEngine.setGrainsPosition(preset.grainsPosition)
+                synthEngine.setGrainsSize(preset.grainsSize)
+                synthEngine.setGrainsPitch(preset.grainsPitch)
+                synthEngine.setGrainsDensity(preset.grainsDensity)
+                synthEngine.setGrainsTexture(preset.grainsTexture)
+                synthEngine.setGrainsDryWet(preset.grainsDryWet)
+                synthEngine.setGrainsFreeze(preset.grainsFreeze)
+                synthEngine.setGrainsMode(preset.grainsMode)
+            }
+            .flowOn(dispatcherProvider.default)
+            .launchIn(viewModelScope)
     }
 
     companion object Companion {
@@ -148,3 +186,4 @@ class GrainsViewModel(
             synthViewModel<GrainsViewModel, GrainsFeature>()
     }
 }
+

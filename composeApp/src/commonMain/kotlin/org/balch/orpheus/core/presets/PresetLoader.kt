@@ -118,7 +118,17 @@ class PresetLoader(
             beatsEuclideanLengths = List(3) { i -> engine.getBeatsEuclideanLength(i) },
             beatsRandomness = engine.getBeatsRandomness(),
             beatsSwing = engine.getBeatsSwing(),
-            beatsMix = engine.getBeatsMix()
+            beatsMix = engine.getBeatsMix(),
+            
+            // Grains (captured from engine)
+            grainsPosition = engine.getGrainsPosition(),
+            grainsSize = engine.getGrainsSize(),
+            grainsPitch = engine.getGrainsPitch(),
+            grainsDensity = engine.getGrainsDensity(),
+            grainsTexture = engine.getGrainsTexture(),
+            grainsDryWet = engine.getGrainsDryWet(),
+            grainsFreeze = engine.getGrainsFreeze(),
+            grainsMode = engine.getGrainsMode()
         )
     }
 }

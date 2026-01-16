@@ -88,6 +88,16 @@ data class DronePreset(
     val beatsSwing: Float = 0f,
     val beatsMix: Float = 0.7f,
 
+    // Grains (Clouds-style texture synthesizer)
+    val grainsPosition: Float = 0.2f,
+    val grainsSize: Float = 0.5f,
+    val grainsPitch: Float = 0.0f,
+    val grainsDensity: Float = 0.5f,
+    val grainsTexture: Float = 0.5f,
+    val grainsDryWet: Float = 0.5f,
+    val grainsFreeze: Boolean = false,
+    val grainsMode: Int = 0,           // GrainsMode ordinal (0=Granular, 1=Reverse, 2=Shimmer)
+
     // Metadata
     val createdAt: Long = currentTimeMillis()
 )
