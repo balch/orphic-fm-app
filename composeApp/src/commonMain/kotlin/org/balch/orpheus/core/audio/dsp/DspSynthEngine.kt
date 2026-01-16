@@ -71,6 +71,10 @@ class DspSynthEngine(
 
     // TOTAL FB: Output → LFO Frequency Modulation
     private val totalFbGain = audioEngine.createMultiply()
+    
+    // Voice sum buses (for feeding into Grains before resonator)
+    private val voiceSumLeft = audioEngine.createPassThrough()
+    private val voiceSumRight = audioEngine.createPassThrough()
 
     // State caches
     private val quadPitchOffsets = DoubleArray(3) { 0.5 }
@@ -152,6 +156,8 @@ class DspSynthEngine(
         
         // Register local units
         audioEngine.addUnit(totalFbGain)
+        audioEngine.addUnit(voiceSumLeft)
+        audioEngine.addUnit(voiceSumRight)
         
         // Initialize all plugins (sets up internal wiring)
         plugins.forEach { it.initialize() }
@@ -163,17 +169,27 @@ class DspSynthEngine(
 
         // ═══════════════════════════════════════════════════════════
         // INTER-PLUGIN WIRING
+        // 
+        // Signal Flow (Grains PARALLEL to Resonator):
+        //   Voices → Pan → voiceSum ─┬→ Grains ──────────────────→ Stereo Sum
+        //                            └→ Resonator → Distortion ──→ Stereo Sum
+        //   Drums → Resonator ↗ (bypasses Grains entirely)
         // ═══════════════════════════════════════════════════════════
 
         // HyperLFO → Delay (modulation)
         hyperLfo.output.connect(delayPlugin.inputs["lfoInput"]!!)
 
-        // Distortion outputs → Grains Inputs (Insert Chain)
-        distortionPlugin.outputs["outputLeft"]?.connect(grainsPlugin.inputs["inputLeft"]!!)
-        distortionPlugin.outputs["outputRight"]?.connect(grainsPlugin.inputs["inputRight"]!!)
-
+        // Voice Sum → Grains (parallel granular path for voices only)
+        voiceSumLeft.output.connect(grainsPlugin.inputs["inputLeft"]!!)
+        voiceSumRight.output.connect(grainsPlugin.inputs["inputRight"]!!)
+        
+        // Grains → Stereo Sum (granular texture output)
         grainsPlugin.outputs["output"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
         grainsPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+
+        // Distortion → Stereo Sum (resonator path output)
+        distortionPlugin.outputs["outputLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        distortionPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
 
         // Delay wet outputs → Stereo sum
         delayPlugin.outputs["wetLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
@@ -189,7 +205,7 @@ class DspSynthEngine(
         stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
         stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
 
-        // Drum outputs → Resonator gated inputs (excitation)
+        // Drum outputs → Resonator ONLY (drums bypass Grains)
         drumPlugin.outputs["outputLeft"]?.connect(resonatorPlugin.inputs["drumLeft"]!!)
         drumPlugin.outputs["outputRight"]?.connect(resonatorPlugin.inputs["drumRight"]!!)
         
@@ -231,22 +247,26 @@ class DspSynthEngine(
             voiceB.envelopeOutput.connect(voiceA.couplingInput)
         }
 
-        // Wire per-voice panning: Voice → PanL/R → Distortion inputs
+        // Wire per-voice panning: Voice → PanL/R → voiceSum (for Grains) AND Resonator
         voices.forEachIndexed { index, voice ->
             // Voice audio goes to pan gain inputs
             voice.output.connect(stereoPlugin.getVoicePanInputLeft(index))
             voice.output.connect(stereoPlugin.getVoicePanInputRight(index))
             
-            // Panned audio goes to Resonator gated inputs (excitation)
+            // Panned audio goes to voice sum buses (feeds Grains in parallel)
+            stereoPlugin.getVoicePanOutputLeft(index).connect(voiceSumLeft.input)
+            stereoPlugin.getVoicePanOutputRight(index).connect(voiceSumRight.input)
+            
+            // Panned audio ALSO goes to Resonator gated inputs (excitation) - parallel path
             stereoPlugin.getVoicePanOutputLeft(index).connect(resonatorPlugin.inputs["synthLeft"]!!)
             stereoPlugin.getVoicePanOutputRight(index).connect(resonatorPlugin.inputs["synthRight"]!!)
             
-            // Panned audio goes to Resonator non-gated inputs (full dry path)
+            // Panned audio ALSO goes to Resonator non-gated inputs (full dry path)
             stereoPlugin.getVoicePanOutputLeft(index).connect(resonatorPlugin.inputs["fullSynthLeft"]!!)
             stereoPlugin.getVoicePanOutputRight(index).connect(resonatorPlugin.inputs["fullSynthRight"]!!)
         }
 
-        // Resonator output goes to Distortion input
+        // Resonator output goes to Distortion input (resonator path continues)
         resonatorPlugin.outputs["outputLeft"]!!.connect(distortionPlugin.inputs["inputLeft"]!!)
         resonatorPlugin.outputs["outputRight"]!!.connect(distortionPlugin.inputs["inputRight"]!!)
 
