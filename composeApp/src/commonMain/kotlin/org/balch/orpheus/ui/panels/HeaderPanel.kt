@@ -32,6 +32,9 @@ import org.balch.orpheus.features.drums808.DrumsPanel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
 import org.balch.orpheus.features.evo.EvoViewModel
+import org.balch.orpheus.features.grains.GrainsFeature
+import org.balch.orpheus.features.grains.GrainsPanel
+import org.balch.orpheus.features.grains.GrainsViewModel
 import org.balch.orpheus.features.lfo.DuoLfoPanel
 import org.balch.orpheus.features.lfo.LfoFeature
 import org.balch.orpheus.features.lfo.LfoViewModel
@@ -71,6 +74,7 @@ fun HeaderPanel(
     delayFeature: DelayFeature = DelayViewModel.feature(),
     distortionFeature: DistortionFeature = DistortionViewModel.feature(),
     resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
+    grainsFeature: GrainsFeature = GrainsViewModel.feature(),
     liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
     aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
@@ -148,6 +152,13 @@ fun HeaderPanel(
             isExpanded = PanelId.RESONATOR.isExpanded(),
             onExpandedChange = { PanelId.RESONATOR.setExpanded(it) },
             modifier = panelModifier(PanelId.RESONATOR.isExpanded())
+        )
+        // Grains Panel
+        GrainsPanel(
+             feature = grainsFeature,
+             isExpanded = PanelId.GRAINS.isExpanded(),
+             onExpandedChange = { PanelId.GRAINS.setExpanded(it) },
+             modifier = panelModifier(PanelId.GRAINS.isExpanded())
         )
         // Live Coding panel
         LiveCodePanel(

@@ -59,15 +59,14 @@ class DspResonatorPlugin(
     private val finalSumR = audioEngine.createAdd()
     
     // State
-    private var _enabled = false
     private var _mode = 0
     private var _target = 1
-    private var _targetMix = 0.5f
+    private var _targetMix = 0.0f
     private var _structure = 0.25f
     private var _brightness = 0.5f
     private var _damping = 0.3f
     private var _position = 0.5f
-    private var _mix = 0.5f
+    private var _mix = 0.0f
     
     override val audioUnits: List<AudioUnit> = listOf(
         resonator,
@@ -134,8 +133,8 @@ class DspResonatorPlugin(
         resoMixR.output.connect(finalSumR.inputA)
         bypassSumR.output.connect(finalSumR.inputB)
         
-        // Apply initial settings
-        resonator.setEnabled(_enabled)
+        // Apply initial settings (always enabled)
+        resonator.setEnabled(true)
         resonator.setMode(_mode)
         resonator.setStructure(_structure)
         resonator.setBrightness(_brightness)
@@ -179,11 +178,6 @@ class DspResonatorPlugin(
         drumBypassGainR.inputB.set(drumBypass)
         synthBypassGainL.inputB.set(synthBypass)
         synthBypassGainR.inputB.set(synthBypass)
-    }
-    
-    fun setEnabled(enabled: Boolean) {
-        _enabled = enabled
-        resonator.setEnabled(enabled)
     }
     
     fun setMode(mode: Int) {
@@ -237,7 +231,6 @@ class DspResonatorPlugin(
     }
     
     // Getters for state saving
-    fun getEnabled(): Boolean = _enabled
     fun getMode(): Int = _mode
     fun getTarget(): Int = _target
     fun getTargetMix(): Float = _targetMix

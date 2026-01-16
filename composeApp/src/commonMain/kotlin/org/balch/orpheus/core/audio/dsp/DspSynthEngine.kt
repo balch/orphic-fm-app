@@ -19,6 +19,7 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspDelayPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDistortionPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDrumPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDuoLfoPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspGrainsPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPerStringBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspResonatorPlugin
@@ -49,6 +50,7 @@ class DspSynthEngine(
     private val perStringBenderPlugin = plugins.filterIsInstance<DspPerStringBenderPlugin>().first()
     private val drumPlugin = plugins.filterIsInstance<DspDrumPlugin>().first()
     private val resonatorPlugin = plugins.filterIsInstance<DspResonatorPlugin>().first()
+    private val grainsPlugin = plugins.filterIsInstance<DspGrainsPlugin>().first()
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
@@ -166,9 +168,12 @@ class DspSynthEngine(
         // HyperLFO → Delay (modulation)
         hyperLfo.output.connect(delayPlugin.inputs["lfoInput"]!!)
 
-        // Distortion outputs → Stereo sum
-        distortionPlugin.outputs["outputLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        distortionPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        // Distortion outputs → Grains Inputs (Insert Chain)
+        distortionPlugin.outputs["outputLeft"]?.connect(grainsPlugin.inputs["inputLeft"]!!)
+        distortionPlugin.outputs["outputRight"]?.connect(grainsPlugin.inputs["inputRight"]!!)
+
+        grainsPlugin.outputs["output"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        grainsPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
 
         // Delay wet outputs → Stereo sum
         delayPlugin.outputs["wetLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
@@ -834,7 +839,6 @@ class DspSynthEngine(
     // ═══════════════════════════════════════════════════════════
     // Rings Resonator Delegation
     // ═══════════════════════════════════════════════════════════
-    override fun setResonatorEnabled(enabled: Boolean) = resonatorPlugin.setEnabled(enabled)
     override fun setResonatorMode(mode: Int) = resonatorPlugin.setMode(mode)
     override fun setResonatorTarget(target: Int) = resonatorPlugin.setTarget(target)
     override fun setResonatorTargetMix(targetMix: Float) = resonatorPlugin.setTargetMix(targetMix)
@@ -845,7 +849,6 @@ class DspSynthEngine(
     override fun setResonatorMix(value: Float) = resonatorPlugin.setMix(value)
     override fun strumResonator(frequency: Float) = resonatorPlugin.strum(frequency)
     
-    override fun getResonatorEnabled(): Boolean = resonatorPlugin.getEnabled()
     override fun getResonatorMode(): Int = resonatorPlugin.getMode()
     override fun getResonatorTarget(): Int = resonatorPlugin.getTarget()
     override fun getResonatorTargetMix(): Float = resonatorPlugin.getTargetMix()
@@ -900,4 +903,60 @@ class DspSynthEngine(
     
     override fun setBeatsSwing(swing: Float) { _beatsSwing = swing }
     override fun getBeatsSwing(): Float = _beatsSwing
+
+    // Grains Implementation
+    private var _grainsPosition = 0f
+    private var _grainsSize = 0f
+    private var _grainsPitch = 0f
+    private var _grainsDensity = 0f
+    private var _grainsTexture = 0f
+    private var _grainsDryWet = 0f
+    private var _grainsFreeze = false
+    
+    override fun setGrainsPosition(value: Float) {
+        _grainsPosition = value
+        grainsPlugin.inputs["position"]?.set(value.toDouble())
+    }
+    override fun setGrainsSize(value: Float) {
+        _grainsSize = value
+        grainsPlugin.inputs["size"]?.set(value.toDouble())
+    }
+    override fun setGrainsPitch(value: Float) {
+        _grainsPitch = value
+        grainsPlugin.inputs["pitch"]?.set(value.toDouble())
+    }
+    override fun setGrainsDensity(value: Float) {
+        _grainsDensity = value
+        grainsPlugin.inputs["density"]?.set(value.toDouble())
+    }
+    override fun setGrainsTexture(value: Float) {
+        _grainsTexture = value
+        grainsPlugin.inputs["texture"]?.set(value.toDouble())
+    }
+    override fun setGrainsDryWet(value: Float) {
+        _grainsDryWet = value
+        grainsPlugin.inputs["dryWet"]?.set(value.toDouble())
+    }
+    override fun setGrainsFreeze(frozen: Boolean) {
+        _grainsFreeze = frozen
+        grainsPlugin.inputs["freeze"]?.set(if (frozen) 1.0 else 0.0)
+    }
+    override fun setGrainsTrigger(trigger: Boolean) {
+        grainsPlugin.inputs["trigger"]?.set(if (trigger) 1.0 else 0.0)
+    }
+    
+    private var _grainsMode: Int = 0 // 0=Granular (default)
+    override fun setGrainsMode(mode: Int) {
+        _grainsMode = mode
+        grainsPlugin.setMode(mode) // This will call CloudsUnit.setMode
+    }
+    
+    override fun getGrainsPosition(): Float = _grainsPosition
+    override fun getGrainsSize(): Float = _grainsSize
+    override fun getGrainsPitch(): Float = _grainsPitch
+    override fun getGrainsDensity(): Float = _grainsDensity
+    override fun getGrainsTexture(): Float = _grainsTexture
+    override fun getGrainsDryWet(): Float = _grainsDryWet
+    override fun getGrainsFreeze(): Boolean = _grainsFreeze
+    override fun getGrainsMode(): Int = _grainsMode
 }

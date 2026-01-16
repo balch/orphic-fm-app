@@ -43,13 +43,12 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         
         RESONATOR (Rings Physical Modeling) - PERFECT FOR DRONES:
         Physical modeling for metallic, string-like, and bell textures:
-        - RESONATOR_ENABLED: Turn on/off (0=off, 1=on)
         - RESONATOR_MODE: 0=Modal (bell/chime), 0.5=String (sustained), 1=Sympathetic (sitar)
         - RESONATOR_STRUCTURE: Harmonic spread (0=focused, 1=wide/bell-like)
         - RESONATOR_BRIGHTNESS: Tone color (0=dark/muted, 1=bright/shimmery)
         - RESONATOR_DAMPING: Decay time (0=infinite sustain, 1=quick fade)
         - RESONATOR_POSITION: Excitation point (0.5=center for fundamental)
-        - RESONATOR_MIX: Blend with dry signal (0.2-0.4 for subtle texture, 0.7+ for dominant)
+        - RESONATOR_MIX: Blend with dry signal (0=off, 0.2-0.4 for subtle texture, 0.7+ for dominant)
         
         RESONATOR DRONE TIPS:
         - Modal mode + low damping = eternal, singing bell pad

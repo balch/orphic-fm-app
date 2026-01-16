@@ -30,6 +30,8 @@ import org.balch.orpheus.features.drums808.DrumFeature
 import org.balch.orpheus.features.drums808.DrumViewModel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoViewModel
+import org.balch.orpheus.features.grains.GrainsFeature
+import org.balch.orpheus.features.grains.GrainsViewModel
 import org.balch.orpheus.features.lfo.LfoFeature
 import org.balch.orpheus.features.lfo.LfoViewModel
 import org.balch.orpheus.features.midi.MidiFeature
@@ -69,6 +71,7 @@ fun DesktopSynthScreen(
     evoFeature: EvoFeature = EvoViewModel.feature(),
     headerFeature: HeaderFeature = HeaderViewModel.feature(),
     presetsFeature: PresetsFeature= PresetsViewModel.feature(),
+    grainsFeature: GrainsFeature = GrainsViewModel.feature(),
     midiFeature: MidiFeature = MidiViewModel.feature(),
     stereoFeature: StereoFeature = StereoViewModel.feature(),
     vizFeature: VizFeature = VizViewModel.feature(),
@@ -110,6 +113,7 @@ fun DesktopSynthScreen(
                 modifier = Modifier.fillMaxWidth()
                     .weight(0.75f),
                 headerFeature = headerFeature,
+                grainsFeature = grainsFeature,
                 presetsFeature = presetsFeature,
                 midiFeature = midiFeature,
                 stereoFeature = stereoFeature,
@@ -188,6 +192,7 @@ private fun DesktopSynthScreenPreview(
             voiceFeature = VoiceViewModel.previewFeature(),
             evoFeature = EvoViewModel.previewFeature(),
             headerFeature = HeaderViewModel.previewFeature(),
+            grainsFeature = GrainsViewModel.previewFeature(),
             presetsFeature = PresetsViewModel.previewFeature(),
             midiFeature = MidiViewModel.previewFeature(),
             stereoFeature = StereoViewModel.previewFeature(),

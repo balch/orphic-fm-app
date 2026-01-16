@@ -108,40 +108,23 @@ fun ResonatorPanel(
                         SingleChoiceSegmentedButtonRow(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            // "Off" option
-                            SegmentedButton(
-                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 4),
-                                onClick = { actions.setEnabled(false) },
-                                selected = !state.enabled,
-                                colors = segColors,
-                                icon = {}
-                            ) {
-                                Text(
-                                    text = "Off",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1
-                                )
-                            }
-
-                            // Regular modes
+                            // Regular modes (no "Off" option)
                             ResonatorMode.entries.forEachIndexed { index, mode ->
-                                val buttonIndex = index + 1
                                 SegmentedButton(
                                     shape = SegmentedButtonDefaults.itemShape(
-                                        index = buttonIndex,
-                                        count = 4
+                                        index = index,
+                                        count = ResonatorMode.entries.size
                                     ),
                                     onClick = {
-                                        actions.setEnabled(true)
                                         actions.setMode(mode)
                                     },
-                                    selected = state.enabled && state.mode == mode,
+                                    selected = state.mode == mode,
                                     colors = segColors,
                                     icon = {}
                                 ) {
                                     Text(
                                         text = mode.displayName,
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.labelMedium,
                                         maxLines = 1
                                     )
                                 }
@@ -375,6 +358,6 @@ private fun SnapBackButton(
 @Composable
 fun ResonatorPanelPreview() {
     OrpheusTheme {
-        ResonatorPanel(feature = ResonatorViewModel.previewFeature(ResonatorUiState(enabled = true)), isExpanded = true)
+        ResonatorPanel(feature = ResonatorViewModel.previewFeature(ResonatorUiState()), isExpanded = true)
     }
 }

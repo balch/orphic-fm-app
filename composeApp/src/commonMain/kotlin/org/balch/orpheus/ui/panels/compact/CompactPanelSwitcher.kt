@@ -48,6 +48,7 @@ enum class CompactPanelType(val displayName: String, val color: Color) {
     DISTORTION("Distortion", OrpheusColors.neonMagenta),
     TWEAKS("Tweaks", OrpheusColors.electricBlue), // Mod tweaks panel
     RESONATOR("Rezo", OrpheusColors.lakersGold), // Lakers-themed Resonator
+    GRAINS("Grains", OrpheusColors.grainsRed), // Lakers-themed Resonator
     LFO("LFO", OrpheusColors.neonCyan),
     DELAY("Delay", OrpheusColors.warmGlow),
     REPL("REPL", OrpheusColors.neonCyan),

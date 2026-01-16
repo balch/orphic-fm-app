@@ -46,6 +46,9 @@ import org.balch.orpheus.features.drums808.DrumsPanel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
 import org.balch.orpheus.features.evo.EvoViewModel
+import org.balch.orpheus.features.grains.GrainsFeature
+import org.balch.orpheus.features.grains.GrainsPanel
+import org.balch.orpheus.features.grains.GrainsViewModel
 import org.balch.orpheus.features.lfo.DuoLfoPanel
 import org.balch.orpheus.features.lfo.LfoFeature
 import org.balch.orpheus.features.lfo.LfoViewModel
@@ -173,6 +176,7 @@ private fun CompactPortraitScreenLayout(
     stereoFeature: StereoFeature = StereoViewModel.feature(),
     vizFeature: VizFeature = VizViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
+    grainsFeature: GrainsFeature = GrainsViewModel.feature(),
     drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
     resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
     focusRequester: FocusRequester = remember { FocusRequester() },
@@ -251,6 +255,7 @@ private fun CompactPortraitScreenLayout(
                                 drumFeature = drumFeature,
                                 drumBeatsFeature = drumBeatsFeature,
                                 resonatorFeature = resonatorFeature,
+                                grainsFeature = grainsFeature,
                             )
                         }
                     }
@@ -327,6 +332,7 @@ private fun PanelContent(
     drumFeature: DrumFeature,
     drumBeatsFeature: DrumBeatsFeature,
     resonatorFeature: ResonatorFeature,
+    grainsFeature: GrainsFeature,
     modifier: Modifier = Modifier,
 ) {
     val panelModifier = modifier
@@ -446,6 +452,15 @@ private fun PanelContent(
                 showCollapsedHeader = false
             )
         }
+
+        CompactPanelType.GRAINS-> {
+            GrainsPanel(
+                feature = grainsFeature,
+                modifier = panelModifier,
+                isExpanded = true,
+                showCollapsedHeader = false
+            )
+        }
     }
 }
 
@@ -468,7 +483,8 @@ private fun CompactPortraitLayoutPreview() {
                 evoFeature = EvoViewModel.previewFeature(),
                 lfoFeature = LfoViewModel.previewFeature(),
                 stereoFeature = StereoViewModel.previewFeature(),
-                vizFeature = VizViewModel.previewFeature()
+                vizFeature = VizViewModel.previewFeature(),
+                grainsFeature = GrainsViewModel.previewFeature(),
             )
         }
     }

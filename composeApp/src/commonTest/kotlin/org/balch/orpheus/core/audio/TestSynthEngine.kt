@@ -175,7 +175,6 @@ open class TestSynthEngine : SynthEngine {
     override fun setDrumTone(type: Int, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {}
     
     // Resonator (Rings) stub implementations
-    private var _resonatorEnabled = false
     private var _resonatorMode = 0
     private var _resonatorTarget = 1  // 0=Drums, 1=Both, 2=Synth
     private var _resonatorTargetMix = 0.5f  // Continuous mix
@@ -185,7 +184,6 @@ open class TestSynthEngine : SynthEngine {
     private var _resonatorPosition = 0.5f
     private var _resonatorMix = 0.5f
     
-    override fun setResonatorEnabled(enabled: Boolean) { _resonatorEnabled = enabled }
     override fun setResonatorMode(mode: Int) { _resonatorMode = mode }
     override fun setResonatorTarget(target: Int) { _resonatorTarget = target }
     override fun setResonatorTargetMix(targetMix: Float) { _resonatorTargetMix = targetMix }
@@ -196,7 +194,6 @@ open class TestSynthEngine : SynthEngine {
     override fun setResonatorMix(value: Float) { _resonatorMix = value }
     override fun strumResonator(frequency: Float) {}
     
-    override fun getResonatorEnabled(): Boolean = _resonatorEnabled
     override fun getResonatorMode(): Int = _resonatorMode
     override fun getResonatorTarget(): Int = _resonatorTarget
     override fun getResonatorTargetMix(): Float = _resonatorTargetMix
@@ -254,5 +251,35 @@ open class TestSynthEngine : SynthEngine {
     private var _beatsMix = 0.7f
     override fun setBeatsMix(mix: Float) { _beatsMix = mix }
     override fun getBeatsMix(): Float = _beatsMix
+
+    // Clouds Stubs
+    private var _cloudsPosition = 0f
+    private var _cloudsSize = 0f
+    private var _cloudsPitch = 0f
+    private var _cloudsDensity = 0f
+    private var _cloudsTexture = 0f
+    private var _cloudsDryWet = 0f
+    private var _cloudsFreeze = false
+    
+    override fun setGrainsPosition(value: Float) { _cloudsPosition = value }
+    override fun setGrainsSize(value: Float) { _cloudsSize = value }
+    override fun setGrainsPitch(value: Float) { _cloudsPitch = value }
+    override fun setGrainsDensity(value: Float) { _cloudsDensity = value }
+    override fun setGrainsTexture(value: Float) { _cloudsTexture = value }
+    override fun setGrainsDryWet(value: Float) { _cloudsDryWet = value }
+    override fun setGrainsFreeze(frozen: Boolean) { _cloudsFreeze = frozen }
+    override fun setGrainsTrigger(trigger: Boolean) {}
+
+    override fun getGrainsPosition(): Float = _cloudsPosition
+    override fun getGrainsSize(): Float = _cloudsSize
+    override fun getGrainsPitch(): Float = _cloudsPitch
+    override fun getGrainsDensity(): Float = _cloudsDensity
+    override fun getGrainsTexture(): Float = _cloudsTexture
+    override fun getGrainsDryWet(): Float = _cloudsDryWet
+    override fun getGrainsFreeze(): Boolean = _cloudsFreeze
+    
+    private var _cloudsMode = 0
+    override fun setGrainsMode(mode: Int) { _cloudsMode = mode }
+    override fun getGrainsMode(): Int = _cloudsMode
 }
 

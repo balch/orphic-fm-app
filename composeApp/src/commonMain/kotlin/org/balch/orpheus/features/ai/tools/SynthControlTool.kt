@@ -86,13 +86,12 @@ class SynthControlTool @Inject constructor(
         RESONATOR (Rings Physical Modeling):
         Physical modeling resonator ported from Mutable Instruments Rings.
         Perfect for adding metallic, string-like, or bell tones to your sound:
-        - RESONATOR_ENABLED: 0=off, 1=on
         - RESONATOR_MODE: 0=Modal (bell/plate), 0.5=String (Karplus-Strong), 1=Sympathetic (sitar-like)
         - RESONATOR_STRUCTURE: Controls harmonic spread/inharmonicity (0-1)
         - RESONATOR_BRIGHTNESS: High frequency content (0=dark, 1=bright)
         - RESONATOR_DAMPING: Decay time (0=long sustain, 1=quick decay)
         - RESONATOR_POSITION: Excitation point (0=edge, 0.5=center, 1=opposite edge)
-        - RESONATOR_MIX: Dry/wet blend (0=dry, 1=fully resonated)
+        - RESONATOR_MIX: Dry/wet blend (0=dry/off, 1=fully resonated)
         
         RESONATOR SOUND DESIGN TIPS:
         - Modal mode: Bell-like tones, struck metal/glass character
@@ -188,7 +187,6 @@ class SynthControlTool @Inject constructor(
             "DRUM_HH_TRIGGER" -> "drum_hh_trigger"
             
             // Resonator (Rings) controls
-            "RESONATOR_ENABLED" -> "resonator_enabled"
             "RESONATOR_MODE" -> "resonator_mode"
             "RESONATOR_STRUCTURE" -> "resonator_structure"
             "RESONATOR_BRIGHTNESS" -> "resonator_brightness"

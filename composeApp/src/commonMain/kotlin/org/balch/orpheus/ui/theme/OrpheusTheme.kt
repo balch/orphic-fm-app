@@ -152,9 +152,8 @@ object OrpheusColors {
     val vizBackground = Color(0xFF151020)
     val neonCyanBright = Color(0xFF00E5FF)
 
-    // Specific Feature & Section Colors
-    val cavsWine = Color(0xFF860038)
-    val cavsWineDark = Color(0xFF2A1010)
+    val grainsRed = Color(0xFF886767)
+
     val patchOrange = Color(0xFFFF9500)
     val lfoBackground = Color(0xFF4A4A5A)
     val greyText = Color(0xFF888888)

@@ -196,3 +196,31 @@ expect interface ResonatorUnit : AudioUnit {
     fun strum(frequency: Float)
 }
 
+/**
+ * Mutable Instruments Clouds Texture Synthesizer Unit.
+ * 
+ * Simplified port focusing on Looping Delay mode.
+ */
+expect interface GrainsUnit : AudioUnit {
+    /** Stereo Audio Input */
+    val inputLeft: AudioInput
+    val inputRight: AudioInput
+    
+    /** Stereo Audio Output (Left is 'output') */
+    val outputRight: AudioOutput
+    
+    // Parameters
+    val position: AudioInput // Delay time / Loop length
+    val size: AudioInput     // Grain size / Diffusion
+    val pitch: AudioInput    // Pitch shifting
+    val density: AudioInput  // Feedback / Decay
+    val texture: AudioInput  // Filter / Color
+    val dryWet: AudioInput   // Mix
+    
+    val freeze: AudioInput   // > 0.5 = Freeze
+    val trigger: AudioInput  // Trigger loop/granular
+    
+    /** Configure mode (0 = Granular, 1 = Stretch, 2 = Looping Delay, 3 = Spectral) */
+    fun setMode(mode: Int)
+}
+

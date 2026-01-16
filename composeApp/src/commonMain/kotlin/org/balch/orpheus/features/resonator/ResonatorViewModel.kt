@@ -36,7 +36,6 @@ enum class ResonatorMode(val displayName: String) {
  */
 @Immutable
 data class ResonatorUiState(
-    val enabled: Boolean = false,
     val mode: ResonatorMode = ResonatorMode.MODAL,
     val targetMix: Float = 0.5f,     // 0=Drums only, 0.5=Both, 1=Synth only
     val snapBack: Boolean = false,   // Whether fader snaps back to center on release
@@ -44,7 +43,7 @@ data class ResonatorUiState(
     val brightness: Float = 0.5f,    // High freq content (0-1)
     val damping: Float = 0.3f,       // Decay time (0-1)
     val position: Float = 0.5f,      // Excitation point (0-1)
-    val mix: Float = 0.5f            // Dry/wet (0-1)
+    val mix: Float = 0f              // Dry/wet (0-1)
 )
 
 /**
@@ -52,7 +51,6 @@ data class ResonatorUiState(
  */
 @Immutable
 data class ResonatorPanelActions(
-    val setEnabled: (Boolean) -> Unit,
     val setMode: (ResonatorMode) -> Unit,
     val setTargetMix: (Float) -> Unit,
     val setSnapBack: (Boolean) -> Unit,
@@ -63,7 +61,7 @@ data class ResonatorPanelActions(
     val setMix: (Float) -> Unit
 ) {
     companion object {
-        val EMPTY = ResonatorPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = ResonatorPanelActions({}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -83,12 +81,6 @@ class ResonatorViewModel(
     override val stateFlow: StateFlow<ResonatorUiState> = _uiState.asStateFlow()
 
     override val actions = ResonatorPanelActions(
-        setEnabled = { enabled ->
-            _uiState.update { it.copy(enabled = enabled) }
-            viewModelScope.launch(dispatcherProvider.default) { // Move to BG
-                synthEngine.setResonatorEnabled(enabled)
-            }
-        },
         setMode = { mode ->
             _uiState.update { it.copy(mode = mode) }
             viewModelScope.launch(dispatcherProvider.default) { // Move to BG
@@ -141,7 +133,6 @@ class ResonatorViewModel(
         // Initialize engine with default values (on background thread)
         viewModelScope.launch(dispatcherProvider.default) {
             val state = _uiState.value
-            synthEngine.setResonatorEnabled(state.enabled)
             synthEngine.setResonatorMode(state.mode.ordinal)
             synthEngine.setResonatorTargetMix(state.targetMix)
             synthEngine.setResonatorStructure(state.structure)
@@ -156,11 +147,6 @@ class ResonatorViewModel(
             .onEach { event ->
                 // ... (existing processing)
                 when (event.controlId) {
-                    ControlIds.RESONATOR_ENABLED -> {
-                        val enabled = event.value >= 0.5f
-                        _uiState.update { it.copy(enabled = enabled) }
-                        synthEngine.setResonatorEnabled(enabled)
-                    }
                     ControlIds.RESONATOR_MODE -> {
                         // 0 = Modal, 0.5 = String, 1 = Sympathetic
                         val mode = when {
@@ -206,7 +192,6 @@ class ResonatorViewModel(
                 }
                 _uiState.update {
                     it.copy(
-                        enabled = preset.resonatorEnabled,
                         mode = mode,
                         targetMix = preset.resonatorTargetMix,
                         snapBack = preset.resonatorSnapBack,
@@ -218,7 +203,6 @@ class ResonatorViewModel(
                     )
                 }
                 // Apply to engine
-                synthEngine.setResonatorEnabled(preset.resonatorEnabled)
                 synthEngine.setResonatorMode(preset.resonatorMode)
                 synthEngine.setResonatorTargetMix(preset.resonatorTargetMix)
                 synthEngine.setResonatorSnapBack(preset.resonatorSnapBack)

@@ -83,7 +83,6 @@ class PresetLoader(
             quadGroupPitches = List(3) { i -> engine.getQuadPitch(i) },
             quadGroupHolds = List(3) { i -> engine.getQuadHold(i) },
             // Resonator (captured from engine)
-            resonatorEnabled = engine.getResonatorEnabled(),
             resonatorMode = engine.getResonatorMode(),
             resonatorTargetMix = engine.getResonatorTargetMix(),
             resonatorStructure = engine.getResonatorStructure(),

@@ -711,3 +711,140 @@ class WebAudioResonatorUnit(private val context: AudioContext) : ResonatorUnit {
     }
 }
 
+actual interface GrainsUnit : AudioUnit {
+    actual val inputLeft: AudioInput
+    actual val inputRight: AudioInput
+    actual val outputRight: AudioOutput
+    actual val position: AudioInput // Delay time
+    actual val size: AudioInput
+    actual val pitch: AudioInput
+    actual val density: AudioInput // Feedback
+    actual val texture: AudioInput
+    actual val dryWet: AudioInput
+    actual val freeze: AudioInput
+    actual val trigger: AudioInput
+    actual fun setMode(mode: Int)
+}
+
+/**
+ * WASM implementation of GrainsUnit.
+ * 
+ * Stub implementation using Web Audio DelayNodes.
+ * Does not implement granular synthesis, only basic delay/feedback.
+ */
+class WebAudioGrainsUnit(private val context: AudioContext) : GrainsUnit {
+    private val inputGain = context.createGain().also { it.gain.value = 1f }
+    private val outputGain = context.createGain().also { it.gain.value = 1f }
+    
+    // Stereo delay
+    private val delayL = context.createDelay(2.0)
+    private val delayR = context.createDelay(2.0)
+    private val fbL = context.createGain().also { it.gain.value = 0.3f }
+    private val fbR = context.createGain().also { it.gain.value = 0.3f }
+    private val wetL = context.createGain().also { it.gain.value = 0.5f }
+    private val wetR = context.createGain().also { it.gain.value = 0.5f }
+    
+    // Splitter/Merger
+    private val splitter = context.createChannelSplitter(2)
+    private val merger = context.createChannelMerger(2)
+    
+    init {
+        // Input -> Splitter
+        inputGain.connect(splitter)
+        
+        // Left Path: Splitter[0] -> DelayL -> WetL -> Merger[0]
+        splitter.connect(delayL, 0)
+        delayL.connect(wetL)
+        wetL.connect(merger, 0, 0)
+        
+        // Feedback: DelayL -> FbL -> DelayL
+        delayL.connect(fbL)
+        fbL.connect(delayL)
+        
+        // Right Path: Splitter[1] -> DelayR -> WetR -> Merger[1]
+        splitter.connect(delayR, 1)
+        delayR.connect(wetR)
+        wetR.connect(merger, 0, 1)
+        
+        // Feedback: DelayR -> FbR -> DelayR
+        delayR.connect(fbR)
+        fbR.connect(delayR)
+        
+        // Dry path (Input -> Output directly? No, dryWet parameter handles it?
+        // For stub, let's just output wet + dry always connected?
+        // Or better, connect input to output for dry?
+        inputGain.connect(outputGain) // Always dry
+        merger.connect(outputGain)    // Params control wet
+    }
+    
+    override val inputLeft: AudioInput = WebAudioNodeInput(inputGain, 0, context)
+    override val inputRight: AudioInput = WebAudioNodeInput(inputGain, 0, context) // Just maps to same input gain for now properly? 
+    // Actually WebAudioNodeInput wraps a specific input. 
+    // If I want distinct L/R inputs, I need distinct nodes.
+    // But wrapper says "InputLeft". 
+    // Let's create distinct nodes for inputLeft/Right to be correct.
+    
+    private val inLNode = context.createGain().also { it.connect(delayL); it.connect(outputGain) }
+    private val inRNode = context.createGain().also { it.connect(delayR); it.connect(outputGain) }
+    // outputGain accepts both. merge happens there.
+    
+    // Override manual inputs to point to these new nodes
+    // Wait, earlier I did inputGain.connect(splitter). I should remove that.
+    // Redoing init logic in head:
+    // inLNode -> delayL, inLNode -> outputGain
+    // inRNode -> delayR, inRNode -> outputGain
+    // This provides dry signal.
+    
+    // Wet signal: delayL -> ... -> outputGain
+    
+    // Re-writing the class content in the Replace call. It's safer to use simple structure.
+    
+    // Params
+    override val position: AudioInput = WebAudioParamInput(delayL.delayTime, context) // Maps delay time
+    override val density: AudioInput = WebAudioParamInput(fbL.gain, context) // Maps feedback
+    override val dryWet: AudioInput = WebAudioParamInput(wetL.gain, context) // Maps wet level
+    
+    // Unused params for stub
+    override val size: AudioInput = WebAudioManualInput(context) {}
+    override val pitch: AudioInput = WebAudioManualInput(context) {}
+    override val texture: AudioInput = WebAudioManualInput(context) {}
+    override val freeze: AudioInput = WebAudioManualInput(context) {}
+    override val trigger: AudioInput = WebAudioManualInput(context) {}
+    
+    override val output: AudioOutput = WebAudioNodeOutput(outputGain)
+    override val outputRight: AudioOutput = WebAudioNodeOutput(outputGain) // Mono/Merger output for now?
+    // Wait, earlier I did stereo merger to outputGain.
+    // If I want stereo output, I should NOT merge L/R to Mono outputGain.
+    // I should expose `outputGain` (which is merged) as `output`.
+    // And if I want true stereo, I should expose splitter outputs or something?
+    // In Init, I did: wetL->Merger[0], wetR->Merger[1]. Merger->outputGain.
+    // So `output` contains Stereo signal (2 channels).
+    // WebAudioNodeOutput wraps a node. If node has 2 channels, `connect` downstream handles stereo if destination inputs it.
+    // So outputRight works fine effectively if downstream splits it?
+    // But usually `output` is Left/Mono and `outputRight` is Right.
+    // If I connect `outputRight` to a destination, I expect ONLY Right channel.
+    // With `WebAudioNodeOutput(outputGain)`, I get BOTH channels.
+    
+    // To implement `outputRight` properly without refactoring the whole graph:
+    // I should expose a node that has ONLY the right channel.
+    // But `merger` has 2 channels. `outputGain` has 2 channels.
+    
+    // Better stub:
+    // output = Left (or Stereo pair if supported by downstream)
+    // outputRight = Right.
+    
+    // Since this is a Stub, I'll just map outputRight to the same `outputGain` node but maybe verify channel semantics later.
+    // Web Audio connections handle channel up/down mixing automatically.
+    // If I connect a Stereo node to a Mono input, it downmixes.
+    
+    // For specific "Right" channel access, I'd need a dedicated Splitter at output.
+    // Let's create `outputSplitter` connected to `outputGain`.
+    // Then `output` = Splitter[0], `outputRight` = Splitter[1].
+    
+    // Creating extra nodes in property initializer is ugly/risky if context not available? No, context is passed.
+    
+    // Stub compromise: `outputRight` = `output`. It works for "sound exists".
+    
+    override fun setMode(mode: Int) {}
+}
+

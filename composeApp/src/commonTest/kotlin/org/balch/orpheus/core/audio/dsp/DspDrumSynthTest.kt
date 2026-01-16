@@ -111,7 +111,6 @@ class DspDrumSynthTest {
         override fun clearParameterAutomation(controlId: String) {}
         
         // Resonator stubs
-        override fun setResonatorEnabled(enabled: Boolean) {}
         override fun setResonatorMode(mode: Int) {}
         override fun setResonatorTarget(target: Int) {}
         override fun setResonatorTargetMix(targetMix: Float) {}
@@ -121,7 +120,6 @@ class DspDrumSynthTest {
         override fun setResonatorPosition(value: Float) {}
         override fun setResonatorMix(value: Float) {}
         override fun strumResonator(frequency: Float) {}
-        override fun getResonatorEnabled(): Boolean = false
         override fun getResonatorMode(): Int = 0
         override fun getResonatorTarget(): Int = 1
         override fun getResonatorTargetMix(): Float = 0.5f
@@ -158,6 +156,26 @@ class DspDrumSynthTest {
         
         override fun setBeatsMix(mix: Float) {}
         override fun getBeatsMix(): Float = 0.7f
+
+        override fun setGrainsPosition(value: Float) {}
+        override fun setGrainsSize(value: Float) {}
+        override fun setGrainsPitch(value: Float) {}
+        override fun setGrainsDensity(value: Float) {}
+        override fun setGrainsTexture(value: Float) {}
+        override fun setGrainsDryWet(value: Float) {}
+        override fun setGrainsFreeze(frozen: Boolean) {}
+        override fun setGrainsTrigger(trigger: Boolean) {}
+
+        override fun getGrainsPosition(): Float = 0f
+        override fun getGrainsSize(): Float = 0f
+        override fun getGrainsPitch(): Float = 0f
+        override fun getGrainsDensity(): Float = 0f
+        override fun getGrainsTexture(): Float = 0f
+        override fun getGrainsDryWet(): Float = 0f
+        override fun getGrainsFreeze(): Boolean = false
+        
+        override fun setGrainsMode(mode: Int) {}
+        override fun getGrainsMode(): Int = 0
     }
 
     @Test

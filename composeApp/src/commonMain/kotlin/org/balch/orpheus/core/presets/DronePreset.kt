@@ -51,7 +51,6 @@ data class DronePreset(
     val quadGroupVolumes: List<Float> = List(3) { 1.0f },
 
     // Resonator (Rings)
-    val resonatorEnabled: Boolean = false,
     val resonatorMode: Int = 0,        // 0=Modal, 1=String, 2=Sympathetic
     val resonatorTargetMix: Float = 0.5f, // 0=Drums only, 0.5=Both, 1=Synth only
     val resonatorStructure: Float = 0.25f,

@@ -191,7 +191,6 @@ interface SynthEngine {
     fun clearParameterAutomation(controlId: String)
     
     // Rings Resonator
-    fun setResonatorEnabled(enabled: Boolean)
     fun setResonatorMode(mode: Int)
     fun setResonatorTarget(target: Int) // 0=Drums, 1=Both, 2=Synth (legacy)
     fun setResonatorTargetMix(targetMix: Float) // 0=Drums, 0.5=Both, 1=Synth (continuous)
@@ -203,7 +202,6 @@ interface SynthEngine {
     fun strumResonator(frequency: Float)
     
     // Resonator Getters
-    fun getResonatorEnabled(): Boolean
     fun getResonatorMode(): Int
     fun getResonatorTarget(): Int
     fun getResonatorTargetMix(): Float
@@ -214,6 +212,25 @@ interface SynthEngine {
     fun getResonatorMix(): Float
     fun getResonatorSnapBack(): Boolean
     fun setResonatorSnapBack(enabled: Boolean)
+
+    fun setGrainsPosition(value: Float)
+    fun setGrainsSize(value: Float)
+    fun setGrainsPitch(value: Float)
+    fun setGrainsDensity(value: Float)
+    fun setGrainsTexture(value: Float)
+    fun setGrainsDryWet(value: Float)
+    fun setGrainsFreeze(frozen: Boolean)
+    fun setGrainsTrigger(trigger: Boolean)
+    fun setGrainsMode(mode: Int) // 0=Granular, 1=Reverse, 2=Shimmer, 3=Spectral, 4=Karplus-Strong
+    
+    fun getGrainsPosition(): Float
+    fun getGrainsSize(): Float
+    fun getGrainsPitch(): Float
+    fun getGrainsDensity(): Float
+    fun getGrainsTexture(): Float
+    fun getGrainsDryWet(): Float
+    fun getGrainsFreeze(): Boolean
+    fun getGrainsMode(): Int
 
     // Drum getters for persistence
     fun getDrumFrequency(type: Int): Float

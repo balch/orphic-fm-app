@@ -95,13 +95,12 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         
         ### RESONATOR (Rings Physical Modeling)
         Physical modeling resonator for metallic, string-like, and bell tones:
-        - RESONATOR_ENABLED: Turn on/off (0=off, 1=on)
         - RESONATOR_MODE: 0=Modal (bell/plate), 0.5=String (Karplus-Strong), 1=Sympathetic (sitar)
         - RESONATOR_STRUCTURE: Harmonic spread/inharmonicity (0=focused, 1=wide/bell-like)
         - RESONATOR_BRIGHTNESS: High frequency content (0=dark/warm, 1=bright/shimmery)
         - RESONATOR_DAMPING: Decay time (0=long sustain, 1=quick decay)
         - RESONATOR_POSITION: Excitation point (0-1, 0.5=center for fundamental)
-        - RESONATOR_MIX: Dry/wet blend (0=dry, 1=fully processed)
+        - RESONATOR_MIX: Dry/wet blend (0=off, 0.3-0.5 for texture, 1=fully processed)
         
         RESONATOR USE CASES:
         - Ethereal pads: Modal mode, low damping, moderate mix (0.3-0.5)

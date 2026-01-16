@@ -110,7 +110,6 @@ data class MidiMappingState(
             const val BENDER = "bender"
             
             // Resonator (Rings) controls
-            const val RESONATOR_ENABLED = "resonator_enabled"
             const val RESONATOR_MODE = "resonator_mode"
             const val RESONATOR_STRUCTURE = "resonator_structure"
             const val RESONATOR_BRIGHTNESS = "resonator_brightness"
