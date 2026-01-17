@@ -58,9 +58,6 @@ import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.resonator.ResonatorFeature
 import org.balch.orpheus.features.resonator.ResonatorPanel
 import org.balch.orpheus.features.resonator.ResonatorViewModel
-import org.balch.orpheus.features.stereo.StereoFeature
-import org.balch.orpheus.features.stereo.StereoPanel
-import org.balch.orpheus.features.stereo.StereoViewModel
 import org.balch.orpheus.features.tidal.LiveCodeFeature
 import org.balch.orpheus.features.tidal.LiveCodePanelLayout
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
@@ -173,7 +170,6 @@ private fun CompactPortraitScreenLayout(
     delayFeature: DelayFeature = DelayViewModel.feature(),
     evoFeature: EvoFeature = EvoViewModel.feature(),
     lfoFeature: LfoFeature = LfoViewModel.feature(),
-    stereoFeature: StereoFeature = StereoViewModel.feature(),
     vizFeature: VizFeature = VizViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
     grainsFeature: GrainsFeature = GrainsViewModel.feature(),
@@ -250,7 +246,6 @@ private fun CompactPortraitScreenLayout(
                                 distortionFeature = distortionFeature,
                                 evoFeature = evoFeature,
                                 lfoFeature = lfoFeature,
-                                stereoFeature = stereoFeature,
                                 vizFeature = vizFeature,
                                 drumFeature = drumFeature,
                                 drumBeatsFeature = drumBeatsFeature,
@@ -327,7 +322,6 @@ private fun PanelContent(
     distortionFeature: DistortionFeature,
     evoFeature: EvoFeature,
     lfoFeature: LfoFeature,
-    stereoFeature: StereoFeature,
     vizFeature: VizFeature,
     drumFeature: DrumFeature,
     drumBeatsFeature: DrumBeatsFeature,
@@ -435,15 +429,6 @@ private fun PanelContent(
                 showCollapsedHeader = false,
             )
         }
-        CompactPanelType.STEREO -> {
-            StereoPanel(
-                feature = stereoFeature,
-                modifier = panelModifier,
-                isExpanded = true,
-                showCollapsedHeader = false
-            )
-        }
-        
         CompactPanelType.RESONATOR -> {
             ResonatorPanel(
                 feature = resonatorFeature,
@@ -482,7 +467,6 @@ private fun CompactPortraitLayoutPreview() {
                 delayFeature = DelayViewModel.previewFeature(),
                 evoFeature = EvoViewModel.previewFeature(),
                 lfoFeature = LfoViewModel.previewFeature(),
-                stereoFeature = StereoViewModel.previewFeature(),
                 vizFeature = VizViewModel.previewFeature(),
                 grainsFeature = GrainsViewModel.previewFeature(),
                 drumFeature = DrumViewModel.previewFeature(),
@@ -507,7 +491,6 @@ private fun PanelContentPreview() {
             distortionFeature = DistortionViewModel.previewFeature(),
             evoFeature = EvoViewModel.previewFeature(),
             lfoFeature = LfoViewModel.previewFeature(),
-            stereoFeature = StereoViewModel.previewFeature(),
             vizFeature = VizViewModel.previewFeature(),
             drumFeature = DrumViewModel.previewFeature(),
             drumBeatsFeature = DrumBeatsViewModel.previewFeature(),

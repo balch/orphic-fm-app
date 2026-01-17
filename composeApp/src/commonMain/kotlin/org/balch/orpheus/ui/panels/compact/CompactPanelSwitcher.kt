@@ -54,7 +54,6 @@ enum class CompactPanelType(val displayName: String, val color: Color) {
     REPL("REPL", OrpheusColors.neonCyan),
     DRUMS("Drums", OrpheusColors.neonMagenta),
     PATTERN("Sequencer", OrpheusColors.neonCyan),
-    STEREO("Stereo", OrpheusColors.stereoCyan),
 }
 
 /**

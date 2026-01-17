@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
@@ -36,20 +37,27 @@ data class DistortionUiState(
     val drive: Float = 0.0f,
     val volume: Float = 0.7f,
     val mix: Float = 0.5f,
-    val peak: Float = 0.0f
+    val peak: Float = 0.0f,
+    val mode: StereoMode = StereoMode.VOICE_PAN,
+    val masterPan: Float = 0f,  // -1=Left, 0=Center, 1=Right
+    val voicePans: List<Float> = listOf(0f, 0f, -0.3f, -0.3f, 0.3f, 0.3f, -0.7f, 0.7f)
 )
 
 @Immutable
 data class DistortionPanelActions(
     val onDriveChange: (Float) -> Unit,
     val onVolumeChange: (Float) -> Unit,
-    val onMixChange: (Float) -> Unit
+    val onMixChange: (Float) -> Unit,
+    val onModeChange: (StereoMode) -> Unit,
+    val onMasterPanChange: (Float) -> Unit,
 ) {
     companion object {
         val EMPTY = DistortionPanelActions(
             onDriveChange = {},
             onVolumeChange = {},
-            onMixChange = {}
+            onMixChange = {},
+            onModeChange = {},
+            onMasterPanChange = {}
         )
     }
 }
@@ -60,6 +68,11 @@ private sealed interface DistortionIntent {
     data class Volume(val value: Float) : DistortionIntent
     data class Mix(val value: Float, val fromSequencer: Boolean = false) : DistortionIntent
     data class Peak(val value: Float) : DistortionIntent
+
+    data class SetMode(val mode: StereoMode) : DistortionIntent
+    data class SetMasterPan(val pan: Float) : DistortionIntent
+    data class SetVoicePan(val index: Int, val pan: Float) : DistortionIntent
+
     data class Restore(val state: DistortionUiState) : DistortionIntent
 }
 
@@ -83,7 +96,9 @@ class DistortionViewModel(
     override val actions = DistortionPanelActions(
         onDriveChange = ::onDriveChange,
         onVolumeChange = ::onVolumeChange,
-        onMixChange = ::onMixChange
+        onMixChange = ::onMixChange,
+        onModeChange = ::onModeChange,
+        onMasterPanChange = ::onMasterPanChange
     )
 
     // User intents flow
@@ -117,6 +132,11 @@ class DistortionViewModel(
             ControlIds.MASTER_VOLUME -> DistortionIntent.Volume(event.value)
             ControlIds.DRIVE -> DistortionIntent.Drive(event.value, fromSequencer)
             ControlIds.DISTORTION_MIX -> DistortionIntent.Mix(event.value, fromSequencer)
+            ControlIds.STEREO_MODE -> DistortionIntent.SetMode(
+                if (event.value >= 0.5f) StereoMode.STEREO_DELAYS else StereoMode.VOICE_PAN
+            )
+            // Convert 0-1 to -1..1 for pan
+            ControlIds.STEREO_PAN -> DistortionIntent.SetMasterPan((event.value * 2f) - 1f)
             else -> null
         }
     }
@@ -146,7 +166,10 @@ class DistortionViewModel(
             drive = engine.getDrive(),
             volume = engine.getMasterVolume(),
             mix = engine.getDistortionMix(),
-            peak = 0.0f
+            peak = 0.0f,
+            mode = engine.getStereoMode(),
+            masterPan = engine.getMasterPan(),
+            voicePans = List(8) { engine.getVoicePan(it) }
         )
     }
 
@@ -160,6 +183,14 @@ class DistortionViewModel(
             is DistortionIntent.Volume -> state.copy(volume = intent.value)
             is DistortionIntent.Mix -> state.copy(mix = intent.value)
             is DistortionIntent.Peak -> state.copy(peak = intent.value)
+            is DistortionIntent.SetMode -> state.copy(mode = intent.mode)
+            is DistortionIntent.SetMasterPan -> state.copy(masterPan = intent.pan)
+            is DistortionIntent.SetVoicePan -> {
+                val newPans = state.voicePans.toMutableList()
+                newPans[intent.index] = intent.pan
+                state.copy(voicePans = newPans)
+            }
+
             is DistortionIntent.Restore -> intent.state
         }
 
@@ -174,6 +205,9 @@ class DistortionViewModel(
             is DistortionIntent.Volume -> engine.setMasterVolume(intent.value)
             is DistortionIntent.Mix -> if (!intent.fromSequencer) engine.setDistortionMix(intent.value)
             is DistortionIntent.Peak -> { /* Peak is read-only from engine */ }
+            is DistortionIntent.SetMode -> engine.setStereoMode(intent.mode)
+            is DistortionIntent.SetMasterPan -> engine.setMasterPan(intent.pan)
+            is DistortionIntent.SetVoicePan -> engine.setVoicePan(intent.index, intent.pan)
             is DistortionIntent.Restore -> applyFullState(intent.state)
         }
     }
@@ -182,6 +216,12 @@ class DistortionViewModel(
         engine.setDrive(state.drive)
         engine.setMasterVolume(state.volume)
         engine.setDistortionMix(state.mix)
+        engine.setStereoMode(state.mode)
+        engine.setMasterPan(state.masterPan)
+        state.voicePans.forEachIndexed { index, pan ->
+            engine.setVoicePan(index, pan)
+        }
+
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -198,6 +238,18 @@ class DistortionViewModel(
 
     fun onMixChange(value: Float) {
         _userIntents.tryEmit(DistortionIntent.Mix(value))
+    }
+
+    fun onModeChange(mode: StereoMode) {
+        _userIntents.tryEmit(DistortionIntent.SetMode(mode))
+    }
+
+    fun onMasterPanChange(pan: Float) {
+        _userIntents.tryEmit(DistortionIntent.SetMasterPan(pan))
+    }
+
+    fun onVoicePanChange(index: Int, pan: Float) {
+        _userIntents.tryEmit(DistortionIntent.SetVoicePan(index, pan))
     }
 
     fun updatePeak(value: Float) {

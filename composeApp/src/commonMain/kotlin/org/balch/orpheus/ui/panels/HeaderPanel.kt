@@ -50,9 +50,6 @@ import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.resonator.ResonatorFeature
 import org.balch.orpheus.features.resonator.ResonatorPanel
 import org.balch.orpheus.features.resonator.ResonatorViewModel
-import org.balch.orpheus.features.stereo.StereoFeature
-import org.balch.orpheus.features.stereo.StereoPanel
-import org.balch.orpheus.features.stereo.StereoViewModel
 import org.balch.orpheus.features.tidal.LiveCodeFeature
 import org.balch.orpheus.features.tidal.LiveCodePanel
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
@@ -70,7 +67,6 @@ fun HeaderPanel(
     headerFeature: HeaderFeature = HeaderViewModel.feature(),
     presetsFeature: PresetsFeature = PresetsViewModel.feature(),
     midiFeature: MidiFeature = MidiViewModel.feature(),
-    stereoFeature: StereoFeature = StereoViewModel.feature(),
     vizFeature: VizFeature = VizViewModel.feature(),
     evoFeature: EvoFeature = EvoViewModel.feature(),
     lfoFeature: LfoFeature = LfoViewModel.feature(),
@@ -113,12 +109,6 @@ fun HeaderPanel(
             isExpanded = PanelId.MIDI.isExpanded(),
             onExpandedChange = { PanelId.MIDI.setExpanded(it) },
             modifier = panelModifier(PanelId.MIDI.isExpanded(), weight = .5f)
-        )
-        StereoPanel(
-            feature = stereoFeature,
-            isExpanded = PanelId.STEREO.isExpanded(),
-            onExpandedChange = { PanelId.STEREO.setExpanded(it) },
-            modifier = panelModifier(PanelId.STEREO.isExpanded(), weight = .5f)
         )
         VizPanel(
             feature = vizFeature,

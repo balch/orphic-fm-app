@@ -38,8 +38,6 @@ import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.stereo.StereoFeature
-import org.balch.orpheus.features.stereo.StereoViewModel
 import org.balch.orpheus.features.tidal.LiveCodeFeature
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tweaks.CenterControlSection
@@ -73,7 +71,6 @@ fun DesktopSynthScreen(
     presetsFeature: PresetsFeature= PresetsViewModel.feature(),
     grainsFeature: GrainsFeature = GrainsViewModel.feature(),
     midiFeature: MidiFeature = MidiViewModel.feature(),
-    stereoFeature: StereoFeature = StereoViewModel.feature(),
     vizFeature: VizFeature = VizViewModel.feature(),
     lfoFeature: LfoFeature = LfoViewModel.feature(),
     delayFeature: DelayFeature = DelayViewModel.feature(),
@@ -116,7 +113,6 @@ fun DesktopSynthScreen(
                 grainsFeature = grainsFeature,
                 presetsFeature = presetsFeature,
                 midiFeature = midiFeature,
-                stereoFeature = stereoFeature,
                 vizFeature = vizFeature,
                 evoFeature = evoFeature,
                 lfoFeature = lfoFeature,
@@ -195,7 +191,6 @@ private fun DesktopSynthScreenPreview(
             grainsFeature = GrainsViewModel.previewFeature(),
             presetsFeature = PresetsViewModel.previewFeature(),
             midiFeature = MidiViewModel.previewFeature(),
-            stereoFeature = StereoViewModel.previewFeature(),
             vizFeature = VizViewModel.previewFeature(),
             lfoFeature = LfoViewModel.previewFeature(),
             delayFeature = DelayViewModel.previewFeature(),

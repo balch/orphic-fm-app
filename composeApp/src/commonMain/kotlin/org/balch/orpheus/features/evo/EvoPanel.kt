@@ -117,10 +117,12 @@ fun EvoPanel(
 
             // Enable Toggle (Mini Vertical Switch)
             HorizontalToggle(
-                endLabel = "OFF",
-                startLabel = "ON",
-                isStart = uiState.isEnabled,
-                onToggle = evoFeature.actions.onEnabledChange,
+                endLabel = "ON",
+                startLabel = "OFF",
+                isStart = !uiState.isEnabled,
+                onToggle = {
+                    evoFeature.actions.onEnabledChange(!it)
+                },
                 color = accentColor,
             )
             Spacer(modifier = Modifier.weight(1f))

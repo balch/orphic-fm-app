@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -21,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -28,6 +28,7 @@ import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.balch.orpheus.ui.widgets.VerticalToggle
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 import kotlin.math.roundToInt
@@ -59,49 +60,84 @@ fun DistortionPanel(
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Spacer(modifier = Modifier.weight(1f))
-            // Top Row: Drive, Volume
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                RotaryKnob(
-                    value = uiState.drive,
-                    onValueChange = actions.onDriveChange,
-                    label = "DISTORTION",
-                    controlId = ControlIds.DRIVE,
-                    size = 56.dp,
-                    progressColor = OrpheusColors.neonMagenta
-                )
-                RotaryKnob(
-                    value = uiState.volume,
-                    onValueChange = actions.onVolumeChange,
-                    label = "VOL",
-                    controlId = ControlIds.MASTER_VOLUME,
-                    size = 56.dp,
-                    progressColor = OrpheusColors.neonMagenta
-                )
-            }
 
-            // Bottom Row: Mix, Peak LED
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                RotaryKnob(
-                    value = uiState.mix,
-                    onValueChange = actions.onMixChange,
-                    label = "MIX",
-                    controlId = ControlIds.DISTORTION_MIX,
-                    size = 56.dp,
-                    progressColor = OrpheusColors.neonMagenta
-                )
+                // Column 1: Drive & Mix
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    RotaryKnob(
+                        value = uiState.drive,
+                        onValueChange = actions.onDriveChange,
+                        label = "DISTORTION",
+                        controlId = ControlIds.DRIVE,
+                        size = 56.dp,
+                        progressColor = OrpheusColors.neonMagenta
+                    )
+                    RotaryKnob(
+                        value = uiState.mix,
+                        onValueChange = actions.onMixChange,
+                        label = "MIX",
+                        controlId = ControlIds.DISTORTION_MIX,
+                        size = 56.dp,
+                        progressColor = OrpheusColors.neonMagenta
+                    )
+                }
 
-                // Peak LED indicator
-                PeakLed(peak = uiState.peak)
+                // Column 2: Volume & Pan
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    RotaryKnob(
+                        value = uiState.volume,
+                        onValueChange = actions.onVolumeChange,
+                        label = "VOL",
+                        controlId = ControlIds.MASTER_VOLUME,
+                        size = 56.dp,
+                        progressColor = OrpheusColors.neonMagenta
+                    )
+                    RotaryKnob(
+                        value = (uiState.masterPan + 1f) / 2f,
+                        onValueChange = { normalized ->
+                            actions.onMasterPanChange((normalized * 2f) - 1f)
+                        },
+                        label = "PAN",
+                        controlId = "stereo_pan",
+                        size = 56.dp,
+                        progressColor = OrpheusColors.neonMagenta
+                    )
+                }
+
+                // Column 3: Peak LED & Mode Toggle
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Peak LED indicator
+                    PeakLed(
+                        peak = uiState.peak
+                    )
+
+                    // Mode toggle: Voice Pan / Stereo Delays
+                    VerticalToggle(
+                        topLabel = "VOICE",
+                        bottomLabel = "DELAY",
+                        isTop = uiState.mode == StereoMode.VOICE_PAN,
+                        onToggle = { isVoicePan ->
+                            actions.onModeChange(
+                                if (isVoicePan) StereoMode.VOICE_PAN else StereoMode.STEREO_DELAYS
+                            )
+                        },
+                        color = OrpheusColors.neonMagenta,
+                    )
+                }
             }
             Spacer(modifier = Modifier.weight(1f))
         }
@@ -143,11 +179,6 @@ private fun PeakLed(peak: Float, modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height(2.dp))
 
-        Text(
-            text = "PEAK",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         Text(
             text = ((peak * 100).roundToInt() / 100.0).toString(),
             style = MaterialTheme.typography.labelMedium,
