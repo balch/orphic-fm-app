@@ -67,7 +67,7 @@ fun DrumBeatsPanel(
     CollapsibleColumnPanel(
         title = "BEATS",
         color = OrpheusColors.seahawksGreen,
-        expandedTitle = "Drums & Space",
+        expandedTitle = "Rhythm",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
@@ -183,8 +183,7 @@ fun DrumBeatsPanel(
                 ) {
                     // Row 1: BD, SD, HH
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween 
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                          KnobControlTopLabel(
                             modifier = Modifier.padding(top = 4.dp),
@@ -405,7 +404,7 @@ private fun KnobControlTopLabel(
         RotaryKnob(
             value = value,
             onValueChange = onValueChange,
-            size = 32.dp, // Reduced size
+            size = 38.dp, // Reduced size
             progressColor = color,
             controlId = controlId
         )

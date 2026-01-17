@@ -40,7 +40,7 @@ fun DrumsPanel(
     CollapsibleColumnPanel(
         title = "808",
         color = OrpheusColors.ninersRed,
-        expandedTitle = "Kit Tuner",
+        expandedTitle = "Tuner Key",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
@@ -257,7 +257,7 @@ private fun KnobGroup(
         RotaryKnob(
             value = value,
             onValueChange = onValueChange,
-            size = 32.dp,
+            size = 34.dp,
             progressColor = color,
             label = bottomLabel,
             controlId = controlId
