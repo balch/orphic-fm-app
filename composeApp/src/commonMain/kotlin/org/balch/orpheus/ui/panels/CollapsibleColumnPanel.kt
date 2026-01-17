@@ -151,7 +151,9 @@ fun CollapsibleColumnPanel(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(vertical = 16.dp),
+                            .padding(vertical =
+                                if (showCollapsedHeader) 16.dp else 4.dp
+                            ),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         if (expandedTitle != null) {

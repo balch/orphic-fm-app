@@ -485,7 +485,34 @@ private fun CompactPortraitLayoutPreview() {
                 stereoFeature = StereoViewModel.previewFeature(),
                 vizFeature = VizViewModel.previewFeature(),
                 grainsFeature = GrainsViewModel.previewFeature(),
+                drumFeature = DrumViewModel.previewFeature(),
+                drumBeatsFeature = DrumBeatsViewModel.previewFeature(),
+                resonatorFeature = ResonatorViewModel.previewFeature(),
             )
         }
+    }
+}
+
+@Preview
+@Composable
+private fun PanelContentPreview() {
+    LiquidPreviewContainerWithGradient {
+        PanelContent(
+            panel = CompactPanelType.EVO,
+            presetFeature = PresetsViewModel.previewFeature(),
+            voiceFeature = VoiceViewModel.previewFeature(),
+            liveCodeFeature = LiveCodeViewModel.previewFeature(),
+            activeReplHighlights = emptyList(),
+            delayFeature = DelayViewModel.previewFeature(),
+            distortionFeature = DistortionViewModel.previewFeature(),
+            evoFeature = EvoViewModel.previewFeature(),
+            lfoFeature = LfoViewModel.previewFeature(),
+            stereoFeature = StereoViewModel.previewFeature(),
+            vizFeature = VizViewModel.previewFeature(),
+            drumFeature = DrumViewModel.previewFeature(),
+            drumBeatsFeature = DrumBeatsViewModel.previewFeature(),
+            resonatorFeature = ResonatorViewModel.previewFeature(),
+            grainsFeature = GrainsViewModel.previewFeature(),
+        )
     }
 }
