@@ -124,6 +124,7 @@ interface SynthEngine {
     // Monitoring
     fun getPeak(): Float
     fun getCpuLoad(): Float
+    fun getCurrentTime(): Double
 
     // Reactive monitoring flows (emit at ~100ms intervals)
     val peakFlow: StateFlow<Float>
@@ -258,6 +259,14 @@ interface SynthEngine {
     fun getBeatsSwing(): Float
     fun setBeatsMix(mix: Float)
     fun getBeatsMix(): Float
+    
+    // Looper
+    fun setLooperRecord(recording: Boolean)
+    fun setLooperPlay(playing: Boolean)
+    fun setLooperOverdub(overdub: Boolean) // Optionally later
+    fun clearLooper()
+    fun getLooperPosition(): Float
+    fun getLooperDuration(): Double
 }
 
 enum class ModSource {

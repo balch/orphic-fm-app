@@ -20,6 +20,7 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspDistortionPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDrumPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDuoLfoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspGrainsPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspLooperPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPerStringBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspResonatorPlugin
@@ -51,6 +52,7 @@ class DspSynthEngine(
     private val drumPlugin = plugins.filterIsInstance<DspDrumPlugin>().first()
     private val resonatorPlugin = plugins.filterIsInstance<DspResonatorPlugin>().first()
     private val grainsPlugin = plugins.filterIsInstance<DspGrainsPlugin>().first()
+    private val looperPlugin = plugins.filterIsInstance<DspLooperPlugin>().first()
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
@@ -183,23 +185,43 @@ class DspSynthEngine(
         voiceSumLeft.output.connect(grainsPlugin.inputs["inputLeft"]!!)
         voiceSumRight.output.connect(grainsPlugin.inputs["inputRight"]!!)
         
-        // Grains → Stereo Sum (granular texture output)
+        // Grains → Stereo Sum (granular texture output) AND Looper input
         grainsPlugin.outputs["output"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
         grainsPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        grainsPlugin.outputs["output"]?.connect(looperPlugin.inputs["inputLeft"]!!)
+        grainsPlugin.outputs["outputRight"]?.connect(looperPlugin.inputs["inputRight"]!!)
 
-        // Distortion → Stereo Sum (resonator path output)
+        // Distortion → Stereo Sum (resonator path output) AND Looper input
         distortionPlugin.outputs["outputLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
         distortionPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        distortionPlugin.outputs["outputLeft"]?.connect(looperPlugin.inputs["inputLeft"]!!)
+        distortionPlugin.outputs["outputRight"]?.connect(looperPlugin.inputs["inputRight"]!!)
 
-        // Delay wet outputs → Stereo sum
+        // Delay wet outputs → Stereo sum AND Looper input
         delayPlugin.outputs["wetLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
         delayPlugin.outputs["wetRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
         delayPlugin.outputs["wet2Left"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
         delayPlugin.outputs["wet2Right"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        delayPlugin.outputs["wetLeft"]?.connect(looperPlugin.inputs["inputLeft"]!!)
+        delayPlugin.outputs["wetRight"]?.connect(looperPlugin.inputs["inputRight"]!!)
+        delayPlugin.outputs["wet2Left"]?.connect(looperPlugin.inputs["inputLeft"]!!)
+        delayPlugin.outputs["wet2Right"]?.connect(looperPlugin.inputs["inputRight"]!!)
 
-        // Bender audio effects (tension/spring sounds) → Stereo sum (mono to both channels)
+        // Bender audio effects (tension/spring sounds) → Stereo sum (mono to both channels) AND Looper
         benderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
         benderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        benderPlugin.outputs["audioOutput"]?.connect(looperPlugin.inputs["inputLeft"]!!)
+        benderPlugin.outputs["audioOutput"]?.connect(looperPlugin.inputs["inputRight"]!!)
+        
+        // Per-String Bender audio effects (tension/spring sounds) → Stereo sum AND Looper
+        perStringBenderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        perStringBenderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        perStringBenderPlugin.outputs["audioOutput"]?.connect(looperPlugin.inputs["inputLeft"]!!)
+        perStringBenderPlugin.outputs["audioOutput"]?.connect(looperPlugin.inputs["inputRight"]!!)
+        
+        // Looper Output -> Stereo Sum (Stereo: Left to Left, Right to Right)
+        looperPlugin.outputs["output"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        looperPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
 
         // Stereo outputs → LineOut
         stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
@@ -434,6 +456,8 @@ class DspSynthEngine(
         log.debug { "Audio Engine Started" }
     }
 
+    override fun getCurrentTime(): Double = audioEngine.getCurrentTime()
+
     override fun stop() {
         log.debug { "Stopping Audio Engine..." }
         monitoringJob?.cancel()
@@ -474,6 +498,26 @@ class DspSynthEngine(
         drumPlugin.setMix(mix)
     }
     override fun getBeatsMix(): Float = drumPlugin.getMix()
+    
+    // Looper delegations
+    override fun setLooperRecord(recording: Boolean) {
+        looperPlugin.setRecording(recording)
+    }
+    
+    override fun setLooperPlay(playing: Boolean) {
+        looperPlugin.setPlaying(playing)
+    }
+    
+    override fun setLooperOverdub(overdub: Boolean) {
+        // Not implemented (needs Feedback loop in Looper)
+    }
+    
+    override fun clearLooper() {
+        looperPlugin.clear()
+    }
+    
+    override fun getLooperPosition(): Float = looperPlugin.getPosition()
+    override fun getLooperDuration(): Double = looperPlugin.getLoopDuration()
 
     // HyperLFO delegations
     override fun setHyperLfoFreq(index: Int, frequency: Float) = hyperLfo.setFreq(index, frequency)

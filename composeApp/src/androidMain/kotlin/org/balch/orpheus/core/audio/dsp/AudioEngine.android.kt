@@ -63,6 +63,14 @@ actual class AudioEngine actual constructor() {
             is JsynDrumUnit -> synth.add(unit)
             is JsynResonatorUnit -> synth.add(unit)
             is JsynGrainsUnit -> synth.add(unit)
+            is JsynLooperUnit -> {
+                 synth.add(unit.writerLeft)
+                 synth.add(unit.writerRight)
+                 synth.add(unit.readerLeft)
+                 synth.add(unit.readerRight)
+                 synth.add(unit.recordGateInput)
+                 synth.add(unit.playGateInput)
+            }
         }
     }
 
@@ -89,6 +97,7 @@ actual class AudioEngine actual constructor() {
     actual fun createDrumUnit(): DrumUnit = JsynDrumUnit()
     actual fun createResonatorUnit(): ResonatorUnit = JsynResonatorUnit()
     actual fun createGrainsUnit(): GrainsUnit = JsynGrainsUnit()
+    actual fun createLooperUnit(): LooperUnit = JsynLooperUnit()
 
     actual val lineOutLeft: AudioInput
         get() = JsynAudioInput(lineOutLeftProxy.input)
@@ -97,4 +106,6 @@ actual class AudioEngine actual constructor() {
         get() = JsynAudioInput(lineOutRightProxy.input)
 
     actual fun getCpuLoad(): Float = (synth.usage * 100f).toFloat()
+
+    actual fun getCurrentTime(): Double = synth.currentTime
 }

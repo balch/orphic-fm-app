@@ -249,3 +249,195 @@ class JsynAutomationPlayer : AutomationPlayer {
         reader.dataQueue.clear()
     }
 }
+
+actual interface LooperUnit : AudioUnit {
+    actual val inputLeft: AudioInput
+    actual val inputRight: AudioInput
+    actual override val output: AudioOutput
+    actual val outputRight: AudioOutput
+    actual val recordGate: AudioInput
+    actual val playGate: AudioInput
+    actual fun setRecording(active: Boolean)
+    actual fun setPlaying(active: Boolean)
+    actual fun allocate(maxSeconds: Double)
+    actual fun clear()
+    actual fun getPosition(): Float
+    actual fun getLoopDuration(): Double
+}
+
+class JsynLooperUnit : LooperUnit {
+    private val SAMPLE_RATE = 44100.0
+    private val CROSSFADE_MS = 20.0  // 20ms crossfade for smooth loop restart
+    private val CROSSFADE_SAMPLES = (SAMPLE_RATE * CROSSFADE_MS / 1000.0).toInt()
+    
+    internal val writerLeft = com.jsyn.unitgen.FixedRateMonoWriter()
+    internal val writerRight = com.jsyn.unitgen.FixedRateMonoWriter()
+    internal val readerLeft = com.jsyn.unitgen.VariableRateMonoReader()
+    internal val readerRight = com.jsyn.unitgen.VariableRateMonoReader()
+    
+    private val bufferLeft = com.jsyn.data.FloatSample()
+    private val bufferRight = com.jsyn.data.FloatSample()
+    
+    // Gates (Mono control for now)
+    internal val recordGateInput = com.jsyn.unitgen.PassThrough()
+    internal val playGateInput = com.jsyn.unitgen.PassThrough()
+    
+    // Connect writer input
+    override val inputLeft: AudioInput = JsynAudioInput(writerLeft.input)
+    override val inputRight: AudioInput = JsynAudioInput(writerRight.input)
+    
+    // Connect reader output
+    override val output: AudioOutput = JsynAudioOutput(readerLeft.output)
+    override val outputRight: AudioOutput = JsynAudioOutput(readerRight.output)
+    
+    // Gates
+    override val recordGate: AudioInput = JsynAudioInput(recordGateInput.input)
+    override val playGate: AudioInput = JsynAudioInput(playGateInput.input)
+
+    private var loopSampleCount: Int = 0  // Exact number of samples recorded
+    private var recordStartFrame: Long = 0
+    private var playbackStartFrame: Long = 0
+    private var isRecording: Boolean = false
+    private var isPlaying: Boolean = false
+
+    init {
+        // Set reader rate to sample rate - CRITICAL for playback!
+        readerLeft.rate.set(SAMPLE_RATE)
+        readerRight.rate.set(SAMPLE_RATE)
+        // Note: Units are naturally in stopped state when created.
+        // Don't call stop() here as units aren't yet added to a synthesizer.
+    }
+    
+    /**
+     * Apply a crossfade between the end and start of the loop to eliminate clicks.
+     * The end of the loop fades out while the start fades in, creating a seamless blend.
+     */
+    private fun applyCrossfade(buffer: com.jsyn.data.FloatSample, sampleCount: Int) {
+        if (sampleCount < CROSSFADE_SAMPLES * 2) return  // Loop too short for crossfade
+        
+        val fadeLength = CROSSFADE_SAMPLES.coerceAtMost(sampleCount / 4)  // Max 25% of loop
+        
+        // Read the relevant portions into temporary arrays
+        val startData = FloatArray(fadeLength)
+        val endData = FloatArray(fadeLength)
+        
+        buffer.read(0, startData, 0, fadeLength)
+        buffer.read(sampleCount - fadeLength, endData, 0, fadeLength)
+        
+        // Apply crossfade: blend start and end
+        for (i in 0 until fadeLength) {
+            val fadeIn = i.toFloat() / fadeLength   // 0.0 -> 1.0
+            val fadeOut = 1.0f - fadeIn              // 1.0 -> 0.0
+            
+            // Blend: fade in the start, fade out the end
+            val blendedStart = startData[i] * fadeIn + endData[i] * fadeOut
+            val blendedEnd = endData[i] * fadeOut + startData[i] * fadeIn
+            
+            startData[i] = blendedStart
+            endData[i] = blendedEnd
+        }
+        
+        // Write the crossfaded data back
+        buffer.write(0, startData, 0, fadeLength)
+        buffer.write(sampleCount - fadeLength, endData, 0, fadeLength)
+    }
+
+    override fun setRecording(active: Boolean) {
+        if (active == isRecording) return
+        isRecording = active
+        
+        if (active) {
+            // Stop any current playback first
+            if (isPlaying) {
+                isPlaying = false
+                readerLeft.dataQueue.clear()
+                readerRight.dataQueue.clear()
+            }
+            
+            // Start recording - track frame count for exact timing
+            recordStartFrame = writerLeft.synthesisEngine.frameCount
+            writerLeft.dataQueue.clear()
+            writerRight.dataQueue.clear()
+            writerLeft.dataQueue.queue(bufferLeft) // Record into buffer once
+            writerRight.dataQueue.queue(bufferRight)
+            writerLeft.start()
+            writerRight.start()
+        } else {
+            // Stop recording - calculate exact sample count
+            writerLeft.stop()
+            writerRight.stop()
+            val endFrame = writerLeft.synthesisEngine.frameCount
+            loopSampleCount = (endFrame - recordStartFrame).toInt().coerceAtMost(bufferLeft.numFrames)
+            
+            // Apply crossfade for seamless looping
+            if (loopSampleCount > 0) {
+                applyCrossfade(bufferLeft, loopSampleCount)
+                applyCrossfade(bufferRight, loopSampleCount)
+                setPlaying(true)
+            }
+        }
+    }
+
+    override fun setPlaying(active: Boolean) {
+        // Avoid redundant calls
+        if (active == isPlaying) return
+        
+        isPlaying = active
+        
+        if (active && loopSampleCount > 0) {
+            playbackStartFrame = readerLeft.synthesisEngine.frameCount
+            readerLeft.dataQueue.clear()
+            readerRight.dataQueue.clear()
+            // Queue the exact recorded samples for looping
+            readerLeft.dataQueue.queueLoop(bufferLeft, 0, loopSampleCount)
+            readerRight.dataQueue.queueLoop(bufferRight, 0, loopSampleCount)
+            readerLeft.start()
+            readerRight.start()
+        } else {
+            // Stop playback - clear queue and stop readers to prevent noise
+            readerLeft.dataQueue.clear()
+            readerRight.dataQueue.clear()
+            readerLeft.stop()
+            readerRight.stop()
+        }
+    }
+
+    override fun allocate(maxSeconds: Double) {
+        val frames = (44100 * maxSeconds).toInt()
+        bufferLeft.allocate(frames, 1)
+        bufferRight.allocate(frames, 1)
+    }
+    
+    override fun clear() {
+        // Stop everything first
+        if (isRecording) {
+            writerLeft.stop()
+            writerRight.stop()
+            isRecording = false
+        }
+        if (isPlaying) {
+            readerLeft.dataQueue.clear()
+            readerRight.dataQueue.clear()
+            readerLeft.stop()
+            readerRight.stop()
+            isPlaying = false
+        }
+        loopSampleCount = 0
+    }
+    
+    override fun getPosition(): Float {
+        if (isRecording) {
+            val recordedFrames = (writerLeft.synthesisEngine.frameCount - recordStartFrame).toInt()
+            val maxFrames = bufferLeft.numFrames
+            return (recordedFrames.toFloat() / maxFrames).coerceIn(0f, 1f)
+        }
+        if (isPlaying && loopSampleCount > 0) {
+            val playedFrames = (readerLeft.synthesisEngine.frameCount - playbackStartFrame).toInt()
+            val posInLoop = playedFrames % loopSampleCount
+            return posInLoop.toFloat() / loopSampleCount
+        }
+        return 0f 
+    }
+    
+    override fun getLoopDuration(): Double = loopSampleCount / SAMPLE_RATE
+}

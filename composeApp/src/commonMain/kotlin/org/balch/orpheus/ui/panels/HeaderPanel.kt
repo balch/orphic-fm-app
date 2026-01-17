@@ -38,6 +38,9 @@ import org.balch.orpheus.features.grains.GrainsViewModel
 import org.balch.orpheus.features.lfo.DuoLfoPanel
 import org.balch.orpheus.features.lfo.LfoFeature
 import org.balch.orpheus.features.lfo.LfoViewModel
+import org.balch.orpheus.features.looper.LooperFeature
+import org.balch.orpheus.features.looper.LooperPanel
+import org.balch.orpheus.features.looper.LooperViewModel
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiPanel
 import org.balch.orpheus.features.midi.MidiViewModel
@@ -75,6 +78,7 @@ fun HeaderPanel(
     distortionFeature: DistortionFeature = DistortionViewModel.feature(),
     resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
     grainsFeature: GrainsFeature = GrainsViewModel.feature(),
+    looperFeature: LooperFeature = LooperViewModel.feature(),
     liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
     aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
@@ -159,6 +163,13 @@ fun HeaderPanel(
              isExpanded = PanelId.GRAINS.isExpanded(),
              onExpandedChange = { PanelId.GRAINS.setExpanded(it) },
              modifier = panelModifier(PanelId.GRAINS.isExpanded())
+        )
+        // Looper Panel
+        LooperPanel(
+             feature = looperFeature,
+             isExpanded = PanelId.LOOPER.isExpanded(),
+             onExpandedChange = { PanelId.LOOPER.setExpanded(it) },
+             modifier = panelModifier(PanelId.LOOPER.isExpanded())
         )
         // Live Coding panel
         LiveCodePanel(

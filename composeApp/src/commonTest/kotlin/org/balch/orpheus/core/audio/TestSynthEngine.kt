@@ -130,6 +130,7 @@ open class TestSynthEngine : SynthEngine {
     // Monitoring
     override fun getPeak(): Float = _peakFlow.value
     override fun getCpuLoad(): Float = _cpuLoadFlow.value
+    override fun getCurrentTime(): Double = org.balch.orpheus.util.currentTimeMillis() / 1000.0
 
     // Flows - override these in tests to inject values
     override val peakFlow: StateFlow<Float> = _peakFlow.asStateFlow()
@@ -281,5 +282,13 @@ open class TestSynthEngine : SynthEngine {
     private var _cloudsMode = 0
     override fun setGrainsMode(mode: Int) { _cloudsMode = mode }
     override fun getGrainsMode(): Int = _cloudsMode
+    
+    // Looper stubs
+    override fun setLooperRecord(recording: Boolean) {}
+    override fun setLooperPlay(playing: Boolean) {}
+    override fun setLooperOverdub(overdub: Boolean) {}
+    override fun clearLooper() {}
+    override fun getLooperPosition(): Float = 0f
+    override fun getLooperDuration(): Double = 0.0
 }
 

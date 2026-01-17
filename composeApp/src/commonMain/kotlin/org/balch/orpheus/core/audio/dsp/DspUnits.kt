@@ -224,3 +224,49 @@ expect interface GrainsUnit : AudioUnit {
     fun setMode(mode: Int)
 }
 
+/**
+ * Simple Native Audio Looper.
+ * Records into an internal buffer and plays it back.
+ */
+expect interface LooperUnit : AudioUnit {
+    /** Audio Input L to record */
+    val inputLeft: AudioInput
+    
+    /** Audio Input R to record */
+    val inputRight: AudioInput
+    
+    /** Loop Playback Output */
+    override val output: AudioOutput
+    val outputRight: AudioOutput
+    
+    /** 
+     * Record continuously when > 0.5.
+     * Overwrites existing buffer content.
+     */
+    val recordGate: AudioInput
+    
+    /** 
+     * Play continuously when > 0.5.
+     * Retains buffer content.
+     */
+    val playGate: AudioInput
+    
+    /** Start/Stop recording manually */
+    fun setRecording(active: Boolean)
+    
+    /** Start/Stop playback manually */
+    fun setPlaying(active: Boolean)
+
+    /** Allocate buffer for max loop time */
+    fun allocate(maxSeconds: Double)
+    
+    /** Clear buffer contents */
+    fun clear()
+    
+    /** Get current loop position (0.0 - 1.0) for UI */
+    fun getPosition(): Float
+    
+    /** Get total recorded loop duration in seconds */
+    fun getLoopDuration(): Double
+}
+

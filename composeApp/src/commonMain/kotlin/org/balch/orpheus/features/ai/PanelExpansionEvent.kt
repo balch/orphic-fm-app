@@ -25,6 +25,7 @@ enum class PanelId(val displayName: String) {
     AI("AI Options"),
     DRUMS("808 Drums"),
     GRAINS("Grains"),
+    LOOPER("Loop"),
     PATTERN("Topographic")
 }
 

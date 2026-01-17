@@ -56,7 +56,7 @@ fun GrainsPanel(
     CollapsibleColumnPanel(
         title = "GRAINS",
         color = panelColor,
-        expandedTitle = "Cumulus Mixer",
+        expandedTitle = "Cumulus",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

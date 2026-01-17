@@ -23,7 +23,7 @@ import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
-import org.balch.orpheus.util.currentTimeMillis
+
 import kotlin.math.pow
 
 /**
@@ -94,8 +94,8 @@ class TidalScheduler(
     private var currentPattern: Pattern<TidalEvent>? = null
     
     // Scheduler timing parameters
-    private val scheduleWindowMs = 250L  // Schedule 250ms chunks at a time
-    private val lookaheadMs = 100L       // Look ahead into the pattern
+    private val scheduleWindowSeconds = 0.25 // Schedule 250ms chunks at a time
+    private val lookaheadSeconds = 0.1       // Look ahead into the pattern
     
     /**
      * Set the current pattern to play.
@@ -124,7 +124,7 @@ class TidalScheduler(
         _state.value = _state.value.copy(isPlaying = true, currentCycle = 0, cyclePosition = 0.0)
         
         playbackJob = scope.launch(dispatchProvider.default) {
-            val startTime = currentTimeMillis()
+            val startTime = synthEngine.getCurrentTime()
             var nextScheduleTime = startTime
             
             // Initial silence to allow scheduling?
@@ -134,23 +134,23 @@ class TidalScheduler(
             var lastScheduledSeconds = 0.0
             
             while (isActive) {
-                val now = currentTimeMillis()
+                val now = synthEngine.getCurrentTime()
                 
                 // Wait until we are close to needing the next block
                 // We want to be ahead of real time by a safe margin.
                 val drift = now - nextScheduleTime
                 if (drift < 0) {
-                     delay(-drift)
+                     delay((-drift * 1000).toLong())
                 }
-                nextScheduleTime += scheduleWindowMs
+                nextScheduleTime += scheduleWindowSeconds
                 
                 // Calculate time window in seconds relative to start
                 // Note: We use relative time for automation paths
                 val windowStartSeconds = lastScheduledSeconds
-                val windowEndSeconds = windowStartSeconds + (scheduleWindowMs / 1000.0)
+                val windowEndSeconds = windowStartSeconds + scheduleWindowSeconds
                 
                 // Update UI state (approximate)
-                val currentRealSeconds = (now - startTime).toDouble() / 1000.0
+                val currentRealSeconds = (now - startTime)
                 val cycles = currentRealSeconds * _state.value.cps
                 _state.value = _state.value.copy(
                     currentCycle = cycles.toInt(),
@@ -240,7 +240,7 @@ class TidalScheduler(
         events: List<Event<TidalEvent>>,
         windowStart: Double,
         windowEnd: Double,
-        playbackStartTime: Long
+        playbackStartTime: Double
     ) {
         val windowDuration = windowEnd - windowStart
         val cps = _state.value.cps
@@ -283,10 +283,10 @@ class TidalScheduler(
             // So we must offset the path by `(windowStartAbsoluteTime - now)`.
             // `windowStartAbsoluteTime` = playbackStartTime + (windowStart * 1000)
             
-            val now = currentTimeMillis()
-            val windowStartAbs = playbackStartTime + (windowStart * 1000).toLong()
-            val offsetMs = (windowStartAbs - now).coerceAtLeast(0) // Should be +ve if ahead
-            val offsetSec = offsetMs / 1000.0
+            val now = synthEngine.getCurrentTime() // Audio time
+            val windowStartAbs = playbackStartTime + windowStart
+            val offsetSec = (windowStartAbs - now).coerceAtLeast(0.0)
+
             
             // We use lists to build the path
             val gateTimes = mutableListOf<Float>()
@@ -385,15 +385,15 @@ class TidalScheduler(
     
     private fun scheduleVisuals(
         events: List<Event<TidalEvent>>,
-        playbackStartTime: Long
+        playbackStartTime: Double
     ) {
          val cps = _state.value.cps
          events.forEach { event ->
              val eventTimeCycles = event.part.start
              val eventTimeSeconds = eventTimeCycles / cps
-             val eventTimeAbs = playbackStartTime + (eventTimeSeconds * 1000).toLong()
-             val now = currentTimeMillis()
-             val delayMs = eventTimeAbs - now
+             val eventTimeAbs = playbackStartTime + eventTimeSeconds
+             val now = synthEngine.getCurrentTime()
+             val delayMs = ((eventTimeAbs - now) * 1000).toLong()
              
              if (delayMs > 0) {
                  scope.launch(dispatchProvider.default) {

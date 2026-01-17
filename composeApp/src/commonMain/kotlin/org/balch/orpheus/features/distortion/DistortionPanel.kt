@@ -49,7 +49,7 @@ fun DistortionPanel(
     CollapsibleColumnPanel(
         title = "VOL",
         color = OrpheusColors.neonMagenta,
-        expandedTitle = "Global Mix",
+        expandedTitle = "Mix",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,

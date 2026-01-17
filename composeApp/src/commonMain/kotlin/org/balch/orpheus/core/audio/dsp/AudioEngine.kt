@@ -38,6 +38,7 @@ expect class AudioEngine() {
     fun createDrumUnit(): DrumUnit
     fun createResonatorUnit(): ResonatorUnit
     fun createGrainsUnit(): GrainsUnit
+    fun createLooperUnit(): LooperUnit
 
     /** Master output - connect final audio here */
     val lineOutLeft: AudioInput
@@ -46,5 +47,8 @@ expect class AudioEngine() {
     // Monitoring
     /** Get current CPU load (0.0 - 1.0) */
     fun getCpuLoad(): Float
+
+    /** Get current audio time in seconds */
+    fun getCurrentTime(): Double
 }
 

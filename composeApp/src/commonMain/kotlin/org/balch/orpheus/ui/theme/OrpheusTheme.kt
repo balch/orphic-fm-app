@@ -234,4 +234,15 @@ object OrpheusColors {
     val lakersPurpleDark = Color(0xFF3A1A5C)    // Darker purple for backgrounds
     val lakersPurpleLight = Color(0xFF7B3FA0)   // Lighter purple for accents
     val lakersGoldBright = Color(0xFFFFD700)    // Brighter gold for highlights
+    
+    // Looper Fire Orange Color Palette
+    val looperFireOrange = Color(0xFFFF6B2C)     // Primary fire orange
+    val looperEmber = Color(0xFFFF8C42)          // Lighter ember orange
+    val looperFlame = Color(0xFFFF4500)          // Intense flame red-orange
+    val looperBrown = Color(0xFF8B4513)          // Saddle brown highlight
+    val looperChestnut = Color(0xFFA0522D)       // Sienna/chestnut brown
+    val looperBurnt = Color(0xFFCC5500)          // Burnt orange
+    val looperAmber = Color(0xFFFFBF00)          // Warm amber glow
+    val looperCoal = Color(0xFF3D2B1F)           // Dark coal brown for backgrounds
+    val looperAsh = Color(0xFF4A3728)            // Ash brown surface
 }
