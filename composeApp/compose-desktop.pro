@@ -1,6 +1,27 @@
 # Suppress all warnings to allow build to proceed
 -ignorewarnings
 
+-dontnote kotlin.**
+-dontwarn kotlin.**
+
+-optimizationpasses 2
+
+-dontobfuscate
+
+# Keep all Compose UI classes - ProGuard optimization breaks Compose's internal bytecode
+-keep class androidx.compose.** { *; }
+-keepclassmembers class androidx.compose.** { *; }
+-keep class org.jetbrains.skiko.** { *; }
+-keep class org.jetbrains.skia.** { *; }
+
+# Strip debug and verbose logging in release builds
+# This removes the method invocations entirely, so string arguments are never evaluated
+# Strip debug and verbose logging in release builds
+-assumenosideeffects class com.diamondedge.logging.** {
+    public void verbose(...);
+    public void debug(...);
+}
+
 # Suppress warnings from JavaCPP about missing Maven classes
 -dontwarn org.apache.maven.**
 -dontwarn org.bytedeco.javacpp.tools.**
@@ -39,6 +60,15 @@
 -dontwarn io.netty.**
 -dontwarn kotlin.internal.**
 
+# Keep Netty logging classes to prevent IncompleteClassHierarchyException
+# ProGuard fails when it can't resolve Log4J2 parent classes during optimization
+-keep class io.netty.util.internal.logging.** { *; }
+-dontwarn org.apache.logging.log4j.**
+
+# Prevent optimization of Netty's Log4J2 logger factory which references missing log4j classes
+-keep,allowshrinking class io.netty.util.internal.logging.Log4J2LoggerFactory { *; }
+-keep,allowshrinking class io.netty.util.internal.logging.Log4J2Logger { *; }
+
 # Additional suppressions for transitive dependencies (Micrometer, Reactor, BouncyCastle, etc.)
 -dontwarn reactor.**
 -dontwarn io.micrometer.**
@@ -52,3 +82,26 @@
 -dontwarn org.openjsse.**
 -dontwarn jakarta.servlet.**
 -dontwarn jakarta.mail.**
+
+# Ktor HTTP client - keep engine discovery via ServiceLoader
+-keep class io.ktor.client.** { *; }
+-keep class io.ktor.client.engine.** { *; }
+-keep class io.ktor.client.engine.apache5.** { *; }
+-keep class io.ktor.client.engine.cio.** { *; }
+# Keep all HttpClientEngineContainer implementations for ServiceLoader discovery
+-keep class * implements io.ktor.client.HttpClientEngineContainer { *; }
+-keepclassmembers class * implements io.ktor.client.HttpClientEngineContainer {
+    <init>(...);
+}
+
+# Keep ServiceLoader metadata files
+-adaptresourcefilenames META-INF/services/**
+-keepnames class * implements io.ktor.client.HttpClientEngineContainer
+
+# Ktor serialization and content negotiation
+-keep class io.ktor.serialization.** { *; }
+-keep class io.ktor.client.plugins.** { *; }
+
+# Apache HTTP Client 5 (used by Ktor Apache5 engine)
+-keep class org.apache.hc.** { *; }
+-dontwarn org.apache.hc.**

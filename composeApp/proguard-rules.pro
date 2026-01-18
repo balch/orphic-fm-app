@@ -7,7 +7,13 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Add any project specific keep rules here:
+-optimizationpasses 4
+
+# Strip debug and verbose logging in release builds
+-assumenosideeffects class com.diamondedge.logging.** {
+    public void verbose(...);
+    public void debug(...);
+}
 
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface

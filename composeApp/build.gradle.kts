@@ -162,7 +162,10 @@ compose.desktop {
 
             macOS {
                 iconFile.set(project.file("src/jvmMain/resources/icon.icns"))
-                dockName = "Orpheus-FM"
+                dockName = "Orphic-FM"
+            }
+            windows {
+                iconFile.set(project.file("src/jvmMain/resources/icon.ico"))
             }
             linux {
                 iconFile.set(project.file("src/jvmMain/resources/icon.png"))
