@@ -196,6 +196,20 @@ class SynthControlAgent(
         }
     }
 
+    private fun String.toUserRequestPrompt() = """
+        ## USER REQUEST
+        
+        The user asked: \"$this\"
+
+        Here are some guidelines for the composition:
+         - Define a preset that allows for creating the sounds in the request above.
+         - Use the drums but not too loud or much
+         - try to make the key of any songs listed
+         - ALWAYS start softly and ease into the song, try not to have too many abrupt changes
+         - DO NOT have any high pitch or high volume notes or noises
+         - listen for the users command to end/quit/stop. Try to provide a quick but graceful ending. 
+    """.trimIndent()
+
     /**
      * Start the agent.
      * 
@@ -328,7 +342,7 @@ class SynthControlAgent(
 
                             // Add user request context if provided (from OrpheusAgent)
                             if (userRequest != null) {
-                                initPrompt += "\n\n## USER REQUEST\nThe user asked: \"$userRequest\"\nPlease create a composition that matches this request."
+                                initPrompt += userRequest.toUserRequestPrompt()
                                 userLogMessage = userRequest
                             }
 
@@ -393,7 +407,20 @@ class SynthControlAgent(
                     strategy = strategy,
                     agentConfig = AIAgentConfig(
                         prompt = prompt(config.name) {
-                             system(config.systemPrompt + "\n\nIMPORTANT: You must rely on the structured output format provided. Do not use native tool calls.")
+                             system(config.systemPrompt + """
+                                 
+                                 IMPORTANT: You must rely on the structured output format provided. Do not use native tool calls.
+                                 
+                                 BEATS/DRUMS CONTROL:
+                                 You can control the Drum Sequencer using the following IDs:
+                                 - BEATS_RUN: 0.0 (Stop) or 1.0 (Start)
+                                 - BEATS_X, BEATS_Y: 0.0 to 1.0 (Topographic Morphing)
+                                 - BEATS_DENSITY_1, BEATS_DENSITY_2, BEATS_DENSITY_3: 0.0 to 1.0 (Density for Kick, Snare, HiHat)
+                                 - BEATS_BPM: 60.0 to 200.0
+                                 - BEATS_MIX: 0.0 to 1.0 (Volume)
+                                 - BEATS_RANDOMNESS, BEATS_SWING
+                                 - BEATS_MODE: 0.0 (Map/Drums) or 1.0 (Euclidean)
+                             """.trimIndent())
                         },
                         model = aiModelProvider.currentKoogModel,
                         maxAgentIterations = Int.MAX_VALUE // Run indefinitely

@@ -270,22 +270,29 @@ class AiOptionsViewModel(
         _soloAgent.value = newAgent
         
         viewModelScope.launch(dispatcherProvider.io) {
-            val soloPreset = generateRandomSoloPreset()
-            
-            // Fade in: Apply preset with Quad Volumes = 0, then ramp up
-            val presetWithZeroQuadVol = soloPreset.copy(
-                quadGroupVolumes = listOf(0f, 0f, 0f)
-            )
-            
-            presetLoader.applyPreset(presetWithZeroQuadVol)
-            log.debug { "Applied solo preset: ${soloPreset.name} (fading in)" }
-            
+
+/*
+            if (event.type != CompositionType.USER_PROMPTED) {
+                val soloPreset = generateRandomSoloPreset()
+
+                // Fade in: Apply preset with Quad Volumes = 0, then ramp up
+                val presetWithZeroQuadVol = soloPreset.copy(
+                    quadGroupVolumes = listOf(0f, 0f, 0f)
+                )
+
+                presetLoader.applyPreset(presetWithZeroQuadVol)
+                log.debug { "Applied solo preset: ${soloPreset.name} (fading in)" }
+            }
+
+ */
+
             // Fade in using JSyn's LinearRamp
             val fadeDuration = 2.0f
             synthEngine.fadeQuadVolume(0, 1f, fadeDuration)
             synthEngine.fadeQuadVolume(1, 1f, fadeDuration)
             synthEngine.fadeQuadVolume(2, 1f, fadeDuration)
-            
+
+
             // Start the agent with custom parameters
             newAgent.start(
                 compositionType = event.type,

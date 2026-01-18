@@ -136,6 +136,20 @@ data class MidiMappingState(
             const val DRUM_HH_DECAY = "drum_hh_decay"
             const val DRUM_HH_NOISY = "drum_hh_noisy"
             const val DRUM_HH_TRIGGER = "drum_hh_trigger"
+
+            // Beats/Sequencer controls
+            const val BEATS_RUN = "beats_run"
+            const val BEATS_X = "beats_x"
+            const val BEATS_Y = "beats_y"
+            const val BEATS_BPM = "beats_bpm"
+            const val BEATS_MIX = "beats_mix"
+            const val BEATS_RANDOMNESS = "beats_randomness"
+            const val BEATS_SWING = "beats_swing"
+            const val BEATS_MODE = "beats_mode"
+            
+            // Indexed Beats controls
+            fun beatsDensity(index: Int) = "beats_density_${index + 1}" // 1-based in ID for consistency
+            fun beatsEuclideanLength(index: Int) = "beats_euclidean_length_${index + 1}"
         }
     }
 

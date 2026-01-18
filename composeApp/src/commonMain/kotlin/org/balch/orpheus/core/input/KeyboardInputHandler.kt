@@ -23,9 +23,12 @@ object KeyboardInputHandler {
 
     // Drum keys → Drum types (0=BD, 1=SD, 2=HH)
     private val drumKeyMap: Map<Key, Int> = mapOf(
-        Key.I to 0,  // Bass Drum
-        Key.O to 1,  // Snare Drum
-        Key.P to 2   // Hi-Hat
+        Key.E to 2,
+        Key.P to 2,
+        Key.W to 1,
+        Key.O to 1,
+        Key.Q to 0,
+        Key.I to 0
     )
 
     // Number row keys → Tune adjustments for voices (0-7)

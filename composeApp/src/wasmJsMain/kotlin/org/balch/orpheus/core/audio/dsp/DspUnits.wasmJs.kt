@@ -726,6 +726,37 @@ actual interface GrainsUnit : AudioUnit {
     actual fun setMode(mode: Int)
 }
 
+actual interface LooperUnit : AudioUnit {
+    actual val inputLeft: AudioInput
+    actual val inputRight: AudioInput
+    actual override val output: AudioOutput
+    actual val outputRight: AudioOutput
+    actual val recordGate: AudioInput
+    actual val playGate: AudioInput
+    actual fun setRecording(active: Boolean)
+    actual fun setPlaying(active: Boolean)
+    actual fun allocate(maxSeconds: Double)
+    actual fun clear()
+    actual fun getPosition(): Float
+    actual fun getLoopDuration(): Double
+}
+
+class WebAudioLooperUnit(private val context: AudioContext) : LooperUnit {
+    override val inputLeft: AudioInput = WebAudioManualInput(context) {}
+    override val inputRight: AudioInput = WebAudioManualInput(context) {}
+    override val output: AudioOutput = WebAudioNodeOutput(context.createGain())
+    override val outputRight: AudioOutput = WebAudioNodeOutput(context.createGain())
+    override val recordGate: AudioInput = WebAudioManualInput(context) {}
+    override val playGate: AudioInput = WebAudioManualInput(context) {}
+
+    override fun setRecording(active: Boolean) {}
+    override fun setPlaying(active: Boolean) {}
+    override fun allocate(maxSeconds: Double) {}
+    override fun clear() {}
+    override fun getPosition(): Float = 0f
+    override fun getLoopDuration(): Double = 0.0
+}
+
 /**
  * WASM implementation of GrainsUnit.
  * 

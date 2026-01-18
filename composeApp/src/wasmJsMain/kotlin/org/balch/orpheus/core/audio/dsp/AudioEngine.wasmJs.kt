@@ -74,6 +74,7 @@ actual class AudioEngine actual constructor() {
     actual fun createDrumUnit(): DrumUnit = WebAudioDrumUnit(audioContext)
     actual fun createResonatorUnit(): ResonatorUnit = WebAudioResonatorUnit(audioContext)
     actual fun createGrainsUnit(): GrainsUnit = WebAudioGrainsUnit(audioContext)
+    actual fun createLooperUnit(): LooperUnit = WebAudioLooperUnit(audioContext)
     
     actual val lineOutLeft: AudioInput
         get() = WebAudioNodeInput(leftGain, 0, audioContext)
@@ -121,6 +122,8 @@ actual class AudioEngine actual constructor() {
         
         return estimatedCpuLoad
     }
+
+    actual fun getCurrentTime(): Double = audioContext.currentTime
     
     /** Get the AudioContext for direct Web Audio API access */
     val webAudioContext: AudioContext get() = audioContext

@@ -176,6 +176,14 @@ class DspDrumSynthTest {
         
         override fun setGrainsMode(mode: Int) {}
         override fun getGrainsMode(): Int = 0
+
+        override fun getCurrentTime(): Double = 0.0
+        override fun setLooperRecord(recording: Boolean) {}
+        override fun setLooperPlay(playing: Boolean) {}
+        override fun setLooperOverdub(overdub: Boolean) {}
+        override fun clearLooper() {}
+        override fun getLooperPosition(): Float = 0f
+        override fun getLooperDuration(): Double = 0.0
     }
 
     @Test
