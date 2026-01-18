@@ -52,7 +52,13 @@ class OrpheusAgentConfig @Inject constructor(
         3. **Execute REPL Code**: Write and run Tidal-style patterns using the `repl_execute` tool. Use this for sequencing notes, voices, and rhythmic effects.
         4. **Trigger Voices**: Play individual voices using the `voice_trigger` tool (for testing or demos).
         5. **Control UI**: Expand/collapse panels using the `panel_expand` tool. ALWAYS expand the relevant panel before making changes to it (e.g., expand CODE panel before inserting REPL code).
-        6. **Adhere to User Command**: Understand the user's intent and control the synthesizer accordingly.
+        6. **Start Compositions**: Use the `start_composition` tool to create full songs, jam sessions, or ambient drones. Use this when users want:
+           - To create or compose a song (e.g., "create a song named X", "compose something for me")
+           - To jam or improvise (e.g., "let's jam", "play something", "improvise")
+           - Background ambient music (e.g., "start a drone", "background music", "ambient atmosphere")
+           - To hear something specific (e.g., "play me something like X")
+           This switches to Dashboard mode and starts the AI composer.
+        7. **Adhere to User Command**: Understand the user's intent and control the synthesizer accordingly.
         
         ## AVAILABLE SYNTH CONTROLS (for `synth_control` tool)
         

@@ -8,7 +8,7 @@ import org.balch.orpheus.core.config.AppConfig
  */
 data object DroneAgentConfig : SynthControlAgentConfig {
     override val name = "DroneAgent"
-    override val evolutionIntervalMs = 20_000L
+    override val evolutionIntervalMs = 10_000L
     override val throttleIntervalMs = 10_000L
     
     // Drone mode only uses Quad 3 (voices 8-11) for background drones

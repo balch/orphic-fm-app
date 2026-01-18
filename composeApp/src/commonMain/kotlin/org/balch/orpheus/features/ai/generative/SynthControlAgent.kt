@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
@@ -44,6 +45,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.features.ai.CompositionType
 import org.balch.orpheus.features.ai.tools.ReplExecuteArgs
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
 import org.balch.orpheus.features.ai.tools.SynthControlArgs
@@ -59,7 +61,7 @@ import kotlin.time.Instant
 private fun Float.format(digits: Int): String {
     val s = toString()
     val i = s.indexOf('.')
-    return if (i >= 0 && i + digits + 1 < s.length) s.substring(0, i + digits + 1) else s
+    return if (i >= 0 && i + digits + 1 < s.length) s.take(i + digits + 1) else s
 }
 
 sealed interface SynthAgentState {
@@ -196,9 +198,18 @@ class SynthControlAgent(
 
     /**
      * Start the agent.
+     * 
+     * @param customPrompt Optional custom prompt to inject as additional direction for the composition
+     * @param moodName Optional mood name to select (for Solo mode, matches a Mood in SoloAgentConfig)
+     * @param userRequest Optional user request description (e.g., "create a song named Midnight Dreams")
      */
     @OptIn(FlowPreview::class)
-    fun start() {
+    fun start(
+        compositionType: CompositionType,
+        customPrompt: String? = null,
+        moodName: String? = null,
+        userRequest: String? = null
+    ) {
         if (agentJob?.isActive == true) {
             log.debug { "${config.name} already running" }
             return
@@ -217,33 +228,36 @@ class SynthControlAgent(
             }
             val (apiKey, _) = keyResult
             try {
-                val selectedMood = if (config.moods.isNotEmpty()) config.moods.random() else null
+
+                val selectedMood =
+                    if (compositionType != CompositionType.USER_PROMPTED && config.moods.isNotEmpty())
+                        config.moods.random()
+                    else null
 
                 // Input Stream: Combine Timer Ticks and Synth Changes
-                val timerFlow = flow {
-                    var evolutionIndex = 0
-                    while (isActive) {
-                        delay(config.evolutionIntervalMs)
-                        if (selectedMood != null && selectedMood.evolutionPrompts.isNotEmpty()) {
-                            // Check if we've completed all prompts and should finish
-                            if (evolutionIndex >= selectedMood.evolutionPrompts.size) {
-                                if (config.finishOnLastEvolution) {
-                                    // Signal completion and stop the flow
-                                    log.debug { "All evolution prompts completed - signaling completion" }
-                                    _completed.tryEmit(Unit)
-                                    return@flow
-                                } else {
-                                    // Cycle back to start (Drone mode behavior)
-                                    evolutionIndex = 0
+                val timerFlow =
+                    if (selectedMood != null && selectedMood.evolutionPrompts.isNotEmpty()) {
+                        flow {
+                            var evolutionIndex = 0
+                            while (isActive) {
+                                delay(config.evolutionIntervalMs)
+                                // Check if we've completed all prompts and should finish
+                                if (evolutionIndex >= selectedMood.evolutionPrompts.size) {
+                                    if (config.finishOnLastEvolution) {
+                                        // Signal completion and stop the flow
+                                        log.debug { "All evolution prompts completed - signaling completion" }
+                                        _completed.tryEmit(Unit)
+                                        return@flow
+                                    } else {
+                                        // Cycle back to start (Drone mode behavior)
+                                        evolutionIndex = 0
+                                    }
                                 }
+                                // Emit the current evolution prompt
+                                emit(selectedMood.evolutionPrompts[evolutionIndex++])
                             }
-                            // Emit the current evolution prompt
-                            emit(selectedMood.evolutionPrompts[evolutionIndex++])
-                        } else if (config.initialMoodPrompts.isNotEmpty()) {
-                            emit(config.initialMoodPrompts.random())
                         }
-                    }
-                }
+                    } else emptyFlow()
 
                 val synthChangeFlow = synthController.onControlChange
                     .filter { it.origin == ControlEventOrigin.UI }
@@ -294,35 +308,46 @@ class SynthControlAgent(
                             // Helper to process response stream
                             suspend fun processStructuredResponse(stream: Flow<StreamFrame>) {
                                 isBusy = true
-                                try {
-                                    val monitoredStream = stream.onEach { 
-                                         if (it is StreamFrame.Append) log.debug { "RAW APPEND: ${it.text}" }
+                                runCatchingSuspend {
+                                    val monitoredStream = stream.onEach {
+                                        if (it is StreamFrame.Append) log.debug { "RAW APPEND: ${it.text}" }
                                     }
-                                    
+
                                     parseSynthActions(monitoredStream).collect { action ->
                                         processAction(action)
                                     }
-                                } catch (e: CancellationException) {
-                                    throw e
-                                } catch (e: Exception) {
-                                     log.error(e) { "Streaming error" }
-                                     emitStatus("Stream Error", isError = true)
-                                } finally {
-                                    isBusy = false
+                                }.onFailure { e ->
+                                    log.error(e) { "Streaming error" }
+                                    emitStatus("Stream Error", isError = true)
                                 }
+                                isBusy = false
                             }
-                            
                             
                             var initPrompt = synthConfig.initialPrompt
                             var userLogMessage = "Initializing ${synthConfig.name}..."
 
+                            // Add user request context if provided (from OrpheusAgent)
+                            if (userRequest != null) {
+                                initPrompt += "\n\n## USER REQUEST\nThe user asked: \"$userRequest\"\nPlease create a composition that matches this request."
+                                userLogMessage = userRequest
+                            }
+
                             if (selectedMood != null) {
                                 initPrompt += "\n\nSpecific Direction: ${selectedMood.name}\n${selectedMood.initialPrompt}"
-                                userLogMessage = "Mood: ${selectedMood.name}"
+                                if (userRequest == null) {
+                                    userLogMessage = "Mood: ${selectedMood.name}"
+                                }
                             } else if (synthConfig.initialMoodPrompts.isNotEmpty()) {
                                 val mood = synthConfig.initialMoodPrompts.random()
                                 initPrompt += "\n\nSpecific Direction:\n$mood"
-                                userLogMessage = mood
+                                if (userRequest == null) {
+                                    userLogMessage = mood
+                                }
+                            }
+
+                            // Add custom prompt if provided (additional creative direction)
+                            if (customPrompt != null) {
+                                initPrompt += "\n\nADDITIONAL DIRECTION:\n$customPrompt"
                             }
 
                             emitStatus("Initializing...", isLoading = true)

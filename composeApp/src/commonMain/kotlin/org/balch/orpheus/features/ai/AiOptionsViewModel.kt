@@ -126,6 +126,7 @@ class AiOptionsViewModel(
     private val replExecuteTool: ReplExecuteTool,
     private val replCodeEventBus: ReplCodeEventBus,
     private val panelExpansionEventBus: PanelExpansionEventBus,
+    private val modeChangeEventBus: ModeChangeEventBus,
     private val synthEngine: SynthEngine,
     private val aiKeyRepository: AiKeyRepository,
     private val aiModelProvider: AiModelProvider,
@@ -174,6 +175,22 @@ class AiOptionsViewModel(
                 }
             }
         }
+        
+        // Subscribe to mode change events (from OrpheusAgent tools like StartCompositionTool)
+        viewModelScope.launch {
+            modeChangeEventBus.events.collect { event ->
+                when (event) {
+                    is ModeChangeEvent.StartComposition -> {
+                        log.debug { "Received StartComposition event: ${event.type} - '${event.userRequest}'" }
+                        handleStartComposition(event)
+                    }
+                    is ModeChangeEvent.StopComposition -> {
+                        log.debug { "Received StopComposition event" }
+                        stopAllAgents()
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -212,6 +229,79 @@ class AiOptionsViewModel(
         
         // Reset playback mode to USER since no AI is active
         synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
+    }
+
+    /**
+     * Handle a StartComposition event from the ModeChangeEventBus.
+     * This is triggered by the StartCompositionTool used by OrpheusAgent.
+     */
+    private fun handleStartComposition(event: ModeChangeEvent.StartComposition) {
+        // Stop any active agents first
+        if (_isDroneActive.value) {
+            _isDroneActive.value = false
+            mediaSessionStateManager.setDroneActive(false)
+            _droneAgent.value?.stop()
+            _droneAgent.value = null
+        }
+        if (_isReplActive.value) {
+            _isReplActive.value = false
+            viewModelScope.launch(dispatcherProvider.io) {
+                runCatchingSuspend {
+                    replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
+                }
+            }
+        }
+
+        _isSoloActive.value = true
+        mediaSessionStateManager.setSoloActive(true)
+        _showChatDialog.value = true  // Show dashboard
+        
+        log.debug { "Starting Solo Agent with custom params - request: $event" }
+
+        // Update playback mode for notifications
+        synthOrchestrator.setPlaybackMode(PlaybackMode.SOLO)
+        
+        // Clear old agent reference before incrementing session
+        _soloAgent.value = null
+        _sessionId.value++
+        
+        // Create fresh agent instance
+        val newAgent = synthAgentFactory.create(SoloAgentConfig)
+        _soloAgent.value = newAgent
+        
+        viewModelScope.launch(dispatcherProvider.io) {
+            val soloPreset = generateRandomSoloPreset()
+            
+            // Fade in: Apply preset with Quad Volumes = 0, then ramp up
+            val presetWithZeroQuadVol = soloPreset.copy(
+                quadGroupVolumes = listOf(0f, 0f, 0f)
+            )
+            
+            presetLoader.applyPreset(presetWithZeroQuadVol)
+            log.debug { "Applied solo preset: ${soloPreset.name} (fading in)" }
+            
+            // Fade in using JSyn's LinearRamp
+            val fadeDuration = 2.0f
+            synthEngine.fadeQuadVolume(0, 1f, fadeDuration)
+            synthEngine.fadeQuadVolume(1, 1f, fadeDuration)
+            synthEngine.fadeQuadVolume(2, 1f, fadeDuration)
+            
+            // Start the agent with custom parameters
+            newAgent.start(
+                compositionType = event.type,
+                customPrompt = event.customPrompt,
+                moodName = event.moodName,
+                userRequest = event.userRequest
+            )
+            
+            // Subscribe to completion signal
+            newAgent.completed.collect {
+                log.debug { "Solo composition completed - auto-stopping" }
+                withContext(dispatcherProvider.main) {
+                    onSoloCompleted()
+                }
+            }
+        }
     }
 
     /**
@@ -334,7 +424,7 @@ class AiOptionsViewModel(
                 synthEngine.fadeQuadVolume(2, 1f, fadeDuration)
                 
                 // Start the agent immediately - it generates the drone sound that fades in
-                newAgent.start()
+                newAgent.start(CompositionType.DRONE)
             }
         } else {
             log.debug { "Stopping Drone Agent" }
@@ -427,7 +517,7 @@ class AiOptionsViewModel(
                 synthEngine.fadeQuadVolume(2, 1f, fadeDuration)
                 
                 // Start the agent immediately - it generates the sound that fades in
-                newAgent.start()
+                newAgent.start(CompositionType.SOLO)
                 
                 // Subscribe to completion signal - auto-stop Solo when all evolution prompts are done
                 newAgent.completed.collect {
