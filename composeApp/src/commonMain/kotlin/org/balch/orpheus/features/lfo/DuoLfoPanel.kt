@@ -1,24 +1,14 @@
 package org.balch.orpheus.features.lfo
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -68,16 +58,18 @@ fun DuoLfoPanel(
         val isActive = uiState.mode != HyperLfoMode.OFF
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 3-way AND/OFF/OR Switch (Left)
-            Box(
-                modifier =
-                    Modifier
-                        .learnable(ControlIds.HYPER_LFO_MODE, learnState)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // 3-way AND/OFF/OR Switch (Left)
                 Vertical3WaySwitch(
+                    modifier =
+                        Modifier
+                            .learnable(ControlIds.HYPER_LFO_MODE, learnState),
                     topLabel = "AND",
                     bottomLabel = "OR",
                     position =
@@ -98,33 +90,26 @@ fun DuoLfoPanel(
                     color = OrpheusColors.neonCyan,
                     enabled = !learnState.isActive
                 )
+
+                // Knobs (Medium size - 56dp)
+                RotaryKnob(
+                    value = uiState.lfoA,
+                    onValueChange = actions.onLfoAChange,
+                    label = "RATE 1",
+                    controlId = ControlIds.HYPER_LFO_A,
+                    size = 64.dp,
+                    progressColor =
+                        if (isActive) OrpheusColors.neonCyan
+                        else OrpheusColors.neonCyan.copy(alpha = 0.4f)
+                )
             }
-
-            // Knobs (Medium size - 56dp)
-            RotaryKnob(
-                value = uiState.lfoA,
-                onValueChange = actions.onLfoAChange,
-                label = "RATE 1",
-                controlId = ControlIds.HYPER_LFO_A,
-                size = 64.dp,
-                progressColor =
-                    if (isActive) OrpheusColors.neonCyan
-                    else OrpheusColors.neonCyan.copy(alpha = 0.4f)
-            )
-            RotaryKnob(
-                value = uiState.lfoB,
-                onValueChange = actions.onLfoBChange,
-                label = "RATE 2",
-                controlId = ControlIds.HYPER_LFO_B,
-                size = 64.dp,
-                progressColor =
-                    if (isActive) OrpheusColors.neonCyan
-                    else OrpheusColors.neonCyan.copy(alpha = 0.4f)
-            )
-
-            // LINK Vertical Switch (Right)
-            Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_LINK, learnState)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // LINK Vertical Switch (Right)
                 VerticalToggle(
+                    modifier = Modifier.learnable(ControlIds.HYPER_LFO_LINK, learnState),
                     topLabel = "LINK",
                     bottomLabel = "OFF",
                     isTop = uiState.linkEnabled,
@@ -132,41 +117,18 @@ fun DuoLfoPanel(
                     color = OrpheusColors.neonCyan,
                     enabled = !learnState.isActive
                 )
+                RotaryKnob(
+                    value = uiState.lfoB,
+                    onValueChange = actions.onLfoBChange,
+                    label = "RATE 2",
+                    controlId = ControlIds.HYPER_LFO_B,
+                    size = 64.dp,
+                    progressColor =
+                        if (isActive) OrpheusColors.neonCyan
+                        else OrpheusColors.neonCyan.copy(alpha = 0.4f)
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun ModeToggleButton(
-    modifier: Modifier = Modifier,
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    activeColor: Color
-) {
-    Box(
-        modifier =
-            modifier.clip(RoundedCornerShape(6.dp))
-                .background(
-                    if (isSelected) activeColor.copy(alpha = 0.8f)
-                    else OrpheusColors.panelSurface
-                )
-                .border(
-                    width = 1.dp,
-                    color = if (isSelected) activeColor else OrpheusColors.lfoBackground,
-                    shape = RoundedCornerShape(6.dp)
-                )
-                .clickable(onClick = onClick)
-                .padding(horizontal = 10.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (isSelected) Color.White else OrpheusColors.greyText
-        )
     }
 }
 

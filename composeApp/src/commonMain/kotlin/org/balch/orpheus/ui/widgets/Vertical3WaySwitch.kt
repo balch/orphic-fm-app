@@ -31,6 +31,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
  */
 @Composable
 fun Vertical3WaySwitch(
+    modifier: Modifier = Modifier,
     topLabel: String,
     bottomLabel: String,
     position: Int, // 0=top, 1=middle, 2=bottom
@@ -40,7 +41,7 @@ fun Vertical3WaySwitch(
 ) {
     Column(
         modifier =
-            Modifier.clip(RoundedCornerShape(6.dp))
+            modifier.clip(RoundedCornerShape(6.dp))
                 .background(OrpheusColors.panelBackground)
                 .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
                 .padding(

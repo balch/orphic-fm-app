@@ -126,7 +126,7 @@ fun HeaderPanel(
             feature = lfoFeature,
             isExpanded = PanelId.LFO.isExpanded(),
             onExpandedChange = { PanelId.LFO.setExpanded(it) },
-            modifier = panelModifier(PanelId.LFO.isExpanded())
+            modifier = panelModifier(PanelId.LFO.isExpanded(), weight = .6f)
         )
         DelayFeedbackPanel(
             feature = delayFeature,
