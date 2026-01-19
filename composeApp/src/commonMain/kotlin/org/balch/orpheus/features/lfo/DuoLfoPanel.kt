@@ -5,10 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -70,81 +67,72 @@ fun DuoLfoPanel(
         val learnState = LocalLearnModeState.current
         val isActive = uiState.mode != HyperLfoMode.OFF
 
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(modifier = Modifier.weight(1f))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // 3-way AND/OFF/OR Switch (Left)
+            Box(
+                modifier =
+                    Modifier
+                        .learnable(ControlIds.HYPER_LFO_MODE, learnState)
             ) {
-                // 3-way AND/OFF/OR Switch (Left)
-                Box(
-                    modifier =
-                        Modifier
-                            .learnable(ControlIds.HYPER_LFO_MODE, learnState)
-                ) {
-                    Vertical3WaySwitch(
-                        topLabel = "AND",
-                        bottomLabel = "OR",
-                        position =
-                            when (uiState.mode) {
-                                HyperLfoMode.AND -> 0
-                                HyperLfoMode.OFF -> 1
-                                HyperLfoMode.OR -> 2
-                            },
-                        onPositionChange = { pos ->
-                            actions.onModeChange(
-                                when (pos) {
-                                    0 -> HyperLfoMode.AND
-                                    1 -> HyperLfoMode.OFF
-                                    else -> HyperLfoMode.OR
-                                }
-                            )
+                Vertical3WaySwitch(
+                    topLabel = "AND",
+                    bottomLabel = "OR",
+                    position =
+                        when (uiState.mode) {
+                            HyperLfoMode.AND -> 0
+                            HyperLfoMode.OFF -> 1
+                            HyperLfoMode.OR -> 2
                         },
-                        color = OrpheusColors.neonCyan,
-                        enabled = !learnState.isActive
-                    )
-                }
-
-                // Knobs (Medium size - 56dp)
-                RotaryKnob(
-                    value = uiState.lfoA,
-                    onValueChange = actions.onLfoAChange,
-                    label = "RATE 1",
-                    controlId = ControlIds.HYPER_LFO_A,
-                    size = 64.dp,
-                    progressColor =
-                        if (isActive) OrpheusColors.neonCyan
-                        else OrpheusColors.neonCyan.copy(alpha = 0.4f)
+                    onPositionChange = { pos ->
+                        actions.onModeChange(
+                            when (pos) {
+                                0 -> HyperLfoMode.AND
+                                1 -> HyperLfoMode.OFF
+                                else -> HyperLfoMode.OR
+                            }
+                        )
+                    },
+                    color = OrpheusColors.neonCyan,
+                    enabled = !learnState.isActive
                 )
-                RotaryKnob(
-                    value = uiState.lfoB,
-                    onValueChange = actions.onLfoBChange,
-                    label = "RATE 2",
-                    controlId = ControlIds.HYPER_LFO_B,
-                    size = 64.dp,
-                    progressColor =
-                        if (isActive) OrpheusColors.neonCyan
-                        else OrpheusColors.neonCyan.copy(alpha = 0.4f)
-                )
-
-                // LINK Vertical Switch (Right)
-                Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_LINK, learnState)) {
-                    VerticalToggle(
-                        topLabel = "LINK",
-                        bottomLabel = "OFF",
-                        isTop = uiState.linkEnabled,
-                        onToggle = { actions.onLinkChange(it) },
-                        color = OrpheusColors.neonCyan,
-                        enabled = !learnState.isActive
-                    )
-                }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            // Knobs (Medium size - 56dp)
+            RotaryKnob(
+                value = uiState.lfoA,
+                onValueChange = actions.onLfoAChange,
+                label = "RATE 1",
+                controlId = ControlIds.HYPER_LFO_A,
+                size = 64.dp,
+                progressColor =
+                    if (isActive) OrpheusColors.neonCyan
+                    else OrpheusColors.neonCyan.copy(alpha = 0.4f)
+            )
+            RotaryKnob(
+                value = uiState.lfoB,
+                onValueChange = actions.onLfoBChange,
+                label = "RATE 2",
+                controlId = ControlIds.HYPER_LFO_B,
+                size = 64.dp,
+                progressColor =
+                    if (isActive) OrpheusColors.neonCyan
+                    else OrpheusColors.neonCyan.copy(alpha = 0.4f)
+            )
+
+            // LINK Vertical Switch (Right)
+            Box(modifier = Modifier.learnable(ControlIds.HYPER_LFO_LINK, learnState)) {
+                VerticalToggle(
+                    topLabel = "LINK",
+                    bottomLabel = "OFF",
+                    isTop = uiState.linkEnabled,
+                    onToggle = { actions.onLinkChange(it) },
+                    color = OrpheusColors.neonCyan,
+                    enabled = !learnState.isActive
+                )
+            }
         }
     }
 }
@@ -182,7 +170,7 @@ private fun ModeToggleButton(
     }
 }
 
-@Preview(widthDp = 320, heightDp = 240)
+@Preview(widthDp = 400, heightDp = 400)
 @Composable
 fun HyperLfoPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,

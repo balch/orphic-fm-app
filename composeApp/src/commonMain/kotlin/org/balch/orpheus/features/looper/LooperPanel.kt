@@ -16,12 +16,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
@@ -46,7 +44,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -78,82 +81,72 @@ fun LooperPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        Column(
+
+        // Central Looper Display
+        Box(
             modifier = Modifier
-                .widthIn(max = 500.dp)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .size(160.dp)
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            
-            // Central Looper Display
-            Box(
-                modifier = Modifier
-                    .size(160.dp)
-                    .padding(8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularLooperDisplay(state)
-                
-                // Duration Text in center
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularLooperDisplay(state)
+
+            // Duration Text in center
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = if (state.isRecording) "REC" else if (state.isPlaying) "PLAY" else "IDLE",
+                    color = if (state.isRecording) RecordColor else if (state.isPlaying) PlayColor else OrpheusColors.greyText,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                if (state.loopDuration > 0 || state.isRecording) {
+                    val seconds =
+                        if (state.isRecording) (state.position * 60.0) else state.loopDuration
+                    val displaySecs = (seconds * 100).roundToInt() / 100.0
                     Text(
-                        text = if (state.isRecording) "REC" else if (state.isPlaying) "PLAY" else "IDLE",
-                        color = if (state.isRecording) RecordColor else if (state.isPlaying) PlayColor else OrpheusColors.greyText,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.labelSmall
+                        text = "${displaySecs}s",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
                     )
-                    if (state.loopDuration > 0 || state.isRecording) {
-                        val seconds = if (state.isRecording) (state.position * 60.0) else state.loopDuration
-                        val displaySecs = (seconds * 100).roundToInt() / 100.0
-                        Text(
-                            text = "${displaySecs}s",
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
                 }
             }
+        }
 
-            Spacer(Modifier.height(24.dp))
+        // Controls
+        Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Record Button (Primary action)
+            LooperActionButton(
+                icon = Icons.Default.Refresh,
+                label = "RECORD",
+                active = state.isRecording,
+                activeColor = RecordColor,
+                onClick = { actions.setRecord(!state.isRecording) },
+                modifier = Modifier.scale(1.2f)
+            )
 
-            // Controls
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Record Button (Primary action)
-                LooperActionButton(
-                    icon = Icons.Default.Refresh,
-                    label = "RECORD",
-                    active = state.isRecording,
-                    activeColor = RecordColor,
-                    onClick = { actions.setRecord(!state.isRecording) },
-                    modifier = Modifier.scale(1.2f)
-                )
+            // Play Button
+            LooperActionButton(
+                icon = Icons.Default.PlayArrow,
+                label = "PLAY",
+                active = state.isPlaying,
+                activeColor = PlayColor,
+                enabled = state.loopDuration > 0,
+                onClick = { actions.setPlay(!state.isPlaying) }
+            )
 
-                // Play Button
-                LooperActionButton(
-                    icon = Icons.Default.PlayArrow,
-                    label = "PLAY",
-                    active = state.isPlaying,
-                    activeColor = PlayColor,
-                    enabled = state.loopDuration > 0,
-                    onClick = { actions.setPlay(!state.isPlaying) }
-                )
-
-                // Clear Button
-                LooperActionButton(
-                    icon = Icons.Default.Clear,
-                    label = "CLEAR",
-                    active = false,
-                    activeColor = OrpheusColors.looperBurnt,
-                    onClick = { actions.clear() }
-                )
-            }
+            // Clear Button
+            LooperActionButton(
+                icon = Icons.Default.Clear,
+                label = "CLEAR",
+                active = false,
+                activeColor = OrpheusColors.looperBurnt,
+                onClick = { actions.clear() }
+            )
         }
     }
 }
@@ -272,6 +265,20 @@ private fun LooperActionButton(
             fontWeight = FontWeight.Bold,
             color = if (active) activeColor else if (enabled) OrpheusColors.looperEmber else OrpheusColors.looperBrown,
             style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+// Preview support
+@Preview(widthDp = 400, heightDp = 400)
+@Composable
+fun LooperPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        LooperPanel(
+            isExpanded = true,
+            feature = LooperViewModel.previewFeature(),
         )
     }
 }

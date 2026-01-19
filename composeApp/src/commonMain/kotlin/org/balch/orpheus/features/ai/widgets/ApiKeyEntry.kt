@@ -98,7 +98,6 @@ fun ApiKeyEntryCompact(
             ),
             keyboardActions = KeyboardActions(onDone = { submit() }),
             modifier = Modifier
-                .fillMaxWidth()
                 .clip(RoundedCornerShape(6.dp))
                 .background(OrpheusColors.midnightBlue.copy(alpha = 0.4f))
                 .padding(10.dp),

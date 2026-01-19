@@ -4,11 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +28,6 @@ import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.Visualization
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -61,117 +56,90 @@ fun VizPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+
+        // Visualization Dropdown
+        var expanded by remember { mutableStateOf(false) }
+
+        Box(
+            modifier = Modifier
+                .height(32.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
+                .clickable { expanded = true }
+                .padding(horizontal = 8.dp),
+            contentAlignment = Alignment.CenterStart
         ) {
-
-            // Visualization Dropdown
-            var expanded by remember { mutableStateOf(false) }
-
-            Box(
-                modifier = Modifier
-                    .height(32.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
-                    .clickable { expanded = true }
-                    .padding(horizontal = 8.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = uiState.selectedViz.name,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray
-                    )
-                    Text(
-                        text = "▼",
-                        fontSize = 12.sp,
-                        color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray,
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    modifier = Modifier.background(OrpheusColors.softPurple) // Use explicit color
-                ) {
-                    uiState.visualizations.forEach { viz ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    viz.name,
-                                    color = if (viz.id == uiState.selectedViz.id) OrpheusColors.vizGreen else Color.White
-                                )
-                            },
-                            onClick = {
-                                actions.onSelectViz(viz)
-                                expanded = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Knobs - Visible but disabled if Off
-            // Note: Since we don't pull values from interface yet, using 0.5f placeholders visually 
-            // but functional updates work.
-            // Ideally we'd cast or expose values.
             Row(
-                horizontalArrangement = Arrangement.spacedBy(48.dp, Alignment.CenterHorizontally),
+                modifier = Modifier.padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                RotaryKnob(
-                    value = uiState.knob1Value,
-                    onValueChange = actions.onKnob1Change,
-                    label = if (uiState.showKnobs) uiState.selectedViz.knob1Label else "-",
-                    controlId = "viz_knob1",
-                    size = 64.dp,
-                    progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(alpha = 0.3f),
-                    enabled = uiState.showKnobs
+                Text(
+                    text = uiState.selectedViz.name,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray
                 )
-                RotaryKnob(
-                    value = uiState.knob2Value,
-                    onValueChange = actions.onKnob2Change,
-                    label = if (uiState.showKnobs) uiState.selectedViz.knob2Label else "-",
-                    controlId = "viz_knob2",
-                    size = 64.dp,
-                    progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(alpha = 0.3f),
-                    enabled = uiState.showKnobs
+                Text(
+                    text = "▼",
+                    fontSize = 12.sp,
+                    color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray,
                 )
             }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(OrpheusColors.softPurple) // Use explicit color
+            ) {
+                uiState.visualizations.forEach { viz ->
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                viz.name,
+                                color = if (viz.id == uiState.selectedViz.id) OrpheusColors.vizGreen else Color.White
+                            )
+                        },
+                        onClick = {
+                            actions.onSelectViz(viz)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RotaryKnob(
+                value = uiState.knob1Value,
+                onValueChange = actions.onKnob1Change,
+                label = if (uiState.showKnobs) uiState.selectedViz.knob1Label else "-",
+                controlId = "viz_knob1",
+                size = 64.dp,
+                progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(
+                    alpha = 0.3f
+                ),
+                enabled = uiState.showKnobs
+            )
+            RotaryKnob(
+                value = uiState.knob2Value,
+                onValueChange = actions.onKnob2Change,
+                label = if (uiState.showKnobs) uiState.selectedViz.knob2Label else "-",
+                controlId = "viz_knob2",
+                size = 64.dp,
+                progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(
+                    alpha = 0.3f
+                ),
+                enabled = uiState.showKnobs
+            )
         }
     }
 }
 
-
-
-
-private object PreviewViz : Visualization {
-    override val id = "preview_viz"
-    override val name = "Swirly"
-    override val color = Color.White
-    override val knob1Label = "Speed"
-    override val knob2Label = "Zoom"
-    override val liquidEffects = VisualizationLiquidEffects()
-    override fun setKnob1(value: Float) {}
-    override fun setKnob2(value: Float) {}
-    override fun onActivate() {}
-    override fun onDeactivate() {}
-    @Composable
-    override fun Content(modifier: Modifier) {}
-}
-
-@Preview(widthDp = 180, heightDp = 240)
+@Preview(widthDp = 400, heightDp = 400)
 @Composable
 fun VizPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,

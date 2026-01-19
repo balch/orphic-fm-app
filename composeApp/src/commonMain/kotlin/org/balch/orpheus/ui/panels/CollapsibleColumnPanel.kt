@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -69,11 +70,11 @@ fun CollapsibleColumnPanel(
     initialExpanded: Boolean = false,
     expandedTitle: String? = null,
     showCollapsedHeader: Boolean = true,
-    content: @Composable () -> Unit
+    content: @Composable ColumnScope.() -> Unit
 ) {
     var internalExpanded by remember { mutableStateOf(initialExpanded) }
     val effectiveExpanded = isExpanded ?: internalExpanded
-    
+
     val toggleExpanded = {
         val next = !effectiveExpanded
         if (isExpanded == null) {
@@ -90,7 +91,7 @@ fun CollapsibleColumnPanel(
     // Base modifier - ensure minimum width for the header strip ONLY if showing header
     val baseModifier = modifier.fillMaxHeight()
         .widthIn(
-            min =if (showCollapsedHeader) collapsedWidth else 200.dp
+            min = if (showCollapsedHeader) collapsedWidth else 200.dp
         )
         .clip(shape)
 
@@ -151,8 +152,9 @@ fun CollapsibleColumnPanel(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(vertical =
-                                if (showCollapsedHeader) 16.dp else 4.dp
+                            .padding(
+                                vertical =
+                                    if (showCollapsedHeader) 16.dp else 4.dp
                             ),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -170,9 +172,12 @@ fun CollapsibleColumnPanel(
 
                         Column(
                             modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.SpaceBetween
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            Spacer(modifier = Modifier.weight(1f))
                             content()
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }

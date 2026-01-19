@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -25,7 +23,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 /**
  * MIDI management properties
@@ -83,111 +86,117 @@ private fun MidiPanelLayout(
         initialExpanded = false,
         modifier = modifier
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(modifier = Modifier.weight(1f))
+            // Connection status dot
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .clip(CircleShape)
+                    .background(if (midiProps.isOpen) OrpheusColors.synthGreen else Color.Red)
+            )
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Connection status dot
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(if (midiProps.isOpen) OrpheusColors.synthGreen else Color.Red)
-                )
-
-                // Device name and status
-                Column {
-                    val friendlyName = midiProps.deviceName?.substringAfter(" - ")
-                        ?: midiProps.deviceName ?: "No Device"
-                    Text(
-                        text = friendlyName,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                    Text(
-                        text = if (midiProps.isOpen) "Connected" else "Not Connected",
-                        fontSize = 10.sp,
-                        color = if (midiProps.isOpen) OrpheusColors.synthGreen else Color.Red.copy(
-                            alpha = 0.7f
-                        )
-                    )
-                }
-            }
-
-            // Learn controls - directly under device info
-            if (midiProps.isLearnModeActive) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(32.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Red.copy(alpha = 0.2f))
-                            .clickable(onClick = midiProps.onLearnCancel),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "CANCEL",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Red
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(32.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(OrpheusColors.synthGreen.copy(alpha = 0.2f))
-                            .clickable(onClick = midiProps.onLearnSave),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "SAVE",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = OrpheusColors.synthGreen
-                        )
-                    }
-                }
-
+            // Device name and status
+            Column {
+                val friendlyName = midiProps.deviceName?.substringAfter(" - ")
+                    ?: midiProps.deviceName ?: "No Device"
                 Text(
-                    "Select control → Press key",
-                    fontSize = 9.sp,
-                    color = OrpheusColors.neonMagenta
+                    text = friendlyName,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
-            } else {
+                Text(
+                    text = if (midiProps.isOpen) "Connected" else "Not Connected",
+                    fontSize = 10.sp,
+                    color = if (midiProps.isOpen) OrpheusColors.synthGreen else Color.Red.copy(
+                        alpha = 0.7f
+                    )
+                )
+            }
+        }
+
+        // Learn controls - directly under device info
+        if (midiProps.isLearnModeActive) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Box(
                     modifier = Modifier
+                        .weight(1f)
                         .height(32.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            if (midiProps.isOpen) OrpheusColors.neonMagenta.copy(alpha = 0.2f)
-                            else Color.Gray.copy(alpha = 0.1f)
-                        )
-                        .clickable(enabled = midiProps.isOpen, onClick = midiProps.onLearnToggle),
+                        .background(Color.Red.copy(alpha = 0.2f))
+                        .clickable(onClick = midiProps.onLearnCancel),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "LEARN",
-                        fontSize = 11.sp,
+                        "CANCEL",
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (midiProps.isOpen) OrpheusColors.neonMagenta else Color.Gray
+                        color = Color.Red
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(OrpheusColors.synthGreen.copy(alpha = 0.2f))
+                        .clickable(onClick = midiProps.onLearnSave),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "SAVE",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OrpheusColors.synthGreen
                     )
                 }
             }
-            Spacer(modifier = Modifier.weight(1f))
+
+            Text(
+                "Select control → Press key",
+                fontSize = 9.sp,
+                color = OrpheusColors.neonMagenta
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        if (midiProps.isOpen) OrpheusColors.neonMagenta.copy(alpha = 0.2f)
+                        else Color.Gray.copy(alpha = 0.1f)
+                    )
+                    .clickable(enabled = midiProps.isOpen, onClick = midiProps.onLearnToggle),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "LEARN",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (midiProps.isOpen) OrpheusColors.neonMagenta else Color.Gray
+                )
+            }
         }
+    }
+}
+
+// Preview support
+@Preview(widthDp = 400, heightDp = 400)
+@Composable
+fun MidiPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        MidiPanel(
+            isExpanded = true,
+            feature = MidiViewModel.previewFeature(),
+        )
     }
 }

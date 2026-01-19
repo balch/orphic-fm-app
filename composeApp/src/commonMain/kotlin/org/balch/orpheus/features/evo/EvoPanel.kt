@@ -4,10 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,63 +60,54 @@ fun EvoPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        // Dropdown takes available weight
+        StrategyDropdown(
+            selectedStrategy = uiState.selectedStrategy,
+            strategies = uiState.strategies,
+            onStrategySelected = evoFeature.actions.onStrategyChange,
+            color = accentColor,
+        )
+
+        // 2. Controls Row - Dynamic labels from selected strategy
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Dropdown takes available weight
-            StrategyDropdown(
-                selectedStrategy = uiState.selectedStrategy,
-                strategies = uiState.strategies,
-                onStrategySelected = evoFeature.actions.onStrategyChange,
-                color = accentColor,
+            // Knob 1 - Label from strategy
+            RotaryKnob(
+                value = uiState.knob1Value,
+                onValueChange = evoFeature.actions.onKnob1Change,
+                label = if (uiState.isEnabled) uiState.selectedStrategy.knob1Label else "-",
+                controlId = ControlIds.EVO_DEPTH,
+                size = 64.dp,
+                progressColor = accentColor,
+                trackColor = accentColor.copy(alpha = 0.3f),
+                enabled = uiState.isEnabled
             )
 
-            // 2. Controls Row - Dynamic labels from selected strategy
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Knob 1 - Label from strategy
-                RotaryKnob(
-                    value = uiState.knob1Value,
-                    onValueChange = evoFeature.actions.onKnob1Change,
-                    label = if (uiState.isEnabled) uiState.selectedStrategy.knob1Label else "-",
-                    controlId = ControlIds.EVO_DEPTH,
-                    size = 64.dp,
-                    progressColor = accentColor,
-                    trackColor = accentColor.copy(alpha = 0.3f),
-                    enabled = uiState.isEnabled
-                )
-
-                // Knob 2 - Label from strategy
-                RotaryKnob(
-                    value = uiState.knob2Value,
-                    onValueChange = evoFeature.actions.onKnob2Change,
-                    label = if (uiState.isEnabled) uiState.selectedStrategy.knob2Label else "-",
-                    controlId = ControlIds.EVO_RATE,
-                    size = 64.dp,
-                    progressColor = accentColor,
-                    trackColor = accentColor.copy(alpha = 0.3f),
-                    enabled = uiState.isEnabled
-                )
-            }
-
-            // Enable Toggle (Mini Vertical Switch)
-            HorizontalToggle(
-                endLabel = "ON",
-                startLabel = "OFF",
-                isStart = !uiState.isEnabled,
-                onToggle = {
-                    evoFeature.actions.onEnabledChange(!it)
-                },
-                color = accentColor,
+            // Knob 2 - Label from strategy
+            RotaryKnob(
+                value = uiState.knob2Value,
+                onValueChange = evoFeature.actions.onKnob2Change,
+                label = if (uiState.isEnabled) uiState.selectedStrategy.knob2Label else "-",
+                controlId = ControlIds.EVO_RATE,
+                size = 64.dp,
+                progressColor = accentColor,
+                trackColor = accentColor.copy(alpha = 0.3f),
+                enabled = uiState.isEnabled
             )
-            Spacer(modifier = Modifier.weight(1f))
         }
+
+        // Enable Toggle (Mini Vertical Switch)
+        HorizontalToggle(
+            endLabel = "ON",
+            startLabel = "OFF",
+            isStart = !uiState.isEnabled,
+            onToggle = {
+                evoFeature.actions.onEnabledChange(!it)
+            },
+            color = accentColor,
+        )
     }
 }
 
@@ -185,7 +173,7 @@ private fun StrategyDropdown(
 }
 
 // Preview support
-@Preview
+@Preview(widthDp = 400, heightDp = 400)
 @Composable
 fun EvoPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,

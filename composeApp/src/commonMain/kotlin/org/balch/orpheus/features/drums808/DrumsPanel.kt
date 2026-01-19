@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -47,84 +46,81 @@ fun DrumsPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        // Center the whole content to keep everything aligned and closer together
-        Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 600.dp)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                // Header Row for common parameters
-                HeaderRow()
+        Column(
+            modifier = Modifier
+                .widthIn(max = 400.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            // Header Row for common parameters
+            HeaderRow()
 
-                Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(4.dp))
 
-                // BD Row (Red) - I key
-                DrumRow(
-                    label = "BD",
-                    tag = "bd",
-                    color = OrpheusColors.ninersRed,
-                    frequency = state.bdFrequency,
-                    tone = state.bdTone,
-                    decay = state.bdDecay,
-                    p4 = state.bdP4,
-                    isActive = state.isBdActive,
-                    onFrequencyChange = actions.setBdFrequency,
-                    onToneChange = actions.setBdTone,
-                    onDecayChange = actions.setBdDecay,
-                    onP4Change = actions.setBdP4,
-                    onTriggerStart = actions.startBdTrigger,
-                    onTriggerEnd = actions.stopBdTrigger
-                )
+            // BD Row (Red) - I key
+            DrumRow(
+                label = "BD",
+                tag = "bd",
+                color = OrpheusColors.ninersRed,
+                frequency = state.bdFrequency,
+                tone = state.bdTone,
+                decay = state.bdDecay,
+                p4 = state.bdP4,
+                isActive = state.isBdActive,
+                onFrequencyChange = actions.setBdFrequency,
+                onToneChange = actions.setBdTone,
+                onDecayChange = actions.setBdDecay,
+                onP4Change = actions.setBdP4,
+                onTriggerStart = actions.startBdTrigger,
+                onTriggerEnd = actions.stopBdTrigger
+            )
 
-                Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
-                // SD Row (Gold) - O key
-                DrumRow(
-                    label = "SD",
-                    tag = "sd",
-                    color = OrpheusColors.ninersGold,
-                    frequency = state.sdFrequency,
-                    tone = state.sdTone,
-                    decay = state.sdDecay,
-                    p4 = state.sdP4,
-                    isActive = state.isSdActive,
-                    onFrequencyChange = actions.setSdFrequency,
-                    onToneChange = actions.setSdTone,
-                    onDecayChange = actions.setSdDecay,
-                    onP4Change = actions.setSdP4,
-                    onTriggerStart = actions.startSdTrigger,
-                    onTriggerEnd = actions.stopSdTrigger
-                )
+            // SD Row (Gold) - O key
+            DrumRow(
+                label = "SD",
+                tag = "sd",
+                color = OrpheusColors.ninersGold,
+                frequency = state.sdFrequency,
+                tone = state.sdTone,
+                decay = state.sdDecay,
+                p4 = state.sdP4,
+                isActive = state.isSdActive,
+                onFrequencyChange = actions.setSdFrequency,
+                onToneChange = actions.setSdTone,
+                onDecayChange = actions.setSdDecay,
+                onP4Change = actions.setSdP4,
+                onTriggerStart = actions.startSdTrigger,
+                onTriggerEnd = actions.stopSdTrigger
+            )
 
-                Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
-                // HH Row (White) - P key
-                DrumRow(
-                    label = "HH",
-                    tag = "hh",
-                    color = Color.White,
-                    frequency = state.hhFrequency,
-                    tone = state.hhTone,
-                    decay = state.hhDecay,
-                    p4 = state.hhP4,
-                    isActive = state.isHhActive,
-                    onFrequencyChange = actions.setHhFrequency,
-                    onToneChange = actions.setHhTone,
-                    onDecayChange = actions.setHhDecay,
-                    onP4Change = actions.setHhP4,
-                    onTriggerStart = actions.startHhTrigger,
-                    onTriggerEnd = actions.stopHhTrigger
-                )
-            }
+            // HH Row (White) - P key
+            DrumRow(
+                label = "HH",
+                tag = "hh",
+                color = Color.White,
+                frequency = state.hhFrequency,
+                tone = state.hhTone,
+                decay = state.hhDecay,
+                p4 = state.hhP4,
+                isActive = state.isHhActive,
+                onFrequencyChange = actions.setHhFrequency,
+                onToneChange = actions.setHhTone,
+                onDecayChange = actions.setHhDecay,
+                onP4Change = actions.setHhP4,
+                onTriggerStart = actions.startHhTrigger,
+                onTriggerEnd = actions.stopHhTrigger
+            )
         }
     }
 }
 
 @Composable
-private fun HeaderRow() {
+private fun HeaderRow(modifier: Modifier = Modifier) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -172,7 +168,6 @@ private fun DrumRow(
     val isLearningTrigger = learnState.isLearning(triggerId)
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -265,7 +260,7 @@ private fun KnobGroup(
     }
 }
 
-@Preview
+@Preview(widthDp = 400, heightDp = 400)
 @Composable
 fun DrumEnginePanelPreview() {
     OrpheusTheme {

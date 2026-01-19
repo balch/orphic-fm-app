@@ -7,14 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -32,9 +31,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.dialogs.ConfirmDialog
 import org.balch.orpheus.ui.widgets.dialogs.PresetNameDialog
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.jetbrains.compose.ui.tooling.preview.PreviewParameter
 
 /**
  * Preset management properties
@@ -54,7 +58,6 @@ fun PresetsPanel(
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
-    fillMaxHeight: Boolean = true,
     showCollapsedHeader: Boolean = true
 ) {
     val uiState by feature.stateFlow.collectAsState()
@@ -77,6 +80,13 @@ fun PresetsPanel(
         presetActions = actions,
     )
 
+    val buttonColors = ButtonColors(
+        containerColor = OrpheusColors.patchOrange.copy(alpha = 0.2f),
+        contentColor = OrpheusColors.presetOrange,
+        disabledContainerColor = Color.Gray.copy(alpha = 0.5f),
+        disabledContentColor = Color.White.copy(alpha = 0.7f)
+    )
+
     CollapsibleColumnPanel(
         title = "PATCH",
         color = OrpheusColors.presetOrange,
@@ -87,140 +97,104 @@ fun PresetsPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        // Buttons row - ABOVE file list
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Buttons row - ABOVE file list
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            // NEW button
+            Button(
+                onClick = {
+                    showNewDialog = true
+                    presetProps.presetActions.onDialogActiveChange(true)
+                },
+                colors = buttonColors
             ) {
-                // NEW button
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(28.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(OrpheusColors.presetOrange.copy(alpha = 0.2f))
-                        .clickable {
-                            showNewDialog = true
-                            presetProps.presetActions.onDialogActiveChange(true)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "NEW",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OrpheusColors.presetOrange
-                    )
-                }
-
-                // OVR button
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(28.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            if (presetProps.selectedPreset != null) OrpheusColors.patchOrange.copy(alpha = 0.2f)
-                            else Color.Gray.copy(alpha = 0.1f)
-                        )
-                        .then(
-                            if (presetProps.selectedPreset != null) Modifier.clickable {
-                                showOverrideDialog = true
-                                presetProps.presetActions.onDialogActiveChange(true)
-                            }
-                            else Modifier
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "OVR",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (presetProps.selectedPreset != null) Color(0xFFFF9500) else Color.Gray
-                    )
-                }
-
-                // DEL button
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(28.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            if (presetProps.selectedPreset != null) Color.Red.copy(alpha = 0.2f)
-                            else Color.Gray.copy(alpha = 0.1f)
-                        )
-                        .then(
-                            if (presetProps.selectedPreset != null) Modifier.clickable {
-                                showDeleteDialog = true
-                                presetProps.presetActions.onDialogActiveChange(true)
-                            }
-                            else Modifier
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "DEL",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (presetProps.selectedPreset != null) Color.Red.copy(alpha = 0.8f) else Color.Gray
-                    )
-                }
+                Text(
+                    "NEW",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                )
             }
 
-            // Scrollable preset list with border
-            val scrollState = rememberScrollState()
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(6.dp))
-                    .border(1.dp, OrpheusColors.presetOrange.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                    .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
+            Button(
+                onClick = {
+                    showOverrideDialog = true
+                    presetProps.presetActions.onDialogActiveChange(true)
+                },
+                colors = buttonColors,
+                enabled = (presetProps.selectedPreset != null),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState)
-                        .padding(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    presetProps.presets.forEach { preset ->
-                        val isSelected = presetProps.selectedPreset?.name == preset.name
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(
-                                    if (isSelected) OrpheusColors.presetOrange.copy(alpha = 0.2f)
-                                    else Color.Transparent
-                                )
-                                .clickable {
-                                    presetProps.presetActions.onSelect(preset)
-                                    presetProps.presetActions.onApply(preset)
-                                }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                preset.name,
-                                fontSize = 10.sp,
-                                color = if (isSelected) OrpheusColors.presetOrange else Color.White.copy(
-                                    alpha = 0.7f
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                Text(
+                    "OVR",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            // DEL button
+            Button(
+                onClick = {
+                    showDeleteDialog = true
+                    presetProps.presetActions.onDialogActiveChange(true)
+                },
+                enabled = (presetProps.selectedPreset != null),
+                colors = buttonColors,
+            ) {
+
+                Text(
+                    "DEL",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        // Scrollable preset list with border
+        val scrollState = rememberScrollState()
+
+        Row(
+            modifier = Modifier
+                .widthIn(min = 240.dp)
+                .padding(horizontal = 8.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .border(
+                    1.dp,
+                    OrpheusColors.presetOrange.copy(alpha = 0.3f),
+                    RoundedCornerShape(6.dp)
+                )
+                .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(scrollState)
+                    .padding(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                presetProps.presets.forEach { preset ->
+                    val isSelected = presetProps.selectedPreset?.name == preset.name
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                if (isSelected) OrpheusColors.presetOrange.copy(alpha = 0.2f)
+                                else Color.Transparent
                             )
-                        }
+                            .clickable {
+                                presetProps.presetActions.onSelect(preset)
+                                presetProps.presetActions.onApply(preset)
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            preset.name,
+                            fontSize = 10.sp,
+                            color = if (isSelected) OrpheusColors.presetOrange else Color.White.copy(
+                                alpha = 0.7f
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
@@ -260,7 +234,7 @@ fun PresetsPanel(
     }
 
     if (showDeleteDialog) {
-         ConfirmDialog(
+        ConfirmDialog(
             title = "Delete Preset",
             message = "Delete '${presetProps.selectedPreset?.name ?: ""}'?",
             onConfirm = {
@@ -273,6 +247,20 @@ fun PresetsPanel(
                 presetProps.presetActions.onDialogActiveChange(false)
             },
             isDestructive = true
+        )
+    }
+}
+
+// Preview support
+@Preview(widthDp = 400, heightDp = 400)
+@Composable
+fun PresetsPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        PresetsPanel(
+            isExpanded = true,
+            feature = PresetsViewModel.previewFeature(),
         )
     }
 }

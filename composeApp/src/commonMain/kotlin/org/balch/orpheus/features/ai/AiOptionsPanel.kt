@@ -3,10 +3,7 @@ package org.balch.orpheus.features.ai
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -63,95 +60,79 @@ fun AiOptionsPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            if (!isAiSupported) {
-                Text(
-                    text = "AI Not Available on Web",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OrpheusColors.warmGlow.copy(alpha = 0.8f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(16.dp)
+        if (!isAiSupported) {
+            Text(
+                text = "AI Not Available on Web",
+                style = MaterialTheme.typography.bodySmall,
+                color = OrpheusColors.warmGlow.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(16.dp)
+            )
+        } else if (!uiState.isApiKeySet) {
+            // Key entry UI
+            ApiKeyEntryCompact(
+                onSubmit = actions.onSaveApiKey,
+            )
+        } else {
+            // User key indicator (if applicable)
+            if (uiState.isUserProvidedKey) {
+                UserKeyIndicator(
+                    aiProvider = (uiState.selectedModel ?: AiModel.DEFAULT).aiProvider,
+                    onRemove = actions.onClearApiKey,
+                    modifier = Modifier.padding(bottom = 4.dp)
                 )
-            } else if (!uiState.isApiKeySet) {
-                // Key entry UI
-                ApiKeyEntryCompact(
-                    onSubmit = actions.onSaveApiKey,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // 2x2 Button Grid
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Spacer(modifier = Modifier.weight(1f))
-                    // User key indicator (if applicable)
-                    if (uiState.isUserProvidedKey) {
-                        UserKeyIndicator(
-                            aiProvider = (uiState.selectedModel ?: AiModel.DEFAULT).aiProvider,
-                            onRemove = actions.onClearApiKey,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                    }
-                    
-                    // Top Row: Drone | Solo
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        AiButton(
-                            label = "Drone",
-                            color = OrpheusColors.aiDrone,
-                            isActive = uiState.isDroneActive,
-                            onClick = { actions.onToggleDrone(true) }
-                        )
-                        AiButton(
-                            label = "Solo",
-                            color = OrpheusColors.aiSolo,
-                            isActive = uiState.isSoloActive,
-                            onClick = { actions.onToggleSolo(true) }
-                        )
-                    }
-                    
-                    // Bottom Row: REPL | Chat
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        AiButton(
-                            label = "Tidal",
-                            color = OrpheusColors.aiRepl,
-                            isActive = uiState.isReplActive,
-                            onClick = { actions.onToggleRepl(true) }
-                        )
-                        AiButton(
-                            label = "AI",
-                            color = OrpheusColors.aiChat,
-                            isActive = uiState.showChatDialog,
-                            onClick = { actions.onToggleChatDialog() }
-                        )
-                    }
-                    // Model Selector
-                    ModelSelector(
-                        selectedModel = uiState.selectedModel ?: AiModel.DEFAULT,
-                        availableModels = uiState.availableModels,
-                        onSelectModel = actions.onSelectModel,
-                        modifier = Modifier
-                            .wrapContentWidth()
-                            .padding(top = 8.dp)
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                }
             }
+
+            // Top Row: Drone | Solo
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                AiButton(
+                    label = "Drone",
+                    color = OrpheusColors.aiDrone,
+                    isActive = uiState.isDroneActive,
+                    onClick = { actions.onToggleDrone(true) }
+                )
+                AiButton(
+                    label = "Solo",
+                    color = OrpheusColors.aiSolo,
+                    isActive = uiState.isSoloActive,
+                    onClick = { actions.onToggleSolo(true) }
+                )
+            }
+
+            // Bottom Row: REPL | Chat
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                AiButton(
+                    label = "Tidal",
+                    color = OrpheusColors.aiRepl,
+                    isActive = uiState.isReplActive,
+                    onClick = { actions.onToggleRepl(true) }
+                )
+                AiButton(
+                    label = "AI",
+                    color = OrpheusColors.aiChat,
+                    isActive = uiState.showChatDialog,
+                    onClick = { actions.onToggleChatDialog() }
+                )
+            }
+            // Model Selector
+            ModelSelector(
+                selectedModel = uiState.selectedModel ?: AiModel.DEFAULT,
+                availableModels = uiState.availableModels,
+                onSelectModel = actions.onSelectModel,
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .padding(top = 8.dp)
+            )
         }
     }
 }
 
 @Composable
-@Preview(heightDp = 300)
+@Preview(widthDp = 400, heightDp = 400)
 fun AiOptionsLayoutPreview() {
     OrpheusTheme {
         AiOptionsPanel(
@@ -168,7 +149,7 @@ fun AiOptionsLayoutPreview() {
 }
 
 @Composable
-@Preview
+@Preview(widthDp = 400, heightDp = 400)
 fun AiOptionsLayoutNoKeyPreview() {
     OrpheusTheme {
         AiOptionsPanel(

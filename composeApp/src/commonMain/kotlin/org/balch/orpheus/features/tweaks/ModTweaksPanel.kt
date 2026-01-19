@@ -1,13 +1,10 @@
 package org.balch.orpheus.features.tweaks
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -51,24 +48,9 @@ fun ModTweaksPanel(
         expandedTitle = "System Tweaker",
         showCollapsedHeader = showCollapsedHeader,
     ) {
-        ModTweaksContent(voiceFeature = voiceFeature)
-    }
-}
 
-@Composable
-private fun ModTweaksContent(
-    voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
-    modifier: Modifier = Modifier,
-) {
-    val voiceState by voiceFeature.stateFlow.collectAsState()
-    val actions = voiceFeature.actions
-
-    Column(
-        modifier = modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // Vertical centering using weighted spacers
-        Spacer(modifier = Modifier.weight(1f))
+        val voiceState by voiceFeature.stateFlow.collectAsState()
+        val actions = voiceFeature.actions
 
         // FM Structure Selector (Centered at top)
         CrossModSelector(
@@ -111,13 +93,11 @@ private fun ModTweaksContent(
                 progressColor = OrpheusColors.warmGlow
             )
         }
-
-        Spacer(modifier = Modifier.weight(1.2f))
     }
 }
 
 @Suppress("StateFlowValueCalledInComposition")
-@Preview(widthDp = 360, heightDp = 300)
+@Preview(widthDp = 400, heightDp = 400)
 @Composable
 private fun ModTweaksPanelPreview(
     @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
