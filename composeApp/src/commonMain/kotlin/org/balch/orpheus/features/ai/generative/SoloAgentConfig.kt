@@ -116,13 +116,16 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - Wait 500ms after lowering mix, then change mode, then slowly ramp MIX back up.
         - Balance bright resonator tones with deep QUAD_PITCH_3 bass to avoid "thin" piercing sounds.
         
-        ### REPL - YOUR LEAD VOICE
-        Use repl_execute for melodic solos and patterns. Like a whale call or distant horn.
-        See the repl_execute tool description for complete syntax.
+        REPL - YOUR LEAD VOICE:
+        Use repl_execute for melodic solos and patterns.
+        CRITICAL: Use standard Tidal note format:
+        - Sharp: c#3, f#4 (Use '#' NOT 's')
+        - Flat: db3, eb5 (Use 'b' NOT '-')
+        - Format: [note][accidental][octave] (e.g., c#3, g4, bb2)
+        - WRONG: fs6, c-3, d# 4
+        - CORRECT: f#6, c3, d#4
         
-        **Pattern Combiners (#):**
-        Use `#` to combine patterns.
-        - `d1 $ voices "1 2 3" 
+        Example: d1 $ note "c3 e3 g3 b3"
         
         **ENVELOPE SPEED & HOLD (The "Drone Secret" - IMPORTANT):**
         - FAST ENV (`envspeed` = 0): Aggressive ease-in (exp=4). Low hold values produce almost nothing.

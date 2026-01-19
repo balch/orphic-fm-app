@@ -166,7 +166,10 @@ class SynthControlAgent(
                 log.debug { "Executing CONTROL: $id = $value" }
                 emitControl("Set $id: ${value.format(2)}")
                 val result = synthControlTool.execute(SynthControlArgs(id, value))
-                if (!result.success) emitControl("Failed: ${result.message}", isError = true)
+                if (!result.success) {
+                    emitControl("Failed: ${result.message}", isError = true)
+                    injectUserPrompt("CONTROL action failed for $id: ${result.message}")
+                }
             }
             ActionType.REPL -> {
                 val code = action.details.getOrNull(0) ?: return
@@ -182,7 +185,11 @@ class SynthControlAgent(
                 log.debug { "Executing REPL: $code" }
                 emitControl("Pattern: $code")
                 val result = replExecuteTool.execute(ReplExecuteArgs(code))
-                if (!result.success) emitControl("Failed: ${result.message}", isError = true)
+                if (!result.success) {
+                    emitControl("Failed: ${result.message}", isError = true)
+                    // Provide feedback to the AI so it can correct the code immediately
+                    injectUserPrompt("REPL execution failed: ${result.message}. Please fix the code format (e.g. use f# instead of fs) and try again.")
+                }
             }
             ActionType.STATUS -> {
                 val msg = action.details.getOrNull(0) ?: return

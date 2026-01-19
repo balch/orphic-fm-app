@@ -28,7 +28,7 @@ enum class AiModel(
     val aiProvider: AiProvider,
     val llmModel: LLModel,
 ) {
-    HAIKU3("Haiku_3", "Haiku 3", AiProvider.Anthropic, AnthropicModels.Haiku_3),
+    HAIKU3("Haiku", "Haiku", AiProvider.Anthropic, AnthropicModels.Haiku_4_5),
     SONNET("Sonnet", "Sonnet", AiProvider.Anthropic, AnthropicModels.Sonnet_4_5),
     OPUS("opus", "Opus", AiProvider.Anthropic, AnthropicModels.Opus_4_5),
     FLASH_25("flash_25", "Flash 2.5", AiProvider.Google, GoogleModels.Gemini2_5Flash),

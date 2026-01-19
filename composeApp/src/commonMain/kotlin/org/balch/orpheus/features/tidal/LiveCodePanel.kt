@@ -354,6 +354,20 @@ fun LiveCodePanelLayout(
             )
         }
 
+        // Error display (inside the main panel)
+        if (uiState.error != null) {
+            Text(
+                text = "⚠ ${uiState.error}",
+                style = MaterialTheme.typography.labelSmall,
+                color = OrpheusColors.warmGlow,
+                maxLines = 2,
+                fontSize = 10.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+
         // AI Loading Overlay
         if (uiState.isAiGenerating) {
             Box(
@@ -380,18 +394,6 @@ fun LiveCodePanelLayout(
                 }
             }
         }
-    }
-
-    // Error display
-    if (uiState.error != null) {
-        Text(
-            text = "⚠ ${uiState.error}",
-            style = MaterialTheme.typography.labelSmall,
-            color = OrpheusColors.warmGlow,
-            maxLines = 2,
-            fontSize = 10.sp,
-            modifier = Modifier.fillMaxWidth()
-        )
     }
 }
 

@@ -191,9 +191,11 @@ class LiveCodeViewModel(
                     }
                     is ReplCodeEvent.Failed -> {
                         logger.w { "AI code generation failed: ${event.error}" }
-                        // Keep loading state - AI agent is still running and will retry
-                        // Just show the error without clearing isAiGenerating
-                        _uiState.value = _uiState.value.copy(error = event.error)
+                        // Clear generating state on failure so UI is not blocked
+                        _uiState.value = _uiState.value.copy(
+                            isAiGenerating = false,
+                            error = event.error
+                        )
                     }
                     is ReplCodeEvent.UserInteraction -> {
                         logger.d { "User took manual control" }
