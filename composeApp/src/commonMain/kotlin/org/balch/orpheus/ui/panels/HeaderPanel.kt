@@ -126,7 +126,7 @@ fun HeaderPanel(
             feature = lfoFeature,
             isExpanded = PanelId.LFO.isExpanded(),
             onExpandedChange = { PanelId.LFO.setExpanded(it) },
-            modifier = panelModifier(PanelId.LFO.isExpanded(), weight = .5f)
+            modifier = panelModifier(PanelId.LFO.isExpanded())
         )
         DelayFeedbackPanel(
             feature = delayFeature,
@@ -138,7 +138,7 @@ fun HeaderPanel(
             feature = distortionFeature,
             isExpanded = PanelId.DISTORTION.isExpanded(),
             onExpandedChange = { PanelId.DISTORTION.setExpanded(it) },
-            modifier = panelModifier(PanelId.DISTORTION.isExpanded(), weight = .5f)
+            modifier = panelModifier(PanelId.DISTORTION.isExpanded(), weight = .6f)
         )
         // Rings Resonator panel
         ResonatorPanel(
@@ -189,7 +189,7 @@ fun HeaderPanel(
             onExpandedChange = { PanelId.AI.setExpanded(it) },
             modifier = panelModifier(
                 isExpanded = PanelId.AI.isExpanded(),
-                weight = .4f,
+                weight = .6f,
             )
         )
     }
