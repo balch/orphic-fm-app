@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,17 +84,14 @@ private fun MidiPanelLayout(
         modifier = modifier
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
         ) {
-            // Device status with connection dot
+            Spacer(modifier = Modifier.weight(1f))
+
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // Connection status dot
                 Box(
@@ -124,8 +120,6 @@ private fun MidiPanelLayout(
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
 
             // Learn controls - directly under device info
             if (midiProps.isLearnModeActive) {
@@ -176,7 +170,6 @@ private fun MidiPanelLayout(
             } else {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
                         .height(32.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(
@@ -194,6 +187,7 @@ private fun MidiPanelLayout(
                     )
                 }
             }
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }

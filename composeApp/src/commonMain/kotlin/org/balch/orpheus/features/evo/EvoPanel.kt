@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,31 +64,24 @@ fun EvoPanel(
         showCollapsedHeader = showCollapsedHeader
     ) {
         Column(
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Spacer(modifier = Modifier.weight(1f))
 
-            // 1. Top Row: Strategy Dropdown + Enable Toggle
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Dropdown takes available weight
-                StrategyDropdown(
-                    selectedStrategy = uiState.selectedStrategy,
-                    strategies = uiState.strategies,
-                    onStrategySelected = evoFeature.actions.onStrategyChange,
-                    color = accentColor,
-                )
-
-            }
+            // Dropdown takes available weight
+            StrategyDropdown(
+                selectedStrategy = uiState.selectedStrategy,
+                strategies = uiState.strategies,
+                onStrategySelected = evoFeature.actions.onStrategyChange,
+                color = accentColor,
+            )
 
             // 2. Controls Row - Dynamic labels from selected strategy
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Top
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // Knob 1 - Label from strategy
                 RotaryKnob(
