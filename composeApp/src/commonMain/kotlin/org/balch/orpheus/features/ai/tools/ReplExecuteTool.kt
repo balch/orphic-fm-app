@@ -47,10 +47,8 @@ class ReplExecuteTool @Inject constructor(
         PATTERN TYPES:
         - note "<notes>" - Melodic notes (octaves 2-6, sharps: c#3, flats: db3)
         - voices:<indices> - Trigger voice envelopes (indices 1-8)
-        - hold "<values>" - Per-voice hold pattern for use with # combiner
         
         VOICE CONTROLS (voice index 1-8):
-        - hold:<voice> <val> - Voice sustain level (0.0-1.0)
         - tune:<voice> <val> - Voice pitch (see TUNING TO NOTES below)
         - pan:<voice> <val> - Voice pan (-1.0 to 1.0)
         - envspeed:<voice> <val> - Envelope speed (0.0=fast, 1.0=slow)
@@ -76,11 +74,6 @@ class ReplExecuteTool @Inject constructor(
         - tune:3 0.562 → Voice 3 plays C4
         - tune:7 0.5 → Voice 7 plays A4 (concert pitch, due to 2x multiplier)
         
-        **IMPORTANT - envspeed requires hold:**
-        When using envspeed, you MUST also set hold or the note won't be heard!
-        - WRONG: d1 $ voices "1" # envspeed "0.7"
-        - CORRECT: d1 $ voices "1" # hold "0.8" # envspeed "0.7"
-        
         QUAD CONTROLS (quad index 1-3):
         - quadhold:<quad> <val> - Quad hold level (0.0-1.0)
         - quadpitch:<quad> <val> - Quad pitch (0.5 = unity)
@@ -100,13 +93,13 @@ class ReplExecuteTool @Inject constructor(
         - slow <n> <pattern> - Slow down by factor n
         
         COMBINING PATTERNS (#):
-        Use # to combine patterns. Per-voice hold example:
-        d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"
+        Use # to combine patterns
+        d1 $ voices "1 2 3" 
         
         EXAMPLES:
         d1 $ note "c2 db2 g2 ab2"
         d2 $ voices:1 2 3 4
-        d3 $ voices "1" # hold "0.8" # envspeed "0.7"
+        d3 $ voices "1" # envspeed "0.3"
         tune:3 0.562
         
         Use hush to silence all patterns.

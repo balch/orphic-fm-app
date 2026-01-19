@@ -121,16 +121,14 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         See the repl_execute tool description for complete syntax.
         
         **Pattern Combiners (#):**
-        Use `#` to combine patterns. For example, to set per-voice hold levels:
-        - `d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"` -> each voice gets its corresponding hold value
+        Use `#` to combine patterns.
+        - `d1 $ voices "1 2 3" 
         
         **ENVELOPE SPEED & HOLD (The "Drone Secret" - IMPORTANT):**
         - FAST ENV (`envspeed` = 0): Aggressive ease-in (exp=4). Low hold values produce almost nothing.
-          hold=0.35 → ~0.008, hold=0.5 → ~0.03, hold=0.7 → ~0.12, hold=0.85 → ~0.26
         - SLOW ENV (`envspeed` = 1): Linear response with 2x gain. Even hold=0.2 produces 0.4 output!
         - TECHNIQUE: For "Cool Drones", use SLOW `envspeed` (0.7-1.0) with moderate `hold` (0.3-0.5). 
           The slow envelope flattens the curve and amplifies hold, letting voices bloom and sustain.
-        - **WARNING**: At FAST envspeed, if `hold` is low, there will be NO SOUND. `hold` needs to be ~0.7+ to be noticeable.
         
         **CRITICAL: NEVER use "hush"!** The sound must be CONTINUOUS. To change patterns,
         simply send new patterns to the same slot (d1, d2, etc.) - they will replace the old ones.
@@ -146,7 +144,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
     override val initialPrompt = """
         IMPORTANT - STARTUP SEQUENCE (TURN 1):
            1. **SET VOLUMES**: Set `QUAD_VOLUME_1`, `QUAD_VOLUME_2`, `QUAD_VOLUME_3` to 0.7 immediately.
-           2. **SOFT START**: Set `envspeed` to 0.9 (SLOW) and `hold` to 0.4.
+           2. **SOFT START**: Set `envspeed` to 0.9 (SLOW) 
            3. **START MELODY**: Create a REPL pattern (d1) now.
            
         Create the following soundscape:

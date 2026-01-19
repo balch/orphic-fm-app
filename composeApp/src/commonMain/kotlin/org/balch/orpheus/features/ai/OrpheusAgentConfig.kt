@@ -149,19 +149,10 @@ class OrpheusAgentConfig @Inject constructor(
         **Pattern Types:**
         - Notes: `note "c3 e3 g3"` or `n "0 4 7"`
         - Voices: `voices "1 2 3 4"` (triggers envelopes)
-        - FX: `drive:0.5`, `vibrato:0.4`, `feedback:0.6`, `envspeed:1 0.8`, `hold:1 0.9`
-        - Drum Controls (Sequenceable): `drum_bd_decay:0.8`, `drum_sd_snappy:0.7`, `drum_bd_trigger:1 0 1 0` 
-        - Rhythm Example: `d1 $ drum_bd_trigger:"1 0 1 0" # drum_sd_trigger:"0 1 0 1"` (Basic 4/4 Beat)
+        - FX: `drive:0.5`, `vibrato:0.4`, `feedback:0.6`, `envspeed:1 0.8`
         - Transformations: `slow 2`, `fast 4`
-        
-        **Pattern Combiners (#):**
-        Use `#` to combine patterns. For example, to set per-voice hold levels:
-        - `d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"` -> voice 1 gets hold 0.2, voice 2 gets hold 0.5, voice 3 gets hold 0.8
-        
-        **IMPORTANT - envspeed requires hold:**
-        When using `envspeed` (slow envelope), you MUST also set `hold` or the note will not sustain long enough to be heard!
-        - WRONG: `d1 $ voices "1" # envspeed "0.7"` -> note may be inaudible
-        - CORRECT: `d1 $ voices "1" # hold "0.8" # envspeed "0.7"` -> sustained note with slow envelope
+                
+        **IMPORTANT
         
         ## Your Personality
         - Be poetic but concise. Use musical metaphors naturally.
@@ -174,9 +165,6 @@ class OrpheusAgentConfig @Inject constructor(
         - When asked to change sounds, use the appropriate tool immediately.
         - Explain what sonic effect your changes will create.
         - For REPL code, prefer examples that demonstrate concepts clearly.
-        - **CREATING RHYTHMS**: To create a beat, sequence the `_trigger` parameters.
-          - Example: `d1 $ drum_bd_trigger:"1 0 1 0" # drum_sd_trigger:"0 1 0 1" # drum_hh_trigger:"1 1 1 1"`
-          - Use `fast` or `slow` to change the tempo of the pattern relative to the global BPM.
     """.trimIndent()
 
     /**
@@ -207,9 +195,6 @@ class OrpheusAgentConfig @Inject constructor(
             - d1: Low drone notes based on $selectedKey $selectedMode (e.g., note "${selectedKey.lowercase()}2 ...") 
             - d2: Mid-range harmony notes
             - d3: Voice cycling (e.g., slow 2 voices:1 2 3 4)
-            
-            Example - SYNTH CONTROLS -  (use built in synth controls to provide more atmosphere):
-            - d4: hold:1 0.8 - sustain voice 1
             
             Example format:
             once $ drive:0.4
