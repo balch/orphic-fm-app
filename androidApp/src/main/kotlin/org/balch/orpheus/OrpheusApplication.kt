@@ -21,9 +21,15 @@ class OrpheusApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         
+        // Create the foreground service controller (app-module implementation)
+        val foregroundServiceController = ForegroundServiceControllerImpl(this)
+        
         // Create the DI graph ONCE at Application level with Application
         // This survives Activity recreation on configuration changes
-        graph = createGraphFactory<OrpheusGraph.Factory>().create(this)
+        graph = createGraphFactory<OrpheusGraph.Factory>().create(
+            this,
+            foregroundServiceController
+        )
         
         // Wire up logging to UI
         KmLogging.addLogger(graph.consoleLogger)

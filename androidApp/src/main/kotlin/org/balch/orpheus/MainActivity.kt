@@ -5,9 +5,6 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.tooling.preview.Devices
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -41,10 +38,4 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
-}
-
-@Preview(device = Devices.DESKTOP)
-@Composable
-fun AppAndroidPreview() {
-    // Note: Preview won't work - needs Application context
 }

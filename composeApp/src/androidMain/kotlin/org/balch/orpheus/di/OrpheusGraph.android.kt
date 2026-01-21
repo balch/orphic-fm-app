@@ -8,6 +8,7 @@ import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.lifecycle.AndroidAppLifecycleManager
+import org.balch.orpheus.core.media.ForegroundServiceController
 import org.balch.orpheus.util.ConsoleLogger
 
 /**
@@ -28,6 +29,9 @@ actual interface OrpheusGraph : ViewModelGraph {
 
     @DependencyGraph.Factory
     fun interface Factory {
-        fun create(@Provides application: Application): OrpheusGraph
+        fun create(
+            @Provides application: Application,
+            @Provides foregroundServiceController: ForegroundServiceController
+        ): OrpheusGraph
     }
 }

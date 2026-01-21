@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -26,7 +27,6 @@ import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.SwitchOrientation
-import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
  * A compact voice button with tune slider (left), pulse button, envelope speed slider (right), and hold toggle.

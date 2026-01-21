@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.features.ai.AiOptionsPanelActions
@@ -20,7 +21,6 @@ import org.balch.orpheus.features.ai.chat.ChatViewModel
 import org.balch.orpheus.features.ai.generative.AiDashboard
 import org.balch.orpheus.features.ai.widgets.AiMode
 import org.balch.orpheus.features.ai.widgets.AiModeSelector
-import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
  * Compact AI section for mobile portrait layout.

@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -19,7 +20,6 @@ import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.HorizontalEnvelopeSlider
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun VoiceColumnMod(

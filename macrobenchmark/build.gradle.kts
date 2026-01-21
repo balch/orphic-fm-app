@@ -1,10 +1,5 @@
 plugins {
     alias(libs.plugins.androidTest)
-    alias(libs.plugins.kotlinMultiplatform)
-}
-
-kotlin {
-    androidTarget()
 }
 
 android {
@@ -23,6 +18,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    kotlin {
+        jvmToolchain(17)
+    }
+
     buildTypes {
         create("benchmark") {
             isDebuggable = true
@@ -31,7 +30,8 @@ android {
         }
     }
 
-    targetProjectPath = ":composeApp"
+    // Target the androidApp module now (since composeApp is a library)
+    targetProjectPath = ":androidApp"
     experimentalProperties["android.experimental.self-instrumenting"] = true
 }
 

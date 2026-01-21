@@ -1,13 +1,9 @@
 package org.balch.orpheus.core.media
 
-import android.content.Context
-import android.content.Intent
-import androidx.core.content.ContextCompat
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import org.balch.orpheus.AudioForegroundService
 
 /**
  * Android implementation of MediaSessionManager.
@@ -18,7 +14,7 @@ import org.balch.orpheus.AudioForegroundService
 @SingleIn(AppScope::class)
 @Inject
 actual class MediaSessionManager(
-    private val context: Context
+    private val foregroundServiceController: ForegroundServiceController
 ) {
     private val log = logging("MediaSessionManager")
     private var handler: MediaSessionActionHandler? = null
@@ -30,7 +26,7 @@ actual class MediaSessionManager(
         log.info { "Activating media session" }
         
         // Set up the action handler bridge before starting the service
-        AudioForegroundService.actionHandler = { action ->
+        foregroundServiceController.actionHandler = { action ->
             log.debug { "Received action from service: $action" }
             when (action) {
                 "play" -> handler?.onPlay()
@@ -39,8 +35,7 @@ actual class MediaSessionManager(
             }
         }
         
-        val intent = Intent(context, AudioForegroundService::class.java)
-        ContextCompat.startForegroundService(context, intent)
+        foregroundServiceController.start()
         isActive = true
     }
     
@@ -48,8 +43,8 @@ actual class MediaSessionManager(
         if (!isActive) return
         
         log.info { "Deactivating media session" }
-        context.stopService(Intent(context, AudioForegroundService::class.java))
-        AudioForegroundService.actionHandler = null
+        foregroundServiceController.stop()
+        foregroundServiceController.actionHandler = null
         isActive = false
     }
     
@@ -57,16 +52,7 @@ actual class MediaSessionManager(
         if (!isActive) return
         
         log.debug { "Updating playback state: isPlaying=$isPlaying" }
-        
-        // Send intent to update the service's notification state
-        val intent = Intent(context, AudioForegroundService::class.java).apply {
-            action = if (isPlaying) {
-                AudioForegroundService.ACTION_UPDATE_STATE_PLAYING
-            } else {
-                AudioForegroundService.ACTION_UPDATE_STATE_PAUSED
-            }
-        }
-        context.startService(intent)
+        foregroundServiceController.updatePlaybackState(isPlaying)
     }
     
     actual fun setActionHandler(handler: MediaSessionActionHandler) {
@@ -77,15 +63,10 @@ actual class MediaSessionManager(
         if (!isActive) return
         
         log.debug { "Updating metadata: mode=${metadata.mode}, isPlaying=${metadata.isPlaying}" }
-        
-        // Send intent to update the service's metadata
-        val intent = Intent(context, AudioForegroundService::class.java).apply {
-            action = AudioForegroundService.ACTION_UPDATE_METADATA
-            putExtra(AudioForegroundService.EXTRA_MODE, metadata.mode.name)
-            putExtra(AudioForegroundService.EXTRA_MODE_DISPLAY_NAME, metadata.mode.displayName)
-            putExtra(AudioForegroundService.EXTRA_IS_PLAYING, metadata.isPlaying)
-        }
-        context.startService(intent)
+        foregroundServiceController.updateMetadata(
+            mode = metadata.mode.name,
+            modeDisplayName = metadata.mode.displayName,
+            isPlaying = metadata.isPlaying
+        )
     }
 }
-

@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.features.draw.DrawSequencerConfig
@@ -42,7 +43,6 @@ import org.balch.orpheus.features.draw.SequencerPath
 import org.balch.orpheus.features.draw.SequencerPoint
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.CompactSecondsSlider
-import org.jetbrains.compose.ui.tooling.preview.Preview
 
 /**
  * Full-screen expanded editor for multi-parameter sequencer automation.
