@@ -10,12 +10,10 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -88,37 +85,27 @@ fun CollapsibleColumnPanel(
 
     val shape = RoundedCornerShape(8.dp)
 
-    // Base modifier - ensure minimum width for the header strip ONLY if showing header
-    val baseModifier = modifier.fillMaxHeight()
-        .widthIn(
-            min = if (showCollapsedHeader) collapsedWidth else 200.dp
-        )
-        .clip(shape)
-
     // Apply liquid effect
     val effects = LocalLiquidEffects.current
-    val liquidModifier = baseModifier.liquidVizEffects(
-        liquidState = liquidState,
-        scope = effects.top,
-        frostAmount = effects.frostSmall.dp,
-        color = color,
-        tintAlpha = effects.tintAlpha,
-        shape = shape
-    )
 
     Box(
-        modifier = liquidModifier
+        modifier = modifier.fillMaxHeight()
+            .liquidVizEffects(
+                liquidState = liquidState,
+                scope = effects.top,
+                frostAmount = effects.frostSmall.dp,
+                color = color,
+                tintAlpha = effects.tintAlpha,
+                shape = shape
+            )
+            .clip(shape)
             .border(
                 width = 1.dp,
                 color = if (effectiveExpanded) color.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.15f),
                 shape = shape
             )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxHeight()
-                .let { if (effectiveExpanded) it.fillMaxWidth() else it }
-        ) {
+        Row {
             // [LEFT] Vertical Header Strip (Visible if enabled)
             if (showCollapsedHeader) {
                 Box(
@@ -139,50 +126,34 @@ fun CollapsibleColumnPanel(
                 }
             }
 
-            // [RIGHT] Content Area - Fills remaining space
-            // Only visible/taking space when expanded
             if (effectiveExpanded) {
-                Box(
+                Column(
                     modifier = Modifier
-                        .weight(1f) // Take all remaining space provided by parent
-                        .fillMaxHeight()
-                        .clipToBounds(),
-                    contentAlignment = Alignment.TopCenter
+                        .fillMaxWidth()
+                        .padding(
+                            vertical =
+                                if (showCollapsedHeader) 16.dp else 4.dp
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(
-                                vertical =
-                                    if (showCollapsedHeader) 16.dp else 4.dp
-                            ),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        if (expandedTitle != null) {
-                            Text(
-                                text = expandedTitle,
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = color,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth(),
-                                maxLines = 1
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Spacer(modifier = Modifier.weight(1f))
-                            content()
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
+                    if (expandedTitle != null) {
+                        Text(
+                            text = expandedTitle,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = color,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
+
+                    Spacer(modifier = Modifier.weight(1f))
+                    content()
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
     }
 }
-
