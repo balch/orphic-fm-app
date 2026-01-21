@@ -127,8 +127,12 @@ class GrainEngine(
             0f
         }
         
-        // Read position = write head - delay - spray offset
-        var readPos = writeHead.toFloat() - delayTime + sprayOffset
+        // For reverse mode, we offset the start position by the grain size
+        // so that the grain plays backwards and *ends* near the target delay point.
+        val reverseOffset = if (mode == 1) grainSize else 0f
+        
+        // Read position = write head - delay - spray offset + reverseOffset
+        var readPos = writeHead.toFloat() - delayTime + sprayOffset + reverseOffset
         
         // Wrap to buffer bounds
         while (readPos < 0f) readPos += bufferSize

@@ -102,7 +102,7 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
         // Update processor parameters mode to enable mode switching
         processor.parameters.mode = when (mode) {
             0 -> GrainsMode.GRANULAR
-            1 -> GrainsMode.REVERSE
+            1 -> GrainsMode.LOOPING_DELAY
             2 -> GrainsMode.SHIMMER
             else -> GrainsMode.GRANULAR
         }
@@ -135,6 +135,9 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
         p.size = jsynSize.getValue(start).toFloat()
         p.pitch = jsynPitch.getValue(start).toFloat()
         p.density = jsynDensity.getValue(start).toFloat()
+        // Feedback: In original Clouds, this is a separate BLEND parameter (0-100%)
+        // Since we don't have a dedicated feedback knob, set to 0 for cleaner sound
+        p.feedback = 0f
         p.texture = jsynTexture.getValue(start).toFloat()
         p.dryWet = jsynDryWet.getValue(start).toFloat()
         

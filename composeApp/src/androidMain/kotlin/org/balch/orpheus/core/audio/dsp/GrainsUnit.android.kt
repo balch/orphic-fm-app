@@ -3,6 +3,7 @@ package org.balch.orpheus.core.audio.dsp
 import com.jsyn.ports.UnitInputPort
 import com.jsyn.ports.UnitOutputPort
 import com.jsyn.unitgen.UnitGenerator
+import org.balch.orpheus.core.audio.dsp.synth.grains.GrainsMode
 import org.balch.orpheus.core.audio.dsp.synth.grains.GranularProcessor
 
 /**
@@ -99,6 +100,13 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
 
     override fun setMode(mode: Int) {
         this.mode = mode
+        // Update processor parameters mode to enable mode switching
+        processor.parameters.mode = when (mode) {
+            0 -> GrainsMode.GRANULAR
+            1 -> GrainsMode.LOOPING_DELAY
+            2 -> GrainsMode.SHIMMER
+            else -> GrainsMode.GRANULAR
+        }
     }
 
     override fun generate(start: Int, end: Int) {
@@ -125,6 +133,10 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
         p.size = jsynSize.getValue(start).toFloat()
         p.pitch = jsynPitch.getValue(start).toFloat()
         p.density = jsynDensity.getValue(start).toFloat()
+        // Feedback: In original Clouds, this is a separate BLEND parameter (0-100%)
+        // Since we don't have a dedicated feedback knob, set to 0 for cleaner sound
+        // Could add a feedback knob to UI later if desired
+        p.feedback = 0f
         p.texture = jsynTexture.getValue(start).toFloat()
         p.dryWet = jsynDryWet.getValue(start).toFloat()
         

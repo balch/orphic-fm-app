@@ -37,10 +37,10 @@ class Grain {
     ) {
         this.readPosition = startPosition
         this.duration = grainDuration
-        // For reverse playback, use negative phase increment and start from end
+        // For reverse playback, use negative phase increment
         this.phaseIncrement = if (reverse) -pitchRatio else pitchRatio
         this.amplitude = gain
-        this.phase = if (reverse) grainDuration else 0f // Start at end if reverse
+        this.phase = 0f
         this.active = true
     }
     
@@ -54,24 +54,14 @@ class Grain {
     fun process(buffer: List<AudioBuffer>, channelIndex: Int): Float {
         if (!active) return 0f
         
-        // Check if grain is finished (works for both forward and reverse)
-        if (phaseIncrement > 0 && phase >= duration) {
-            // Forward playback finished
-            active = false
-            return 0f
-        } else if (phaseIncrement < 0 && phase <= 0f) {
-            // Reverse playback finished
+        // Check if grain is finished
+        if (phase >= duration) {
             active = false
             return 0f
         }
         
         // Calculate envelope (Hann window)
-        // For reverse, normalize phase relative to duration
-        val normalizedPhase = if (phaseIncrement < 0) {
-            (duration - phase) / duration // Reverse: envelope goes backward
-        } else {
-            phase / duration // Forward: normal envelope
-        }
+        val normalizedPhase = phase / duration
         val envelope = 0.5f * (1f - cos(2f * PI.toFloat() * normalizedPhase))
         
         // Read from buffer with interpolation
@@ -88,8 +78,8 @@ class Grain {
         val sample = buffer[channelIndex].readHermite(integral, fractional)
         
         // Advance phase and read position
-        phase += 1f // Phase always advances forward (used for envelope)
-        readPosition += phaseIncrement // Read position can go backward
+        phase += 1f // Phase always advances forward from 0 to duration
+        readPosition += phaseIncrement // Read position follows pitch and direction
         
         return sample * envelope * amplitude
     }

@@ -89,22 +89,17 @@ class AudioBuffer(sizeWithTail: Int) {
     // integral: integer index
     // fractional: 16-bit fractional part (0-65535) represented as Int
     fun readHermite(integralInput: Int, fractional: Int): Float {
-        var integral = integralInput
-        if (integral >= size) {
-            integral -= size
-        }
+        var i0 = integralInput % size
+        if (i0 < 0) i0 += size
         
-        val idx = integral
-        // If idx is valid, we can read 4 points (xm1, x0, x1, x2)
-        // because of the tail replication (K_INTERPOLATION_TAIL = 8), 
-        // we can safely read past 'size' up to size + 8.
-        // integral usually is [0, size-1].
-        // If integral is size-1, x0=buffer[size-1], x1=buffer[size] (which is buffer[0]), etc.
+        val im1 = if (i0 == 0) size - 1 else i0 - 1
+        val i1 = if (i0 == size - 1) 0 else i0 + 1
+        val i2 = if (i1 == size - 1) 0 else i1 + 1
         
-        val xm1 = buffer[idx]
-        val x0 = buffer[idx + 1]
-        val x1 = buffer[idx + 2]
-        val x2 = buffer[idx + 3]
+        val xm1 = buffer[im1]
+        val x0 = buffer[i0]
+        val x1 = buffer[i1]
+        val x2 = buffer[i2]
         
         val t = fractional / 65536.0f
         
