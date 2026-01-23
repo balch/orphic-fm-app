@@ -2,6 +2,7 @@ package org.balch.orpheus.core.presets
 
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.dsp.synth.warps.WarpsSource
 import org.balch.orpheus.features.lfo.HyperLfoMode
 import org.balch.orpheus.util.currentTimeMillis
 
@@ -97,6 +98,15 @@ data class DronePreset(
     val grainsDryWet: Float = 0.0f,
     val grainsFreeze: Boolean = false,
     val grainsMode: Int = 0,           // GrainsMode ordinal (0=Granular, 1=Reverse, 2=Shimmer)
+
+    // Warps (Meta-Modulator)
+    val warpsAlgorithm: Float = 0.0f,
+    val warpsTimbre: Float = 0.5f,
+    val warpsCarrierLevel: Float = 0.5f,
+    val warpsModulatorLevel: Float = 0.5f,
+    val warpsCarrierSource: WarpsSource = WarpsSource.SYNTH,
+    val warpsModulatorSource: WarpsSource = WarpsSource.DRUMS,
+    val warpsMix: Float = 0.0f,
 
     // Metadata
     val createdAt: Long = currentTimeMillis()

@@ -1,11 +1,14 @@
 package org.balch.orpheus.ui.panels
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,6 +59,9 @@ import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizPanel
 import org.balch.orpheus.features.visualizations.VizViewModel
+import org.balch.orpheus.features.warps.WarpsFeature
+import org.balch.orpheus.features.warps.WarpsPanel
+import org.balch.orpheus.features.warps.WarpsViewModel
 
 /**
  * A container for the top header panel row that manages expansion state
@@ -79,11 +85,13 @@ fun HeaderPanel(
     aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
     drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
+    warpsFeature: WarpsFeature = WarpsViewModel.feature(),
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
     val uiState by headerFeature.stateFlow.collectAsState()
     val headerActions = headerFeature.actions
+    val scrollState = rememberScrollState()
 
     fun PanelId.setExpanded(expanded: Boolean) {
         headerActions.setExpanded(this, expanded)
@@ -94,7 +102,8 @@ fun HeaderPanel(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(height),
+            .height(height)
+            .horizontalScroll(scrollState),
         horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -161,6 +170,13 @@ fun HeaderPanel(
              onExpandedChange = { PanelId.LOOPER.setExpanded(it) },
              modifier = panelModifier(PanelId.LOOPER.isExpanded())
         )
+        // Warps Panel
+        WarpsPanel(
+            feature = warpsFeature,
+            isExpanded = PanelId.WARPS.isExpanded(),
+            onExpandedChange = { PanelId.WARPS.setExpanded(it) },
+            modifier = panelModifier(PanelId.WARPS.isExpanded())
+        )
         // Live Coding panel
         LiveCodePanel(
             feature = liveCodeFeature,
@@ -203,11 +219,13 @@ fun HeaderPanel(
 @Composable
 private fun RowScope.panelModifier(
     isExpanded: Boolean,
-    weight: Float = 1f
+    weight: Float = 1f,
+    minWidth: Dp = 320.dp
 ): Modifier {
     return if (isExpanded) {
         Modifier
             .fillMaxHeight()
+            .widthIn(min = minWidth) // Minimum width to prevent UX compaction
             .weight(weight)
     } else {
         Modifier.fillMaxHeight()

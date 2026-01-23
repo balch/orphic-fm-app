@@ -52,7 +52,8 @@ data class HeaderPanelUiState(
             PanelId.AI to false,
             PanelId.DRUMS to false,
             PanelId.LOOPER to false,
-            PanelId.PATTERN to false
+            PanelId.PATTERN to false,
+            PanelId.WARPS to false
         )
     }
 }

@@ -62,6 +62,7 @@ actual class AudioEngine actual constructor() {
             is JsynDrumUnit -> synth.add(unit)
             is JsynResonatorUnit -> synth.add(unit)
             is JsynGrainsUnit -> synth.add(unit)
+            is JsynWarpsUnit -> synth.add(unit)
             is JsynLooperUnit -> {
                  synth.add(unit.writerLeft)
                  synth.add(unit.writerRight)
@@ -97,6 +98,7 @@ actual class AudioEngine actual constructor() {
     actual fun createResonatorUnit(): ResonatorUnit = JsynResonatorUnit()
     actual fun createGrainsUnit(): GrainsUnit = JsynGrainsUnit()
     actual fun createLooperUnit(): LooperUnit = JsynLooperUnit()
+    actual fun createWarpsUnit(): WarpsUnit = JsynWarpsUnit()
 
     actual val lineOutLeft: AudioInput
         get() = JsynAudioInput(lineOutLeftProxy.input)

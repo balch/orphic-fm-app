@@ -245,4 +245,9 @@ object OrpheusColors {
     val looperAmber = Color(0xFFFFBF00)          // Warm amber glow
     val looperCoal = Color(0xFF3D2B1F)           // Dark coal brown for backgrounds
     val looperAsh = Color(0xFF4A3728)            // Ash brown surface
+    
+    // Warps Meta-Modulator Palette
+    val warpsGreen = Color(0xFF90EE90)           // Primary Warps Green
+    val warpsYellow = Color(0xFFFFFF00)          // Bright Yellow for accents
+    val warpsDarkGreen = Color(0xFF2E4D2E)       // Darker green for backgrounds
 }

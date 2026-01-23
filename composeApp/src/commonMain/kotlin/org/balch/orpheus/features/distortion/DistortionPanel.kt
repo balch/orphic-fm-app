@@ -173,7 +173,8 @@ private fun PeakLed(peak: Float, modifier: Modifier = Modifier) {
         Text(
             text = ((peak * 100).roundToInt() / 100.0).toString(),
             style = MaterialTheme.typography.labelMedium,
-            color = ledColor
+            color = ledColor,
+            maxLines = 1,
         )
     }
 }

@@ -290,5 +290,30 @@ open class TestSynthEngine : SynthEngine {
     override fun clearLooper() {}
     override fun getLooperPosition(): Float = 0f
     override fun getLooperDuration(): Double = 0.0
+    
+    // Warps stubs
+    private var _warpsAlgorithm = 0f
+    private var _warpsTimbre = 0.5f
+    private var _warpsLevel1 = 0.5f
+    private var _warpsLevel2 = 0.5f
+    private var _warpsCarrierSource = 0
+    private var _warpsModulatorSource = 1
+    private var _warpsMix = 0.5f
+    
+    override fun setWarpsAlgorithm(value: Float) { _warpsAlgorithm = value }
+    override fun setWarpsTimbre(value: Float) { _warpsTimbre = value }
+    override fun setWarpsLevel1(value: Float) { _warpsLevel1 = value }
+    override fun setWarpsLevel2(value: Float) { _warpsLevel2 = value }
+    override fun setWarpsCarrierSource(source: Int) { _warpsCarrierSource = source }
+    override fun setWarpsModulatorSource(source: Int) { _warpsModulatorSource = source }
+    override fun setWarpsMix(value: Float) { _warpsMix = value }
+    
+    override fun getWarpsAlgorithm(): Float = _warpsAlgorithm
+    override fun getWarpsTimbre(): Float = _warpsTimbre
+    override fun getWarpsLevel1(): Float = _warpsLevel1
+    override fun getWarpsLevel2(): Float = _warpsLevel2
+    override fun getWarpsCarrierSource(): Int = _warpsCarrierSource
+    override fun getWarpsModulatorSource(): Int = _warpsModulatorSource
+    override fun getWarpsMix(): Float = _warpsMix
 }
 

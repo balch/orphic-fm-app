@@ -150,6 +150,15 @@ data class MidiMappingState(
             // Indexed Beats controls
             fun beatsDensity(index: Int) = "beats_density_${index + 1}" // 1-based in ID for consistency
             fun beatsEuclideanLength(index: Int) = "beats_euclidean_length_${index + 1}"
+            
+            // Warps (Meta-Modulator) controls
+            const val WARPS_ALGORITHM = "warps_algorithm"
+            const val WARPS_TIMBRE = "warps_timbre"
+            const val WARPS_CARRIER_LEVEL = "warps_carrier_level"
+            const val WARPS_MODULATOR_LEVEL = "warps_modulator_level"
+            const val WARPS_CARRIER_SOURCE = "warps_carrier_source"
+            const val WARPS_MODULATOR_SOURCE = "warps_modulator_source"
+            const val WARPS_MIX = "warps_mix"
         }
     }
 

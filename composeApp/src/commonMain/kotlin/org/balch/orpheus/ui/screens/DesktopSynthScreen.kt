@@ -49,6 +49,8 @@ import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
+import org.balch.orpheus.features.warps.WarpsFeature
+import org.balch.orpheus.features.warps.WarpsViewModel
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.panels.HeaderViewModel
@@ -79,6 +81,7 @@ fun DesktopSynthScreen(
     aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
     drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
+    warpsFeature: WarpsFeature = WarpsViewModel.feature(),
     effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
     isDialogActive: Boolean = false,
     onDialogActiveChange: (Boolean) -> Unit,
@@ -122,6 +125,7 @@ fun DesktopSynthScreen(
                 aiOptionsFeature = aiOptionsFeature,
                 drumFeature = drumFeature,
                 drumBeatsFeature = drumBeatsFeature,
+                warpsFeature = warpsFeature,
                 onDialogActiveChange = onDialogActiveChange,
             )
 
@@ -199,6 +203,7 @@ private fun DesktopSynthScreenPreview(
             aiOptionsFeature = AiOptionsViewModel.previewFeature(),
             drumFeature = DrumViewModel.previewFeature(),
             drumBeatsFeature = DrumBeatsViewModel.previewFeature(),
+            warpsFeature = WarpsViewModel.previewFeature(),
             effects = effects,
             onDialogActiveChange = {},
             focusRequester = FocusRequester()

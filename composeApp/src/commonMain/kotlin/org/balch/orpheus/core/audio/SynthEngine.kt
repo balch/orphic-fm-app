@@ -267,6 +267,23 @@ interface SynthEngine {
     fun clearLooper()
     fun getLooperPosition(): Float
     fun getLooperDuration(): Double
+
+    // Warps Meta-Modulator
+    fun setWarpsAlgorithm(value: Float)
+    fun setWarpsTimbre(value: Float)
+    fun setWarpsLevel1(value: Float)
+    fun setWarpsLevel2(value: Float)
+    fun setWarpsCarrierSource(source: Int)  // See WarpsSource enum ordinals
+    fun setWarpsModulatorSource(source: Int)
+    fun setWarpsMix(value: Float)  // 0=dry (bypass), 1=wet (full effect)
+    
+    fun getWarpsAlgorithm(): Float
+    fun getWarpsTimbre(): Float
+    fun getWarpsLevel1(): Float
+    fun getWarpsLevel2(): Float
+    fun getWarpsCarrierSource(): Int
+    fun getWarpsModulatorSource(): Int
+    fun getWarpsMix(): Float
 }
 
 enum class ModSource {

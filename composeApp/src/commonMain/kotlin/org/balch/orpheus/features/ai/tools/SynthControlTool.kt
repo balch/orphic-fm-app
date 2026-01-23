@@ -105,6 +105,35 @@ class SynthControlTool @Inject constructor(
         2. Change RESONATOR_MODE
         3. Slowly ramp RESONATOR_MIX back to desired level
         Avoid sustained high brightness + high structure (causes listener fatigue).
+        
+        MATRIX (Meta-Modulator):
+        Signal routing and cross-modulation matrix ported from Mutable Instruments Warps (Parasites firmware).
+        Cross-modulates carrier and modulator signals using 8 different algorithms:
+        - MATRIX_ALGORITHM: Selects algorithm (0.0-0.875 in steps of 0.125):
+          * 0.000-0.124: Crossfade - Simple crossfading between inputs
+          * 0.125-0.249: Cross-folding - Wave folding modulation
+          * 0.250-0.374: Diode ring modulator - Classic harsh metallic RM
+          * 0.375-0.499: XOR (digital destroyer) - Bitwise chaos
+          * 0.500-0.624: Comparator - Gate/trigger generation
+          * 0.625-0.749: Vocoder - Spectral transfer
+          * 0.750-0.874: Chebyshev waveshaping
+          * 0.875-1.000: Frequency shifter - Inharmonic shifting
+        - MATRIX_TIMBRE: Algorithm-specific timbral control (0-1)
+        - MATRIX_CARRIER_LEVEL: Carrier input level (0-1)
+        - MATRIX_MODULATOR_LEVEL: Modulator input level (0-1)
+        - MATRIX_CARRIER_SOURCE: Carrier audio source (0=Synth, 0.5=Drums, 1=REPL)
+        - MATRIX_MODULATOR_SOURCE: Modulator audio source (0=Synth, 0.5=Drums, 1=REPL)
+        - MATRIX_MIX: Dry/wet blend (0=dry/bypass, 1=fully processed)
+        
+        MATRIX SOUND DESIGN TIPS:
+        - Crossfade: Use for smooth transitions between sources
+        - Cross-folding: Creates rich harmonics, great for aggressive sounds
+        - Ring mod: Classic metallic tones, increase timbre for more chaos
+        - XOR: Digital destruction, glitchy artifacts
+        - Comparator: Rhythmic gate patterns from audio
+        - Vocoder: Synth talks like drums, or vice versa
+        - Chebyshev: Smooth waveshaping, controlled distortion
+        - Freq shifter: Inharmonic shifts, alien tones (timbre = shift amount)
     """.trimIndent()
 ) {
     // Track current values for each control to enable smooth ramping
@@ -193,6 +222,15 @@ class SynthControlTool @Inject constructor(
             "RESONATOR_DAMPING" -> "resonator_damping"
             "RESONATOR_POSITION" -> "resonator_position"
             "RESONATOR_MIX" -> "resonator_mix"
+            
+            // Warps (Meta-Modulator) controls - aliased as MATRIX for AI
+            "MATRIX_ALGORITHM", "WARPS_ALGORITHM" -> "warps_algorithm"
+            "MATRIX_TIMBRE", "WARPS_TIMBRE" -> "warps_timbre"
+            "MATRIX_CARRIER_LEVEL", "WARPS_CARRIER_LEVEL" -> "warps_carrier_level"
+            "MATRIX_MODULATOR_LEVEL", "WARPS_MODULATOR_LEVEL" -> "warps_modulator_level"
+            "MATRIX_CARRIER_SOURCE", "WARPS_CARRIER_SOURCE" -> "warps_carrier_source"
+            "MATRIX_MODULATOR_SOURCE", "WARPS_MODULATOR_SOURCE" -> "warps_modulator_source"
+            "MATRIX_MIX", "WARPS_MIX" -> "warps_mix"
             
             // Per-voice controls (VOICE_TUNE_1 through VOICE_TUNE_12, etc.)
             else -> {

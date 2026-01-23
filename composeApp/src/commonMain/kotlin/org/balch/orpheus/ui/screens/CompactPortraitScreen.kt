@@ -69,6 +69,9 @@ import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
+import org.balch.orpheus.features.warps.WarpsFeature
+import org.balch.orpheus.features.warps.WarpsPanel
+import org.balch.orpheus.features.warps.WarpsViewModel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.panels.compact.CompactAiSection
@@ -175,6 +178,7 @@ private fun CompactPortraitScreenLayout(
     grainsFeature: GrainsFeature = GrainsViewModel.feature(),
     drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
     resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
+    warpsFeature: WarpsFeature = WarpsViewModel.feature(),
     focusRequester: FocusRequester = remember { FocusRequester() },
     onKeyEvent: (KeyEvent) -> Boolean = { false },
 ) {
@@ -251,6 +255,7 @@ private fun CompactPortraitScreenLayout(
                                 drumBeatsFeature = drumBeatsFeature,
                                 resonatorFeature = resonatorFeature,
                                 grainsFeature = grainsFeature,
+                                warpsFeature = warpsFeature,
                             )
                         }
                     }
@@ -327,6 +332,7 @@ private fun PanelContent(
     drumBeatsFeature: DrumBeatsFeature,
     resonatorFeature: ResonatorFeature,
     grainsFeature: GrainsFeature,
+    warpsFeature: WarpsFeature,
     modifier: Modifier = Modifier,
 ) {
     val panelModifier = modifier
@@ -446,6 +452,15 @@ private fun PanelContent(
                 showCollapsedHeader = false
             )
         }
+        
+        CompactPanelType.WARPS -> {
+            WarpsPanel(
+                feature = warpsFeature,
+                modifier = panelModifier,
+                isExpanded = true,
+                showCollapsedHeader = false
+            )
+        }
     }
 }
 
@@ -472,6 +487,7 @@ private fun CompactPortraitLayoutPreview() {
                 drumFeature = DrumViewModel.previewFeature(),
                 drumBeatsFeature = DrumBeatsViewModel.previewFeature(),
                 resonatorFeature = ResonatorViewModel.previewFeature(),
+                warpsFeature = WarpsViewModel.previewFeature(),
             )
         }
     }
@@ -496,6 +512,7 @@ private fun PanelContentPreview() {
             drumBeatsFeature = DrumBeatsViewModel.previewFeature(),
             resonatorFeature = ResonatorViewModel.previewFeature(),
             grainsFeature = GrainsViewModel.previewFeature(),
+            warpsFeature = WarpsViewModel.previewFeature(),
         )
     }
 }

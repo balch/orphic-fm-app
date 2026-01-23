@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -48,7 +49,8 @@ enum class CompactPanelType(val displayName: String, val color: Color) {
     DISTORTION("Distortion", OrpheusColors.neonMagenta),
     TWEAKS("Tweaks", OrpheusColors.electricBlue), // Mod tweaks panel
     RESONATOR("Rezo", OrpheusColors.lakersGold), // Lakers-themed Resonator
-    GRAINS("Grains", OrpheusColors.grainsRed), // Lakers-themed Resonator
+    GRAINS("Grains", OrpheusColors.grainsRed), 
+    WARPS("Warps", OrpheusColors.warpsGreen),
     LFO("LFO", OrpheusColors.neonCyan),
     DELAY("Delay", OrpheusColors.warmGlow),
     REPL("REPL", OrpheusColors.neonCyan),
@@ -155,6 +157,13 @@ private fun PanelNavigationHeader(
             onClick = onLeftClick,
             isLeft = true,
             color = panelColor
+        )
+
+        Text(
+            text = panelName.uppercase(),
+            style = MaterialTheme.typography.titleMedium,
+            color = panelColor,
+            fontWeight = FontWeight.ExtraBold
         )
 
         // Right arrow

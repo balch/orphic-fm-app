@@ -26,6 +26,7 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspResonatorPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspStereoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspVibratoPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspWarpsPlugin
 import kotlin.math.pow
 
 /**
@@ -53,6 +54,7 @@ class DspSynthEngine(
     private val resonatorPlugin = plugins.filterIsInstance<DspResonatorPlugin>().first()
     private val grainsPlugin = plugins.filterIsInstance<DspGrainsPlugin>().first()
     private val looperPlugin = plugins.filterIsInstance<DspLooperPlugin>().first()
+    private val warpsPlugin = plugins.filterIsInstance<DspWarpsPlugin>().first()
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
@@ -222,6 +224,14 @@ class DspSynthEngine(
         // Looper Output -> Stereo Sum (Stereo: Left to Left, Right to Right)
         looperPlugin.outputs["output"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
         looperPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+
+        // Warps Meta-Modulator -> Stereo Sum AND Looper
+        voiceSumLeft.output.connect(warpsPlugin.inputs["inputLeft"]!!)
+        voiceSumRight.output.connect(warpsPlugin.inputs["inputRight"]!!)
+        warpsPlugin.outputs["output"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
+        warpsPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        warpsPlugin.outputs["output"]?.connect(looperPlugin.inputs["inputLeft"]!!)
+        warpsPlugin.outputs["outputRight"]?.connect(looperPlugin.inputs["inputRight"]!!)
 
         // Stereo outputs → LineOut
         stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
@@ -1023,4 +1033,101 @@ class DspSynthEngine(
     override fun getGrainsDryWet(): Float = _grainsDryWet
     override fun getGrainsFreeze(): Boolean = _grainsFreeze
     override fun getGrainsMode(): Int = _grainsMode
+
+    // Warps Implementation
+    private var _warpsAlgorithm = 0.0f
+    private var _warpsTimbre = 0.5f
+    private var _warpsLevel1 = 0.5f
+    private var _warpsLevel2 = 0.5f
+    private var _warpsCarrierSource = 0  // SYNTH
+    private var _warpsModulatorSource = 1  // DRUMS
+    private var _warpsMix = 0.5f
+
+    override fun setWarpsAlgorithm(value: Float) {
+        _warpsAlgorithm = value
+        warpsPlugin.setAlgorithm(value)
+    }
+    override fun setWarpsTimbre(value: Float) {
+        _warpsTimbre = value
+        warpsPlugin.setTimbre(value)
+    }
+    override fun setWarpsLevel1(value: Float) {
+        _warpsLevel1 = value
+        warpsPlugin.setLevel1(value)
+    }
+    override fun setWarpsLevel2(value: Float) {
+        _warpsLevel2 = value
+        warpsPlugin.setLevel2(value)
+    }
+    
+    override fun setWarpsCarrierSource(source: Int) {
+        _warpsCarrierSource = source
+        warpsPlugin.disconnectCarrier()
+        warpsPlugin.setCarrierSource(source)
+        
+        // Connect the new source to carrier input
+        getWarpsSourceOutput(source)?.first?.connect(warpsPlugin.carrierRouteInput)
+        
+        // Also connect to dry path for proper dry/wet mix
+        warpsPlugin.disconnectDry()
+        getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(warpsPlugin.dryInputLeft)
+        getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(warpsPlugin.dryInputRight)
+    }
+    
+    override fun setWarpsModulatorSource(source: Int) {
+        _warpsModulatorSource = source
+        warpsPlugin.disconnectModulator()
+        warpsPlugin.setModulatorSource(source)
+        
+        // Connect the new source to modulator input
+        getWarpsSourceOutput(source)?.second?.connect(warpsPlugin.modulatorRouteInput)
+        
+        // Also update dry path
+        warpsPlugin.disconnectDry()
+        getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(warpsPlugin.dryInputLeft)
+        getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(warpsPlugin.dryInputRight)
+    }
+    
+    override fun setWarpsMix(value: Float) {
+        _warpsMix = value
+        warpsPlugin.setMix(value)
+    }
+    
+    /**
+     * Get audio outputs for a given WarpsSource ordinal.
+     * Returns Pair<LeftOutput, RightOutput> for the source.
+     * 
+     * For stereo sources (SYNTH, DRUMS, REPL), we return left output for the first
+     * channel and right output for the second. This allows:
+     * - Different sources on carrier/modulator: Normal stereo operation
+     * - Same source on both: Carrier gets left, modulator gets right (stereo split)
+     * 
+     * Sources:
+     * - 0 = SYNTH: Main synth voices output (stereo)
+     * - 1 = DRUMS: Drum machine output (stereo)
+     * - 2 = REPL: Third quad voices 8-11, used for REPL-controlled notes (stereo)
+     */
+    private fun getWarpsSourceOutput(source: Int): Pair<AudioOutput, AudioOutput>? {
+        return when (source) {
+            0 -> Pair(voiceSumLeft.output, voiceSumRight.output)  // SYNTH
+            1 -> drumPlugin.outputs["outputLeft"]?.let { left ->
+                drumPlugin.outputs["outputRight"]?.let { right -> Pair(left, right) }
+            }  // DRUMS
+            2 -> {
+                // REPL - voices 8-11 (third quad)
+                // For REPL we use the same voiceSum since REPL voices contribute there
+                Pair(voiceSumLeft.output, voiceSumRight.output)
+            }
+            else -> null
+        }
+    }
+
+    override fun getWarpsAlgorithm(): Float = _warpsAlgorithm
+    override fun getWarpsTimbre(): Float = _warpsTimbre
+    override fun getWarpsLevel1(): Float = _warpsLevel1
+    override fun getWarpsLevel2(): Float = _warpsLevel2
+    override fun getWarpsCarrierSource(): Int = _warpsCarrierSource
+    override fun getWarpsModulatorSource(): Int = _warpsModulatorSource
+    override fun getWarpsMix(): Float = _warpsMix
 }
+

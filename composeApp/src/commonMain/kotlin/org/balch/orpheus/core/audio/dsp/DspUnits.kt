@@ -270,3 +270,24 @@ expect interface LooperUnit : AudioUnit {
     fun getLoopDuration(): Double
 }
 
+/**
+ * Mutable Instruments Warps Meta-Modulator Unit.
+ * 
+ * Blends and combines two audio signals using various cross-modulation
+ * algorithms, including a vocoder.
+ */
+expect interface WarpsUnit : AudioUnit {
+    /** Carrier Audio Input */
+    val inputLeft: AudioInput
+    /** Modulator Audio Input */
+    val inputRight: AudioInput
+    
+    /** Stereo Audio Output (Main sum is 'output') */
+    val outputRight: AudioOutput
+    
+    // Parameters
+    val algorithm: AudioInput // Algorithm selection (0.0 to 1.0)
+    val timbre: AudioInput    // Timbre / Modulation parameter
+    val level1: AudioInput    // Carrier drive
+    val level2: AudioInput    // Modulator drive
+}

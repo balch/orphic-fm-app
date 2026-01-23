@@ -26,7 +26,8 @@ enum class PanelId(val displayName: String) {
     DRUMS("808 Drums"),
     GRAINS("Grains"),
     LOOPER("Loop"),
-    PATTERN("Topographic")
+    PATTERN("Topographic"),
+    WARPS("Warps")
 }
 
 /**
