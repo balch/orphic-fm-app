@@ -1,6 +1,9 @@
 package org.balch.orpheus.core.audio.dsp
 
 import com.diamondedge.logging.logging
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -14,19 +17,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.audio.dsp.plugins.DspBenderPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspDelayPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspDistortionPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspDrumPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspDuoLfoPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspGrainsPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspLooperPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspPerStringBenderPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspResonatorPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspStereoPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspVibratoPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspWarpsPlugin
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import kotlin.math.pow
 
 /**
@@ -35,26 +26,15 @@ import kotlin.math.pow
  * 
  * Uses a plugin architecture where processing modules are injected and wired together.
  */
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
 class DspSynthEngine(
     private val audioEngine: AudioEngine,
-    plugins: Set<DspPlugin>,
+    private val pluginProvider: DspPluginProvider,
+    private val dispatcherProvider: DispatcherProvider,
 ) : SynthEngine {
 
     private val log = logging("DspSynthEngine")
-
-    // Extract plugins by type
-    private val hyperLfo = plugins.filterIsInstance<DspDuoLfoPlugin>().first()
-    private val delayPlugin = plugins.filterIsInstance<DspDelayPlugin>().first()
-    private val distortionPlugin = plugins.filterIsInstance<DspDistortionPlugin>().first()
-    private val stereoPlugin = plugins.filterIsInstance<DspStereoPlugin>().first()
-    private val vibratoPlugin = plugins.filterIsInstance<DspVibratoPlugin>().first()
-    private val benderPlugin = plugins.filterIsInstance<DspBenderPlugin>().first()
-    private val perStringBenderPlugin = plugins.filterIsInstance<DspPerStringBenderPlugin>().first()
-    private val drumPlugin = plugins.filterIsInstance<DspDrumPlugin>().first()
-    private val resonatorPlugin = plugins.filterIsInstance<DspResonatorPlugin>().first()
-    private val grainsPlugin = plugins.filterIsInstance<DspGrainsPlugin>().first()
-    private val looperPlugin = plugins.filterIsInstance<DspLooperPlugin>().first()
-    private val warpsPlugin = plugins.filterIsInstance<DspWarpsPlugin>().first()
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
@@ -152,7 +132,7 @@ class DspSynthEngine(
 
     init {
         // Register all plugin audio units
-        plugins.forEach { plugin ->
+        pluginProvider.plugins.forEach { plugin ->
             plugin.audioUnits.forEach { unit ->
                 audioEngine.addUnit(unit)
             }
@@ -164,12 +144,12 @@ class DspSynthEngine(
         audioEngine.addUnit(voiceSumRight)
         
         // Initialize all plugins (sets up internal wiring)
-        plugins.forEach { it.initialize() }
+        pluginProvider.plugins.forEach { it.initialize() }
 
         // TOTAL FB: StereoPlugin.peak → scaled → HyperLfo.feedbackInput
-        stereoPlugin.outputs["peakOutput"]?.connect(totalFbGain.inputA)
+        pluginProvider.stereoPlugin.outputs["peakOutput"]?.connect(totalFbGain.inputA)
         totalFbGain.inputB.set(0.0) // Default: no feedback
-        totalFbGain.output.connect(hyperLfo.feedbackInput)
+        totalFbGain.output.connect(pluginProvider.hyperLfo.feedbackInput)
 
         // ═══════════════════════════════════════════════════════════
         // INTER-PLUGIN WIRING
@@ -181,86 +161,86 @@ class DspSynthEngine(
         // ═══════════════════════════════════════════════════════════
 
         // HyperLFO → Delay (modulation)
-        hyperLfo.output.connect(delayPlugin.inputs["lfoInput"]!!)
+        pluginProvider.hyperLfo.output.connect(pluginProvider.delayPlugin.inputs["lfoInput"]!!)
 
         // Voice Sum → Grains (parallel granular path for voices only)
-        voiceSumLeft.output.connect(grainsPlugin.inputs["inputLeft"]!!)
-        voiceSumRight.output.connect(grainsPlugin.inputs["inputRight"]!!)
+        voiceSumLeft.output.connect(pluginProvider.grainsPlugin.inputs["inputLeft"]!!)
+        voiceSumRight.output.connect(pluginProvider.grainsPlugin.inputs["inputRight"]!!)
         
         // Grains → Stereo Sum (granular texture output) AND Looper input
-        grainsPlugin.outputs["output"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        grainsPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
-        grainsPlugin.outputs["output"]?.connect(looperPlugin.inputs["inputLeft"]!!)
-        grainsPlugin.outputs["outputRight"]?.connect(looperPlugin.inputs["inputRight"]!!)
+        pluginProvider.grainsPlugin.outputs["output"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.grainsPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.grainsPlugin.outputs["output"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        pluginProvider.grainsPlugin.outputs["outputRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
 
         // Distortion → Stereo Sum (resonator path output) AND Looper input
-        distortionPlugin.outputs["outputLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        distortionPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
-        distortionPlugin.outputs["outputLeft"]?.connect(looperPlugin.inputs["inputLeft"]!!)
-        distortionPlugin.outputs["outputRight"]?.connect(looperPlugin.inputs["inputRight"]!!)
+        pluginProvider.distortionPlugin.outputs["outputLeft"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.distortionPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.distortionPlugin.outputs["outputLeft"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        pluginProvider.distortionPlugin.outputs["outputRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
 
         // Delay wet outputs → Stereo sum AND Looper input
-        delayPlugin.outputs["wetLeft"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        delayPlugin.outputs["wetRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
-        delayPlugin.outputs["wet2Left"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        delayPlugin.outputs["wet2Right"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
-        delayPlugin.outputs["wetLeft"]?.connect(looperPlugin.inputs["inputLeft"]!!)
-        delayPlugin.outputs["wetRight"]?.connect(looperPlugin.inputs["inputRight"]!!)
-        delayPlugin.outputs["wet2Left"]?.connect(looperPlugin.inputs["inputLeft"]!!)
-        delayPlugin.outputs["wet2Right"]?.connect(looperPlugin.inputs["inputRight"]!!)
+        pluginProvider.delayPlugin.outputs["wetLeft"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.delayPlugin.outputs["wetRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.delayPlugin.outputs["wet2Left"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.delayPlugin.outputs["wet2Right"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.delayPlugin.outputs["wetLeft"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        pluginProvider.delayPlugin.outputs["wetRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+        pluginProvider.delayPlugin.outputs["wet2Left"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        pluginProvider.delayPlugin.outputs["wet2Right"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
 
         // Bender audio effects (tension/spring sounds) → Stereo sum (mono to both channels) AND Looper
-        benderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        benderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
-        benderPlugin.outputs["audioOutput"]?.connect(looperPlugin.inputs["inputLeft"]!!)
-        benderPlugin.outputs["audioOutput"]?.connect(looperPlugin.inputs["inputRight"]!!)
+        pluginProvider.benderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.benderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.benderPlugin.outputs["audioOutput"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        pluginProvider.benderPlugin.outputs["audioOutput"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
         
         // Per-String Bender audio effects (tension/spring sounds) → Stereo sum AND Looper
-        perStringBenderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        perStringBenderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
-        perStringBenderPlugin.outputs["audioOutput"]?.connect(looperPlugin.inputs["inputLeft"]!!)
-        perStringBenderPlugin.outputs["audioOutput"]?.connect(looperPlugin.inputs["inputRight"]!!)
+        pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
         
         // Looper Output -> Stereo Sum (Stereo: Left to Left, Right to Right)
-        looperPlugin.outputs["output"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        looperPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.looperPlugin.outputs["output"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.looperPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
 
         // Warps Meta-Modulator -> Stereo Sum AND Looper
-        voiceSumLeft.output.connect(warpsPlugin.inputs["inputLeft"]!!)
-        voiceSumRight.output.connect(warpsPlugin.inputs["inputRight"]!!)
-        warpsPlugin.outputs["output"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        warpsPlugin.outputs["outputRight"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
-        warpsPlugin.outputs["output"]?.connect(looperPlugin.inputs["inputLeft"]!!)
-        warpsPlugin.outputs["outputRight"]?.connect(looperPlugin.inputs["inputRight"]!!)
+        voiceSumLeft.output.connect(pluginProvider.warpsPlugin.inputs["inputLeft"]!!)
+        voiceSumRight.output.connect(pluginProvider.warpsPlugin.inputs["inputRight"]!!)
+        pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.warpsPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        pluginProvider.warpsPlugin.outputs["outputRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
 
         // Stereo outputs → LineOut
-        stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
-        stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
+        pluginProvider.stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
+        pluginProvider.stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
 
         // Drum outputs → Resonator ONLY (drums bypass Grains)
-        drumPlugin.outputs["outputLeft"]?.connect(resonatorPlugin.inputs["drumLeft"]!!)
-        drumPlugin.outputs["outputRight"]?.connect(resonatorPlugin.inputs["drumRight"]!!)
+        pluginProvider.drumPlugin.outputs["outputLeft"]?.connect(pluginProvider.resonatorPlugin.inputs["drumLeft"]!!)
+        pluginProvider.drumPlugin.outputs["outputRight"]?.connect(pluginProvider.resonatorPlugin.inputs["drumRight"]!!)
         
         // Drum outputs → Resonator non-gated inputs (full dry path)
-        drumPlugin.outputs["outputLeft"]?.connect(resonatorPlugin.inputs["fullDrumLeft"]!!)
-        drumPlugin.outputs["outputRight"]?.connect(resonatorPlugin.inputs["fullDrumRight"]!!)
+        pluginProvider.drumPlugin.outputs["outputLeft"]?.connect(pluginProvider.resonatorPlugin.inputs["fullDrumLeft"]!!)
+        pluginProvider.drumPlugin.outputs["outputRight"]?.connect(pluginProvider.resonatorPlugin.inputs["fullDrumRight"]!!)
 
         // Wire voices to audio paths
         voices.forEachIndexed { index, voice ->
             // VOICES → DELAYS (wet path)
-            voice.output.connect(delayPlugin.inputs["input"]!!)
+            voice.output.connect(pluginProvider.delayPlugin.inputs["input"]!!)
 
             // VIBRATO → Voice frequency modulation
-            vibratoPlugin.outputs["output"]?.connect(voice.vibratoInput)
+            pluginProvider.vibratoPlugin.outputs["output"]?.connect(voice.vibratoInput)
             voice.vibratoDepth.set(1.0)
 
             // GLOBAL BENDER → Voice pitch bend modulation (for fader bender)
-            benderPlugin.outputs["pitchOutput"]?.connect(voice.benderInput)
+            pluginProvider.benderPlugin.outputs["pitchOutput"]?.connect(voice.benderInput)
             
             // PER-STRING BENDER → Voice pitch bend modulation (for string bender)
             // Only wire first 8 voices (quad 0 and 1 = 4 strings * 2 voices)
             if (index < 8) {
-                perStringBenderPlugin.outputs["voiceBend$index"]?.connect(voice.benderInput)
+                pluginProvider.perStringBenderPlugin.outputs["voiceBend$index"]?.connect(voice.benderInput)
             }
 
             // COUPLING default depth
@@ -268,8 +248,8 @@ class DspSynthEngine(
         }
         
         // Per-String Bender audio effects (tension/spring sounds) → Stereo sum
-        perStringBenderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputLeft"]!!)
-        perStringBenderPlugin.outputs["audioOutput"]?.connect(stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
 
         // Wire voice coupling
         for (pairIndex in 0 until 6) {
@@ -282,25 +262,30 @@ class DspSynthEngine(
         // Wire per-voice panning: Voice → PanL/R → voiceSum (for Grains) AND Resonator
         voices.forEachIndexed { index, voice ->
             // Voice audio goes to pan gain inputs
-            voice.output.connect(stereoPlugin.getVoicePanInputLeft(index))
-            voice.output.connect(stereoPlugin.getVoicePanInputRight(index))
+            voice.output.connect(pluginProvider.stereoPlugin.getVoicePanInputLeft(index))
+            voice.output.connect(pluginProvider.stereoPlugin.getVoicePanInputRight(index))
             
             // Panned audio goes to voice sum buses (feeds Grains in parallel)
-            stereoPlugin.getVoicePanOutputLeft(index).connect(voiceSumLeft.input)
-            stereoPlugin.getVoicePanOutputRight(index).connect(voiceSumRight.input)
+            pluginProvider.stereoPlugin.getVoicePanOutputLeft(index).connect(voiceSumLeft.input)
+            pluginProvider.stereoPlugin.getVoicePanOutputRight(index).connect(voiceSumRight.input)
             
             // Panned audio ALSO goes to Resonator gated inputs (excitation) - parallel path
-            stereoPlugin.getVoicePanOutputLeft(index).connect(resonatorPlugin.inputs["synthLeft"]!!)
-            stereoPlugin.getVoicePanOutputRight(index).connect(resonatorPlugin.inputs["synthRight"]!!)
+            pluginProvider.stereoPlugin.getVoicePanOutputLeft(index).connect(pluginProvider.resonatorPlugin.inputs["synthLeft"]!!)
+            pluginProvider.stereoPlugin.getVoicePanOutputRight(index).connect(pluginProvider.resonatorPlugin.inputs["synthRight"]!!)
             
             // Panned audio ALSO goes to Resonator non-gated inputs (full dry path)
-            stereoPlugin.getVoicePanOutputLeft(index).connect(resonatorPlugin.inputs["fullSynthLeft"]!!)
-            stereoPlugin.getVoicePanOutputRight(index).connect(resonatorPlugin.inputs["fullSynthRight"]!!)
+            pluginProvider.stereoPlugin.getVoicePanOutputLeft(index).connect(pluginProvider.resonatorPlugin.inputs["fullSynthLeft"]!!)
+            pluginProvider.stereoPlugin.getVoicePanOutputRight(index).connect(pluginProvider.resonatorPlugin.inputs["fullSynthRight"]!!)
         }
 
         // Resonator output goes to Distortion input (resonator path continues)
-        resonatorPlugin.outputs["outputLeft"]!!.connect(distortionPlugin.inputs["inputLeft"]!!)
-        resonatorPlugin.outputs["outputRight"]!!.connect(distortionPlugin.inputs["inputRight"]!!)
+        pluginProvider.resonatorPlugin.outputs["outputLeft"]!!.connect(pluginProvider.distortionPlugin.inputs["inputLeft"]!!)
+        pluginProvider.resonatorPlugin.outputs["outputRight"]!!.connect(pluginProvider.distortionPlugin.inputs["inputRight"]!!)
+
+        // Wire Radio outputs to Stereo sum (if radio plugin is present)
+        // Note: For now, we connect all existing radio channels to the stereo mixer.
+        // As new channels are added at runtime, they will need to be wired.
+        // For V1, we'll implement a 'm_wireRadioChannel' helper.
 
 
         // ═══════════════════════════════════════════════════════════
@@ -326,28 +311,28 @@ class DspSynthEngine(
         }
 
         // LFO Frequencies
-        setupAutomation("hyper_lfo_a", listOf(hyperLfo.frequencyA), 10.0, 0.01) { setHyperLfoFreq(0, getHyperLfoFreq(0)) }
-        setupAutomation("hyper_lfo_b", listOf(hyperLfo.frequencyB), 10.0, 0.01) { setHyperLfoFreq(1, getHyperLfoFreq(1)) }
+        setupAutomation("hyper_lfo_a", listOf(pluginProvider.hyperLfo.frequencyA), 10.0, 0.01) { setHyperLfoFreq(0, getHyperLfoFreq(0)) }
+        setupAutomation("hyper_lfo_b", listOf(pluginProvider.hyperLfo.frequencyB), 10.0, 0.01) { setHyperLfoFreq(1, getHyperLfoFreq(1)) }
 
         // Delay Times
-        setupAutomation("delay_time_1", listOf(delayPlugin.delay1TimeRampInput), 1.99, 0.01) { setDelayTime(0, getDelayTime(0)) }
-        setupAutomation("delay_time_2", listOf(delayPlugin.delay2TimeRampInput), 1.99, 0.01) { setDelayTime(1, getDelayTime(1)) }
+        setupAutomation("delay_time_1", listOf(pluginProvider.delayPlugin.delay1TimeRampInput), 1.99, 0.01) { setDelayTime(0, getDelayTime(0)) }
+        setupAutomation("delay_time_2", listOf(pluginProvider.delayPlugin.delay2TimeRampInput), 1.99, 0.01) { setDelayTime(1, getDelayTime(1)) }
 
         // Delay Mod Depths
-        setupAutomation("delay_mod_1", listOf(delayPlugin.delay1ModDepthRampInput), 0.1, 0.0) { setDelayModDepth(0, getDelayModDepth(0)) }
-        setupAutomation("delay_mod_2", listOf(delayPlugin.delay2ModDepthRampInput), 0.1, 0.0) { setDelayModDepth(1, getDelayModDepth(1)) }
+        setupAutomation("delay_mod_1", listOf(pluginProvider.delayPlugin.delay1ModDepthRampInput), 0.1, 0.0) { setDelayModDepth(0, getDelayModDepth(0)) }
+        setupAutomation("delay_mod_2", listOf(pluginProvider.delayPlugin.delay2ModDepthRampInput), 0.1, 0.0) { setDelayModDepth(1, getDelayModDepth(1)) }
 
         // Delay Feedback
-        setupAutomation("delay_feedback", listOf(delayPlugin.delay1FeedbackInput, delayPlugin.delay2FeedbackInput), 0.95, 0.0) { setDelayFeedback(getDelayFeedback()) }
+        setupAutomation("delay_feedback", listOf(pluginProvider.delayPlugin.delay1FeedbackInput, pluginProvider.delayPlugin.delay2FeedbackInput), 0.95, 0.0) { setDelayFeedback(getDelayFeedback()) }
 
         // Vibrato
         setupAutomation("vibrato", listOf(), 20.0, 0.0) { setVibrato(getVibrato()) }
 
         // Master Volume
-        setupAutomation("master_volume", listOf(stereoPlugin.masterGainLeftInput, stereoPlugin.masterGainRightInput), 1.0, 0.0) { setMasterVolume(getMasterVolume()) }
+        setupAutomation("master_volume", listOf(pluginProvider.stereoPlugin.masterGainLeftInput, pluginProvider.stereoPlugin.masterGainRightInput), 1.0, 0.0) { setMasterVolume(getMasterVolume()) }
 
         // Drive
-        setupAutomation("drive", listOf(distortionPlugin.limiterLeftDrive, distortionPlugin.limiterRightDrive), 14.0, 1.0) { setDrive(getDrive()) }
+        setupAutomation("drive", listOf(pluginProvider.distortionPlugin.limiterLeftDrive, pluginProvider.distortionPlugin.limiterRightDrive), 14.0, 1.0) { setDrive(getDrive()) }
 
         // Delay Mix - complex with wet and dry scalers
         run {
@@ -364,10 +349,10 @@ class DspSynthEngine(
             player.output.connect(dryScaler.inputA)
             
             val wetTargets = listOf(
-                delayPlugin.delay1WetLeftGain, delayPlugin.delay1WetRightGain,
-                delayPlugin.delay2WetLeftGain, delayPlugin.delay2WetRightGain
+                pluginProvider.delayPlugin.delay1WetLeftGain, pluginProvider.delayPlugin.delay1WetRightGain,
+                pluginProvider.delayPlugin.delay2WetLeftGain, pluginProvider.delayPlugin.delay2WetRightGain
             )
-            val dryTargets = listOf(distortionPlugin.dryGainLeftInput, distortionPlugin.dryGainRightInput)
+            val dryTargets = listOf(pluginProvider.distortionPlugin.dryGainLeftInput, pluginProvider.distortionPlugin.dryGainRightInput)
             
             automationSetups["delay_mix"] = AutomationSetup(player, wetScaler, wetTargets + dryTargets) { setDelayMix(getDelayMix()) }
             automationSetups["delay_mix_dry"] = AutomationSetup(player, dryScaler, dryTargets) {}
@@ -391,8 +376,8 @@ class DspSynthEngine(
             player.output.connect(distScaler.inputA)
             player.output.connect(cleanScaler.inputA)
             
-            val distTargets = listOf(distortionPlugin.distortedPathLeftGain, distortionPlugin.distortedPathRightGain)
-            val cleanTargets = listOf(distortionPlugin.cleanPathLeftGain, distortionPlugin.cleanPathRightGain)
+            val distTargets = listOf(pluginProvider.distortionPlugin.distortedPathLeftGain, pluginProvider.distortionPlugin.distortedPathRightGain)
+            val cleanTargets = listOf(pluginProvider.distortionPlugin.cleanPathLeftGain, pluginProvider.distortionPlugin.cleanPathRightGain)
             
             automationSetups["distortion_mix"] = AutomationSetup(player, distScaler, distTargets + cleanTargets) { setDistortionMix(getDistortionMix()) }
             automationSetups["distortion_mix_clean"] = AutomationSetup(player, cleanScaler, cleanTargets) {}
@@ -441,10 +426,10 @@ class DspSynthEngine(
         log.debug { "Starting Shared Audio Engine..." }
         audioEngine.start()
 
-        monitoringJob = monitoringScope.launch {
+        monitoringJob = monitoringScope.launch(dispatcherProvider.io) {
             val voiceLevels = FloatArray(12)
             while (isActive) {
-                val currentPeak = stereoPlugin.getPeak()
+                val currentPeak = pluginProvider.stereoPlugin.getPeak()
                 _peakFlow.value = currentPeak
                 _cpuLoadFlow.value = audioEngine.getCpuLoad()
 
@@ -455,7 +440,7 @@ class DspSynthEngine(
                     voiceSum += level
                 }
                 _voiceLevelsFlow.value = voiceLevels.copyOf()
-                _lfoOutputFlow.value = hyperLfo.getCurrentValue()
+                _lfoOutputFlow.value = pluginProvider.hyperLfo.getCurrentValue()
                 
                 val computedMaster = (voiceSum / 12f).coerceIn(0f, 1f)
                 _masterLevelFlow.value = maxOf(currentPeak.coerceIn(0f, 1f), computedMaster)
@@ -477,45 +462,45 @@ class DspSynthEngine(
     }
 
     // Delay delegations
-    override fun setDelayTime(index: Int, time: Float) = delayPlugin.setTime(index, time)
+    override fun setDelayTime(index: Int, time: Float) = pluginProvider.delayPlugin.setTime(index, time)
     override fun setDelayFeedback(amount: Float) {
-        delayPlugin.setFeedback(amount)
+        pluginProvider.delayPlugin.setFeedback(amount)
         _delayFeedbackFlow.value = amount
     }
     override fun setDelayMix(amount: Float) {
-        delayPlugin.setMix(amount)
-        distortionPlugin.setDryLevel(1.0f - amount)
+        pluginProvider.delayPlugin.setMix(amount)
+        pluginProvider.distortionPlugin.setDryLevel(1.0f - amount)
         _delayMixFlow.value = amount
     }
-    override fun setDelayModDepth(index: Int, amount: Float) = delayPlugin.setModDepth(index, amount)
-    override fun setDelayModSource(index: Int, isLfo: Boolean) = delayPlugin.setModSource(index, isLfo)
-    override fun setDelayLfoWaveform(isTriangle: Boolean) = hyperLfo.setTriangleMode(isTriangle)
+    override fun setDelayModDepth(index: Int, amount: Float) = pluginProvider.delayPlugin.setModDepth(index, amount)
+    override fun setDelayModSource(index: Int, isLfo: Boolean) = pluginProvider.delayPlugin.setModSource(index, isLfo)
+    override fun setDelayLfoWaveform(isTriangle: Boolean) = pluginProvider.hyperLfo.setTriangleMode(isTriangle)
     @Deprecated("Use granular setDelayTime/Feedback instead")
     override fun setDelay(time: Float, feedback: Float) {
         setDelayTime(0, time)
         setDelayTime(1, time)
         setDelayFeedback(feedback)
     }
-    override fun getDelayTime(index: Int): Float = delayPlugin.getTime(index)
-    override fun getDelayFeedback(): Float = delayPlugin.getFeedback()
-    override fun getDelayMix(): Float = delayPlugin.getMix()
-    override fun getDelayModDepth(index: Int): Float = delayPlugin.getModDepth(index)
-    override fun getDelayModSourceIsLfo(index: Int): Boolean = delayPlugin.getModSourceIsLfo(index)
+    override fun getDelayTime(index: Int): Float = pluginProvider.delayPlugin.getTime(index)
+    override fun getDelayFeedback(): Float = pluginProvider.delayPlugin.getFeedback()
+    override fun getDelayMix(): Float = pluginProvider.delayPlugin.getMix()
+    override fun getDelayModDepth(index: Int): Float = pluginProvider.delayPlugin.getModDepth(index)
+    override fun getDelayModSourceIsLfo(index: Int): Boolean = pluginProvider.delayPlugin.getModSourceIsLfo(index)
     override fun getDelayLfoWaveformIsTriangle(): Boolean = true // Default to triangle
 
     // Beats Mix delegation
     override fun setBeatsMix(mix: Float) {
-        drumPlugin.setMix(mix)
+        pluginProvider.drumPlugin.setMix(mix)
     }
-    override fun getBeatsMix(): Float = drumPlugin.getMix()
+    override fun getBeatsMix(): Float = pluginProvider.drumPlugin.getMix()
     
     // Looper delegations
     override fun setLooperRecord(recording: Boolean) {
-        looperPlugin.setRecording(recording)
+        pluginProvider.looperPlugin.setRecording(recording)
     }
     
     override fun setLooperPlay(playing: Boolean) {
-        looperPlugin.setPlaying(playing)
+        pluginProvider.looperPlugin.setPlaying(playing)
     }
     
     override fun setLooperOverdub(overdub: Boolean) {
@@ -523,59 +508,59 @@ class DspSynthEngine(
     }
     
     override fun clearLooper() {
-        looperPlugin.clear()
+        pluginProvider.looperPlugin.clear()
     }
     
-    override fun getLooperPosition(): Float = looperPlugin.getPosition()
-    override fun getLooperDuration(): Double = looperPlugin.getLoopDuration()
+    override fun getLooperPosition(): Float = pluginProvider.looperPlugin.getPosition()
+    override fun getLooperDuration(): Double = pluginProvider.looperPlugin.getLoopDuration()
 
     // HyperLFO delegations
-    override fun setHyperLfoFreq(index: Int, frequency: Float) = hyperLfo.setFreq(index, frequency)
-    override fun setHyperLfoMode(mode: Int) = hyperLfo.setMode(mode)
-    override fun setHyperLfoLink(active: Boolean) = hyperLfo.setLink(active)
-    override fun getHyperLfoFreq(index: Int): Float = hyperLfo.getFreq(index)
-    override fun getHyperLfoMode(): Int = hyperLfo.getMode()
-    override fun getHyperLfoLink(): Boolean = hyperLfo.getLink()
+    override fun setHyperLfoFreq(index: Int, frequency: Float) = pluginProvider.hyperLfo.setFreq(index, frequency)
+    override fun setHyperLfoMode(mode: Int) = pluginProvider.hyperLfo.setMode(mode)
+    override fun setHyperLfoLink(active: Boolean) = pluginProvider.hyperLfo.setLink(active)
+    override fun getHyperLfoFreq(index: Int): Float = pluginProvider.hyperLfo.getFreq(index)
+    override fun getHyperLfoMode(): Int = pluginProvider.hyperLfo.getMode()
+    override fun getHyperLfoLink(): Boolean = pluginProvider.hyperLfo.getLink()
 
     // Distortion delegations
     override fun setDrive(amount: Float) {
-        distortionPlugin.setDrive(amount)
+        pluginProvider.distortionPlugin.setDrive(amount)
         _driveFlow.value = amount
     }
     override fun setDistortionMix(amount: Float) {
-        distortionPlugin.setMix(amount)
+        pluginProvider.distortionPlugin.setMix(amount)
         _distortionMixFlow.value = amount
     }
-    override fun getDrive(): Float = distortionPlugin.getDrive()
-    override fun getDistortionMix(): Float = distortionPlugin.getMix()
+    override fun getDrive(): Float = pluginProvider.distortionPlugin.getDrive()
+    override fun getDistortionMix(): Float = pluginProvider.distortionPlugin.getMix()
 
     // Stereo delegations
-    override fun setMasterVolume(amount: Float) = stereoPlugin.setMasterVolume(amount)
-    override fun getMasterVolume(): Float = stereoPlugin.getMasterVolume()
-    override fun setVoicePan(index: Int, pan: Float) = stereoPlugin.setVoicePan(index, pan)
-    override fun getVoicePan(index: Int): Float = stereoPlugin.getVoicePan(index)
-    override fun setMasterPan(pan: Float) = stereoPlugin.setMasterPan(pan)
-    override fun getMasterPan(): Float = stereoPlugin.getMasterPan()
+    override fun setMasterVolume(amount: Float) = pluginProvider.stereoPlugin.setMasterVolume(amount)
+    override fun getMasterVolume(): Float = pluginProvider.stereoPlugin.getMasterVolume()
+    override fun setVoicePan(index: Int, pan: Float) = pluginProvider.stereoPlugin.setVoicePan(index, pan)
+    override fun getVoicePan(index: Int): Float = pluginProvider.stereoPlugin.getVoicePan(index)
+    override fun setMasterPan(pan: Float) = pluginProvider.stereoPlugin.setMasterPan(pan)
+    override fun getMasterPan(): Float = pluginProvider.stereoPlugin.getMasterPan()
     override fun setStereoMode(mode: StereoMode) {
         _stereoMode = mode
-        delayPlugin.setStereoMode(mode == StereoMode.STEREO_DELAYS)
+        pluginProvider.delayPlugin.setStereoMode(mode == StereoMode.STEREO_DELAYS)
     }
     override fun getStereoMode(): StereoMode = _stereoMode
 
     // Vibrato delegation
-    override fun setVibrato(amount: Float) = vibratoPlugin.setDepth(amount)
-    override fun getVibrato(): Float = vibratoPlugin.getDepth()
+    override fun setVibrato(amount: Float) = pluginProvider.vibratoPlugin.setDepth(amount)
+    override fun getVibrato(): Float = pluginProvider.vibratoPlugin.getDepth()
     
     // Bender delegation
     override fun setBend(amount: Float) {
-        benderPlugin.setBend(amount)
+        pluginProvider.benderPlugin.setBend(amount)
         _bendFlow.value = amount
     }
-    override fun getBend(): Float = benderPlugin.getBend()
+    override fun getBend(): Float = pluginProvider.benderPlugin.getBend()
     
     // Per-String Bender delegation
     override fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float) {
-        if (perStringBenderPlugin.setStringBend(stringIndex, bendAmount, voiceMix)) {
+        if (pluginProvider.perStringBenderPlugin.setStringBend(stringIndex, bendAmount, voiceMix)) {
             // Plugin requests voice trigger
             val voiceA = stringIndex * 2
             val voiceB = stringIndex * 2 + 1
@@ -586,7 +571,7 @@ class DspSynthEngine(
     }
     
     override fun releaseStringBend(stringIndex: Int): Int {
-        val (springDuration, shouldRelease) = perStringBenderPlugin.releaseString(stringIndex)
+        val (springDuration, shouldRelease) = pluginProvider.perStringBenderPlugin.releaseString(stringIndex)
         
         if (shouldRelease) {
              val voiceA = stringIndex * 2
@@ -600,15 +585,15 @@ class DspSynthEngine(
     
     // Slide Bar delegation
     override fun setSlideBar(yPosition: Float, xPosition: Float) {
-        perStringBenderPlugin.setSlideBar(yPosition, xPosition)
+        pluginProvider.perStringBenderPlugin.setSlideBar(yPosition, xPosition)
     }
     
     override fun releaseSlideBar() {
-        perStringBenderPlugin.releaseSlideBar()
+        pluginProvider.perStringBenderPlugin.releaseSlideBar()
     }
     
     override fun resetStringBenders() {
-        perStringBenderPlugin.resetAll()
+        pluginProvider.perStringBenderPlugin.resetAll()
     }
 
     // Voice controls (still managed locally)
@@ -631,7 +616,7 @@ class DspSynthEngine(
         // This ensures the string "pluck" sound matches the user's tuned notes (Issue 2)
         if (index % 2 == 0) {
             val stringIndex = index / 2
-            perStringBenderPlugin.setStringFrequency(stringIndex, finalFreq)
+            pluginProvider.perStringBenderPlugin.setStringFrequency(stringIndex, finalFreq)
         }
     }
 
@@ -660,15 +645,15 @@ class DspSynthEngine(
     }
 
     override fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {
-        drumPlugin.trigger(type, accent, frequency, tone, decay, p4, p5)
+        pluginProvider.drumPlugin.trigger(type, accent, frequency, tone, decay, p4, p5)
     }
 
     override fun setDrumTone(type: Int, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {
-        drumPlugin.setParameters(type, frequency, tone, decay, p4, p5)
+        pluginProvider.drumPlugin.setParameters(type, frequency, tone, decay, p4, p5)
     }
 
     override fun triggerDrum(type: Int, accent: Float) {
-        drumPlugin.trigger(type, accent)
+        pluginProvider.drumPlugin.trigger(type, accent)
     }
 
     override fun setQuadPitch(quadIndex: Int, pitch: Float) {
@@ -731,8 +716,8 @@ class DspSynthEngine(
         when (source) {
             ModSource.OFF -> { }
             ModSource.LFO -> {
-                hyperLfo.output.connect(voices[voiceA].modInput)
-                hyperLfo.output.connect(voices[voiceB].modInput)
+                pluginProvider.hyperLfo.output.connect(voices[voiceA].modInput)
+                pluginProvider.hyperLfo.output.connect(voices[voiceB].modInput)
             }
             ModSource.VOICE_FM -> {
                 if (_fmStructureCrossQuad) {
@@ -848,22 +833,22 @@ class DspSynthEngine(
         
         when (controlId) {
             "delay_mix" -> {
-                listOf(delayPlugin.delay1WetLeftGain, delayPlugin.delay1WetRightGain, 
-                       delayPlugin.delay2WetLeftGain, delayPlugin.delay2WetRightGain).forEach {
+                listOf(pluginProvider.delayPlugin.delay1WetLeftGain, pluginProvider.delayPlugin.delay1WetRightGain, 
+                       pluginProvider.delayPlugin.delay2WetLeftGain, pluginProvider.delayPlugin.delay2WetRightGain).forEach {
                     setup.scaler.output.connect(it)
                 }
                 secondarySetup?.let { secondary ->
-                    listOf(distortionPlugin.dryGainLeftInput, distortionPlugin.dryGainRightInput).forEach {
+                    listOf(pluginProvider.distortionPlugin.dryGainLeftInput, pluginProvider.distortionPlugin.dryGainRightInput).forEach {
                         secondary.scaler.output.connect(it)
                     }
                 }
             }
             "distortion_mix" -> {
-                listOf(distortionPlugin.distortedPathLeftGain, distortionPlugin.distortedPathRightGain).forEach {
+                listOf(pluginProvider.distortionPlugin.distortedPathLeftGain, pluginProvider.distortionPlugin.distortedPathRightGain).forEach {
                     setup.scaler.output.connect(it)
                 }
                 secondarySetup?.let { secondary ->
-                    listOf(distortionPlugin.cleanPathLeftGain, distortionPlugin.cleanPathRightGain).forEach {
+                    listOf(pluginProvider.distortionPlugin.cleanPathLeftGain, pluginProvider.distortionPlugin.cleanPathRightGain).forEach {
                         secondary.scaler.output.connect(it)
                     }
                 }
@@ -894,7 +879,7 @@ class DspSynthEngine(
         activeAutomations.remove(controlId)
     }
 
-    override fun getPeak(): Float = stereoPlugin.getPeak()
+    override fun getPeak(): Float = pluginProvider.stereoPlugin.getPeak()
     override fun getCpuLoad(): Float = audioEngine.getCpuLoad()
 
     // Getters for State Saving
@@ -913,32 +898,32 @@ class DspSynthEngine(
     // ═══════════════════════════════════════════════════════════
     // Rings Resonator Delegation
     // ═══════════════════════════════════════════════════════════
-    override fun setResonatorMode(mode: Int) = resonatorPlugin.setMode(mode)
-    override fun setResonatorTarget(target: Int) = resonatorPlugin.setTarget(target)
-    override fun setResonatorTargetMix(targetMix: Float) = resonatorPlugin.setTargetMix(targetMix)
-    override fun setResonatorStructure(value: Float) = resonatorPlugin.setStructure(value)
-    override fun setResonatorBrightness(value: Float) = resonatorPlugin.setBrightness(value)
-    override fun setResonatorDamping(value: Float) = resonatorPlugin.setDamping(value)
-    override fun setResonatorPosition(value: Float) = resonatorPlugin.setPosition(value)
-    override fun setResonatorMix(value: Float) = resonatorPlugin.setMix(value)
-    override fun strumResonator(frequency: Float) = resonatorPlugin.strum(frequency)
+    override fun setResonatorMode(mode: Int) = pluginProvider.resonatorPlugin.setMode(mode)
+    override fun setResonatorTarget(target: Int) = pluginProvider.resonatorPlugin.setTarget(target)
+    override fun setResonatorTargetMix(targetMix: Float) = pluginProvider.resonatorPlugin.setTargetMix(targetMix)
+    override fun setResonatorStructure(value: Float) = pluginProvider.resonatorPlugin.setStructure(value)
+    override fun setResonatorBrightness(value: Float) = pluginProvider.resonatorPlugin.setBrightness(value)
+    override fun setResonatorDamping(value: Float) = pluginProvider.resonatorPlugin.setDamping(value)
+    override fun setResonatorPosition(value: Float) = pluginProvider.resonatorPlugin.setPosition(value)
+    override fun setResonatorMix(value: Float) = pluginProvider.resonatorPlugin.setMix(value)
+    override fun strumResonator(frequency: Float) = pluginProvider.resonatorPlugin.strum(frequency)
     
-    override fun getResonatorMode(): Int = resonatorPlugin.getMode()
-    override fun getResonatorTarget(): Int = resonatorPlugin.getTarget()
-    override fun getResonatorTargetMix(): Float = resonatorPlugin.getTargetMix()
-    override fun getResonatorStructure(): Float = resonatorPlugin.getStructure()
-    override fun getResonatorBrightness(): Float = resonatorPlugin.getBrightness()
-    override fun getResonatorDamping(): Float = resonatorPlugin.getDamping()
-    override fun getResonatorPosition(): Float = resonatorPlugin.getPosition()
-    override fun getResonatorMix(): Float = resonatorPlugin.getMix()
-    override fun getResonatorSnapBack(): Boolean = resonatorPlugin.getSnapBack()
-    override fun setResonatorSnapBack(enabled: Boolean) = resonatorPlugin.setSnapBack(enabled)
+    override fun getResonatorMode(): Int = pluginProvider.resonatorPlugin.getMode()
+    override fun getResonatorTarget(): Int = pluginProvider.resonatorPlugin.getTarget()
+    override fun getResonatorTargetMix(): Float = pluginProvider.resonatorPlugin.getTargetMix()
+    override fun getResonatorStructure(): Float = pluginProvider.resonatorPlugin.getStructure()
+    override fun getResonatorBrightness(): Float = pluginProvider.resonatorPlugin.getBrightness()
+    override fun getResonatorDamping(): Float = pluginProvider.resonatorPlugin.getDamping()
+    override fun getResonatorPosition(): Float = pluginProvider.resonatorPlugin.getPosition()
+    override fun getResonatorMix(): Float = pluginProvider.resonatorPlugin.getMix()
+    override fun getResonatorSnapBack(): Boolean = pluginProvider.resonatorPlugin.getSnapBack()
+    override fun setResonatorSnapBack(enabled: Boolean) = pluginProvider.resonatorPlugin.setSnapBack(enabled)
 
-    override fun getDrumFrequency(type: Int): Float = drumPlugin.getFrequency(type)
-    override fun getDrumTone(type: Int): Float = drumPlugin.getTone(type)
-    override fun getDrumDecay(type: Int): Float = drumPlugin.getDecay(type)
-    override fun getDrumP4(type: Int): Float = drumPlugin.getP4(type)
-    override fun getDrumP5(type: Int): Float = drumPlugin.getP5(type)
+    override fun getDrumFrequency(type: Int): Float = pluginProvider.drumPlugin.getFrequency(type)
+    override fun getDrumTone(type: Int): Float = pluginProvider.drumPlugin.getTone(type)
+    override fun getDrumDecay(type: Int): Float = pluginProvider.drumPlugin.getDecay(type)
+    override fun getDrumP4(type: Int): Float = pluginProvider.drumPlugin.getP4(type)
+    override fun getDrumP5(type: Int): Float = pluginProvider.drumPlugin.getP5(type)
     
     // Beat Sequencer Storage (State only)
     private var _beatsX = 0.5f
@@ -989,40 +974,40 @@ class DspSynthEngine(
     
     override fun setGrainsPosition(value: Float) {
         _grainsPosition = value
-        grainsPlugin.inputs["position"]?.set(value.toDouble())
+        pluginProvider.grainsPlugin.inputs["position"]?.set(value.toDouble())
     }
     override fun setGrainsSize(value: Float) {
         _grainsSize = value
-        grainsPlugin.inputs["size"]?.set(value.toDouble())
+        pluginProvider.grainsPlugin.inputs["size"]?.set(value.toDouble())
     }
     override fun setGrainsPitch(value: Float) {
         _grainsPitch = value
-        grainsPlugin.inputs["pitch"]?.set(value.toDouble())
+        pluginProvider.grainsPlugin.inputs["pitch"]?.set(value.toDouble())
     }
     override fun setGrainsDensity(value: Float) {
         _grainsDensity = value
-        grainsPlugin.inputs["density"]?.set(value.toDouble())
+        pluginProvider.grainsPlugin.inputs["density"]?.set(value.toDouble())
     }
     override fun setGrainsTexture(value: Float) {
         _grainsTexture = value
-        grainsPlugin.inputs["texture"]?.set(value.toDouble())
+        pluginProvider.grainsPlugin.inputs["texture"]?.set(value.toDouble())
     }
     override fun setGrainsDryWet(value: Float) {
         _grainsDryWet = value
-        grainsPlugin.inputs["dryWet"]?.set(value.toDouble())
+        pluginProvider.grainsPlugin.inputs["dryWet"]?.set(value.toDouble())
     }
     override fun setGrainsFreeze(frozen: Boolean) {
         _grainsFreeze = frozen
-        grainsPlugin.inputs["freeze"]?.set(if (frozen) 1.0 else 0.0)
+        pluginProvider.grainsPlugin.inputs["freeze"]?.set(if (frozen) 1.0 else 0.0)
     }
     override fun setGrainsTrigger(trigger: Boolean) {
-        grainsPlugin.inputs["trigger"]?.set(if (trigger) 1.0 else 0.0)
+        pluginProvider.grainsPlugin.inputs["trigger"]?.set(if (trigger) 1.0 else 0.0)
     }
     
     private var _grainsMode: Int = 0 // 0=Granular (default)
     override fun setGrainsMode(mode: Int) {
         _grainsMode = mode
-        grainsPlugin.setMode(mode) // This will call CloudsUnit.setMode
+        pluginProvider.grainsPlugin.setMode(mode) // This will call CloudsUnit.setMode
     }
     
     override fun getGrainsPosition(): Float = _grainsPosition
@@ -1045,63 +1030,63 @@ class DspSynthEngine(
 
     override fun setWarpsAlgorithm(value: Float) {
         _warpsAlgorithm = value
-        warpsPlugin.setAlgorithm(value)
+        pluginProvider.warpsPlugin.setAlgorithm(value)
     }
     override fun setWarpsTimbre(value: Float) {
         _warpsTimbre = value
-        warpsPlugin.setTimbre(value)
+        pluginProvider.warpsPlugin.setTimbre(value)
     }
     override fun setWarpsLevel1(value: Float) {
         _warpsLevel1 = value
-        warpsPlugin.setLevel1(value)
+        pluginProvider.warpsPlugin.setLevel1(value)
     }
     override fun setWarpsLevel2(value: Float) {
         _warpsLevel2 = value
-        warpsPlugin.setLevel2(value)
+        pluginProvider.warpsPlugin.setLevel2(value)
     }
-    
+
     override fun setWarpsCarrierSource(source: Int) {
         _warpsCarrierSource = source
-        warpsPlugin.disconnectCarrier()
-        warpsPlugin.setCarrierSource(source)
-        
+        pluginProvider.warpsPlugin.disconnectCarrier()
+        pluginProvider.warpsPlugin.setCarrierSource(source)
+
         // Connect the new source to carrier input
-        getWarpsSourceOutput(source)?.first?.connect(warpsPlugin.carrierRouteInput)
-        
+        getWarpsSourceOutput(source)?.first?.connect(pluginProvider.warpsPlugin.carrierRouteInput)
+
         // Also connect to dry path for proper dry/wet mix
-        warpsPlugin.disconnectDry()
-        getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(warpsPlugin.dryInputLeft)
-        getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(warpsPlugin.dryInputRight)
+        pluginProvider.warpsPlugin.disconnectDry()
+        getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(pluginProvider.warpsPlugin.dryInputLeft)
+        getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(pluginProvider.warpsPlugin.dryInputRight)
     }
-    
+
     override fun setWarpsModulatorSource(source: Int) {
         _warpsModulatorSource = source
-        warpsPlugin.disconnectModulator()
-        warpsPlugin.setModulatorSource(source)
-        
+        pluginProvider.warpsPlugin.disconnectModulator()
+        pluginProvider.warpsPlugin.setModulatorSource(source)
+
         // Connect the new source to modulator input
-        getWarpsSourceOutput(source)?.second?.connect(warpsPlugin.modulatorRouteInput)
-        
+        getWarpsSourceOutput(source)?.second?.connect(pluginProvider.warpsPlugin.modulatorRouteInput)
+
         // Also update dry path
-        warpsPlugin.disconnectDry()
-        getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(warpsPlugin.dryInputLeft)
-        getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(warpsPlugin.dryInputRight)
+        pluginProvider.warpsPlugin.disconnectDry()
+        getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(pluginProvider.warpsPlugin.dryInputLeft)
+        getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(pluginProvider.warpsPlugin.dryInputRight)
     }
-    
+
     override fun setWarpsMix(value: Float) {
         _warpsMix = value
-        warpsPlugin.setMix(value)
+        pluginProvider.warpsPlugin.setMix(value)
     }
-    
+
     /**
      * Get audio outputs for a given WarpsSource ordinal.
      * Returns Pair<LeftOutput, RightOutput> for the source.
-     * 
+     *
      * For stereo sources (SYNTH, DRUMS, REPL), we return left output for the first
      * channel and right output for the second. This allows:
      * - Different sources on carrier/modulator: Normal stereo operation
      * - Same source on both: Carrier gets left, modulator gets right (stereo split)
-     * 
+     *
      * Sources:
      * - 0 = SYNTH: Main synth voices output (stereo)
      * - 1 = DRUMS: Drum machine output (stereo)
@@ -1110,8 +1095,8 @@ class DspSynthEngine(
     private fun getWarpsSourceOutput(source: Int): Pair<AudioOutput, AudioOutput>? {
         return when (source) {
             0 -> Pair(voiceSumLeft.output, voiceSumRight.output)  // SYNTH
-            1 -> drumPlugin.outputs["outputLeft"]?.let { left ->
-                drumPlugin.outputs["outputRight"]?.let { right -> Pair(left, right) }
+            1 -> pluginProvider.drumPlugin.outputs["outputLeft"]?.let { left ->
+                pluginProvider.drumPlugin.outputs["outputRight"]?.let { right -> Pair(left, right) }
             }  // DRUMS
             2 -> {
                 // REPL - voices 8-11 (third quad)

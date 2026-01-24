@@ -39,7 +39,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
@@ -56,27 +55,10 @@ import kotlin.math.log10
  */
 @Composable
 fun DebugBottomBar(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    debugFeature: DebugFeature,
 ) {
-    val viewModel: DebugViewModel = metroViewModel()
-    val state by viewModel.stateFlow.collectAsState()
-    
-    DebugBottomBarContent(
-        state = state,
-        actions = viewModel.actions,
-        modifier = modifier
-    )
-}
-
-/**
- * Stateless composable that renders the debug bar.
- */
-@Composable
-fun DebugBottomBarContent(
-    state: DebugUiState,
-    actions: DebugPanelActions,
-    modifier: Modifier = Modifier
-) {
+    val state by debugFeature.stateFlow.collectAsState()
     var isExpanded by remember { mutableStateOf(false) }
 
     val liquidState = LocalLiquidState.current
@@ -188,7 +170,7 @@ fun DebugBottomBarContent(
         if (isExpanded) {
             DebugLogsPanel(
                 logs = state.logs,
-                onClearLogs = actions.onClearLogs
+                onClearLogs = debugFeature.actions.onClearLogs
             )
         }
     }
@@ -275,9 +257,8 @@ fun DebugBottomBarPreview(
 
     LiquidPreviewContainerWithGradient(effects = effects) {
         Box(modifier = Modifier.fillMaxSize()) {
-            DebugBottomBarContent(
-                state = previewState,
-                actions = DebugPanelActions.EMPTY,
+            DebugBottomBar(
+                debugFeature = DebugViewModel.previewFeature(state = previewState),
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
