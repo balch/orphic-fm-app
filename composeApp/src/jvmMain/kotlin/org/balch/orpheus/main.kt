@@ -13,20 +13,24 @@ import org.jetbrains.compose.resources.painterResource
 import orpheus.composeapp.generated.resources.Res
 import orpheus.composeapp.generated.resources.icon
 
-fun main() = application {
-    val graph = remember { createGraphFactory<OrpheusGraph.Factory>().create() }
-    
-    // Wire up logging to UI
-    remember(graph) {
-        KmLogging.addLogger(graph.consoleLogger)
-    }
+fun main() {
+    System.setProperty("apple.awt.application.appearance", "system")
 
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = AppConfig.APP_DISPLAY_NAME,
-        state = rememberWindowState(width = 1280.dp, height = 800.dp),
-        icon = painterResource(Res.drawable.icon),
-    ) {
-        App(graph)
+    application {
+        val graph = remember { createGraphFactory<OrpheusGraph.Factory>().create() }
+
+        // Wire up logging to UI
+        remember(graph) {
+            KmLogging.addLogger(graph.consoleLogger)
+        }
+
+        Window(
+            onCloseRequest = ::exitApplication,
+            title = AppConfig.APP_DISPLAY_NAME,
+            state = rememberWindowState(width = 1280.dp, height = 800.dp),
+            icon = painterResource(Res.drawable.icon),
+        ) {
+            App(graph)
+        }
     }
 }
