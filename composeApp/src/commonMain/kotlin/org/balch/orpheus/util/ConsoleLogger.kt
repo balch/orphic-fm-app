@@ -57,7 +57,7 @@ class ConsoleLogger @Inject constructor() : Logger {
     }
 
     override fun debug(tag: String, msg: String) {
-        addToUi(msg, LogLevel.DEBUG)
+//        addToUi(msg, LogLevel.DEBUG)
     }
 
     override fun info(tag: String, msg: String) {

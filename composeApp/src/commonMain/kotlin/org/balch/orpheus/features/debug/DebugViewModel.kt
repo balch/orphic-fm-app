@@ -77,6 +77,8 @@ class DebugViewModel(
     }
 
     companion object {
+        const val POLL_INTERVAL_MS = 200L
+
         fun previewFeature(state: DebugUiState = DebugUiState(peak = 0.5f, cpuLoad = 12.5f)): DebugFeature =
             object : DebugFeature {
                 override val stateFlow: StateFlow<DebugUiState> = MutableStateFlow(state)

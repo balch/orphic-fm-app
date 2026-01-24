@@ -18,6 +18,7 @@ import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.features.debug.DebugViewModel.Companion.POLL_INTERVAL_MS
 import kotlin.math.pow
 
 /**
@@ -445,7 +446,7 @@ class DspSynthEngine(
                 val computedMaster = (voiceSum / 12f).coerceIn(0f, 1f)
                 _masterLevelFlow.value = maxOf(currentPeak.coerceIn(0f, 1f), computedMaster)
 
-                delay(33) // ~30fps
+                delay(POLL_INTERVAL_MS)
             }
         }
         log.debug { "Audio Engine Started" }
