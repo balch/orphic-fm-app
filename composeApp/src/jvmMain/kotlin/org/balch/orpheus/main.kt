@@ -1,9 +1,6 @@
 package org.balch.orpheus
 
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.painter.BitmapPainter
-import androidx.compose.ui.res.loadImageBitmap
-import androidx.compose.ui.res.useResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -12,6 +9,9 @@ import com.diamondedge.logging.KmLogging
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.config.AppConfig
 import org.balch.orpheus.di.OrpheusGraph
+import org.jetbrains.compose.resources.painterResource
+import orpheus.composeapp.generated.resources.Res
+import orpheus.composeapp.generated.resources.icon
 
 fun main() = application {
     val graph = remember { createGraphFactory<OrpheusGraph.Factory>().create() }
@@ -25,7 +25,7 @@ fun main() = application {
         onCloseRequest = ::exitApplication,
         title = AppConfig.APP_DISPLAY_NAME,
         state = rememberWindowState(width = 1280.dp, height = 800.dp),
-        icon = BitmapPainter(useResource("icon.png", ::loadImageBitmap))
+        icon = painterResource(Res.drawable.icon),
     ) {
         App(graph)
     }
