@@ -243,6 +243,7 @@ object OrpheusColors {
     val looperChestnut = Color(0xFFA0522D)       // Sienna/chestnut brown
     val looperBurnt = Color(0xFFCC5500)          // Burnt orange
     val looperAmber = Color(0xFFFFBF00)          // Warm amber glow
+    val looperGreen = Color(0xFF00FF88)          // Vibrant green for play
     val looperCoal = Color(0xFF3D2B1F)           // Dark coal brown for backgrounds
     val looperAsh = Color(0xFF4A3728)            // Ash brown surface
     

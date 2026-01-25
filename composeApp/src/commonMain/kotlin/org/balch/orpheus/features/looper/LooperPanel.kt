@@ -31,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -44,6 +46,7 @@ import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.compositeOver
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import kotlin.math.PI
 import kotlin.math.cos
@@ -53,7 +56,7 @@ import kotlin.math.sin
 // Fire Orange Looper Color Scheme
 private val LooperColor = OrpheusColors.looperFireOrange
 private val RecordColor = OrpheusColors.looperFlame
-private val PlayColor = OrpheusColors.looperAmber
+private val PlayColor = OrpheusColors.looperGreen
 
 @Composable
 fun LooperPanel(
@@ -66,10 +69,21 @@ fun LooperPanel(
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
 
+    val recordGlowAlpha by animateFloatAsState(if (state.isRecording) 1f else 0.2f)
+    val playGlowAlpha by animateFloatAsState(if (state.isPlaying) 1f else 0.2f)
+
+    val textColor by animateColorAsState(
+        targetValue = when {
+            state.isRecording -> RecordColor
+            state.isPlaying -> PlayColor
+            else -> OrpheusColors.greyText
+        }
+    )
+
     CollapsibleColumnPanel(
         title = "LOOP",
         color = LooperColor,
-        expandedTitle = "Circle Back",
+        expandedTitle = "Circular Buffer",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
@@ -84,13 +98,13 @@ fun LooperPanel(
                 .padding(8.dp),
             contentAlignment = Alignment.Center
         ) {
-            CircularLooperDisplay(state)
+            CircularLooperDisplay(state, recordGlowAlpha, playGlowAlpha)
 
             // Duration Text in center
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = if (state.isRecording) "REC" else if (state.isPlaying) "PLAY" else "IDLE",
-                    color = if (state.isRecording) RecordColor else if (state.isPlaying) PlayColor else OrpheusColors.greyText,
+                    color = textColor,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.labelSmall
@@ -120,6 +134,7 @@ fun LooperPanel(
                 label = "RECORD",
                 active = state.isRecording,
                 activeColor = RecordColor,
+                glowAlpha = recordGlowAlpha,
                 onClick = { actions.setRecord(!state.isRecording) },
             )
 
@@ -130,6 +145,7 @@ fun LooperPanel(
                 active = state.isPlaying,
                 activeColor = PlayColor,
                 enabled = state.loopDuration > 0,
+                glowAlpha = playGlowAlpha,
                 onClick = { actions.setPlay(!state.isPlaying) },
             )
 
@@ -146,15 +162,16 @@ fun LooperPanel(
 }
 
 @Composable
-fun CircularLooperDisplay(state: LooperUiState) {
+fun CircularLooperDisplay(
+    state: LooperUiState,
+    recordGlowAlpha: Float,
+    playGlowAlpha: Float
+) {
     val progress by animateFloatAsState(
         targetValue = state.position,
         animationSpec = if (state.position == 0f) tween(0) else tween(100, easing = LinearEasing)
     )
     
-    val recordGlowAlpha by animateFloatAsState(if (state.isRecording) 1f else 0.2f)
-    val playGlowAlpha by animateFloatAsState(if (state.isPlaying) 1f else 0.2f)
-
     Canvas(modifier = Modifier.fillMaxSize()) {
         val centerX = size.width / 2f
         val centerY = size.height / 2f
@@ -168,37 +185,69 @@ fun CircularLooperDisplay(state: LooperUiState) {
         )
         
         // Recording Track (Full circle if recording started) - chestnut brown
-        if (state.isRecording) {
+        // Use recordGlowAlpha for smooth fade
+        val arcSize = Size(radius * 2, radius * 2)
+        val arcTopLeft = Offset(centerX - radius, centerY - radius)
+        
+        val recordAlpha = (recordGlowAlpha - 0.2f) / 0.8f
+        if (recordAlpha > 0f) {
             drawArc(
-                color = OrpheusColors.looperChestnut.copy(alpha = 0.5f),
+                color = OrpheusColors.looperChestnut.copy(alpha = 0.5f * recordAlpha),
                 startAngle = -90f,
                 sweepAngle = 360f,
                 useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
                 style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
             )
         }
 
         // Progress Arc
-        if (state.isRecording || state.isPlaying) {
-            val color = if (state.isRecording) RecordColor else PlayColor
-            drawArc(
-                color = color,
-                startAngle = -90f,
-                sweepAngle = progress * 360f,
-                useCenter = false,
-                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
-            )
+        if (state.isRecording || state.isPlaying || recordAlpha > 0f || playGlowAlpha > 0.2f) {
+            val isActiveRecord = state.isRecording || recordAlpha > 0.01f
+            val color = if (isActiveRecord) RecordColor else PlayColor
+            val glowAlpha = if (isActiveRecord) recordAlpha else (playGlowAlpha - 0.2f) / 0.8f
             
-            // Glow effect at tip
-            val angle = (progress * 360f - 90f) * PI.toFloat() / 180f
-            val tipX = centerX + radius * cos(angle)
-            val tipY = centerY + radius * sin(angle)
-            
-            drawCircle(
-                color = color,
-                radius = 6.dp.toPx(),
-                center = androidx.compose.ui.geometry.Offset(tipX, tipY)
-            )
+            if (glowAlpha > 0f) {
+                // Glow effect for arc
+                drawArc(
+                    color = color.copy(alpha = glowAlpha * 0.3f),
+                    startAngle = -90f,
+                    sweepAngle = progress * 360f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round)
+                )
+
+                drawArc(
+                    color = color.copy(alpha = glowAlpha),
+                    startAngle = -90f,
+                    sweepAngle = progress * 360f,
+                    useCenter = false,
+                    topLeft = arcTopLeft,
+                    size = arcSize,
+                    style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+                )
+
+                // Glow effect at tip
+                val angle = (progress * 360f - 90f) * PI.toFloat() / 180f
+                val tipX = centerX + radius * cos(angle)
+                val tipY = centerY + radius * sin(angle)
+
+                // Outer tip glow
+                drawCircle(
+                    color = color.copy(alpha = glowAlpha * 0.4f),
+                    radius = 12.dp.toPx(),
+                    center = Offset(tipX, tipY)
+                )
+
+                drawCircle(
+                    color = color.copy(alpha = glowAlpha),
+                    radius = 6.dp.toPx(),
+                    center = Offset(tipX, tipY)
+                )
+            }
         }
     }
 }
@@ -210,10 +259,13 @@ private fun LooperActionButton(
     active: Boolean,
     activeColor: Color,
     enabled: Boolean = true,
+    glowAlpha: Float = 1f,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val backgroundColor by animateColorAsState(if (active) activeColor.copy(alpha = 0.25f) else if (enabled) OrpheusColors.looperAsh else OrpheusColors.looperCoal)
+    val baseColor = if (enabled) OrpheusColors.looperAsh else OrpheusColors.looperCoal
+    val activeBg = activeColor.copy(alpha = 0.25f).compositeOver(baseColor)
+    val backgroundColor by animateColorAsState(if (active) activeBg else baseColor)
     val tintColor by animateColorAsState(if (active) activeColor else if (enabled) OrpheusColors.looperEmber else OrpheusColors.looperBrown)
     
     Column(
@@ -223,7 +275,12 @@ private fun LooperActionButton(
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .shadow(if (active) 8.dp else 0.dp, CircleShape, ambientColor = activeColor, spotColor = activeColor)
+                .shadow(
+                    elevation = if (active || glowAlpha > 0.2f) (8 * (glowAlpha - 0.2f) / 0.8f).dp else 0.dp,
+                    shape = CircleShape,
+                    ambientColor = activeColor,
+                    spotColor = activeColor
+                )
                 .clip(CircleShape)
                 .background(backgroundColor)
                 .clickable(enabled = enabled) { onClick() },
