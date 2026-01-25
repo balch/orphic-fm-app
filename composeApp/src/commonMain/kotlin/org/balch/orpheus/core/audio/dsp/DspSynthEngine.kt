@@ -1095,14 +1095,18 @@ class DspSynthEngine(
      */
     private fun getWarpsSourceOutput(source: Int): Pair<AudioOutput, AudioOutput>? {
         return when (source) {
-            0 -> Pair(voiceSumLeft.output, voiceSumRight.output)  // SYNTH
+            0 -> pluginProvider.distortionPlugin.outputs["outputLeft"]?.let { left ->
+                pluginProvider.distortionPlugin.outputs["outputRight"]?.let { right -> Pair(left, right) }
+            } // SYNTH (Post-Distortion)
             1 -> pluginProvider.drumPlugin.outputs["outputLeft"]?.let { left ->
                 pluginProvider.drumPlugin.outputs["outputRight"]?.let { right -> Pair(left, right) }
             }  // DRUMS
             2 -> {
-                // REPL - voices 8-11 (third quad)
-                // For REPL we use the same voiceSum since REPL voices contribute there
                 Pair(voiceSumLeft.output, voiceSumRight.output)
+            }
+            3 -> {
+                // LFO - Dual Mono / Stereo A/B
+                Pair(pluginProvider.hyperLfo.outputA, pluginProvider.hyperLfo.outputB)
             }
             else -> null
         }

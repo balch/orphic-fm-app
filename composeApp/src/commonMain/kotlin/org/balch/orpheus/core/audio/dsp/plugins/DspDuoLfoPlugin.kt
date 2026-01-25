@@ -32,6 +32,8 @@ class DspDuoLfoPlugin(
     private val inputA = audioEngine.createPassThrough()
     private val inputB = audioEngine.createPassThrough()
     private val outputProxy = audioEngine.createPassThrough()
+    private val outputAProxy = audioEngine.createPassThrough()
+    private val outputBProxy = audioEngine.createPassThrough()
 
     // Feedback Modulation
     private val feedbackProxy = audioEngine.createPassThrough()
@@ -43,6 +45,8 @@ class DspDuoLfoPlugin(
     val frequencyB: AudioInput get() = inputB.input
     val feedbackInput: AudioInput get() = feedbackProxy.input // TOTAL FB input
     val output: AudioOutput get() = outputProxy.output
+    val outputA: AudioOutput get() = outputAProxy.output
+    val outputB: AudioOutput get() = outputBProxy.output
 
     // Internal Components - Square
     private val lfoASquare = audioEngine.createSquareOscillator()
@@ -87,7 +91,7 @@ class DspDuoLfoPlugin(
     private var _hyperLfoLink = false
 
     override val audioUnits: List<AudioUnit> = listOf(
-        inputA, inputB, outputProxy, feedbackProxy,
+        inputA, inputB, outputProxy, outputAProxy, outputBProxy, feedbackProxy,
         freqAModMixer, freqBModMixer,
         lfoASquare, lfoBSquare, lfoATriangle, lfoBTriangle,
         toUnipolarA, toUnipolarB, logicAnd,
@@ -186,6 +190,10 @@ class DspDuoLfoPlugin(
 
         // Initial Output: Triangle AND (MIN)
         triangleMin.output.connect(outputProxy.input)
+        
+        // Initial Separate Outputs
+        lfoATriangle.output.connect(outputAProxy.input)
+        lfoBTriangle.output.connect(outputBProxy.input)
     }
 
     /**
@@ -219,8 +227,14 @@ class DspDuoLfoPlugin(
 
     private fun updateOutput() {
         outputProxy.input.disconnectAll()
+        outputAProxy.input.disconnectAll()
+        outputBProxy.input.disconnectAll()
 
         if (isTriangleMode) {
+            // Raw outputs
+            lfoATriangle.output.connect(outputAProxy.input)
+            lfoBTriangle.output.connect(outputBProxy.input)
+
             // Triangle mode: AND = MIN, OR = MAX
             if (isAndMode) {
                 triangleMin.output.connect(outputProxy.input)
@@ -228,6 +242,11 @@ class DspDuoLfoPlugin(
                 triangleMax.output.connect(outputProxy.input)
             }
         } else {
+            // Raw outputs (Square) - use Direct Square or Bipolar?
+            // For Warps Source, we likely want the raw square wave (-1 to 1)
+            lfoASquare.output.connect(outputAProxy.input)
+            lfoBSquare.output.connect(outputBProxy.input)
+
             // Square mode: use AND/OR logic (with proper bipolar conversion)
             if (isAndMode) {
                 toBipolarAnd.output.connect(outputProxy.input)
