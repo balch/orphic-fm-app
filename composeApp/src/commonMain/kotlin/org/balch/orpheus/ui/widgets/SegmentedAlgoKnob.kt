@@ -19,10 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -33,6 +35,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.theme.darken
+import org.balch.orpheus.ui.theme.lighten
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -181,7 +185,7 @@ fun SegmentedAlgoKnob(
                     
                     // Segment Light
                     drawArc(
-                        color = color.copy(alpha = 0.2f + 0.8f * intensity),
+                        color = color.darken(.45f).copy(alpha = 0.2f + .8f * intensity),
                         startAngle = angle - 12f,
                         sweepAngle = 24f,
                         useCenter = false,
@@ -191,15 +195,15 @@ fun SegmentedAlgoKnob(
                     )
                     
                     // Drawing Icons at each segment position
-                    val iconRadius = radius * 0.85f
+                    val iconRadius = radius * 0.9f
                     val iconX = center.x + iconRadius * cos(rad)
                     val iconY = center.y + iconRadius * sin(rad)
-                    val iconSize = 14.dp.toPx()
+                    val iconSize = 12.dp.toPx()
                     
                     withTransform({
                         translate(iconX, iconY)
                     }) {
-                        drawIcon(i, color.copy(alpha = intensity), iconSize)
+                        drawIcon(i, color.lighten(), iconSize)
                     }
                 }
 
@@ -214,33 +218,43 @@ fun SegmentedAlgoKnob(
                     center = center.copy(y = center.y + 4.dp.toPx())
                 )
                 
-                // Knob Body
+                // Get active algorithm color for knob tinting
+                val activeIdx = (internalValue * (segmentCount - 1)).toInt().coerceIn(0, segmentCount - 1)
+                val activeColor = algoColors[activeIdx]
+
+                // Create smooth gradient with algorithm color sync
+                val shadowColor = OrpheusColors.almostBlack
+
+                // Knob Body with multi-stop gradient
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(OrpheusColors.panelSurface, OrpheusColors.almostBlack),
+                        0.2f to activeColor.darken().copy(alpha = 0.3f),
+                        .5f to activeColor.darken().copy(alpha = 0.6f),
+                        0.85f to shadowColor,
+                        1.0f to Color.Transparent,
                         center = center,
-                        radius = innerRadius
+                        radius = innerRadius,
+                        tileMode = TileMode.Clamp,
                     ),
                     radius = innerRadius,
-                    center = center
+                    center = center,
+                    blendMode = BlendMode.Plus
                 )
-                
-                // Knob Indicator
+
+                // Knob Indicator with active color
                 val indicatorLength = innerRadius * 0.7f
                 val endX = center.x + indicatorLength * cos(currentRad)
                 val endY = center.y + indicatorLength * sin(currentRad)
-                
+
                 drawLine(
-                    color = Color.White.copy(alpha = 0.9f),
+                    color = activeColor.copy(alpha = 0.95f),
                     start = center,
                     end = Offset(endX, endY),
                     strokeWidth = 5.dp.toPx(),
                     cap = StrokeCap.Round
                 )
-                
+
                 // Central status LED
-                val activeIdx = (internalValue * (segmentCount - 1)).toInt().coerceIn(0, segmentCount - 1)
-                val activeColor = algoColors[activeIdx]
                 
                 drawCircle(
                     color = activeColor,
@@ -248,8 +262,18 @@ fun SegmentedAlgoKnob(
                     center = center
                 )
                 drawCircle( // Glow
-                    color = activeColor.copy(alpha = 0.4f),
+                    color = activeColor.copy(alpha = 0.7f),
                     radius = innerRadius * 0.25f,
+                    center = center
+                )
+                drawCircle( // Glow
+                    color = activeColor.copy(alpha = 0.4f),
+                    radius = innerRadius * 0.55f,
+                    center = center
+                )
+                drawCircle( // Glow
+                    color = activeColor.copy(alpha = 0.2f),
+                    radius = innerRadius * 0.85f,
                     center = center
                 )
             }

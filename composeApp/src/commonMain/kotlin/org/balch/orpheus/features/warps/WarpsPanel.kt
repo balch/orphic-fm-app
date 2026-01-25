@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -60,7 +59,7 @@ fun WarpsPanel(
     CollapsibleColumnPanel(
         title = "WARP",
         color = panelColor,
-        expandedTitle = "Kris Kross",
+        expandedTitle = "X-MOD",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
@@ -68,12 +67,8 @@ fun WarpsPanel(
         showCollapsedHeader = showCollapsedHeader
     ) {
         Row(
-            modifier = Modifier
-                .padding(horizontal = 12.dp)
-                .requiredWidth(440.dp) // Match the expanded panel's minWidth
-                .height(200.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Carrier Section (Left)
             Column(
