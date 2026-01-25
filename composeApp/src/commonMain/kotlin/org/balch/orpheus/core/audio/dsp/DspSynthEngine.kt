@@ -1095,14 +1095,20 @@ class DspSynthEngine(
      */
     private fun getWarpsSourceOutput(source: Int): Pair<AudioOutput, AudioOutput>? {
         return when (source) {
-            0 -> pluginProvider.distortionPlugin.outputs["outputLeft"]?.let { left ->
-                pluginProvider.distortionPlugin.outputs["outputRight"]?.let { right -> Pair(left, right) }
+            0 -> {
+                Pair(voiceSumLeft.output, voiceSumRight.output)
             } // SYNTH (Post-Distortion)
             1 -> pluginProvider.drumPlugin.outputs["outputLeft"]?.let { left ->
-                pluginProvider.drumPlugin.outputs["outputRight"]?.let { right -> Pair(left, right) }
+                pluginProvider.drumPlugin.outputs["outputRight"]?.let { right ->
+                    Pair(left, right)
+                }
             }  // DRUMS
             2 -> {
-                Pair(voiceSumLeft.output, voiceSumRight.output)
+                pluginProvider.stereoPlugin.outputs["lineOutLeft"]?.let { left ->
+                    pluginProvider.stereoPlugin.outputs["lineOutRight"]?.let { right ->
+                        Pair(left,right)
+                    }
+                }
             }
             3 -> {
                 // LFO - Dual Mono / Stereo A/B
