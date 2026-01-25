@@ -1,14 +1,11 @@
 package org.balch.orpheus.features.looper
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
@@ -34,7 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -85,7 +80,7 @@ fun LooperPanel(
         // Central Looper Display
         Box(
             modifier = Modifier
-                .size(160.dp)
+                .size(140.dp)
                 .padding(8.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -116,8 +111,8 @@ fun LooperPanel(
 
         // Controls
         Row(
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top
         ) {
             // Record Button (Primary action)
             LooperActionButton(
@@ -126,7 +121,6 @@ fun LooperPanel(
                 active = state.isRecording,
                 activeColor = RecordColor,
                 onClick = { actions.setRecord(!state.isRecording) },
-                modifier = Modifier.scale(1.2f)
             )
 
             // Play Button
@@ -136,7 +130,7 @@ fun LooperPanel(
                 active = state.isPlaying,
                 activeColor = PlayColor,
                 enabled = state.loopDuration > 0,
-                onClick = { actions.setPlay(!state.isPlaying) }
+                onClick = { actions.setPlay(!state.isPlaying) },
             )
 
             // Clear Button
@@ -145,7 +139,7 @@ fun LooperPanel(
                 label = "CLEAR",
                 active = false,
                 activeColor = OrpheusColors.looperBurnt,
-                onClick = { actions.clear() }
+                onClick = { actions.clear() },
             )
         }
     }
@@ -219,35 +213,19 @@ private fun LooperActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
-    val pulseScale by if (active && activeColor == RecordColor) {
-        infiniteTransition.animateFloat(
-            initialValue = 1f,
-            targetValue = 1.1f,
-            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                animation = tween(600, easing = FastOutSlowInEasing),
-                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-            )
-        )
-    } else {
-        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(1f) }
-    }
-
     val backgroundColor by animateColorAsState(if (active) activeColor.copy(alpha = 0.25f) else if (enabled) OrpheusColors.looperAsh else OrpheusColors.looperCoal)
     val tintColor by animateColorAsState(if (active) activeColor else if (enabled) OrpheusColors.looperEmber else OrpheusColors.looperBrown)
     
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.width(60.dp)
+        modifier = modifier
     ) {
         Box(
             modifier = Modifier
-                .scale(pulseScale)
                 .size(48.dp)
                 .shadow(if (active) 8.dp else 0.dp, CircleShape, ambientColor = activeColor, spotColor = activeColor)
                 .clip(CircleShape)
                 .background(backgroundColor)
-                .then(if (active) Modifier.border(2.dp, activeColor, CircleShape) else Modifier)
                 .clickable(enabled = enabled) { onClick() },
             contentAlignment = Alignment.Center
         ) {
