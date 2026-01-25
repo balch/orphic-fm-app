@@ -9,7 +9,7 @@ import org.balch.orpheus.core.config.AppConfig
  */
 data object SoloAgentConfig : SynthControlAgentConfig {
     override val name = "SoloAgent"
-    override val evolutionIntervalMs = 12_000L  // Evolve every 15 seconds
+    override val evolutionIntervalMs = 9_000L
     override val throttleIntervalMs = 5_000L   // Minimum 5 seconds between actions
     override val finishOnLastEvolution = true  // Stop after completing all evolution prompts
 

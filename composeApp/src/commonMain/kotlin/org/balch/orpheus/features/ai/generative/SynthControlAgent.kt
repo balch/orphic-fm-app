@@ -261,7 +261,6 @@ class SynthControlAgent(
                         flow {
                             var evolutionIndex = 0
                             while (isActive) {
-                                delay(config.evolutionIntervalMs)
                                 // Check if we've completed all prompts and should finish
                                 if (evolutionIndex >= selectedMood.evolutionPrompts.size) {
                                     if (config.finishOnLastEvolution) {
@@ -276,6 +275,7 @@ class SynthControlAgent(
                                 }
                                 // Emit the current evolution prompt
                                 emit(selectedMood.evolutionPrompts[evolutionIndex++])
+                                delay(config.evolutionIntervalMs)
                             }
                         }
                     } else emptyFlow()
