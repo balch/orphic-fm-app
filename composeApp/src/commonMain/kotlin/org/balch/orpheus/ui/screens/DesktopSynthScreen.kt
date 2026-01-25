@@ -36,10 +36,14 @@ import org.balch.orpheus.features.grains.GrainsFeature
 import org.balch.orpheus.features.grains.GrainsViewModel
 import org.balch.orpheus.features.lfo.LfoFeature
 import org.balch.orpheus.features.lfo.LfoViewModel
+import org.balch.orpheus.features.looper.LooperFeature
+import org.balch.orpheus.features.looper.LooperViewModel
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.resonator.ResonatorFeature
+import org.balch.orpheus.features.resonator.ResonatorViewModel
 import org.balch.orpheus.features.tidal.LiveCodeFeature
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tweaks.CenterControlSection
@@ -82,6 +86,8 @@ fun DesktopSynthScreen(
     drumFeature: DrumFeature = DrumViewModel.feature(),
     drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
     warpsFeature: WarpsFeature = WarpsViewModel.feature(),
+    looperFeature: LooperFeature = LooperViewModel.feature(),
+    resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
     effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
     isDialogActive: Boolean = false,
     onDialogActiveChange: (Boolean) -> Unit,
@@ -126,6 +132,8 @@ fun DesktopSynthScreen(
                 drumFeature = drumFeature,
                 drumBeatsFeature = drumBeatsFeature,
                 warpsFeature = warpsFeature,
+                resonatorFeature = resonatorFeature,
+                looperFeature = looperFeature,
                 onDialogActiveChange = onDialogActiveChange,
             )
 
@@ -204,6 +212,8 @@ private fun DesktopSynthScreenPreview(
             drumFeature = DrumViewModel.previewFeature(),
             drumBeatsFeature = DrumBeatsViewModel.previewFeature(),
             warpsFeature = WarpsViewModel.previewFeature(),
+            resonatorFeature = ResonatorViewModel.previewFeature(),
+            looperFeature = LooperViewModel.previewFeature(),
             effects = effects,
             onDialogActiveChange = {},
             focusRequester = FocusRequester()

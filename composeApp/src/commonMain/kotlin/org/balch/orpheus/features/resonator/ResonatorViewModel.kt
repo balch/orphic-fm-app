@@ -228,4 +228,3 @@ class ResonatorViewModel(
             synthViewModel<ResonatorViewModel, ResonatorFeature>()
     }
 }
-
