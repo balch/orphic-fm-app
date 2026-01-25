@@ -141,7 +141,7 @@ fun HeaderPanel(
             feature = delayFeature,
             isExpanded = PanelId.DELAY.isExpanded(),
             onExpandedChange = { PanelId.DELAY.setExpanded(it) },
-            modifier = panelModifier(PanelId.DELAY.isExpanded(), weight = 1.25f)
+            modifier = panelModifier(PanelId.DELAY.isExpanded())
         )
         DistortionPanel(
             feature = distortionFeature,
