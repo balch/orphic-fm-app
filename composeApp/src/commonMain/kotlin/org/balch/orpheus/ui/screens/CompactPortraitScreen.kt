@@ -60,7 +60,7 @@ import org.balch.orpheus.features.resonator.ResonatorFeature
 import org.balch.orpheus.features.resonator.ResonatorPanel
 import org.balch.orpheus.features.resonator.ResonatorViewModel
 import org.balch.orpheus.features.tidal.LiveCodeFeature
-import org.balch.orpheus.features.tidal.LiveCodePanelLayout
+import org.balch.orpheus.features.tidal.LiveCodePanel
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tweaks.ModTweaksPanel
 import org.balch.orpheus.features.visualizations.VizFeature
@@ -245,7 +245,6 @@ private fun CompactPortraitScreenLayout(
                                 presetFeature = presetFeature,
                                 voiceFeature = voiceFeature,
                                 liveCodeFeature = liveCodeFeature,
-                                activeReplHighlights = activeReplHighlights,
                                 delayFeature = delayFeature,
                                 distortionFeature = distortionFeature,
                                 evoFeature = evoFeature,
@@ -322,7 +321,6 @@ private fun PanelContent(
     presetFeature: PresetsFeature,
     voiceFeature: VoicesFeature,
     liveCodeFeature: LiveCodeFeature,
-    activeReplHighlights: List<IntRange>,
     delayFeature: DelayFeature,
     distortionFeature: DistortionFeature,
     evoFeature: EvoFeature,
@@ -344,11 +342,8 @@ private fun PanelContent(
 
     when (panel) {
         CompactPanelType.REPL -> {
-            val state by liveCodeFeature.stateFlow.collectAsState()
-            LiveCodePanelLayout(
-                uiState = state,
-                actions = liveCodeFeature.actions,
-                activeHighlights = activeReplHighlights,
+            LiveCodePanel(
+                feature = liveCodeFeature,
                 modifier = panelModifier,
                 isExpanded = true,
                 showCollapsedHeader = false,
@@ -502,7 +497,6 @@ private fun PanelContentPreview() {
             presetFeature = PresetsViewModel.previewFeature(),
             voiceFeature = VoiceViewModel.previewFeature(),
             liveCodeFeature = LiveCodeViewModel.previewFeature(),
-            activeReplHighlights = emptyList(),
             delayFeature = DelayViewModel.previewFeature(),
             distortionFeature = DistortionViewModel.previewFeature(),
             evoFeature = EvoViewModel.previewFeature(),
