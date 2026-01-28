@@ -39,6 +39,13 @@ import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.SegmentedAlgoKnob
 
+private data class WarpsColors(
+    val panelColor: Color = OrpheusColors.warpsGreen,
+    val knobTrackColor: Color = OrpheusColors.warpsDarkGreen,
+    val knobProgressColor: Color = panelColor,
+    val knobColor: Color = OrpheusColors.warpsYellow,
+    val labelColor: Color = panelColor,
+)
 @Composable
 fun WarpsPanel(
     feature: WarpsFeature = WarpsViewModel.feature(),
@@ -47,18 +54,14 @@ fun WarpsPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true
 ) {
+    val warpsColors = remember { WarpsColors() }
+
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
 
-    val panelColor = OrpheusColors.warpsGreen
-    val knobTrackColor = OrpheusColors.warpsDarkGreen
-    val knobProgressColor = panelColor
-    val knobColor = OrpheusColors.warpsYellow
-    val labelColor = panelColor
-
     CollapsibleColumnPanel(
         title = "WARP",
-        color = panelColor,
+        color = warpsColors.panelColor,
         expandedTitle = "X-MOD",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
@@ -66,92 +69,111 @@ fun WarpsPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader
     ) {
-        Row(
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy((-20).dp)
         ) {
-            // Carrier Section (Left)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                SourceDropdown(
+                ChannelSourceWidget(
+                    controlId = "warps_carrier_level",
+                    label = "CARRIER",
+                    level = state.carrierLevel,
+                    onLevelChange = actions.setCarrierLevel,
                     selectedSource = state.carrierSource,
-                    onSourceSelected = actions.setCarrierSource,
-                    color = panelColor,
-                    label = "CARRIER"
+                    onSelectSource = actions.setCarrierSource,
+                    warpsColors = warpsColors,
                 )
-                RotaryKnob(
-                    value = state.carrierLevel,
-                    onValueChange = actions.setCarrierLevel,
-                    label = "DRIVE",
-                    size = 48.dp,
-                    trackColor = knobTrackColor,
-                    progressColor = knobProgressColor,
-                    knobColor = knobColor,
-                    labelColor = labelColor,
-                    controlId = "warps_carrier_level"
+
+                // Big Algo Knob (Center)
+                SegmentedAlgoKnob(
+                    modifier = Modifier.size(150.dp),
+                    value = state.algorithm,
+                    onValueChange = actions.setAlgorithm,
+                    controlId = "warps_algo"
+                )
+
+                ChannelSourceWidget(
+                    controlId = "warps_modulator_level",
+                    label = "MODULATOR",
+                    level = state.modulatorLevel,
+                    onLevelChange = actions.setModulatorLevel,
+                    selectedSource = state.modulatorSource,
+                    onSelectSource = actions.setModulatorSource,
+                    warpsColors = warpsColors,
                 )
             }
 
-            RotaryKnob(
-                modifier = Modifier.padding(top = 80.dp),
-                value = state.timbre,
-                onValueChange = actions.setTimbre,
-                label = "TIMBRE",
-                size = 42.dp,
-                trackColor = knobTrackColor,
-                progressColor = knobProgressColor,
-                knobColor = knobColor,
-                labelColor = labelColor,
-                controlId = "warps_timbre"
-            )
-
-            // Big Algo Knob (Center)
-            SegmentedAlgoKnob(
-                modifier = Modifier.size(150.dp),
-                value = state.algorithm,
-                onValueChange = actions.setAlgorithm,
-                controlId = "warps_algo"
-            )
-
-            RotaryKnob(
-                modifier = Modifier.padding(top = 80.dp),
-                value = state.mix,
-                onValueChange = actions.setMix,
-                label = "MIX",
-                size = 42.dp,
-                trackColor = knobTrackColor,
-                progressColor = knobProgressColor,
-                knobColor = knobColor,
-                labelColor = labelColor,
-                controlId = "warps_mix"
-            )
-
-            // Modulator Section (Right)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+            Row(
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                SourceDropdown(
-                    selectedSource = state.modulatorSource,
-                    onSourceSelected = actions.setModulatorSource,
-                    color = panelColor,
-                    label = "MODULATOR"
-                )
                 RotaryKnob(
-                    value = state.modulatorLevel,
-                    onValueChange = actions.setModulatorLevel,
-                    label = "DRIVE",
-                    size = 48.dp,
-                    trackColor = knobTrackColor,
-                    progressColor = knobProgressColor,
-                    knobColor = knobColor,
-                    labelColor = labelColor,
-                    controlId = "warps_modulator_level"
+                    modifier = Modifier.padding(end = 44.dp),
+                    value = state.timbre,
+                    onValueChange = actions.setTimbre,
+                    label = "TIMBRE",
+                    size = 42.dp,
+                    trackColor = warpsColors.knobTrackColor,
+                    progressColor = warpsColors.knobProgressColor,
+                    knobColor = warpsColors.knobColor,
+                    labelColor = warpsColors.labelColor,
+                    controlId = "warps_timbre"
+                )
+
+                RotaryKnob(
+                    modifier = Modifier.padding(start = 44.dp),
+                    value = state.mix,
+                    onValueChange = actions.setMix,
+                    label = "MIX",
+                    size = 42.dp,
+                    trackColor = warpsColors.knobTrackColor,
+                    progressColor = warpsColors.knobProgressColor,
+                    knobColor = warpsColors.knobColor,
+                    labelColor = warpsColors.labelColor,
+                    controlId = "warps_mix"
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ChannelSourceWidget(
+    controlId: String,
+    label: String,
+    level: Float,
+    onLevelChange: (Float) -> Unit,
+    selectedSource: WarpsSource,
+    onSelectSource: (WarpsSource) -> Unit,
+    warpsColors: WarpsColors,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        SourceDropdown(
+            selectedSource = selectedSource,
+            onSourceSelected = onSelectSource,
+            color = warpsColors.panelColor,
+            label = label
+        )
+        RotaryKnob(
+            value = level,
+            onValueChange = onLevelChange,
+            label = "DRIVE",
+            size = 48.dp,
+            trackColor = warpsColors.knobTrackColor,
+            progressColor = warpsColors.knobProgressColor,
+            knobColor = warpsColors.knobColor,
+            labelColor = warpsColors.labelColor,
+            controlId = controlId
+        )
     }
 }
 
