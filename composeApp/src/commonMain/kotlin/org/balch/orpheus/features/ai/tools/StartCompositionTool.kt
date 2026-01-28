@@ -70,14 +70,15 @@ class StartCompositionTool @Inject constructor(
     resultSerializer = StartCompositionResult.serializer(),
     name = "start_composition",
     description = """
-        Start a musical composition or jam session. Use this tool when the user wants to:
-        - Create a new song or composition
-        - Start jamming or improvising
-        - Have background ambient/drone music
-        - Hear something specific played on the synth
+        IMMEDIATELY use this tool when the user wants to:
+        - JAM or improvise (\"let's jam\", \"jam with me\", \"start jamming\", \"improvise something\")
+        - CREATE A SONG (\"create a song\", \"compose something\", \"write a song\", \"make music\")
+        - PLAY MUSIC (\"play something\", \"play me a song\", \"I want to hear music\")
+        - START A DRONE (\"start a drone\", \"background music\", \"ambient atmosphere\")
+        - HEAR A SPECIFIC STYLE (\"play something like X\", \"create something atmospheric\")
         
-        This will switch to Dashboard mode and start the AI composer.
-        Choose the appropriate action based on user intent.
+        This switches to Dashboard mode and launches the Solo AI composer to create full compositions.
+        DO NOT use REPL or manual synth controls when the user asks for jamming or full compositions.
     """.trimIndent()
 ) {
     private val log = logging("StartCompositionTool")
