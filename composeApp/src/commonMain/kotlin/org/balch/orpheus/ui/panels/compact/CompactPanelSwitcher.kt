@@ -33,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -106,7 +105,6 @@ fun CompactPanelSwitcher(
 
         // Navigation header with arrows and title
         PanelNavigationHeader(
-            panelName = selectedPanel.displayName,
             panelColor = selectedPanel.color,
             canGoLeft = currentIndex > 0,
             canGoRight = currentIndex < panels.size - 1,
@@ -130,7 +128,6 @@ fun CompactPanelSwitcher(
  */
 @Composable
 private fun PanelNavigationHeader(
-    panelName: String,
     panelColor: Color,
     canGoLeft: Boolean,
     canGoRight: Boolean,
@@ -157,13 +154,6 @@ private fun PanelNavigationHeader(
             onClick = onLeftClick,
             isLeft = true,
             color = panelColor
-        )
-
-        Text(
-            text = panelName.uppercase(),
-            style = MaterialTheme.typography.titleMedium,
-            color = panelColor,
-            fontWeight = FontWeight.ExtraBold
         )
 
         // Right arrow
@@ -251,7 +241,6 @@ private fun CompactPanelSwitcherPreview() {
 private fun PanelNavigationHeaderPreview() {
     OrpheusTheme {
         PanelNavigationHeader(
-            panelName = "Delay",
             panelColor = OrpheusColors.warmGlow,
             canGoLeft = true,
             canGoRight = true,

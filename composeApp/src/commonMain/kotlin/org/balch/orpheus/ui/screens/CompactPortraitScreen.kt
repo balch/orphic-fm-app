@@ -21,13 +21,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
-import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.delay
@@ -84,7 +81,6 @@ import org.balch.orpheus.ui.panels.compact.CompactPortraitVoicePads
 import org.balch.orpheus.ui.panels.compact.CompactStringPanel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.DraggableDivider
 import org.balch.orpheus.ui.widgets.VizBackground
 
@@ -101,9 +97,19 @@ import org.balch.orpheus.ui.widgets.VizBackground
 @Composable
 fun CompactPortraitScreen(
     modifier: Modifier = Modifier,
-    liveCodeViewModel: LiveCodeViewModel = metroViewModel(),
-    voiceViewModel: VoiceViewModel = metroViewModel(),
-    drumViewModel: DrumViewModel = metroViewModel(),
+    liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
+    presetFeature: PresetsFeature = PresetsViewModel.feature(),
+    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
+    distortionFeature: DistortionFeature = DistortionViewModel.feature(),
+    delayFeature: DelayFeature = DelayViewModel.feature(),
+    evoFeature: EvoFeature = EvoViewModel.feature(),
+    lfoFeature: LfoFeature = LfoViewModel.feature(),
+    vizFeature: VizFeature = VizViewModel.feature(),
+    drumFeature: DrumFeature = DrumViewModel.feature(),
+    grainsFeature: GrainsFeature = GrainsViewModel.feature(),
+    drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
+    resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
+    warpsFeature: WarpsFeature = WarpsViewModel.feature(),
 ) {
 
     // Track active highlight ranges for token highlighting (Map of unique ID to range)
@@ -111,12 +117,9 @@ fun CompactPortraitScreen(
     var highlightIdCounter by remember { mutableStateOf(0L) }
     val scope = rememberCoroutineScope()
 
-    // Derive active highlights from the map for the transformer
-    val activeHighlights = activeHighlightMap.values.toList()
-
     // Subscribe to trigger events for token highlighting
-    LaunchedEffect(liveCodeViewModel) {
-        liveCodeViewModel.triggers.collect { triggerEvent ->
+    LaunchedEffect(liveCodeFeature) {
+        liveCodeFeature.triggers.collect { triggerEvent ->
             // Create unique IDs for each new highlight
             val newHighlights = triggerEvent.locations.associate { loc ->
                 val id = highlightIdCounter++
@@ -142,46 +145,6 @@ fun CompactPortraitScreen(
         focusRequester.requestFocus()
     }
 
-    CompactPortraitScreenLayout(
-        modifier = modifier,
-        liquidState = liquidState,
-        effects = effects,
-        liveCodeFeature = liveCodeViewModel,
-        activeReplHighlights = activeHighlights,
-        focusRequester = focusRequester,
-        onKeyEvent = { event ->
-            SynthKeyboardHandler.handleKeyEvent(
-                keyEvent = event,
-                voiceFeature = voiceViewModel,
-                drumFeature = drumViewModel,
-                isDialogActive = false
-            )
-        }
-    )
-}
-
-@Composable
-private fun CompactPortraitScreenLayout(
-    modifier: Modifier = Modifier,
-    presetFeature: PresetsFeature = PresetsViewModel.feature(),
-    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
-    distortionFeature: DistortionFeature = DistortionViewModel.feature(),
-    liquidState: LiquidState,
-    effects: VisualizationLiquidEffects,
-    liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
-    activeReplHighlights: List<IntRange> = emptyList(),
-    delayFeature: DelayFeature = DelayViewModel.feature(),
-    evoFeature: EvoFeature = EvoViewModel.feature(),
-    lfoFeature: LfoFeature = LfoViewModel.feature(),
-    vizFeature: VizFeature = VizViewModel.feature(),
-    drumFeature: DrumFeature = DrumViewModel.feature(),
-    grainsFeature: GrainsFeature = GrainsViewModel.feature(),
-    drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
-    resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
-    warpsFeature: WarpsFeature = WarpsViewModel.feature(),
-    focusRequester: FocusRequester = remember { FocusRequester() },
-    onKeyEvent: (KeyEvent) -> Boolean = { false },
-) {
     // Request focus for keyboard input
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -205,7 +168,14 @@ private fun CompactPortraitScreenLayout(
             .fillMaxSize()
             .focusRequester(focusRequester)
             .focusable()
-            .onPreviewKeyEvent { event -> onKeyEvent(event) }
+            .onPreviewKeyEvent { event ->
+                SynthKeyboardHandler.handleKeyEvent(
+                    keyEvent = event,
+                    voiceFeature = voiceFeature,
+                    drumFeature = drumFeature,
+                    isDialogActive = false
+                )
+            }
             .then(
                 Modifier.liquefiable(liquidState)
             )
@@ -465,26 +435,21 @@ private fun PanelContent(
 @Composable
 private fun CompactPortraitLayoutPreview() {
     LiquidPreviewContainerWithGradient() {
-        val liquidState = LocalLiquidState.current
-        if (liquidState != null) {
-            CompactPortraitScreenLayout(
-                presetFeature = PresetsViewModel.previewFeature(),
-                voiceFeature = VoiceViewModel.previewFeature(),
-                distortionFeature = DistortionViewModel.previewFeature(),
-                liquidState = liquidState,
-                effects = VisualizationLiquidEffects.Default,
-                liveCodeFeature = LiveCodeViewModel.previewFeature(),
-                delayFeature = DelayViewModel.previewFeature(),
-                evoFeature = EvoViewModel.previewFeature(),
-                lfoFeature = LfoViewModel.previewFeature(),
-                vizFeature = VizViewModel.previewFeature(),
-                grainsFeature = GrainsViewModel.previewFeature(),
-                drumFeature = DrumViewModel.previewFeature(),
-                drumBeatsFeature = DrumBeatsViewModel.previewFeature(),
-                resonatorFeature = ResonatorViewModel.previewFeature(),
-                warpsFeature = WarpsViewModel.previewFeature(),
-            )
-        }
+        CompactPortraitScreen(
+            presetFeature = PresetsViewModel.previewFeature(),
+            voiceFeature = VoiceViewModel.previewFeature(),
+            distortionFeature = DistortionViewModel.previewFeature(),
+            liveCodeFeature = LiveCodeViewModel.previewFeature(),
+            delayFeature = DelayViewModel.previewFeature(),
+            evoFeature = EvoViewModel.previewFeature(),
+            lfoFeature = LfoViewModel.previewFeature(),
+            vizFeature = VizViewModel.previewFeature(),
+            grainsFeature = GrainsViewModel.previewFeature(),
+            drumFeature = DrumViewModel.previewFeature(),
+            drumBeatsFeature = DrumBeatsViewModel.previewFeature(),
+            resonatorFeature = ResonatorViewModel.previewFeature(),
+            warpsFeature = WarpsViewModel.previewFeature(),
+        )
     }
 }
 
