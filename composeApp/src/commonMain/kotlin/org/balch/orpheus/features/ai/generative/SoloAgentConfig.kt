@@ -116,6 +116,53 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - Wait 500ms after lowering mix, then change mode, then slowly ramp MIX back up.
         - Balance bright resonator tones with deep QUAD_PITCH_3 bass to avoid "thin" piercing sounds.
         
+        ### DRUMS (Two Independent Systems)
+        Use the `drums_control` tool to add rhythmic foundation and percussive texture.
+        
+        **808 DRUMS - Analog-Style Synthesis:**
+        Three independently tunable drum voices you can trigger manually:
+        - Bass Drum (BD): DRUM_BD_FREQ (0.2-0.4 for kick), DRUM_BD_TONE, DRUM_BD_DECAY, DRUM_BD_AFM, DRUM_BD_SFM
+        - Snare Drum (SD): DRUM_SD_FREQ (0.4-0.6), DRUM_SD_TONE, DRUM_SD_DECAY, DRUM_SD_SNAPPY
+        - Hi-Hat (HH): DRUM_HH_FREQ (0.6-0.8), DRUM_HH_TONE, DRUM_HH_DECAY, DRUM_HH_NOISY
+        - Triggers: DRUM_BD_TRIGGER, DRUM_SD_TRIGGER, DRUM_HH_TRIGGER (1.0=trigger, 0.0=release)
+        
+        Use 808 drums for:
+        - Manual, rhythmic punctuation in ambient pieces
+        - Sound design (tune them low/high for tonal percussion)
+        - One-shot hits to accent emotional moments
+        
+        **DRUM BEATS - Algorithmic Pattern Generator:**
+        Autonomous beat sequencer with two modes:
+        - BEATS_RUN: 1.0=start sequencer, 0.0=stop
+        - BEATS_BPM: Tempo (maps 0.0-1.0 → 60-200 BPM, 0.5 ≈ 130 BPM)
+        - BEATS_X, BEATS_Y: Morph position in pattern space (0.0-1.0)
+        - BEATS_DENSITY_1/2/3: Kick/snare/hi-hat activity (0.0=sparse, 1.0=dense)
+        - BEATS_MODE: 0.0=DRUMS (morphing patterns), 1.0=EUCLIDEAN (polyrhythms)
+        - BEATS_SWING: Groove (0.0=straight, 0.3-0.5=classic swing)
+        - BEATS_RANDOMNESS: Variation (0.0=locked, 0.1-0.3=humanized, 0.5+=chaotic)
+        - BEATS_MIX: Dry/wet (0.0=off, 0.7=present, 1.0=dominant)
+        
+        EUCLIDEAN MODE extras:
+        - BEATS_EUCLIDEAN_LENGTH_1/2/3: Pattern lengths (0.0-1.0 → 1-32 steps)
+        - Creates mathematically perfect beat distributions
+        - Different lengths = polyrhythmic patterns (e.g., kick=16, snare=12, hh=9)
+        
+        **WHEN TO USE DRUMS:**
+        ✓ Use for driving, rhythmic pieces (Urban Longing, Menacing Drive, Confrontational Weight)
+        ✓ Use sparingly for ambient/atmospheric pieces - drums can dominate!
+        ✓ Start beats AFTER establishing tonal foundation (turn 2-3, not turn 1)
+        ✓ For cinematic moods, keep BEATS_MIX low (0.2-0.4) for subtle pulse
+        ✗ Don't use for pure ambient/drone pieces (Submarine Resonances, Celestial Grief)
+        ✗ Don't start beats on turn 1 - establish melody/harmony first!
+        
+        **DRUM INTEGRATION TIPS:**
+        - Tune 808 drums to match your key (BD can be tonal bass!)
+        - Lower BEATS_DENSITY when using REPL melodies (0.2-0.4) to avoid clutter
+        - Use BEATS_X/Y morphing to keep patterns evolving
+        - Combine 808 triggers with BEATS sequencer for layered percussion
+        - Increase BEATS_RANDOMNESS during chaotic/breakdown sections
+        - Set BEATS_SWING to 0.4-0.5 for funky, human feel
+        
         REPL - YOUR LEAD VOICE:
         Use repl_execute for melodic solos and patterns.
         CRITICAL: Use standard Tidal note format:

@@ -65,6 +65,15 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         The drone should be a subtle backing layer, NOT the main sound.
         ALWAYS set QUAD_VOLUME_3 between 0.5 and 0.7 to keep drone volume lower than main voices.
         
+        ## DRUMS (Generally Not Used in Drone Mode)
+        The `drums_control` tool is available but typically NOT used for pure ambient drones.
+        However, you can use 808 drums sparingly for:
+        - Tonal percussion (tune DRUM_BD_FREQ very low for sub-bass rumble)
+        - Rare, spaced-out textural hits (one kick every 30 seconds for emphasis)
+        - Sound design experiments (highly processed, reverberant hits)
+        
+        AVOID using BEATS sequencer in drone mode - it breaks the ambient flow.
+        
         ## REPL ACTIONS
         Use REPL actions if you want to add note patterns.
         Example: "d5 $ quadhold:3 0.8" to sustain the drone voices (Quad 3 = Voices 9-12).
