@@ -74,6 +74,33 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         
         AVOID using BEATS sequencer in drone mode - it breaks the ambient flow.
         
+        MATRIX (Warps Meta-Modulator) - TEXTURAL PROCESSING:
+        Cross-modulation for evolving, otherworldly drone textures:
+        - MATRIX_ALGORITHM: Choose processing style (0.0-0.875 in steps of 0.125):
+          * 0.000-0.124: Crossfade - Gentle blend between drone layers
+          * 0.125-0.249: Cross-folding - Subtle harmonic enrichment
+          * 0.625-0.749: Vocoder - Spectral transfer for whispered textures
+          * 0.750-0.874: Chebyshev - Warm waveshaping
+          * 0.875-1.000: Frequency shifter - Slow inharmonic drifts
+        - MATRIX_TIMBRE: Tonal character (0-1)
+        - MATRIX_CARRIER_SOURCE: 0=Synth, 0.5=Drums, 1=REPL
+        - MATRIX_MODULATOR_SOURCE: 0=Synth, 0.5=Drums, 1=REPL
+        - MATRIX_MIX: Blend (0=bypass, keep LOW for drones: 0.1-0.3)
+        
+        MATRIX DRONE RECIPES:
+        1. **Harmonic Enhancement** (Cross-folding):
+           - MATRIX_ALGORITHM: 0.15, both sources = Synth, MATRIX_MIX: 0.2
+           - Result: Rich, organ-like overtones
+        2. **Spectral Whispers** (Vocoder):
+           - MATRIX_ALGORITHM: 0.65, Carrier=Synth, Modulator=Synth
+           - Add slow REPL pattern, MATRIX_MIX: 0.3
+           - Result: Formant-filtered, vocal-like drone
+        3. **Alien Drift** (Freq Shifter):
+           - MATRIX_ALGORITHM: 0.9, MATRIX_TIMBRE: 0.2-0.4 (slow shift)
+           - Result: Slowly drifting inharmonic partials, submarine-like
+        
+        ⚠️ MATRIX IN DRONES: Keep MATRIX_MIX low (0.1-0.3)! Heavy processing breaks the ambient flow.
+        
         ## REPL ACTIONS
         Use REPL actions if you want to add note patterns.
         Example: "d5 $ quadhold:3 0.8" to sustain the drone voices (Quad 3 = Voices 9-12).

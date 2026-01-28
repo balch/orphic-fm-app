@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
+import ai.koog.agents.core.tools.annotations.LLMDescription
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -11,7 +12,50 @@ import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 
 @Serializable
-data class SynthControlArgs(val controlId: String, val value: Float)
+data class SynthControlArgs(
+    @property:LLMDescription("""
+        Control ID for the synth parameter. Valid controls include:
+        
+        GLOBAL: VIBRATO, DRIVE, DISTORTION_MIX, VOICE_COUPLING, TOTAL_FEEDBACK
+        
+        VOICES (1-8): VOICE_TUNE_1..8, VOICE_FM_DEPTH_1..8, VOICE_ENV_SPEED_1..8
+        
+        QUADS: QUAD_PITCH_1..3, QUAD_HOLD_1..3, QUAD_VOLUME_1..3
+        
+        PAIRS: DUO_MOD_SOURCE_1..4, PAIR_SHARPNESS_1..4
+        
+        LFO: HYPER_LFO_A, HYPER_LFO_B, HYPER_LFO_MODE, HYPER_LFO_LINK
+        
+        DELAY: DELAY_TIME_1/2, DELAY_MOD_1/2, DELAY_FEEDBACK, DELAY_MIX, DELAY_MOD_SOURCE, DELAY_LFO_WAVEFORM
+        
+        RESONATOR: RESONATOR_MODE, RESONATOR_STRUCTURE, RESONATOR_BRIGHTNESS, RESONATOR_DAMPING, RESONATOR_POSITION, RESONATOR_MIX
+        
+        MATRIX (Warps Cross-Modulation):
+        - MATRIX_ALGORITHM: 0.0-0.875 in 0.125 steps (Crossfade, Fold, Ring Mod, XOR, Comparator, Vocoder, Chebyshev, Freq Shift)
+        - MATRIX_TIMBRE: Algorithm-specific tone (0-1)
+        - MATRIX_CARRIER_LEVEL, MATRIX_MODULATOR_LEVEL: Input volumes (0-1)
+        - MATRIX_CARRIER_SOURCE, MATRIX_MODULATOR_SOURCE: Audio routing (0=Synth, 0.5=Drums, 1=REPL)
+        - MATRIX_MIX: Dry/wet blend (0=bypass, 1=fully processed)
+        
+        BENDER: Special pitch bend control (-1.0 to +1.0)
+        
+        Use uppercase names (e.g., MATRIX_ALGORITHM, VOICE_TUNE_1).
+    """)
+    val controlId: String,
+    
+    @property:LLMDescription("""
+        Value for the control parameter (0.0 to 1.0, except BENDER which uses -1.0 to +1.0).
+        
+        Special cases:
+        - MATRIX_ALGORITHM: 0.0=Crossfade, 0.125=Fold, 0.25=RingMod, 0.375=XOR, 0.5=Comparator, 0.625=Vocoder, 0.75=Chebyshev, 0.875=FreqShift
+        - MATRIX_*_SOURCE: 0=Synth, 0.5=Drums, 1=REPL patterns
+        - DUO_MOD_SOURCE: 0=VoiceFM, 0.5=Off, 1=LFO
+        - HYPER_LFO_MODE: 0=AND, 0.5=OFF, 1=OR
+        - RESONATOR_MODE: 0=Modal (bell), 0.5=String, 1=Sympathetic (sitar)
+        - BENDER: -1=full down, 0=center, +1=full up
+    """)
+    val value: Float
+)
 
 @Serializable
 data class SynthControlResult(val success: Boolean, val message: String)

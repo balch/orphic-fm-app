@@ -163,6 +163,72 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - Increase BEATS_RANDOMNESS during chaotic/breakdown sections
         - Set BEATS_SWING to 0.4-0.5 for funky, human feel
         
+        ### MATRIX (Warps Meta-Modulator) - EXPERIMENTAL SOUND DESIGN
+        Cross-modulates carrier and modulator signals using 8 algorithms. Perfect for creating WEIRD, experimental patterns!
+        
+        **MATRIX CONTROLS:**
+        - MATRIX_ALGORITHM: Selects algorithm (0.0-0.875 in steps of 0.125):
+          * 0.000-0.124: Crossfade - Smooth blend between sources
+          * 0.125-0.249: Cross-folding - Wave folding creates rich harmonics
+          * 0.250-0.374: Diode ring mod - Classic harsh metallic textures
+          * 0.375-0.499: XOR (digital destroyer) - Bitcrushed chaos
+          * 0.500-0.624: Comparator - Rhythmic gate patterns from audio
+          * 0.625-0.749: Vocoder - Spectral transfer (drums "speak" through synth!)
+          * 0.750-0.874: Chebyshev - Smooth waveshaping distortion
+          * 0.875-1.000: Frequency shifter - Inharmonic, alien tones
+        - MATRIX_TIMBRE: Algorithm-specific tone shaping (0-1)
+        - MATRIX_CARRIER_LEVEL: Carrier input volume (0-1)
+        - MATRIX_MODULATOR_LEVEL: Modulator input volume (0-1)
+        - MATRIX_CARRIER_SOURCE: Carrier audio (0=Synth, 0.5=Drums, 1=REPL)
+        - MATRIX_MODULATOR_SOURCE: Modulator audio (0=Synth, 0.5=Drums, 1=REPL)
+        - MATRIX_MIX: Dry/wet blend (0=bypass, 1=fully processed)
+        
+        **CREATIVE MATRIX RECIPES (WEIRD PATTERNS):**
+        1. **Drums Through Synth Voice** (Vocoder):
+           - MATRIX_ALGORITHM: 0.65 (Vocoder)
+           - MATRIX_CARRIER_SOURCE: 0.0 (Synth)
+           - MATRIX_MODULATOR_SOURCE: 0.5 (Drums)
+           - Result: Synth tones take on the rhythm and timbre of drum hits!
+           
+        2. **REPL Patterns Destroying Drums** (XOR):
+           - MATRIX_ALGORITHM: 0.4 (XOR digital destroyer)
+           - MATRIX_CARRIER_SOURCE: 0.5 (Drums)
+           - MATRIX_MODULATOR_SOURCE: 1.0 (REPL)
+           - Result: Bitcrushed, glitchy fusion of drum patterns and REPL sequences
+           
+        3. **Metallic Ring Mod Chaos** (Ring Mod):
+           - MATRIX_ALGORITHM: 0.3 (Diode ring mod)
+           - MATRIX_CARRIER_SOURCE: 0.0 (Synth)
+           - MATRIX_MODULATOR_SOURCE: 0.5 (Drums)
+           - MATRIX_TIMBRE: 0.7 (more chaotic)
+           - Result: Harsh, metallic sidebands from synth × drums
+           
+        4. **Alien Frequency Shifting** (Freq Shifter):
+           - MATRIX_ALGORITHM: 0.9 (Frequency shifter)
+           - MATRIX_CARRIER_SOURCE: 1.0 (REPL melodies)
+           - MATRIX_MODULATOR_SOURCE: 0.0 (Synth)
+           - MATRIX_TIMBRE: Shift amount (0.3-0.7 for weird, 0.5 for bell-like)
+           - Result: Inharmonic, extraterrestrial tonal shifts
+           
+        5. **Rhythmic Gate Patterns** (Comparator):
+           - MATRIX_ALGORITHM: 0.55 (Comparator)
+           - MATRIX_CARRIER_SOURCE: 0.0 (Synth pads)
+           - MATRIX_MODULATOR_SOURCE: 0.5 (Drums)
+           - Result: Drums chop the synth into rhythmic gates
+           
+        **MATRIX WORKFLOW:**
+        1. Start with MATRIX_MIX at 0.0 (bypassed)
+        2. Set your sources (carrier + modulator) and algorithm
+        3. Slowly ramp MATRIX_MIX to 0.3-0.6 to blend in the effect
+        4. Adjust MATRIX_TIMBRE to fine-tune the algorithm's character
+        5. Automate MATRIX_ALGORITHM changes during evolution for dramatic shifts!
+        
+        ⚠️ MATRIX TIPS:
+        - Ring mod + Vocoder work best with active signals from both sources
+        - Start beats BEFORE engaging Matrix to have rhythmic modulation material
+        - Lower MATRIX_MIX during quiet sections to avoid noise floor
+        - Combine with RESONATOR for metallic, processed textures
+        
         REPL - YOUR LEAD VOICE:
         Use repl_execute for melodic solos and patterns.
         CRITICAL: Use standard Tidal note format:
