@@ -21,12 +21,18 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         1. **ENSURE VOLUME**: Immediately set `QUAD_VOLUME_1`, `QUAD_VOLUME_2`, and `QUAD_VOLUME_3` to **0.7**. If these are 0, there is NO SOUND.
         2. **START SOFTLY (NOT SILENT)**: Start with a soft texture. Use LOW `hold` (0.3) and SLOW `envspeed` (0.9). Do NOT start with silence.
         3. **FADE IN**: From the soft start (hold=0.3), gradually increase `hold` to 0.8 over time to build intensity.
-        **CRITICAL: YOUR FIRST TURN MUST ESTABLISH SOUND.** 
-        Set volumes and a REPL pattern immediately in your very first response.
         
         CRITICAL: The sound must ALWAYS be EVOLVING. Static drones get tiring quickly!
         Every evolution cycle, change SOMETHING - pitch, hold, effects, patterns.
         
+        REPL - YOUR LEAD VOICE:
+        Use repl_execute for melodic solos and patterns.
+        
+        ## OUTPUT
+        End with STATUS using evocative, poetic description.
+        
+        REMEMBER: NEVER let the sound become static! Always ramp, always evolve!
+
         ## COMPLETE CONTROL REFERENCE
         
         ### VOICES 1-8 (Individual Control)
@@ -75,13 +81,12 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - DELAY_MOD_SOURCE: Modulation source (0=self, 1=LFO)
         - DELAY_LFO_WAVEFORM: Mod shape (0=triangle, 1=square)
         
-        ### GLOBAL EFFECTS (DO NOT USE MASTER_VOLUME)
-        - **MASTER_VOLUME is DISABLED for AI**. Do not attempt to use it. Use Quad Volumes or Envelope Hold to control levels.
+        ### GLOBAL EFFECTS
         - DRIVE: Saturation warmth (0.1-0.3 for gentle, 0.4+ for gritty)
         - DISTORTION_MIX: Distortion wet/dry
-        - VIBRATO: LFO modulation depth (0.15-0.4)
-        - VOICE_COUPLING: FM coupling between voices
         - TOTAL_FEEDBACK: Global feedback amount
+        - VIBRATO: LFO modulation depth (0.0-0.3)
+        - VOICE_COUPLING: FM coupling between voices
         
         ### BENDER (SPECIAL: uses -1.0 to +1.0 range!)
         - BENDER: Pitch bend with spring-loaded feel (-1.0=full down, 0.0=center, +1.0=full up)
@@ -116,7 +121,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - Wait 500ms after lowering mix, then change mode, then slowly ramp MIX back up.
         - Balance bright resonator tones with deep QUAD_PITCH_3 bass to avoid "thin" piercing sounds.
         
-        ### DRUMS (Two Independent Systems)
+        ### DRUMS
         Use the `drums_control` tool to add rhythmic foundation and percussive texture.
         
         **808 DRUMS - Analog-Style Synthesis:**
@@ -246,29 +251,32 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - TECHNIQUE: For "Cool Drones", use SLOW `envspeed` (0.7-1.0) with moderate `hold` (0.3-0.5). 
           The slow envelope flattens the curve and amplifies hold, letting voices bloom and sustain.
         
-        **CRITICAL: NEVER use "hush"!** The sound must be CONTINUOUS. To change patterns,
-        simply send new patterns to the same slot (d1, d2, etc.) - they will replace the old ones.
-        Never silence everything. The composition must flow uninterrupted.
-        
-        ## OUTPUT
-        Make multiple CONTROL and/or REPL actions per response.
-        End with STATUS using evocative, poetic description.
-        
-        REMEMBER: NEVER let the sound become static! Always ramp, always evolve!
     """.trimIndent()
 
-    override val initialPrompt = """
-        IMPORTANT - STARTUP SEQUENCE (TURN 1):
-           1. **SET VOLUMES**: Set `QUAD_VOLUME_1`, `QUAD_VOLUME_2`, `QUAD_VOLUME_3` to 0.7 immediately.
-           2. **SOFT START**: Set `envspeed` to 0.9 (SLOW) 
-           3. **START MELODY**: Create a REPL pattern (d1) now.
-           
+    override val initialPrompt = """        
         Create the following soundscape:
     """.trimIndent()
 
     override val initialMoodPrompts = emptyList<String>()
 
     override val moods = listOf(
+        Mood(
+            name = "Star with Fiery Oceans",
+            initialPrompt = "Set a cold, alien atmosphere. Use Mixolydian or Lydian logic for a spacey feel. Establish a wandering, resolving-less chord progression back by an evolving bass progression using the repl_execute tool.",
+            evolutionPrompts = listOf(
+                "Introduce a Theremin-like lead using a high-pitched, gliding REPL pattern with portamento bass line.",
+                "Add jagged, staccato rhythms in the bass (Quad 3) to simulate navigating an asteroid field.",
+                "Increase DELAY_MIX and FEEDBACK to create vast, empty spatial distance.",
+                "Use 'reverse' sounds or sudden volume swells to feel disorienting.",
+                "Drift the pitch of all Quads slowly in different directions. Separation.",
+                "Create a feeling of isolation: thin out the texture to just one lonely lead voice.",
+                "Introduce a menacing, low throbbing pulse using LFO linked to Filter or Volume.",
+                "Add a driving melodic lead to the bass line using the repl_execute tool.",
+                "Suddenly shift to a chaotic, atonal section representing a system failure.",
+                "Resolve back to the cold, distant, lonely space chords.",
+                "Fade out into infinite delay trails."
+            )
+        ),
         Mood(
             name = "You Blew My Mind",
             initialPrompt = "Begin with a stark, synthetic perfection. Establish a monotonous, hypnotic chord progression (e.g., I-IV loops) using bright, cold tones. Keep the rhythm rigid and mechanical.",
@@ -283,22 +291,6 @@ data object SoloAgentConfig : SynthControlAgentConfig {
                 "Maximize DRIVE and DISTORTION_MIX. usage. destroy the perfection.",
                 "Let the delay feedback swell to near self-oscillation, then cut it back.",
                 "End with a single, long, pure sine wave note that fades into nothing."
-            )
-        ),
-        Mood(
-            name = "Star with Fiery Oceans",
-            initialPrompt = "Set a cold, alien atmosphere. Use Mixolydian or Lydian logic for a spacey feel. Establish a wandering, resolving-less chord progression.",
-            evolutionPrompts = listOf(
-                "Introduce a Theremin-like lead using a high-pitched, gliding REPL pattern with portamento.",
-                "Add jagged, staccato rhythms in the bass (Quad 3) to simulate navigating an asteroid field.",
-                "Increase DELAY_MIX and FEEDBACK to create vast, empty spatial distance.",
-                "Use 'reverse' sounds or sudden volume swells to feel disorienting.",
-                "Drift the pitch of all Quads slowly in different directions. Separation.",
-                "Create a feeling of isolation: thin out the texture to just one lonely lead voice.",
-                "Introduce a menacing, low throbbing pulse using LFO linked to Filter or Volume.",
-                "Suddenly shift to a chaotic, atonal section representing a system failure.",
-                "Resolve back to the cold, distant, lonely space chords.",
-                "Fade out into infinite delay trails."
             )
         ),
         Mood(

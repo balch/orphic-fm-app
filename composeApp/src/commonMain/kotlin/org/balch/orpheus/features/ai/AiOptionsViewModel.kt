@@ -220,7 +220,7 @@ class AiOptionsViewModel(
             _isReplActive.value = false
             viewModelScope.launch {
                 try {
-                    replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
+                    replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
                 } catch (e: Exception) {
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
@@ -247,7 +247,7 @@ class AiOptionsViewModel(
             _isReplActive.value = false
             viewModelScope.launch(dispatcherProvider.io) {
                 runCatchingSuspend {
-                    replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
+                    replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
                 }
             }
         }
@@ -387,7 +387,7 @@ class AiOptionsViewModel(
             _isReplActive.value = false
             viewModelScope.launch(dispatcherProvider.io) {
                 runCatchingSuspend {
-                    replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
+                    replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
                 }.onFailure { e ->
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
@@ -471,7 +471,7 @@ class AiOptionsViewModel(
             _isReplActive.value = false
             viewModelScope.launch {
                 try {
-                    replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
+                    replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
                 } catch (e: Exception) {
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
@@ -736,7 +736,7 @@ class AiOptionsViewModel(
                     delay((fadeDuration * 1000).toLong())
                     
                     replExecuteTool.execute(
-                        ReplExecuteArgs(code = "hush")
+                        ReplExecuteArgs(lines = listOf("hush"))
                     )
                     log.debug { "Hushed REPL patterns" }
                     
@@ -750,7 +750,7 @@ class AiOptionsViewModel(
                     log.warn { "Failed to hush REPL patterns gracefully: ${e.message}" }
                     // Fallback
                     replExecuteTool.execute(
-                        ReplExecuteArgs(code = "hush")
+                        ReplExecuteArgs(lines = listOf("hush"))
                     )
                 }
             }

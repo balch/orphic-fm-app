@@ -59,7 +59,6 @@ class OrpheusAgentConfig @Inject constructor(
            - **SPECIFIC STYLE** (e.g., "play something like X", "create something atmospheric")
            
            This tool switches to Dashboard mode and launches the AI composer (Solo Agent).
-           Do NOT try to manually create compositions using REPL or synth_control when the user wants a full song/jam.
         
         ### SECONDARY TOOLS (Use for manual control and explanation):
         
@@ -73,11 +72,11 @@ class OrpheusAgentConfig @Inject constructor(
         ## AVAILABLE SYNTH CONTROLS (for `synth_control` tool)
         
         ### GLOBAL
-        - VIBRATO (0.0-1.0): LFO modulation depth
         - DRIVE (0.0-1.0): Saturation/warmth
         - DISTORTION_MIX (0.0-1.0): Distortion wet/dry
-        - VOICE_COUPLING (0.0-1.0): FM coupling between voices
         - TOTAL_FEEDBACK (0.0-1.0): Global feedback amount
+        - VIBRATO (0.0-1.0): LFO modulation depth
+        - VOICE_COUPLING (0.0-1.0): FM coupling between voices
         
         ### LFO
         - HYPER_LFO_A (0.0-1.0): LFO A speed

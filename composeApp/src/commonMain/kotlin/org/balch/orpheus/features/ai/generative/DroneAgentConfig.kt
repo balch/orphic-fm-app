@@ -101,14 +101,6 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         
         ⚠️ MATRIX IN DRONES: Keep MATRIX_MIX low (0.1-0.3)! Heavy processing breaks the ambient flow.
         
-        ## REPL ACTIONS
-        Use REPL actions if you want to add note patterns.
-        Example: "d5 $ quadhold:3 0.8" to sustain the drone voices (Quad 3 = Voices 9-12).
-        
-        **Pattern Combiners (#):**
-        Use `#` to combine patterns. For example, to set per-voice hold levels:
-        - `d1 $ voices "1 2 3" # hold "0.2 0.5 0.8"` -> each voice gets its corresponding hold value
-        
         **ENVELOPE SPEED & HOLD (The "Drone Secret"):**
         - FAST ENV (`envspeed` = 0): Aggressive ease-in (exp=4). Low hold values produce almost nothing.
           hold=0.35 → ~0.008, hold=0.5 → ~0.03, hold=0.7 → ~0.12, hold=0.85 → ~0.26

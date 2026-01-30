@@ -184,7 +184,7 @@ class SynthControlAgent(
 
                 log.debug { "Executing REPL: $code" }
                 emitControl("Pattern: $code")
-                val result = replExecuteTool.execute(ReplExecuteArgs(code))
+                val result = replExecuteTool.execute(ReplExecuteArgs(lines = code.lines()))
                 if (!result.success) {
                     emitControl("Failed: ${result.message}", isError = true)
                     // Provide feedback to the AI so it can correct the code immediately
@@ -474,7 +474,7 @@ class SynthControlAgent(
                 // Wait for fade to complete
                 delay((fadeDuration * 1000).toLong())
 
-                replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
+                replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
 
                 // Restore volumes after hush (instant, not faded)
                 savedVolumes.forEach { (quadIndex, volume) ->
@@ -484,7 +484,7 @@ class SynthControlAgent(
                 log.debug { "Restored quad volumes" }
             }.onFailure { e ->
                 log.warn(e) { "Failed to stop gracefully: ${e.message}" }
-                replExecuteTool.execute(ReplExecuteArgs(code = "hush"))
+                replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
             }
             emitStatus("Stopped")
             _state.value = SynthAgentState.Idle

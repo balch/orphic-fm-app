@@ -1,22 +1,60 @@
 package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
+import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.tidal.ReplResult
 import org.balch.orpheus.core.tidal.TidalRepl
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
 import org.balch.orpheus.features.ai.PanelId
 import org.balch.orpheus.features.ai.ReplCodeEventBus
 
+@LLMDescription("Arguments for executing REPL code. Provide an array of lines to execute together as one block.")
 @Serializable
-data class ReplExecuteArgs(val code: String)
+data class ReplExecuteArgs(
+    @property:LLMDescription("""
+        Array of code lines to execute. Each element is a separate line of REPL code.
+        All lines are joined with newlines and executed together as one atomic block.
+        
+        IMPORTANT: Use an array with one element per line of code!
+        
+        Example - Single line:
+        ["d1 $ note \"c3 e3 g3\""]
+        
+        Example - Multiple lines (CORRECT way to send multi-line code):
+        [
+            "d1 $ note \"c2 db2 g2 ab2\"",
+            "d2 $ voices:1 2 3 4",
+            "d3 $ slow 2 $ voices \"1\" # envspeed \"0.3\"",
+            "tune:3 0.562"
+        ]
+        
+        Each line can be:
+        - Slot patterns: "d1 $ note \"c3 e3\"" (cycled every beat)
+        - Control commands: "drive:0.5" (applied once immediately)
+        - Voice patterns: "d2 $ voices:1 2 3 4"
+        - Tuning: "tune:3 0.562"
+    """)
+    val lines: List<String>
+)
 
+@LLMDescription("Result of REPL code execution with success status and active slot information.")
 @Serializable
-data class ReplExecuteResult(val success: Boolean, val message: String, val activeSlots: List<String> = emptyList())
+data class ReplExecuteResult(
+    @property:LLMDescription("True if the code executed successfully, false if there was an error.")
+    val success: Boolean,
+    
+    @property:LLMDescription("Human-readable message describing the result or error.")
+    val message: String,
+    
+    @property:LLMDescription("List of active slot IDs (d1, d2, etc.) that now have running patterns.")
+    val activeSlots: List<String> = emptyList()
+)
 
 
 /**
@@ -35,6 +73,13 @@ class ReplExecuteTool @Inject constructor(
     name = "repl_execute",
     description = """
         Execute Tidal-style REPL code for musical patterns.
+        
+        IMPORTANT: Pass code as an array of strings in the 'lines' parameter!
+        Each array element = one line of code. Lines are joined and executed together.
+        
+        Example call with lines array:
+        { "lines": ["d1 $ note \"c3 e3\"", "d2 $ voices:1 2 3 4", "drive:0.4"] }
+        
         Use slots d1-d8 for different pattern layers.
         
         IMMEDIATE vs CYCLED COMMANDS:
@@ -92,27 +137,27 @@ class ReplExecuteTool @Inject constructor(
         - fast <n> <pattern> - Speed up by factor n
         - slow <n> <pattern> - Slow down by factor n
         
-        COMBINING PATTERNS (#):
-        Use # to combine patterns
-        d1 $ voices "1 2 3" 
+        COMPLETE EXAMPLE (as a lines array):
+        { "lines": [
+            "d1 $ note \"c2 db2 g2 ab2\"",
+            "d2 $ voices:1 2 3 4",
+            "d3 $ voices \"1\" # envspeed \"0.3\"",
+            "tune:3 0.562",
+            "drive:0.4"
+        ]}
         
-        EXAMPLES:
-        d1 $ note "c2 db2 g2 ab2"
-        d2 $ voices:1 2 3 4
-        d3 $ voices "1" # envspeed "0.3"
-        tune:3 0.562
-        
-        Use hush to silence all patterns.
+        To silence all patterns, send: { "lines": ["hush"] }
     """.trimIndent()
 ) {
     private val log = logging("ReplExecuteTool")
 
     override suspend fun execute(args: ReplExecuteArgs): ReplExecuteResult {
-        val code = args.code.trim()
-        log.debug { "ReplExecuteTool: Executing: ${code.take(80)}..." }
+        // Join lines into a single code block
+        val code = args.lines.joinToString("\n").trim()
+        log.debug { "ReplExecuteTool: Executing ${args.lines.size} lines: ${code.take(80)}..." }
         
-        // Handle hush command specially
-        if (code.equals("hush", ignoreCase = true)) {
+        // Handle hush command specially (if single line is just "hush")
+        if (args.lines.size == 1 && code.equals("hush", ignoreCase = true)) {
             log.debug { "ReplExecuteTool: Executing hush" }
             tidalRepl.hush()
             // Don't emit Generated for hush - we don't want to update the UI with "hush" text
@@ -135,13 +180,13 @@ class ReplExecuteTool @Inject constructor(
         val slots: Set<String>
         
         when (result) {
-            is org.balch.orpheus.core.tidal.ReplResult.Success -> {
+            is ReplResult.Success -> {
                 log.debug { "ReplExecuteTool: Success, slots=${result.slots}" }
                 resultSuccess = true
                 resultMessage = "Pattern executed successfully"
                 slots = result.slots
             }
-            is org.balch.orpheus.core.tidal.ReplResult.Error -> {
+            is ReplResult.Error -> {
                 log.warn { "ReplExecuteTool: Error - ${result.message}" }
                 resultSuccess = false
                 resultMessage = result.message
