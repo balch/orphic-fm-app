@@ -82,7 +82,7 @@ data class DronePreset(
     val beatsX: Float = 0.5f,
     val beatsY: Float = 0.5f,
     val beatsDensities: List<Float> = listOf(0.5f, 0.5f, 0.5f),
-    val beatsBpm: Float = 120f,
+    val bpm: Float = 120f,
     val beatsOutputMode: Int = 0,      // DrumBeatsGenerator.OutputMode ordinal
     val beatsEuclideanLengths: List<Int> = listOf(16, 16, 16),
     val beatsRandomness: Float = 0f,

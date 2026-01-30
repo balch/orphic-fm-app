@@ -72,6 +72,10 @@ actual class AudioEngine actual constructor() {
                  synth.add(unit.recordGateInput)
                  synth.add(unit.playGateInput)
             }
+            is JsynClockUnit -> {
+                 synth.add(unit.jsOsc)
+                 synth.add(unit.scaler)
+            }
         }
     }
 
@@ -100,6 +104,7 @@ actual class AudioEngine actual constructor() {
     actual fun createGrainsUnit(): GrainsUnit = JsynGrainsUnit()
     actual fun createLooperUnit(): LooperUnit = JsynLooperUnit()
     actual fun createWarpsUnit(): WarpsUnit = JsynWarpsUnit()
+    actual fun createClockUnit(): ClockUnit = JsynClockUnit()
 
     actual val lineOutLeft: AudioInput
         get() = JsynAudioInput(lineOutLeftProxy.input)

@@ -75,6 +75,8 @@ actual class AudioEngine actual constructor() {
     actual fun createResonatorUnit(): ResonatorUnit = WebAudioResonatorUnit(audioContext)
     actual fun createGrainsUnit(): GrainsUnit = WebAudioGrainsUnit(audioContext)
     actual fun createLooperUnit(): LooperUnit = WebAudioLooperUnit(audioContext)
+    actual fun createWarpsUnit(): WarpsUnit = WebAudioWarpsUnit(audioContext)
+    actual fun createClockUnit(): ClockUnit = WebAudioClockUnit(audioContext)
     
     actual val lineOutLeft: AudioInput
         get() = WebAudioNodeInput(leftGain, 0, audioContext)

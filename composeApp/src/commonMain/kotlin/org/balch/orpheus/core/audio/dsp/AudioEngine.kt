@@ -40,6 +40,7 @@ expect class AudioEngine() {
     fun createGrainsUnit(): GrainsUnit
     fun createLooperUnit(): LooperUnit
     fun createWarpsUnit(): WarpsUnit
+    fun createClockUnit(): ClockUnit
 
     /** Master output - connect final audio here */
     val lineOutLeft: AudioInput

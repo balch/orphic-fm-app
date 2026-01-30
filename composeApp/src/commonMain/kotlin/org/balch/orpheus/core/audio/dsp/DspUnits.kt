@@ -291,3 +291,18 @@ expect interface WarpsUnit : AudioUnit {
     val level1: AudioInput    // Carrier drive
     val level2: AudioInput    // Modulator drive
 }
+
+/**
+ * Precision clock generator.
+ * Outputs pulses at a set frequency (BPM / 60 * PPQN).
+ */
+expect interface ClockUnit : AudioUnit {
+    /** Frequency input in Hz (e.g. 2.0 = 120 BPM) */
+    val frequency: AudioInput
+    
+    /** Pulse width input (0.01 - 0.99) */
+    val pulseWidth: AudioInput
+    
+    /** Trigger output (0.0 or 1.0 pulses) */
+    override val output: AudioOutput
+}

@@ -67,6 +67,16 @@ fun ModTweaksPanel(
             verticalAlignment = Alignment.Top
         ) {
             RotaryKnob(
+                value = voiceState.bpm.toFloat(),
+                onValueChange = { actions.onBpmChange(it.toDouble()) },
+                label = "BPM",
+                range = 60f..200f,
+                controlId = ControlIds.BPM,
+                size = 52.dp,
+                progressColor = OrpheusColors.neonMagenta
+            )
+
+            RotaryKnob(
                 value = voiceState.totalFeedback,
                 onValueChange = actions.onTotalFeedbackChange,
                 label = "\u221E\u221E", // infinity",

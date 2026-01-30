@@ -23,6 +23,7 @@ import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.core.tempo.GlobalTempo
 
 import kotlin.math.pow
 
@@ -52,6 +53,7 @@ class TidalScheduler(
     private val synthEngine: SynthEngine,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val dispatchProvider: DispatcherProvider,
+    private val globalTempo: GlobalTempo,
 ) {
     private val log = logging("TidalScheduler")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -60,6 +62,14 @@ class TidalScheduler(
     val state: StateFlow<TidalSchedulerState> = _state.asStateFlow()
     
     init {
+        // Subscribe to GlobalTempo updates
+        scope.launch(dispatchProvider.default) {
+            globalTempo.bpm.collect { bpm ->
+                val cps = bpm / 60.0 / 4.0
+                _state.value = _state.value.copy(bpm = bpm, cps = cps)
+            }
+        }
+
         // Subscribe to playback lifecycle events (e.g., foreground service stop)
         scope.launch(dispatchProvider.default) {
             playbackLifecycleManager.events.collect { event ->
@@ -230,8 +240,10 @@ class TidalScheduler(
     
     /**
      * Set the tempo in BPM.
+     * Updates GlobalTempo which will sync to all modules.
      */
     fun setBpm(bpm: Double) {
+        globalTempo.setBpm(bpm)
         val cps = bpm / 60.0 / 4.0
         _state.value = _state.value.copy(bpm = bpm, cps = cps)
     }

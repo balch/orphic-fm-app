@@ -139,7 +139,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         **DRUM BEATS - Algorithmic Pattern Generator:**
         Autonomous beat sequencer with two modes:
         - BEATS_RUN: 1.0=start sequencer, 0.0=stop
-        - BEATS_BPM: Tempo (maps 0.0-1.0 → 60-200 BPM, 0.5 ≈ 130 BPM)
+        - BPM: Tempo (maps 0.0-1.0 → 60-200 BPM, 0.5 ≈ 130 BPM). Target 90-140 BPM for most songs.
         - BEATS_X, BEATS_Y: Morph position in pattern space (0.0-1.0)
         - BEATS_DENSITY_1/2/3: Kick/snare/hi-hat activity (0.0=sparse, 1.0=dense)
         - BEATS_MODE: 0.0=DRUMS (morphing patterns), 1.0=EUCLIDEAN (polyrhythms)

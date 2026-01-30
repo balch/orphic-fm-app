@@ -30,6 +30,7 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.tempo.GlobalTempo
 import kotlin.math.roundToInt
 
 /** UI state for voice management. */
@@ -49,7 +50,8 @@ data class VoiceUiState(
     val voiceCoupling: Float = 0.0f,
     val masterVolume: Float = 0.7f,
     val peakLevel: Float = 0.0f,
-    val bendPosition: Float = 0.0f // -1 to +1, current bender position for UI display
+    val bendPosition: Float = 0.0f, // -1 to +1, current bender position for UI display
+    val bpm: Double = 120.0
 ) {
     companion object {
         val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
@@ -83,6 +85,7 @@ private sealed interface VoiceIntent {
     data class MasterVolume(val value: Float) : VoiceIntent
     data class PeakLevel(val value: Float) : VoiceIntent
     data class BendPosition(val value: Float) : VoiceIntent // For UI updates from engine
+    data class SetBpm(val value: Double) : VoiceIntent
 
     // Restore
     data class Restore(val state: VoiceUiState) : VoiceIntent
@@ -103,6 +106,7 @@ class VoiceViewModel(
     private val presetLoader: PresetLoader,
     private val synthController: SynthController,
     private val wobbleController: VoiceWobbleController,
+    private val globalTempo: GlobalTempo,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), VoicesFeature {
 
@@ -135,7 +139,8 @@ class VoiceViewModel(
         onStringBendChange = ::onStringBendChange,
         onStringBendRelease = ::onStringBendRelease,
         onSlideBarChange = ::onSlideBarChange,
-        onSlideBarRelease = ::onSlideBarRelease
+        onSlideBarRelease = ::onSlideBarRelease,
+        onBpmChange = ::onBpmChange
     )
 
     fun onMasterVolumeChange(value: Float) {
@@ -227,6 +232,13 @@ class VoiceViewModel(
             launch {
                 engine.bendFlow.collect { bendAmount ->
                     intents.tryEmit(VoiceIntent.BendPosition(bendAmount))
+                }
+            }
+            
+            // Subscribe to GlobalTempo
+            launch {
+                globalTempo.bpm.collect { bpm ->
+                    intents.tryEmit(VoiceIntent.SetBpm(bpm))
                 }
             }
         }
@@ -410,6 +422,9 @@ class VoiceViewModel(
 
             is VoiceIntent.BendPosition ->
                 state.copy(bendPosition = intent.value)
+                
+            is VoiceIntent.SetBpm ->
+                state.copy(bpm = intent.value)
 
             is VoiceIntent.Restore -> intent.state
         }
@@ -512,6 +527,7 @@ class VoiceViewModel(
             is VoiceIntent.MasterVolume -> engine.setMasterVolume(intent.value)
             is VoiceIntent.PeakLevel -> { /* No side effect, strictly monitoring */ }
             is VoiceIntent.BendPosition -> { /* No side effect, UI display only - engine already updated via bendFlow */ }
+            is VoiceIntent.SetBpm -> { /* State update only, side effect handled in onBpmChange via GlobalTempo */ }
             is VoiceIntent.Restore -> applyFullState(intent.state)
         }
     }
@@ -762,6 +778,10 @@ class VoiceViewModel(
     fun onSlideBarRelease() {
         engine.releaseSlideBar()
     }
+    
+    fun onBpmChange(bpm: Double) {
+        globalTempo.setBpm(bpm)
+    }
 
     companion object {
         fun previewFeature(state: VoiceUiState = VoiceUiState()) =
@@ -801,7 +821,8 @@ data class VoicePanelActions(
     val onStringBendChange: (stringIndex: Int, bendAmount: Float, voiceMix: Float) -> Unit,
     val onStringBendRelease: (stringIndex: Int) -> Int,
     val onSlideBarChange: (yPosition: Float, xPosition: Float) -> Unit,
-    val onSlideBarRelease: () -> Unit
+    val onSlideBarRelease: () -> Unit,
+    val onBpmChange: (Double) -> Unit
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
@@ -816,7 +837,8 @@ data class VoicePanelActions(
             onWobbleMove = {_, _, _ -> }, onWobblePulseEnd = {},
             onBendChange = {}, onBendRelease = {},
             onStringBendChange = {_, _, _ -> }, onStringBendRelease = { 0 },
-            onSlideBarChange = {_, _ -> }, onSlideBarRelease = {}
+            onSlideBarChange = {_, _ -> }, onSlideBarRelease = {},
+            onBpmChange = {}
         )
     }
 }

@@ -56,7 +56,7 @@ class OrpheusAgentConfig @Inject constructor(
            - **CREATE A SONG** (e.g., "create a song", "compose something", "make a song named X")
            - **PLAY MUSIC** (e.g., "play something", "play me a song", "I want to hear something")
            - **START A DRONE** (e.g., "start a drone", "background music", "ambient atmosphere")
-           - **SPECIFIC STYLE** (e.g., "play something like X", "create something atmospheric")
+           - **ADJUST TEMPO** (e.g., "play faster", "slow down", "set bpm to 140"). Most songs should be 90-140 BPM.
            
            This tool switches to Dashboard mode and launches the AI composer (Solo Agent).
         

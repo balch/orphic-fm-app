@@ -3,6 +3,7 @@ package org.balch.orpheus.di
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.util.ConsoleLogger
 
 /**
@@ -15,4 +16,5 @@ expect interface OrpheusGraph : ViewModelGraph {
     val synthOrchestrator: SynthOrchestrator
     val synthEngine: SynthEngine
     val consoleLogger: ConsoleLogger
+    val globalTempo: GlobalTempo
 }

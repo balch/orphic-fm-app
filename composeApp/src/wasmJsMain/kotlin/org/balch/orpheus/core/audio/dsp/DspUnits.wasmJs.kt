@@ -879,3 +879,85 @@ class WebAudioGrainsUnit(private val context: AudioContext) : GrainsUnit {
     override fun setMode(mode: Int) {}
 }
 
+actual interface WarpsUnit : AudioUnit {
+    actual val inputLeft: AudioInput
+    actual val inputRight: AudioInput
+    actual val outputRight: AudioOutput
+    actual val algorithm: AudioInput
+    actual val timbre: AudioInput
+    actual val level1: AudioInput
+    actual val level2: AudioInput
+}
+
+class WebAudioWarpsUnit(private val context: AudioContext) : WarpsUnit {
+    private val outputGain = context.createGain()
+    
+    // Stub: pass inputs to output mixed
+    private val inL = context.createGain().also { it.connect(outputGain) }
+    private val inR = context.createGain().also { it.connect(outputGain) }
+
+    override val inputLeft: AudioInput = WebAudioNodeInput(inL, 0, context)
+    override val inputRight: AudioInput = WebAudioNodeInput(inR, 0, context)
+    override val output: AudioOutput = WebAudioNodeOutput(outputGain)
+    override val outputRight: AudioOutput = WebAudioNodeOutput(outputGain)
+
+    override val algorithm: AudioInput = WebAudioManualInput(context) {}
+    override val timbre: AudioInput = WebAudioManualInput(context) {}
+    override val level1: AudioInput = WebAudioManualInput(context) {}
+    override val level2: AudioInput = WebAudioManualInput(context) {}
+}
+
+actual interface ClockUnit : AudioUnit {
+    actual val frequency: AudioInput
+    actual val pulseWidth: AudioInput
+    actual override val output: AudioOutput
+}
+
+class WebAudioClockUnit(private val context: AudioContext) : ClockUnit {
+    // Pulse Width Modulation implementation
+    // Sawtooth Oscillator -> Add (Threshold) -> WaveShaper (Comparator)
+    
+    // 1. Sawtooth Oscillator (Frequency)
+    private val osc = context.createOscillator().also {
+        it.type = "sawtooth"
+        it.start()
+    }
+    
+    // 2. Pulse Width control (Threshold)
+    // We need: Saw + (-1) + (2*PW) > 0
+    
+    private val pwScaler = context.createGain().also { it.gain.value = 2f } // Scale PW by 2
+    private val minusOne = context.createConstantSource().also {
+        it.offset.value = -1f
+        it.start()
+    }
+    
+    private val comparatorSum = context.createGain().also { it.gain.value = 1f }
+    
+    private fun createSharpCurve(): Float32Array {
+        val size = 256
+        val curve = Float32Array(size)
+        val center = size / 2
+        for (i in 0 until size) {
+             curve[i] = if (i < center) 0f else 1f
+        }
+        return curve
+    }
+    
+    private val comparatorShaper = context.createWaveShaper().also {
+        it.curve = createSharpCurve()
+        it.oversample = "4x"
+    }
+    
+    init {
+        osc.connect(comparatorSum)
+        minusOne.connect(comparatorSum)
+        pwScaler.connect(comparatorSum)
+        comparatorSum.connect(comparatorShaper)
+    }
+
+    override val frequency: AudioInput = WebAudioParamInput(osc.frequency, context)
+    override val pulseWidth: AudioInput = WebAudioNodeInput(pwScaler, 0, context)
+    override val output: AudioOutput = WebAudioNodeOutput(comparatorShaper)
+}
+

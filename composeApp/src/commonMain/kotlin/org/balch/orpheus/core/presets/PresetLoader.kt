@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.lfo.HyperLfoMode
 
 /**
@@ -16,7 +17,8 @@ import org.balch.orpheus.features.lfo.HyperLfoMode
 @SingleIn(AppScope::class)
 @Inject
 class PresetLoader(
-    private val engine: SynthEngine
+    private val engine: SynthEngine,
+    private val globalTempo: GlobalTempo
 ) {
 
     // Shared flow to broadcast preset changes to ViewModels
@@ -40,6 +42,8 @@ class PresetLoader(
      * controllable via direct user interaction.
      */
     fun applyPreset(preset: DronePreset) {
+        // Update global tempo immediately
+        globalTempo.setBpm(preset.bpm.toDouble())
         _presetFlow.tryEmit(preset)
     }
 
@@ -113,7 +117,7 @@ class PresetLoader(
             beatsX = engine.getBeatsX(),
             beatsY = engine.getBeatsY(),
             beatsDensities = List(3) { i -> engine.getBeatsDensity(i) },
-            beatsBpm = engine.getBeatsBpm(),
+            bpm = engine.getBeatsBpm(),
             beatsOutputMode = engine.getBeatsOutputMode(),
             beatsEuclideanLengths = List(3) { i -> engine.getBeatsEuclideanLength(i) },
             beatsRandomness = engine.getBeatsRandomness(),

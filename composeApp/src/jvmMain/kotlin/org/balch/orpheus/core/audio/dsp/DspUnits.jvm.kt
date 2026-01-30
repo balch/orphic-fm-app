@@ -441,3 +441,32 @@ class JsynLooperUnit : LooperUnit {
     
     override fun getLoopDuration(): Double = loopSampleCount / SAMPLE_RATE
 }
+
+actual interface ClockUnit : AudioUnit {
+    actual val frequency: AudioInput
+    actual val pulseWidth: AudioInput
+    actual override val output: AudioOutput
+}
+
+class JsynClockUnit : ClockUnit {
+    internal val jsOsc = com.jsyn.unitgen.PulseOscillator()
+    internal val scaler = com.jsyn.unitgen.MultiplyAdd()
+    
+    init {
+        // PulseOsc output is -1 to 1. We want 0 to 1 for logic triggers.
+        // Scale by 0.5 -> -0.5 to 0.5
+        // Add 0.5 -> 0.0 to 1.0
+        scaler.inputB.set(0.5)
+        scaler.inputC.set(0.5)
+        jsOsc.output.connect(scaler.inputA)
+        
+        // Default amplitude 1.0 (full range -1 to 1 before scaling)
+        jsOsc.amplitude.set(1.0)
+        // Default pulse width (50% duty cycle)
+        jsOsc.width.set(0.5)
+    }
+
+    override val frequency: AudioInput = JsynAudioInput(jsOsc.frequency)
+    override val pulseWidth: AudioInput = JsynAudioInput(jsOsc.width)
+    override val output: AudioOutput = JsynAudioOutput(scaler.output)
+}

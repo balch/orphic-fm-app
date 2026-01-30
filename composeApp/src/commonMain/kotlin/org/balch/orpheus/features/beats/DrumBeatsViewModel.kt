@@ -36,6 +36,7 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.tempo.GlobalTempo
 
 @Immutable
 data class BeatsUiState(
@@ -79,6 +80,7 @@ class DrumBeatsViewModel @Inject constructor(
     presetLoader: PresetLoader,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
+    private val globalTempo: GlobalTempo,
 ) : ViewModel(), DrumBeatsFeature {
 
     private val patternGenerator = DrumBeatsGenerator(synthEngine)
@@ -97,7 +99,7 @@ class DrumBeatsViewModel @Inject constructor(
                 x = preset.beatsX,
                 y = preset.beatsY,
                 densities = preset.beatsDensities,
-                bpm = preset.beatsBpm,
+                bpm = preset.bpm,
                 outputMode = outputMode,
                 euclideanLengths = preset.beatsEuclideanLengths,
                 randomness = preset.beatsRandomness,
@@ -113,7 +115,7 @@ class DrumBeatsViewModel @Inject constructor(
             ControlIds.BEATS_RUN -> DrumBeatsIntent.Run(event.value > 0.5f, fromSequencer)
             ControlIds.BEATS_X -> DrumBeatsIntent.SetX(event.value, fromSequencer)
             ControlIds.BEATS_Y -> DrumBeatsIntent.SetY(event.value, fromSequencer)
-            ControlIds.BEATS_BPM -> DrumBeatsIntent.SetBpm(event.value, fromSequencer)
+            ControlIds.BPM -> DrumBeatsIntent.SetBpm(event.value, fromSequencer)
             ControlIds.BEATS_MIX -> DrumBeatsIntent.SetMix(event.value, fromSequencer)
             ControlIds.BEATS_RANDOMNESS -> DrumBeatsIntent.SetRandomness(event.value, fromSequencer)
             ControlIds.BEATS_SWING -> DrumBeatsIntent.SetSwing(event.value, fromSequencer)
@@ -144,8 +146,13 @@ class DrumBeatsViewModel @Inject constructor(
         applyFullState(initial)
         emit(initial)
         
+        // Subscribe to GlobalTempo updates
+        val tempoIntents = globalTempo.bpm.map { bpm ->
+            DrumBeatsIntent.SetBpm(bpm.toFloat(), fromSequencer = true) // Treat as sequencer update to avoid loop
+        }
+        
         emitAll(
-            merge(_userIntents, presetIntents, controlIntents)
+            merge(_userIntents, presetIntents, controlIntents, tempoIntents)
                 .filterNotNull() // Filter out nulls from controlIntents
                 .onEach { intent -> applyToEngine(intent) }
                 .scan(initial) { state, intent -> reduce(state, intent) }
@@ -212,7 +219,13 @@ class DrumBeatsViewModel @Inject constructor(
                 // Engine doesn't track running state efficiently, it expects ticks.
                 // However, we can use this to perhaps reset or prepare.
             }
-            is DrumBeatsIntent.SetBpm -> if (!intent.fromSequencer) synthEngine.setBeatsBpm(intent.value)
+            is DrumBeatsIntent.SetBpm -> {
+                // Update GlobalTempo so REPL and Flux sync
+                if (!intent.fromSequencer) {
+                    globalTempo.setBpm(intent.value.toDouble())
+                    synthEngine.setBeatsBpm(intent.value)
+                }
+            }
             is DrumBeatsIntent.SetOutputMode -> {
                 patternGenerator.outputMode = intent.mode
                 if (!intent.fromSequencer) synthEngine.setBeatsOutputMode(intent.mode.ordinal)
@@ -242,6 +255,8 @@ class DrumBeatsViewModel @Inject constructor(
             synthEngine.setBeatsDensity(i, d)
         }
         synthEngine.setBeatsBpm(state.bpm)
+        // Also update GlobalTempo for cross-module sync
+        globalTempo.setBpm(state.bpm.toDouble())
         patternGenerator.outputMode = state.outputMode
         synthEngine.setBeatsOutputMode(state.outputMode.ordinal)
         state.euclideanLengths.forEachIndexed { i, l -> 
@@ -273,29 +288,52 @@ class DrumBeatsViewModel @Inject constructor(
     private fun startClock() {
         clockJob?.cancel()
         clockJob = viewModelScope.launch(dispatcherProvider.io) {
+            // Align start time to current audio time
+            var nextTickTime = synthEngine.getCurrentTime()
+            
             while (isActive) {
-                // Access current state via patternGenerator since it's the source of truth for step logic
-                // But we need BPM/Swing which are in state. 
-                // Ideally reading latest state from flow, but here we can rely on patternGenerator having latest params
-                // EXCEPT BPM/Swing which are not stored in generator explicitly for timing calculation? 
-                
-                // We'll read the stateFlow value. Note: this might be slightly racy if flow hasn't emitted yet.
-                val state = stateFlow.value 
+                // Read current state parameters
+                val state = stateFlow.value
                 val bpm = state.bpm
                 val swing = state.swing
                 
-                var tickDurationMs = (60_000.0 / bpm / 24.0).toLong()
-                val currentStep = patternGenerator.getCurrentStep()
-                // Simple swing logic (same as before)
-                val swingFactor = if (currentStep % 2 == 0) (1.0 + swing * 0.5) else (1.0 - swing * 0.5)
-                tickDurationMs = (tickDurationMs * swingFactor).toLong()
-
-                patternGenerator.tick()
-                val step = patternGenerator.getCurrentStep()
+                // Calculate tick duration based on 24 PPQN standard
+                // Seconds per tick = 60 / (BPM * 24) = 2.5 / BPM
+                val baseSecondsPerTick = 2.5 / bpm
                 
-                _userIntents.tryEmit(DrumBeatsIntent.TickStep(step)) // Internal intent for UI update
+                val now = synthEngine.getCurrentTime()
                 
-                delay(tickDurationMs)
+                if (now >= nextTickTime) {
+                    // Execute tick
+                    patternGenerator.tick()
+                    val step = patternGenerator.getCurrentStep()
+                    _userIntents.tryEmit(DrumBeatsIntent.TickStep(step))
+                    
+                    // Calculate next tick time with swing applied
+                    // Swing affects even/odd 16th notes (every 6 ticks at 24 PPQN)
+                    // We apply swing micro-timing to every tick for simplicity or specific grid steps?
+                    // DrumBeatsGenerator has 'resolution = 6'.
+                    // The standard swing usually delays the even 16th notes.
+                    // Since we tick at resolution (PPQN), we should apply swing to the *duration* of the specific step we are in.
+                    
+                    // Simple swing:
+                    // If we assume we are just stepping forward, we can apply swing factor to the interval.
+                    // But DrumBeatsGenerator.tick() handles the sub-steps.
+                    // Let's stick to the previous simple logic but in seconds.
+                    val swingFactor = if (step % 2 == 0) (1.0 + swing * 0.5) else (1.0 - swing * 0.5)
+                    val duration = baseSecondsPerTick * swingFactor
+                    
+                    nextTickTime += duration
+                    
+                    // Drift correction: if we fell too far behind (e.g. debugging pause), reset
+                    if (now > nextTickTime + 0.1) {
+                        nextTickTime = now + duration
+                    }
+                } else {
+                    // Wait until next tick
+                    val waitMs = ((nextTickTime - now) * 1000).toLong().coerceAtLeast(1)
+                    delay(waitMs)
+                }
             }
         }
     }

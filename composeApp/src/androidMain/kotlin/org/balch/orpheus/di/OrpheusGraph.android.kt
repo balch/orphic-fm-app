@@ -9,6 +9,7 @@ import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.lifecycle.AndroidAppLifecycleManager
 import org.balch.orpheus.core.media.ForegroundServiceController
+import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.util.ConsoleLogger
 
 /**
@@ -20,6 +21,7 @@ actual interface OrpheusGraph : ViewModelGraph {
     actual val synthOrchestrator: SynthOrchestrator
     actual val synthEngine: SynthEngine
     actual val consoleLogger: ConsoleLogger
+    actual val globalTempo: GlobalTempo
     
     /**
      * Android-specific lifecycle manager for background audio handling.

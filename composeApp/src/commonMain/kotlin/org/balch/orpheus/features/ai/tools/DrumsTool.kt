@@ -22,7 +22,7 @@ data class DrumsControlArgs(
         - DRUM_HH_FREQ, DRUM_HH_TONE, DRUM_HH_DECAY, DRUM_HH_NOISY, DRUM_HH_TRIGGER
         
         DRUM BEATS (Pattern sequencer):
-        - BEATS_RUN (start/stop), BEATS_BPM (tempo), BEATS_X, BEATS_Y (pattern morph)
+        - BEATS_RUN (start/stop), BPM (tempo), BEATS_X, BEATS_Y (pattern morph)
         - BEATS_DENSITY_1 (kick), BEATS_DENSITY_2 (snare), BEATS_DENSITY_3 (hi-hat)
         - BEATS_MODE (0=DRUMS, 1=EUCLIDEAN)
         - BEATS_EUCLIDEAN_LENGTH_1/2/3 (pattern lengths)
@@ -37,7 +37,7 @@ data class DrumsControlArgs(
         
         Special cases:
         - BEATS_RUN: 1.0 to start sequencer, 0.0 to stop
-        - BEATS_BPM: Maps 0.0-1.0 to 60-200 BPM (0.5 ≈ 130 BPM)
+        - BPM: Maps 0.0-1.0 to 60-200 BPM (0.5 ≈ 130 BPM). Target 90-140 BPM for most songs.
         - BEATS_MODE: 0.0 for DRUMS mode, 1.0 for EUCLIDEAN mode
         - BEATS_EUCLIDEAN_LENGTH: Internally scaled to 1-32 steps
         - DRUM triggers: Set to 1.0 to trigger drum hit, 0.0 to release
@@ -165,7 +165,7 @@ class DrumsTool @Inject constructor(
         
         DRUM BEATS - Algorithmic pattern generator:
         Pattern: BEATS_X, BEATS_Y, BEATS_DENSITY_1/2/3, BEATS_RUN (0=stop, 1=run)
-        Timing: BEATS_BPM (60-200 mapped to 0-1), BEATS_SWING (0=straight, 1=swing)
+        Timing: BPM (60-200 mapped to 0-1), BEATS_SWING (0=straight, 1=swing)
         Mode: BEATS_MODE (0=DRUMS, 1=EUCLIDEAN)
         Euclidean: BEATS_EUCLIDEAN_LENGTH_1/2/3 (1-32 steps)
         Feel: BEATS_RANDOMNESS (0=locked, 1=chaotic), BEATS_MIX (0=off, 1=full)
@@ -216,7 +216,7 @@ class DrumsTool @Inject constructor(
             "BEATS_DENSITY_2" -> "beats_density_2"
             "BEATS_DENSITY_3" -> "beats_density_3"
             "BEATS_RUN" -> "beats_run"
-            "BEATS_BPM" -> "beats_bpm"
+            "BPM", "BEATS_BPM" -> "bpm"
             "BEATS_MODE" -> "beats_mode"
             "BEATS_EUCLIDEAN_LENGTH_1" -> "beats_euclidean_length_1"
             "BEATS_EUCLIDEAN_LENGTH_2" -> "beats_euclidean_length_2"
@@ -264,7 +264,7 @@ class DrumsTool @Inject constructor(
                         val length = ((normalizedValue * 31) + 1).toInt().coerceIn(1, 32)
                         "Set ${targetId.removePrefix("beats_")} to $length steps"
                     }
-                    targetId == "beats_bpm" -> {
+                    targetId == "bpm" -> {
                         val bpm = (60 + normalizedValue * 140).toInt()
                         "Set tempo to $bpm BPM"
                     }
