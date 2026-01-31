@@ -25,8 +25,12 @@ class FluxProcessor(private val sampleRate: Float) {
     private var scaleIndex = 0 // Which scale to use
     
     // Output state
-    private var currentVoltage = 0.5f
-    private var previousSteps = 0.5f
+    private var outX1 = 0.5f
+    private var outX2 = 0.5f
+    private var outX3 = 0.5f
+    
+    // Temp buffer for vector generation
+    private val rawVector = FloatArray(3)
     
     // Scales (matches Marbles preset order)
     private val scales = arrayOf(
@@ -37,39 +41,44 @@ class FluxProcessor(private val sampleRate: Float) {
         Scale.wholeTone(),
         Scale.chromatic()
     )
-    
+
     init {
         randomSequence.init(randomStream)
         quantizer.init(scales[0])
     }
-    
+
+    private var previousSteps = 0.5f
+
     /**
-     * Generate the next voltage when triggered by a gate/clock.
-     * @return CV voltage in range 0-1 (represents pitch)
+     * Generate the next voltage(s) when triggered by a gate/clock.
+     * Updates internal state for X1, X2, X3.
      */
-    fun tick(): Float {
-        // Generate raw random voltage with spread and bias
-        val raw = generateRawVoltage()
+    fun tick() {
+        // Generate correlated random vector (X1, X2, X3)
+        // This consumes one step of the Dejavu loop, ensuring all 3 are locked to the loop
+        randomSequence.nextVector(rawVector, 3)
         
-        // Apply steps control (smooth → stepped → quantized)
-        currentVoltage = applySteps(raw)
-        
-        return currentVoltage
+        // Process each channel
+        outX1 = processChannel(rawVector[0])
+        outX2 = processChannel(rawVector[1])
+        outX3 = processChannel(rawVector[2])
     }
     
-    private fun generateRawVoltage(): Float {
-        // Get raw value from déjà-vu sequence
-        val raw = randomSequence.nextValue(deterministic = false, value = 0.0f)
-        
+    private fun processChannel(raw: Float): Float {
         // Apply spread and bias
-        // Spread controls the distribution width
-        // Bias skews toward high or low values
         val centered = raw - 0.5f
-        val spread = centered * (spread * 2.0f)  // Expand or contract
-        val biased = spread + bias
+        val spreadVal = centered * (spread * 2.0f)
+        val biased = spreadVal + bias
+        val preQuantized = biased.coerceIn(0.0f, 1.0f)
         
-        return biased.coerceIn(0.0f, 1.0f)
+        // Apply steps/quantization
+        return applySteps(preQuantized)
     }
+
+    // Getters for current state
+    fun getX1(): Float = outX1
+    fun getX2(): Float = outX2
+    fun getX3(): Float = outX3
     
     private fun applySteps(voltage: Float): Float {
         return when {
@@ -125,7 +134,9 @@ class FluxProcessor(private val sampleRate: Float) {
     
     // Getters for current state
     
-    fun getCurrentVoltage(): Float = currentVoltage
+    // Legacy support (defaults to X2)
+    fun getCurrentVoltage(): Float = outX2
+    
     fun getSpread(): Float = spread
     fun getBias(): Float = bias
     fun getSteps(): Float = steps
@@ -138,6 +149,8 @@ class FluxProcessor(private val sampleRate: Float) {
      */
     fun reset() {
         randomSequence.reset()
-        currentVoltage = 0.5f
+        outX1 = 0.5f
+        outX2 = 0.5f
+        outX3 = 0.5f
     }
 }

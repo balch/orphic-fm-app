@@ -332,6 +332,15 @@ expect interface FluxUnit : AudioUnit {
     /** Clock rate/division (0.0 - 1.0) maps to dividers */
     val rate: AudioInput
     
+    /** Master Output (X2 - Main Melody) */
+    override val output: AudioOutput
+    
+    /** Secondary Output (X1) */
+    val outputX1: AudioOutput
+    
+    /** Tertiary Output (X3) */
+    val outputX3: AudioOutput
+    
     /**
      * Set the musical scale index.
      * @param index 0=Major, 1=Minor, 2=Pentatonic, etc.

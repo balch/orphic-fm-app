@@ -16,6 +16,8 @@ actual interface FluxUnit : AudioUnit {
     actual val dejaVu: AudioInput
     actual val length: AudioInput
     actual val rate: AudioInput
+    actual val outputX1: AudioOutput
+    actual val outputX3: AudioOutput
     actual fun setScale(index: Int)
 }
 
@@ -34,6 +36,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     
     // Output
     private val jsynOutput = UnitOutputPort("Output")
+    private val jsynOutputX1 = UnitOutputPort("OutputX1")
+    private val jsynOutputX3 = UnitOutputPort("OutputX3")
     
     // AudioUnit Wrapper Ports
     override val clock: AudioInput = JsynAudioInput(jsynClock)
@@ -45,6 +49,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     override val rate: AudioInput = JsynAudioInput(jsynRate)
     
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
+    override val outputX1: AudioOutput = JsynAudioOutput(jsynOutputX1)
+    override val outputX3: AudioOutput = JsynAudioOutput(jsynOutputX3)
     
     // Internal state for edge detection
     private var lastClock = 0.0
@@ -59,6 +65,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         addPort(jsynLength)
         addPort(jsynRate)
         addPort(jsynOutput)
+        addPort(jsynOutputX1)
+        addPort(jsynOutputX3)
         
         // Default values
         jsynSpread.set(0.5)
@@ -86,6 +94,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         val rates = jsynRate.values
         
         val outputs = jsynOutput.values
+        val outputsX1 = jsynOutputX1.values
+        val outputsX3 = jsynOutputX3.values
         
         for (i in 0 until count) {
             val idx = start + i
@@ -95,13 +105,6 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
             if (currentClock > 0.1 && lastClock <= 0.1) {
                 // Determine divisor based on rate input (0.0 - 1.0)
                 // Input is 24 PPQN
-                // 1/16th = 6 ticks
-                // 1/8th = 12 ticks
-                // 1/4th = 24 ticks
-                // 1/2th = 48 ticks
-                // 1 Bar = 96 ticks
-                // 2 Bar = 192 ticks
-                
                 val rateVal = rates[idx]
                 val divisor = when {
                     rateVal < 0.15 -> 6   // 1/16th (Fast)
@@ -128,7 +131,9 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
             }
             
             lastClock = currentClock
-            outputs[idx] = processor.getCurrentVoltage().toDouble()
+            outputs[idx] = processor.getX2().toDouble() // Main (X2)
+            outputsX1[idx] = processor.getX1().toDouble() // Secondary (X1)
+            outputsX3[idx] = processor.getX3().toDouble() // Tertiary (X3)
         }
     }
 }
