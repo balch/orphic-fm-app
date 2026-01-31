@@ -105,8 +105,7 @@ fun FluxPanel(
                 progressColor = androidx.compose.ui.graphics.Color.Gray
             )
             
-            // Simpler Scale Selector (cycling button for now or logic to be added later)
-            // Just a knob for scale index for now
+            // Scale Selector
              RotaryKnob(
                 value = state.scaleIndex.toFloat(),
                 onValueChange = { actions.setScale(it.toInt()) },
@@ -114,6 +113,16 @@ fun FluxPanel(
                 range = 0f..5f,
                 size = 48.dp,
                 progressColor = androidx.compose.ui.graphics.Color.Gray
+            )
+            
+            // Rate Divider
+            RotaryKnob(
+                value = state.rate,
+                onValueChange = { actions.setRate(it) },
+                label = "RATE",
+                controlId = "flux_rate",
+                size = 48.dp,
+                progressColor = OrpheusColors.synthPink
             )
         }
     }

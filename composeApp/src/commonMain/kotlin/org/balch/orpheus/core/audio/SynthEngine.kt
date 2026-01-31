@@ -299,6 +299,9 @@ interface SynthEngine {
     fun getFluxDejaVu(): Float
     fun getFluxLength(): Int
     fun getFluxScale(): Int
+    
+    fun setFluxRate(rate: Float) // 0-1, divider control
+    fun getFluxRate(): Float
 }
 
 enum class ModSource {

@@ -23,6 +23,7 @@ class DspFluxPlugin(
     private var _dejaVu = 0.0f
     private var _length = 8
     private var _scale = 0
+    private var _rate = 0.5f
 
     override val audioUnits: List<AudioUnit> = listOf(flux)
     
@@ -32,7 +33,8 @@ class DspFluxPlugin(
         "bias" to flux.bias,
         "steps" to flux.steps,
         "dejaVu" to flux.dejaVu,
-        "length" to flux.length
+        "length" to flux.length,
+        "rate" to flux.rate
     )
     
     override val outputs: Map<String, AudioOutput> = mapOf(
@@ -47,6 +49,12 @@ class DspFluxPlugin(
         setDejaVu(0.0f)
         setLength(8)
         setScale(0)
+        setRate(0.5f)
+    }
+    
+    fun setRate(value: Float) {
+        _rate = value
+        flux.rate.set(value.toDouble())
     }
     
     fun setSpread(value: Float) {
@@ -71,11 +79,6 @@ class DspFluxPlugin(
     
     fun setLength(value: Int) {
         _length = value
-        // Map 1-16 or similar logic. FluxProcessor logic clamps it but expects double on input port
-        // Wait, loop length is set via setLength(Int) on FluxProcessor,
-        // but exposed as AudioInput on FluxUnit.
-        // My FluxUnit.jvm.kt implementation uses `jsynLength` port.
-        // And inside `generate`, it sets `processor.setLength(lengths[idx].toInt())`.
         flux.length.set(value.toDouble())
     }
     
@@ -91,4 +94,5 @@ class DspFluxPlugin(
     fun getDejaVu() = _dejaVu
     fun getLength() = _length
     fun getScale() = _scale
+    fun getRate() = _rate
 }

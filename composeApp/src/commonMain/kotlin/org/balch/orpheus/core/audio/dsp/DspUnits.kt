@@ -329,6 +329,9 @@ expect interface FluxUnit : AudioUnit {
     /** Length of the loop (mapped to 1-16) */
     val length: AudioInput
     
+    /** Clock rate/division (0.0 - 1.0) maps to dividers */
+    val rate: AudioInput
+    
     /**
      * Set the musical scale index.
      * @param index 0=Major, 1=Minor, 2=Pentatonic, etc.

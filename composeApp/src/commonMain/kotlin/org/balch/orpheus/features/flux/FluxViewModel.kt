@@ -36,7 +36,8 @@ data class FluxUiState(
     val steps: Float = 0.5f,
     val dejaVu: Float = 0.0f,
     val length: Int = 8,
-    val scaleIndex: Int = 0
+    val scaleIndex: Int = 0,
+    val rate: Float = 0.5f
 )
 
 @Immutable
@@ -46,10 +47,11 @@ data class FluxPanelActions(
     val setSteps: (Float) -> Unit,
     val setDejaVu: (Float) -> Unit,
     val setLength: (Int) -> Unit,
-    val setScale: (Int) -> Unit
+    val setScale: (Int) -> Unit,
+    val setRate: (Float) -> Unit
 ) {
     companion object {
-        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {})
+        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -60,6 +62,7 @@ private sealed interface FluxIntent {
     data class DejaVu(val value: Float, val fromSequencer: Boolean = false) : FluxIntent
     data class Length(val value: Int) : FluxIntent
     data class Scale(val value: Int) : FluxIntent
+    data class Rate(val value: Float) : FluxIntent
     data class Restore(val state: FluxUiState) : FluxIntent
 }
 
@@ -80,7 +83,8 @@ class FluxViewModel(
         setSteps = ::onStepsChange,
         setDejaVu = ::onDejaVuChange,
         setLength = ::onLengthChange,
-        setScale = ::onScaleChange
+        setScale = ::onScaleChange,
+        setRate = ::onRateChange
     )
 
     private val _userIntents = MutableSharedFlow<FluxIntent>(
@@ -125,7 +129,8 @@ class FluxViewModel(
         steps = engine.getFluxSteps(),
         dejaVu = engine.getFluxDejaVu(),
         length = engine.getFluxLength(),
-        scaleIndex = engine.getFluxScale()
+        scaleIndex = engine.getFluxScale(),
+        rate = engine.getFluxRate()
     )
 
     private fun reduce(state: FluxUiState, intent: FluxIntent): FluxUiState = when (intent) {
@@ -135,6 +140,7 @@ class FluxViewModel(
         is FluxIntent.DejaVu -> state.copy(dejaVu = intent.value)
         is FluxIntent.Length -> state.copy(length = intent.value)
         is FluxIntent.Scale -> state.copy(scaleIndex = intent.value)
+        is FluxIntent.Rate -> state.copy(rate = intent.value)
         is FluxIntent.Restore -> intent.state
     }
 
@@ -146,6 +152,7 @@ class FluxViewModel(
             is FluxIntent.DejaVu -> engine.setFluxDejaVu(intent.value)
             is FluxIntent.Length -> engine.setFluxLength(intent.value)
             is FluxIntent.Scale -> engine.setFluxScale(intent.value)
+            is FluxIntent.Rate -> engine.setFluxRate(intent.value)
             is FluxIntent.Restore -> applyFullState(intent.state)
         }
     }
@@ -157,6 +164,7 @@ class FluxViewModel(
         engine.setFluxDejaVu(state.dejaVu)
         engine.setFluxLength(state.length)
         engine.setFluxScale(state.scaleIndex)
+        engine.setFluxRate(state.rate)
     }
 
     fun onSpreadChange(value: Float) = _userIntents.tryEmit(FluxIntent.Spread(value))
@@ -165,6 +173,7 @@ class FluxViewModel(
     fun onDejaVuChange(value: Float) = _userIntents.tryEmit(FluxIntent.DejaVu(value))
     fun onLengthChange(value: Int) = _userIntents.tryEmit(FluxIntent.Length(value))
     fun onScaleChange(value: Int) = _userIntents.tryEmit(FluxIntent.Scale(value))
+    fun onRateChange(value: Float) = _userIntents.tryEmit(FluxIntent.Rate(value))
 
     companion object Ids {
         const val SPREAD = "flux_spread"

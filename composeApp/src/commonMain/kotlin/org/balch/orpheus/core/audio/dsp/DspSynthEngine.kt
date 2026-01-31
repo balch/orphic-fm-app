@@ -1143,6 +1143,7 @@ class DspSynthEngine(
     override fun setFluxDejaVu(value: Float) = pluginProvider.fluxPlugin.setDejaVu(value)
     override fun setFluxLength(value: Int) = pluginProvider.fluxPlugin.setLength(value)
     override fun setFluxScale(index: Int) = pluginProvider.fluxPlugin.setScale(index)
+    override fun setFluxRate(rate: Float) = pluginProvider.fluxPlugin.setRate(rate)
     
     override fun getFluxSpread(): Float = pluginProvider.fluxPlugin.getSpread()
     override fun getFluxBias(): Float = pluginProvider.fluxPlugin.getBias()
@@ -1150,5 +1151,6 @@ class DspSynthEngine(
     override fun getFluxDejaVu(): Float = pluginProvider.fluxPlugin.getDejaVu()
     override fun getFluxLength(): Int = pluginProvider.fluxPlugin.getLength()
     override fun getFluxScale(): Int = pluginProvider.fluxPlugin.getScale()
+    override fun getFluxRate(): Float = pluginProvider.fluxPlugin.getRate()
 }
 
