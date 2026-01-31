@@ -15,7 +15,7 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspResonatorPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspStereoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspVibratoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspWarpsPlugin
-import org.balch.orpheus.plugins.delay.Lv2DelayPlugin
+import org.balch.orpheus.plugins.delay.DelayPlugin
 import org.balch.orpheus.plugins.distortion.DistortionPlugin
 
 @Inject
@@ -24,7 +24,7 @@ class DspPluginProvider(
     val plugins: Set<DspPlugin>
 ) {
     val hyperLfo by lazy { plugins.filterIsInstance<DspDuoLfoPlugin>().first() }
-    val delayPlugin by lazy { plugins.filterIsInstance<Lv2DelayPlugin>().first() }
+    val delayPlugin by lazy { plugins.filterIsInstance<DelayPlugin>().first() }
     val distortionPlugin by lazy { plugins.filterIsInstance<DistortionPlugin>().first() }
     val stereoPlugin by lazy { plugins.filterIsInstance<DspStereoPlugin>().first() }
     val vibratoPlugin by lazy { plugins.filterIsInstance<DspVibratoPlugin>().first() }

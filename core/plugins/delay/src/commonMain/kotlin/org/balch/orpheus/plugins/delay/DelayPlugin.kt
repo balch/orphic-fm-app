@@ -39,7 +39,7 @@ import org.balch.orpheus.core.audio.dsp.plugins.Lv2DspPlugin
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
-class Lv2DelayPlugin(
+class DelayPlugin(
     private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory
 ) : Lv2DspPlugin {
