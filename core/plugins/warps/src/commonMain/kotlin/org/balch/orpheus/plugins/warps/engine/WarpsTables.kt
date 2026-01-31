@@ -1,4 +1,4 @@
-package org.balch.orpheus.core.audio.dsp.synth.warps
+package org.balch.orpheus.plugins.warps.engine
 
 /**
  * Port of Mutable Instruments Warps lookup tables.

@@ -1,9 +1,14 @@
-package org.balch.orpheus.core.audio.dsp
+package org.balch.orpheus.plugins.warps
 
 import com.jsyn.ports.UnitInputPort
 import com.jsyn.ports.UnitOutputPort
 import com.jsyn.unitgen.UnitGenerator
-import org.balch.orpheus.core.audio.dsp.synth.warps.WarpsProcessor
+import org.balch.orpheus.core.audio.dsp.AudioInput
+import org.balch.orpheus.core.audio.dsp.AudioOutput
+import org.balch.orpheus.core.audio.dsp.JsynAudioInput
+import org.balch.orpheus.core.audio.dsp.JsynAudioOutput
+import org.balch.orpheus.core.audio.dsp.WarpsUnit
+import org.balch.orpheus.plugins.warps.engine.WarpsProcessor
 
 class JsynWarpsUnit : UnitGenerator(), WarpsUnit {
     

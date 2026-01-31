@@ -1,4 +1,4 @@
-package org.balch.orpheus.core.audio.dsp.synth.warps
+package org.balch.orpheus.plugins.warps.engine
 
 import org.balch.orpheus.core.audio.dsp.synth.grains.ParameterInterpolator
 

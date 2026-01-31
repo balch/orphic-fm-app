@@ -1,4 +1,4 @@
-package org.balch.orpheus.core.audio.dsp.synth.warps
+package org.balch.orpheus.plugins.warps.engine
 
 import kotlin.math.abs
 import kotlin.math.exp

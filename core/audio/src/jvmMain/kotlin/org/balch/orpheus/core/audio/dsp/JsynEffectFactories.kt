@@ -29,11 +29,7 @@ class JsynLooperUnitFactory @Inject constructor() : LooperUnit.Factory {
     override fun create(): LooperUnit = JsynLooperUnit()
 }
 
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
-class JsynWarpsUnitFactory @Inject constructor() : WarpsUnit.Factory {
-    override fun create(): WarpsUnit = JsynWarpsUnit()
-}
+
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)

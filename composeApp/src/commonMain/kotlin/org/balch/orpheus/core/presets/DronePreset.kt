@@ -2,8 +2,8 @@ package org.balch.orpheus.core.presets
 
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.audio.ModSource
-import org.balch.orpheus.core.audio.dsp.synth.warps.WarpsSource
 import org.balch.orpheus.features.lfo.HyperLfoMode
+import org.balch.orpheus.plugins.warps.engine.WarpsSource
 import org.balch.orpheus.util.currentTimeMillis
 
 /**
