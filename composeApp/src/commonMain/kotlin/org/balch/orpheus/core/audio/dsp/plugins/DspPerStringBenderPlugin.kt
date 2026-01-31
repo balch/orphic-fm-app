@@ -28,7 +28,7 @@ import kotlin.time.ExperimentalTime
  *   - Left strings: left = down, right = up
  *   - Right strings: left = up, right = down
  * - Per-voice volume mixing based on vertical pluck position
- * - Matching tension/spring sounds to DspBenderPlugin (no hum)
+ * - Matching tension/spring sounds to BenderPlugin (no hum)
  * 
  * String 0 -> Voices 0,1 (LEFT - normal direction)
  * String 1 -> Voices 2,3 (LEFT - normal direction)
@@ -73,7 +73,7 @@ class DspPerStringBenderPlugin(
     private val stringBendMonitors = Array(NUM_STRINGS) { dspFactory.createPeakFollower() }
     
     // ═══════════════════════════════════════════════════════════
-    // TENSION SOUND - Very subtle, matching DspBenderPlugin
+    // TENSION SOUND - Very subtle, matching BenderPlugin
     // ═══════════════════════════════════════════════════════════
     private val tensionOscillators = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }
     private val tensionEnvelopes = Array(NUM_STRINGS) { dspFactory.createEnvelope() }
@@ -82,7 +82,7 @@ class DspPerStringBenderPlugin(
     private val tensionGains = Array(NUM_STRINGS) { dspFactory.createMultiply() }
     
     // ═══════════════════════════════════════════════════════════
-    // SPRING SOUND - Matching DspBenderPlugin's wobble effect
+    // SPRING SOUND - Matching BenderPlugin's wobble effect
     // ═══════════════════════════════════════════════════════════
     private val springOscillators = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }
     private val springEnvelopes = Array(NUM_STRINGS) { dspFactory.createEnvelope() }

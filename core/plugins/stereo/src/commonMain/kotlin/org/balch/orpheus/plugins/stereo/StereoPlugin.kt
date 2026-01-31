@@ -1,61 +1,66 @@
-package org.balch.orpheus.core.audio.dsp.plugins
+package org.balch.orpheus.plugins.stereo
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
+import org.balch.orpheus.core.audio.dsp.lv2.AudioPort
+import org.balch.orpheus.core.audio.dsp.lv2.ControlPort
+import org.balch.orpheus.core.audio.dsp.lv2.PluginInfo
+import org.balch.orpheus.core.audio.dsp.lv2.Port
+import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.Lv2DspPlugin
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * DSP Plugin for stereo output stage.
+ * Stereo Plugin (Output stage).
  * 
- * Features:
- * - Stereo sum buses
- * - Per-voice panning (8 voices, equal-power pan law)
- * - Master pan and volume
- * - Peak monitoring
+ * Port Map:
+ * 0: Left Input (Audio)
+ * 1: Right Input (Audio)
+ * 2: Left Line Output (Audio)
+ * 3: Right Line Output (Audio)
+ * 4: Peak Output (Control Output)
+ * 5: Master Pan (Control Input, -1..1)
+ * 6: Master Volume (Control Input, 0..1)
+ * 7..18: Voice Pan (Control Input, -1..1)
  */
 @Inject
-@ContributesIntoSet(AppScope::class)
-class DspStereoPlugin(
+@SingleIn(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
+class StereoPlugin(
     private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory
-) : DspPlugin {
+) : Lv2DspPlugin {
 
-    // Parameters (smooth ramps)
-    private val widthRamp = dspFactory.createLinearRamp()
-    private val panRamp = dspFactory.createLinearRamp()
-    
-    // Core processing
-    private val midSideEncoder = dspFactory.createPassThrough() // Placeholder for MS logic if we had dedicated unit
-    
-    // Left/Right processing
-    private val leftGain = dspFactory.createMultiply()
-    private val rightGain = dspFactory.createMultiply()
+    override val info = PluginInfo(
+        uri = "org.balch.orpheus.plugins.stereo",
+        name = "Stereo Output",
+        author = "Balch"
+    )
 
-    // Pan calculation: 
-    // L = Input * (1 - Pan) * Volume
-    // R = Input * Pan * Volume
-    // For now simple balance:
-    private val panInverter = dspFactory.createMultiplyAdd() // 1 - Pan
-    
-    // Width (Mid/Side w/ decorrelation - simplified as delay offset?)
-    // Using simple Haas effect for width? Or just gain panning?
-    // Let's implement Width as simple channel separation control?
-    // Actually, Stereo Width usually requires M/S processing.
-    // Let's stick to Pan for now to be safe.
-    
-    // Audio Inputs/Outputs
-    // We need 2 inputs and 2 outputs for true stereo.
-    // DspPlugin interface is generic...
+    override val ports: List<Port> = buildList {
+        add(AudioPort(0, "in_l", "Left Input", true))
+        add(AudioPort(1, "in_r", "Right Input", true))
+        add(AudioPort(2, "out_l", "Left Output", false))
+        add(AudioPort(3, "out_r", "Right Output", false))
+        add(ControlPort(4, "peak", "Peak Monitor", 0f, 0f, 2f))
+        add(ControlPort(5, "master_pan", "Master Pan", 0f, -1f, 1f))
+        add(ControlPort(6, "master_vol", "Master Volume", 0.7f, 0f, 1f))
+        for (i in 0 until 12) {
+            add(ControlPort(7 + i, "voice_pan_$i", "Voice $i Pan", 0f, -1f, 1f))
+        }
+    }
 
-    // Stereo sum buses
+    // Summing buses
     private val stereoSumLeft = dspFactory.createPassThrough()
     private val stereoSumRight = dspFactory.createPassThrough()
     
@@ -71,23 +76,11 @@ class DspStereoPlugin(
     
     // Peak monitoring
     private val peakFollower = dspFactory.createPeakFollower()
-    private val peakFollowerL = dspFactory.createPeakFollower()
-    private val peakFollowerR = dspFactory.createPeakFollower()
 
     // State caches
     private val _voicePan = FloatArray(12) { 0f }
     private var _masterPan = 0f
     private var _masterVolume = 0.7f
-    
-    // Default voice pan positions (bass center, mids slight L/R, highs wide, REPL center)
-    private val defaultVoicePans = floatArrayOf(
-        0f, 0f,       // Quad 1 Pair 1 (Bass)
-        -0.3f, -0.3f, // Quad 1 Pair 2
-        0.3f, 0.3f,   // Quad 2 Pair 3
-        -0.7f, 0.7f,  // Quad 2 Pair 4
-        0f, 0f,       // Quad 3 Pair 5 (REPL)
-        0f, 0f        // Quad 3 Pair 6 (REPL)
-    )
 
     override val audioUnits: List<AudioUnit> = listOf(
         stereoSumLeft, stereoSumRight,
@@ -96,42 +89,36 @@ class DspStereoPlugin(
         peakFollower
     ) + voicePanLeft + voicePanRight
 
-    override val inputs: Map<String, AudioInput>
-        get() = mapOf(
-            "dryInputLeft" to stereoSumLeft.input,
-            "dryInputRight" to stereoSumRight.input
-        )
+    override val inputs: Map<String, AudioInput> = mapOf(
+        "dryInputLeft" to stereoSumLeft.input,
+        "dryInputRight" to stereoSumRight.input
+    )
 
-    // Expose voice pan outputs for external connection (to distortion)
-    fun getVoicePanOutputLeft(index: Int): AudioOutput = voicePanLeft[index].output
-    fun getVoicePanOutputRight(index: Int): AudioOutput = voicePanRight[index].output
+    override val outputs: Map<String, AudioOutput> = mapOf(
+        "lineOutLeft" to masterGainLeft.output,
+        "lineOutRight" to masterGainRight.output,
+        "peakOutput" to peakFollower.output
+    )
 
-    override val outputs: Map<String, AudioOutput>
-        get() = mapOf(
-            "lineOutLeft" to masterGainLeft.output,
-            "lineOutRight" to masterGainRight.output,
-            "peakOutput" to peakFollower.output
-        )
-
-    // Expose for automation
+    // Bridge methods
     val masterGainLeftInput: AudioInput get() = masterGainLeft.inputB
     val masterGainRightInput: AudioInput get() = masterGainRight.inputB
-
-    /** Get voice pan input for connection by DspSynthEngine */
     fun getVoicePanInputLeft(index: Int): AudioInput = voicePanLeft[index].inputA
     fun getVoicePanInputRight(index: Int): AudioInput = voicePanRight[index].inputA
+    fun getVoicePanOutputLeft(index: Int): AudioOutput = voicePanLeft[index].output
+    fun getVoicePanOutputRight(index: Int): AudioOutput = voicePanRight[index].output
 
     override fun initialize() {
         // Master defaults
         masterGainLeft.inputB.set(0.7)
         masterGainRight.inputB.set(0.7)
-        masterPanLeft.inputB.set(1.0)  // Center (equal L/R)
+        masterPanLeft.inputB.set(1.0)
         masterPanRight.inputB.set(1.0)
 
-        // Peak follower setup
+        // Peak follower
         peakFollower.setHalfLife(0.1)
 
-        // Stereo Sum → Master Pan → Master Gain → LineOut
+        // Sum -> Master Pan -> Master Gain -> LineOut
         stereoSumLeft.output.connect(masterPanLeft.inputA)
         stereoSumRight.output.connect(masterPanRight.inputA)
         masterPanLeft.output.connect(masterGainLeft.inputA)
@@ -140,19 +127,31 @@ class DspStereoPlugin(
         // Peak follower monitors left channel
         masterGainLeft.output.connect(peakFollower.input)
 
-        // NOTE: voicePan outputs are NOT connected to stereoSum here!
-        // DspSynthEngine wires: voicePan → distortion → stereoSum
-        // Direct wet paths (delays) can connect to stereoSum directly
+        // Register with engine
+        audioUnits.forEach { audioEngine.addUnit(it) }
 
-        // Apply default voice pan positions
-        defaultVoicePans.forEachIndexed { index, pan ->
-            setVoicePan(index, pan)
-        }
+        // Default voice pans
+        setVoicePan(0, 0f)
+        setVoicePan(1, 0f)
+        setVoicePan(2, -0.3f)
+        setVoicePan(3, -0.3f)
+        setVoicePan(4, 0.3f)
+        setVoicePan(5, 0.3f)
+        setVoicePan(6, -0.7f)
+        setVoicePan(7, 0.7f)
+        setVoicePan(8, 0f)
+        setVoicePan(9, 0f)
+        setVoicePan(10, 0f)
+        setVoicePan(11, 0f)
     }
 
+    override fun onStart() {}
+    override fun connectPort(index: Int, data: Any) {}
+    override fun run(nFrames: Int) {}
+
     fun setVoicePan(index: Int, pan: Float) {
+        if (index !in 0 until 12) return
         _voicePan[index] = pan.coerceIn(-1f, 1f)
-        // Equal-power pan law: L = cos(angle), R = sin(angle)
         val angle = ((pan + 1f) / 2f) * (PI / 2).toFloat()
         val leftGain = cos(angle.toDouble())
         val rightGain = sin(angle.toDouble())
@@ -176,8 +175,6 @@ class DspStereoPlugin(
     }
 
     fun getPeak(): Float = peakFollower.getCurrent().toFloat()
-
-    // Getters for state saving
     fun getVoicePan(index: Int): Float = _voicePan[index]
     fun getMasterPan(): Float = _masterPan
     fun getMasterVolume(): Float = _masterVolume
