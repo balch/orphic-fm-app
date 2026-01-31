@@ -9,14 +9,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
-import org.balch.orpheus.ui.preview.LiquidEffectsProvider
-import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -129,12 +125,8 @@ fun DuoLfoPanel(
 
 @Preview(widthDp = 400, heightDp = 400)
 @Composable
-fun HyperLfoPanelPreview(
-    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
-) {
-    LiquidPreviewContainerWithGradient(effects = effects) {
-        DuoLfoPanel(
-            feature = LfoViewModel.previewFeature()
-        )
-    }
+fun HyperLfoPanelPreview() {
+    DuoLfoPanel(
+        feature = LfoViewModel.previewFeature()
+    )
 }

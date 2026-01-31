@@ -12,12 +12,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
-import org.balch.orpheus.ui.preview.LiquidEffectsProvider
-import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.ValueCycleButton
@@ -172,14 +168,10 @@ fun FluxPanel(
 @Suppress("StateFlowValueCalledInComposition")
 @Preview(widthDp = 400, heightDp = 400)
 @Composable
-private fun FluxPanelPreview(
-    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
-) {
-    LiquidPreviewContainerWithGradient(effects = effects) {
-        FluxPanel(
-            flux = FluxViewModel.previewFeature(),
-            isExpanded = true,
-            showCollapsedHeader = false
-        )
-    }
+private fun FluxPanelPreview() {
+    FluxPanel(
+        flux = FluxViewModel.previewFeature(),
+        isExpanded = true,
+        showCollapsedHeader = false
+    )
 }

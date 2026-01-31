@@ -39,13 +39,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
-import org.balch.orpheus.ui.preview.LiquidEffectsProvider
-import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.compositeOver
 import kotlin.math.PI
@@ -307,13 +303,9 @@ private fun LooperActionButton(
 // Preview support
 @Preview(widthDp = 400, heightDp = 400)
 @Composable
-fun LooperPanelPreview(
-    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
-) {
-    LiquidPreviewContainerWithGradient(effects = effects) {
-        LooperPanel(
-            isExpanded = true,
-            feature = LooperViewModel.previewFeature(),
-        )
-    }
+fun LooperPanelPreview() {
+    LooperPanel(
+        isExpanded = true,
+        feature = LooperViewModel.previewFeature(),
+    )
 }

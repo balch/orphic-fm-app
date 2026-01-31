@@ -19,14 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
-import org.balch.orpheus.ui.preview.LiquidEffectsProvider
-import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VerticalToggle
@@ -181,12 +177,8 @@ private fun PeakLed(peak: Float, modifier: Modifier = Modifier) {
 
 @Preview(widthDp = 400, heightDp = 400)
 @Composable
-fun DistortionPanelPreview(
-    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
-) {
-    LiquidPreviewContainerWithGradient(effects = effects) {
-        DistortionPanel(
-            feature = DistortionViewModel.previewFeature()
-        )
-    }
+fun DistortionPanelPreview() {
+    DistortionPanel(
+        feature = DistortionViewModel.previewFeature()
+    )
 }

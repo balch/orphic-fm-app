@@ -46,6 +46,15 @@ kotlin {
             implementation(libs.findLibrary("androidx-lifecycle-runtimeCompose").get())
             implementation(libs.findLibrary("metrox-viewmodel-compose").get())
             implementation(libs.findLibrary("compose-ui-tooling-preview").get())
+            implementation(libs.findLibrary("kmlogging").get())
+
+            if (project.path.startsWith(":features")) {
+                implementation(project(":core:audio"))
+                implementation(project(":core:foundation"))
+                implementation(project(":ui:widgets"))
+                implementation(project(":ui:theme"))
+            }
+
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

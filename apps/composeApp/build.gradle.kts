@@ -64,6 +64,13 @@ kotlin {
             // TODO: Re-enable after moving shared code (SynthEngine, SynthFeature) to core:audio
             implementation(project(":features:warps"))
             implementation(project(":features:drum"))
+            implementation(project(":features:flux"))
+            implementation(project(":features:grains"))
+            implementation(project(":features:resonator"))
+            implementation(project(":features:lfo"))
+            implementation(project(":features:delay"))
+            implementation(project(":features:distortion"))
+            implementation(project(":features:looper"))
             implementation(libs.compose.material.icons)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)

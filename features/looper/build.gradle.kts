@@ -6,7 +6,7 @@ plugins {
 
 kotlin {
     androidLibrary {
-        namespace = "org.balch.orpheus.features.drum"
+        namespace = "org.balch.orpheus.features.looper"
     }
 
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
@@ -16,7 +16,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.core.plugins.drum)
+            implementation(projects.core.plugins.looper)
         }
     }
 }

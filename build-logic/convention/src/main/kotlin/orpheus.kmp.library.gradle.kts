@@ -31,6 +31,10 @@ kotlin {
     jvm()
 
     sourceSets {
+        commonMain.dependencies {
+            implementation(libs.findLibrary("kmlogging").get())
+        }
+
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
