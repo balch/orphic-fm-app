@@ -19,10 +19,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.config.AppConfig
-import org.balch.orpheus.ui.panels.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.liquidVizEffects
 
 @Preview
 @Composable

@@ -1,0 +1,46 @@
+Reusing configuration cache.
+> Task :foundation:audio:kspKotlinJvm SKIPPED
+> Task :foundation:copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :foundation:convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :foundation:audio:jvmProcessResources NO-SOURCE
+> Task :foundation:convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :foundation:audio:processJvmMainResources SKIPPED
+> Task :foundation:copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :foundation:generateExpectResourceCollectorsForCommonMain UP-TO-DATE
+> Task :foundation:generateBuildKonfig UP-TO-DATE
+> Task :foundation:audio:kmpPartiallyResolvedDependenciesChecker
+> Task :foundation:generateComposeResClass UP-TO-DATE
+> Task :foundation:kmpPartiallyResolvedDependenciesChecker
+> Task :foundation:prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :foundation:prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :foundation:audio:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :foundation:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :foundation:generateResourceAccessorsForCommonMain NO-SOURCE
+> Task :foundation:generateResourceAccessorsForJvmMain NO-SOURCE
+> Task :foundation:generateActualResourceCollectorsForJvmMain UP-TO-DATE
+> Task :foundation:audio:compileKotlinJvm UP-TO-DATE
+> Task :foundation:audio:compileJvmMainJava NO-SOURCE
+> Task :foundation:audio:jvmMainClasses UP-TO-DATE
+> Task :foundation:audio:jvmJar UP-TO-DATE
+> Task :foundation:kspKotlinJvm SKIPPED
+
+> Task :foundation:compileKotlinJvm FAILED
+e: file:///Users/balch/Source/Orpheus/foundation/foundation/jvmMain/kotlin/org/balch/orpheus/core/midi/MidiAccessFactory.jvm.kt:12:8 Unresolved reference 'uk'.
+e: file:///Users/balch/Source/Orpheus/foundation/foundation/jvmMain/kotlin/org/balch/orpheus/core/midi/MidiAccessFactory.jvm.kt:154:13 Unresolved reference 'CoreMidiDeviceProvider'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':foundation:compileKotlinJvm'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1s
+9 actionable tasks: 3 executed, 6 up-to-date
+Configuration cache entry reused.

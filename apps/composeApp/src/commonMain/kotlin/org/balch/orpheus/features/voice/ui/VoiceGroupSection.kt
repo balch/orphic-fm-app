@@ -30,12 +30,12 @@ import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
-import org.balch.orpheus.ui.panels.LocalLiquidEffects
-import org.balch.orpheus.ui.panels.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.ValueCycleButton
 

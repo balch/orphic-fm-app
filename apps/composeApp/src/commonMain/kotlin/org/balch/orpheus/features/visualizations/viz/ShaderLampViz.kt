@@ -22,11 +22,12 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.features.visualizations.viz.shader.MetaballsCanvas
 import org.balch.orpheus.features.visualizations.viz.shader.MetaballsConfig
+import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.CenterPanelStyle
+import org.balch.orpheus.ui.viz.Blob
 import org.balch.orpheus.ui.viz.Visualization
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.VisualizationLiquidScope
 import org.balch.orpheus.util.currentTimeMillis
 import kotlin.math.cos
 import kotlin.math.sin
@@ -189,7 +190,7 @@ class ShaderLampViz(
         x = x,
         y = y,
         radius = radius,
-        velocityY = velocityY,
+//        velocityY = velocityY,
         color = color,
         voiceIndex = voiceIndex,
         // Boost energy (color weight/influence) when active to retain color vibrancy

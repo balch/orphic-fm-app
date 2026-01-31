@@ -11,8 +11,8 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import org.balch.orpheus.features.visualizations.viz.Blob
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.Blob
 import org.balch.orpheus.ui.viz.Visualization
 
 /**

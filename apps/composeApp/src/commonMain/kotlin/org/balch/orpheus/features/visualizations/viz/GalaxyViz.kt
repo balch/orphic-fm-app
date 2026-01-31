@@ -27,12 +27,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.CenterPanelStyle
 import org.balch.orpheus.ui.viz.DynamicVisualization
 import org.balch.orpheus.ui.viz.Visualization
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.VisualizationLiquidScope
 import org.balch.orpheus.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos

@@ -61,12 +61,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.tidal.TidalScheduler
+import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
-import org.balch.orpheus.ui.panels.LocalLiquidEffects
-import org.balch.orpheus.ui.panels.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 
 /**

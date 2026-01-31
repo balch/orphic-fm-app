@@ -27,9 +27,9 @@ import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionPanelActions
 import org.balch.orpheus.features.distortion.DistortionUiState
 import org.balch.orpheus.features.distortion.DistortionViewModel
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 
 /**

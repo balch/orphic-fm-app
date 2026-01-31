@@ -11,23 +11,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.Vertical3WaySwitch
 import org.balch.orpheus.ui.widgets.VerticalToggle
 import org.balch.orpheus.ui.widgets.learnable
-
-enum class HyperLfoMode {
-    AND,
-    OFF,
-    OR
-}
 
 /**
  * HyperLfoPanel consuming feature() interface.

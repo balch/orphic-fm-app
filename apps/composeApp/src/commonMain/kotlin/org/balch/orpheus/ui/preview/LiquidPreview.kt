@@ -16,11 +16,11 @@ import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.features.visualizations.viz.GalaxyViz
 import org.balch.orpheus.features.visualizations.viz.LavaLampViz
 import org.balch.orpheus.features.visualizations.viz.SwirlyViz
-import org.balch.orpheus.ui.panels.LocalLiquidEffects
-import org.balch.orpheus.ui.panels.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 
 /**
  * PreviewParameterProvider for VisualizationLiquidEffects.

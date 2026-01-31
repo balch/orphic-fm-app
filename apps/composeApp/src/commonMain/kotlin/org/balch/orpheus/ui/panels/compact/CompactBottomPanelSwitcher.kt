@@ -32,11 +32,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.ui.panels.LocalLiquidEffects
-import org.balch.orpheus.ui.panels.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.viz.liquidVizEffects
 
 /**
  * Bottom panel switcher with oval nav bar for compact portrait mode.

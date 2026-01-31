@@ -3,10 +3,10 @@ package org.balch.orpheus.features.presets.patches
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
-import org.balch.orpheus.features.lfo.HyperLfoMode
 
 /**
  * Default Patch - A rich, musical starting point optimized for pleasant exploration.

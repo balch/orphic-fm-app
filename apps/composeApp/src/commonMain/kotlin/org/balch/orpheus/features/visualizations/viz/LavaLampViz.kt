@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
@@ -20,11 +19,12 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.CenterPanelStyle
+import org.balch.orpheus.ui.viz.Blob
 import org.balch.orpheus.ui.viz.Visualization
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.VisualizationLiquidScope
 import org.balch.orpheus.ui.widgets.VizBackground
 import org.balch.orpheus.util.currentTimeMillis
 import kotlin.random.Random
@@ -37,23 +37,6 @@ data class LavaLampUiState(
     val lfoModulation: Float = 0f,    // -1 to 1, affects color hue shift
     val masterEnergy: Float = 0f      // 0-1, overall brightness multiplier
 )
-
-/**
- * Represents a lava lamp blob/bubble in the visualization.
- */
-data class Blob(
-    val id: Int,
-    var x: Float,              // 0-1 normalized horizontal position
-    var y: Float,              // 0-1 normalized vertical position (0=bottom, 1=top)
-    var radius: Float,         // 0-0.3 normalized radius
-    var velocityY: Float,      // upward drift velocity
-    var color: Color, // color based on voice pair
-    var voiceIndex: Int,       // source voice 0-7
-    var energy: Float,         // current audio energy driving this blob
-    var alpha: Float = 1f,     // fade alpha for dying blobs
-    var age: Float = 0f        // age in seconds for lifecycle
-)
-
 
 /**
  * Lava Lamp visualization implementation.
@@ -200,8 +183,8 @@ class LavaLampViz(
             val lfoSpeedMod = 1f + (lfoValue * 0.3f)
 
             // Drift upward
-            blob.velocityY = baseDriftSpeed * lfoSpeedMod
-            blob.y += blob.velocityY
+            blob.vy = baseDriftSpeed * lfoSpeedMod
+            blob.y += blob.vy
 
             // Grow/Shrink
             if (blob.energy > baseSpawnThreshold * 0.5f) {
@@ -246,7 +229,7 @@ class LavaLampViz(
             x = x,
             y = -0.05f + Random.nextFloat() * 0.1f,
             radius = (0.02f + (masterLevel * 0.04f)) * sizeMultiplier, // Affected by SIZE
-            velocityY = baseDriftSpeed * 0.8f,
+            vy = baseDriftSpeed * 0.8f,
             color = color.copy(alpha = 0.5f),  // Reduced brightness
             voiceIndex = colorIndex * 2,
             energy = masterLevel
@@ -272,7 +255,7 @@ class LavaLampViz(
             x = baseX + (Random.nextFloat() - 0.5f) * 0.1f,
             y = -0.05f + Random.nextFloat() * 0.1f,
             radius = (0.03f + (level * 0.05f)) * sizeMultiplier, // Affected by SIZE
-            velocityY = baseDriftSpeed,
+            vy = baseDriftSpeed,
             color = color.copy(alpha = 0.6f),  // Reduced brightness
             voiceIndex = voiceIndex,
             energy = level
@@ -288,7 +271,7 @@ class LavaLampViz(
             x = childX,
             y = parent.y,
             radius = parent.radius * 0.4f,
-            velocityY = baseDriftSpeed * 1.5f,
+            vy = baseDriftSpeed * 1.5f,
             color = parent.color.copy(alpha = 0.5f),  // Reduced brightness
             voiceIndex = parent.voiceIndex,
             energy = parent.energy * 0.7f,

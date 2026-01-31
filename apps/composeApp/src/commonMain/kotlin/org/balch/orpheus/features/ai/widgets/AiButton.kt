@@ -17,7 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.liquid
-import org.balch.orpheus.ui.panels.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 /**

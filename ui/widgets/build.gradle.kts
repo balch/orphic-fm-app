@@ -22,14 +22,16 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":ui:theme"))
-            api(project(":core:foundation"))
+            api(project(":foundation"))
             
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
+            implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
             implementation(libs.liquid)
+            implementation(libs.compose.ui.tooling.preview)
         }
     }
 }

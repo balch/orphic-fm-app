@@ -21,10 +21,10 @@ import org.balch.orpheus.features.ai.chat.ChatDialog
 import org.balch.orpheus.features.debug.DebugBottomBar
 import org.balch.orpheus.features.debug.DebugViewModel
 import org.balch.orpheus.features.visualizations.VizViewModel
-import org.balch.orpheus.ui.panels.LocalLiquidEffects
-import org.balch.orpheus.ui.panels.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.VizBackground
 
 @Composable

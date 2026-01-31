@@ -6,8 +6,8 @@ import androidx.compose.ui.graphics.Color
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.Visualization
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 
 @Inject
 @ContributesIntoSet(AppScope::class)

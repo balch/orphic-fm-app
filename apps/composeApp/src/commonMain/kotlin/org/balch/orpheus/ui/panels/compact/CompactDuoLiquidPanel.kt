@@ -21,9 +21,9 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.liquidVizEffects
 
 /**
  * A glass panel containing a pair of voices (2 voices) with exact styling from reference.

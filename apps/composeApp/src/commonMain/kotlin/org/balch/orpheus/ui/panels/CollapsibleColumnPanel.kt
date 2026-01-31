@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,20 +28,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.lighten
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.liquidVizEffects
-
-/**
- * CompositionLocal for sharing LiquidState across panels.
- */
-val LocalLiquidState = compositionLocalOf<LiquidState?> { null }
-
-/**
- * CompositionLocal for sharing visualization-specific liquid effects across panels.
- */
-val LocalLiquidEffects = compositionLocalOf { VisualizationLiquidEffects.Default }
 
 /**
  * Collapsible settings panel for the left side of top row.

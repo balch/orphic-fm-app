@@ -50,9 +50,9 @@ import org.balch.orpheus.features.draw.DrawSequencerUiState
 import org.balch.orpheus.features.draw.DrawSequencerViewModel
 import org.balch.orpheus.features.draw.SequencerPath
 import org.balch.orpheus.features.draw.SequencerPoint
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.liquidVizEffects
 
 /**
  * Compact inline view for multi-parameter sequencer automation.

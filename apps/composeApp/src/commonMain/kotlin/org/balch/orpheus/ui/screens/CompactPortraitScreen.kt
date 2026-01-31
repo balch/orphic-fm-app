@@ -72,8 +72,8 @@ import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.features.warps.WarpsFeature
 import org.balch.orpheus.features.warps.WarpsPanel
 import org.balch.orpheus.features.warps.WarpsViewModel
-import org.balch.orpheus.ui.panels.LocalLiquidEffects
-import org.balch.orpheus.ui.panels.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
+import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.panels.compact.CompactAiSection
 import org.balch.orpheus.ui.panels.compact.CompactBottomPanelSwitcher
 import org.balch.orpheus.ui.panels.compact.CompactBottomPanelType

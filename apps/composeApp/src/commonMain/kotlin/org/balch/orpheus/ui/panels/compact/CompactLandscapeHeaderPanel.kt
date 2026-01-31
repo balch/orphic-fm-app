@@ -35,9 +35,9 @@ import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
-import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 
 @OptIn(ExperimentalMaterial3Api::class)

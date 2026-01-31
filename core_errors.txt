@@ -1,0 +1,67 @@
+Reusing configuration cache.
+> Task :core:audio:kspKotlinJvm SKIPPED
+> Task :core:audio:jvmProcessResources NO-SOURCE
+> Task :core:convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :core:convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :core:audio:processJvmMainResources SKIPPED
+> Task :core:copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :core:copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :core:prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :core:audio:kmpPartiallyResolvedDependenciesChecker
+> Task :core:generateExpectResourceCollectorsForCommonMain UP-TO-DATE
+> Task :core:kmpPartiallyResolvedDependenciesChecker
+> Task :core:audio:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:generateResourceAccessorsForJvmMain NO-SOURCE
+> Task :core:generateComposeResClass UP-TO-DATE
+> Task :core:prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :core:generateBuildKonfig UP-TO-DATE
+> Task :core:generateResourceAccessorsForCommonMain NO-SOURCE
+> Task :core:generateActualResourceCollectorsForJvmMain UP-TO-DATE
+> Task :core:audio:compileKotlinJvm UP-TO-DATE
+> Task :core:audio:compileJvmMainJava NO-SOURCE
+> Task :core:audio:jvmMainClasses UP-TO-DATE
+> Task :core:audio:jvmJar UP-TO-DATE
+> Task :core:kspKotlinJvm SKIPPED
+
+> Task :core:compileKotlinJvm FAILED
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/SynthFeature.kt:5:39 Unresolved reference 'metroViewModel'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/SynthFeature.kt:35:5 Unresolved reference 'metroViewModel'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/SynthFeature.kt:41:5 Unresolved reference 'metroViewModel'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:5:26 Unresolved reference 'features'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:6:26 Unresolved reference 'plugins'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:7:26 Unresolved reference 'util'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:28:23 Serializer has not been found for type 'ERROR CLASS: Symbol not found for HyperLfoMode'. To use context serializer as fallback, explicitly annotate type or property with @Contextual
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:28:23 Unresolved reference 'HyperLfoMode'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:28:38 Unresolved reference 'HyperLfoMode'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:113:29 Serializer has not been found for type 'ERROR CLASS: Symbol not found for WarpsSource'. To use context serializer as fallback, explicitly annotate type or property with @Contextual
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:113:29 Unresolved reference 'WarpsSource'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:113:43 Unresolved reference 'WarpsSource'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:114:31 Serializer has not been found for type 'ERROR CLASS: Symbol not found for WarpsSource'. To use context serializer as fallback, explicitly annotate type or property with @Contextual
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:114:31 Unresolved reference 'WarpsSource'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:114:45 Unresolved reference 'WarpsSource'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/DronePreset.kt:131:27 Unresolved reference 'currentTimeMillis'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/PresetLoader.kt:12:26 Unresolved reference 'features'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/PresetLoader.kt:68:21 Unresolved reference 'HyperLfoMode'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/PresetLoader.kt:68:21 Cannot infer type for type parameter 'V'. Specify it explicitly.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/presets/PresetLoader.kt:70:21 Unresolved reference 'HyperLfoMode'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/tidal/TidalRepl.kt:15:26 Unresolved reference 'util'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/tidal/TidalRepl.kt:1015:49 Unresolved reference 'currentTimeMillis'.
+e: file:///Users/balch/Source/Orpheus/core/foundation/commonMain/kotlin/org/balch/orpheus/core/tidal/TidalRepl.kt:1025:34 Unresolved reference 'currentTimeMillis'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':core:compileKotlinJvm'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2s
+9 actionable tasks: 3 executed, 6 up-to-date
+Configuration cache entry reused.

@@ -62,7 +62,11 @@ fun SynthScreen(
 
     var isDialogActive by remember { mutableStateOf(false) }
 
-    LearnModeProvider {
+    LearnModeProvider(
+        isLearnModeActive = isDialogActive,
+        selectedControlId = "",
+        onSelectControl = {  },
+    ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val layoutMode = determineLayoutMode(maxWidth.value, maxHeight.value)
             

@@ -55,14 +55,14 @@ import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
 import org.balch.orpheus.features.warps.WarpsFeature
 import org.balch.orpheus.features.warps.WarpsViewModel
+import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.panels.HeaderViewModel
-import org.balch.orpheus.ui.panels.LocalLiquidEffects
 import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 
 /**

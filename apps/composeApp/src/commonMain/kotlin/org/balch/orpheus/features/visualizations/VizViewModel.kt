@@ -20,9 +20,9 @@ import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.visualizations.viz.OffViz
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.DynamicVisualization
 import org.balch.orpheus.ui.viz.Visualization
-import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 
 
 /**

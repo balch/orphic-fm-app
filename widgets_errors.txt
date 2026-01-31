@@ -1,0 +1,183 @@
+Calculating task graph as no cached configuration is available for tasks: :ui:widgets:compileKotlinJvm
+Type-safe project accessors is an incubating feature.
+> Task :convention:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :convention:generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :convention:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :convention:compilePluginsBlocks UP-TO-DATE
+> Task :convention:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :convention:generateScriptPluginAdapters UP-TO-DATE
+> Task :convention:compileKotlin UP-TO-DATE
+> Task :convention:compileJava NO-SOURCE
+> Task :convention:pluginDescriptors UP-TO-DATE
+> Task :convention:processResources UP-TO-DATE
+> Task :convention:classes UP-TO-DATE
+> Task :convention:jar UP-TO-DATE
+> Task :ui:theme:generateComposeResClass SKIPPED
+> Task :ui:theme:convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :ui:theme:convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :foundation:copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :ui:widgets:convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :ui:theme:copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :foundation:audio:kspKotlinJvm SKIPPED
+> Task :foundation:copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :ui:theme:copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :foundation:convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :foundation:convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :ui:theme:generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :foundation:generateBuildKonfig UP-TO-DATE
+> Task :foundation:generateExpectResourceCollectorsForCommonMain UP-TO-DATE
+> Task :ui:theme:prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :ui:widgets:copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :foundation:audio:jvmProcessResources NO-SOURCE
+> Task :ui:theme:generateResourceAccessorsForCommonMain SKIPPED
+> Task :foundation:generateComposeResClass UP-TO-DATE
+> Task :foundation:kmpPartiallyResolvedDependenciesChecker
+> Task :ui:theme:kmpPartiallyResolvedDependenciesChecker
+> Task :ui:widgets:generateComposeResClass UP-TO-DATE
+> Task :ui:widgets:convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :ui:widgets:kmpPartiallyResolvedDependenciesChecker
+> Task :foundation:audio:kmpPartiallyResolvedDependenciesChecker
+> Task :foundation:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :ui:theme:prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :ui:widgets:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :ui:widgets:copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :foundation:audio:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :foundation:prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :ui:widgets:generateExpectResourceCollectorsForCommonMain UP-TO-DATE
+> Task :ui:theme:generateResourceAccessorsForJvmMain SKIPPED
+> Task :foundation:audio:processJvmMainResources SKIPPED
+> Task :ui:theme:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :foundation:prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :ui:widgets:prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :ui:theme:generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :foundation:generateResourceAccessorsForCommonMain NO-SOURCE
+> Task :foundation:generateResourceAccessorsForJvmMain NO-SOURCE
+> Task :ui:widgets:prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :ui:theme:assembleJvmMainResources UP-TO-DATE
+> Task :foundation:assembleJvmMainResources UP-TO-DATE
+> Task :ui:widgets:generateResourceAccessorsForCommonMain NO-SOURCE
+> Task :ui:widgets:generateResourceAccessorsForJvmMain NO-SOURCE
+> Task :ui:theme:jvmProcessResources UP-TO-DATE
+> Task :ui:widgets:generateActualResourceCollectorsForJvmMain UP-TO-DATE
+> Task :foundation:generateActualResourceCollectorsForJvmMain UP-TO-DATE
+> Task :ui:theme:processJvmMainResources SKIPPED
+> Task :ui:theme:compileKotlinJvm UP-TO-DATE
+> Task :ui:theme:compileJvmMainJava NO-SOURCE
+> Task :ui:theme:jvmMainClasses UP-TO-DATE
+> Task :ui:theme:jvmJar UP-TO-DATE
+> Task :foundation:audio:compileKotlinJvm UP-TO-DATE
+> Task :foundation:audio:compileJvmMainJava NO-SOURCE
+> Task :foundation:audio:jvmMainClasses UP-TO-DATE
+> Task :foundation:audio:jvmJar UP-TO-DATE
+> Task :foundation:kspKotlinJvm SKIPPED
+> Task :foundation:jvmProcessResources UP-TO-DATE
+> Task :foundation:processJvmMainResources SKIPPED
+> Task :foundation:compileKotlinJvm UP-TO-DATE
+> Task :foundation:compileJvmMainJava NO-SOURCE
+> Task :foundation:jvmMainClasses UP-TO-DATE
+> Task :foundation:jvmJar UP-TO-DATE
+
+> Task :ui:widgets:compileKotlinJvm FAILED
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:18:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:22:29 Unresolved reference 'panels'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:24:29 Unresolved reference 'viz'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:25:29 Unresolved reference 'viz'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:27:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:31:14 Unresolved reference 'VisualizationLiquidEffects'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:31:43 Unresolved reference 'VisualizationLiquidEffects'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:34:23 Unresolved reference 'LocalLiquidState'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:37:39 Unresolved reference 'title'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:38:20 Cannot infer type for type parameter 'R'. Specify it explicitly.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:38:44 Unresolved reference 'title'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:39:18 'operator' modifier is required on 'fun <T> Comparable<T>.compareTo(other: T): Int'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:52:14 Unresolved reference 'liquidVizEffects'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:54:33 Unresolved reference 'title'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:55:39 Unresolved reference 'frostLarge'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:61:75 Unresolved reference 'title'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:65:38 Unresolved reference 'title'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:65:65 Unresolved reference 'title'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:72:29 Unresolved reference 'title'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/AppTitleTreatment.kt:75:29 Unresolved reference 'title'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/BenderFaderWidget.kt:39:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/BenderFaderWidget.kt:342:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/BenderFaderWidget.kt:366:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/CompactSecondsSlider.kt:35:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/CompactSecondsSlider.kt:154:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/DraggableDivider.kt:21:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/DraggableDivider.kt:101:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/DraggableDivider.kt:116:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HoldSwitch.kt:19:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HoldSwitch.kt:26:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HorizontalEnvelopeSlider.kt:34:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HorizontalEnvelopeSlider.kt:171:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HorizontalMiniSlider.kt:34:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HorizontalMiniSlider.kt:184:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HorizontalSwitch3Way.kt:26:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HorizontalSwitch3Way.kt:148:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HorizontalToggle.kt:23:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/HorizontalToggle.kt:98:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/LfoSwitch.kt:24:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/LfoSwitch.kt:34:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/ModSourceSelector.kt:25:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/ModSourceSelector.kt:93:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/PulseButton.kt:24:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/PulseButton.kt:44:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/RotaryKnob.kt:29:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/RotaryKnob.kt:41:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/SegmentedAlgoKnob.kt:33:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/SegmentedAlgoKnob.kt:347:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VerticalMiniSlider.kt:33:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VerticalMiniSlider.kt:179:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VerticalToggle.kt:22:28 Unresolved reference 'tooling'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VerticalToggle.kt:113:2 Unresolved reference 'Preview'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:14:26 Unresolved reference 'features'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:16:29 Unresolved reference 'viz'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:24:18 Unresolved reference 'Visualization'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:32:21 Unresolved reference 'Content'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:40:17 Unresolved reference 'Blob'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:66:25 Unresolved reference 'Blob'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:111:38 Unresolved reference 'Blob'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:112:24 Unresolved reference 'x'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:113:30 Unresolved reference 'y'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:114:29 Unresolved reference 'radius'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:117:22 'operator' modifier is required on 'fun <T> Comparable<T>.compareTo(other: T): Int'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:120:32 Unresolved reference 'alpha'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:120:45 Unresolved reference 'energy'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:123:27 Unresolved reference 'color'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:124:26 Unresolved reference 'color'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:126:26 Unresolved reference 'color'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:146:31 Unresolved reference 'color'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:147:21 Unresolved reference 'color'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:148:23 Unresolved reference 'color'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/VizBackground.kt:149:22 Unresolved reference 'color'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/dialogs/DraggableDialog.kt:20:34 Unresolved reference 'icons'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/dialogs/DraggableDialog.kt:21:34 Unresolved reference 'icons'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/dialogs/DraggableDialog.kt:45:16 Unresolved reference 'apps'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/dialogs/DraggableDialog.kt:46:16 Unresolved reference 'apps'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/dialogs/DraggableDialog.kt:129:55 Unresolved reference 'Res'.
+e: file:///Users/balch/Source/Orpheus/ui/widgets/src/commonMain/kotlin/org/balch/orpheus/ui/widgets/dialogs/DraggableDialog.kt:159:43 Unresolved reference 'Icons'.
+
+[Incubating] Problems report is available at: file:///Users/balch/Source/Orpheus/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':ui:widgets:compileKotlinJvm'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.3.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 2s
+31 actionable tasks: 5 executed, 26 up-to-date
+Configuration cache entry stored.
