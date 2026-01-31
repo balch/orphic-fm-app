@@ -41,6 +41,11 @@ kotlin {
             implementation(libs.findLibrary("compose-material3").get())
             implementation(libs.findLibrary("ui").get())
             implementation(libs.findLibrary("compose-components-resources").get())
+            implementation(libs.findLibrary("compose-material-icons").get())
+            implementation(libs.findLibrary("androidx-lifecycle-viewmodelCompose").get())
+            implementation(libs.findLibrary("androidx-lifecycle-runtimeCompose").get())
+            implementation(libs.findLibrary("metrox-viewmodel-compose").get())
+            implementation(libs.findLibrary("compose-ui-tooling-preview").get())
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

@@ -9,11 +9,18 @@ kotlin {
         namespace = "org.balch.orpheus.features.warps"
     }
 
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+    }
+
     sourceSets {
         commonMain.dependencies {
-            implementation(compose.components.uiToolingPreview)
             implementation(projects.core.audio)
+            implementation(projects.core.foundation)
             implementation(projects.core.plugins.warps)
+            implementation(projects.ui.widgets)
+            implementation(projects.ui.theme)
         }
     }
 }

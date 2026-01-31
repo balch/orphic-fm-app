@@ -16,9 +16,11 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(compose.components.uiToolingPreview)
             implementation(projects.core.audio)
+            implementation(projects.core.foundation)
             implementation(projects.core.plugins.drum)
+            implementation(projects.ui.widgets)
+            implementation(projects.ui.theme)
         }
     }
 }

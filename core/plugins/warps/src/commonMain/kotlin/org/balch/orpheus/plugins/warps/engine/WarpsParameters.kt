@@ -4,7 +4,6 @@ package org.balch.orpheus.plugins.warps.engine
  * Audio sources available for Warps carrier and modulator inputs.
  */
 
-
 enum class ModulationAlgorithm {
     XFADE,
     FOLD,

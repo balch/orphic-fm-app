@@ -24,12 +24,12 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.WarpsSource
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
-import org.balch.orpheus.plugins.warps.engine.WarpsSource
 
 @Immutable
 data class WarpsUiState(

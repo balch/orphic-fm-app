@@ -55,5 +55,5 @@ include(":core:plugins:duolfo")
 include(":ui:theme")
 include(":ui:widgets")
 // TODO: Re-enable after moving shared code (SynthEngine, SynthFeature) to core:audio
-// include(":features:warps")
-// include(":features:drum")
+include(":features:warps")
+include(":features:drum")
