@@ -24,6 +24,7 @@ kotlinx-collections-immutable = "0.4.0"
 liquid = "1.1.1"
 jsyn = "v17.2.0"
 kmlogging = "2.1.0"
+material3Version = "1.9.0"
 media = "1.7.1"
 slf4jApi = "2.0.17"
 logback = "1.5.27"
@@ -40,19 +41,25 @@ markdown = "0.39.1"
 androidx-benchmark-macro = "1.4.1"
 androidx-profileinstaller = "1.4.1"
 androidx-test-uiautomator = "2.3.0"
+composeIcons = "1.7.3"
 
 [libraries]
 androidx-media = { module = "androidx.media:media", version.ref = "media" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeGradlePlugin" }
+compose-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "composeIcons" }
 compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
 compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "composeGradlePlugin" }
 dev-zacsweers-metro-gradle-plugin = { module = "dev.zacsweers.metro:dev.zacsweers.metro.gradle.plugin", version.ref = "metro" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeGradlePlugin" }
 gradle = { module = "com.android.tools.build:gradle", version.ref = "gradle" }
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 ksp-gradle-plugin = { module = "com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3Version" }
 metro-gradle-plugin = { module = "dev.zacsweers.metro:metro-gradle-plugin", version.ref = "metro" }
 liquid = { module = "io.github.fletchmckee.liquid:liquid", version.ref = "liquid" }
 jsyn = { module = "com.github.philburk:jsyn", version.ref = "jsyn" }
 kmlogging = { module = "com.diamondedge:logging", version.ref = "kmlogging" }
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeGradlePlugin" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4jApi" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
@@ -105,6 +112,7 @@ androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", 
 # Compose UI Tooling (for previews)
 compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "composeMultiplatform" }
 compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
+ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeGradlePlugin" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

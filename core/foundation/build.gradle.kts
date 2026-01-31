@@ -30,8 +30,6 @@ kotlin {
     
     sourceSets {
         val commonMain by getting {
-            kotlin.srcDirs("core/commonMain/kotlin")
-            resources.srcDirs("core/commonMain/resources")
             dependencies {
                 api(project(":core:audio"))
                 
@@ -60,8 +58,6 @@ kotlin {
             }
         }
         val jvmMain by getting {
-            kotlin.srcDirs("foundation/jvmMain/kotlin")
-            resources.srcDirs("foundation/jvmMain/resources")
             dependencies {
                 implementation(libs.ktmidi.jvm.desktop)
                 implementation(libs.jsyn)
@@ -70,12 +66,8 @@ kotlin {
             }
         }
         val androidMain by getting {
-            kotlin.srcDirs("foundation/androidMain/kotlin")
-            resources.srcDirs("foundation/androidMain/resources")
         }
         val wasmJsMain by getting {
-            kotlin.srcDirs("foundation/wasmJsMain/kotlin")
-            resources.srcDirs("foundation/wasmJsMain/resources")
         }
     }
 }

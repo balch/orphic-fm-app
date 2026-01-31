@@ -21,7 +21,7 @@ kotlin {
             api(project(":ui:theme"))
             api(project(":core:foundation"))
 
-            implementation(compose.materialIconsExtended)
+            implementation(libs.compose.material.icons)
 
             implementation(libs.liquid)
             implementation(libs.compose.ui.tooling.preview)

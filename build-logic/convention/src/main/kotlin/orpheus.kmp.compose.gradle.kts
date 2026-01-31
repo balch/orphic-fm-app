@@ -36,11 +36,11 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
+            implementation(libs.findLibrary("compose-runtime").get())
+            implementation(libs.findLibrary("compose-foundation").get())
+            implementation(libs.findLibrary("compose-material3").get())
+            implementation(libs.findLibrary("ui").get())
+            implementation(libs.findLibrary("compose-components-resources").get())
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
