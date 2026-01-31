@@ -62,6 +62,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":core:audio"))
             implementation(project(":core:plugins:delay"))
+            implementation(project(":core:plugins:distortion"))
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
