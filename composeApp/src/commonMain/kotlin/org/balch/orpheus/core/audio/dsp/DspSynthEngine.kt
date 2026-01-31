@@ -74,6 +74,8 @@ class DspSynthEngine(
     private var fluxClockSource = 0 // 0=Internal, 1=LFO
     private val quadTriggerSources = IntArray(3) { 0 }
     private val quadPitchSources = IntArray(3) { 0 }
+    private var fluxGateLength = 0.5f
+    private var quadEnvelopeTriggerMode = 0 // 0=Gate, 1=Trigger
 
     // Reactive monitoring flows
     private val _peakFlow = MutableStateFlow(0f)
@@ -1039,6 +1041,14 @@ class DspSynthEngine(
         }
     }
 
+    override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) {
+        if (quadIndex !in 0..2) return
+        val voiceIndices = (quadIndex * 4) until ((quadIndex + 1) * 4)
+        for (i in voiceIndices) {
+            voices[i].setTriggerMode(enabled)
+        }
+    }
+
     override fun getQuadPitchSource(quadIndex: Int): Int = quadPitchSources.getOrElse(quadIndex) { 0 }
     override fun getQuadTriggerSource(quadIndex: Int): Int = quadTriggerSources.getOrElse(quadIndex) { 0 }
     
@@ -1054,6 +1064,13 @@ class DspSynthEngine(
     }
     
     override fun getFluxClockSource(): Int = fluxClockSource
+    
+    override fun setFluxGateLength(value: Float) {
+        fluxGateLength = value
+        pluginProvider.fluxPlugin.setGateLength(value)
+    }
+    
+    override fun getFluxGateLength(): Float = fluxGateLength
     
     // Beat Sequencer Storage (State only)
     private var _beatsX = 0.5f

@@ -26,6 +26,7 @@ class DspFluxPlugin(
     private var _rate = 0.5f
     private var _jitter = 0.0f
     private var _probability = 0.5f
+    private var _gateLength = 0.5f
 
     override val audioUnits: List<AudioUnit> = listOf(flux)
     
@@ -38,7 +39,8 @@ class DspFluxPlugin(
         "length" to flux.length,
         "rate" to flux.rate,
         "jitter" to flux.jitter,
-        "probability" to flux.probability
+        "probability" to flux.probability,
+        "gateLength" to flux.gateLength
     )
     
     override val outputs: Map<String, AudioOutput> = mapOf(
@@ -61,6 +63,7 @@ class DspFluxPlugin(
         setRate(0.5f)
         setJitter(0.0f)
         setProbability(0.5f)
+        setGateLength(0.5f)
     }
     
     fun setRate(value: Float) {
@@ -106,6 +109,11 @@ class DspFluxPlugin(
     fun setProbability(value: Float) {
         _probability = value
         flux.probability.set(value.toDouble())
+    }
+    
+    fun setGateLength(value: Float) {
+        _gateLength = value
+        flux.gateLength.set(value.toDouble())
     }
     
     // Getters for state perstistence/UI

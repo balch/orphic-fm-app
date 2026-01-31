@@ -18,6 +18,7 @@ actual interface FluxUnit : AudioUnit {
     actual val rate: AudioInput
     actual val jitter: AudioInput
     actual val probability: AudioInput
+    actual val gateLength: AudioInput
     actual val outputX1: AudioOutput
     actual val outputX3: AudioOutput
     actual val outputT2: AudioOutput
@@ -40,6 +41,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     private val jsynRate = UnitInputPort("Rate") // Divider control
     private val jsynJitter = UnitInputPort("Jitter")
     private val jsynProbability = UnitInputPort("Probability")
+    private val jsynGateLength = UnitInputPort("GateLength")
     
     // Output
     private val jsynOutput = UnitOutputPort("Output")
@@ -61,6 +63,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     override val rate: AudioInput = JsynAudioInput(jsynRate)
     override val jitter: AudioInput = JsynAudioInput(jsynJitter)
     override val probability: AudioInput = JsynAudioInput(jsynProbability)
+    override val gateLength: AudioInput = JsynAudioInput(jsynGateLength)
     
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
     override val outputX1: AudioOutput = JsynAudioOutput(jsynOutputX1)
@@ -72,6 +75,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     // Internal state for edge detection
     private var lastClock = 0.0
     private var clockCounter = 0
+    private var currentDivisor = 24
+    private var isGateActive = false
     
     init {
         addPort(jsynClock)
@@ -83,6 +88,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         addPort(jsynRate)
         addPort(jsynJitter)
         addPort(jsynProbability)
+        addPort(jsynGateLength)
         addPort(jsynOutput)
         addPort(jsynOutputX1)
         addPort(jsynOutputX3)
@@ -99,6 +105,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         jsynRate.set(0.5) // Default to 1/2 note or similar
         jsynJitter.set(0.0)
         jsynProbability.set(0.5)
+        jsynGateLength.set(0.5)
     }
     
     override fun setScale(index: Int) {
@@ -119,6 +126,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         val rates = jsynRate.values
         val jitters = jsynJitter.values
         val probabilities = jsynProbability.values
+        val gateLengths = jsynGateLength.values
         
         val outputs = jsynOutput.values
         val outputsX1 = jsynOutputX1.values
@@ -133,24 +141,21 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
             
             // Rising edge detection
             if (currentClock > 0.1 && lastClock <= 0.1) {
-                // Determine divisor based on rate input (0.0 - 1.0)
-                // Input is 24 PPQN
                 val rateVal = rates[idx]
-                val divisor = when {
-                    rateVal < 0.05 -> 1   // Direct (No division - for LFO or custom clocks)
-                    rateVal < 0.15 -> 6   // 1/16th (Fast)
-                    rateVal < 0.30 -> 12  // 1/8th
-                    rateVal < 0.50 -> 24  // 1/4th (Beat)
-                    rateVal < 0.70 -> 48  // 1/2th
-                    rateVal < 0.85 -> 96  // 1 Bar
-                    else -> 192           // 2 Bars (Slow)
+                currentDivisor = when {
+                    rateVal < 0.05 -> 1   
+                    rateVal < 0.15 -> 6   
+                    rateVal < 0.30 -> 12  
+                    rateVal < 0.50 -> 24  
+                    rateVal < 0.70 -> 48  
+                    rateVal < 0.85 -> 96  
+                    else -> 192           
                 }
                 
                 clockCounter++
-                if (clockCounter >= divisor) {
-                    clockCounter = 0 // Reset counter
+                if (clockCounter >= currentDivisor) {
+                    clockCounter = 0 
                     
-                    // Trigger Processor
                     processor.setSpread(spreads[idx].toFloat())
                     processor.setBias(biases[idx].toFloat())
                     processor.setSteps(steps[idx].toFloat())
@@ -160,14 +165,20 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
                     processor.setGateProbability(probabilities[idx].toFloat())
                     
                     processor.tick()
+                    isGateActive = true
                 }
-            } else if (currentClock <= 0.1) {
-                // Ensure gates turn off when clock is low (simplified pulse width)
-                // For proper gates we might want a counter, but clock pulse is usually short.
-                // We use tickClockOff to allow TimingGenerator to reset its state if needed.
-                if (lastClock > 0.1) {
-                     processor.tickClockOff()
-                }
+            } else if (currentClock < 0.01) {
+                // If the master clock pulse ends, we might still want to keep the Flux gate high 
+                // based on the gateLength setting.
+            }
+            
+            // Handle gate-off based on gateLength percentage of the divisor
+            val gateLenVal = gateLengths[idx]
+            val gateOffThreshold = (currentDivisor * gateLenVal).toInt().coerceAtLeast(1)
+            
+            if (isGateActive && clockCounter >= gateOffThreshold) {
+                processor.tickClockOff()
+                isGateActive = false
             }
             
             lastClock = currentClock

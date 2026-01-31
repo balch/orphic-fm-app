@@ -26,6 +26,7 @@ interface VoiceActions {
     fun onWobbleMove(index: Int, x: Float, y: Float)
     fun onWobblePulseEnd(index: Int)
     fun onQuadTriggerSourceChange(quadIndex: Int, sourceIndex: Int)
+    fun onQuadEnvelopeTriggerModeChange(quadIndex: Int, enabled: Boolean)
 }
 
 interface MidiActions {
@@ -56,6 +57,7 @@ fun VoicePanelActions.toVoiceActions(): VoiceActions = object : VoiceActions {
     override fun onWobbleMove(index: Int, x: Float, y: Float) = this@toVoiceActions.onWobbleMove(index, x, y)
     override fun onWobblePulseEnd(index: Int) = this@toVoiceActions.onWobblePulseEnd(index)
     override fun onQuadTriggerSourceChange(quadIndex: Int, sourceIndex: Int) = this@toVoiceActions.onQuadTriggerSourceChange(quadIndex, sourceIndex)
+    override fun onQuadEnvelopeTriggerModeChange(quadIndex: Int, enabled: Boolean) = this@toVoiceActions.onQuadEnvelopeTriggerModeChange(quadIndex, enabled)
 }
 
 /**

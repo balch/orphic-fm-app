@@ -248,6 +248,7 @@ interface SynthEngine {
     // Voice/Quad Routing
     fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int)
     fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int)
+    fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean)
 
     // Beat Sequencer (Grids)
     fun setBeatsX(x: Float)
@@ -319,6 +320,8 @@ interface SynthEngine {
     
     fun setFluxClockSource(sourceIndex: Int) // 0=Internal, 1=LFO
     fun getFluxClockSource(): Int
+    fun setFluxGateLength(value: Float)
+    fun getFluxGateLength(): Float
 }
 
 enum class ModSource {

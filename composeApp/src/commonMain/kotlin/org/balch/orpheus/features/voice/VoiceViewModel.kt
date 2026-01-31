@@ -53,7 +53,8 @@ data class VoiceUiState(
     val bendPosition: Float = 0.0f, // -1 to +1, current bender position for UI display
     val bpm: Double = 120.0,
     val quadTriggerSources: List<Int> = List(3) { 0 },
-    val quadPitchSources: List<Int> = List(3) { 0 }
+    val quadPitchSources: List<Int> = List(3) { 0 },
+    val quadEnvelopeTriggerModes: List<Boolean> = listOf(false, false, false)
 ) {
     companion object {
         val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
@@ -80,6 +81,7 @@ private sealed interface VoiceIntent {
     data class QuadVolume(val quadIndex: Int, val value: Float) : VoiceIntent
     data class QuadTriggerSource(val quadIndex: Int, val sourceIndex: Int) : VoiceIntent
     data class QuadPitchSource(val quadIndex: Int, val sourceIndex: Int) : VoiceIntent
+    data class QuadEnvelopeTriggerMode(val quadIndex: Int, val enabled: Boolean) : VoiceIntent
 
     // Global intents
     data class FmStructure(val crossQuad: Boolean) : VoiceIntent
@@ -146,7 +148,8 @@ class VoiceViewModel(
         onSlideBarRelease = ::onSlideBarRelease,
         onBpmChange = ::onBpmChange,
         onQuadTriggerSourceChange = ::onQuadTriggerSourceChange,
-        onQuadPitchSourceChange = ::onQuadPitchSourceChange
+        onQuadPitchSourceChange = ::onQuadPitchSourceChange,
+        onQuadEnvelopeTriggerModeChange = ::onQuadEnvelopeTriggerModeChange
     )
 
     fun onMasterVolumeChange(value: Float) {
@@ -414,6 +417,9 @@ class VoiceViewModel(
             is VoiceIntent.QuadPitchSource ->
                 state.withQuadPitchSource(intent.quadIndex, intent.sourceIndex)
 
+            is VoiceIntent.QuadEnvelopeTriggerMode ->
+                state.copy(quadEnvelopeTriggerModes = state.quadEnvelopeTriggerModes.toMutableList().also { it[intent.quadIndex] = intent.enabled })
+
             is VoiceIntent.FmStructure ->
                 state.copy(fmStructureCrossQuad = intent.crossQuad)
 
@@ -440,6 +446,10 @@ class VoiceViewModel(
 
             is VoiceIntent.Restore -> intent.state
         }
+
+    fun onQuadEnvelopeTriggerModeChange(quadIndex: Int, enabled: Boolean) {
+        intents.tryEmit(VoiceIntent.QuadEnvelopeTriggerMode(quadIndex, enabled))
+    }
 
     // Helper extensions for cleaner state transformations
     private fun VoiceUiState.withVoice(index: Int, transform: (VoiceState) -> VoiceState) =
@@ -536,6 +546,9 @@ class VoiceViewModel(
             is VoiceIntent.QuadPitchSource ->
                 engine.setQuadPitchSource(intent.quadIndex, intent.sourceIndex)
 
+            is VoiceIntent.QuadEnvelopeTriggerMode ->
+                engine.setQuadEnvelopeTriggerMode(intent.quadIndex, intent.enabled)
+
             is VoiceIntent.FmStructure -> {
                 engine.setFmStructure(intent.crossQuad)
                 stateFlow.value.duoModSources.forEachIndexed { index, source ->
@@ -578,6 +591,7 @@ class VoiceViewModel(
         state.quadGroupVolumes.forEachIndexed { i, v -> engine.setQuadVolume(i, v) }
         state.quadTriggerSources.forEachIndexed { i, s -> engine.setQuadTriggerSource(i, s) }
         state.quadPitchSources.forEachIndexed { i, s -> engine.setQuadPitchSource(i, s) }
+        state.quadEnvelopeTriggerModes.forEachIndexed { i, m -> engine.setQuadEnvelopeTriggerMode(i, m) }
         
         // IMPORTANT: Set FM structure BEFORE duoModSources!
         // VOICE_FM routing in setDuoModSource depends on the fmStructureCrossQuad flag
@@ -858,7 +872,8 @@ data class VoicePanelActions(
     val onSlideBarRelease: () -> Unit,
     val onBpmChange: (Double) -> Unit,
     val onQuadTriggerSourceChange: (Int, Int) -> Unit,
-    val onQuadPitchSourceChange: (Int, Int) -> Unit
+    val onQuadPitchSourceChange: (Int, Int) -> Unit,
+    val onQuadEnvelopeTriggerModeChange: (Int, Boolean) -> Unit
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
@@ -875,7 +890,8 @@ data class VoicePanelActions(
             onStringBendChange = {_, _, _ -> }, onStringBendRelease = { 0 },
             onSlideBarChange = {_, _ -> }, onSlideBarRelease = {},
             onBpmChange = {}, onQuadTriggerSourceChange = {_, _ -> },
-            onQuadPitchSourceChange = {_, _ -> }
+            onQuadPitchSourceChange = {_, _ -> },
+            onQuadEnvelopeTriggerModeChange = {_, _ -> }
         )
     }
 }

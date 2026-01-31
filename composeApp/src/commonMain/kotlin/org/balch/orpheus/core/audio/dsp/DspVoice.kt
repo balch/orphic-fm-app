@@ -70,8 +70,9 @@ class DspVoice(
     private val vcaControlMixer = audioEngine.createAdd()
 
     // State for Hold-Envelope interaction
-    private var currentEnvelopeSpeed = 0f
-    private var rawHoldLevel = 0.0
+    private var currentEnvelopeSpeed = 0.5f
+    private var isTriggerMode = false
+    private var currentHoldLevel = 0.0
 
     // Exposed ports for external wiring
     val frequency: AudioInput get() = pitchScaler.inputA           // Base frequency (through pitchScaler)
@@ -296,7 +297,7 @@ class DspVoice(
         // Slow: attack=3.0s, decay=3.0s, sustain=1.0, release=4.0s (long drone)
         val attack = 0.005 + (eased * (3.0 - 0.005))
         val decay = 0.05 + (eased * (3.0 - 0.05))  // Increased for more linger
-        val sustain = 0.8 + (eased * 0.2) // 0.8 → 1.0 (full sustain at slow)
+        val sustain = if (isTriggerMode) 0.0 else (0.8 + (eased * 0.2)) // 0.8 → 1.0 (full sustain at slow)
         val release = 0.1 + (eased * (4.0 - 0.1))  // Longer release for drone
 
         ampEnv.setAttack(attack)
@@ -313,8 +314,15 @@ class DspVoice(
      * Like classic drone synths: slow envelopes make Hold more effective (lower threshold to drone).
      */
     fun setHoldLevel(level: Double) {
-        rawHoldLevel = level
+        currentHoldLevel = level
         applyScaledHold()
+    }
+
+    fun setTriggerMode(enabled: Boolean) {
+        if (isTriggerMode == enabled) return
+        isTriggerMode = enabled
+        // Re-apply envelope speed settings to update sustain/mode
+        setEnvelopeSpeed(currentEnvelopeSpeed)
     }
 
     private fun applyScaledHold() {
@@ -324,7 +332,7 @@ class DspVoice(
         // 
         // Exponent interpolation: speed=0 → exponent=4 (severe), speed=1 → exponent=1 (linear)
         val exponent = FAST_EASE_EXPONENT - (currentEnvelopeSpeed * (FAST_EASE_EXPONENT - 1.0))
-        val easedHold = rawHoldLevel.pow(exponent)
+        val easedHold = currentHoldLevel.pow(exponent)
         
         // Scale factor: slow mode (speed=1) → 2x, fast mode (speed=0) → 0.5x
         // This means in slow mode, a low Hold value still creates a drone

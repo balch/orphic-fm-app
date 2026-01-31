@@ -40,7 +40,8 @@ data class FluxUiState(
     val rate: Float = 0.5f,
     val jitter: Float = 0.0f,
     val probability: Float = 0.5f,
-    val clockSource: Int = 0 // 0=Internal, 1=LFO
+    val clockSource: Int = 0, // 0=Internal, 1=LFO
+    val gateLength: Float = 0.5f
 )
 
 @Immutable
@@ -54,10 +55,11 @@ data class FluxPanelActions(
     val setRate: (Float) -> Unit,
     val setJitter: (Float) -> Unit,
     val setProbability: (Float) -> Unit,
-    val setClockSource: (Int) -> Unit
+    val setClockSource: (Int) -> Unit,
+    val setGateLength: (Float) -> Unit
 ) {
     companion object {
-        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -72,6 +74,7 @@ private sealed interface FluxIntent {
     data class Jitter(val value: Float) : FluxIntent
     data class Probability(val value: Float) : FluxIntent
     data class ClockSource(val value: Int) : FluxIntent
+    data class GateLength(val value: Float) : FluxIntent
     data class Restore(val state: FluxUiState) : FluxIntent
 }
 
@@ -96,7 +99,8 @@ class FluxViewModel(
         setRate = ::onRateChange,
         setJitter = ::onJitterChange,
         setProbability = ::onProbabilityChange,
-        setClockSource = ::onClockSourceChange
+        setClockSource = ::onClockSourceChange,
+        setGateLength = ::onGateLengthChange
     )
 
     private val _userIntents = MutableSharedFlow<FluxIntent>(
@@ -159,6 +163,7 @@ class FluxViewModel(
         is FluxIntent.Jitter -> state.copy(jitter = intent.value)
         is FluxIntent.Probability -> state.copy(probability = intent.value)
         is FluxIntent.ClockSource -> state.copy(clockSource = intent.value)
+        is FluxIntent.GateLength -> state.copy(gateLength = intent.value)
         is FluxIntent.Restore -> intent.state
     }
 
@@ -174,6 +179,7 @@ class FluxViewModel(
             is FluxIntent.Jitter -> engine.setFluxJitter(intent.value)
             is FluxIntent.Probability -> engine.setFluxProbability(intent.value)
             is FluxIntent.ClockSource -> engine.setFluxClockSource(intent.value)
+            is FluxIntent.GateLength -> engine.setFluxGateLength(intent.value)
             is FluxIntent.Restore -> applyFullState(intent.state)
         }
     }
@@ -189,6 +195,7 @@ class FluxViewModel(
         engine.setFluxJitter(state.jitter)
         engine.setFluxProbability(state.probability)
         engine.setFluxClockSource(state.clockSource)
+        engine.setFluxGateLength(state.gateLength)
     }
 
     fun onSpreadChange(value: Float) = _userIntents.tryEmit(FluxIntent.Spread(value))
@@ -201,6 +208,7 @@ class FluxViewModel(
     fun onJitterChange(value: Float) = _userIntents.tryEmit(FluxIntent.Jitter(value))
     fun onProbabilityChange(value: Float) = _userIntents.tryEmit(FluxIntent.Probability(value))
     fun onClockSourceChange(value: Int) = _userIntents.tryEmit(FluxIntent.ClockSource(value))
+    fun onGateLengthChange(value: Float) = _userIntents.tryEmit(FluxIntent.GateLength(value))
 
     companion object Ids {
         const val SPREAD = "flux_spread"

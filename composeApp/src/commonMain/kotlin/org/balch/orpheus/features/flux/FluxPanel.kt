@@ -146,6 +146,15 @@ fun FluxPanel(
                 size = 48.dp,
                 progressColor = OrpheusColors.electricBlue
             )
+
+            // Gate Length
+            RotaryKnob(
+                value = state.gateLength,
+                onValueChange = { actions.setGateLength(it) },
+                label = "GATE",
+                size = 48.dp,
+                progressColor = OrpheusColors.warmGlow
+            )
             
             // Clock Source
             ValueCycleButton(
