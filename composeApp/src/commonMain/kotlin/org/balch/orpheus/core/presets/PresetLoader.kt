@@ -132,7 +132,25 @@ class PresetLoader(
             grainsTexture = engine.getGrainsTexture(),
             grainsDryWet = engine.getGrainsDryWet(),
             grainsFreeze = engine.getGrainsFreeze(),
-            grainsMode = engine.getGrainsMode()
+            grainsMode = engine.getGrainsMode(),
+            
+            // Flux
+            fluxSpread = engine.getFluxSpread(),
+            fluxBias = engine.getFluxBias(),
+            fluxSteps = engine.getFluxSteps(),
+            fluxDejaVu = engine.getFluxDejaVu(),
+            fluxLength = engine.getFluxLength(),
+            fluxScale = engine.getFluxScale(),
+            fluxRate = engine.getFluxRate(),
+            fluxJitter = engine.getFluxJitter(),
+            fluxProbability = engine.getFluxProbability(),
+            fluxClockSource = engine.getFluxClockSource(),
+            fluxGateLength = engine.getFluxGateLength(),
+            
+            // Drum Triggers
+            drumBdTriggerSource = engine.getDrumTriggerSource(0),
+            drumSdTriggerSource = engine.getDrumTriggerSource(1),
+            drumHhTriggerSource = engine.getDrumTriggerSource(2)
         )
     }
 }

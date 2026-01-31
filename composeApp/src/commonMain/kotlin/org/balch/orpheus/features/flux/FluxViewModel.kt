@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -80,15 +81,18 @@ private sealed interface FluxIntent {
 
 typealias FluxFeature = SynthFeature<FluxUiState, FluxPanelActions>
 
-@Inject
 @ViewModelKey(FluxViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class FluxViewModel(
+class FluxViewModel @Inject constructor(
     private val engine: SynthEngine,
     synthController: SynthController,
-    dispatcherProvider: DispatcherProvider
+    dispatcherProvider: DispatcherProvider,
+    presetLoader: PresetLoader
 ) : ViewModel(), FluxFeature {
 
+    // ... actions ... (keep as is, but I can't overwrite easily without seeing lines again if I'm not careful. 
+    // Wait, I can't just replace the constructor without replacing the whole class header.
+    
     override val actions = FluxPanelActions(
         setSpread = ::onSpreadChange,
         setBias = ::onBiasChange,
@@ -120,6 +124,24 @@ class FluxViewModel(
             else -> null
         }
     }
+    
+    private val presetIntents = presetLoader.presetFlow.map { preset ->
+        FluxIntent.Restore(
+            FluxUiState(
+                spread = preset.fluxSpread,
+                bias = preset.fluxBias,
+                steps = preset.fluxSteps,
+                dejaVu = preset.fluxDejaVu,
+                length = preset.fluxLength,
+                scaleIndex = preset.fluxScale,
+                rate = preset.fluxRate,
+                jitter = preset.fluxJitter,
+                probability = preset.fluxProbability,
+                clockSource = preset.fluxClockSource,
+                gateLength = preset.fluxGateLength
+            )
+        )
+    }
 
     override val stateFlow: StateFlow<FluxUiState> = flow {
         val initial = loadInitialState()
@@ -127,7 +149,7 @@ class FluxViewModel(
         emit(initial)
         
         emitAll(
-            merge(_userIntents, controlIntents)
+            merge(_userIntents, controlIntents, presetIntents)
                 .onEach { intent -> if (intent != null) applyToEngine(intent) }
                 .scan(initial) { state, intent -> if (intent != null) reduce(state, intent) else state }
         )

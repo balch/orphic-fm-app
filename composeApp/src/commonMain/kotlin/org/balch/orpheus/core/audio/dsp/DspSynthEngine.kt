@@ -1006,7 +1006,12 @@ class DspSynthEngine(
     override fun getDrumP4(type: Int): Float = pluginProvider.drumPlugin.getP4(type)
     override fun getDrumP5(type: Int): Float = pluginProvider.drumPlugin.getP5(type)
     
+    private val drumTriggerSources = IntArray(3) { 0 }
+
     override fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int) {
+        if (drumIndex !in 0..2) return
+        drumTriggerSources[drumIndex] = sourceIndex
+        
         val drumIn = when(drumIndex) {
             0 -> pluginProvider.drumPlugin.inputs["triggerBD"]
             1 -> pluginProvider.drumPlugin.inputs["triggerSD"]
@@ -1026,6 +1031,8 @@ class DspSynthEngine(
             else -> { /* Internal, left disconnected */ }
         }
     }
+
+    override fun getDrumTriggerSource(drumIndex: Int): Int = drumTriggerSources.getOrElse(drumIndex) { 0 }
 
     override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) {
         if (quadIndex !in 0..2) return

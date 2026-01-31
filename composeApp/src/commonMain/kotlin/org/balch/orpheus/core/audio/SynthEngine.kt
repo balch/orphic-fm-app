@@ -244,6 +244,7 @@ interface SynthEngine {
     
     // Drum Trigger Routing
     fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int)
+    fun getDrumTriggerSource(drumIndex: Int): Int
     
     // Voice/Quad Routing
     fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int)

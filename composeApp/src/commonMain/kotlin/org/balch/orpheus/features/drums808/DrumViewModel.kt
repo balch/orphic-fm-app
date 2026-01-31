@@ -238,16 +238,20 @@ class DrumViewModel(
                         bdDecay = preset.drumBdDecay,
                         bdP4 = preset.drumBdP4,
                         bdP5 = preset.drumBdP5,
+                        bdTriggerSource = DrumTriggerSource.entries.getOrElse(preset.drumBdTriggerSource) { DrumTriggerSource.INTERNAL },
                         
                         sdFrequency = preset.drumSdFrequency,
                         sdTone = preset.drumSdTone,
                         sdDecay = preset.drumSdDecay,
                         sdP4 = preset.drumSdP4,
+                        sdTriggerSource = DrumTriggerSource.entries.getOrElse(preset.drumSdTriggerSource) { DrumTriggerSource.INTERNAL },
                         
                         hhFrequency = preset.drumHhFrequency,
                         hhTone = preset.drumHhTone,
                         hhDecay = preset.drumHhDecay,
                         hhP4 = preset.drumHhP4,
+                        hhTriggerSource = DrumTriggerSource.entries.getOrElse(preset.drumHhTriggerSource) { DrumTriggerSource.INTERNAL },
+                        
                         drumsBypass = preset.drumsBypass
                     )
                 }
@@ -257,6 +261,9 @@ class DrumViewModel(
                 updateSdParams(s)
                 updateHhParams(s)
                 synthEngine.setDrumsBypass(s.drumsBypass)
+                synthEngine.setDrumTriggerSource(0, s.bdTriggerSource.ordinal)
+                synthEngine.setDrumTriggerSource(1, s.sdTriggerSource.ordinal)
+                synthEngine.setDrumTriggerSource(2, s.hhTriggerSource.ordinal)
             }
         }
 

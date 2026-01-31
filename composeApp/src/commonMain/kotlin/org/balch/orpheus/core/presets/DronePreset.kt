@@ -77,6 +77,11 @@ data class DronePreset(
     val drumHhTone: Float = 0.5f,
     val drumHhDecay: Float = 0.5f,
     val drumHhP4: Float = 0.5f,
+    
+    val drumBdTriggerSource: Int = 0, // 0=Internal, 1=FluxT1, 2=FluxT2, 3=FluxT3
+    val drumSdTriggerSource: Int = 0,
+    val drumHhTriggerSource: Int = 0,
+    
     val drumsBypass: Boolean = true,
 
     // Drum Beats (Grids-style pattern generator)
@@ -108,6 +113,19 @@ data class DronePreset(
     val warpsCarrierSource: WarpsSource = WarpsSource.SYNTH,
     val warpsModulatorSource: WarpsSource = WarpsSource.DRUMS,
     val warpsMix: Float = 0.0f,
+
+    // Flux (Bernoulli Gate Sequencer)
+    val fluxSpread: Float = 0.5f,
+    val fluxBias: Float = 0.5f,
+    val fluxSteps: Float = 0.5f,
+    val fluxDejaVu: Float = 0.0f,
+    val fluxLength: Int = 8,
+    val fluxScale: Int = 0,
+    val fluxRate: Float = 0.5f,
+    val fluxJitter: Float = 0.0f,
+    val fluxProbability: Float = 0.5f,
+    val fluxClockSource: Int = 0,
+    val fluxGateLength: Float = 0.5f,
 
     // Metadata
     val createdAt: Long = currentTimeMillis()
