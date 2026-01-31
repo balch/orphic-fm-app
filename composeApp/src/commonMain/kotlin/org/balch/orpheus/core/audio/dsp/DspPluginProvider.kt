@@ -11,12 +11,12 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspGrainsPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspLooperPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPerStringBenderPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.DspResonatorPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspStereoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspVibratoPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspWarpsPlugin
 import org.balch.orpheus.plugins.delay.DelayPlugin
 import org.balch.orpheus.plugins.distortion.DistortionPlugin
+import org.balch.orpheus.plugins.resonator.ResonatorPlugin
 
 @Inject
 @SingleIn(AppScope::class)
@@ -31,7 +31,7 @@ class DspPluginProvider(
     val benderPlugin by lazy { plugins.filterIsInstance<DspBenderPlugin>().first() }
     val perStringBenderPlugin by lazy { plugins.filterIsInstance<DspPerStringBenderPlugin>().first() }
     val drumPlugin by lazy { plugins.filterIsInstance<DspDrumPlugin>().first() }
-    val resonatorPlugin by lazy { plugins.filterIsInstance<DspResonatorPlugin>().first() }
+    val resonatorPlugin by lazy { plugins.filterIsInstance<ResonatorPlugin>().first() }
     val grainsPlugin by lazy { plugins.filterIsInstance<DspGrainsPlugin>().first() }
     val looperPlugin by lazy { plugins.filterIsInstance<DspLooperPlugin>().first() }
     val warpsPlugin by lazy { plugins.filterIsInstance<DspWarpsPlugin>().first() }

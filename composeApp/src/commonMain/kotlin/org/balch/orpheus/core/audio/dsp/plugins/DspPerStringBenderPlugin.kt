@@ -11,6 +11,7 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
+import org.balch.orpheus.plugins.resonator.ResonatorPlugin
 import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlin.time.Clock
@@ -39,7 +40,7 @@ import kotlin.time.ExperimentalTime
 @ContributesIntoSet(AppScope::class)
 class DspPerStringBenderPlugin(
     private val audioEngine: AudioEngine,
-    private val resonatorPlugin: DspResonatorPlugin,
+    private val resonatorPlugin: ResonatorPlugin,
     private val dspFactory: DspFactory
 ) : DspPlugin {
 
