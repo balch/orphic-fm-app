@@ -90,6 +90,7 @@ class DspSynthEngine(
     private val drumDirectResoSumR = dspFactory.createAdd()
 
     // State caches
+    private val drumTriggerSources = IntArray(3) { 0 }
     private val quadPitchOffsets = DoubleArray(3) { 0.5 }
     private val voiceTuneCache = DoubleArray(12) { 0.5 }
     
@@ -349,6 +350,14 @@ class DspSynthEngine(
         drumDirectResoWetGainR.inputB.set(0.0)
 
         setDrumsBypass(true)
+
+        // Default Generative Drum Setup:
+        // BD = T1 (Kick on probabilistic beat)
+        // SD = T2 (Steady beat)
+        // HH = T3 (Complementary probabilistic beat)
+        setDrumTriggerSource(0, 1) // Kick -> T1
+        setDrumTriggerSource(1, 2) // Snare -> T2
+        setDrumTriggerSource(2, 3) // HiHat -> T3
 
         // Wire voices to audio paths
         voices.forEachIndexed { index, voice ->
@@ -1162,7 +1171,8 @@ class DspSynthEngine(
     override fun getDrumP4(type: Int): Float = pluginProvider.drumPlugin.getP4(type)
     override fun getDrumP5(type: Int): Float = pluginProvider.drumPlugin.getP5(type)
     
-    private val drumTriggerSources = IntArray(3) { 0 }
+    
+
 
     override fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int) {
         if (drumIndex !in 0..2) return

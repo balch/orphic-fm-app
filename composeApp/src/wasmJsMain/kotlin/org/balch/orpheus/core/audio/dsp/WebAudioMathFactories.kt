@@ -7,8 +7,8 @@ import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class WebAudioMultiplyFactory @Inject constructor(private val engine: OrpheusAudioEngine) : Multiply.Factory {
-    override fun create(): Multiply = WebAudioMultiply(engine.webAudioContext)
+class WebAudioMultiplyFactory @Inject constructor(private val engine: AudioEngine) : Multiply.Factory {
+    override fun create(): Multiply = WebAudioMultiply((engine as OrpheusAudioEngine).webAudioContext)
 }
 
 @SingleIn(AppScope::class)

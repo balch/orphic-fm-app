@@ -60,6 +60,7 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
             is JsynSineOscillatorWrapper -> synth.add(unit.jsOsc)
             is JsynTriangleOscillatorWrapper -> synth.add(unit.jsOsc)
             is JsynSquareOscillatorWrapper -> synth.add(unit.jsOsc)
+            is JsynSawtoothOscillatorWrapper -> synth.add(unit.jsOsc)
             is JsynMinimumWrapper -> synth.add(unit.jsUnit)
             is JsynMaximumWrapper -> synth.add(unit.jsUnit)
             is JsynLinearRampWrapper -> synth.add(unit.jsRamp)

@@ -92,7 +92,8 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
                 estimatedLoad += when (unit) {
                     is WebAudioSineOscillator, 
                     is WebAudioTriangleOscillator, 
-                    is WebAudioSquareOscillator -> 1.0f
+                    is WebAudioSquareOscillator,
+                    is WebAudioSawtoothOscillator -> 1.0f
                     is WebAudioDelayLine -> 1.5f
                     is WebAudioLimiter -> 2.0f
                     is WebAudioPeakFollower -> 1.0f
