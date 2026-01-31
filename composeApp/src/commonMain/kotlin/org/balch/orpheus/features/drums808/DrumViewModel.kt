@@ -56,7 +56,8 @@ data class DrumUiState(
     // Trigger States (Visual Feedback)
     val isBdActive: Boolean = false,
     val isSdActive: Boolean = false,
-    val isHhActive: Boolean = false
+    val isHhActive: Boolean = false,
+    val drumsBypass: Boolean = true
 )
 
 data class DrumPanelActions(
@@ -85,13 +86,16 @@ data class DrumPanelActions(
     val setHhP4: (Float) -> Unit,
     val setHhTriggerSource: (DrumTriggerSource) -> Unit,
     val startHhTrigger: () -> Unit,
-    val stopHhTrigger: () -> Unit
+    val stopHhTrigger: () -> Unit,
+    
+    // Global
+    val setDrumsBypass: (Boolean) -> Unit
 ) {
     companion object {
         val EMPTY = DrumPanelActions(
             {}, {}, {}, {}, {}, {}, {},
             {}, {}, {}, {}, {}, {}, {},
-            {}, {}, {}, {}, {}, {}, {}
+            {}, {}, {}, {}, {}, {}, {}, {}
         )
     }
 }
@@ -182,7 +186,11 @@ class DrumViewModel(
             synthEngine.setDrumTriggerSource(2, src.ordinal)
         },
         startHhTrigger = ::startHhTrigger,
-        stopHhTrigger = { _uiState.update { it.copy(isHhActive = false) } }
+        stopHhTrigger = { _uiState.update { it.copy(isHhActive = false) } },
+        setDrumsBypass = { bypass ->
+            _uiState.update { it.copy(drumsBypass = bypass) }
+            synthEngine.setDrumsBypass(bypass)
+        }
     )
 
     private fun startBdTrigger() {
@@ -218,6 +226,7 @@ class DrumViewModel(
         updateBdParams(_uiState.value)
         updateSdParams(_uiState.value)
         updateHhParams(_uiState.value)
+        synthEngine.setDrumsBypass(_uiState.value.drumsBypass)
         
         // Subscribe to presets
         viewModelScope.launch(dispatcherProvider.default) {
@@ -238,7 +247,8 @@ class DrumViewModel(
                         hhFrequency = preset.drumHhFrequency,
                         hhTone = preset.drumHhTone,
                         hhDecay = preset.drumHhDecay,
-                        hhP4 = preset.drumHhP4
+                        hhP4 = preset.drumHhP4,
+                        drumsBypass = preset.drumsBypass
                     )
                 }
                 // Push to engine
@@ -246,6 +256,7 @@ class DrumViewModel(
                 updateBdParams(s)
                 updateSdParams(s)
                 updateHhParams(s)
+                synthEngine.setDrumsBypass(s.drumsBypass)
             }
         }
 
@@ -270,6 +281,7 @@ class DrumViewModel(
                     ControlIds.DRUM_HH_DECAY -> actions.setHhDecay(event.value)
                     ControlIds.DRUM_HH_NOISY -> actions.setHhP4(event.value)
                     ControlIds.DRUM_HH_TRIGGER -> if (event.value >= 0.5f) actions.startHhTrigger() else actions.stopHhTrigger()
+                    ControlIds.DRUMS_BYPASS -> actions.setDrumsBypass(event.value >= 0.5f)
                 }
             }
         }

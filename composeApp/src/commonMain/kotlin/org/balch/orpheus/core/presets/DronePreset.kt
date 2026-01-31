@@ -77,6 +77,7 @@ data class DronePreset(
     val drumHhTone: Float = 0.5f,
     val drumHhDecay: Float = 0.5f,
     val drumHhP4: Float = 0.5f,
+    val drumsBypass: Boolean = true,
 
     // Drum Beats (Grids-style pattern generator)
     val beatsX: Float = 0.5f,

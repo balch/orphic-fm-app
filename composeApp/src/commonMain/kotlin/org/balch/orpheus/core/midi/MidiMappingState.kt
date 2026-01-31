@@ -143,6 +143,7 @@ data class MidiMappingState(
             const val BEATS_Y = "beats_y"
             const val BPM = "bpm"
             const val BEATS_MIX = "beats_mix"
+            const val DRUMS_BYPASS = "drums_bypass"
             const val BEATS_RANDOMNESS = "beats_randomness"
             const val BEATS_SWING = "beats_swing"
             const val BEATS_MODE = "beats_mode"

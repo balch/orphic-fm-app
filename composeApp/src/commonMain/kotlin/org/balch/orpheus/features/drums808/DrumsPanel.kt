@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.widgets.HorizontalSlidingSwitch
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
@@ -39,7 +40,7 @@ fun DrumsPanel(
     CollapsibleColumnPanel(
         title = "808",
         color = OrpheusColors.ninersRed,
-        expandedTitle = "Tuner Key",
+        expandedTitle = "808 Drums",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
@@ -51,6 +52,28 @@ fun DrumsPanel(
                 .widthIn(max = 400.dp)
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
+            // Routing Switch
+            Row(
+                modifier = Modifier.padding(bottom = 12.dp, start = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "ROUTING",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = OrpheusColors.warmGlow.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(end = 12.dp)
+                )
+
+                HorizontalSlidingSwitch(
+                    isLeft = state.drumsBypass,
+                    onToggle = { isMain -> actions.setDrumsBypass(isMain) },
+                    leftLabel = "MAIN",
+                    rightLabel = "FX",
+                    activeColor = OrpheusColors.ninersRed,
+                    width = 90.dp
+                )
+            }
+
             // Header Row for common parameters
             HeaderRow()
 

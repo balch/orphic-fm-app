@@ -67,6 +67,13 @@ class DspSynthEngine(
     private val replSumLeft = audioEngine.createPassThrough()
     private val replSumRight = audioEngine.createPassThrough()
 
+    // Drum routing gains
+    private val drumChainGainL = audioEngine.createMultiply()
+    private val drumChainGainR = audioEngine.createMultiply()
+    private val drumDirectGainL = audioEngine.createMultiply()
+    private val drumDirectGainR = audioEngine.createMultiply()
+    private var _drumsBypass = true
+
     // State caches
     private val quadPitchOffsets = DoubleArray(3) { 0.5 }
     private val voiceTuneCache = DoubleArray(12) { 0.5 }
@@ -157,6 +164,10 @@ class DspSynthEngine(
         audioEngine.addUnit(voiceSumRight)
         audioEngine.addUnit(replSumLeft)
         audioEngine.addUnit(replSumRight)
+        audioEngine.addUnit(drumChainGainL)
+        audioEngine.addUnit(drumChainGainR)
+        audioEngine.addUnit(drumDirectGainL)
+        audioEngine.addUnit(drumDirectGainR)
         
         // Initialize all plugins (sets up internal wiring)
         pluginProvider.plugins.forEach { it.initialize() }
@@ -238,7 +249,6 @@ class DspSynthEngine(
         pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
         pluginProvider.warpsPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
         pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
-        pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
         pluginProvider.warpsPlugin.outputs["outputRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
         
         // Warps → Delay (Send)
@@ -252,13 +262,25 @@ class DspSynthEngine(
         pluginProvider.stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
         pluginProvider.stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
 
-        // Drum outputs → Resonator ONLY (drums bypass Grains)
-        pluginProvider.drumPlugin.outputs["outputLeft"]?.connect(pluginProvider.resonatorPlugin.inputs["drumLeft"]!!)
-        pluginProvider.drumPlugin.outputs["outputRight"]?.connect(pluginProvider.resonatorPlugin.inputs["drumRight"]!!)
-        
-        // Drum outputs → Resonator non-gated inputs (full dry path)
-        pluginProvider.drumPlugin.outputs["outputLeft"]?.connect(pluginProvider.resonatorPlugin.inputs["fullDrumLeft"]!!)
-        pluginProvider.drumPlugin.outputs["outputRight"]?.connect(pluginProvider.resonatorPlugin.inputs["fullDrumRight"]!!)
+        // Drum routing (Bypass Chain switchable)
+        pluginProvider.drumPlugin.outputs["outputLeft"]?.connect(drumChainGainL.inputA)
+        pluginProvider.drumPlugin.outputs["outputRight"]?.connect(drumChainGainR.inputA)
+        pluginProvider.drumPlugin.outputs["outputLeft"]?.connect(drumDirectGainL.inputA)
+        pluginProvider.drumPlugin.outputs["outputRight"]?.connect(drumDirectGainR.inputA)
+
+        // Path 1: To full chain (Resonator -> Distortion -> Delay)
+        drumChainGainL.output.connect(pluginProvider.resonatorPlugin.inputs["drumLeft"]!!)
+        drumChainGainR.output.connect(pluginProvider.resonatorPlugin.inputs["drumRight"]!!)
+        drumChainGainL.output.connect(pluginProvider.resonatorPlugin.inputs["fullDrumLeft"]!!)
+        drumChainGainR.output.connect(pluginProvider.resonatorPlugin.inputs["fullDrumRight"]!!)
+
+        // Path 2: Direct to output (Stereo Sum + Looper)
+        drumDirectGainL.output.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        drumDirectGainR.output.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        drumDirectGainL.output.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        drumDirectGainR.output.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+
+        setDrumsBypass(true)
 
         // Wire voices to audio paths
         voices.forEachIndexed { index, voice ->
@@ -531,6 +553,23 @@ class DspSynthEngine(
         pluginProvider.drumPlugin.setMix(mix)
     }
     override fun getBeatsMix(): Float = pluginProvider.drumPlugin.getMix()
+    
+    override fun setDrumsBypass(bypass: Boolean) {
+        _drumsBypass = bypass
+        if (bypass) {
+            drumChainGainL.inputB.set(0.0)
+            drumChainGainR.inputB.set(0.0)
+            drumDirectGainL.inputB.set(1.0)
+            drumDirectGainR.inputB.set(1.0)
+        } else {
+            drumChainGainL.inputB.set(1.0)
+            drumChainGainR.inputB.set(1.0)
+            drumDirectGainL.inputB.set(0.0)
+            drumDirectGainR.inputB.set(0.0)
+        }
+    }
+    
+    override fun getDrumsBypass(): Boolean = _drumsBypass
     
     // Looper delegations
     override fun setLooperRecord(recording: Boolean) {

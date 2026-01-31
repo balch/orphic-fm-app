@@ -270,6 +270,10 @@ interface SynthEngine {
     fun setBeatsMix(mix: Float)
     fun getBeatsMix(): Float
     
+    // Drum Bypass
+    fun setDrumsBypass(bypass: Boolean)
+    fun getDrumsBypass(): Boolean
+    
     // Looper
     fun setLooperRecord(recording: Boolean)
     fun setLooperPlay(playing: Boolean)
