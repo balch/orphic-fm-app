@@ -1,21 +1,27 @@
-package org.balch.orpheus.core.audio.dsp.plugins
+package org.balch.orpheus.plugins.perstringbender
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.datetime.Clock
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
+import org.balch.orpheus.core.audio.dsp.lv2.AudioPort
+import org.balch.orpheus.core.audio.dsp.lv2.PluginInfo
+import org.balch.orpheus.core.audio.dsp.lv2.Port
+import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.Lv2DspPlugin
 import org.balch.orpheus.plugins.resonator.ResonatorPlugin
 import kotlin.math.absoluteValue
 import kotlin.math.pow
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 /**
  * DSP Plugin for per-string pitch bending.
@@ -34,15 +40,39 @@ import kotlin.time.ExperimentalTime
  * String 1 -> Voices 2,3 (LEFT - normal direction)
  * String 2 -> Voices 4,5 (RIGHT - inverted direction)
  * String 3 -> Voices 6,7 (RIGHT - inverted direction)
+ *
+ * Port Map:
+ * 0..7: Voice Bend Outputs (CV)
+ * 8..15: Voice Mix Outputs (CV)
+ * 16: Audio Output (Effects mix)
  */
-@OptIn(ExperimentalTime::class)
 @Inject
-@ContributesIntoSet(AppScope::class)
-class DspPerStringBenderPlugin(
+@SingleIn(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
+class PerStringBenderPlugin(
     private val audioEngine: AudioEngine,
     private val resonatorPlugin: ResonatorPlugin,
     private val dspFactory: DspFactory
-) : DspPlugin {
+) : Lv2DspPlugin {
+
+    override val info = PluginInfo(
+        uri = "org.balch.orpheus.plugins.perstringbender",
+        name = "Per-String Bender",
+        author = "Balch"
+    )
+
+    override val ports: List<Port> = buildList {
+        // Voice Bend Outputs (0-7)
+        for (i in 0..7) {
+            add(AudioPort(i, "bend_$i", "Bend Voice $i", false))
+        }
+        // Voice Mix Outputs (8-15)
+        for (i in 0..7) {
+            add(AudioPort(8 + i, "mix_$i", "Mix Voice $i", false))
+        }
+        // Audio Output (16)
+        add(AudioPort(16, "audio_out", "Audio Output", false))
+    }
 
     companion object {
         private const val NUM_STRINGS = 4
@@ -73,7 +103,7 @@ class DspPerStringBenderPlugin(
     private val stringBendMonitors = Array(NUM_STRINGS) { dspFactory.createPeakFollower() }
     
     // ═══════════════════════════════════════════════════════════
-    // TENSION SOUND - Very subtle, matching BenderPlugin
+    // TENSION SOUND
     // ═══════════════════════════════════════════════════════════
     private val tensionOscillators = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }
     private val tensionEnvelopes = Array(NUM_STRINGS) { dspFactory.createEnvelope() }
@@ -82,7 +112,7 @@ class DspPerStringBenderPlugin(
     private val tensionGains = Array(NUM_STRINGS) { dspFactory.createMultiply() }
     
     // ═══════════════════════════════════════════════════════════
-    // SPRING SOUND - Matching BenderPlugin's wobble effect
+    // SPRING SOUND
     // ═══════════════════════════════════════════════════════════
     private val springOscillators = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }
     private val springEnvelopes = Array(NUM_STRINGS) { dspFactory.createEnvelope() }
@@ -95,8 +125,7 @@ class DspPerStringBenderPlugin(
     private val springGains = Array(NUM_STRINGS) { dspFactory.createMultiply() }
     
     // ═══════════════════════════════════════════════════════════
-    // PLUCK SOUND - Percussive ping on quick release
-    // Pitch based on string index and release velocity
+    // PLUCK SOUND
     // ═══════════════════════════════════════════════════════════
     private val pluckOscillators = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }
     private val pluckEnvelopes = Array(NUM_STRINGS) { dspFactory.createEnvelope() }
@@ -104,8 +133,7 @@ class DspPerStringBenderPlugin(
     private val pluckGains = Array(NUM_STRINGS) { dspFactory.createMultiply() }
     
     // ═══════════════════════════════════════════════════════════
-    // SLIDE SOUND - Textured sound when sliding vertically
-    // Fast-modulated oscillator creates "scratchy" texture
+    // SLIDE SOUND
     // ═══════════════════════════════════════════════════════════
     private val slideOscillators = Array(NUM_STRINGS) { dspFactory.createSquareOscillator() }
     private val slideLfos = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }  // Rapid modulation
@@ -150,62 +178,60 @@ class DspPerStringBenderPlugin(
     private val _springPositionFlow = MutableStateFlow(FloatArray(NUM_STRINGS))
     val springPositionFlow: StateFlow<FloatArray> = _springPositionFlow.asStateFlow()
 
-    override val audioUnits: List<AudioUnit>
-        get() = voiceBendOutputs.toList() +
-                voiceMixOutputs.toList() +
-                stringBendMonitors.toList() +
-                tensionOscillators.toList() +
-                tensionEnvelopes.toList() +
-                tensionVcas.toList() +
-                tensionRamps.toList() +
-                tensionGains.toList() +
-                springOscillators.toList() +
-                springEnvelopes.toList() +
-                springVcas.toList() +
-                springFreqBases.toList() +
-                wobbleLfos.toList() +
-                wobbleDepths.toList() +
-                wobbleMixers.toList() +
-                springGains.toList() +
-                pluckOscillators.toList() +
-                pluckEnvelopes.toList() +
-                pluckVcas.toList() +
-                pluckGains.toList() +
-                slideOscillators.toList() +
-                slideLfos.toList() +
-                slideFreqMixers.toList() +
-                slideRamps.toList() +
-                slideGains.toList() +
-                listOf(tensionMixerA, tensionMixerB, tensionMixerFinal,
-                       springMixerA, springMixerB, springMixerFinal,
-                       pluckMixerA, pluckMixerB, pluckMixerFinal,
-                       slideMixerA, slideMixerB, slideMixerFinal,
-                       effectsMixerA, effectsMixerB,
-                       audioMixer, audioOutputProxy)
+    override val audioUnits: List<AudioUnit> = 
+        voiceBendOutputs.toList() +
+        voiceMixOutputs.toList() +
+        stringBendMonitors.toList() +
+        tensionOscillators.toList() +
+        tensionEnvelopes.toList() +
+        tensionVcas.toList() +
+        tensionRamps.toList() +
+        tensionGains.toList() +
+        springOscillators.toList() +
+        springEnvelopes.toList() +
+        springVcas.toList() +
+        springFreqBases.toList() +
+        wobbleLfos.toList() +
+        wobbleDepths.toList() +
+        wobbleMixers.toList() +
+        springGains.toList() +
+        pluckOscillators.toList() +
+        pluckEnvelopes.toList() +
+        pluckVcas.toList() +
+        pluckGains.toList() +
+        slideOscillators.toList() +
+        slideLfos.toList() +
+        slideFreqMixers.toList() +
+        slideRamps.toList() +
+        slideGains.toList() +
+        listOf(
+            tensionMixerA, tensionMixerB, tensionMixerFinal,
+            springMixerA, springMixerB, springMixerFinal,
+            pluckMixerA, pluckMixerB, pluckMixerFinal,
+            slideMixerA, slideMixerB, slideMixerFinal,
+            effectsMixerA, effectsMixerB,
+            audioMixer, audioOutputProxy
+        )
 
-    override val inputs: Map<String, AudioInput>
-        get() = emptyMap()
+    override val inputs: Map<String, AudioInput> = emptyMap()
 
-    override val outputs: Map<String, AudioOutput>
-        get() = buildMap {
-            for (i in 0 until 8) {
-                put("voiceBend$i", voiceBendOutputs[i].output)
-                put("voiceMix$i", voiceMixOutputs[i].output)
-            }
-            put("audioOutput", audioOutputProxy.output)
+    override val outputs: Map<String, AudioOutput> = buildMap {
+        for (i in 0 until 8) {
+            put("voiceBend$i", voiceBendOutputs[i].output)
+            put("voiceMix$i", voiceMixOutputs[i].output)
         }
+        put("audioOutput", audioOutputProxy.output)
+    }
 
     override fun initialize() {
         stringBendMonitors.forEach { it.setHalfLife(0.016) }
         
-        // ═══════════════════════════════════════════════════════════
-        // TENSION SOUND SETUP - Very subtle, matching DspBenderPlugin
-        // ═══════════════════════════════════════════════════════════
+        // TENSION SOUND SETUP
         for (i in 0 until NUM_STRINGS) {
             tensionOscillators[i].frequency.set(300.0 + i * 20.0)
-            tensionOscillators[i].amplitude.set(0.4) // Louder tension sound
+            tensionOscillators[i].amplitude.set(0.4)
             
-            tensionEnvelopes[i].setAttack(0.1)  // Slow attack to fade in
+            tensionEnvelopes[i].setAttack(0.1)
             tensionEnvelopes[i].setDecay(0.1)
             tensionEnvelopes[i].setSustain(0.6)
             tensionEnvelopes[i].setRelease(0.2)
@@ -214,53 +240,36 @@ class DspPerStringBenderPlugin(
             tensionEnvelopes[i].output.connect(tensionVcas[i].inputB)
             tensionVcas[i].output.connect(tensionGains[i].inputA)
             
-            // Tension level ramp for click-free transitions
-            tensionRamps[i].time.set(0.02) // 20ms ramp time
+            tensionRamps[i].time.set(0.02)
             tensionRamps[i].input.set(0.0)
             tensionRamps[i].output.connect(tensionGains[i].inputB)
         }
         
-        // ═══════════════════════════════════════════════════════════
-        // SPRING SOUND SETUP - Matching DspBenderPlugin's wobble
-        // ═══════════════════════════════════════════════════════════
+        // SPRING SOUND SETUP
         for (i in 0 until NUM_STRINGS) {
-            springOscillators[i].amplitude.set(0.5) // Louder spring sound
-            
-            // Wobble LFO - 8Hz to match DspBenderPlugin
+            springOscillators[i].amplitude.set(0.5)
             wobbleLfos[i].frequency.set(8.0)
             wobbleLfos[i].amplitude.set(1.0)
-            
-            // Wobble depth modulated by envelope
             wobbleLfos[i].output.connect(wobbleDepths[i].inputA)
-            wobbleDepths[i].inputB.set(80.0) // ±80Hz wobble depth
-            
-            // Spring frequency base: envelope controls sweep
-            springFreqBases[i].inputB.set(-200.0) // Sweep down 200Hz
-            springFreqBases[i].inputC.set(500.0)  // Base 500Hz
-            
-            // Mix base freq + wobble -> spring oscillator frequency
+            wobbleDepths[i].inputB.set(80.0)
+            springFreqBases[i].inputB.set(-200.0)
+            springFreqBases[i].inputC.set(500.0)
             springFreqBases[i].output.connect(wobbleMixers[i].inputA)
             wobbleDepths[i].output.connect(wobbleMixers[i].inputB)
             wobbleMixers[i].output.connect(springOscillators[i].frequency)
-            
-            // Spring envelope
             springEnvelopes[i].setAttack(0.002)
             springEnvelopes[i].setDecay(0.5)
             springEnvelopes[i].setSustain(0.0)
             springEnvelopes[i].setRelease(0.3)
-            
-            // Envelope controls VCA, freq sweep, and wobble depth
             springEnvelopes[i].output.connect(springVcas[i].inputB)
             springEnvelopes[i].output.connect(springFreqBases[i].inputA)
             springEnvelopes[i].output.connect(wobbleDepths[i].inputB)
-            
-            // Wire oscillator through VCA and gain
             springOscillators[i].output.connect(springVcas[i].inputA)
             springVcas[i].output.connect(springGains[i].inputA)
-            springGains[i].inputB.set(0.8) // 80% spring volume - louder!
+            springGains[i].inputB.set(0.8)
         }
         
-        // Mix tension sounds: 0+1 -> A, 2+3 -> B, A+B -> Final
+        // Mixers wiring
         tensionGains[0].output.connect(tensionMixerA.inputA)
         tensionGains[1].output.connect(tensionMixerA.inputB)
         tensionGains[2].output.connect(tensionMixerB.inputA)
@@ -268,7 +277,6 @@ class DspPerStringBenderPlugin(
         tensionMixerA.output.connect(tensionMixerFinal.inputA)
         tensionMixerB.output.connect(tensionMixerFinal.inputB)
         
-        // Mix spring sounds: 0+1 -> A, 2+3 -> B, A+B -> Final
         springGains[0].output.connect(springMixerA.inputA)
         springGains[1].output.connect(springMixerA.inputB)
         springGains[2].output.connect(springMixerB.inputA)
@@ -276,55 +284,37 @@ class DspPerStringBenderPlugin(
         springMixerA.output.connect(springMixerFinal.inputA)
         springMixerB.output.connect(springMixerFinal.inputB)
         
-        // ═══════════════════════════════════════════════════════════
-        // PLUCK SOUND SETUP - Percussive ping on release
-        // ═══════════════════════════════════════════════════════════
+        // PLUCK SOUND SETUP
         for (i in 0 until NUM_STRINGS) {
-            // Base frequency depends on string (higher strings = higher pitch)
-            val baseFreq = 400.0 + i * 150.0  // 400Hz, 550Hz, 700Hz, 850Hz
+            val baseFreq = 400.0 + i * 150.0
             pluckOscillators[i].frequency.set(baseFreq)
             pluckOscillators[i].amplitude.set(0.4)
-            
-            // Very fast envelope for percussive attack
-            pluckEnvelopes[i].setAttack(0.001)   // 1ms attack
-            pluckEnvelopes[i].setDecay(0.08)     // 80ms decay
-            pluckEnvelopes[i].setSustain(0.0)    // No sustain
-            pluckEnvelopes[i].setRelease(0.05)   // 50ms release
-            
-            // Wire: osc -> VCA -> gain
+            pluckEnvelopes[i].setAttack(0.001)
+            pluckEnvelopes[i].setDecay(0.08)
+            pluckEnvelopes[i].setSustain(0.0)
+            pluckEnvelopes[i].setRelease(0.05)
             pluckOscillators[i].output.connect(pluckVcas[i].inputA)
             pluckEnvelopes[i].output.connect(pluckVcas[i].inputB)
             pluckVcas[i].output.connect(pluckGains[i].inputA)
-            pluckGains[i].inputB.set(0.6)  // 60% volume
+            pluckGains[i].inputB.set(0.6)
         }
         
-        // ═══════════════════════════════════════════════════════════
-        // SLIDE SOUND SETUP - Scratchy texture during vertical slide
-        // ═══════════════════════════════════════════════════════════
+        // SLIDE SOUND SETUP
         for (i in 0 until NUM_STRINGS) {
-            // Base frequency depends on string
             val baseFreq = 200.0 + i * 100.0
-            slideOscillators[i].amplitude.set(0.15)  // Subtle
-            
-            // Rapid LFO modulates frequency for scratchy texture
-            slideLfos[i].frequency.set(40.0 + i * 10.0)  // 40-70Hz modulation
-            slideLfos[i].amplitude.set(50.0)  // ±50Hz variation
-            
-            // Mix base freq + LFO wobble
+            slideOscillators[i].amplitude.set(0.15)
+            slideLfos[i].frequency.set(40.0 + i * 10.0)
+            slideLfos[i].amplitude.set(50.0)
             slideFreqMixers[i].inputA.set(baseFreq)
             slideLfos[i].output.connect(slideFreqMixers[i].inputB)
             slideFreqMixers[i].output.connect(slideOscillators[i].frequency)
-            
-            // Volume ramp for smooth transitions
-            slideRamps[i].time.set(0.03)  // 30ms ramp
-            slideRamps[i].input.set(0.0)  // Start silent
+            slideRamps[i].time.set(0.03)
+            slideRamps[i].input.set(0.0)
             slideRamps[i].output.connect(slideGains[i].inputB)
-            
-            // Wire oscillator through gain
             slideOscillators[i].output.connect(slideGains[i].inputA)
         }
         
-        // Mix pluck sounds: 0+1 -> A, 2+3 -> B, A+B -> Final
+        // Final mixer wiring
         pluckGains[0].output.connect(pluckMixerA.inputA)
         pluckGains[1].output.connect(pluckMixerA.inputB)
         pluckGains[2].output.connect(pluckMixerB.inputA)
@@ -332,7 +322,6 @@ class DspPerStringBenderPlugin(
         pluckMixerA.output.connect(pluckMixerFinal.inputA)
         pluckMixerB.output.connect(pluckMixerFinal.inputB)
         
-        // Mix slide sounds: 0+1 -> A, 2+3 -> B, A+B -> Final
         slideGains[0].output.connect(slideMixerA.inputA)
         slideGains[1].output.connect(slideMixerA.inputB)
         slideGains[2].output.connect(slideMixerB.inputA)
@@ -340,7 +329,6 @@ class DspPerStringBenderPlugin(
         slideMixerA.output.connect(slideMixerFinal.inputA)
         slideMixerB.output.connect(slideMixerFinal.inputB)
         
-        // Final mix: (tension + spring) + (pluck + slide) -> output
         tensionMixerFinal.output.connect(effectsMixerA.inputA)
         springMixerFinal.output.connect(effectsMixerA.inputB)
         pluckMixerFinal.output.connect(effectsMixerB.inputA)
@@ -349,39 +337,28 @@ class DspPerStringBenderPlugin(
         effectsMixerB.output.connect(audioMixer.inputB)
         audioMixer.output.connect(audioOutputProxy.input)
         
-        // Initialize all outputs
         voiceMixOutputs.forEach { it.input.set(1.0) }
         voiceBendOutputs.forEach { it.input.set(0.0) }
+
+        audioUnits.forEach { audioEngine.addUnit(it) }
     }
 
-    /**
-     * Apply direction inversion based on string position.
-     * REVERSED: Left strings (0,1) are normal so pulling outward (left/-) = pitch down
-     * Right strings (2,3): inverted so pulling outward (right/+) = pitch down
-     * Result: both sides pulling outward = pitch DOWN together
-     */
+    override fun onStart() {}
+    override fun connectPort(index: Int, data: Any) {}
+    override fun run(nFrames: Int) {}
+
     private fun applyDirectionForString(stringIndex: Int, rawDeflection: Float): Float {
         return if (stringIndex < 2) {
-            rawDeflection // Normal for LEFT strings (pulling left/outward = negative/pitch down)
+            rawDeflection
         } else {
-            -rawDeflection  // Invert for RIGHT strings (pulling right/outward = negative/pitch down)
+            -rawDeflection
         }
     }
 
-    /**
-     * Called when a string starts being plucked or is being bent.
-     * 
-     * @param stringIndex 0-3
-     * @param bendAmount -1 to +1 (horizontal deflection - will be direction-adjusted internally)
-     * @param voiceMix 0 to 1 (0=top/voice A, 0.5=center/both, 1=bottom/voice B)
-     * @param voiceIsPlaying Whether the associated voices are currently playing
-     * @return true if we triggered the voice (caller should track for release)
-     */
     fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float, voiceIsPlaying: Boolean = true): Boolean {
         if (stringIndex !in 0 until NUM_STRINGS) return false
         
         val state = stringStates[stringIndex]
-        val wasActive = state.isActive
         
         // Store raw and apply direction
         state.rawDeflection = bendAmount.coerceIn(-1f, 1f)
@@ -389,9 +366,7 @@ class DspPerStringBenderPlugin(
         state.voiceMix = voiceMix.coerceIn(0f, 1f)
         state.isActive = true
         
-        // Calculate pitch bend with AGGRESSIVE EASE-IN
-        // Flatten the center (stable pitch) and ramp up at edges
-        // Cubic curve: x^3
+        // Calculate pitch bend
         val normalizedBend = state.bendAmount
         val tensionCurve = normalizedBend.pow(3) 
         val semitones = tensionCurve * MAX_BEND_SEMITONES
@@ -419,35 +394,24 @@ class DspPerStringBenderPlugin(
         voiceMixOutputs[voiceA].input.set(voiceAVolume.toDouble())
         voiceMixOutputs[voiceB].input.set(voiceBVolume.toDouble())
         
-        // ═══════════════════════════════════════════════════════════
-        // TENSION SOUND CONTROL - Very subtle, matching DspBenderPlugin
-        // ═══════════════════════════════════════════════════════════
+        // Effects control
         val tension = normalizedBend.absoluteValue
-        
-        // Tension frequency rises with bend (300-500Hz range)
         val tensionFreq = 300.0 + (tension * 200.0) + stringIndex * 20.0
         tensionOscillators[stringIndex].frequency.set(tensionFreq)
         
-        // Tension level - SCALED DOWN TO 0 to rely purely on synth voices
-        // val tensionLevel = tension * 0.10
-        val tensionLevel = 0.0
-        tensionRamps[stringIndex].input.set(tensionLevel.toDouble())  // Ramp for click-free
+        val tensionLevel = 0.0 // Muted by default logic
+        tensionRamps[stringIndex].input.set(tensionLevel)
         
-        // ═══════════════════════════════════════════════════════════
-        // SLIDE DETECTION - Vertical movement creates scratchy sound
-        // ═══════════════════════════════════════════════════════════
+        // Automatic slide handling
         val gesture = gestureStates[stringIndex]
         val currentTime = Clock.System.now().toEpochMilliseconds()
         val deltaY = (voiceMix - gesture.lastY).absoluteValue
         val deltaTime = (currentTime - gesture.lastTime).coerceAtLeast(1L)
-        val slideVelocity = deltaY / deltaTime * 1000f  // velocity per second
+        val slideVelocity = deltaY / deltaTime * 1000f
         
-        // Activate slide if moving fast enough vertically
-        val slideThreshold = 0.5f  // Velocity threshold
-        // val slideLevel = ((slideVelocity - slideThreshold) / 2f).coerceIn(0f, 1f)
-        val slideLevel = 0.0f // SILENCED
+        val slideThreshold = 0.5f 
+        val slideLevel = 0.0f // Muted by default logic
         
-        // Slide frequency follows Y position (high at top, low at bottom)
         val slideBaseFreq = 150.0 + (1.0 - voiceMix) * 400.0 + stringIndex * 50.0
         slideFreqMixers[stringIndex].inputA.set(slideBaseFreq)
         slideRamps[stringIndex].input.set(slideLevel.toDouble())
@@ -457,37 +421,28 @@ class DspPerStringBenderPlugin(
         gesture.lastTime = currentTime
         gesture.slideActive = slideLevel > 0.1f
         
-        // Trigger tension envelope when bend starts
+        // Trigger envelope
         val isActive = tension > 0.05f
         if (isActive && !state.wasActive) {
             tensionEnvelopes[stringIndex].input.set(1.0)
             state.wasActive = true
             
-            // If voice wasn't playing, we triggered it
             if (!voiceIsPlaying) {
                 state.triggeredVoice = true
                 return true
             }
         }
         
-        // Update monitor for UI
         stringBendMonitors[stringIndex].input.set(state.rawDeflection.toDouble())
         
         return false
     }
 
-    /**
-     * Simplified version for when we don't need to track voice triggering.
-     */
     fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float): Boolean {
         // Pass false to indicate we want this interaction to be capable of triggering the voice
         return setStringBend(stringIndex, bendAmount, voiceMix, voiceIsPlaying = false)
     }
 
-    /**
-     * Called when a string is released.
-     * @return Spring duration in ms for UI animation, and whether to release the voice
-     */
     fun releaseString(stringIndex: Int): Pair<Int, Boolean> {
         if (stringIndex !in 0 until NUM_STRINGS) return Pair(0, false)
         
@@ -501,10 +456,9 @@ class DspPerStringBenderPlugin(
         val pullDistance = state.rawDeflection.absoluteValue
         val gesture = gestureStates[stringIndex]
         
-        // Calculate release velocity for pluck detection
         val currentTime = Clock.System.now().toEpochMilliseconds()
         val deltaTime = (currentTime - gesture.lastTime).coerceAtLeast(1L)
-        val releaseVelocity = pullDistance / deltaTime * 1000f  // per second
+        val releaseVelocity = pullDistance / deltaTime * 1000f
         
         // Reset outputs
         val voiceA = stringIndex * 2
@@ -514,60 +468,28 @@ class DspPerStringBenderPlugin(
         voiceMixOutputs[voiceA].input.set(1.0)
         voiceMixOutputs[voiceB].input.set(1.0)
         
-        // Stop slide sound
         slideRamps[stringIndex].input.set(0.0)
         gesture.slideActive = false
         
-        // Release tension and trigger spring (matching DspBenderPlugin logic)
         if (state.wasActive) {
             tensionEnvelopes[stringIndex].input.set(0.0)
-            tensionRamps[stringIndex].input.set(0.0)  // Ramp down for click-free
-            
-            // Trigger spring sound
-            /* SILENCED INTERNAL SPRING
-            if (pullDistance > 0.05f) {
-                springEnvelopes[stringIndex].input.set(1.0)
-                springEnvelopes[stringIndex].input.set(0.0)
-            }
-            */
+            tensionRamps[stringIndex].input.set(0.0)
             state.wasActive = false
         }
         
-        // ═══════════════════════════════════════════════════════════
-        // PLUCK SOUND - Trigger on quick release with velocity
-        // ═══════════════════════════════════════════════════════════
-        val pluckThreshold = 1.5f  // Velocity threshold for pluck
+        // Pluck logic
+        val pluckThreshold = 1.5f
         if (releaseVelocity > pluckThreshold && pullDistance > 0.15f) {
-            // Pitch up for fast release, down for slow
             val velocityPitchMod = 1.0 + (releaseVelocity - pluckThreshold) * 0.1
-            val basePitch = 400.0 + stringIndex * 150.0
-            
-            // Direction affects pitch: left release = lower, right release = higher
-            val directionMod = if (state.bendAmount > 0) 1.2 else 0.8
-            
-            // Slide Bar affects pitch: Higher slider (lower Y) = higher pitch? 
-            // Or just follow the global pitch bend?
-            // Let's use the slideBar pitch multiplier we calculated in setSlideBar
-            val slideBend = slideBarPosition // 0 to 1
+            val slideBend = slideBarPosition
             val tensionCurve = slideBend * (1.0 + slideBend.absoluteValue * 0.5)
             val slideSemitones = tensionCurve * MAX_BEND_SEMITONES * 0.5
             val slideMultiplier = 2.0.pow(slideSemitones / 12.0)
             
-            // Trigger Rings Resonator Strum
             val strumFreq = state.baseFrequency * velocityPitchMod * slideMultiplier
             resonatorPlugin.strum(strumFreq.toFloat())
-            
-            // Legacy internal pluck sound (disabled)
-            /*
-            pluckOscillators[stringIndex].frequency.set(basePitch * velocityPitchMod * directionMod * slideMultiplier)
-            
-            // Trigger pluck envelope
-            pluckEnvelopes[stringIndex].input.set(1.0)
-            pluckEnvelopes[stringIndex].input.set(0.0)
-            */
         }
         
-        // Reset state
         state.bendAmount = 0f
         state.rawDeflection = 0f
         state.voiceMix = 0.5f
@@ -575,61 +497,38 @@ class DspPerStringBenderPlugin(
         gesture.lastX = 0f
         gesture.lastTime = currentTime
         
-        // Return spring duration proportional to bend distance
         val springDuration = (SPRING_DURATION_MS * pullDistance.coerceIn(0.3f, 1f)).toInt()
         return Pair(springDuration, shouldReleaseVoice)
     }
 
-    /**
-     * Get the current spring position for a string (for UI visualization).
-     */
+    // Accessors
     fun getSpringPosition(stringIndex: Int): Float {
         if (stringIndex !in 0 until NUM_STRINGS) return 0f
         return stringBendMonitors[stringIndex].getCurrent().toFloat().coerceIn(-1f, 1f)
     }
 
-    /**
-     * Check if a string is currently active (being touched).
-     */
     fun isStringActive(stringIndex: Int): Boolean {
         if (stringIndex !in 0 until NUM_STRINGS) return false
         return stringStates[stringIndex].isActive
     }
 
-    /**
-     * Get the current bend amount for a string (direction-adjusted).
-     */
     fun getStringBend(stringIndex: Int): Float {
         if (stringIndex !in 0 until NUM_STRINGS) return 0f
         return stringStates[stringIndex].bendAmount
     }
 
-    /**
-     * Get the raw deflection for a string (not direction-adjusted, for UI).
-     */
     fun getRawDeflection(stringIndex: Int): Float {
         if (stringIndex !in 0 until NUM_STRINGS) return 0f
         return stringStates[stringIndex].rawDeflection
     }
     
-    
-    /**
-     * Set the base frequency for a string's pluck sound.
-     * Should match the current tuning of the associated voice.
-     */
     fun setStringFrequency(stringIndex: Int, frequency: Double) {
         if (stringIndex !in 0 until NUM_STRINGS) return
         pluckOscillators[stringIndex].frequency.set(frequency)
         stringStates[stringIndex].baseFrequency = frequency.toFloat()
     }
 
-    /**
-     * Reset all string bender state to neutral.
-     * Call this when switching away from the strings panel or when using voice pads' global bender.
-     * Ensures clean state transition between different interaction modes.
-     */
     fun resetAll() {
-        // Release all active strings
         for (i in 0 until NUM_STRINGS) {
             val state = stringStates[i]
             state.isActive = false
@@ -639,7 +538,6 @@ class DspPerStringBenderPlugin(
             state.rawDeflection = 0f
             state.voiceMix = 0.5f
             
-            // Reset voice outputs to neutral (0 = no bend, 1 = full volume)
             val voiceA = i * 2
             val voiceB = i * 2 + 1
             voiceBendOutputs[voiceA].input.set(0.0)
@@ -647,66 +545,45 @@ class DspPerStringBenderPlugin(
             voiceMixOutputs[voiceA].input.set(1.0)
             voiceMixOutputs[voiceB].input.set(1.0)
             
-            // Reset tension sounds
             tensionEnvelopes[i].input.set(0.0)
             tensionRamps[i].input.set(0.0)
             slideRamps[i].input.set(0.0)
             
-            // Reset gesture state
             gestureStates[i].lastY = 0.5f
             gestureStates[i].lastX = 0f
             gestureStates[i].slideActive = false
         }
         
-        // Reset slide bar state
         slideBarPosition = 0f
         slideBarVibratoDepth = 0f
         slideBarWasActive = false
     }
 
-    // ═══════════════════════════════════════════════════════════
-    // SLIDE BAR - Global pitch control across all strings
-    // ═══════════════════════════════════════════════════════════
-    
-    private var slideBarPosition = 0f  // 0=top (no bend), 1=bottom (max bend)
+    // SLIDE BAR
+    private var slideBarPosition = 0f
     private var slideBarLastX = 0.5f
     private var slideBarLastTime = 0L
     private var slideBarVibratoDepth = 0f
     private var slideBarWasActive = false
     
-    /**
-     * Set the slide bar position and horizontal wiggle for vibrato.
-     * 
-     * @param yPosition 0 to 1 (0=top, 1=bottom) - controls pitch bend (down = higher pitch)
-     * @param xPosition 0 to 1 (horizontal position) - used for vibrato detection
-     */
     fun setSlideBar(yPosition: Float, xPosition: Float) {
         val currentTime = Clock.System.now().toEpochMilliseconds()
         val deltaTime = (currentTime - slideBarLastTime).coerceAtLeast(1L)
         
-        // Calculate wiggle velocity for vibrato
         val deltaX = (xPosition - slideBarLastX).absoluteValue
         val wiggleVelocity = deltaX / deltaTime * 1000f
         
-        // Vibrato depth based on wiggle speed (above threshold)
         val vibratoThreshold = 0.8f
         slideBarVibratoDepth = ((wiggleVelocity - vibratoThreshold) / 3f).coerceIn(0f, 1f)
         
-        // Store for next frame
         slideBarLastX = xPosition
         slideBarLastTime = currentTime
         slideBarPosition = yPosition.coerceIn(0f, 1f)
         
-        // Calculate pitch bend: 0.0=top (no bend), 1.0=bottom (max bend up)
-        // User requested sliding down raises pitch
-        val slideBend = slideBarPosition // 0 to 1
-        
-        // Determine if slide bar is actively bending
+        val slideBend = slideBarPosition
         val isActive = slideBend > 0.02f
         
-        // Apply slide bend to ALL voices (first 8 = strings)
         for (i in 0 until NUM_STRINGS) {
-            // Add vibrato as rapid oscillation
             val vibratoOscillation = if (slideBarVibratoDepth > 0.05f) {
                 kotlin.math.sin(currentTime * 0.03) * slideBarVibratoDepth * 0.3
             } else {
@@ -714,68 +591,47 @@ class DspPerStringBenderPlugin(
             }
             
             val totalBend = slideBend + vibratoOscillation.toFloat()
-            
-            // Calculate pitch modulation
             val tensionCurve = totalBend * (1.0 + totalBend.absoluteValue * 0.5)
-            val semitones = tensionCurve * MAX_BEND_SEMITONES * 0.5  // Half range for slide bar
+            val semitones = tensionCurve * MAX_BEND_SEMITONES * 0.5
             val frequencyMultiplier = 2.0.pow(semitones / 12.0) - 1.0
             
             val voiceA = i * 2
             val voiceB = i * 2 + 1
             
-            // ALWAYS apply slide bar pitch bend to voices
-            // This is additive with any string bend the voice might have
-            // The voice's benderInput receives both global bender AND per-string bender signals
-            // So we apply the slide bar bend unconditionally
             voiceBendOutputs[voiceA].input.set(frequencyMultiplier)
             voiceBendOutputs[voiceB].input.set(frequencyMultiplier)
         }
         
-        // ═══════════════════════════════════════════════════════════
-        // TENSION SOUND CONTROL - Like DspBenderPlugin.setBend
-        // ═══════════════════════════════════════════════════════════
         if (isActive) {
-            // Tension frequency rises with slide amount (250Hz to 400Hz range)
             val tensionFreq = 250.0 + (slideBend * 150.0)
             tensionOscillators[0].frequency.set(tensionFreq)
             
-            // Tension gain scales with slide intensity (subtle like global bender)
             val tensionLevel = slideBend * 0.015
             tensionRamps[0].input.set(tensionLevel)
             
-            // Trigger tension envelope when slide bar first moves from rest
             if (!slideBarWasActive) {
                 tensionEnvelopes[0].input.set(1.0)
                 slideBarWasActive = true
             }
         } else if (slideBarWasActive) {
-            // Release tension envelope when returning to rest
             tensionEnvelopes[0].input.set(0.0)
             tensionRamps[0].input.set(0.0)
         }
     }
     
-    /**
-     * Release the slide bar (spring back to center).
-     */
     fun releaseSlideBar() {
         val wasActive = slideBarWasActive
-        slideBarPosition = 0f // Reset to top
+        slideBarPosition = 0f
         slideBarVibratoDepth = 0f
         slideBarWasActive = false
         
-        // Release tension envelope
         if (wasActive) {
             tensionEnvelopes[0].input.set(0.0)
             tensionRamps[0].input.set(0.0)
-            
-            // Trigger spring sound for slide bar (wobbling boing effect)
             springEnvelopes[0].input.set(1.0)
             springEnvelopes[0].input.set(0.0)
         }
         
-        // Reset all voice bends controlled by slide bar
-        // Note: only reset if string is not actively being bent
         for (i in 0 until NUM_STRINGS) {
             if (!stringStates[i].isActive) {
                 val voiceA = i * 2
@@ -786,13 +642,6 @@ class DspPerStringBenderPlugin(
         }
     }
     
-    /**
-     * Get current slide bar position for UI.
-     */
     fun getSlideBarPosition(): Float = slideBarPosition
-    
-    /**
-     * Get current vibrato depth for UI feedback.
-     */
     fun getSlideBarVibratoDepth(): Float = slideBarVibratoDepth
 }

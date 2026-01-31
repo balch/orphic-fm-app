@@ -73,6 +73,7 @@ kotlin {
             implementation(project(":core:plugins:duolfo"))
             implementation(project(":core:plugins:flux"))
             implementation(project(":core:plugins:looper"))
+            implementation(project(":core:plugins:perstringbender"))
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)

@@ -67,6 +67,7 @@ dependencies {
     implementation(project(":core:plugins:duolfo"))
     implementation(project(":core:plugins:flux"))
     implementation(project(":core:plugins:looper"))
+    implementation(project(":core:plugins:perstringbender"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.media)
     implementation(libs.kmlogging)
