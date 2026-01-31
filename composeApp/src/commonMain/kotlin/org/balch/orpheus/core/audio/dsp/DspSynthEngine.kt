@@ -1054,8 +1054,16 @@ class DspSynthEngine(
         pluginProvider.resonatorPlugin.setMode(mode)
         drumDirectResonator.setMode(mode)
     }
+    private var _resoTargetMix = 0.5f
+    private var _resoMix = 0.0f
+    
     override fun setResonatorTarget(target: Int) = pluginProvider.resonatorPlugin.setTarget(target)
-    override fun setResonatorTargetMix(targetMix: Float) = pluginProvider.resonatorPlugin.setTargetMix(targetMix)
+    
+    override fun setResonatorTargetMix(targetMix: Float) {
+        _resoTargetMix = targetMix
+        pluginProvider.resonatorPlugin.setTargetMix(targetMix)
+        updateDirectResonatorGains()
+    }
     
     override fun setResonatorStructure(value: Float) {
         pluginProvider.resonatorPlugin.setStructure(value)
@@ -1078,14 +1086,57 @@ class DspSynthEngine(
     }
     
     override fun setResonatorMix(value: Float) {
+        _resoMix = value
         pluginProvider.resonatorPlugin.setMix(value)
-        // Sync Direct Resonator Wet/Dry Mix
-        val wetLevel = value.toDouble().coerceIn(0.0, 1.0)
-        val dryLevel = 1.0 - wetLevel
-        drumDirectResoWetGainL.inputB.set(wetLevel)
-        drumDirectResoWetGainR.inputB.set(wetLevel)
-        drumDirectResoDryGainL.inputB.set(dryLevel)
-        drumDirectResoDryGainR.inputB.set(dryLevel)
+        updateDirectResonatorGains()
+    }
+    
+    private fun updateDirectResonatorGains() {
+        // Calculate Drum Excite Level based on TargetMix (Crossfader)
+        // 0.0 (Left/Drums) -> 1.0
+        // 0.5 (Center) -> 1.0
+        // 1.0 (Right/Synth) -> 0.0
+        // Fade out drums as we go from 0.5 to 1.0
+        val drumExcite = if (_resoTargetMix <= 0.5f) 1.0f else (1.0f - (_resoTargetMix - 0.5f) * 2.0f).coerceIn(0.0f, 1.0f)
+        
+        // Calculate base Wet/Dry from Mix knob
+        val mixWet = _resoMix.coerceIn(0.0f, 1.0f)
+        val mixDry = 1.0f - mixWet
+        
+        // Apply Crossfader logic:
+        // If Drums are excited (drumExcite = 1), we use the Mix knob values.
+        // If Drums are NOT excited (drumExcite = 0), we force fully Dry (Wet=0, Dry=1).
+        
+        // Final Gain = MixWet * DrumExcite
+        // But what about Dry? 
+        // In "Bypass" behavior: Signal -[Resonator]-> Wet | Signal -> Dry.
+        // If we reduce Wet, we should increase Dry to maintain unity if we want "Dry Bypass".
+        // DspResonatorPlugin does: 
+        // ExciteGain = drumExcite
+        // BypassGain = 1.0 - drumExcite
+        // Output = (Excite -> Reso -> Mix) + Bypass.
+        
+        // We can replicate this logic:
+        // Signal is split into "To Reso" and "Direct Dry".
+        // "Direct Dry" isn't strictly controlled here independently in my previous wiring. 
+        // Previous wiring: 
+        // Input -> DryGain -> Sum
+        // Input -> Reso -> WetGain -> Sum
+        
+        // We need to adjust:
+        // WetGain = mixWet * drumExcite
+        // DryGain = mixDry * drumExcite + (1.0f - drumExcite)  <-- This adds the "Bypass" part!
+        // If Excite is 1: DryGain = mixDry + 0 = mixDry. (Standard Mix behavior)
+        // If Excite is 0: WetGain = 0. DryGain = 0 + 1 = 1. (Fully Dry Bypass)
+        // If Excite is 0.5 (Mixing): Blend of both.
+        
+        val finalWet = (mixWet * drumExcite).toDouble()
+        val finalDry = ((mixDry * drumExcite) + (1.0f - drumExcite)).toDouble()
+        
+        drumDirectResoWetGainL.inputB.set(finalWet)
+        drumDirectResoWetGainR.inputB.set(finalWet)
+        drumDirectResoDryGainL.inputB.set(finalDry)
+        drumDirectResoDryGainR.inputB.set(finalDry)
     }
     
     override fun strumResonator(frequency: Float) {
