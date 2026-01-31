@@ -1,35 +1,63 @@
-package org.balch.orpheus.core.audio.dsp.plugins
+package org.balch.orpheus.plugins.duolfo
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
+import org.balch.orpheus.core.audio.dsp.lv2.AudioPort
+import org.balch.orpheus.core.audio.dsp.lv2.ControlPort
+import org.balch.orpheus.core.audio.dsp.lv2.PluginInfo
+import org.balch.orpheus.core.audio.dsp.lv2.Port
+import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.Lv2DspPlugin
 
 /**
- * Shared DuoLFO implementation using DSP primitive interfaces.
+ * Shared DuoLFO implementation.
  * Two Oscillators (A & B) with logical AND/OR combination.
- * Supports both Square and Triangle waveforms with AND/OR modes.
- *
- * For square waves (-1 to +1), proper AND/OR logic requires:
- * 1. Convert bipolar (-1,+1) to unipolar (0,1): u = (x + 1) / 2 = x * 0.5 + 0.5
- * 2. Apply logic: AND = Ua * Ub, OR = Ua + Ub - Ua*Ub
- * 3. Convert back to bipolar: x = u * 2 - 1
- *
- * For triangle waves, AND/OR is implemented as:
- * - AND = MIN(A, B) - output follows the lower of the two
- * - OR = MAX(A, B) - output follows the higher of the two
+ * 
+ * Port Map:
+ * 0: Frequency A Input (Audio)
+ * 1: Frequency B Input (Audio)
+ * 2: Feedback Input (Audio)
+ * 3: Output (Audio)
+ * 4: Output A (Audio)
+ * 5: Output B (Audio)
+ * 6: Mode (Control Input, 0=AND, 1=OFF, 2=OR)
+ * 7: Link (Control Input, bool)
+ * 8: Triangle Mode (Control Input, bool)
  */
-// Rename to DspHyperLfo
 @Inject
-@ContributesIntoSet(AppScope::class)
-class DspDuoLfoPlugin(
+@SingleIn(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
+class DuoLfoPlugin(
     private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory
-): DspPlugin {
+): Lv2DspPlugin {
+
+    override val info = PluginInfo(
+        uri = "org.balch.orpheus.plugins.duolfo",
+        name = "Duo LFO",
+        author = "Balch"
+    )
+
+    override val ports: List<Port> = listOf(
+        AudioPort(0, "freq_a", "Frequency A", true),
+        AudioPort(1, "freq_b", "Frequency B", true),
+        AudioPort(2, "feedback", "Feedback", true),
+        AudioPort(3, "out", "Output", false),
+        AudioPort(4, "out_a", "Output A", false),
+        AudioPort(5, "out_b", "Output B", false),
+        ControlPort(6, "mode", "Mode", 1f, 0f, 2f),
+        ControlPort(7, "link", "Link", 0f, 0f, 1f),
+        ControlPort(8, "triangle_mode", "Triangle Mode", 1f, 0f, 1f)
+    )
+
     // Interface Units (Proxies)
     private val inputA = dspFactory.createPassThrough()
     private val inputB = dspFactory.createPassThrough()
@@ -41,14 +69,6 @@ class DspDuoLfoPlugin(
     private val feedbackProxy = dspFactory.createPassThrough()
     private val freqAModMixer = dspFactory.createAdd() // BaseFreqA + Feedback
     private val freqBModMixer = dspFactory.createAdd() // BaseFreqB + Feedback
-
-    // Public Ports (for external connection)
-    val frequencyA: AudioInput get() = inputA.input
-    val frequencyB: AudioInput get() = inputB.input
-    val feedbackInput: AudioInput get() = feedbackProxy.input // TOTAL FB input
-    val output: AudioOutput get() = outputProxy.output
-    val outputA: AudioOutput get() = outputAProxy.output
-    val outputB: AudioOutput get() = outputBProxy.output
 
     // Internal Components - Square
     private val lfoASquare = dspFactory.createSquareOscillator()
@@ -68,8 +88,7 @@ class DspDuoLfoPlugin(
     // OR logic: Ua + Ub - Ua*Ub
     private val orProduct = dspFactory.createMultiply()  // Ua * Ub
     private val orSum = dspFactory.createAdd()           // Ua + Ub
-    private val orResult =
-        dspFactory.createMultiplyAdd() // orSum + (-1 * orProduct) = Ua + Ub - Ua*Ub
+    private val orResult = dspFactory.createMultiplyAdd() // orSum + (-1 * orProduct)
 
     // Unipolar to Bipolar converter: x = u * 2 - 1
     private val toBipolarAnd = dspFactory.createMultiplyAdd()
@@ -87,6 +106,7 @@ class DspDuoLfoPlugin(
     private var isAndMode = true
     private var isTriangleMode = true // Default to triangle for delay mod
     
+    // Backing fields for persistence getters
     private var _hyperLfoFreqA = 0.0f
     private var _hyperLfoFreqB = 0.0f
     private var _hyperLfoMode = 1
@@ -101,21 +121,26 @@ class DspDuoLfoPlugin(
         toBipolarAnd, toBipolarOr,
         triangleMin, triangleMax, fmGain, lfoMonitor
     )
+    
+    // Compatibility Accessors
+    val frequencyA: AudioInput get() = inputA.input
+    val frequencyB: AudioInput get() = inputB.input
+    val feedbackInput: AudioInput get() = feedbackProxy.input
+    val output: AudioOutput get() = outputProxy.output
+    val outputA: AudioOutput get() = outputAProxy.output
+    val outputB: AudioOutput get() = outputBProxy.output
 
-    override val inputs: Map<String, AudioInput>
-        get() = mapOf(
-            "frequencyA" to inputA.input,
-            "frequencyB" to inputB.input,
-            "feedback" to feedbackProxy.input
-        )
+    override val inputs: Map<String, AudioInput> = mapOf(
+        "frequencyA" to inputA.input,
+        "frequencyB" to inputB.input,
+        "feedback" to feedbackProxy.input
+    )
 
-    override val outputs: Map<String, AudioOutput>
-        get() = mapOf(
-            "output" to outputProxy.output
-        )
+    override val outputs: Map<String, AudioOutput> = mapOf(
+        "output" to outputProxy.output
+    )
 
     override fun initialize() {
-
         // Monitor the LFO output for visualization
         outputProxy.output.connect(lfoMonitor.input)
         lfoMonitor.setHalfLife(0.016) // ~60fps response
@@ -140,10 +165,7 @@ class DspDuoLfoPlugin(
         fmGain.inputB.set(0.0) // Link OFF
         fmGain.output.connect(lfoBSquare.frequency) // Modulate B Square
 
-        // ═══════════════════════════════════════════════════════════
-        // BIPOLAR TO UNIPOLAR CONVERSION
-        // u = x * 0.5 + 0.5 (converts -1,+1 to 0,1)
-        // ═══════════════════════════════════════════════════════════
+        // Bipolar to Unipolar
         lfoASquare.output.connect(toUnipolarA.inputA)
         toUnipolarA.inputB.set(0.5)
         toUnipolarA.inputC.set(0.5)
@@ -152,34 +174,25 @@ class DspDuoLfoPlugin(
         toUnipolarB.inputB.set(0.5)
         toUnipolarB.inputC.set(0.5)
 
-        // ═══════════════════════════════════════════════════════════
-        // AND LOGIC: Ua * Ub (works correctly for 0/1 values)
-        // ═══════════════════════════════════════════════════════════
+        // AND LOGIC: Ua * Ub
         toUnipolarA.output.connect(logicAnd.inputA)
         toUnipolarB.output.connect(logicAnd.inputB)
 
-        // Convert AND result back to bipolar: x = u * 2 - 1
+        // Convert AND result back to bipolar
         logicAnd.output.connect(toBipolarAnd.inputA)
         toBipolarAnd.inputB.set(2.0)
         toBipolarAnd.inputC.set(-1.0)
 
-        // ═══════════════════════════════════════════════════════════
         // OR LOGIC: Ua + Ub - Ua*Ub
-        // ═══════════════════════════════════════════════════════════
-        // First: Ua * Ub
         toUnipolarA.output.connect(orProduct.inputA)
         toUnipolarB.output.connect(orProduct.inputB)
-
-        // Second: Ua + Ub
         toUnipolarA.output.connect(orSum.inputA)
         toUnipolarB.output.connect(orSum.inputB)
-
-        // Third: (Ua + Ub) + (-1 * Ua*Ub) = Ua + Ub - Ua*Ub
         orProduct.output.connect(orResult.inputA)
         orResult.inputB.set(-1.0)
         orSum.output.connect(orResult.inputC)
 
-        // Convert OR result back to bipolar: x = u * 2 - 1
+        // Convert OR result back to bipolar
         orResult.output.connect(toBipolarOr.inputA)
         toBipolarOr.inputB.set(2.0)
         toBipolarOr.inputC.set(-1.0)
@@ -196,11 +209,14 @@ class DspDuoLfoPlugin(
         // Initial Separate Outputs
         lfoATriangle.output.connect(outputAProxy.input)
         lfoBTriangle.output.connect(outputBProxy.input)
-    }
 
-    /**
-     * Set LFO mode: 0=AND, 1=OFF, 2=OR
-     */
+        audioUnits.forEach { audioEngine.addUnit(it) }
+    }
+    
+    override fun onStart() {}
+    override fun connectPort(index: Int, data: Any) {}
+    override fun run(nFrames: Int) {}
+
     fun setMode(mode: Int) {
         _hyperLfoMode = mode
         when (mode) {
@@ -208,12 +224,10 @@ class DspDuoLfoPlugin(
                 isAndMode = true
                 updateOutput()
             }
-
-            1 -> { // OFF - output stable 0 (becomes 0.5 after unipolar conversion)
+            1 -> { // OFF
                 outputProxy.input.disconnectAll()
-                outputProxy.input.set(0.0) // Stable center position
+                outputProxy.input.set(0.0)
             }
-
             2 -> { // OR
                 isAndMode = false
                 updateOutput()
@@ -237,19 +251,18 @@ class DspDuoLfoPlugin(
             lfoATriangle.output.connect(outputAProxy.input)
             lfoBTriangle.output.connect(outputBProxy.input)
 
-            // Triangle mode: AND = MIN, OR = MAX
+            // Triangle mode
             if (isAndMode) {
                 triangleMin.output.connect(outputProxy.input)
             } else {
                 triangleMax.output.connect(outputProxy.input)
             }
         } else {
-            // Raw outputs (Square) - use Direct Square or Bipolar?
-            // For Warps Source, we likely want the raw square wave (-1 to 1)
+            // Raw outputs (Square)
             lfoASquare.output.connect(outputAProxy.input)
             lfoBSquare.output.connect(outputBProxy.input)
 
-            // Square mode: use AND/OR logic (with proper bipolar conversion)
+            // Square mode
             if (isAndMode) {
                 toBipolarAnd.output.connect(outputProxy.input)
             } else {
@@ -260,7 +273,6 @@ class DspDuoLfoPlugin(
 
     fun setLink(enabled: Boolean) {
         _hyperLfoLink = enabled
-        // Simple FM depth switch
         fmGain.inputB.set(if (enabled) 10.0 else 0.0)
     }
 
@@ -282,9 +294,6 @@ class DspDuoLfoPlugin(
     fun getFreq(index: Int): Float = if (index == 0) _hyperLfoFreqA else _hyperLfoFreqB
     fun getMode(): Int = _hyperLfoMode
     fun getLink(): Boolean = _hyperLfoLink
-
-    /**
-     * Get the current LFO output value (-1 to 1 range) for visualization.
-     */
+    
     fun getCurrentValue(): Float = lfoMonitor.getCurrent().toFloat().coerceIn(-1f, 1f)
 }

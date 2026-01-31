@@ -55,6 +55,18 @@ android {
 
 dependencies {
     implementation(projects.composeApp)
+    implementation(project(":core:plugins:delay"))
+    implementation(project(":core:plugins:distortion"))
+    implementation(project(":core:plugins:resonator"))
+    implementation(project(":core:plugins:bender"))
+    implementation(project(":core:plugins:stereo"))
+    implementation(project(":core:plugins:vibrato"))
+    implementation(project(":core:plugins:warps"))
+    implementation(project(":core:plugins:grains"))
+    implementation(project(":core:plugins:drum"))
+    implementation(project(":core:plugins:duolfo"))
+    implementation(project(":core:plugins:flux"))
+    implementation(project(":core:plugins:looper"))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.media)
     implementation(libs.kmlogging)

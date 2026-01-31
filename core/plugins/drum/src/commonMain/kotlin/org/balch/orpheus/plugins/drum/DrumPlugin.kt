@@ -1,24 +1,51 @@
-package org.balch.orpheus.core.audio.dsp.plugins
+package org.balch.orpheus.plugins.drum
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
+import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
+import org.balch.orpheus.core.audio.dsp.lv2.AudioPort
+import org.balch.orpheus.core.audio.dsp.lv2.ControlPort
+import org.balch.orpheus.core.audio.dsp.lv2.PluginInfo
+import org.balch.orpheus.core.audio.dsp.lv2.Port
+import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.Lv2DspPlugin
 
 /**
  * DSP Plugin for specialized 808-style drum synthesis.
  * 
  * Uses the DrumUnit which wraps AnalogBassDrum, AnalogSnareDrum, and MetallicHiHat.
+ * 
+ * Port Map:
+ * 0: Output Left (Audio)
+ * 1: Output Right (Audio)
+ * 2: Mix (Control Input, 0..1)
  */
 @Inject
-@ContributesIntoSet(AppScope::class)
-class DspDrumPlugin(
-    audioEngine: AudioEngine,
-    dspFactory: DspFactory
-) : DspPlugin {
+@SingleIn(AppScope::class)
+@ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
+class DrumPlugin(
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
+) : Lv2DspPlugin {
+
+    override val info = PluginInfo(
+        uri = "org.balch.orpheus.plugins.drum",
+        name = "Drum Machine",
+        author = "Balch"
+    )
+
+    override val ports: List<Port> = listOf(
+        AudioPort(0, "out_l", "Output Left", false),
+        AudioPort(1, "out_r", "Output Right", false),
+        ControlPort(2, "mix", "Mix", 0.7f, 0f, 1f)
+    )
 
     private val drumUnit = dspFactory.createDrumUnit()
     
@@ -29,30 +56,32 @@ class DspDrumPlugin(
     override val audioUnits: List<AudioUnit> = listOf(
         drumUnit, drumGainLeft, drumGainRight
     )
-
-    override val outputs: Map<String, AudioOutput>
-        get() = mapOf(
-            "outputLeft" to drumGainLeft.output,
-            "outputRight" to drumGainRight.output
-        )
-        
-    override val inputs: Map<String, org.balch.orpheus.core.audio.dsp.AudioInput>
-        get() = mapOf(
-            "triggerBD" to drumUnit.triggerInputBd,
-            "triggerSD" to drumUnit.triggerInputSd,
-            "triggerHH" to drumUnit.triggerInputHh
-        )
+    
+    // Backwards compatibility maps
+    override val outputs: Map<String, AudioOutput> = mapOf(
+        "outputLeft" to drumGainLeft.output,
+        "outputRight" to drumGainRight.output
+    )
+    
+    override val inputs: Map<String, AudioInput> = mapOf(
+        "triggerBD" to drumUnit.triggerInputBd,
+        "triggerSD" to drumUnit.triggerInputSd,
+        "triggerHH" to drumUnit.triggerInputHh
+    )
 
     override fun initialize() {
-        // Connect drum unit to output gains
         drumUnit.output.connect(drumGainLeft.inputA)
         drumUnit.output.connect(drumGainRight.inputA)
         
-        // Default gains - calibrated to sit just below synth pad volume
-        // Default gains - calibrated to sit just below synth pad volume
         updateGains()
+        
+        audioUnits.forEach { audioEngine.addUnit(it) }
     }
     
+    override fun onStart() {}
+    override fun connectPort(index: Int, data: Any) {}
+    override fun run(nFrames: Int) {}
+
     private var mix = 0.7f
     
     fun setMix(value: Float) {
@@ -69,10 +98,6 @@ class DspDrumPlugin(
         drumGainRight.inputB.set(finalGain.toDouble())
     }
 
-    /**
-     * Trigger a drum sound.
-     * @param type 0=BD, 1=SD, 2=HH
-     */
     // State duplication for persistence
     private val frequencies = FloatArray(3) { 0.5f }
     private val tones = FloatArray(3) { 0.5f }
