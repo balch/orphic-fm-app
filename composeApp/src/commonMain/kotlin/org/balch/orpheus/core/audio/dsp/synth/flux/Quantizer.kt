@@ -94,6 +94,13 @@ class Quantizer {
         
         if (level > 0) {
             val levelIndex = level - 1
+            val l = levels[levelIndex]
+            
+            // Safety check: if no notes meet this threshold (bitmask is 0), skip quantization
+            if (l.bitmask == 0) {
+                return value
+            }
+
             var inputValue = value
             if (hysteresis) {
                 inputValue += feedback[levelIndex]
@@ -111,9 +118,12 @@ class Quantizer {
             noteFractional *= baseInterval
             
             // Search for tightest upper/lower bound in active notes
-            val l = levels[levelIndex]
-            var a = voltage[l.last] - baseInterval
-            var b = voltage[l.first] + baseInterval
+            // Ensure indices are safe (though bitmask check above covers most cases)
+            val safeLast = l.last.coerceIn(0, voltage.lastIndex)
+            val safeFirst = l.first.coerceIn(0, voltage.lastIndex)
+            
+            var a = voltage[safeLast] - baseInterval
+            var b = voltage[safeFirst] + baseInterval
             
             var bitmask = l.bitmask
             for (i in 0 until numDegrees) {
