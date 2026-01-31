@@ -341,6 +341,12 @@ expect interface FluxUnit : AudioUnit {
     /** Clock rate/division (0.0 - 1.0) maps to dividers */
     val rate: AudioInput
     
+    /** Jitter amount (0.0 - 1.0) */
+    val jitter: AudioInput
+    
+    /** Gate Probability Bias (0.0 = Favors T3, 1.0 = Favors T1) */
+    val probability: AudioInput
+    
     /** Master Output (X2 - Main Melody) */
     override val output: AudioOutput
     

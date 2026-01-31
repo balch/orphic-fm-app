@@ -50,6 +50,10 @@ class DspVoice(
     private val fmFreqMixer = audioEngine.createMultiplyAdd() // (FmSignal * 200Hz) + ActualFreq
     private val pitchScaler = audioEngine.createMultiply()    // BaseFreq * PitchMultiplier
     
+    // CV Pitch: (CvInput * CvDepth) + ScaledFreq
+    private val cvPitchScaler = audioEngine.createMultiply()
+    private val cvPitchMixer = audioEngine.createAdd()
+    
     // Direct frequency: Bypasses pitchScaler for note automation (Hz value goes straight through)
     private val directFreqMixer = audioEngine.createAdd()     // Adds direct freq to scaled freq
 
@@ -83,6 +87,8 @@ class DspVoice(
     val couplingInput: AudioInput get() = couplingScaler.inputA    // Partner envelope input
     val couplingDepth: AudioInput get() = couplingScaler.inputB    // Coupling depth (Hz range)
     val holdLevel: AudioInput get() = vcaControlMixer.inputB       // Hold/drone level
+    val cvPitchInput: AudioInput get() = cvPitchScaler.inputA      // CV input (0-1)
+    val cvPitchDepth: AudioInput get() = cvPitchScaler.inputB      // Depth in Hz
 
     // Outputs - volumeGain is the final output stage
     val output: AudioOutput get() = volumeGain.output
@@ -148,6 +154,8 @@ class DspVoice(
         audioEngine.addUnit(fmDepthControl)
         audioEngine.addUnit(fmFreqMixer)
         audioEngine.addUnit(pitchScaler)
+        audioEngine.addUnit(cvPitchScaler)
+        audioEngine.addUnit(cvPitchMixer)
         audioEngine.addUnit(directFreqMixer)
         audioEngine.addUnit(vibratoScaler)
         audioEngine.addUnit(vibratoMixer)
@@ -205,7 +213,10 @@ class DspVoice(
 
         // Direct frequency mixer: pitchScaler.output + directFrequency -> vibratoMixer
         // This allows note automation to bypass pitchScaler entirely
-        pitchScaler.output.connect(directFreqMixer.inputA)
+        pitchScaler.output.connect(cvPitchMixer.inputA)
+        cvPitchScaler.output.connect(cvPitchMixer.inputB)
+        cvPitchMixer.output.connect(directFreqMixer.inputA)
+        
         directFreqMixer.inputB.set(0.0)  // Default: no direct frequency override
         
         directFreqMixer.output.connect(vibratoMixer.inputA)
@@ -237,6 +248,9 @@ class DspVoice(
 
         // Default coupling depth = 0 (no partner influence)
         couplingDepth.set(0.0)
+        
+        // Default CV pitch depth = 0
+        cvPitchDepth.set(0.0)
 
         // Wire: Mixed Oscillator -> VCA inputA
         oscMixer.output.connect(vca.inputA)

@@ -24,7 +24,6 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.balch.orpheus.ui.widgets.ValueCycleButton
 
 @Composable
 fun DrumsPanel(
@@ -66,13 +65,11 @@ fun DrumsPanel(
                 tone = state.bdTone,
                 decay = state.bdDecay,
                 p4 = state.bdP4,
-                triggerSource = state.bdTriggerSource,
                 isActive = state.isBdActive,
                 onFrequencyChange = actions.setBdFrequency,
                 onToneChange = actions.setBdTone,
                 onDecayChange = actions.setBdDecay,
                 onP4Change = actions.setBdP4,
-                onTriggerSourceChange = actions.setBdTriggerSource,
                 onTriggerStart = actions.startBdTrigger,
                 onTriggerEnd = actions.stopBdTrigger
             )
@@ -88,13 +85,11 @@ fun DrumsPanel(
                 tone = state.sdTone,
                 decay = state.sdDecay,
                 p4 = state.sdP4,
-                triggerSource = state.sdTriggerSource,
                 isActive = state.isSdActive,
                 onFrequencyChange = actions.setSdFrequency,
                 onToneChange = actions.setSdTone,
                 onDecayChange = actions.setSdDecay,
                 onP4Change = actions.setSdP4,
-                onTriggerSourceChange = actions.setSdTriggerSource,
                 onTriggerStart = actions.startSdTrigger,
                 onTriggerEnd = actions.stopSdTrigger
             )
@@ -110,13 +105,11 @@ fun DrumsPanel(
                 tone = state.hhTone,
                 decay = state.hhDecay,
                 p4 = state.hhP4,
-                triggerSource = state.hhTriggerSource,
                 isActive = state.isHhActive,
                 onFrequencyChange = actions.setHhFrequency,
                 onToneChange = actions.setHhTone,
                 onDecayChange = actions.setHhDecay,
                 onP4Change = actions.setHhP4,
-                onTriggerSourceChange = actions.setHhTriggerSource,
                 onTriggerStart = actions.startHhTrigger,
                 onTriggerEnd = actions.stopHhTrigger
             )
@@ -137,7 +130,6 @@ private fun HeaderRow(modifier: Modifier = Modifier) {
         LabelHeader("DECAY", Modifier.weight(1f))
         LabelHeader("MOD", Modifier.weight(1f))
         LabelHeader("TRIG", Modifier.weight(1f))
-        LabelHeader("SRC", Modifier.weight(1f))
     }
 }
 
@@ -163,13 +155,11 @@ private fun DrumRow(
     tone: Float,
     decay: Float,
     p4: Float,
-    triggerSource: DrumTriggerSource,
     isActive: Boolean,
     onFrequencyChange: (Float) -> Unit,
     onToneChange: (Float) -> Unit,
     onDecayChange: (Float) -> Unit,
     onP4Change: (Float) -> Unit,
-    onTriggerSourceChange: (DrumTriggerSource) -> Unit,
     onTriggerStart: () -> Unit,
     onTriggerEnd: () -> Unit
 ) {
@@ -240,28 +230,6 @@ private fun DrumRow(
                     isLearnMode = learnState.isActive,
                     isLearning = isLearningTrigger,
                     onLearnSelect = { learnState.onSelectControl(triggerId) }
-                )
-            }
-            
-            // Source Source selection
-            Column(
-                modifier = Modifier.weight(1f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                ValueCycleButton(
-                    value = triggerSource,
-                    values = DrumTriggerSource.entries,
-                    onValueChange = onTriggerSourceChange,
-                    modifier = Modifier.height(24.dp),
-                    labelProvider = { src ->
-                        when(src) {
-                            DrumTriggerSource.INTERNAL -> "INT"
-                            DrumTriggerSource.FLUX_T1 -> "T1"
-                            DrumTriggerSource.FLUX_T2 -> "T2"
-                            DrumTriggerSource.FLUX_T3 -> "T3"
-                        }
-                    }
                 )
             }
         }

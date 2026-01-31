@@ -63,7 +63,7 @@ class FluxProcessor(private val sampleRate: Float) {
     fun tick() {
         // Update Timing State (Gates)
         // Since 'tick' is called ON a clock event, we treat this as the trigger
-        timingGenerator.process(clockInput = true, rate = 0.5f, jitter = 0.0f) // Jitter TODO
+        timingGenerator.process(clockInput = true, rate = 0.5f, jitter = jitter, probability = probability)
         
         outT1 = if (timingGenerator.getT1()) 1.0f else 0.0f
         outT2 = if (timingGenerator.getT2()) 1.0f else 0.0f
@@ -83,7 +83,7 @@ class FluxProcessor(private val sampleRate: Float) {
      * Called when clock is low/off to reset gates
      */
     fun tickClockOff() {
-        timingGenerator.process(clockInput = false, rate = 0.5f, jitter = 0.0f)
+        timingGenerator.process(clockInput = false, rate = 0.5f, jitter = jitter, probability = probability)
         outT1 = 0.0f
         outT2 = 0.0f
         outT3 = 0.0f
@@ -161,6 +161,23 @@ class FluxProcessor(private val sampleRate: Float) {
         quantizer.init(scales[scaleIndex])
     }
     
+    // Timing Generator Parameters
+    private var jitter = 0.0f
+    private var probability = 0.5f // Replaces "bias" for gates in original Marbles spec? 
+                                   // Actually Marbles reuses "Bias" for t-section probability when input is plugged into clock?
+                                   // But user asked to add "jitter and bias" specifically. 
+                                   // Since "Bias" knob already exists and controls voltage bias, we should probably add a dedicated Probability/Gate Bias knob
+                                   // OR reuse the existing Bias knob if we want true Marbles behavior (context dependent).
+                                   // Given the UI panel has separate sections, let's make them separate parameters to be explicit.
+                                   
+    fun setJitter(jitter: Float) {
+        this.jitter = jitter.coerceIn(0.0f, 1.0f)
+    }
+    
+    fun setGateProbability(p: Float) {
+        this.probability = p.coerceIn(0.0f, 1.0f)
+    }
+    
     // Getters for current state
     
     // Legacy support (defaults to X2)
@@ -172,6 +189,8 @@ class FluxProcessor(private val sampleRate: Float) {
     fun getDejaVu(): Float = dejaVu
     fun getLength(): Int = length
     fun getScaleIndex(): Int = scaleIndex
+    fun getJitter(): Float = jitter
+    fun getGateProbability(): Float = probability
     
     /**
      * Reset the sequence (useful for syncing or manual reset)

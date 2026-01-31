@@ -268,7 +268,7 @@ class DspDuoLfoPlugin(
         } else {
             _hyperLfoFreqB = frequency
         }
-        val freqHz = 0.01 + (frequency * 10.0)
+        val freqHz = 0.01 + (frequency * 200.0)
         if (index == 0) {
             inputA.input.set(freqHz)
         } else {

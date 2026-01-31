@@ -1,20 +1,27 @@
 package org.balch.orpheus.features.tweaks
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.features.drums808.DrumTriggerSource
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -25,6 +32,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.CrossModSelector
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.balch.orpheus.ui.widgets.ValueCycleButton
 
 /**
  * Mod Tweaks Panel - Compact view for modulation and voice controls.
@@ -102,6 +110,48 @@ fun ModTweaksPanel(
                 size = 52.dp,
                 progressColor = OrpheusColors.warmGlow
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Quad Trigger Sources
+        Text(
+            text = "QUAD TRIGGERS",
+            color = OrpheusColors.electricBlue,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf("Q1", "Q2", "Q3").forEachIndexed { index, label ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = label,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 9.sp,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    ValueCycleButton(
+                        value = DrumTriggerSource.values().getOrElse(voiceState.quadTriggerSources.getOrElse(index) { 0 }) { DrumTriggerSource.INTERNAL },
+                        values = DrumTriggerSource.values().toList(),
+                        onValueChange = { src -> actions.onQuadTriggerSourceChange(index, src.ordinal) },
+                        modifier = Modifier.height(24.dp),
+                        labelProvider = { src ->
+                            when (src) {
+                                DrumTriggerSource.INTERNAL -> "INT"
+                                DrumTriggerSource.FLUX_T1 -> "T1"
+                                DrumTriggerSource.FLUX_T2 -> "T2"
+                                DrumTriggerSource.FLUX_T3 -> "T3"
+                            }
+                        }
+                    )
+                }
+            }
         }
     }
 }

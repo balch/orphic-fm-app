@@ -24,6 +24,8 @@ class DspFluxPlugin(
     private var _length = 8
     private var _scale = 0
     private var _rate = 0.5f
+    private var _jitter = 0.0f
+    private var _probability = 0.5f
 
     override val audioUnits: List<AudioUnit> = listOf(flux)
     
@@ -34,7 +36,9 @@ class DspFluxPlugin(
         "steps" to flux.steps,
         "dejaVu" to flux.dejaVu,
         "length" to flux.length,
-        "rate" to flux.rate
+        "rate" to flux.rate,
+        "jitter" to flux.jitter,
+        "probability" to flux.probability
     )
     
     override val outputs: Map<String, AudioOutput> = mapOf(
@@ -55,6 +59,8 @@ class DspFluxPlugin(
         setLength(8)
         setScale(0)
         setRate(0.5f)
+        setJitter(0.0f)
+        setProbability(0.5f)
     }
     
     fun setRate(value: Float) {
@@ -92,6 +98,16 @@ class DspFluxPlugin(
         flux.setScale(index)
     }
     
+    fun setJitter(value: Float) {
+        _jitter = value
+        flux.jitter.set(value.toDouble())
+    }
+    
+    fun setProbability(value: Float) {
+        _probability = value
+        flux.probability.set(value.toDouble())
+    }
+    
     // Getters for state perstistence/UI
     fun getSpread() = _spread
     fun getBias() = _bias
@@ -100,4 +116,6 @@ class DspFluxPlugin(
     fun getLength() = _length
     fun getScale() = _scale
     fun getRate() = _rate
+    fun getJitter() = _jitter
+    fun getProbability() = _probability
 }

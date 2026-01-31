@@ -53,8 +53,9 @@ class DspDelayPlugin(
     private val delay2WetLeft = audioEngine.createMultiply()
     private val delay2WetRight = audioEngine.createMultiply()
 
-    // Input proxy for voices → delays
-    private val inputProxy = audioEngine.createPassThrough()
+    // Input proxies for stereo processing
+    private val inputLeftProxy = audioEngine.createPassThrough()
+    private val inputRightProxy = audioEngine.createPassThrough()
     
     // LFO input proxy
     private val lfoInputProxy = audioEngine.createPassThrough()
@@ -78,12 +79,13 @@ class DspDelayPlugin(
         selfMod1Attenuator, selfMod2Attenuator,
         delay1WetLeft, delay1WetRight,
         delay2WetLeft, delay2WetRight,
-        inputProxy, lfoInputProxy
+        inputLeftProxy, inputRightProxy, lfoInputProxy
     )
 
     override val inputs: Map<String, AudioInput>
         get() = mapOf(
-            "input" to inputProxy.input,
+            "inputLeft" to inputLeftProxy.input,
+            "inputRight" to inputRightProxy.input,
             "lfoInput" to lfoInputProxy.input
         )
 
@@ -155,9 +157,9 @@ class DspDelayPlugin(
         delay1ModMixer.output.connect(delay1.delay)
         delay2ModMixer.output.connect(delay2.delay)
 
-        // Input proxy → both delays
-        inputProxy.output.connect(delay1.input)
-        inputProxy.output.connect(delay2.input)
+        // Input proxies → respective delay lines
+        inputLeftProxy.output.connect(delay1.input)
+        inputRightProxy.output.connect(delay2.input)
 
         // Feedback loops
         delay1.output.connect(delay1FeedbackGain.inputA)

@@ -28,7 +28,8 @@ enum class PanelId(val displayName: String) {
     LOOPER("Loop"),
     PATTERN("Topographic"),
     WARPS("Warps"),
-    FLUX("Flux Generator")
+    FLUX("Flux Generator"),
+    ROUTER("Pulse Router")
 }
 
 /**

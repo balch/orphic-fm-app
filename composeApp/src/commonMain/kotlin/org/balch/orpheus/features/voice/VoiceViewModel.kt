@@ -51,7 +51,9 @@ data class VoiceUiState(
     val masterVolume: Float = 0.7f,
     val peakLevel: Float = 0.0f,
     val bendPosition: Float = 0.0f, // -1 to +1, current bender position for UI display
-    val bpm: Double = 120.0
+    val bpm: Double = 120.0,
+    val quadTriggerSources: List<Int> = List(3) { 0 },
+    val quadPitchSources: List<Int> = List(3) { 0 }
 ) {
     companion object {
         val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
@@ -76,6 +78,8 @@ private sealed interface VoiceIntent {
     data class QuadPitch(val quadIndex: Int, val value: Float) : VoiceIntent
     data class QuadHold(val quadIndex: Int, val value: Float) : VoiceIntent
     data class QuadVolume(val quadIndex: Int, val value: Float) : VoiceIntent
+    data class QuadTriggerSource(val quadIndex: Int, val sourceIndex: Int) : VoiceIntent
+    data class QuadPitchSource(val quadIndex: Int, val sourceIndex: Int) : VoiceIntent
 
     // Global intents
     data class FmStructure(val crossQuad: Boolean) : VoiceIntent
@@ -140,7 +144,9 @@ class VoiceViewModel(
         onStringBendRelease = ::onStringBendRelease,
         onSlideBarChange = ::onSlideBarChange,
         onSlideBarRelease = ::onSlideBarRelease,
-        onBpmChange = ::onBpmChange
+        onBpmChange = ::onBpmChange,
+        onQuadTriggerSourceChange = ::onQuadTriggerSourceChange,
+        onQuadPitchSourceChange = ::onQuadPitchSourceChange
     )
 
     fun onMasterVolumeChange(value: Float) {
@@ -402,6 +408,12 @@ class VoiceViewModel(
             is VoiceIntent.QuadVolume ->
                 state.withQuadVolume(intent.quadIndex, intent.value)
 
+            is VoiceIntent.QuadTriggerSource ->
+                state.withQuadTriggerSource(intent.quadIndex, intent.sourceIndex)
+
+            is VoiceIntent.QuadPitchSource ->
+                state.withQuadPitchSource(intent.quadIndex, intent.sourceIndex)
+
             is VoiceIntent.FmStructure ->
                 state.copy(fmStructureCrossQuad = intent.crossQuad)
 
@@ -453,6 +465,12 @@ class VoiceViewModel(
 
     private fun VoiceUiState.withQuadVolume(quadIndex: Int, value: Float) =
         copy(quadGroupVolumes = quadGroupVolumes.mapIndexed { i, v -> if (i == quadIndex) value else v })
+
+    private fun VoiceUiState.withQuadTriggerSource(quadIndex: Int, sourceIndex: Int) =
+        copy(quadTriggerSources = quadTriggerSources.mapIndexed { i, s -> if (i == quadIndex) sourceIndex else s })
+
+    private fun VoiceUiState.withQuadPitchSource(quadIndex: Int, sourceIndex: Int) =
+        copy(quadPitchSources = quadPitchSources.mapIndexed { i, s -> if (i == quadIndex) sourceIndex else s })
 
 
     // ═══════════════════════════════════════════════════════════
@@ -511,6 +529,12 @@ class VoiceViewModel(
 
             is VoiceIntent.QuadVolume ->
                 engine.setQuadVolume(intent.quadIndex, intent.value)
+            
+            is VoiceIntent.QuadTriggerSource ->
+                engine.setQuadTriggerSource(intent.quadIndex, intent.sourceIndex)
+
+            is VoiceIntent.QuadPitchSource ->
+                engine.setQuadPitchSource(intent.quadIndex, intent.sourceIndex)
 
             is VoiceIntent.FmStructure -> {
                 engine.setFmStructure(intent.crossQuad)
@@ -552,6 +576,8 @@ class VoiceViewModel(
         state.quadGroupPitches.forEachIndexed { i, p -> engine.setQuadPitch(i, p) }
         state.quadGroupHolds.forEachIndexed { i, h -> engine.setQuadHold(i, h) }
         state.quadGroupVolumes.forEachIndexed { i, v -> engine.setQuadVolume(i, v) }
+        state.quadTriggerSources.forEachIndexed { i, s -> engine.setQuadTriggerSource(i, s) }
+        state.quadPitchSources.forEachIndexed { i, s -> engine.setQuadPitchSource(i, s) }
         
         // IMPORTANT: Set FM structure BEFORE duoModSources!
         // VOICE_FM routing in setDuoModSource depends on the fmStructureCrossQuad flag
@@ -627,6 +653,14 @@ class VoiceViewModel(
 
     fun onQuadHoldChange(index: Int, value: Float) {
         synthController.emitControlChange(ControlIds.quadHold(index), value, ControlEventOrigin.UI)
+    }
+
+    fun onQuadTriggerSourceChange(quadIndex: Int, sourceIndex: Int) {
+        intents.tryEmit(VoiceIntent.QuadTriggerSource(quadIndex, sourceIndex))
+    }
+
+    fun onQuadPitchSourceChange(quadIndex: Int, sourceIndex: Int) {
+        intents.tryEmit(VoiceIntent.QuadPitchSource(quadIndex, sourceIndex))
     }
 
     fun onFmStructureChange(crossQuad: Boolean) {
@@ -822,7 +856,9 @@ data class VoicePanelActions(
     val onStringBendRelease: (stringIndex: Int) -> Int,
     val onSlideBarChange: (yPosition: Float, xPosition: Float) -> Unit,
     val onSlideBarRelease: () -> Unit,
-    val onBpmChange: (Double) -> Unit
+    val onBpmChange: (Double) -> Unit,
+    val onQuadTriggerSourceChange: (Int, Int) -> Unit,
+    val onQuadPitchSourceChange: (Int, Int) -> Unit
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
@@ -838,7 +874,8 @@ data class VoicePanelActions(
             onBendChange = {}, onBendRelease = {},
             onStringBendChange = {_, _, _ -> }, onStringBendRelease = { 0 },
             onSlideBarChange = {_, _ -> }, onSlideBarRelease = {},
-            onBpmChange = {}
+            onBpmChange = {}, onQuadTriggerSourceChange = {_, _ -> },
+            onQuadPitchSourceChange = {_, _ -> }
         )
     }
 }

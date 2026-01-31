@@ -70,6 +70,10 @@ class DspSynthEngine(
     // State caches
     private val quadPitchOffsets = DoubleArray(3) { 0.5 }
     private val voiceTuneCache = DoubleArray(12) { 0.5 }
+    
+    private var fluxClockSource = 0 // 0=Internal, 1=LFO
+    private val quadTriggerSources = IntArray(3) { 0 }
+    private val quadPitchSources = IntArray(3) { 0 }
 
     // Reactive monitoring flows
     private val _peakFlow = MutableStateFlow(0f)
@@ -181,12 +185,20 @@ class DspSynthEngine(
         pluginProvider.grainsPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
         pluginProvider.grainsPlugin.outputs["output"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
         pluginProvider.grainsPlugin.outputs["outputRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+        
+        // Grains → Delay (Send)
+        pluginProvider.grainsPlugin.outputs["output"]?.connect(pluginProvider.delayPlugin.inputs["inputLeft"]!!)
+        pluginProvider.grainsPlugin.outputs["outputRight"]?.connect(pluginProvider.delayPlugin.inputs["inputRight"]!!)
 
         // Distortion → Stereo Sum (resonator path output) AND Looper input
         pluginProvider.distortionPlugin.outputs["outputLeft"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
         pluginProvider.distortionPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
         pluginProvider.distortionPlugin.outputs["outputLeft"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
         pluginProvider.distortionPlugin.outputs["outputRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+        
+        // Distortion → Delay (Send)
+        pluginProvider.distortionPlugin.outputs["outputLeft"]?.connect(pluginProvider.delayPlugin.inputs["inputLeft"]!!)
+        pluginProvider.distortionPlugin.outputs["outputRight"]?.connect(pluginProvider.delayPlugin.inputs["inputRight"]!!)
 
         // Delay wet outputs → Stereo sum AND Looper input
         pluginProvider.delayPlugin.outputs["wetLeft"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
@@ -203,6 +215,10 @@ class DspSynthEngine(
         pluginProvider.benderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
         pluginProvider.benderPlugin.outputs["audioOutput"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
         pluginProvider.benderPlugin.outputs["audioOutput"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+        
+        // Bender → Delay (Send)
+        pluginProvider.benderPlugin.outputs["audioOutput"]?.connect(pluginProvider.delayPlugin.inputs["inputLeft"]!!)
+        pluginProvider.benderPlugin.outputs["audioOutput"]?.connect(pluginProvider.delayPlugin.inputs["inputRight"]!!)
         
         // Per-String Bender audio effects (tension/spring sounds) → Stereo sum AND Looper
         pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
@@ -222,6 +238,10 @@ class DspSynthEngine(
         pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
         pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
         pluginProvider.warpsPlugin.outputs["outputRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+        
+        // Warps → Delay (Send)
+        pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.delayPlugin.inputs["inputLeft"]!!)
+        pluginProvider.warpsPlugin.outputs["outputRight"]?.connect(pluginProvider.delayPlugin.inputs["inputRight"]!!)
 
         // Flux Clock Wiring (Sync GlobalClock to Flux)
         globalTempo.getClockOutput().connect(pluginProvider.fluxPlugin.inputs["clock"]!!)
@@ -240,9 +260,6 @@ class DspSynthEngine(
 
         // Wire voices to audio paths
         voices.forEachIndexed { index, voice ->
-            // VOICES → DELAYS (wet path)
-            voice.output.connect(pluginProvider.delayPlugin.inputs["input"]!!)
-
             // VIBRATO → Voice frequency modulation
             pluginProvider.vibratoPlugin.outputs["output"]?.connect(voice.vibratoInput)
             voice.vibratoDepth.set(1.0)
@@ -968,6 +985,75 @@ class DspSynthEngine(
             else -> { /* Internal, left disconnected */ }
         }
     }
+
+    override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) {
+        if (quadIndex !in 0..2) return
+        quadPitchSources[quadIndex] = sourceIndex
+        
+        val voiceIndices = (quadIndex * 4) until ((quadIndex + 1) * 4)
+        
+        for (i in voiceIndices) {
+            val voice = voices[i]
+            voice.cvPitchInput.disconnectAll()
+            
+            // 0=None, 1=X1, 2=X2, 3=X3
+            when (sourceIndex) {
+                1 -> {
+                    pluginProvider.fluxPlugin.outputs["outputX1"]?.connect(voice.cvPitchInput)
+                    voice.cvPitchDepth.set(200.0) // 200Hz range for now
+                }
+                2 -> {
+                    pluginProvider.fluxPlugin.outputs["output"]?.connect(voice.cvPitchInput)
+                    voice.cvPitchDepth.set(200.0)
+                }
+                3 -> {
+                    pluginProvider.fluxPlugin.outputs["outputX3"]?.connect(voice.cvPitchInput)
+                    voice.cvPitchDepth.set(200.0)
+                }
+                else -> {
+                    voice.cvPitchDepth.set(0.0)
+                }
+            }
+        }
+    }
+    
+    override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) {
+        if (quadIndex !in 0..2) return
+        quadTriggerSources[quadIndex] = sourceIndex
+        
+        val voiceIndices = (quadIndex * 4) until ((quadIndex + 1) * 4)
+        
+        for (i in voiceIndices) {
+            val voiceIn = voices[i].gate
+            
+            // Disconnect existing
+            voiceIn.disconnectAll()
+            
+            // 1=T1, 2=T2, 3=T3
+            when (sourceIndex) {
+                1 -> pluginProvider.fluxPlugin.outputs["outputT1"]?.connect(voiceIn)
+                2 -> pluginProvider.fluxPlugin.outputs["outputT2"]?.connect(voiceIn)
+                3 -> pluginProvider.fluxPlugin.outputs["outputT3"]?.connect(voiceIn)
+                else -> { /* Internal/MIDI */ }
+            }
+        }
+    }
+
+    override fun getQuadPitchSource(quadIndex: Int): Int = quadPitchSources.getOrElse(quadIndex) { 0 }
+    override fun getQuadTriggerSource(quadIndex: Int): Int = quadTriggerSources.getOrElse(quadIndex) { 0 }
+    
+    override fun setFluxClockSource(sourceIndex: Int) {
+        fluxClockSource = sourceIndex
+        val fluxIn = pluginProvider.fluxPlugin.inputs["clock"] ?: return
+        fluxIn.disconnectAll()
+        
+        when (sourceIndex) {
+            1 -> pluginProvider.hyperLfo.output.connect(fluxIn)
+            else -> globalTempo.getClockOutput().connect(fluxIn)
+        }
+    }
+    
+    override fun getFluxClockSource(): Int = fluxClockSource
     
     // Beat Sequencer Storage (State only)
     private var _beatsX = 0.5f
@@ -1201,6 +1287,8 @@ class DspSynthEngine(
     override fun setFluxLength(value: Int) = pluginProvider.fluxPlugin.setLength(value)
     override fun setFluxScale(index: Int) = pluginProvider.fluxPlugin.setScale(index)
     override fun setFluxRate(rate: Float) = pluginProvider.fluxPlugin.setRate(rate)
+    override fun setFluxJitter(value: Float) = pluginProvider.fluxPlugin.setJitter(value)
+    override fun setFluxProbability(value: Float) = pluginProvider.fluxPlugin.setProbability(value)
     
     override fun getFluxSpread(): Float = pluginProvider.fluxPlugin.getSpread()
     override fun getFluxBias(): Float = pluginProvider.fluxPlugin.getBias()
@@ -1209,5 +1297,7 @@ class DspSynthEngine(
     override fun getFluxLength(): Int = pluginProvider.fluxPlugin.getLength()
     override fun getFluxScale(): Int = pluginProvider.fluxPlugin.getScale()
     override fun getFluxRate(): Float = pluginProvider.fluxPlugin.getRate()
+    override fun getFluxJitter(): Float = pluginProvider.fluxPlugin.getJitter()
+    override fun getFluxProbability(): Float = pluginProvider.fluxPlugin.getProbability()
 }
 

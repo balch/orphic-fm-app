@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -19,6 +20,7 @@ import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.balch.orpheus.ui.widgets.ValueCycleButton
 
 /**
  * Flux Panel - Controls for the random melody generator.
@@ -123,6 +125,36 @@ fun FluxPanel(
                 controlId = "flux_rate",
                 size = 48.dp,
                 progressColor = OrpheusColors.synthPink
+            )
+
+            // Jitter
+            RotaryKnob(
+                value = state.jitter,
+                onValueChange = { actions.setJitter(it) },
+                label = "JITTER",
+                controlId = "flux_jitter",
+                size = 48.dp,
+                progressColor = OrpheusColors.neonMagenta
+            )
+
+            // Probability/Gate Bias
+            RotaryKnob(
+                value = state.probability,
+                onValueChange = { actions.setProbability(it) },
+                label = "PROB",
+                controlId = "flux_probability",
+                size = 48.dp,
+                progressColor = OrpheusColors.electricBlue
+            )
+            
+            // Clock Source
+            ValueCycleButton(
+                value = state.clockSource,
+                values = listOf(0, 1),
+                onValueChange = actions.setClockSource,
+                labelProvider = { if (it == 0) "INT" else "LFO" },
+                modifier = Modifier.width(48.dp).height(24.dp),
+                color = OrpheusColors.neonMagenta
             )
         }
     }

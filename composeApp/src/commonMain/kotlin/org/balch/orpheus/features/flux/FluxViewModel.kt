@@ -37,7 +37,10 @@ data class FluxUiState(
     val dejaVu: Float = 0.0f,
     val length: Int = 8,
     val scaleIndex: Int = 0,
-    val rate: Float = 0.5f
+    val rate: Float = 0.5f,
+    val jitter: Float = 0.0f,
+    val probability: Float = 0.5f,
+    val clockSource: Int = 0 // 0=Internal, 1=LFO
 )
 
 @Immutable
@@ -48,10 +51,13 @@ data class FluxPanelActions(
     val setDejaVu: (Float) -> Unit,
     val setLength: (Int) -> Unit,
     val setScale: (Int) -> Unit,
-    val setRate: (Float) -> Unit
+    val setRate: (Float) -> Unit,
+    val setJitter: (Float) -> Unit,
+    val setProbability: (Float) -> Unit,
+    val setClockSource: (Int) -> Unit
 ) {
     companion object {
-        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {})
+        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -63,6 +69,9 @@ private sealed interface FluxIntent {
     data class Length(val value: Int) : FluxIntent
     data class Scale(val value: Int) : FluxIntent
     data class Rate(val value: Float) : FluxIntent
+    data class Jitter(val value: Float) : FluxIntent
+    data class Probability(val value: Float) : FluxIntent
+    data class ClockSource(val value: Int) : FluxIntent
     data class Restore(val state: FluxUiState) : FluxIntent
 }
 
@@ -84,7 +93,10 @@ class FluxViewModel(
         setDejaVu = ::onDejaVuChange,
         setLength = ::onLengthChange,
         setScale = ::onScaleChange,
-        setRate = ::onRateChange
+        setRate = ::onRateChange,
+        setJitter = ::onJitterChange,
+        setProbability = ::onProbabilityChange,
+        setClockSource = ::onClockSourceChange
     )
 
     private val _userIntents = MutableSharedFlow<FluxIntent>(
@@ -130,7 +142,10 @@ class FluxViewModel(
         dejaVu = engine.getFluxDejaVu(),
         length = engine.getFluxLength(),
         scaleIndex = engine.getFluxScale(),
-        rate = engine.getFluxRate()
+        rate = engine.getFluxRate(),
+        jitter = engine.getFluxJitter(),
+        probability = engine.getFluxProbability(),
+        clockSource = engine.getFluxClockSource()
     )
 
     private fun reduce(state: FluxUiState, intent: FluxIntent): FluxUiState = when (intent) {
@@ -141,6 +156,9 @@ class FluxViewModel(
         is FluxIntent.Length -> state.copy(length = intent.value)
         is FluxIntent.Scale -> state.copy(scaleIndex = intent.value)
         is FluxIntent.Rate -> state.copy(rate = intent.value)
+        is FluxIntent.Jitter -> state.copy(jitter = intent.value)
+        is FluxIntent.Probability -> state.copy(probability = intent.value)
+        is FluxIntent.ClockSource -> state.copy(clockSource = intent.value)
         is FluxIntent.Restore -> intent.state
     }
 
@@ -153,6 +171,9 @@ class FluxViewModel(
             is FluxIntent.Length -> engine.setFluxLength(intent.value)
             is FluxIntent.Scale -> engine.setFluxScale(intent.value)
             is FluxIntent.Rate -> engine.setFluxRate(intent.value)
+            is FluxIntent.Jitter -> engine.setFluxJitter(intent.value)
+            is FluxIntent.Probability -> engine.setFluxProbability(intent.value)
+            is FluxIntent.ClockSource -> engine.setFluxClockSource(intent.value)
             is FluxIntent.Restore -> applyFullState(intent.state)
         }
     }
@@ -165,6 +186,9 @@ class FluxViewModel(
         engine.setFluxLength(state.length)
         engine.setFluxScale(state.scaleIndex)
         engine.setFluxRate(state.rate)
+        engine.setFluxJitter(state.jitter)
+        engine.setFluxProbability(state.probability)
+        engine.setFluxClockSource(state.clockSource)
     }
 
     fun onSpreadChange(value: Float) = _userIntents.tryEmit(FluxIntent.Spread(value))
@@ -174,6 +198,9 @@ class FluxViewModel(
     fun onLengthChange(value: Int) = _userIntents.tryEmit(FluxIntent.Length(value))
     fun onScaleChange(value: Int) = _userIntents.tryEmit(FluxIntent.Scale(value))
     fun onRateChange(value: Float) = _userIntents.tryEmit(FluxIntent.Rate(value))
+    fun onJitterChange(value: Float) = _userIntents.tryEmit(FluxIntent.Jitter(value))
+    fun onProbabilityChange(value: Float) = _userIntents.tryEmit(FluxIntent.Probability(value))
+    fun onClockSourceChange(value: Int) = _userIntents.tryEmit(FluxIntent.ClockSource(value))
 
     companion object Ids {
         const val SPREAD = "flux_spread"

@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +23,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.features.drums808.DrumTriggerSource
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiUiState
 import org.balch.orpheus.features.midi.MidiViewModel
@@ -34,6 +37,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.liquidVizEffects
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.balch.orpheus.ui.widgets.ValueCycleButton
 
 @Composable
 fun VoiceGroupSection(
@@ -158,6 +162,22 @@ fun VoiceGroupSectionLayout(
                 controlId = ControlIds.quadHold(quadIndex),
                 size = 36.dp,
                 progressColor = OrpheusColors.warmGlow
+            )
+            
+            // Local Quad Trigger Source
+            ValueCycleButton(
+                value = DrumTriggerSource.values().getOrElse(voiceState.quadTriggerSources.getOrElse(quadIndex) { 0 }) { DrumTriggerSource.INTERNAL },
+                values = DrumTriggerSource.values().toList(),
+                onValueChange = { src -> voiceActions.onQuadTriggerSourceChange(quadIndex, src.ordinal) },
+                modifier = Modifier.height(24.dp).width(48.dp),
+                labelProvider = { src ->
+                    when (src) {
+                        DrumTriggerSource.INTERNAL -> "\u2022" // Bullet
+                        DrumTriggerSource.FLUX_T1 -> "T1"
+                        DrumTriggerSource.FLUX_T2 -> "T2"
+                        DrumTriggerSource.FLUX_T3 -> "T3"
+                    }
+                }
             )
         }
 

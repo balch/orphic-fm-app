@@ -163,6 +163,8 @@ interface SynthEngine {
     fun getTotalFeedback(): Float
     fun getVibrato(): Float
     fun getVoiceCoupling(): Float
+    fun getQuadPitchSource(quadIndex: Int): Int
+    fun getQuadTriggerSource(quadIndex: Int): Int
 
     fun getDelayTime(index: Int): Float
     fun getDelayFeedback(): Float
@@ -242,6 +244,10 @@ interface SynthEngine {
     
     // Drum Trigger Routing
     fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int)
+    
+    // Voice/Quad Routing
+    fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int)
+    fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int)
 
     // Beat Sequencer (Grids)
     fun setBeatsX(x: Float)
@@ -305,6 +311,14 @@ interface SynthEngine {
     
     fun setFluxRate(rate: Float) // 0-1, divider control
     fun getFluxRate(): Float
+    
+    fun setFluxJitter(value: Float)
+    fun getFluxJitter(): Float
+    fun setFluxProbability(value: Float)
+    fun getFluxProbability(): Float
+    
+    fun setFluxClockSource(sourceIndex: Int) // 0=Internal, 1=LFO
+    fun getFluxClockSource(): Int
 }
 
 enum class ModSource {

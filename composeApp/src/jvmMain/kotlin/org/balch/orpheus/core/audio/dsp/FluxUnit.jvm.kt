@@ -16,6 +16,8 @@ actual interface FluxUnit : AudioUnit {
     actual val dejaVu: AudioInput
     actual val length: AudioInput
     actual val rate: AudioInput
+    actual val jitter: AudioInput
+    actual val probability: AudioInput
     actual val outputX1: AudioOutput
     actual val outputX3: AudioOutput
     actual val outputT2: AudioOutput
@@ -36,6 +38,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     private val jsynDejaVu = UnitInputPort("DejaVu")
     private val jsynLength = UnitInputPort("Length")
     private val jsynRate = UnitInputPort("Rate") // Divider control
+    private val jsynJitter = UnitInputPort("Jitter")
+    private val jsynProbability = UnitInputPort("Probability")
     
     // Output
     private val jsynOutput = UnitOutputPort("Output")
@@ -55,6 +59,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     override val dejaVu: AudioInput = JsynAudioInput(jsynDejaVu)
     override val length: AudioInput = JsynAudioInput(jsynLength)
     override val rate: AudioInput = JsynAudioInput(jsynRate)
+    override val jitter: AudioInput = JsynAudioInput(jsynJitter)
+    override val probability: AudioInput = JsynAudioInput(jsynProbability)
     
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
     override val outputX1: AudioOutput = JsynAudioOutput(jsynOutputX1)
@@ -75,6 +81,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         addPort(jsynDejaVu)
         addPort(jsynLength)
         addPort(jsynRate)
+        addPort(jsynJitter)
+        addPort(jsynProbability)
         addPort(jsynOutput)
         addPort(jsynOutputX1)
         addPort(jsynOutputX3)
@@ -89,6 +97,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         jsynDejaVu.set(0.0)
         jsynLength.set(8.0)
         jsynRate.set(0.5) // Default to 1/2 note or similar
+        jsynJitter.set(0.0)
+        jsynProbability.set(0.5)
     }
     
     override fun setScale(index: Int) {
@@ -107,6 +117,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         val dejaVus = jsynDejaVu.values
         val lengths = jsynLength.values
         val rates = jsynRate.values
+        val jitters = jsynJitter.values
+        val probabilities = jsynProbability.values
         
         val outputs = jsynOutput.values
         val outputsX1 = jsynOutputX1.values
@@ -125,6 +137,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
                 // Input is 24 PPQN
                 val rateVal = rates[idx]
                 val divisor = when {
+                    rateVal < 0.05 -> 1   // Direct (No division - for LFO or custom clocks)
                     rateVal < 0.15 -> 6   // 1/16th (Fast)
                     rateVal < 0.30 -> 12  // 1/8th
                     rateVal < 0.50 -> 24  // 1/4th (Beat)
@@ -143,6 +156,8 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
                     processor.setSteps(steps[idx].toFloat())
                     processor.setDejaVu(dejaVus[idx].toFloat())
                     processor.setLength(lengths[idx].toInt())
+                    processor.setJitter(jitters[idx].toFloat())
+                    processor.setGateProbability(probabilities[idx].toFloat())
                     
                     processor.tick()
                 }

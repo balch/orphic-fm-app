@@ -62,6 +62,8 @@ import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizPanel
 import org.balch.orpheus.features.visualizations.VizViewModel
+import org.balch.orpheus.features.voice.VoiceViewModel
+import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.features.warps.WarpsFeature
 import org.balch.orpheus.features.warps.WarpsPanel
 import org.balch.orpheus.features.warps.WarpsViewModel
@@ -90,6 +92,7 @@ fun HeaderPanel(
     drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
     warpsFeature: WarpsFeature = WarpsViewModel.feature(),
     fluxFeature: FluxFeature = FluxViewModel.feature(),
+    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
@@ -180,6 +183,15 @@ fun HeaderPanel(
             isExpanded = PanelId.WARPS.isExpanded(),
             onExpandedChange = { PanelId.WARPS.setExpanded(it) },
             modifier = panelModifier(PanelId.WARPS.isExpanded())
+        )
+        // Pulse Router Panel
+        TriggerRouterPanel(
+            drumFeature = drumFeature,
+            voiceFeature = voiceFeature,
+            fluxFeature = fluxFeature,
+            isExpanded = PanelId.ROUTER.isExpanded(),
+            onExpandedChange = { PanelId.ROUTER.setExpanded(it) },
+            modifier = panelModifier(PanelId.ROUTER.isExpanded(), weight = 0.8f)
         )
         // Flux Panel
         FluxPanel(
