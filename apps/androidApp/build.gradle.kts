@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.androidApplication)
-    alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
+    id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.plugin.compose")
     alias(libs.plugins.ksp)
     alias(libs.plugins.metro)
 }

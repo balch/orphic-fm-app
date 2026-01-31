@@ -1,6 +1,5 @@
 import com.codingfeline.buildkonfig.compiler.FieldSpec
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -13,11 +12,8 @@ val localProperties = Properties().apply {
 }
 
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidMultiplatformLibrary)
-    alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
-    alias(libs.plugins.composeHotReload)
+    id("orpheus.kmp.compose")
+    id("org.jetbrains.compose.hot-reload")
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.metro)
@@ -25,22 +21,10 @@ plugins {
 }
 
 kotlin {
-    // Android configuration using the new androidLibrary block for AGP 9.0
+    // Override namespace for this specific module
     androidLibrary {
         namespace = "org.balch.orpheus.shared"
-        compileSdk = libs.versions.android.compileSdk.get().toInt()
-        minSdk = libs.versions.android.minSdk.get().toInt()
-
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
-
-        androidResources {
-            enable = true
-        }
     }
-
-    jvm()
 
     wasmJs {
         browser {
@@ -77,12 +61,7 @@ kotlin {
             // TODO: Re-enable after moving shared code (SynthEngine, SynthFeature) to core:audio
             // implementation(project(":features:warps"))
             // implementation(project(":features:drum"))
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
             implementation(compose.materialIconsExtended)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
@@ -121,11 +100,6 @@ kotlin {
             // Web Audio API used directly via Kotlin/JS interop
         }
     }
-}
-
-// Exclude libremidi-panama from test configurations (requires JVM 22+, we use JVM 21)
-configurations.matching { it.name.contains("test", ignoreCase = true) }.all {
-    exclude(group = "dev.atsushieno", module = "libremidi-panama")
 }
 
 // For Compose previews with AGP 9.0 and the android KMP library plugin

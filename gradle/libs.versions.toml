@@ -10,8 +10,10 @@ androidx-espresso = "3.7.0"
 androidx-lifecycle = "2.9.6"
 androidx-lifecycle-viewmodel = "2.10.0"
 androidx-testExt = "1.3.0"
+composeGradlePlugin = "1.10.0"
 composeHotReload = "1.0.0"
 composeMultiplatform = "1.10.0"
+gradle = "9.0.0"
 junit = "4.13.2"
 kotlin = "2.3.0"
 ksp = "2.3.5"
@@ -41,6 +43,10 @@ androidx-test-uiautomator = "2.3.0"
 
 [libraries]
 androidx-media = { module = "androidx.media:media", version.ref = "media" }
+compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "composeGradlePlugin" }
+gradle = { module = "com.android.tools.build:gradle", version.ref = "gradle" }
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 liquid = { module = "io.github.fletchmckee.liquid:liquid", version.ref = "liquid" }
 jsyn = { module = "com.github.philburk:jsyn", version.ref = "jsyn" }
 kmlogging = { module = "com.diamondedge:logging", version.ref = "kmlogging" }

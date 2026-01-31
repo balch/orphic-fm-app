@@ -2,6 +2,7 @@ rootProject.name = "Orpheus"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
+    includeBuild("build-logic/convention")
     repositories {
         google {
             mavenContent {
