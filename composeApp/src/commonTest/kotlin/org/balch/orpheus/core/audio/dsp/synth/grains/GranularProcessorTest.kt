@@ -1,4 +1,4 @@
-package org.balch.orpheus.core.audio.dsp.synth.grains
+package org.balch.orpheus.plugins.grains.engine
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

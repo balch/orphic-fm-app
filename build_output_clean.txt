@@ -1,0 +1,443 @@
+Initialized native services in: /Users/balch/.gradle/native
+Initialized jansi services in: /Users/balch/.gradle/native
+Found daemon DaemonInfo{pid=24892, address=[0b4d1692-ae68-45b5-8bf6-7f690296fa82 port:62289, addresses:[/127.0.0.1]], state=Idle, lastBusy=1769881451441, context=DefaultDaemonContext[uid=b2144cd5-4362-441b-8700-7fcd38912032,javaHome=/Users/balch/.antigravity/extensions/redhat.java-1.52.0-darwin-arm64/jre/21.0.9-macosx-aarch64,javaVersion=21,javaVendor=Eclipse Adoptium,daemonRegistryDir=/Users/balch/.gradle/daemon,pid=24892,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-Xmx6144M,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]} however its context does not match the desired criteria.
+JVM is incompatible.
+Wanted: DaemonRequestContext{jvmCriteria=/opt/homebrew/Cellar/openjdk@21/21.0.7/libexec/openjdk.jdk/Contents/Home (no Daemon JVM specified, using current Java home), daemonOpts=[-Xmx6144M, -Dfile.encoding=UTF-8, -Duser.country=US, -Duser.language=en, -Duser.variant], applyInstrumentationAgent=true, nativeServicesMode=ENABLED, priority=NORMAL}
+Actual: DefaultDaemonContext[uid=b2144cd5-4362-441b-8700-7fcd38912032,javaHome=/Users/balch/.antigravity/extensions/redhat.java-1.52.0-darwin-arm64/jre/21.0.9-macosx-aarch64,javaVersion=21,javaVendor=Eclipse Adoptium,daemonRegistryDir=/Users/balch/.gradle/daemon,pid=24892,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-Xmx6144M,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]
+
+  Looking for a different daemon...
+Found daemon DaemonInfo{pid=81705, address=[e1d51a1b-de0d-45b5-9a6a-506dd0a9b1f2 port:63224, addresses:[/127.0.0.1]], state=Idle, lastBusy=1769880340085, context=DefaultDaemonContext[uid=628a4713-e182-44a3-8e60-91fd1562695f,javaHome=/Applications/Android Studio.app/Contents/jbr/Contents/Home,javaVersion=21,javaVendor=JetBrains s.r.o.,daemonRegistryDir=/Users/balch/.gradle/daemon,pid=81705,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-Xmx6144M,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]} however its context does not match the desired criteria.
+JVM is incompatible.
+Wanted: DaemonRequestContext{jvmCriteria=/opt/homebrew/Cellar/openjdk@21/21.0.7/libexec/openjdk.jdk/Contents/Home (no Daemon JVM specified, using current Java home), daemonOpts=[-Xmx6144M, -Dfile.encoding=UTF-8, -Duser.country=US, -Duser.language=en, -Duser.variant], applyInstrumentationAgent=true, nativeServicesMode=ENABLED, priority=NORMAL}
+Actual: DefaultDaemonContext[uid=628a4713-e182-44a3-8e60-91fd1562695f,javaHome=/Applications/Android Studio.app/Contents/jbr/Contents/Home,javaVersion=21,javaVendor=JetBrains s.r.o.,daemonRegistryDir=/Users/balch/.gradle/daemon,pid=81705,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-Xmx6144M,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]
+
+  Looking for a different daemon...
+The client will now receive all logging from the daemon (pid: 91736). The daemon log file: /Users/balch/.gradle/daemon/9.3.0/daemon-91736.out.log
+Starting 109th build in daemon [uptime: 10 hrs 9 mins 53.578 secs, performance: 100%, GC rate: 0.00/s, heap usage: 2% of 6 GiB]
+Using 14 worker leases.
+Operational build model parameters: {requiresToolingModels=false, parallelProjectExecution=false, configureOnDemand=false, configurationCache=true, configurationCacheParallelStore=false, configurationCacheParallelLoad=true, isolatedProjects=false, parallelProjectConfiguration=false, intermediateModelCache=false, parallelToolingApiActions=false, invalidateCoupledProjects=false, modelAsProjectDependency=false, resilientModelBuilding=false}
+Encryption key source: default Gradle keystore (pkcs12)
+Now considering [/Users/balch/Source/Orpheus] as hierarchies to watch
+Calculating task graph as configuration cache cannot be reused because file 'settings.gradle.kts' has changed.
+Now considering [/Users/balch/Source/Orpheus] as hierarchies to watch
+Watching the file system is configured to be enabled if available
+File system watching is active
+Starting Build
+Resolved plugin [id: 'org.gradle.toolchains.foojay-resolver-convention', version: '1.0.0']
+Settings evaluated using settings file '/Users/balch/Source/Orpheus/settings.gradle.kts'.
+Using local directory build cache for the root build (location = /Users/balch/.gradle/caches/build-cache-1, remove unused entries = after 7 days).
+Type-safe project accessors is an incubating feature.
+Projects loaded. Root project using build file '/Users/balch/Source/Orpheus/build.gradle.kts'.
+Included projects: [root project 'Orpheus', project ':androidApp', project ':composeApp', project ':core', project ':macrobenchmark', project ':core:audio', project ':core:plugins', project ':core:plugins:bender', project ':core:plugins:delay', project ':core:plugins:distortion', project ':core:plugins:drum', project ':core:plugins:duolfo', project ':core:plugins:flux', project ':core:plugins:grains', project ':core:plugins:looper', project ':core:plugins:perstringbender', project ':core:plugins:resonator', project ':core:plugins:stereo', project ':core:plugins:vibrato', project ':core:plugins:warps']
+
+> Configure project :
+Evaluating root project 'Orpheus' using build file '/Users/balch/Source/Orpheus/build.gradle.kts'.
+Resolved plugin [id: 'com.android.application', version: '9.0.0', apply: false]
+Resolved plugin [id: 'com.android.library', version: '9.0.0', apply: false]
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0', apply: false]
+Resolved plugin [id: 'com.android.test', version: '9.0.0', apply: false]
+Resolved plugin [id: 'org.jetbrains.compose.hot-reload', version: '1.0.0', apply: false]
+Resolved plugin [id: 'org.jetbrains.compose', version: '1.10.0', apply: false]
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.compose', version: '2.3.0', apply: false]
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0', apply: false]
+Resolved plugin [id: 'org.jetbrains.kotlin.android', version: '2.3.0', apply: false]
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.serialization', version: '2.3.0', apply: false]
+
+> Configure project :androidApp
+Evaluating project ':androidApp' using build file '/Users/balch/Source/Orpheus/androidApp/build.gradle.kts'.
+Resolved plugin [id: 'com.android.application', version: '9.0.0']
+Resolved plugin [id: 'org.jetbrains.compose', version: '1.10.0']
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.compose', version: '2.3.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Build 047f2471-2677-41dc-9fa7-023fcdff28bf is started
+Using default execution profile
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+
+> Configure project :composeApp
+Evaluating project ':composeApp' using build file '/Users/balch/Source/Orpheus/composeApp/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'org.jetbrains.compose', version: '1.10.0']
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.compose', version: '2.3.0']
+Resolved plugin [id: 'org.jetbrains.compose.hot-reload', version: '1.0.0']
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.serialization', version: '2.3.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Resolved plugin [id: 'com.codingfeline.buildkonfig', version: '0.17.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+Configure multi-module compose resources
+Configure compose resources generation
+Configure resource accessors generation for androidMain
+Configure Res object generation for commonMain
+Configure resource accessors generation for commonMain
+Configure resource accessors generation for commonTest
+Configure expect resource collectors generation for commonMain
+Configure actual resource collectors generation for androidMain
+Configure compose resources with KotlinMultiplatformAndroidComponentsExtension
+Configure resource accessors generation for jvmMain
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Configure resource accessors generation for jvmTest
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+Configure actual resource collectors generation for jvmMain
+Configure main resources for 'jvm' target
+Configure test resources for 'jvm' target
+Configure resource accessors generation for jvmDev
+kotlin scripting plugin: created the scripting discovery configuration: devKotlinScriptDef
+Configure dev resources for 'jvm' target
+Configure resource accessors generation for wasmJsMain
+Configure resource accessors generation for wasmJsTest
+Configure actual resource collectors generation for wasmJsMain
+Configure main resources for 'wasmJs' target
+Configure KMP component publication for 'wasmJs'
+Collect resolved main resources for 'wasmJs'
+Configure test resources for 'wasmJs' target
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:composeApp] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+Configure androidMain resources for 'android' target
+Check that new 'org.jetbrains.kotlin.plugin.compose' was applied
+Configure resource accessors generation for webMain
+Configure resource accessors generation for webTest
+file or directory '/Users/balch/Source/Orpheus/composeApp/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/composeApp/build/generated/compose/resourceGenerator/kotlin/webMainResourceAccessors', not found
+file or directory '/Users/balch/Source/Orpheus/composeApp/src/webTest/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/composeApp/build/generated/compose/resourceGenerator/kotlin/webTestResourceAccessors', not found
+
+> Configure project :core
+Evaluating project ':core' using build file '/Users/balch/Source/Orpheus/core/build.gradle'.
+
+> Configure project :macrobenchmark
+Evaluating project ':macrobenchmark' using build file '/Users/balch/Source/Orpheus/macrobenchmark/build.gradle.kts'.
+Resolved plugin [id: 'com.android.test', version: '9.0.0']
+Using default execution profile
+
+> Configure project :core:audio
+Evaluating project ':core:audio' using build file '/Users/balch/Source/Orpheus/core/audio/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:audio] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/audio/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/audio/src/webTest/kotlin', not found
+
+> Configure project :core:plugins
+Evaluating project ':core:plugins' using build file '/Users/balch/Source/Orpheus/core/plugins/build.gradle'.
+
+> Configure project :core:plugins:bender
+Evaluating project ':core:plugins:bender' using build file '/Users/balch/Source/Orpheus/core/plugins/bender/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:bender] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/bender/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/bender/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:delay
+Evaluating project ':core:plugins:delay' using build file '/Users/balch/Source/Orpheus/core/plugins/delay/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:delay] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/delay/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/delay/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:distortion
+Evaluating project ':core:plugins:distortion' using build file '/Users/balch/Source/Orpheus/core/plugins/distortion/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:distortion] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/distortion/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/distortion/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:drum
+Evaluating project ':core:plugins:drum' using build file '/Users/balch/Source/Orpheus/core/plugins/drum/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:drum] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/drum/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/drum/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:duolfo
+Evaluating project ':core:plugins:duolfo' using build file '/Users/balch/Source/Orpheus/core/plugins/duolfo/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:duolfo] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/duolfo/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/duolfo/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:flux
+Evaluating project ':core:plugins:flux' using build file '/Users/balch/Source/Orpheus/core/plugins/flux/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:flux] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/flux/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/flux/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:grains
+Evaluating project ':core:plugins:grains' using build file '/Users/balch/Source/Orpheus/core/plugins/grains/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:grains] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/grains/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/grains/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:looper
+Evaluating project ':core:plugins:looper' using build file '/Users/balch/Source/Orpheus/core/plugins/looper/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:looper] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/looper/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/looper/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:perstringbender
+Evaluating project ':core:plugins:perstringbender' using build file '/Users/balch/Source/Orpheus/core/plugins/perstringbender/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:perstringbender] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/perstringbender/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/perstringbender/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:resonator
+Evaluating project ':core:plugins:resonator' using build file '/Users/balch/Source/Orpheus/core/plugins/resonator/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:resonator] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/resonator/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/resonator/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:stereo
+Evaluating project ':core:plugins:stereo' using build file '/Users/balch/Source/Orpheus/core/plugins/stereo/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:stereo] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/stereo/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/stereo/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:vibrato
+Evaluating project ':core:plugins:vibrato' using build file '/Users/balch/Source/Orpheus/core/plugins/vibrato/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:vibrato] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/vibrato/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/vibrato/src/webTest/kotlin', not found
+
+> Configure project :core:plugins:warps
+Evaluating project ':core:plugins:warps' using build file '/Users/balch/Source/Orpheus/core/plugins/warps/build.gradle.kts'.
+Resolved plugin [id: 'org.jetbrains.kotlin.multiplatform', version: '2.3.0']
+Resolved plugin [id: 'com.android.kotlin.multiplatform.library', version: '9.0.0']
+Resolved plugin [id: 'com.google.devtools.ksp', version: '2.3.4']
+Resolved plugin [id: 'dev.zacsweers.metro', version: '0.10.1']
+Using Kotlin Gradle Plugin gradle813 variant
+Created androidJvm target
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+Created compile task: compileAndroidMain
+Using default execution profile
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/balch/.gradle
+[:core:plugins:warps] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+compileSdkVersion=android-36
+file or directory '/Users/balch/Source/Orpheus/core/plugins/warps/src/webMain/kotlin', not found
+file or directory '/Users/balch/Source/Orpheus/core/plugins/warps/src/webTest/kotlin', not found
+All projects evaluated.
+Task path ':core:audio:compileKotlinJvm' matched project ':core:audio'
+Task name matched 'compileKotlinJvm'
+Selected primary task 'compileKotlinJvm' from project :core:audio
+Tasks to be executed: [task ':core:audio:kmpPartiallyResolvedDependenciesChecker', task ':core:audio:checkKotlinGradlePluginConfigurationErrors', task ':core:audio:kspKotlinJvm', task ':core:audio:compileKotlinJvm']
+Tasks that were excluded: []
+Using local directory build cache for the root build (location = /Users/balch/.gradle/caches/build-cache-1, remove unused entries = after 7 days).
+Ignoring listeners of task graph ready event, as this build (:) has already executed work.
+Resolve mutations for :core:audio:kmpPartiallyResolvedDependenciesChecker (Thread[#10997,Execution worker,5,main]) started.
+Resolve mutations for :core:audio:kspKotlinJvm (Thread[#10998,Execution worker Thread 2,5,main]) started.
+:core:audio:kmpPartiallyResolvedDependenciesChecker (Thread[#10997,Execution worker,5,main]) started.
+:core:audio:kspKotlinJvm (Thread[#10998,Execution worker Thread 2,5,main]) started.
+
+> Task :core:audio:kspKotlinJvm SKIPPED
+Skipping task ':core:audio:kspKotlinJvm' as task onlyIf 'Task satisfies onlyIf spec' is false.
+
+> Task :core:audio:kmpPartiallyResolvedDependenciesChecker
+Caching disabled for task ':core:audio:kmpPartiallyResolvedDependenciesChecker' because:
+  This task is not intended for execution
+Task ':core:audio:kmpPartiallyResolvedDependenciesChecker' is not up-to-date because:
+  Task has not declared any outputs despite executing actions.
+Execution stopped by some action with message: null
+Resolve mutations for :core:audio:checkKotlinGradlePluginConfigurationErrors (Thread[#10997,Execution worker,5,main]) started.
+:core:audio:checkKotlinGradlePluginConfigurationErrors (Thread[#10997,Execution worker,5,main]) started.
+
+> Task :core:audio:checkKotlinGradlePluginConfigurationErrors SKIPPED
+Skipping task ':core:audio:checkKotlinGradlePluginConfigurationErrors' as task onlyIf 'errorDiagnostics are present' is false.
+Resolve mutations for :core:audio:compileKotlinJvm (Thread[#10997,Execution worker,5,main]) started.
+:core:audio:compileKotlinJvm (Thread[#10997,Execution worker,5,main]) started.
+
+> Task :core:audio:compileKotlinJvm UP-TO-DATE
+Build cache key for task ':core:audio:compileKotlinJvm' is 6d4b98e8817af6303115ca6ea03de90e
+Skipping task ':core:audio:compileKotlinJvm' as it is up-to-date.
+Build 047f2471-2677-41dc-9fa7-023fcdff28bf is closed
+
+See the complete report at file:///Users/balch/Source/Orpheus/build/reports/configuration-cache/4q4ragbx6vgssyvc50n2dtgzp/2mp377czfn4wd0z908joaw15j/configuration-cache-report.html
+
+[Incubating] Problems report is available at: file:///Users/balch/Source/Orpheus/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.3.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1s
+2 actionable tasks: 1 executed, 1 up-to-date
+Watched directory hierarchies: [/Users/balch/Source/Orpheus]
+Configuration cache entry stored.
+Configuration Cache (/Users/balch/Source/Orpheus/.gradle/configuration-cache) [subdir: /Users/balch/Source/Orpheus/.gradle/configuration-cache/18370303-2fac-40e1-a894-16c319ca85fc] cleanup deleted 8 files/directories.

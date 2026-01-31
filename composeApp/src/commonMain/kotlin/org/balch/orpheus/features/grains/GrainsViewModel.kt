@@ -19,10 +19,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.audio.dsp.synth.grains.GrainsMode
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.plugins.grains.engine.GrainsMode
 
 @Immutable
 data class GrainsUiState(

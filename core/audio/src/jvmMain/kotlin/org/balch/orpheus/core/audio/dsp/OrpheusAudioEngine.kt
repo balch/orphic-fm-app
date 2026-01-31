@@ -65,9 +65,7 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
             is JsynMaximumWrapper -> synth.add(unit.jsUnit)
             is JsynLinearRampWrapper -> synth.add(unit.jsRamp)
             is JsynAutomationPlayer -> synth.add(unit.reader)
-            is JsynDrumUnit -> synth.add(unit)
-            is JsynResonatorUnit -> synth.add(unit)
-            is JsynGrainsUnit -> synth.add(unit)
+
             is JsynLooperUnit -> {
                  synth.add(unit.writerLeft)
                  synth.add(unit.writerRight)
@@ -80,7 +78,7 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
                  synth.add(unit.jsOsc)
                  synth.add(unit.scaler)
             }
-            is JsynFluxUnit -> synth.add(unit)
+
             is com.jsyn.unitgen.UnitGenerator -> synth.add(unit)
         }
     }

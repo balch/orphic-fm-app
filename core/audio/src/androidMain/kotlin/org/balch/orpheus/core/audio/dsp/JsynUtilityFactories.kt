@@ -11,11 +11,7 @@ class JsynAutomationPlayerFactory @Inject constructor() : AutomationPlayer.Facto
     override fun create(): AutomationPlayer = JsynAutomationPlayer()
 }
 
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
-class JsynDrumUnitFactory @Inject constructor() : DrumUnit.Factory {
-    override fun create(): DrumUnit = JsynDrumUnit()
-}
+
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)

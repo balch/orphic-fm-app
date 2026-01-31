@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.audio.dsp.synth.DrumBeatsGenerator
+import org.balch.orpheus.plugins.drum.engine.DrumBeatsGenerator
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

@@ -1,6 +1,6 @@
 package org.balch.orpheus.plugins.warps.engine
 
-import org.balch.orpheus.core.audio.dsp.synth.grains.ParameterInterpolator
+import org.balch.orpheus.core.audio.dsp.synth.ParameterInterpolator
 
 /**
  * Port of Mutable Instruments Warps SaturatingAmplifier.
