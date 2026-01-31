@@ -33,9 +33,9 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":androidApp")
-include(":composeApp")
-include(":macrobenchmark")
+include(":apps:androidApp")
+include(":apps:composeApp")
+include(":apps:macrobenchmark")
 include(":core:audio")
 include(":core:plugins:delay")
 include(":core:plugins:distortion")
@@ -47,6 +47,8 @@ include(":core:plugins:warps")
 include(":core:plugins:grains")
 include(":core:plugins:drum")
 include(":core:plugins:duolfo")
+include(":features:warps")
+include(":features:drum")
 include(":core:plugins:flux")
 include(":core:plugins:looper")
 include(":core:plugins:perstringbender")
