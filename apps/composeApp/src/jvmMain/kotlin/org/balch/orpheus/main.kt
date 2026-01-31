@@ -10,8 +10,8 @@ import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.config.AppConfig
 import org.balch.orpheus.di.OrpheusGraph
 import org.jetbrains.compose.resources.painterResource
-import orpheus.composeapp.generated.resources.Res
-import orpheus.composeapp.generated.resources.icon
+import orpheus.apps.composeapp.generated.resources.Res
+import orpheus.apps.composeapp.generated.resources.icon
 
 fun main() {
     System.setProperty("apple.awt.application.appearance", "system")

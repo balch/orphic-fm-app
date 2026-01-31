@@ -29,8 +29,7 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
-            
-            implementation(projects.core)
+
             implementation(projects.core.audio)
             implementation(projects.core.plugins.warps)
         }

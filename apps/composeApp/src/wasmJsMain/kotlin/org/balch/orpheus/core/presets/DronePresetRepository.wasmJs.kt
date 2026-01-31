@@ -6,7 +6,7 @@ import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
 import org.w3c.dom.get
 import org.w3c.dom.set
-import orpheus.composeapp.generated.resources.Res
+import orpheus.apps.composeapp.generated.resources.Res
 
 /**
  * WASM implementation of DronePresetRepository using browser localStorage.

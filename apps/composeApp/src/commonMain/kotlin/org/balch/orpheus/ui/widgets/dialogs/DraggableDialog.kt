@@ -42,8 +42,8 @@ import io.github.fletchmckee.liquid.liquid
 import org.balch.orpheus.core.config.AppConfig
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.jetbrains.compose.resources.painterResource
-import orpheus.composeapp.generated.resources.Res
-import orpheus.composeapp.generated.resources.orpheus_avatar
+import orpheus.apps.composeapp.generated.resources.Res
+import orpheus.apps.composeapp.generated.resources.orpheus_avatar
 import kotlin.math.roundToInt
 
 /**

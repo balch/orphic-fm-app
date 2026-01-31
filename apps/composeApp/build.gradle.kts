@@ -74,8 +74,9 @@ kotlin {
             implementation(project(":core:plugins:flux"))
             implementation(project(":core:plugins:looper"))
             implementation(project(":core:plugins:perstringbender"))
-            implementation(project(":features:warps"))
-            implementation(project(":features:drum"))
+            // TODO: Re-enable after moving shared code (SynthEngine, SynthFeature) to core:audio
+            // implementation(project(":features:warps"))
+            // implementation(project(":features:drum"))
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)

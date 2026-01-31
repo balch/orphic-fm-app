@@ -39,8 +39,8 @@ import com.mikepenz.markdown.model.DefaultMarkdownColors
 import com.mikepenz.markdown.model.DefaultMarkdownTypography
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.jetbrains.compose.resources.painterResource
-import orpheus.composeapp.generated.resources.Res
-import orpheus.composeapp.generated.resources.orpheus_avatar
+import orpheus.apps.composeapp.generated.resources.Res
+import orpheus.apps.composeapp.generated.resources.orpheus_avatar
 
 /**
  * Chat message bubble for AI conversations.
