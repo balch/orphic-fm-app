@@ -78,6 +78,16 @@ class DspSynthEngine(
     private val drumDirectLimiterR = audioEngine.createLimiter()
     private var _drumsBypass = true
 
+
+    // Drum Direct Resonator (Parallel)
+    private val drumDirectResonator = audioEngine.createResonatorUnit()
+    private val drumDirectResoWetGainL = audioEngine.createMultiply()
+    private val drumDirectResoWetGainR = audioEngine.createMultiply()
+    private val drumDirectResoDryGainL = audioEngine.createMultiply()
+    private val drumDirectResoDryGainR = audioEngine.createMultiply()
+    private val drumDirectResoSumL = audioEngine.createAdd()
+    private val drumDirectResoSumR = audioEngine.createAdd()
+
     // State caches
     private val quadPitchOffsets = DoubleArray(3) { 0.5 }
     private val voiceTuneCache = DoubleArray(12) { 0.5 }
@@ -174,6 +184,14 @@ class DspSynthEngine(
         audioEngine.addUnit(drumDirectGainR)
         audioEngine.addUnit(drumDirectLimiterL)
         audioEngine.addUnit(drumDirectLimiterR)
+        
+        audioEngine.addUnit(drumDirectResonator)
+        audioEngine.addUnit(drumDirectResoWetGainL)
+        audioEngine.addUnit(drumDirectResoWetGainR)
+        audioEngine.addUnit(drumDirectResoDryGainL)
+        audioEngine.addUnit(drumDirectResoDryGainR)
+        audioEngine.addUnit(drumDirectResoSumL)
+        audioEngine.addUnit(drumDirectResoSumR)
         
         // Initialize all plugins (sets up internal wiring)
         pluginProvider.plugins.forEach { it.initialize() }
@@ -280,14 +298,54 @@ class DspSynthEngine(
         drumChainGainL.output.connect(pluginProvider.resonatorPlugin.inputs["fullDrumLeft"]!!)
         drumChainGainR.output.connect(pluginProvider.resonatorPlugin.inputs["fullDrumRight"]!!)
 
-        // Path 2: Direct to output (Stereo Sum + Looper) -> VIA Dedicated Limiter (Distortion)
-        drumDirectGainL.output.connect(drumDirectLimiterL.input)
-        drumDirectGainR.output.connect(drumDirectLimiterR.input)
+        // Path 2: Direct to output (Stereo Sum + Looper) -> VIA Dedicated Resonator -> Dedicated Limiter (Distortion)
+        
+        // Connect Gains to Direct Splits
+        drumDirectGainL.output.connect(drumDirectResoDryGainL.inputA)
+        drumDirectGainR.output.connect(drumDirectResoDryGainR.inputA)
+        drumDirectGainL.output.connect(drumDirectResonator.input) // Resonator takes mono/stereo sum usually, or separate inputs?
+        // Wait, ResonatorUnit interface has one input? "val input: AudioInput". It sums whatever is connected.
+        drumDirectGainR.output.connect(drumDirectResonator.input)
+        
+        // Resonator Output Routing
+        drumDirectResonator.output.connect(drumDirectResoWetGainL.inputA)
+        drumDirectResonator.auxOutput.connect(drumDirectResoWetGainR.inputA) // Using Aux for Right channel stereo width (Simulating Rings Odd/Even split)
+        // OR should we duplicate the main output to both if it's mono? The Resonator implementation usually has a stereo output or just 'output' + 'aux'.
+        // DspResonatorPlugin uses 'output' and 'aux' as left/right in some modes, or 'output' -> wetGainL/R.
+        // Let's copy DspResonatorPlugin wiring:
+        // resonator.output.connect(wetGainL.inputA)
+        // resonator.output.connect(wetGainR.inputA)
+        // Wait, DspResonatorPlugin connects 'output' to both L and R wet gains? Let's check lines 121-122 of DspResonatorPlugin from Step 42.
+        // Yes: resonator.output.connect(wetGainL.inputA); resonator.output.connect(wetGainR.inputA).
+        // It seems the ResonatorUnit is mono-out here? Or we treat it as mono.
+        
+        drumDirectResonator.output.connect(drumDirectResoWetGainL.inputA)
+        drumDirectResonator.output.connect(drumDirectResoWetGainR.inputA)
+
+        // Sum Dry and Wet
+        drumDirectResoDryGainL.output.connect(drumDirectResoSumL.inputA)
+        drumDirectResoWetGainL.output.connect(drumDirectResoSumL.inputB)
+        drumDirectResoDryGainR.output.connect(drumDirectResoSumR.inputA)
+        drumDirectResoWetGainR.output.connect(drumDirectResoSumR.inputB)
+
+        // Sums -> Limiters
+        drumDirectResoSumL.output.connect(drumDirectLimiterL.input)
+        drumDirectResoSumR.output.connect(drumDirectLimiterR.input)
         
         drumDirectLimiterL.output.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
         drumDirectLimiterR.output.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
         drumDirectLimiterL.output.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
         drumDirectLimiterR.output.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+        
+        // Initialize Direct Resonator Defaults
+        drumDirectResonator.setEnabled(true)
+        drumDirectResonator.setMode(0) 
+        // Sync defaults will happen via the setX calls or we should init them here?
+        // Let's init with defaults to be safe
+        drumDirectResoDryGainL.inputB.set(1.0)
+        drumDirectResoDryGainR.inputB.set(1.0)
+        drumDirectResoWetGainL.inputB.set(0.0)
+        drumDirectResoWetGainR.inputB.set(0.0)
 
         setDrumsBypass(true)
 
@@ -992,15 +1050,48 @@ class DspSynthEngine(
     // ═══════════════════════════════════════════════════════════
     // Rings Resonator Delegation
     // ═══════════════════════════════════════════════════════════
-    override fun setResonatorMode(mode: Int) = pluginProvider.resonatorPlugin.setMode(mode)
+    override fun setResonatorMode(mode: Int) {
+        pluginProvider.resonatorPlugin.setMode(mode)
+        drumDirectResonator.setMode(mode)
+    }
     override fun setResonatorTarget(target: Int) = pluginProvider.resonatorPlugin.setTarget(target)
     override fun setResonatorTargetMix(targetMix: Float) = pluginProvider.resonatorPlugin.setTargetMix(targetMix)
-    override fun setResonatorStructure(value: Float) = pluginProvider.resonatorPlugin.setStructure(value)
-    override fun setResonatorBrightness(value: Float) = pluginProvider.resonatorPlugin.setBrightness(value)
-    override fun setResonatorDamping(value: Float) = pluginProvider.resonatorPlugin.setDamping(value)
-    override fun setResonatorPosition(value: Float) = pluginProvider.resonatorPlugin.setPosition(value)
-    override fun setResonatorMix(value: Float) = pluginProvider.resonatorPlugin.setMix(value)
-    override fun strumResonator(frequency: Float) = pluginProvider.resonatorPlugin.strum(frequency)
+    
+    override fun setResonatorStructure(value: Float) {
+        pluginProvider.resonatorPlugin.setStructure(value)
+        drumDirectResonator.setStructure(value)
+    }
+    
+    override fun setResonatorBrightness(value: Float) {
+        pluginProvider.resonatorPlugin.setBrightness(value)
+        drumDirectResonator.setBrightness(value)
+    }
+    
+    override fun setResonatorDamping(value: Float) {
+        pluginProvider.resonatorPlugin.setDamping(value)
+        drumDirectResonator.setDamping(value)
+    }
+    
+    override fun setResonatorPosition(value: Float) {
+        pluginProvider.resonatorPlugin.setPosition(value)
+        drumDirectResonator.setPosition(value)
+    }
+    
+    override fun setResonatorMix(value: Float) {
+        pluginProvider.resonatorPlugin.setMix(value)
+        // Sync Direct Resonator Wet/Dry Mix
+        val wetLevel = value.toDouble().coerceIn(0.0, 1.0)
+        val dryLevel = 1.0 - wetLevel
+        drumDirectResoWetGainL.inputB.set(wetLevel)
+        drumDirectResoWetGainR.inputB.set(wetLevel)
+        drumDirectResoDryGainL.inputB.set(dryLevel)
+        drumDirectResoDryGainR.inputB.set(dryLevel)
+    }
+    
+    override fun strumResonator(frequency: Float) {
+        pluginProvider.resonatorPlugin.strum(frequency)
+        drumDirectResonator.strum(frequency)
+    }
     
     override fun getResonatorMode(): Int = pluginProvider.resonatorPlugin.getMode()
     override fun getResonatorTarget(): Int = pluginProvider.resonatorPlugin.getTarget()
