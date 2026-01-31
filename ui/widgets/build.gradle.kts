@@ -1,8 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidMultiplatformLibrary)
-    alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
+    id("orpheus.kmp.compose")
 }
 
 kotlin {
@@ -22,14 +19,10 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":ui:theme"))
-            api(project(":foundation"))
-            
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
+            api(project(":core:foundation"))
+
             implementation(compose.materialIconsExtended)
-            implementation(compose.components.resources)
+
             implementation(libs.liquid)
             implementation(libs.compose.ui.tooling.preview)
         }
