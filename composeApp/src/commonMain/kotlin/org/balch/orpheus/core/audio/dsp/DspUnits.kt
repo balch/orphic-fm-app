@@ -159,6 +159,15 @@ expect interface DrumUnit : AudioUnit {
      * Trigger a drum hit using stored parameters.
      */
     fun trigger(type: Int, accent: Float)
+    
+    /** Trigger Input for Bass Drum (Audio Rate) */
+    val triggerInputBd: AudioInput
+    
+    /** Trigger Input for Snare Drum (Audio Rate) */
+    val triggerInputSd: AudioInput
+    
+    /** Trigger Input for Hi-Hat (Audio Rate) */
+    val triggerInputHh: AudioInput
 }
 
 /**
@@ -340,6 +349,15 @@ expect interface FluxUnit : AudioUnit {
     
     /** Tertiary Output (X3) */
     val outputX3: AudioOutput
+    
+    /** Gate Output T2 (Main Clock) */
+    val outputT2: AudioOutput
+    
+    /** Gate Output T1 (Probabilistic) */
+    val outputT1: AudioOutput
+    
+    /** Gate Output T3 (Probabilistic) */
+    val outputT3: AudioOutput
     
     /**
      * Set the musical scale index.

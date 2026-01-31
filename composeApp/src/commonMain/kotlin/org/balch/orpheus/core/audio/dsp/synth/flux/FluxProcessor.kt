@@ -24,10 +24,17 @@ class FluxProcessor(private val sampleRate: Float) {
     private var length = 8     // Loop length 1-16
     private var scaleIndex = 0 // Which scale to use
     
+    private val timingGenerator = TimingGenerator()
+
     // Output state
     private var outX1 = 0.5f
     private var outX2 = 0.5f
     private var outX3 = 0.5f
+    
+    // Gate Outputs
+    private var outT1 = 0.0f
+    private var outT2 = 0.0f
+    private var outT3 = 0.0f
     
     // Temp buffer for vector generation
     private val rawVector = FloatArray(3)
@@ -54,6 +61,14 @@ class FluxProcessor(private val sampleRate: Float) {
      * Updates internal state for X1, X2, X3.
      */
     fun tick() {
+        // Update Timing State (Gates)
+        // Since 'tick' is called ON a clock event, we treat this as the trigger
+        timingGenerator.process(clockInput = true, rate = 0.5f, jitter = 0.0f) // Jitter TODO
+        
+        outT1 = if (timingGenerator.getT1()) 1.0f else 0.0f
+        outT2 = if (timingGenerator.getT2()) 1.0f else 0.0f
+        outT3 = if (timingGenerator.getT3()) 1.0f else 0.0f
+
         // Generate correlated random vector (X1, X2, X3)
         // This consumes one step of the Dejavu loop, ensuring all 3 are locked to the loop
         randomSequence.nextVector(rawVector, 3)
@@ -63,6 +78,20 @@ class FluxProcessor(private val sampleRate: Float) {
         outX2 = processChannel(rawVector[1])
         outX3 = processChannel(rawVector[2])
     }
+    
+    /**
+     * Called when clock is low/off to reset gates
+     */
+    fun tickClockOff() {
+        timingGenerator.process(clockInput = false, rate = 0.5f, jitter = 0.0f)
+        outT1 = 0.0f
+        outT2 = 0.0f
+        outT3 = 0.0f
+    }
+    
+    fun getT1() = outT1
+    fun getT2() = outT2
+    fun getT3() = outT3
     
     private fun processChannel(raw: Float): Float {
         // Apply spread and bias

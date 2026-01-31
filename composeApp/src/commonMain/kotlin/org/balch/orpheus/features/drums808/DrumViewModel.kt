@@ -22,6 +22,13 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
 
+enum class DrumTriggerSource(val displayName: String) {
+    INTERNAL("Internal"),
+    FLUX_T1("Flux T1"),
+    FLUX_T2("Flux T2"),
+    FLUX_T3("Flux T3")
+}
+
 @Immutable
 data class DrumUiState(
     // Bass Drum
@@ -30,18 +37,21 @@ data class DrumUiState(
     val bdDecay: Float = 0.5f,
     val bdP4: Float = 0.5f,  // AFM (Attack FM)
     val bdP5: Float = 0.5f,  // Self FM
+    val bdTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     
     // Snare Drum
     val sdFrequency: Float = 0.4f, // Maps to ~180Hz
     val sdTone: Float = 0.5f,
     val sdDecay: Float = 0.5f,
     val sdP4: Float = 0.5f,  // Snappiness
+    val sdTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     
     // Hi-Hat
     val hhFrequency: Float = 0.6f, // Maps to ~400Hz
     val hhTone: Float = 0.5f,
     val hhDecay: Float = 0.5f,
     val hhP4: Float = 0.5f,  // Noisiness
+    val hhTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     
     // Trigger States (Visual Feedback)
     val isBdActive: Boolean = false,
@@ -55,6 +65,7 @@ data class DrumPanelActions(
     val setBdTone: (Float) -> Unit,
     val setBdDecay: (Float) -> Unit,
     val setBdP4: (Float) -> Unit,
+    val setBdTriggerSource: (DrumTriggerSource) -> Unit,
     val startBdTrigger: () -> Unit,
     val stopBdTrigger: () -> Unit,
     
@@ -63,6 +74,7 @@ data class DrumPanelActions(
     val setSdTone: (Float) -> Unit,
     val setSdDecay: (Float) -> Unit,
     val setSdP4: (Float) -> Unit,
+    val setSdTriggerSource: (DrumTriggerSource) -> Unit,
     val startSdTrigger: () -> Unit,
     val stopSdTrigger: () -> Unit,
     
@@ -71,14 +83,15 @@ data class DrumPanelActions(
     val setHhTone: (Float) -> Unit,
     val setHhDecay: (Float) -> Unit,
     val setHhP4: (Float) -> Unit,
+    val setHhTriggerSource: (DrumTriggerSource) -> Unit,
     val startHhTrigger: () -> Unit,
     val stopHhTrigger: () -> Unit
 ) {
     companion object {
         val EMPTY = DrumPanelActions(
-            {}, {}, {}, {}, {}, {},
-            {}, {}, {}, {}, {}, {},
-            {}, {}, {}, {}, {}, {}
+            {}, {}, {}, {}, {}, {}, {},
+            {}, {}, {}, {}, {}, {}, {},
+            {}, {}, {}, {}, {}, {}, {}
         )
     }
 }
@@ -116,6 +129,10 @@ class DrumViewModel(
             _uiState.update { it.copy(bdP4 = p) }
             updateBdParams(_uiState.value)
         },
+        setBdTriggerSource = { src ->
+            _uiState.update { it.copy(bdTriggerSource = src) }
+            synthEngine.setDrumTriggerSource(0, src.ordinal)
+        },
         startBdTrigger = ::startBdTrigger,
         stopBdTrigger = { _uiState.update { it.copy(isBdActive = false) } },
         
@@ -136,6 +153,10 @@ class DrumViewModel(
             _uiState.update { it.copy(sdP4 = p) }
             updateSdParams(_uiState.value)
         },
+        setSdTriggerSource = { src ->
+            _uiState.update { it.copy(sdTriggerSource = src) }
+            synthEngine.setDrumTriggerSource(1, src.ordinal)
+        },
         startSdTrigger = ::startSdTrigger,
         stopSdTrigger = { _uiState.update { it.copy(isSdActive = false) } },
         
@@ -155,6 +176,10 @@ class DrumViewModel(
         setHhP4 = { p -> 
             _uiState.update { it.copy(hhP4 = p) }
             updateHhParams(_uiState.value)
+        },
+        setHhTriggerSource = { src ->
+            _uiState.update { it.copy(hhTriggerSource = src) }
+            synthEngine.setDrumTriggerSource(2, src.ordinal)
         },
         startHhTrigger = ::startHhTrigger,
         stopHhTrigger = { _uiState.update { it.copy(isHhActive = false) } }

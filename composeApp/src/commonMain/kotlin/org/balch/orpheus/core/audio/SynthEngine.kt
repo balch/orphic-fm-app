@@ -239,6 +239,9 @@ interface SynthEngine {
     fun getDrumDecay(type: Int): Float
     fun getDrumP4(type: Int): Float
     fun getDrumP5(type: Int): Float
+    
+    // Drum Trigger Routing
+    fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int)
 
     // Beat Sequencer (Grids)
     fun setBeatsX(x: Float)

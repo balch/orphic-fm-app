@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.audio.dsp
 
+import com.jsyn.ports.UnitInputPort
 import com.jsyn.ports.UnitOutputPort
 import com.jsyn.unitgen.UnitGenerator
 import org.balch.orpheus.core.audio.dsp.synth.AnalogBassDrum
@@ -38,6 +39,10 @@ actual interface DrumUnit : AudioUnit {
     )
 
     actual fun trigger(type: Int, accent: Float)
+    
+    actual val triggerInputBd: AudioInput
+    actual val triggerInputSd: AudioInput
+    actual val triggerInputHh: AudioInput
 }
 
 class JsynDrumUnit : UnitGenerator(), DrumUnit {
@@ -49,7 +54,17 @@ class JsynDrumUnit : UnitGenerator(), DrumUnit {
     // JSyn output port
     private val jsynOutput = UnitOutputPort("Output")
     
+    // JSyn Trigger Inputs
+    private val jsynTriggerInputBd = UnitInputPort("TriggerBD")
+    private val jsynTriggerInputSd = UnitInputPort("TriggerSD")
+    private val jsynTriggerInputHh = UnitInputPort("TriggerHH")
+    
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
+    
+    // AudioUnit Wrapper Ports
+    override val triggerInputBd: AudioInput = JsynAudioInput(jsynTriggerInputBd)
+    override val triggerInputSd: AudioInput = JsynAudioInput(jsynTriggerInputSd)
+    override val triggerInputHh: AudioInput = JsynAudioInput(jsynTriggerInputHh)
 
     // Mode: 0 = 808, 1 = FM
     private var drumMode = 0
@@ -92,6 +107,9 @@ class JsynDrumUnit : UnitGenerator(), DrumUnit {
         
         // Add JSyn output port
         addPort(jsynOutput)
+        addPort(jsynTriggerInputBd)
+        addPort(jsynTriggerInputSd)
+        addPort(jsynTriggerInputHh)
     }
 
     override fun trigger(
@@ -164,24 +182,51 @@ class JsynDrumUnit : UnitGenerator(), DrumUnit {
             }
         }
     }
+    
+    // Internal state for edge detection
+    private var lastBdTrig = 0.0
+    private var lastSdTrig = 0.0
+    private var lastHhTrig = 0.0
 
     override fun generate(start: Int, end: Int) {
         val outputs = jsynOutput.values
+        val bdTrigs = jsynTriggerInputBd.values
+        val sdTrigs = jsynTriggerInputSd.values
+        val hhTrigs = jsynTriggerInputHh.values
         
         for (i in start until end) {
-            // Process trigger flags only on first sample of buffer
-            val bdTrig = if (i == start && bdTrigger) { bdTrigger = false; true } else false
-            val sdTrig = if (i == start && sdTrigger) { sdTrigger = false; true } else false
-            val hhTrig = if (i == start && hhTrigger) { hhTrigger = false; true } else false
-            val fmTrig = if (i == start && fmTrigger) { fmTrigger = false; true } else false
+            // Manual Triggers (Control Rate, processed at buffer start)
+            val bdManual = if (i == start && bdTrigger) { bdTrigger = false; true } else false
+            val sdManual = if (i == start && sdTrigger) { sdTrigger = false; true } else false
+            val hhManual = if (i == start && hhTrigger) { hhTrigger = false; true } else false
+            val fmManual = if (i == start && fmTrigger) { fmTrigger = false; true } else false
+            
+            // Audio Rate Triggers (Edge Detection)
+            val bdIn = bdTrigs[i - start] // JSyn unit buffers are usually aligned
+            val sdIn = sdTrigs[i - start]
+            val hhIn = hhTrigs[i - start]
+            
+            val bdAudio = bdIn > 0.1 && lastBdTrig <= 0.1
+            val sdAudio = sdIn > 0.1 && lastSdTrig <= 0.1
+            val hhAudio = hhIn > 0.1 && lastHhTrig <= 0.1
+            
+            lastBdTrig = bdIn
+            lastSdTrig = sdIn
+            lastHhTrig = hhIn
+            
+            // Combine Triggers
+            val doBd = bdManual || bdAudio
+            val doSd = sdManual || sdAudio
+            val doHh = hhManual || hhAudio
+            val doFm = fmManual
             
             // Process ALL drums every sample (they naturally decay to 0 when not triggered)
-            val bdSample = bd.process(bdTrig, bdAccent, bdF0, bdTone, bdDecay, bdP4, bdP5)
-            val sdSample = sd.process(sdTrig, sdAccent, sdF0, sdTone, sdDecay, sdP4)
-            val hhSample = hh.process(hhTrig, hhAccent, hhF0, hhTone, hhDecay, hhP4)
+            val bdSample = bd.process(doBd, bdAccent, bdF0, bdTone, bdDecay, bdP4, bdP5)
+            val sdSample = sd.process(doSd, sdAccent, sdF0, sdTone, sdDecay, sdP4)
+            val hhSample = hh.process(doHh, hhAccent, hhF0, hhTone, hhDecay, hhP4)
             
             // FM Drum - using BD params as proxy for the single FM instance for now
-            val fmSample = fm.process(fmTrig, bdAccent, bdF0, bdTone, bdDecay, bdP4, bdP5)
+            val fmSample = fm.process(doFm, bdAccent, bdF0, bdTone, bdDecay, bdP4, bdP5)
             
             // Mix all drums with gain staging
             // BD is internally scaled 0.3x so needs higher mix, SD/HH have stronger output

@@ -18,6 +18,9 @@ actual interface FluxUnit : AudioUnit {
     actual val rate: AudioInput
     actual val outputX1: AudioOutput
     actual val outputX3: AudioOutput
+    actual val outputT2: AudioOutput
+    actual val outputT1: AudioOutput
+    actual val outputT3: AudioOutput
     actual fun setScale(index: Int)
 }
 
@@ -39,6 +42,11 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     private val jsynOutputX1 = UnitOutputPort("OutputX1")
     private val jsynOutputX3 = UnitOutputPort("OutputX3")
     
+    // Gate Outputs
+    private val jsynOutputT1 = UnitOutputPort("OutputT1")
+    private val jsynOutputT2 = UnitOutputPort("OutputT2")
+    private val jsynOutputT3 = UnitOutputPort("OutputT3")
+    
     // AudioUnit Wrapper Ports
     override val clock: AudioInput = JsynAudioInput(jsynClock)
     override val spread: AudioInput = JsynAudioInput(jsynSpread)
@@ -51,6 +59,9 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
     override val outputX1: AudioOutput = JsynAudioOutput(jsynOutputX1)
     override val outputX3: AudioOutput = JsynAudioOutput(jsynOutputX3)
+    override val outputT1: AudioOutput = JsynAudioOutput(jsynOutputT1)
+    override val outputT2: AudioOutput = JsynAudioOutput(jsynOutputT2)
+    override val outputT3: AudioOutput = JsynAudioOutput(jsynOutputT3)
     
     // Internal state for edge detection
     private var lastClock = 0.0
@@ -67,6 +78,9 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         addPort(jsynOutput)
         addPort(jsynOutputX1)
         addPort(jsynOutputX3)
+        addPort(jsynOutputT1)
+        addPort(jsynOutputT2)
+        addPort(jsynOutputT3)
         
         // Default values
         jsynSpread.set(0.5)
@@ -81,6 +95,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         processor.setScale(index)
     }
     
+    // Generate method
     override fun generate(start: Int, end: Int) {
         val count = end - start
         if (count <= 0) return
@@ -96,6 +111,9 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         val outputs = jsynOutput.values
         val outputsX1 = jsynOutputX1.values
         val outputsX3 = jsynOutputX3.values
+        val outputsT1 = jsynOutputT1.values
+        val outputsT2 = jsynOutputT2.values
+        val outputsT3 = jsynOutputT3.values
         
         for (i in 0 until count) {
             val idx = start + i
@@ -128,12 +146,23 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
                     
                     processor.tick()
                 }
+            } else if (currentClock <= 0.1) {
+                // Ensure gates turn off when clock is low (simplified pulse width)
+                // For proper gates we might want a counter, but clock pulse is usually short.
+                // We use tickClockOff to allow TimingGenerator to reset its state if needed.
+                if (lastClock > 0.1) {
+                     processor.tickClockOff()
+                }
             }
             
             lastClock = currentClock
             outputs[idx] = processor.getX2().toDouble() // Main (X2)
             outputsX1[idx] = processor.getX1().toDouble() // Secondary (X1)
             outputsX3[idx] = processor.getX3().toDouble() // Tertiary (X3)
+            
+            outputsT1[idx] = processor.getT1().toDouble()
+            outputsT2[idx] = processor.getT2().toDouble() // Main Clock Gate
+            outputsT3[idx] = processor.getT3().toDouble()
         }
     }
 }

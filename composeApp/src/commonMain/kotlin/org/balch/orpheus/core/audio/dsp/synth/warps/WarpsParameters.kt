@@ -6,8 +6,11 @@ package org.balch.orpheus.core.audio.dsp.synth.warps
 enum class WarpsSource(val displayName: String) {
     SYNTH("Synth"),
     DRUMS("Drums"),
-    ALL("ALL"),
-    LFO("LFO")
+    REPL("REPL"),
+    LFO("LFO"),
+    RESONATOR("Rings"),
+    WARPS("Feedback"),
+    FLUX("Marbles")
 }
 
 enum class ModulationAlgorithm {

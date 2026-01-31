@@ -62,6 +62,10 @@ class DspSynthEngine(
     // Voice sum buses (for feeding into Grains before resonator)
     private val voiceSumLeft = audioEngine.createPassThrough()
     private val voiceSumRight = audioEngine.createPassThrough()
+    
+    // REPL Sum buses (Voices 8-11)
+    private val replSumLeft = audioEngine.createPassThrough()
+    private val replSumRight = audioEngine.createPassThrough()
 
     // State caches
     private val quadPitchOffsets = DoubleArray(3) { 0.5 }
@@ -145,6 +149,8 @@ class DspSynthEngine(
         audioEngine.addUnit(totalFbGain)
         audioEngine.addUnit(voiceSumLeft)
         audioEngine.addUnit(voiceSumRight)
+        audioEngine.addUnit(replSumLeft)
+        audioEngine.addUnit(replSumRight)
         
         // Initialize all plugins (sets up internal wiring)
         pluginProvider.plugins.forEach { it.initialize() }
@@ -283,6 +289,12 @@ class DspSynthEngine(
             // Panned audio ALSO goes to Resonator non-gated inputs (full dry path)
             pluginProvider.stereoPlugin.getVoicePanOutputLeft(index).connect(pluginProvider.resonatorPlugin.inputs["fullSynthLeft"]!!)
             pluginProvider.stereoPlugin.getVoicePanOutputRight(index).connect(pluginProvider.resonatorPlugin.inputs["fullSynthRight"]!!)
+
+            // REPL Voices (8-11) go to separate REPL bus
+            if (index >= 8) {
+                pluginProvider.stereoPlugin.getVoicePanOutputLeft(index).connect(replSumLeft.input)
+                pluginProvider.stereoPlugin.getVoicePanOutputRight(index).connect(replSumRight.input)
+            }
         }
 
         // Resonator output goes to Distortion input (resonator path continues)
@@ -936,6 +948,27 @@ class DspSynthEngine(
     override fun getDrumP4(type: Int): Float = pluginProvider.drumPlugin.getP4(type)
     override fun getDrumP5(type: Int): Float = pluginProvider.drumPlugin.getP5(type)
     
+    override fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int) {
+        val drumIn = when(drumIndex) {
+            0 -> pluginProvider.drumPlugin.inputs["triggerBD"]
+            1 -> pluginProvider.drumPlugin.inputs["triggerSD"]
+            2 -> pluginProvider.drumPlugin.inputs["triggerHH"]
+            else -> null
+        } ?: return
+        
+        // Disconnect existing
+        drumIn.disconnectAll()
+        
+        // Internal = 0. Use defaults (no connection to audio rate source).
+        // 1=T1, 2=T2, 3=T3
+        when (sourceIndex) {
+            1 -> pluginProvider.fluxPlugin.outputs["outputT1"]?.connect(drumIn)
+            2 -> pluginProvider.fluxPlugin.outputs["outputT2"]?.connect(drumIn)
+            3 -> pluginProvider.fluxPlugin.outputs["outputT3"]?.connect(drumIn)
+            else -> { /* Internal, left disconnected */ }
+        }
+    }
+    
     // Beat Sequencer Storage (State only)
     private var _beatsX = 0.5f
     private var _beatsY = 0.5f
@@ -1114,15 +1147,39 @@ class DspSynthEngine(
                 }
             }  // DRUMS
             2 -> {
-                pluginProvider.stereoPlugin.outputs["lineOutLeft"]?.let { left ->
-                    pluginProvider.stereoPlugin.outputs["lineOutRight"]?.let { right ->
-                        Pair(left,right)
-                    }
-                }
+                // REPL - Voices 8-11
+                Pair(replSumLeft.output, replSumRight.output)
             }
             3 -> {
                 // LFO - Dual Mono / Stereo A/B
                 Pair(pluginProvider.hyperLfo.outputA, pluginProvider.hyperLfo.outputB)
+            }
+            4 -> {
+                // RESONATOR (Rings)
+                pluginProvider.resonatorPlugin.outputs["outputLeft"]?.let { left ->
+                    pluginProvider.resonatorPlugin.outputs["outputRight"]?.let { right ->
+                        Pair(left, right)
+                    }
+                }
+            }
+            5 -> {
+                // WARPS (Feedback from previous block?) - Not purely safe without delay, but Warps uses block processing
+                // Let's tap the output.
+                pluginProvider.warpsPlugin.outputs["output"]?.let { left ->
+                    pluginProvider.warpsPlugin.outputs["outputRight"]?.let { right ->
+                        Pair(left, right)
+                    }
+                }
+            }
+            6 -> {
+                 // FLUX (Marbles)
+                 // Map X1 to Left, X3 to Right (X2 is usually internal but we can use main output for left too)
+                 // Let's use X1 and X3 for interesting stereo modulation
+                 pluginProvider.fluxPlugin.outputs["outputX1"]?.let { left ->
+                     pluginProvider.fluxPlugin.outputs["outputX3"]?.let { right ->
+                         Pair(left, right)
+                     }
+                 }
             }
             else -> null
         }

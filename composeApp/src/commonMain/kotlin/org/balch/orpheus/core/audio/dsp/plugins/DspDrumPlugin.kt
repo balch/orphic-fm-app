@@ -33,6 +33,13 @@ class DspDrumPlugin(
             "outputLeft" to drumGainLeft.output,
             "outputRight" to drumGainRight.output
         )
+        
+    override val inputs: Map<String, org.balch.orpheus.core.audio.dsp.AudioInput>
+        get() = mapOf(
+            "triggerBD" to drumUnit.triggerInputBd,
+            "triggerSD" to drumUnit.triggerInputSd,
+            "triggerHH" to drumUnit.triggerInputHh
+        )
 
     override fun initialize() {
         // Connect drum unit to output gains

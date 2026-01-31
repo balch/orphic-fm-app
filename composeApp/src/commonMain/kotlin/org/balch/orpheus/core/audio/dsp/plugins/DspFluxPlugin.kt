@@ -40,7 +40,10 @@ class DspFluxPlugin(
     override val outputs: Map<String, AudioOutput> = mapOf(
         "output" to flux.output,
         "outputX1" to flux.outputX1,
-        "outputX3" to flux.outputX3
+        "outputX3" to flux.outputX3,
+        "outputT1" to flux.outputT1,
+        "outputT2" to flux.outputT2,
+        "outputT3" to flux.outputT3
     )
     
     override fun initialize() {
