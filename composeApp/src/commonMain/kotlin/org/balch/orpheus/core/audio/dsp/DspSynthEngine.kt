@@ -72,6 +72,10 @@ class DspSynthEngine(
     private val drumChainGainR = audioEngine.createMultiply()
     private val drumDirectGainL = audioEngine.createMultiply()
     private val drumDirectGainR = audioEngine.createMultiply()
+
+    // Drum Direct Distortion (Parallel Limiter)
+    private val drumDirectLimiterL = audioEngine.createLimiter()
+    private val drumDirectLimiterR = audioEngine.createLimiter()
     private var _drumsBypass = true
 
     // State caches
@@ -168,6 +172,8 @@ class DspSynthEngine(
         audioEngine.addUnit(drumChainGainR)
         audioEngine.addUnit(drumDirectGainL)
         audioEngine.addUnit(drumDirectGainR)
+        audioEngine.addUnit(drumDirectLimiterL)
+        audioEngine.addUnit(drumDirectLimiterR)
         
         // Initialize all plugins (sets up internal wiring)
         pluginProvider.plugins.forEach { it.initialize() }
@@ -274,11 +280,14 @@ class DspSynthEngine(
         drumChainGainL.output.connect(pluginProvider.resonatorPlugin.inputs["fullDrumLeft"]!!)
         drumChainGainR.output.connect(pluginProvider.resonatorPlugin.inputs["fullDrumRight"]!!)
 
-        // Path 2: Direct to output (Stereo Sum + Looper)
-        drumDirectGainL.output.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
-        drumDirectGainR.output.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
-        drumDirectGainL.output.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
-        drumDirectGainR.output.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+        // Path 2: Direct to output (Stereo Sum + Looper) -> VIA Dedicated Limiter (Distortion)
+        drumDirectGainL.output.connect(drumDirectLimiterL.input)
+        drumDirectGainR.output.connect(drumDirectLimiterR.input)
+        
+        drumDirectLimiterL.output.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        drumDirectLimiterR.output.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        drumDirectLimiterL.output.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        drumDirectLimiterR.output.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
 
         setDrumsBypass(true)
 
@@ -392,7 +401,7 @@ class DspSynthEngine(
         setupAutomation("master_volume", listOf(pluginProvider.stereoPlugin.masterGainLeftInput, pluginProvider.stereoPlugin.masterGainRightInput), 1.0, 0.0) { setMasterVolume(getMasterVolume()) }
 
         // Drive
-        setupAutomation("drive", listOf(pluginProvider.distortionPlugin.limiterLeftDrive, pluginProvider.distortionPlugin.limiterRightDrive), 14.0, 1.0) { setDrive(getDrive()) }
+        setupAutomation("drive", listOf(pluginProvider.distortionPlugin.limiterLeftDrive, pluginProvider.distortionPlugin.limiterRightDrive, drumDirectLimiterL.drive, drumDirectLimiterR.drive), 14.0, 1.0) { setDrive(getDrive()) }
 
         // Delay Mix - complex with wet and dry scalers
         run {
@@ -602,6 +611,10 @@ class DspSynthEngine(
     // Distortion delegations
     override fun setDrive(amount: Float) {
         pluginProvider.distortionPlugin.setDrive(amount)
+        // Also update direct drum limiters
+        val driveVal = 1.0 + (amount * 14.0)
+        drumDirectLimiterL.drive.set(driveVal)
+        drumDirectLimiterR.drive.set(driveVal)
         _driveFlow.value = amount
     }
     override fun setDistortionMix(amount: Float) {

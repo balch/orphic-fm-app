@@ -70,7 +70,8 @@ fun DrumsPanel(
                     leftLabel = "MAIN",
                     rightLabel = "FX",
                     activeColor = OrpheusColors.ninersRed,
-                    width = 90.dp
+                    width = 90.dp,
+                    height = 24.dp,
                 )
             }
 
