@@ -31,9 +31,7 @@ import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
 import org.balch.orpheus.ui.widgets.PulseButton
-import org.balch.orpheus.ui.widgets.Switch3WayState
 
 
 @Composable
@@ -82,27 +80,15 @@ fun DuoPairBox(
                 color = color
             )
 
-            // 3-Way Mod Source Switch (Horizontal)
-            // Calculate pair index (0,1,2,3)
+            // Mod Source Selector (Cycles: OFF -> LFO -> FM -> FLUX)
             val pairIndex = voiceA / 2
-
-            HorizontalSwitch3Way(
-                state = when (duoModSource) {
-                    ModSource.OFF -> Switch3WayState.MIDDLE
-                    ModSource.VOICE_FM -> Switch3WayState.END
-                    ModSource.LFO -> Switch3WayState.START
-                },
-                onStateChange = { state ->
-                    val modSource = when (state) {
-                        Switch3WayState.START -> ModSource.LFO
-                        Switch3WayState.MIDDLE -> ModSource.OFF
-                        Switch3WayState.END -> ModSource.VOICE_FM
-                    }
-                    voiceActions.onDuoModSourceChange(pairIndex, modSource)
+            
+            org.balch.orpheus.ui.widgets.ModSourceSelector(
+                activeSource = duoModSource,
+                onSourceChange = { newSource ->
+                    voiceActions.onDuoModSourceChange(pairIndex, newSource)
                 },
                 color = color,
-                startText = "LFO",
-                endText = "FM",
                 controlId = ControlIds.duoModSource(pairIndex)
             )
         }

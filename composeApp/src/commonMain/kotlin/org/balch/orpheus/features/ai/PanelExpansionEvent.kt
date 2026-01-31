@@ -27,7 +27,8 @@ enum class PanelId(val displayName: String) {
     GRAINS("Grains"),
     LOOPER("Loop"),
     PATTERN("Topographic"),
-    WARPS("Warps")
+    WARPS("Warps"),
+    FLUX("Flux Generator")
 }
 
 /**

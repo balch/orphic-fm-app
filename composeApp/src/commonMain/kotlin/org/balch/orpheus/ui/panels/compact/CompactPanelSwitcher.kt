@@ -50,6 +50,7 @@ enum class CompactPanelType(val displayName: String, val color: Color) {
     RESONATOR("Rezo", OrpheusColors.lakersGold), // Lakers-themed Resonator
     GRAINS("Grains", OrpheusColors.grainsRed), 
     WARPS("Warps", OrpheusColors.warpsGreen),
+    FLUX("Flux", OrpheusColors.neonCyan),
     LFO("LFO", OrpheusColors.neonCyan),
     DELAY("Delay", OrpheusColors.warmGlow),
     REPL("REPL", OrpheusColors.neonCyan),

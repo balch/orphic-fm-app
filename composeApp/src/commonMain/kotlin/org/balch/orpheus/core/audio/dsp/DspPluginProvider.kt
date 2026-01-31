@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.plugins.DspDelayPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDistortionPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDrumPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspDuoLfoPlugin
+import org.balch.orpheus.core.audio.dsp.plugins.DspFluxPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspGrainsPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspLooperPlugin
 import org.balch.orpheus.core.audio.dsp.plugins.DspPerStringBenderPlugin
@@ -34,4 +35,5 @@ class DspPluginProvider(
     val grainsPlugin by lazy { plugins.filterIsInstance<DspGrainsPlugin>().first() }
     val looperPlugin by lazy { plugins.filterIsInstance<DspLooperPlugin>().first() }
     val warpsPlugin by lazy { plugins.filterIsInstance<DspWarpsPlugin>().first() }
+    val fluxPlugin by lazy { plugins.filterIsInstance<DspFluxPlugin>().first() }
 }

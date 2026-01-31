@@ -35,6 +35,9 @@ import org.balch.orpheus.features.drums808.DrumsPanel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoPanel
 import org.balch.orpheus.features.evo.EvoViewModel
+import org.balch.orpheus.features.flux.FluxFeature
+import org.balch.orpheus.features.flux.FluxPanel
+import org.balch.orpheus.features.flux.FluxViewModel
 import org.balch.orpheus.features.grains.GrainsFeature
 import org.balch.orpheus.features.grains.GrainsPanel
 import org.balch.orpheus.features.grains.GrainsViewModel
@@ -86,6 +89,7 @@ fun HeaderPanel(
     drumFeature: DrumFeature = DrumViewModel.feature(),
     drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
     warpsFeature: WarpsFeature = WarpsViewModel.feature(),
+    fluxFeature: FluxFeature = FluxViewModel.feature(),
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
@@ -176,6 +180,13 @@ fun HeaderPanel(
             isExpanded = PanelId.WARPS.isExpanded(),
             onExpandedChange = { PanelId.WARPS.setExpanded(it) },
             modifier = panelModifier(PanelId.WARPS.isExpanded())
+        )
+        // Flux Panel
+        FluxPanel(
+            flux = fluxFeature,
+            isExpanded = PanelId.FLUX.isExpanded(),
+            onExpandedChange = { PanelId.FLUX.setExpanded(it) },
+            modifier = panelModifier(PanelId.FLUX.isExpanded())
         )
         // Live Coding panel
         LiveCodePanel(

@@ -284,12 +284,28 @@ interface SynthEngine {
     fun getWarpsCarrierSource(): Int
     fun getWarpsModulatorSource(): Int
     fun getWarpsMix(): Float
+
+    // Flux / Marbles
+    fun setFluxSpread(value: Float)
+    fun setFluxBias(value: Float)
+    fun setFluxSteps(value: Float)
+    fun setFluxDejaVu(value: Float)
+    fun setFluxLength(value: Int)
+    fun setFluxScale(index: Int)
+    
+    fun getFluxSpread(): Float
+    fun getFluxBias(): Float
+    fun getFluxSteps(): Float
+    fun getFluxDejaVu(): Float
+    fun getFluxLength(): Int
+    fun getFluxScale(): Int
 }
 
 enum class ModSource {
     VOICE_FM,
     OFF,
-    LFO
+    LFO,
+    FLUX
 }
 
 enum class StereoMode {

@@ -306,3 +306,32 @@ expect interface ClockUnit : AudioUnit {
     /** Trigger output (0.0 or 1.0 pulses) */
     override val output: AudioOutput
 }
+
+/**
+ * Flux / Marbles Random Generator Unit.
+ */
+expect interface FluxUnit : AudioUnit {
+    /** Clock input for triggering new values */
+    val clock: AudioInput
+    
+    /** Spread/Probability distribution width (0.0 - 1.0) */
+    val spread: AudioInput
+    
+    /** Bias/Offset (0.0 - 1.0) */
+    val bias: AudioInput
+    
+    /** Steps/Quantization amount (0.0 - 1.0) */
+    val steps: AudioInput
+    
+    /** Deja Vu/Loop probability (0.0 - 1.0) */
+    val dejaVu: AudioInput
+    
+    /** Length of the loop (mapped to 1-16) */
+    val length: AudioInput
+    
+    /**
+     * Set the musical scale index.
+     * @param index 0=Major, 1=Minor, 2=Pentatonic, etc.
+     */
+    fun setScale(index: Int)
+}

@@ -1,0 +1,135 @@
+package org.balch.orpheus.features.flux
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.unit.dp
+import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.preview.LiquidEffectsProvider
+import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
+import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.VisualizationLiquidEffects
+import org.balch.orpheus.ui.widgets.RotaryKnob
+
+/**
+ * Flux Panel - Controls for the random melody generator.
+ */
+@Composable
+fun FluxPanel(
+    flux: FluxFeature,
+    modifier: Modifier = Modifier,
+    isExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
+) {
+    CollapsibleColumnPanel(
+        modifier = modifier,
+        title = "FLUX",
+        color = OrpheusColors.neonCyan,
+        isExpanded = isExpanded,
+        onExpandedChange = onExpandedChange,
+        initialExpanded = true,
+        expandedTitle = "Marbles Generator",
+        showCollapsedHeader = showCollapsedHeader,
+    ) {
+        val state by flux.stateFlow.collectAsState()
+        val actions = flux.actions
+
+        // Row 1: Main Controls
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.Top
+        ) {
+            RotaryKnob(
+                value = state.spread,
+                onValueChange = actions.setSpread,
+                label = "SPREAD",
+                controlId = FluxViewModel.SPREAD,
+                size = 52.dp,
+                progressColor = OrpheusColors.neonMagenta
+            )
+            
+            RotaryKnob(
+                value = state.bias,
+                onValueChange = actions.setBias,
+                label = "BIAS",
+                controlId = FluxViewModel.BIAS,
+                size = 52.dp,
+                progressColor = OrpheusColors.electricBlue
+            )
+            
+            RotaryKnob(
+                value = state.steps,
+                onValueChange = actions.setSteps,
+                label = "STEPS",
+                controlId = FluxViewModel.STEPS,
+                size = 52.dp,
+                progressColor = OrpheusColors.synthGreen
+            )
+            
+            RotaryKnob(
+                value = state.dejaVu,
+                onValueChange = actions.setDejaVu,
+                label = "DÉJÀ VU",
+                controlId = FluxViewModel.DEJA_VU,
+                size = 52.dp,
+                progressColor = OrpheusColors.warmGlow
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Row 2: Length and Scale
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+             // Length Knob (1-16)
+            RotaryKnob(
+                value = state.length.toFloat(),
+                onValueChange = { actions.setLength(it.toInt()) },
+                label = "LENGTH",
+                range = 1f..16f,
+                size = 48.dp,
+                progressColor = androidx.compose.ui.graphics.Color.Gray
+            )
+            
+            // Simpler Scale Selector (cycling button for now or logic to be added later)
+            // Just a knob for scale index for now
+             RotaryKnob(
+                value = state.scaleIndex.toFloat(),
+                onValueChange = { actions.setScale(it.toInt()) },
+                label = "SCALE",
+                range = 0f..5f,
+                size = 48.dp,
+                progressColor = androidx.compose.ui.graphics.Color.Gray
+            )
+        }
+    }
+}
+
+@Suppress("StateFlowValueCalledInComposition")
+@Preview(widthDp = 400, heightDp = 400)
+@Composable
+private fun FluxPanelPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
+) {
+    LiquidPreviewContainerWithGradient(effects = effects) {
+        FluxPanel(
+            flux = FluxViewModel.previewFeature(),
+            isExpanded = true,
+            showCollapsedHeader = false
+        )
+    }
+}

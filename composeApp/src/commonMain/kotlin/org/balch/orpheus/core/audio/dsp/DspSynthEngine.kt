@@ -18,6 +18,7 @@ import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.debug.DebugViewModel.Companion.POLL_INTERVAL_MS
 import kotlin.math.pow
 
@@ -33,6 +34,7 @@ class DspSynthEngine(
     private val audioEngine: AudioEngine,
     private val pluginProvider: DspPluginProvider,
     private val dispatcherProvider: DispatcherProvider,
+    private val globalTempo: GlobalTempo,
 ) : SynthEngine {
 
     private val log = logging("DspSynthEngine")
@@ -212,7 +214,11 @@ class DspSynthEngine(
         pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
         pluginProvider.warpsPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
         pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
         pluginProvider.warpsPlugin.outputs["outputRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+
+        // Flux Clock Wiring (Sync GlobalClock to Flux)
+        globalTempo.getClockOutput().connect(pluginProvider.fluxPlugin.inputs["clock"]!!)
 
         // Stereo outputs → LineOut
         pluginProvider.stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
@@ -750,6 +756,10 @@ class DspSynthEngine(
                     voices[voiceB].output.connect(voices[voiceA].modInput)
                 }
             }
+            ModSource.FLUX -> {
+                pluginProvider.fluxPlugin.outputs["output"]?.connect(voices[voiceA].modInput)
+                pluginProvider.fluxPlugin.outputs["output"]?.connect(voices[voiceB].modInput)
+            }
         }
     }
 
@@ -1125,5 +1135,20 @@ class DspSynthEngine(
     override fun getWarpsCarrierSource(): Int = _warpsCarrierSource
     override fun getWarpsModulatorSource(): Int = _warpsModulatorSource
     override fun getWarpsMix(): Float = _warpsMix
+
+    // Flux
+    override fun setFluxSpread(value: Float) = pluginProvider.fluxPlugin.setSpread(value)
+    override fun setFluxBias(value: Float) = pluginProvider.fluxPlugin.setBias(value)
+    override fun setFluxSteps(value: Float) = pluginProvider.fluxPlugin.setSteps(value)
+    override fun setFluxDejaVu(value: Float) = pluginProvider.fluxPlugin.setDejaVu(value)
+    override fun setFluxLength(value: Int) = pluginProvider.fluxPlugin.setLength(value)
+    override fun setFluxScale(index: Int) = pluginProvider.fluxPlugin.setScale(index)
+    
+    override fun getFluxSpread(): Float = pluginProvider.fluxPlugin.getSpread()
+    override fun getFluxBias(): Float = pluginProvider.fluxPlugin.getBias()
+    override fun getFluxSteps(): Float = pluginProvider.fluxPlugin.getSteps()
+    override fun getFluxDejaVu(): Float = pluginProvider.fluxPlugin.getDejaVu()
+    override fun getFluxLength(): Int = pluginProvider.fluxPlugin.getLength()
+    override fun getFluxScale(): Int = pluginProvider.fluxPlugin.getScale()
 }
 
