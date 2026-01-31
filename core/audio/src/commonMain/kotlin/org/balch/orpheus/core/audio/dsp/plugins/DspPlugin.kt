@@ -33,3 +33,8 @@ interface DspPlugin {
     /** Called when audio engine stops */
     fun onStop() {}
 }
+
+/**
+ * Combined interface for transition to LV2 style.
+ */
+interface Lv2DspPlugin : DspPlugin, org.balch.orpheus.core.audio.dsp.lv2.Lv2Plugin
