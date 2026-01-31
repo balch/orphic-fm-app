@@ -36,3 +36,4 @@ plugins {
 include(":androidApp")
 include(":composeApp")
 include(":macrobenchmark")
+include(":core:audio")

@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 
 /**
  * DSP Plugin for dual delay lines with modulation.
@@ -20,45 +21,46 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspDelayPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
 
     // Delay Lines
-    private val delay1 = audioEngine.createDelayLine()
-    private val delay2 = audioEngine.createDelayLine()
-    private val delay1FeedbackGain = audioEngine.createMultiply()
-    private val delay2FeedbackGain = audioEngine.createMultiply()
+    private val delay1 = dspFactory.createDelayLine()
+    private val delay2 = dspFactory.createDelayLine()
+    private val delay1FeedbackGain = dspFactory.createMultiply()
+    private val delay2FeedbackGain = dspFactory.createMultiply()
 
     // Bipolar to Unipolar converters for LFO: u = x * 0.5 + 0.5
-    private val lfoToUnipolar1 = audioEngine.createMultiplyAdd()
-    private val lfoToUnipolar2 = audioEngine.createMultiplyAdd()
+    private val lfoToUnipolar1 = dspFactory.createMultiplyAdd()
+    private val lfoToUnipolar2 = dspFactory.createMultiplyAdd()
     
     // Modulation mixers: (UnipolarLFO * Depth) + BaseTime
-    private val delay1ModMixer = audioEngine.createMultiplyAdd()
-    private val delay2ModMixer = audioEngine.createMultiplyAdd()
+    private val delay1ModMixer = dspFactory.createMultiplyAdd()
+    private val delay2ModMixer = dspFactory.createMultiplyAdd()
 
     // LinearRamp units for smooth parameter transitions
-    private val delay1TimeRamp = audioEngine.createLinearRamp()
-    private val delay2TimeRamp = audioEngine.createLinearRamp()
-    private val delay1ModDepthRamp = audioEngine.createLinearRamp()
-    private val delay2ModDepthRamp = audioEngine.createLinearRamp()
+    private val delay1TimeRamp = dspFactory.createLinearRamp()
+    private val delay2TimeRamp = dspFactory.createLinearRamp()
+    private val delay1ModDepthRamp = dspFactory.createLinearRamp()
+    private val delay2ModDepthRamp = dspFactory.createLinearRamp()
 
     // Self-modulation attenuators
-    private val selfMod1Attenuator = audioEngine.createMultiply()
-    private val selfMod2Attenuator = audioEngine.createMultiply()
+    private val selfMod1Attenuator = dspFactory.createMultiply()
+    private val selfMod2Attenuator = dspFactory.createMultiply()
 
     // Stereo wet gains
-    private val delay1WetLeft = audioEngine.createMultiply()
-    private val delay1WetRight = audioEngine.createMultiply()
-    private val delay2WetLeft = audioEngine.createMultiply()
-    private val delay2WetRight = audioEngine.createMultiply()
+    private val delay1WetLeft = dspFactory.createMultiply()
+    private val delay1WetRight = dspFactory.createMultiply()
+    private val delay2WetLeft = dspFactory.createMultiply()
+    private val delay2WetRight = dspFactory.createMultiply()
 
     // Input proxies for stereo processing
-    private val inputLeftProxy = audioEngine.createPassThrough()
-    private val inputRightProxy = audioEngine.createPassThrough()
+    private val inputLeftProxy = dspFactory.createPassThrough()
+    private val inputRightProxy = dspFactory.createPassThrough()
     
     // LFO input proxy
-    private val lfoInputProxy = audioEngine.createPassThrough()
+    private val lfoInputProxy = dspFactory.createPassThrough()
 
     // State caches
     private val _delayTime = FloatArray(2) { 0.3f }

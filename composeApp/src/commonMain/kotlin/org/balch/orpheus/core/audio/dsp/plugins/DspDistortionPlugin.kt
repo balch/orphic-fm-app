@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 
 /**
  * DSP Plugin for stereo distortion with drive and mix control.
@@ -20,34 +21,35 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspDistortionPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
 
     // Stereo dry sum buses
-    private val drySumLeft = audioEngine.createPassThrough()
-    private val drySumRight = audioEngine.createPassThrough()
+    private val drySumLeft = dspFactory.createPassThrough()
+    private val drySumRight = dspFactory.createPassThrough()
     
     // Dry level control
-    private val dryGainLeft = audioEngine.createMultiply()
-    private val dryGainRight = audioEngine.createMultiply()
+    private val dryGainLeft = dspFactory.createMultiply()
+    private val dryGainRight = dspFactory.createMultiply()
     
     // Drive amount
-    private val driveGainLeft = audioEngine.createMultiply()
-    private val driveGainRight = audioEngine.createMultiply()
+    private val driveGainLeft = dspFactory.createMultiply()
+    private val driveGainRight = dspFactory.createMultiply()
     
     // Limiters (saturation)
-    private val limiterLeft = audioEngine.createLimiter()
-    private val limiterRight = audioEngine.createLimiter()
+    private val limiterLeft = dspFactory.createLimiter()
+    private val limiterRight = dspFactory.createLimiter()
     
     // Clean/Distorted mix paths
-    private val cleanPathGainLeft = audioEngine.createMultiply()
-    private val cleanPathGainRight = audioEngine.createMultiply()
-    private val distortedPathGainLeft = audioEngine.createMultiply()
-    private val distortedPathGainRight = audioEngine.createMultiply()
+    private val cleanPathGainLeft = dspFactory.createMultiply()
+    private val cleanPathGainRight = dspFactory.createMultiply()
+    private val distortedPathGainLeft = dspFactory.createMultiply()
+    private val distortedPathGainRight = dspFactory.createMultiply()
     
     // Post-mix summers
-    private val postMixSummerLeft = audioEngine.createAdd()
-    private val postMixSummerRight = audioEngine.createAdd()
+    private val postMixSummerLeft = dspFactory.createAdd()
+    private val postMixSummerRight = dspFactory.createAdd()
 
     // State caches
     private var _drive = 0.0f

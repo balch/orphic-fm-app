@@ -1,16 +1,12 @@
 package org.balch.orpheus.core.audio.dsp
 
-import org.khronos.webgl.Float32Array
-import org.khronos.webgl.set
+
 
 /**
  * WASM actual implementations of math/utility units using Web Audio API.
  */
 
-actual interface Multiply : AudioUnit {
-    actual val inputA: AudioInput
-    actual val inputB: AudioInput
-}
+
 
 /**
  * Multiply using a GainNode.
@@ -26,10 +22,7 @@ class WebAudioMultiply(private val context: AudioContext) : Multiply {
     override val output: AudioOutput = WebAudioNodeOutput(gainNode)
 }
 
-actual interface Add : AudioUnit {
-    actual val inputA: AudioInput
-    actual val inputB: AudioInput
-}
+
 
 /**
  * Add by routing two signals to the same gain node (summing).
@@ -52,11 +45,7 @@ class WebAudioAdd(private val context: AudioContext) : Add {
     override val output: AudioOutput = WebAudioNodeOutput(sumNode)
 }
 
-actual interface MultiplyAdd : AudioUnit {
-    actual val inputA: AudioInput
-    actual val inputB: AudioInput
-    actual val inputC: AudioInput
-}
+
 
 /**
  * MultiplyAdd: output = (inputA * inputB) + inputC
@@ -82,9 +71,7 @@ class WebAudioMultiplyAdd(private val context: AudioContext) : MultiplyAdd {
     override val output: AudioOutput = WebAudioNodeOutput(sumNode)
 }
 
-actual interface PassThrough : AudioUnit {
-    actual val input: AudioInput
-}
+
 
 class WebAudioPassThrough(private val context: AudioContext) : PassThrough {
     private val gainNode = context.createGain().also { it.gain.value = 1f }
@@ -93,10 +80,7 @@ class WebAudioPassThrough(private val context: AudioContext) : PassThrough {
     override val output: AudioOutput = WebAudioNodeOutput(gainNode)
 }
 
-actual interface SineOscillator : AudioUnit {
-    actual val frequency: AudioInput
-    actual val amplitude: AudioInput
-}
+
 
 /**
  * Base class for Web Audio oscillators
@@ -127,30 +111,21 @@ class WebAudioSineOscillator(context: AudioContext) : WebAudioOscillatorBase(con
     override val amplitude: AudioInput get() = super.amplitude
 }
 
-actual interface TriangleOscillator : AudioUnit {
-    actual val frequency: AudioInput
-    actual val amplitude: AudioInput
-}
+
 
 class WebAudioTriangleOscillator(context: AudioContext) : WebAudioOscillatorBase(context, "triangle"), TriangleOscillator {
     override val frequency: AudioInput get() = super.frequency
     override val amplitude: AudioInput get() = super.amplitude
 }
 
-actual interface SquareOscillator : AudioUnit {
-    actual val frequency: AudioInput
-    actual val amplitude: AudioInput
-}
+
 
 class WebAudioSquareOscillator(context: AudioContext) : WebAudioOscillatorBase(context, "square"), SquareOscillator {
     override val frequency: AudioInput get() = super.frequency
     override val amplitude: AudioInput get() = super.amplitude
 }
 
-actual interface Minimum : AudioUnit {
-    actual val inputA: AudioInput
-    actual val inputB: AudioInput
-}
+
 
 /**
  * Minimum of two signals using Web Audio nodes.
@@ -230,10 +205,7 @@ class WebAudioMinimum(private val context: AudioContext) : Minimum {
     override val output: AudioOutput = WebAudioNodeOutput(resultGain)
 }
 
-actual interface Maximum : AudioUnit {
-    actual val inputA: AudioInput
-    actual val inputB: AudioInput
-}
+
 
 /**
  * Maximum of two signals using Web Audio nodes.

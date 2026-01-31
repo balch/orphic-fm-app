@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 
 /**
  * DSP Plugin for Native Audio Looper.
@@ -15,15 +16,16 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspLooperPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
 
-    private val looper = audioEngine.createLooperUnit()
+    private val looper = dspFactory.createLooperUnit()
     
     // Internal proxies if needed, otherwise direct exposure
     // Let's use proxies to forward inputs cleanly
-    private val inputLeftProxy = audioEngine.createPassThrough()
-    private val inputRightProxy = audioEngine.createPassThrough()
+    private val inputLeftProxy = dspFactory.createPassThrough()
+    private val inputRightProxy = dspFactory.createPassThrough()
     
     // Gate control via automation/manual
     // LooperUnit has recordGate/playGate inputs.

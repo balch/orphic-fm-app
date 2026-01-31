@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlin.random.Random
@@ -30,58 +31,59 @@ import kotlin.random.Random
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspBenderPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
 
     // Control signal path: bendInput -> nonlinearShaper -> modDepth -> output
-    private val bendInputProxy = audioEngine.createPassThrough()
-    private val bendDepthGain = audioEngine.createMultiply()
+    private val bendInputProxy = dspFactory.createPassThrough()
+    private val bendDepthGain = dspFactory.createMultiply()
     
     // Non-linear shaping: creates exponential response curve for more natural feel
-    private val nonlinearMixer = audioEngine.createMultiplyAdd()
+    private val nonlinearMixer = dspFactory.createMultiplyAdd()
     
     // Randomized micro-detuning LFO for organic movement
-    private val randomLfo = audioEngine.createSineOscillator()
-    private val randomDepthGain = audioEngine.createMultiply()
-    private val randomMixer = audioEngine.createAdd()
+    private val randomLfo = dspFactory.createSineOscillator()
+    private val randomDepthGain = dspFactory.createMultiply()
+    private val randomMixer = dspFactory.createAdd()
     
     // Timbre modulation: bend also affects sharpness
-    private val timbreModGain = audioEngine.createMultiply()
+    private val timbreModGain = dspFactory.createMultiply()
     
     // Output proxies
-    private val pitchOutputProxy = audioEngine.createPassThrough()
-    private val timbreOutputProxy = audioEngine.createPassThrough()
+    private val pitchOutputProxy = dspFactory.createPassThrough()
+    private val timbreOutputProxy = dspFactory.createPassThrough()
     
     // Peak follower for visual feedback
-    private val bendMonitor = audioEngine.createPeakFollower()
+    private val bendMonitor = dspFactory.createPeakFollower()
     
     // ═══════════════════════════════════════════════════════════
     // TENSION SOUND - very subtle, low-frequency hum while bending
     // ═══════════════════════════════════════════════════════════
-    private val tensionOsc = audioEngine.createSineOscillator()
-    private val tensionEnvelope = audioEngine.createEnvelope()
-    private val tensionVca = audioEngine.createMultiply()
-    private val tensionGain = audioEngine.createMultiply()
+    private val tensionOsc = dspFactory.createSineOscillator()
+    private val tensionEnvelope = dspFactory.createEnvelope()
+    private val tensionVca = dspFactory.createMultiply()
+    private val tensionGain = dspFactory.createMultiply()
     
     // ═══════════════════════════════════════════════════════════
     // SPRING SOUND - wobbling "boing" with multiple bounces
     // Uses an LFO to modulate the spring frequency for wobble effect
     // ═══════════════════════════════════════════════════════════
-    private val springOsc = audioEngine.createSineOscillator()
-    private val springEnvelope = audioEngine.createEnvelope()
-    private val springVca = audioEngine.createMultiply()
-    private val springFreqBase = audioEngine.createMultiplyAdd() // Base freq sweep
+    private val springOsc = dspFactory.createSineOscillator()
+    private val springEnvelope = dspFactory.createEnvelope()
+    private val springVca = dspFactory.createMultiply()
+    private val springFreqBase = dspFactory.createMultiplyAdd() // Base freq sweep
     
     // Wobble LFO - modulates spring frequency for bounce effect
-    private val wobbleLfo = audioEngine.createSineOscillator()
-    private val wobbleDepth = audioEngine.createMultiply()
-    private val wobbleMixer = audioEngine.createAdd() // Combine base freq + wobble
+    private val wobbleLfo = dspFactory.createSineOscillator()
+    private val wobbleDepth = dspFactory.createMultiply()
+    private val wobbleMixer = dspFactory.createAdd() // Combine base freq + wobble
     
-    private val springGain = audioEngine.createMultiply() // Final volume control
+    private val springGain = dspFactory.createMultiply() // Final volume control
     
     // Audio output mixer
-    private val audioMixer = audioEngine.createAdd()
-    private val audioOutputProxy = audioEngine.createPassThrough()
+    private val audioMixer = dspFactory.createAdd()
+    private val audioOutputProxy = dspFactory.createPassThrough()
 
     // State
     private var _bendAmount = 0.0f

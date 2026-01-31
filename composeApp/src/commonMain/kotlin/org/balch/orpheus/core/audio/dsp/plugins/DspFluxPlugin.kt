@@ -7,14 +7,16 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspFluxPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
 
-    val flux = audioEngine.createFluxUnit()
+    val flux = dspFactory.createFluxUnit()
     
     // Internal state tracking
     private var _spread = 0.5f

@@ -83,7 +83,9 @@ class DrumBeatsViewModel @Inject constructor(
     private val globalTempo: GlobalTempo,
 ) : ViewModel(), DrumBeatsFeature {
 
-    private val patternGenerator = DrumBeatsGenerator(synthEngine)
+    private val patternGenerator = DrumBeatsGenerator { type, acc -> 
+        synthEngine.triggerDrum(type, acc)
+    }
     private var clockJob: Job? = null
 
     private val _userIntents = MutableSharedFlow<DrumBeatsIntent>(

@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.ClockUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 
 /**
  * Centralized global tempo management for all time-synced modules.
@@ -26,14 +27,15 @@ import org.balch.orpheus.core.audio.dsp.ClockUnit
  */
 @SingleIn(AppScope::class)
 class GlobalTempo @Inject constructor(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) {
 
     private val _bpm = MutableStateFlow(120.0)
     val bpm: StateFlow<Double> = _bpm.asStateFlow()
 
     // Clock generator for audio-rate timing (24 PPQN standard)
-    private val clockUnit: ClockUnit = audioEngine.createClockUnit().also { clock ->
+    private val clockUnit: ClockUnit = dspFactory.createClockUnit().also { clock ->
         audioEngine.addUnit(clock)
         // Initialize clock frequency based on default BPM (120)
         // 120 BPM = 2 beats/sec, 24 PPQN = 48 Hz

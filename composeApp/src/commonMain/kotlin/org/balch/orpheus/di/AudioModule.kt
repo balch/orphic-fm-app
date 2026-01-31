@@ -2,9 +2,6 @@ package org.balch.orpheus.di
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
-import dev.zacsweers.metro.Provides
-import dev.zacsweers.metro.SingleIn
-import org.balch.orpheus.core.audio.dsp.AudioEngine
 
 /**
  * Provides the AudioEngine and SynthEngine instances for DI.
@@ -15,8 +12,5 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 @ContributesTo(AppScope::class)
 interface AudioModule {
     companion object {
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideAudioEngine(): AudioEngine = AudioEngine()
     }
 }

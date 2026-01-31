@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.GrainsUnit
 
 /**
@@ -15,11 +16,12 @@ import org.balch.orpheus.core.audio.dsp.GrainsUnit
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspGrainsPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
 
     // The core unit
-    private val grains: GrainsUnit = audioEngine.createGrainsUnit()
+    private val grains: GrainsUnit = dspFactory.createGrainsUnit()
 
     override val audioUnits: List<AudioUnit> = listOf(grains)
 

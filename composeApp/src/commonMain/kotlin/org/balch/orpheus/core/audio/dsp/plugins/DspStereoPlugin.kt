@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -23,25 +24,55 @@ import kotlin.math.sin
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspStereoPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
 
+    // Parameters (smooth ramps)
+    private val widthRamp = dspFactory.createLinearRamp()
+    private val panRamp = dspFactory.createLinearRamp()
+    
+    // Core processing
+    private val midSideEncoder = dspFactory.createPassThrough() // Placeholder for MS logic if we had dedicated unit
+    
+    // Left/Right processing
+    private val leftGain = dspFactory.createMultiply()
+    private val rightGain = dspFactory.createMultiply()
+
+    // Pan calculation: 
+    // L = Input * (1 - Pan) * Volume
+    // R = Input * Pan * Volume
+    // For now simple balance:
+    private val panInverter = dspFactory.createMultiplyAdd() // 1 - Pan
+    
+    // Width (Mid/Side w/ decorrelation - simplified as delay offset?)
+    // Using simple Haas effect for width? Or just gain panning?
+    // Let's implement Width as simple channel separation control?
+    // Actually, Stereo Width usually requires M/S processing.
+    // Let's stick to Pan for now to be safe.
+    
+    // Audio Inputs/Outputs
+    // We need 2 inputs and 2 outputs for true stereo.
+    // DspPlugin interface is generic...
+
     // Stereo sum buses
-    private val stereoSumLeft = audioEngine.createPassThrough()
-    private val stereoSumRight = audioEngine.createPassThrough()
+    private val stereoSumLeft = dspFactory.createPassThrough()
+    private val stereoSumRight = dspFactory.createPassThrough()
     
     // Master output
-    private val masterGainLeft = audioEngine.createMultiply()
-    private val masterGainRight = audioEngine.createMultiply()
-    private val masterPanLeft = audioEngine.createMultiply()
-    private val masterPanRight = audioEngine.createMultiply()
+    private val masterGainLeft = dspFactory.createMultiply()
+    private val masterGainRight = dspFactory.createMultiply()
+    private val masterPanLeft = dspFactory.createMultiply()
+    private val masterPanRight = dspFactory.createMultiply()
     
     // Per-voice panning (12 voices)
-    private val voicePanLeft = List(12) { audioEngine.createMultiply() }
-    private val voicePanRight = List(12) { audioEngine.createMultiply() }
+    private val voicePanLeft = List(12) { dspFactory.createMultiply() }
+    private val voicePanRight = List(12) { dspFactory.createMultiply() }
     
     // Peak monitoring
-    private val peakFollower = audioEngine.createPeakFollower()
+    private val peakFollower = dspFactory.createPeakFollower()
+    private val peakFollowerL = dspFactory.createPeakFollower()
+    private val peakFollowerR = dspFactory.createPeakFollower()
 
     // State caches
     private val _voicePan = FloatArray(12) { 0f }

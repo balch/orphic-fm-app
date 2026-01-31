@@ -8,67 +8,68 @@ import kotlin.math.pow
  */
 class DspVoice(
     private val audioEngine: AudioEngine,
+    private val factory: DspFactory,
     private val pitchMultiplier: Double = 1.0 // 0.5=bass, 1.0=mid, 2.0=high
 ) {
     // Dual Oscillators for waveform morphing
-    private val triangleOsc = audioEngine.createTriangleOscillator()
-    private val squareOsc = audioEngine.createSquareOscillator()
+    private val triangleOsc = factory.createTriangleOscillator()
+    private val squareOsc = factory.createSquareOscillator()
 
     // Waveform Crossfade: (triangle * (1-sharp)) + (square * sharp)
-    private val sharpnessProxy = audioEngine.createPassThrough()
-    private val triangleGain = audioEngine.createMultiply() // Triangle * (1 - sharpness)
-    private val squareGain = audioEngine.createMultiply()   // Square * sharpness
-    private val oscMixer = audioEngine.createAdd()          // Sum both
+    private val sharpnessProxy = factory.createPassThrough()
+    private val triangleGain = factory.createMultiply() // Triangle * (1 - sharpness)
+    private val squareGain = factory.createMultiply()   // Square * sharpness
+    private val oscMixer = factory.createAdd()          // Sum both
 
     // Sharpness inversion: 1 - sharpness
-    private val sharpnessInverter = audioEngine.createMultiplyAdd() // (-1 * sharpness) + 1
+    private val sharpnessInverter = factory.createMultiplyAdd() // (-1 * sharpness) + 1
 
     // Envelope for gating
-    private val ampEnv = audioEngine.createEnvelope()
+    private val ampEnv = factory.createEnvelope()
 
     // VCA: Multiply mixed oscillator by envelope
-    private val vca = audioEngine.createMultiply()
+    private val vca = factory.createMultiply()
     
     // Wobble: Real-time volume modulation from finger movement
-    private val wobbleRamp = audioEngine.createLinearRamp()  // Smooth parameter changes
-    private val wobbleGain = audioEngine.createMultiply()
+    private val wobbleRamp = factory.createLinearRamp()  // Smooth parameter changes
+    private val wobbleGain = factory.createMultiply()
     
     // Volume: Programmable volume control (per-voice or quad-level)
-    private val volumeRamp = audioEngine.createLinearRamp()  // Smooth volume changes
-    private val volumeGain = audioEngine.createMultiply()
+    private val volumeRamp = factory.createLinearRamp()  // Smooth volume changes
+    private val volumeGain = factory.createMultiply()
 
     // Envelope Follower for voice coupling
-    private val envelopeFollower = audioEngine.createPeakFollower()
+    private val envelopeFollower = factory.createPeakFollower()
 
     // Coupling: Partner voice envelope modulates our frequency
-    private val couplingScaler = audioEngine.createMultiply() // PartnerEnvelope * CouplingDepth
+    private val couplingScaler = factory.createMultiply() // PartnerEnvelope * CouplingDepth
     private val couplingMixer =
-        audioEngine.createAdd()       // Add coupling modulation to vibrato chain
+        factory.createAdd()       // Add coupling modulation to vibrato chain
 
     // FM: (ModInput * FmDepth * Scaling) + (BaseFreq * PitchMult) -> Osc.frequency
-    private val fmDepthControl = audioEngine.createMultiply()
-    private val fmFreqMixer = audioEngine.createMultiplyAdd() // (FmSignal * 200Hz) + ActualFreq
-    private val pitchScaler = audioEngine.createMultiply()    // BaseFreq * PitchMultiplier
+    private val fmDepthControl = factory.createMultiply()
+    private val fmFreqMixer = factory.createMultiplyAdd() // (FmSignal * 200Hz) + ActualFreq
+    private val pitchScaler = factory.createMultiply()    // BaseFreq * PitchMultiplier
     
     // CV Pitch: (CvInput * CvDepth) + ScaledFreq
-    private val cvPitchScaler = audioEngine.createMultiply()
-    private val cvPitchMixer = audioEngine.createAdd()
+    private val cvPitchScaler = factory.createMultiply()
+    private val cvPitchMixer = factory.createAdd()
     
     // Direct frequency: Bypasses pitchScaler for note automation (Hz value goes straight through)
-    private val directFreqMixer = audioEngine.createAdd()     // Adds direct freq to scaled freq
+    private val directFreqMixer = factory.createAdd()     // Adds direct freq to scaled freq
 
     // Vibrato: LFO input scaled and added to frequency
-    private val vibratoScaler = audioEngine.createMultiply() // LFO * depth
-    private val vibratoMixer = audioEngine.createAdd()       // Base freq + vibrato
+    private val vibratoScaler = factory.createMultiply() // LFO * depth
+    private val vibratoMixer = factory.createAdd()       // Base freq + vibrato
 
     // Bender: Pitch bend input scaled and added to frequency
-    private val benderScaler = audioEngine.createMultiply()  // Bend signal * depth
-    private val benderMixer = audioEngine.createAdd()        // Vibrato freq + bend
+    private val benderScaler = factory.createMultiply()  // Bend signal * depth
+    private val benderMixer = factory.createAdd()        // Vibrato freq + bend
 
     // VCA control (envelope + hold)
-    private val holdRamp = audioEngine.createLinearRamp()  // Smooth hold changes
-    private val vcaControlMixer = audioEngine.createAdd()
-
+    private val holdRamp = factory.createLinearRamp()  // Smooth hold changes
+    private val vcaControlMixer = factory.createAdd()
+    
     // State for Hold-Envelope interaction
     private var currentEnvelopeSpeed = 0.5f
     private var isTriggerMode = false

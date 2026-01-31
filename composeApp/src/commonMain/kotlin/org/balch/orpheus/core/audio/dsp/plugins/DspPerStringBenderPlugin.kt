@@ -10,6 +10,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlin.time.Clock
@@ -38,7 +39,8 @@ import kotlin.time.ExperimentalTime
 @ContributesIntoSet(AppScope::class)
 class DspPerStringBenderPlugin(
     private val audioEngine: AudioEngine,
-    private val resonatorPlugin: DspResonatorPlugin
+    private val resonatorPlugin: DspResonatorPlugin,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
 
     companion object {
@@ -61,78 +63,78 @@ class DspPerStringBenderPlugin(
     private val stringStates = Array(NUM_STRINGS) { StringBenderState() }
 
     // Per-voice pitch bend outputs (connect to voice frequency modulation)
-    private val voiceBendOutputs = Array(8) { audioEngine.createPassThrough() }
+    private val voiceBendOutputs = Array(8) { dspFactory.createPassThrough() }
     
     // Per-voice volume mix outputs (connect to voice VCA)
-    private val voiceMixOutputs = Array(8) { audioEngine.createPassThrough() }
+    private val voiceMixOutputs = Array(8) { dspFactory.createPassThrough() }
     
     // Per-string spring monitors for UI feedback
-    private val stringBendMonitors = Array(NUM_STRINGS) { audioEngine.createPeakFollower() }
+    private val stringBendMonitors = Array(NUM_STRINGS) { dspFactory.createPeakFollower() }
     
     // ═══════════════════════════════════════════════════════════
     // TENSION SOUND - Very subtle, matching DspBenderPlugin
     // ═══════════════════════════════════════════════════════════
-    private val tensionOscillators = Array(NUM_STRINGS) { audioEngine.createSineOscillator() }
-    private val tensionEnvelopes = Array(NUM_STRINGS) { audioEngine.createEnvelope() }
-    private val tensionVcas = Array(NUM_STRINGS) { audioEngine.createMultiply() }
-    private val tensionRamps = Array(NUM_STRINGS) { audioEngine.createLinearRamp() }  // Smooth level changes
-    private val tensionGains = Array(NUM_STRINGS) { audioEngine.createMultiply() }
+    private val tensionOscillators = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }
+    private val tensionEnvelopes = Array(NUM_STRINGS) { dspFactory.createEnvelope() }
+    private val tensionVcas = Array(NUM_STRINGS) { dspFactory.createMultiply() }
+    private val tensionRamps = Array(NUM_STRINGS) { dspFactory.createLinearRamp() }  // Smooth level changes
+    private val tensionGains = Array(NUM_STRINGS) { dspFactory.createMultiply() }
     
     // ═══════════════════════════════════════════════════════════
     // SPRING SOUND - Matching DspBenderPlugin's wobble effect
     // ═══════════════════════════════════════════════════════════
-    private val springOscillators = Array(NUM_STRINGS) { audioEngine.createSineOscillator() }
-    private val springEnvelopes = Array(NUM_STRINGS) { audioEngine.createEnvelope() }
-    private val springVcas = Array(NUM_STRINGS) { audioEngine.createMultiply() }
-    private val springFreqBases = Array(NUM_STRINGS) { audioEngine.createMultiplyAdd() }
+    private val springOscillators = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }
+    private val springEnvelopes = Array(NUM_STRINGS) { dspFactory.createEnvelope() }
+    private val springVcas = Array(NUM_STRINGS) { dspFactory.createMultiply() }
+    private val springFreqBases = Array(NUM_STRINGS) { dspFactory.createMultiplyAdd() }
     
-    private val wobbleLfos = Array(NUM_STRINGS) { audioEngine.createSineOscillator() }
-    private val wobbleDepths = Array(NUM_STRINGS) { audioEngine.createMultiply() }
-    private val wobbleMixers = Array(NUM_STRINGS) { audioEngine.createAdd() }
-    private val springGains = Array(NUM_STRINGS) { audioEngine.createMultiply() }
+    private val wobbleLfos = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }
+    private val wobbleDepths = Array(NUM_STRINGS) { dspFactory.createMultiply() }
+    private val wobbleMixers = Array(NUM_STRINGS) { dspFactory.createAdd() }
+    private val springGains = Array(NUM_STRINGS) { dspFactory.createMultiply() }
     
     // ═══════════════════════════════════════════════════════════
     // PLUCK SOUND - Percussive ping on quick release
     // Pitch based on string index and release velocity
     // ═══════════════════════════════════════════════════════════
-    private val pluckOscillators = Array(NUM_STRINGS) { audioEngine.createSineOscillator() }
-    private val pluckEnvelopes = Array(NUM_STRINGS) { audioEngine.createEnvelope() }
-    private val pluckVcas = Array(NUM_STRINGS) { audioEngine.createMultiply() }
-    private val pluckGains = Array(NUM_STRINGS) { audioEngine.createMultiply() }
+    private val pluckOscillators = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }
+    private val pluckEnvelopes = Array(NUM_STRINGS) { dspFactory.createEnvelope() }
+    private val pluckVcas = Array(NUM_STRINGS) { dspFactory.createMultiply() }
+    private val pluckGains = Array(NUM_STRINGS) { dspFactory.createMultiply() }
     
     // ═══════════════════════════════════════════════════════════
     // SLIDE SOUND - Textured sound when sliding vertically
     // Fast-modulated oscillator creates "scratchy" texture
     // ═══════════════════════════════════════════════════════════
-    private val slideOscillators = Array(NUM_STRINGS) { audioEngine.createSquareOscillator() }
-    private val slideLfos = Array(NUM_STRINGS) { audioEngine.createSineOscillator() }  // Rapid modulation
-    private val slideFreqMixers = Array(NUM_STRINGS) { audioEngine.createAdd() }
-    private val slideRamps = Array(NUM_STRINGS) { audioEngine.createLinearRamp() }
-    private val slideGains = Array(NUM_STRINGS) { audioEngine.createMultiply() }
+    private val slideOscillators = Array(NUM_STRINGS) { dspFactory.createSquareOscillator() }
+    private val slideLfos = Array(NUM_STRINGS) { dspFactory.createSineOscillator() }  // Rapid modulation
+    private val slideFreqMixers = Array(NUM_STRINGS) { dspFactory.createAdd() }
+    private val slideRamps = Array(NUM_STRINGS) { dspFactory.createLinearRamp() }
+    private val slideGains = Array(NUM_STRINGS) { dspFactory.createMultiply() }
     
     // Additional mixers for all sound sources
-    private val pluckMixerA = audioEngine.createAdd()
-    private val pluckMixerB = audioEngine.createAdd()
-    private val pluckMixerFinal = audioEngine.createAdd()
+    private val pluckMixerA = dspFactory.createAdd()
+    private val pluckMixerB = dspFactory.createAdd()
+    private val pluckMixerFinal = dspFactory.createAdd()
     
-    private val slideMixerA = audioEngine.createAdd()
-    private val slideMixerB = audioEngine.createAdd()
-    private val slideMixerFinal = audioEngine.createAdd()
+    private val slideMixerA = dspFactory.createAdd()
+    private val slideMixerB = dspFactory.createAdd()
+    private val slideMixerFinal = dspFactory.createAdd()
     
     // Audio mixers - combine all sources
-    private val tensionMixerA = audioEngine.createAdd()
-    private val tensionMixerB = audioEngine.createAdd()
-    private val tensionMixerFinal = audioEngine.createAdd()
+    private val tensionMixerA = dspFactory.createAdd()
+    private val tensionMixerB = dspFactory.createAdd()
+    private val tensionMixerFinal = dspFactory.createAdd()
     
-    private val springMixerA = audioEngine.createAdd()
-    private val springMixerB = audioEngine.createAdd()
-    private val springMixerFinal = audioEngine.createAdd()
+    private val springMixerA = dspFactory.createAdd()
+    private val springMixerB = dspFactory.createAdd()
+    private val springMixerFinal = dspFactory.createAdd()
     
     // Final mix stages
-    private val effectsMixerA = audioEngine.createAdd()  // tension + spring
-    private val effectsMixerB = audioEngine.createAdd()  // pluck + slide
-    private val audioMixer = audioEngine.createAdd()     // all effects
-    private val audioOutputProxy = audioEngine.createPassThrough()
+    private val effectsMixerA = dspFactory.createAdd()  // tension + spring
+    private val effectsMixerB = dspFactory.createAdd()  // pluck + slide
+    private val audioMixer = dspFactory.createAdd()     // all effects
+    private val audioOutputProxy = dspFactory.createPassThrough()
     
     // State for gesture tracking
     private data class GestureState(

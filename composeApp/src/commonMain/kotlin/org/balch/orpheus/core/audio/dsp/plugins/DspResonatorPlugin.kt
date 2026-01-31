@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 
 /**
  * DSP Plugin for Rings-style resonator (modal synthesis and string).
@@ -22,41 +23,42 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspResonatorPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
     
     // Core resonator unit
-    private val resonator = audioEngine.createResonatorUnit()
+    private val resonator = dspFactory.createResonatorUnit()
     
     // Excitation gains (what goes TO the resonator, controlled by fader)
-    private val drumExciteGainL = audioEngine.createMultiply()
-    private val drumExciteGainR = audioEngine.createMultiply()
-    private val synthExciteGainL = audioEngine.createMultiply()
-    private val synthExciteGainR = audioEngine.createMultiply()
+    private val drumExciteGainL = dspFactory.createMultiply()
+    private val drumExciteGainR = dspFactory.createMultiply()
+    private val synthExciteGainL = dspFactory.createMultiply()
+    private val synthExciteGainR = dspFactory.createMultiply()
     
     // Dry bypass gains (what SKIPS the resonator, inverse of excitation)
-    private val drumBypassGainL = audioEngine.createMultiply()
-    private val drumBypassGainR = audioEngine.createMultiply()
-    private val synthBypassGainL = audioEngine.createMultiply()
-    private val synthBypassGainR = audioEngine.createMultiply()
+    private val drumBypassGainL = dspFactory.createMultiply()
+    private val drumBypassGainR = dspFactory.createMultiply()
+    private val synthBypassGainL = dspFactory.createMultiply()
+    private val synthBypassGainR = dspFactory.createMultiply()
     
     // Summing units
-    private val excitationSumL = audioEngine.createAdd()
-    private val excitationSumR = audioEngine.createAdd()
-    private val bypassSumL = audioEngine.createAdd()
-    private val bypassSumR = audioEngine.createAdd()
+    private val excitationSumL = dspFactory.createAdd()
+    private val excitationSumR = dspFactory.createAdd()
+    private val bypassSumL = dspFactory.createAdd()
+    private val bypassSumR = dspFactory.createAdd()
     
     // Wet/Dry mix for resonator output
-    private val wetGainL = audioEngine.createMultiply()
-    private val wetGainR = audioEngine.createMultiply()
-    private val dryGainL = audioEngine.createMultiply()
-    private val dryGainR = audioEngine.createMultiply()
+    private val wetGainL = dspFactory.createMultiply()
+    private val wetGainR = dspFactory.createMultiply()
+    private val dryGainL = dspFactory.createMultiply()
+    private val dryGainR = dspFactory.createMultiply()
     
     // Mix resonated (wet+dry) with bypass
-    private val resoMixL = audioEngine.createAdd()
-    private val resoMixR = audioEngine.createAdd()
-    private val finalSumL = audioEngine.createAdd()
-    private val finalSumR = audioEngine.createAdd()
+    private val resoMixL = dspFactory.createAdd()
+    private val resoMixR = dspFactory.createAdd()
+    private val finalSumL = dspFactory.createAdd()
+    private val finalSumR = dspFactory.createAdd()
     
     // State
     private var _mode = 0

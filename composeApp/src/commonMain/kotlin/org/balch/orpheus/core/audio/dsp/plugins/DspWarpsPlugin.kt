@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.synth.warps.WarpsSource
 
 /**
@@ -18,25 +19,27 @@ import org.balch.orpheus.core.audio.dsp.synth.warps.WarpsSource
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspWarpsPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
-    private val warps = audioEngine.createWarpsUnit()
+
+    private val warps = dspFactory.createWarpsUnit()
     
     // Source routing pass-throughs for dynamic connection
-    private val carrierInput = audioEngine.createPassThrough()
-    private val modulatorInput = audioEngine.createPassThrough()
+    private val carrierInput = dspFactory.createPassThrough()
+    private val modulatorInput = dspFactory.createPassThrough()
     
     // Dry/Wet Mix routing
-    private val dryGainLeft = audioEngine.createMultiply()
-    private val dryGainRight = audioEngine.createMultiply()
-    private val wetGainLeft = audioEngine.createMultiply()
-    private val wetGainRight = audioEngine.createMultiply()
-    private val mixSumLeft = audioEngine.createPassThrough()
-    private val mixSumRight = audioEngine.createPassThrough()
+    private val dryGainLeft = dspFactory.createMultiply()
+    private val dryGainRight = dspFactory.createMultiply()
+    private val wetGainLeft = dspFactory.createMultiply()
+    private val wetGainRight = dspFactory.createMultiply()
+    private val mixSumLeft = dspFactory.createPassThrough()
+    private val mixSumRight = dspFactory.createPassThrough()
     
     // Dry signal pass-throughs (receives the carrier/modulator sum for dry path)
-    private val dryPassLeft = audioEngine.createPassThrough()
-    private val dryPassRight = audioEngine.createPassThrough()
+    private val dryPassLeft = dspFactory.createPassThrough()
+    private val dryPassRight = dspFactory.createPassThrough()
     
     // State tracking
     private var _carrierSource = WarpsSource.SYNTH.ordinal

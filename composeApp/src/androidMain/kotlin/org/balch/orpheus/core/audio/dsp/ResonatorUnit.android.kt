@@ -7,24 +7,7 @@ import org.balch.orpheus.core.audio.dsp.synth.ModalResonator
 import org.balch.orpheus.core.audio.dsp.synth.ResonatorString
 import org.balch.orpheus.core.audio.dsp.synth.SynthDsp
 
-/**
- * Android Implementation of ResonatorUnit using JSyn.
- * 
- * Wraps the ported Rings DSP classes (ModalResonator and ResonatorString)
- * in a JSyn UnitGenerator for audio engine integration.
- */
-actual interface ResonatorUnit : AudioUnit {
-    actual val input: AudioInput
-    actual val auxOutput: AudioOutput
-    
-    actual fun setEnabled(enabled: Boolean)
-    actual fun setMode(mode: Int)
-    actual fun setStructure(value: Float)
-    actual fun setBrightness(value: Float)
-    actual fun setDamping(value: Float)
-    actual fun setPosition(value: Float)
-    actual fun strum(frequency: Float)
-}
+
 
 class JsynResonatorUnit : UnitGenerator(), ResonatorUnit {
     

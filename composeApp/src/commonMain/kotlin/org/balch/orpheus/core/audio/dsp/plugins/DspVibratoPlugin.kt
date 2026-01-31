@@ -6,6 +6,7 @@ import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 
 /**
  * DSP Plugin for global vibrato (pitch wobble).
@@ -16,34 +17,35 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspVibratoPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ) : DspPlugin {
 
-    private val vibratoLfo = audioEngine.createSineOscillator()
-    private val vibratoDepthGain = audioEngine.createMultiply()
+    private val lfo = dspFactory.createSineOscillator()
+    private val depthGain = dspFactory.createMultiply()
 
     private var _vibrato = 0.0f
 
     override val audioUnits: List<AudioUnit> = listOf(
-        vibratoLfo, vibratoDepthGain
+        lfo, depthGain
     )
 
     override val outputs: Map<String, AudioOutput>
         get() = mapOf(
-            "output" to vibratoDepthGain.output
+            "output" to depthGain.output
         )
 
     override fun initialize() {
-        vibratoLfo.frequency.set(5.0)  // 5Hz wobble rate
-        vibratoLfo.amplitude.set(1.0)
-        vibratoLfo.output.connect(vibratoDepthGain.inputA)
-        vibratoDepthGain.inputB.set(0.0)  // Default: no vibrato
+        lfo.frequency.set(5.0)  // 5Hz wobble rate
+        lfo.amplitude.set(1.0)
+        lfo.output.connect(depthGain.inputA)
+        depthGain.inputB.set(0.0)  // Default: no vibrato
     }
 
     fun setDepth(amount: Float) {
         _vibrato = amount
         val depthHz = amount * 20.0
-        vibratoDepthGain.inputB.set(depthHz)
+        depthGain.inputB.set(depthHz)
     }
 
     // Getter for state saving

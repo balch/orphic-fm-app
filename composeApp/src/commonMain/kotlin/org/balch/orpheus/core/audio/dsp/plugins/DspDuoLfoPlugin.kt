@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 
 /**
  * Shared DuoLFO implementation using DSP primitive interfaces.
@@ -26,19 +27,20 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspDuoLfoPlugin(
-    private val audioEngine: AudioEngine
+    private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory
 ): DspPlugin {
     // Interface Units (Proxies)
-    private val inputA = audioEngine.createPassThrough()
-    private val inputB = audioEngine.createPassThrough()
-    private val outputProxy = audioEngine.createPassThrough()
-    private val outputAProxy = audioEngine.createPassThrough()
-    private val outputBProxy = audioEngine.createPassThrough()
+    private val inputA = dspFactory.createPassThrough()
+    private val inputB = dspFactory.createPassThrough()
+    private val outputProxy = dspFactory.createPassThrough()
+    private val outputAProxy = dspFactory.createPassThrough()
+    private val outputBProxy = dspFactory.createPassThrough()
 
     // Feedback Modulation
-    private val feedbackProxy = audioEngine.createPassThrough()
-    private val freqAModMixer = audioEngine.createAdd() // BaseFreqA + Feedback
-    private val freqBModMixer = audioEngine.createAdd() // BaseFreqB + Feedback
+    private val feedbackProxy = dspFactory.createPassThrough()
+    private val freqAModMixer = dspFactory.createAdd() // BaseFreqA + Feedback
+    private val freqBModMixer = dspFactory.createAdd() // BaseFreqB + Feedback
 
     // Public Ports (for external connection)
     val frequencyA: AudioInput get() = inputA.input
@@ -49,37 +51,37 @@ class DspDuoLfoPlugin(
     val outputB: AudioOutput get() = outputBProxy.output
 
     // Internal Components - Square
-    private val lfoASquare = audioEngine.createSquareOscillator()
-    private val lfoBSquare = audioEngine.createSquareOscillator()
+    private val lfoASquare = dspFactory.createSquareOscillator()
+    private val lfoBSquare = dspFactory.createSquareOscillator()
 
     // Internal Components - Triangle
-    private val lfoATriangle = audioEngine.createTriangleOscillator()
-    private val lfoBTriangle = audioEngine.createTriangleOscillator()
+    private val lfoATriangle = dspFactory.createTriangleOscillator()
+    private val lfoBTriangle = dspFactory.createTriangleOscillator()
 
     // Bipolar to Unipolar converters: u = x * 0.5 + 0.5
-    private val toUnipolarA = audioEngine.createMultiplyAdd()
-    private val toUnipolarB = audioEngine.createMultiplyAdd()
+    private val toUnipolarA = dspFactory.createMultiplyAdd()
+    private val toUnipolarB = dspFactory.createMultiplyAdd()
 
     // Logic units (operate on unipolar 0-1 signals)
-    private val logicAnd = audioEngine.createMultiply() // Ua * Ub
+    private val logicAnd = dspFactory.createMultiply() // Ua * Ub
 
     // OR logic: Ua + Ub - Ua*Ub
-    private val orProduct = audioEngine.createMultiply()  // Ua * Ub
-    private val orSum = audioEngine.createAdd()           // Ua + Ub
+    private val orProduct = dspFactory.createMultiply()  // Ua * Ub
+    private val orSum = dspFactory.createAdd()           // Ua + Ub
     private val orResult =
-        audioEngine.createMultiplyAdd() // orSum + (-1 * orProduct) = Ua + Ub - Ua*Ub
+        dspFactory.createMultiplyAdd() // orSum + (-1 * orProduct) = Ua + Ub - Ua*Ub
 
     // Unipolar to Bipolar converter: x = u * 2 - 1
-    private val toBipolarAnd = audioEngine.createMultiplyAdd()
-    private val toBipolarOr = audioEngine.createMultiplyAdd()
+    private val toBipolarAnd = dspFactory.createMultiplyAdd()
+    private val toBipolarOr = dspFactory.createMultiplyAdd()
 
     // Triangle AND/OR using Min/Max
-    private val triangleMin = audioEngine.createMinimum() // AND = MIN(A, B)
-    private val triangleMax = audioEngine.createMaximum() // OR = MAX(A, B)
-    private val fmGain = audioEngine.createMultiply()
+    private val triangleMin = dspFactory.createMinimum() // AND = MIN(A, B)
+    private val triangleMax = dspFactory.createMaximum() // OR = MAX(A, B)
+    private val fmGain = dspFactory.createMultiply()
 
     // LFO Output Monitoring for visualization
-    private val lfoMonitor = audioEngine.createPeakFollower()
+    private val lfoMonitor = dspFactory.createPeakFollower()
 
     // Internal State
     private var isAndMode = true

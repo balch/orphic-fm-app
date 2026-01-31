@@ -9,22 +9,7 @@ import org.balch.orpheus.core.audio.dsp.synth.grains.GranularProcessor
 /**
  * Android Implementation of GrainsUnit using JSyn.
  */
-actual interface GrainsUnit : AudioUnit {
-    actual val inputLeft: AudioInput
-    actual val inputRight: AudioInput
-    actual val outputRight: AudioOutput
-    
-    actual val position: AudioInput
-    actual val size: AudioInput
-    actual val pitch: AudioInput
-    actual val density: AudioInput
-    actual val texture: AudioInput
-    actual val dryWet: AudioInput
-    actual val freeze: AudioInput
-    actual val trigger: AudioInput
-    
-    actual fun setMode(mode: Int)
-}
+
 
 class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
     

@@ -5,19 +5,7 @@ import com.jsyn.ports.UnitOutputPort
 import com.jsyn.unitgen.UnitGenerator
 import org.balch.orpheus.core.audio.dsp.synth.warps.WarpsProcessor
 
-/**
- * Android Implementation of WarpsUnit using JSyn.
- */
-actual interface WarpsUnit : AudioUnit {
-    actual val inputLeft: AudioInput
-    actual val inputRight: AudioInput
-    actual val outputRight: AudioOutput
-    
-    actual val algorithm: AudioInput
-    actual val timbre: AudioInput
-    actual val level1: AudioInput
-    actual val level2: AudioInput
-}
+
 
 class JsynWarpsUnit : UnitGenerator(), WarpsUnit {
     

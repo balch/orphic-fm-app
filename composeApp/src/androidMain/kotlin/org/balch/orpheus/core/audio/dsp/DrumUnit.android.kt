@@ -17,39 +17,27 @@ import kotlin.math.tanh
  * Fixed to render ALL drums simultaneously (not just the last triggered type).
  * This prevents clicks when rapidly triggering different drums.
  */
-actual interface DrumUnit : AudioUnit {
-    actual fun trigger(
-        type: Int,
-        accent: Float,
-        frequency: Float,
-        tone: Float,
-        decay: Float,
-        param4: Float,
-        param5: Float
-    )
-    
-    actual fun setParameters(
-        type: Int,
-        frequency: Float,
-        tone: Float,
-        decay: Float,
-        param4: Float,
-        param5: Float
-    )
 
-    actual fun trigger(type: Int, accent: Float)
-}
 
 class JsynDrumUnit : UnitGenerator(), DrumUnit {
     private val bd = AnalogBassDrum()
     private val sd = AnalogSnareDrum()
     private val hh = MetallicHiHat()
     private val fm = FmDrum(SynthDsp.SAMPLE_RATE)
+
+    // JSyn input ports for triggers
+    private val jsynTriggerBd = com.jsyn.ports.UnitInputPort("TriggerBD")
+    private val jsynTriggerSd = com.jsyn.ports.UnitInputPort("TriggerSD")
+    private val jsynTriggerHh = com.jsyn.ports.UnitInputPort("TriggerHH")
     
     // JSyn output port
     private val jsynOutput = UnitOutputPort("Output")
     
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
+    
+    override val triggerInputBd: AudioInput = JsynAudioInput(jsynTriggerBd)
+    override val triggerInputSd: AudioInput = JsynAudioInput(jsynTriggerSd)
+    override val triggerInputHh: AudioInput = JsynAudioInput(jsynTriggerHh)
 
     // Mode: 0 = 808, 1 = FM
     private var drumMode = 0
@@ -60,6 +48,11 @@ class JsynDrumUnit : UnitGenerator(), DrumUnit {
     private var sdTrigger = false
     private var hhTrigger = false
     private var fmTrigger = false
+    
+    // Edge detection state
+    private var lastBdTrigState = false
+    private var lastSdTrigState = false
+    private var lastHhTrigState = false
     
     // Per-drum parameters (stored on trigger, used until next trigger)
     // Bass Drum
@@ -92,6 +85,9 @@ class JsynDrumUnit : UnitGenerator(), DrumUnit {
         
         // Add JSyn output port
         addPort(jsynOutput)
+        addPort(jsynTriggerBd)
+        addPort(jsynTriggerSd)
+        addPort(jsynTriggerHh)
     }
 
     override fun trigger(
@@ -167,12 +163,28 @@ class JsynDrumUnit : UnitGenerator(), DrumUnit {
 
     override fun generate(start: Int, end: Int) {
         val outputs = jsynOutput.values
+        val bdInputs = jsynTriggerBd.values
+        val sdInputs = jsynTriggerSd.values
+        val hhInputs = jsynTriggerHh.values
         
         for (i in start until end) {
-            // Process trigger flags only on first sample of buffer
-            val bdTrig = if (i == start && bdTrigger) { bdTrigger = false; true } else false
-            val sdTrig = if (i == start && sdTrigger) { sdTrigger = false; true } else false
-            val hhTrig = if (i == start && hhTrigger) { hhTrigger = false; true } else false
+            // Check Input Port Triggers (Edge Detection)
+            val bdVal = bdInputs[i]
+            val bdEdge = (bdVal > 0.5) && !lastBdTrigState
+            lastBdTrigState = bdVal > 0.5
+            
+            val sdVal = sdInputs[i]
+            val sdEdge = (sdVal > 0.5) && !lastSdTrigState
+            lastSdTrigState = sdVal > 0.5
+            
+            val hhVal = hhInputs[i]
+            val hhEdge = (hhVal > 0.5) && !lastHhTrigState
+            lastHhTrigState = hhVal > 0.5
+
+            // Process trigger flags (manual or signal)
+            val bdTrig = bdEdge || (if (i == start && bdTrigger) { bdTrigger = false; true } else false)
+            val sdTrig = sdEdge || (if (i == start && sdTrigger) { sdTrigger = false; true } else false)
+            val hhTrig = hhEdge || (if (i == start && hhTrigger) { hhTrigger = false; true } else false)
             val fmTrig = if (i == start && fmTrigger) { fmTrigger = false; true } else false
             
             // Process ALL drums every sample (they naturally decay to 0 when not triggered)

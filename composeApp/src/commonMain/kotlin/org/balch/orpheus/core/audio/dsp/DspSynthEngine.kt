@@ -32,6 +32,7 @@ import kotlin.math.pow
 @ContributesBinding(AppScope::class)
 class DspSynthEngine(
     private val audioEngine: AudioEngine,
+    private val dspFactory: DspFactory,
     private val pluginProvider: DspPluginProvider,
     private val dispatcherProvider: DispatcherProvider,
     private val globalTempo: GlobalTempo,
@@ -41,52 +42,52 @@ class DspSynthEngine(
 
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     private val voices = listOf(
-        DspVoice(audioEngine, pitchMultiplier = 0.5),
-        DspVoice(audioEngine, pitchMultiplier = 0.5),
-        DspVoice(audioEngine, pitchMultiplier = 1.0),
-        DspVoice(audioEngine, pitchMultiplier = 1.0),
-        DspVoice(audioEngine, pitchMultiplier = 1.0),
-        DspVoice(audioEngine, pitchMultiplier = 1.0),
-        DspVoice(audioEngine, pitchMultiplier = 2.0),
-        DspVoice(audioEngine, pitchMultiplier = 2.0),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 0.5),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 0.5),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 2.0),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 2.0),
         // REPL Voices (Quad 3)
-        DspVoice(audioEngine, pitchMultiplier = 1.0),
-        DspVoice(audioEngine, pitchMultiplier = 1.0),
-        DspVoice(audioEngine, pitchMultiplier = 1.0),
-        DspVoice(audioEngine, pitchMultiplier = 1.0)
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 1.0),
+        DspVoice(audioEngine, dspFactory, pitchMultiplier = 1.0)
     )
 
     // TOTAL FB: Output → LFO Frequency Modulation
-    private val totalFbGain = audioEngine.createMultiply()
+    private val totalFbGain = dspFactory.createMultiply()
     
     // Voice sum buses (for feeding into Grains before resonator)
-    private val voiceSumLeft = audioEngine.createPassThrough()
-    private val voiceSumRight = audioEngine.createPassThrough()
+    private val voiceSumLeft = dspFactory.createPassThrough()
+    private val voiceSumRight = dspFactory.createPassThrough()
     
     // REPL Sum buses (Voices 8-11)
-    private val replSumLeft = audioEngine.createPassThrough()
-    private val replSumRight = audioEngine.createPassThrough()
+    private val replSumLeft = dspFactory.createPassThrough()
+    private val replSumRight = dspFactory.createPassThrough()
 
     // Drum routing gains
-    private val drumChainGainL = audioEngine.createMultiply()
-    private val drumChainGainR = audioEngine.createMultiply()
-    private val drumDirectGainL = audioEngine.createMultiply()
-    private val drumDirectGainR = audioEngine.createMultiply()
+    private val drumChainGainL = dspFactory.createMultiply()
+    private val drumChainGainR = dspFactory.createMultiply()
+    private val drumDirectGainL = dspFactory.createMultiply()
+    private val drumDirectGainR = dspFactory.createMultiply()
 
     // Drum Direct Distortion (Parallel Limiter)
-    private val drumDirectLimiterL = audioEngine.createLimiter()
-    private val drumDirectLimiterR = audioEngine.createLimiter()
+    private val drumDirectLimiterL = dspFactory.createLimiter()
+    private val drumDirectLimiterR = dspFactory.createLimiter()
     private var _drumsBypass = true
 
 
     // Drum Direct Resonator (Parallel)
-    private val drumDirectResonator = audioEngine.createResonatorUnit()
-    private val drumDirectResoWetGainL = audioEngine.createMultiply()
-    private val drumDirectResoWetGainR = audioEngine.createMultiply()
-    private val drumDirectResoDryGainL = audioEngine.createMultiply()
-    private val drumDirectResoDryGainR = audioEngine.createMultiply()
-    private val drumDirectResoSumL = audioEngine.createAdd()
-    private val drumDirectResoSumR = audioEngine.createAdd()
+    private val drumDirectResonator = dspFactory.createResonatorUnit()
+    private val drumDirectResoWetGainL = dspFactory.createMultiply()
+    private val drumDirectResoWetGainR = dspFactory.createMultiply()
+    private val drumDirectResoDryGainL = dspFactory.createMultiply()
+    private val drumDirectResoDryGainR = dspFactory.createMultiply()
+    private val drumDirectResoSumL = dspFactory.createAdd()
+    private val drumDirectResoSumR = dspFactory.createAdd()
 
     // State caches
     private val quadPitchOffsets = DoubleArray(3) { 0.5 }
@@ -426,8 +427,8 @@ class DspSynthEngine(
             offset: Double,
             restoreManualValue: () -> Unit
         ) {
-            val player = audioEngine.createAutomationPlayer()
-            val scaler = audioEngine.createMultiplyAdd()
+            val player = dspFactory.createAutomationPlayer()
+            val scaler = dspFactory.createMultiplyAdd()
             scaler.inputB.set(scale)
             scaler.inputC.set(offset)
             player.output.connect(scaler.inputA)
@@ -463,9 +464,9 @@ class DspSynthEngine(
 
         // Delay Mix - complex with wet and dry scalers
         run {
-            val player = audioEngine.createAutomationPlayer()
-            val wetScaler = audioEngine.createMultiplyAdd()
-            val dryScaler = audioEngine.createMultiplyAdd()
+            val player = dspFactory.createAutomationPlayer()
+            val wetScaler = dspFactory.createMultiplyAdd()
+            val dryScaler = dspFactory.createMultiplyAdd()
             
             wetScaler.inputB.set(1.0)
             wetScaler.inputC.set(0.0)
@@ -491,9 +492,9 @@ class DspSynthEngine(
 
         // Distortion Mix
         run {
-            val player = audioEngine.createAutomationPlayer()
-            val distScaler = audioEngine.createMultiplyAdd()
-            val cleanScaler = audioEngine.createMultiplyAdd()
+            val player = dspFactory.createAutomationPlayer()
+            val distScaler = dspFactory.createMultiplyAdd()
+            val cleanScaler = dspFactory.createMultiplyAdd()
             
             distScaler.inputB.set(1.0)
             distScaler.inputC.set(0.0)
@@ -933,8 +934,8 @@ class DspSynthEngine(
         }
         
         if (testOsc == null) {
-            testOsc = audioEngine.createSineOscillator()
-            testGain = audioEngine.createMultiply()
+            testOsc = dspFactory.createSineOscillator()
+            testGain = dspFactory.createMultiply()
             audioEngine.addUnit(testOsc!!)
             audioEngine.addUnit(testGain!!)
             testOsc!!.output.connect(testGain!!.inputA)

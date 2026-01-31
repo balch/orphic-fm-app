@@ -6,6 +6,7 @@ import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.DspFactory
 
 /**
  * DSP Plugin for specialized 808-style drum synthesis.
@@ -15,14 +16,15 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 @Inject
 @ContributesIntoSet(AppScope::class)
 class DspDrumPlugin(
-    audioEngine: AudioEngine
+    audioEngine: AudioEngine,
+    dspFactory: DspFactory
 ) : DspPlugin {
 
-    private val drumUnit = audioEngine.createDrumUnit()
+    private val drumUnit = dspFactory.createDrumUnit()
     
     // Stereo output gain for drums
-    private val drumGainLeft = audioEngine.createMultiply()
-    private val drumGainRight = audioEngine.createMultiply()
+    private val drumGainLeft = dspFactory.createMultiply()
+    private val drumGainRight = dspFactory.createMultiply()
 
     override val audioUnits: List<AudioUnit> = listOf(
         drumUnit, drumGainLeft, drumGainRight
