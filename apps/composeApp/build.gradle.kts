@@ -1,4 +1,4 @@
-import com.codingfeline.buildkonfig.compiler.FieldSpec
+
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.io.FileInputStream
 import java.util.Properties
@@ -17,7 +17,7 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.metro)
-    alias(libs.plugins.buildkonfig)
+
 }
 
 kotlin {
@@ -46,41 +46,41 @@ kotlin {
         commonMain.dependencies {
             api(project(":core:audio"))
             api(project(":core:foundation"))
-            implementation(project(":core:plugins:delay"))
-            implementation(project(":core:plugins:distortion"))
-            implementation(project(":core:plugins:resonator"))
-            implementation(project(":core:plugins:bender"))
-            implementation(project(":core:plugins:stereo"))
-            implementation(project(":core:plugins:vibrato"))
-            implementation(project(":core:plugins:warps"))
-            implementation(project(":core:plugins:grains"))
-            implementation(project(":core:plugins:drum"))
-            implementation(project(":core:plugins:duolfo"))
-            implementation(project(":core:plugins:flux"))
-            implementation(project(":core:plugins:looper"))
-            implementation(project(":core:plugins:perstringbender"))
-            implementation(project(":ui:theme"))
-            implementation(project(":ui:widgets"))
-            implementation(project(":features:warps"))
-            implementation(project(":features:drum"))
-            implementation(project(":features:flux"))
-            implementation(project(":features:grains"))
-            implementation(project(":features:resonator"))
-            implementation(project(":features:lfo"))
-            implementation(project(":features:delay"))
-            implementation(project(":features:distortion"))
-            implementation(project(":features:looper"))
-            implementation(project(":features:beats"))
-            implementation(project(":features:draw"))
-            implementation(project(":features:evo"))
-            implementation(project(":features:tidal"))
-            implementation(project(":features:visualizations"))
-            implementation(project(":features:ai"))
-            implementation(project(":features:debug"))
-            implementation(project(":features:midi"))
-            implementation(project(":features:presets"))
-            implementation(project(":features:tweaks"))
-            implementation(project(":features:voice"))
+            api(project(":core:plugins:delay"))
+            api(project(":core:plugins:distortion"))
+            api(project(":core:plugins:resonator"))
+            api(project(":core:plugins:bender"))
+            api(project(":core:plugins:stereo"))
+            api(project(":core:plugins:vibrato"))
+            api(project(":core:plugins:warps"))
+            api(project(":core:plugins:grains"))
+            api(project(":core:plugins:drum"))
+            api(project(":core:plugins:duolfo"))
+            api(project(":core:plugins:flux"))
+            api(project(":core:plugins:looper"))
+            api(project(":core:plugins:perstringbender"))
+            api(project(":ui:theme"))
+            api(project(":ui:widgets"))
+            api(project(":features:warps"))
+            api(project(":features:drum"))
+            api(project(":features:flux"))
+            api(project(":features:grains"))
+            api(project(":features:resonator"))
+            api(project(":features:lfo"))
+            api(project(":features:delay"))
+            api(project(":features:distortion"))
+            api(project(":features:looper"))
+            api(project(":features:beats"))
+            api(project(":features:draw"))
+            api(project(":features:evo"))
+            api(project(":features:tidal"))
+            api(project(":features:visualizations"))
+            api(project(":features:ai"))
+            api(project(":features:debug"))
+            api(project(":features:midi"))
+            api(project(":features:presets"))
+            api(project(":features:tweaks"))
+            api(project(":features:voice"))
             implementation(libs.compose.material.icons)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
@@ -147,16 +147,3 @@ compose.desktop {
 }
 
 // BuildKonfig configuration for cross-platform BuildConfig
-buildkonfig {
-    packageName = "org.balch.orpheus"
-
-    defaultConfigs {
-        val geminiKey = "GEMINI_API_KEY"
-        val geminiApiKey = localProperties.getProperty(geminiKey) ?: ""
-        buildConfigField(FieldSpec.Type.STRING, geminiKey, geminiApiKey)
-
-        val anthropicKey = "ANTHROPIC_API_KEY"
-        val anthropicApiKey = localProperties.getProperty(anthropicKey) ?: ""
-        buildConfigField(FieldSpec.Type.STRING, anthropicKey, anthropicApiKey)
-    }
-}
