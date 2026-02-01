@@ -49,6 +49,7 @@ import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tweaks.CenterControlSection
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
+import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
@@ -60,7 +61,6 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.panels.HeaderViewModel
-import org.balch.orpheus.ui.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.AppTitleTreatment

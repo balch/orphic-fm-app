@@ -47,6 +47,7 @@ kotlin {
             implementation(libs.findLibrary("metrox-viewmodel-compose").get())
             implementation(libs.findLibrary("compose-ui-tooling-preview").get())
             implementation(libs.findLibrary("kmlogging").get())
+            implementation(libs.findLibrary("liquid").get())
 
             if (project.path.startsWith(":features")) {
                 implementation(project(":core:audio"))

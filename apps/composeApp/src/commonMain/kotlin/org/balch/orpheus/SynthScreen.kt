@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import com.diamondedge.logging.logging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.ui.screens.CompactLandscapeScreen
 import org.balch.orpheus.ui.screens.CompactPortraitScreen
 import org.balch.orpheus.ui.screens.DesktopSynthScreen

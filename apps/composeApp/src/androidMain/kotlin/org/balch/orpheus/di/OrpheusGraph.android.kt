@@ -5,8 +5,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
-import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.lifecycle.AndroidAppLifecycleManager
 import org.balch.orpheus.core.media.ForegroundServiceController
 import org.balch.orpheus.core.tempo.GlobalTempo

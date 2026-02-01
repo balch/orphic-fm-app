@@ -3,8 +3,8 @@ package org.balch.orpheus.di
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
-import org.balch.orpheus.SynthOrchestrator
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.util.ConsoleLogger
 

@@ -21,13 +21,7 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
-
-enum class DrumTriggerSource(val displayName: String) {
-    INTERNAL("Internal"),
-    FLUX_T1("Flux T1"),
-    FLUX_T2("Flux T2"),
-    FLUX_T3("Flux T3")
-}
+import org.balch.orpheus.core.triggers.DrumTriggerSource
 
 @Immutable
 data class DrumUiState(
