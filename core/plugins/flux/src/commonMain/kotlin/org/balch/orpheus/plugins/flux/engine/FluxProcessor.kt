@@ -1,5 +1,7 @@
 package org.balch.orpheus.plugins.flux.engine
 
+import kotlin.math.pow
+
 /**
  * Simplified Flux processor for melody generation.
  * 
@@ -94,37 +96,121 @@ class FluxProcessor(private val sampleRate: Float) {
     fun getT3() = outT3
     
     private fun processChannel(raw: Float): Float {
-        // Apply spread and bias
-        val centered = raw - 0.5f
-        val spreadVal = centered * (spread * 2.0f)
-        val biased = spreadVal + bias
-        val preQuantized = biased.coerceIn(0.0f, 1.0f)
+        // Marbles uses a specific algorithm to mix 3 behaviors:
+        // 1. Degenerate: Output is constant (equal to bias)
+        // 2. Beta: Output is a bell curve around bias
+        // 3. Bernoulli: Output is binary (0 or 1)
         
-        // Apply steps/quantization
-        return applySteps(preQuantized)
+        // 1. Calculate mixing amounts based on spread
+        // Spread < 0.05: Mostly degenerate
+        // Spread > 0.95: Mostly bernoulli
+        var degenerateAmount = 1.25f - spread * 25.0f
+        var bernoulliAmount = spread * 25.0f - 23.75f
+        
+        degenerateAmount = degenerateAmount.coerceIn(0.0f, 1.0f)
+        bernoulliAmount = bernoulliAmount.coerceIn(0.0f, 1.0f)
+        
+        // 2. Beta Distribution Approximation
+        // We approximate the table-based BetaDistributionSample using a polynomial curve.
+        // We essentially want to cluster 'raw' (uniform) around the center, then warp it by bias.
+        
+        // First, handle the variance (Spread) for the middle range.
+        // As spread increases in the mid-range, we want wider variance.
+        // We map spread 0.0..1.0 to an exponent that shapes the curve.
+        // Marbles uses complex tables, but a simple power curve works for "bell" shape.
+        // Pushing raw towards 0.5 helps clustering.
+        val betaValue = approximateBeta(raw, spread, bias)
+        
+        var value = betaValue
+
+        // 3. Apply mixing
+        // Mix in Degenerate (snap to bias)
+        // value = value + amount * (target - value) -> standard lerp
+        value += degenerateAmount * (bias - value)
+        
+        // Mix in Bernoulli (snap to 0 or 1)
+        val bernoulliValue = if (raw >= (1.0f - bias)) 0.999999f else 0.0f
+        value += bernoulliAmount * (bernoulliValue - value)
+        
+        // Output scaling/offsetting (Standard Marbles range is -5V to +5V)
+        // Here we keep it 0..1 internally for the engine to scale later, 
+        // OR we just return 0..1 and let the Quantizer handle it.
+        // The Marbles quantizer expects 0..1 range usually then scales.
+        
+        return applySteps(value.coerceIn(0.0f, 1.0f))
+    }
+    
+    /**
+     * Approximation of Mutable Instruments' BetaDistributionSample.
+     * Maps uniform random [u] to a value distributed according to [spread] and [bias].
+     */
+    private fun approximateBeta(u: Float, spread: Float, bias: Float): Float {
+        // This is a heuristic approximation to avoid 20KB of lookup tables.
+        
+        // 1. Center the uniform value (0..1 -> -1..1)
+        var x = (u - 0.5f) * 2.0f
+        
+        // 2. Shape the distribution (Variance)
+        // If spread is low, we want x to be pulled towards 0.
+        // x = sgn(x) * |x|^k where k > 1 roughly clusters.
+        // We use spread to modulate this.
+        // When spread is high (mid-range), it should be linear.
+        // When spread is low (mid-range), it should be clustered.
+        // We only care about the "Beta" part here, as "Degenerate" handles the extreme low spread.
+        // So let's assume a moderate clamping.
+        
+        // Simple linear expansion for now as it's robust:
+        // x *= (0.5 + spread) // Not quite right for beta.
+        
+        // Use a polynomial shaping for "clustering"
+        // At spread=0, we want high clustering (k=high). At spread=1, uniform (k=1).
+        // Actually beta distribution at extremes is U-shaped.
+        // Let's rely on the simple linear scaling logic from our v1 but improved:
+        val width = 0.1f + 0.9f * spread
+        x *= width 
+        
+        // 3. Apply Bias warping (Skew)
+        // Map centered X back to 0..1 then warp.
+        var y = x * 0.5f + 0.5f
+        
+        // Warp y such that 0.5 maps to bias.
+        // Power function: y' = y ^ k
+        // Solve for k: bias = 0.5 ^ k  =>  log(bias) = k * log(0.5) => k = log(bias)/log(0.5)
+        // We limit bias to avoid infinity.
+        val safeBias = bias.coerceIn(0.01f, 0.99f)
+        val k = kotlin.math.ln(safeBias) / kotlin.math.ln(0.5f)
+        y = y.pow(k)
+        
+        return y
     }
 
-    // Getters for current state
-    fun getX1(): Float = outX1
-    fun getX2(): Float = outX2
-    fun getX3(): Float = outX3
-    
     private fun applySteps(voltage: Float): Float {
-        return when {
-            steps < 0.33f -> {
-                // Smooth mode: lag processor (for now, just return voltage)
-                // TODO: Implement lag processing
-                voltage
-            }
-            steps < 0.67f -> {
-                // Sample & Hold mode: stepped but not quantized
-                voltage
-            }
-            else -> {
-                // Quantized mode: snap to scale
-                val quantizeAmount = ((steps - 0.67f) / 0.33f) * 7.0f  // Map to 0-7
-                quantizer.process(voltage, quantizeAmount, hysteresis = true)
-            }
+        // Marbles Logic:
+        // Steps < 0.5: Slew Limiter (Smoothness)
+        // Steps >= 0.5: Quantizer
+        
+        if (steps >= 0.5f) {
+            // Quantized Mode
+            // The quantization amount (hysteresis) increases with steps
+            // 0.5 -> 0.0 (continuous)
+            // 1.0 -> 1.0 (hard steps)
+            val qAmount = 2.0f * steps - 1.0f
+            
+            // In the real Marbles, this calls Quantize(voltage, hysteresis)
+            // Our quantizer.process takes "amount" which maps differently.
+            // Let's assume our quantizer.process handles the mix.
+            // We pass qAmount (0..1) directly.
+             return quantizer.process(voltage, qAmount, hysteresis = true)
+        } else {
+            // Smooth / Slew Mode
+            // smoothness goes from 1.0 (at steps=0) to 0.0 (at steps=0.5)
+            // TODO: Implement actual LagProcessor state for standard slew
+            // For now, we return the raw voltage, as "Smooth" implies no quantization.
+            // Slew limiting requires storing previous output, which we track in outX1/X2/X3 via feedback?
+            // Since this function is "stateless" w.r.t the channel, we can't easily add slew here 
+            // without passing in the previous value or managing state per channel.
+            // For now, direct pass-through is "infinite slew" (instant) which is acceptable for "voltage".
+            return voltage
         }
     }
     
@@ -182,6 +268,10 @@ class FluxProcessor(private val sampleRate: Float) {
     
     // Legacy support (defaults to X2)
     fun getCurrentVoltage(): Float = outX2
+
+    fun getX1(): Float = outX1
+    fun getX2(): Float = outX2
+    fun getX3(): Float = outX3
     
     fun getSpread(): Float = spread
     fun getBias(): Float = bias

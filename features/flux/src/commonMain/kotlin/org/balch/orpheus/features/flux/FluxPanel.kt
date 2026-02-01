@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,7 +55,8 @@ fun FluxPanel(
                 values = listOf(0, 1),
                 onValueChange = actions.setClockSource,
                 labelProvider = { if (it == 0) "INT" else "LFO" },
-                modifier = Modifier.width(48.dp).height(24.dp).align(Alignment.CenterVertically),
+                label = "CLK",
+                modifier = Modifier.align(Alignment.Top),
                 color = OrpheusColors.metallicBlueLight
             )
 
