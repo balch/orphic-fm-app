@@ -66,6 +66,11 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     private var currentDivisor = 24
     private var isGateActive = false
     
+    // Internal state for Slew Limiting
+    private var currX1 = 0.5
+    private var currX2 = 0.5
+    private var currX3 = 0.5
+    
     init {
         addPort(jsynClock)
         addPort(jsynSpread)
@@ -170,9 +175,34 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
             }
             
             lastClock = currentClock
-            outputs[idx] = processor.getX2().toDouble() // Main (X2)
-            outputsX1[idx] = processor.getX1().toDouble() // Secondary (X1)
-            outputsX3[idx] = processor.getX3().toDouble() // Tertiary (X3)
+            
+            // Get Target Voltages from Processor
+            val targetX1 = processor.getX1().toDouble()
+            val targetX2 = processor.getX2().toDouble() // Main
+            val targetX3 = processor.getX3().toDouble()
+            
+            // Calculate Slew / Smoothing
+            // If steps < 0.5, apply lag processing. 
+            // If steps >= 0.5, output is instantaneous (S&H or Quantized).
+            val currentSteps = processor.getSteps()
+            
+            val alpha = if (currentSteps >= 0.5f) {
+                1.0 // Instant change
+            } else {
+                // Map steps 0.0 (Slow) .. 0.5 (Instant)
+                val t = (currentSteps / 0.5f).coerceIn(0.0f, 1.0f)
+                // Use cubic curve for natural feel
+                // Min alpha ~ 0.0005 (slow glide), Max alpha 1.0
+                0.0005 + (1.0 - 0.0005) * (t * t * t * t)
+            }
+            
+            currX1 += (targetX1 - currX1) * alpha
+            currX2 += (targetX2 - currX2) * alpha
+            currX3 += (targetX3 - currX3) * alpha
+            
+            outputs[idx] = currX2
+            outputsX1[idx] = currX1 
+            outputsX3[idx] = currX3
             
             outputsT1[idx] = processor.getT1().toDouble()
             outputsT2[idx] = processor.getT2().toDouble() // Main Clock Gate

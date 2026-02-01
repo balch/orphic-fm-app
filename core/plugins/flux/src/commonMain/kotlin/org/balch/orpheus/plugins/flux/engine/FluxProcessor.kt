@@ -151,21 +151,7 @@ class FluxProcessor(private val sampleRate: Float) {
         var x = (u - 0.5f) * 2.0f
         
         // 2. Shape the distribution (Variance)
-        // If spread is low, we want x to be pulled towards 0.
-        // x = sgn(x) * |x|^k where k > 1 roughly clusters.
-        // We use spread to modulate this.
-        // When spread is high (mid-range), it should be linear.
-        // When spread is low (mid-range), it should be clustered.
-        // We only care about the "Beta" part here, as "Degenerate" handles the extreme low spread.
-        // So let's assume a moderate clamping.
-        
-        // Simple linear expansion for now as it's robust:
-        // x *= (0.5 + spread) // Not quite right for beta.
-        
-        // Use a polynomial shaping for "clustering"
-        // At spread=0, we want high clustering (k=high). At spread=1, uniform (k=1).
-        // Actually beta distribution at extremes is U-shaped.
-        // Let's rely on the simple linear scaling logic from our v1 but improved:
+        // We use spread to modulate the width/clustering.
         val width = 0.1f + 0.9f * spread
         x *= width 
         
@@ -175,8 +161,6 @@ class FluxProcessor(private val sampleRate: Float) {
         
         // Warp y such that 0.5 maps to bias.
         // Power function: y' = y ^ k
-        // Solve for k: bias = 0.5 ^ k  =>  log(bias) = k * log(0.5) => k = log(bias)/log(0.5)
-        // We limit bias to avoid infinity.
         val safeBias = bias.coerceIn(0.01f, 0.99f)
         val k = kotlin.math.ln(safeBias) / kotlin.math.ln(0.5f)
         y = y.pow(k)
@@ -196,20 +180,14 @@ class FluxProcessor(private val sampleRate: Float) {
             // 1.0 -> 1.0 (hard steps)
             val qAmount = 2.0f * steps - 1.0f
             
-            // In the real Marbles, this calls Quantize(voltage, hysteresis)
-            // Our quantizer.process takes "amount" which maps differently.
-            // Let's assume our quantizer.process handles the mix.
-            // We pass qAmount (0..1) directly.
              return quantizer.process(voltage, qAmount, hysteresis = true)
         } else {
             // Smooth / Slew Mode
-            // smoothness goes from 1.0 (at steps=0) to 0.0 (at steps=0.5)
-            // TODO: Implement actual LagProcessor state for standard slew
-            // For now, we return the raw voltage, as "Smooth" implies no quantization.
-            // Slew limiting requires storing previous output, which we track in outX1/X2/X3 via feedback?
-            // Since this function is "stateless" w.r.t the channel, we can't easily add slew here 
-            // without passing in the previous value or managing state per channel.
-            // For now, direct pass-through is "infinite slew" (instant) which is acceptable for "voltage".
+            // In this mode, we return the raw voltage as the target.
+            // Slew limiting (gliding between values) must be handled by the
+            // continuous audio/control processor (e.g. JsynFluxUnit),
+            // as this FluxProcessor 'tick' function is discrete and event-based.
+            // The slew rate should depend on the 'steps' value (0.0 = slow slew, 0.5 = instant).
             return voltage
         }
     }
@@ -249,12 +227,8 @@ class FluxProcessor(private val sampleRate: Float) {
     
     // Timing Generator Parameters
     private var jitter = 0.0f
-    private var probability = 0.5f // Replaces "bias" for gates in original Marbles spec? 
-                                   // Actually Marbles reuses "Bias" for t-section probability when input is plugged into clock?
-                                   // But user asked to add "jitter and bias" specifically. 
-                                   // Since "Bias" knob already exists and controls voltage bias, we should probably add a dedicated Probability/Gate Bias knob
-                                   // OR reuse the existing Bias knob if we want true Marbles behavior (context dependent).
-                                   // Given the UI panel has separate sections, let's make them separate parameters to be explicit.
+    private var probability = 0.5f // Controls the T-Section Gate Probability (T1 vs T3 distribution)
+                                   // Separate from the main voltage 'Bias' parameter as verified in FluxPanel.
                                    
     fun setJitter(jitter: Float) {
         this.jitter = jitter.coerceIn(0.0f, 1.0f)
