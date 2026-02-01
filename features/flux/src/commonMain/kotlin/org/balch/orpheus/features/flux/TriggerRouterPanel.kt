@@ -1,4 +1,4 @@
-package org.balch.orpheus.ui.panels
+package org.balch.orpheus.features.flux
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,8 +20,6 @@ import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 import org.balch.orpheus.features.drum.DrumFeature
 import org.balch.orpheus.features.drum.DrumViewModel
-import org.balch.orpheus.features.flux.FluxFeature
-import org.balch.orpheus.features.flux.FluxViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -44,13 +42,13 @@ fun TriggerRouterPanel(
     val voiceActions = voiceFeature.actions
     val fluxActions = fluxFeature.actions
 
-    CollapsibleColumnPanel(
-        title = "PULSE",
+    _root_ide_package_.org.balch.orpheus.ui.panels.CollapsibleColumnPanel(
+        title = "TRIGG",
         color = OrpheusColors.electricBlue,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        expandedTitle = "Pulse Matrix",
+        expandedTitle = "Connect-4",
         modifier = modifier
     ) {
         Row(
@@ -61,9 +59,21 @@ fun TriggerRouterPanel(
             RouterSection(
                 title = "DRUMS",
                 items = listOf(
-                    RoutingItem("BASS", drumState.bdTriggerSource.ordinal, listOf("INT", "T1", "T2", "T3")) { drumActions.setBdTriggerSource(DrumTriggerSource.entries[it]) },
-                    RoutingItem("SNARE", drumState.sdTriggerSource.ordinal, listOf("INT", "T1", "T2", "T3")) { drumActions.setSdTriggerSource(DrumTriggerSource.entries[it]) },
-                    RoutingItem("HIHAT", drumState.hhTriggerSource.ordinal, listOf("INT", "T1", "T2", "T3")) { drumActions.setHhTriggerSource(DrumTriggerSource.entries[it]) }
+                    RoutingItem(
+                        "BASS",
+                        drumState.bdTriggerSource.ordinal,
+                        listOf("INT", "T1", "T2", "T3")
+                    ) { drumActions.setBdTriggerSource(DrumTriggerSource.entries[it]) },
+                    RoutingItem(
+                        "SNARE",
+                        drumState.sdTriggerSource.ordinal,
+                        listOf("INT", "T1", "T2", "T3")
+                    ) { drumActions.setSdTriggerSource(DrumTriggerSource.entries[it]) },
+                    RoutingItem(
+                        "HIHAT",
+                        drumState.hhTriggerSource.ordinal,
+                        listOf("INT", "T1", "T2", "T3")
+                    ) { drumActions.setHhTriggerSource(DrumTriggerSource.entries[it]) }
                 ),
                 color = OrpheusColors.neonMagenta
             )
@@ -72,9 +82,21 @@ fun TriggerRouterPanel(
             RouterSection(
                 title = "V-TRIG",
                 items = listOf(
-                    RoutingItem("QUAD 1", voiceState.quadTriggerSources.getOrElse(0) { 0 }, listOf("INT", "T1", "T2", "T3")) { voiceActions.onQuadTriggerSourceChange(0, it) },
-                    RoutingItem("QUAD 2", voiceState.quadTriggerSources.getOrElse(1) { 0 }, listOf("INT", "T1", "T2", "T3")) { voiceActions.onQuadTriggerSourceChange(1, it) },
-                    RoutingItem("QUAD 3", voiceState.quadTriggerSources.getOrElse(2) { 0 }, listOf("INT", "T1", "T2", "T3")) { voiceActions.onQuadTriggerSourceChange(2, it) }
+                    RoutingItem(
+                        "QUAD 1",
+                        voiceState.quadTriggerSources.getOrElse(0) { 0 },
+                        listOf("INT", "T1", "T2", "T3")
+                    ) { voiceActions.onQuadTriggerSourceChange(0, it) },
+                    RoutingItem(
+                        "QUAD 2",
+                        voiceState.quadTriggerSources.getOrElse(1) { 0 },
+                        listOf("INT", "T1", "T2", "T3")
+                    ) { voiceActions.onQuadTriggerSourceChange(1, it) },
+                    RoutingItem(
+                        "QUAD 3",
+                        voiceState.quadTriggerSources.getOrElse(2) { 0 },
+                        listOf("INT", "T1", "T2", "T3")
+                    ) { voiceActions.onQuadTriggerSourceChange(2, it) }
                 ),
                 color = OrpheusColors.synthGreen
             )
@@ -83,9 +105,21 @@ fun TriggerRouterPanel(
             RouterSection(
                 title = "V-PITCH",
                 items = listOf(
-                    RoutingItem("QUAD 1", voiceState.quadPitchSources.getOrElse(0) { 0 }, listOf("---", "X1", "X2", "X3")) { voiceActions.onQuadPitchSourceChange(0, it) },
-                    RoutingItem("QUAD 2", voiceState.quadPitchSources.getOrElse(1) { 0 }, listOf("---", "X1", "X2", "X3")) { voiceActions.onQuadPitchSourceChange(1, it) },
-                    RoutingItem("QUAD 3", voiceState.quadPitchSources.getOrElse(2) { 0 }, listOf("---", "X1", "X2", "X3")) { voiceActions.onQuadPitchSourceChange(2, it) }
+                    RoutingItem(
+                        "QUAD 1",
+                        voiceState.quadPitchSources.getOrElse(0) { 0 },
+                        listOf("---", "X1", "X2", "X3")
+                    ) { voiceActions.onQuadPitchSourceChange(0, it) },
+                    RoutingItem(
+                        "QUAD 2",
+                        voiceState.quadPitchSources.getOrElse(1) { 0 },
+                        listOf("---", "X1", "X2", "X3")
+                    ) { voiceActions.onQuadPitchSourceChange(1, it) },
+                    RoutingItem(
+                        "QUAD 3",
+                        voiceState.quadPitchSources.getOrElse(2) { 0 },
+                        listOf("---", "X1", "X2", "X3")
+                    ) { voiceActions.onQuadPitchSourceChange(2, it) }
                 ),
                 color = OrpheusColors.warmGlow
             )
@@ -94,7 +128,11 @@ fun TriggerRouterPanel(
             RouterSection(
                 title = "FLUX",
                 items = listOf(
-                    RoutingItem("CLK SRC", fluxState.clockSource, listOf("INT", "LFO")) { fluxActions.setClockSource(it) }
+                    RoutingItem(
+                        "CLK SRC",
+                        fluxState.clockSource,
+                        listOf("INT", "LFO")
+                    ) { fluxActions.setClockSource(it) }
                 ),
                 color = OrpheusColors.electricBlue
             )

@@ -38,18 +38,9 @@ class PanelExpandTool @Inject constructor(
     @Serializable
     data class Args(
         @property:LLMDescription("""
-            The panel to expand or collapse. Valid values:
-            - "CODE" - Live Code REPL editor
-            - "PRESETS" - Preset selector
-            - "MIDI" - MIDI settings
-            - "STEREO" - Stereo imaging controls
-            - "VIZ" - Visualization settings
-            - "LFO" - Hyper LFO modulation
-            - "DELAY" - Mod Delay effects
-            - "DISTORTION" - Distortion effects
-            - "AI" - AI options panel
+            The panel to expand or collapse
         """)
-        val panelId: String,
+        val panelId: PanelId,
         
         @property:LLMDescription("True to expand the panel, false to collapse it. Defaults to true.")
         val expand: Boolean = true
@@ -63,17 +54,8 @@ class PanelExpandTool @Inject constructor(
 
     override suspend fun execute(args: Args): Result {
         log.debug { "PanelExpandTool: ${args.panelId} expand=${args.expand}" }
-        
-        val panelId = try {
-            PanelId.valueOf(args.panelId.uppercase())
-        } catch (e: IllegalArgumentException) {
-            log.warn { "PanelExpandTool: Unknown panel ${args.panelId}" }
-            return Result(
-                success = false,
-                message = "Unknown panel: ${args.panelId}. Valid panels: ${PanelId.entries.joinToString { it.name }}"
-            )
-        }
-        
+
+        val panelId = args.panelId
         if (args.expand) {
             panelExpansionEventBus.expand(panelId)
         } else {
@@ -81,10 +63,10 @@ class PanelExpandTool @Inject constructor(
         }
         
         val action = if (args.expand) "expanded" else "collapsed"
-        log.debug { "PanelExpandTool: ${panelId.displayName} $action" }
+        log.debug { "PanelExpandTool: ${panelId.name} $action" }
         return Result(
             success = true,
-            message = "${panelId.displayName} panel $action"
+            message = "${panelId.name} panel $action"
         )
     }
 }

@@ -19,6 +19,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.plugins.flux)
+            implementation(projects.features.drum)
+            implementation(projects.features.voice)
         }
     }
 }

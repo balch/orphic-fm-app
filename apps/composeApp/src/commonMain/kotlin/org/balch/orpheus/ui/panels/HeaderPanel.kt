@@ -38,6 +38,7 @@ import org.balch.orpheus.features.evo.EvoViewModel
 import org.balch.orpheus.features.flux.FluxFeature
 import org.balch.orpheus.features.flux.FluxPanel
 import org.balch.orpheus.features.flux.FluxViewModel
+import org.balch.orpheus.features.flux.TriggerRouterPanel
 import org.balch.orpheus.features.grains.GrainsFeature
 import org.balch.orpheus.features.grains.GrainsPanel
 import org.balch.orpheus.features.grains.GrainsViewModel
@@ -189,9 +190,9 @@ fun HeaderPanel(
             drumFeature = drumFeature,
             voiceFeature = voiceFeature,
             fluxFeature = fluxFeature,
-            isExpanded = PanelId.ROUTER.isExpanded(),
-            onExpandedChange = { PanelId.ROUTER.setExpanded(it) },
-            modifier = panelModifier(PanelId.ROUTER.isExpanded(), weight = 0.8f)
+            isExpanded = PanelId.FLUX_TRIGGERS.isExpanded(),
+            onExpandedChange = { PanelId.FLUX_TRIGGERS.setExpanded(it) },
+            modifier = panelModifier(PanelId.FLUX_TRIGGERS.isExpanded(), weight = 0.8f)
         )
         // Flux Panel
         FluxPanel(
@@ -217,9 +218,9 @@ fun HeaderPanel(
         // Pattern panel
         DrumBeatsPanel(
             drumBeatsFeature = drumBeatsFeature,
-            isExpanded = PanelId.PATTERN.isExpanded(),
-            onExpandedChange = { PanelId.PATTERN.setExpanded(it) },
-            modifier = panelModifier(PanelId.PATTERN.isExpanded(), weight = 1.25f)
+            isExpanded = PanelId.BEATS.isExpanded(),
+            onExpandedChange = { PanelId.BEATS.setExpanded(it) },
+            modifier = panelModifier(PanelId.BEATS.isExpanded(), weight = 1.25f)
         )
         // AI Options panel
         AiOptionsPanel(

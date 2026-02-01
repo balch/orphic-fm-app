@@ -60,7 +60,7 @@ fun WarpsPanel(
     val actions = feature.actions
 
     CollapsibleColumnPanel(
-        title = "WARP",
+        title = "BLEND",
         color = warpsColors.panelColor,
         expandedTitle = "X-MOD",
         isExpanded = isExpanded,

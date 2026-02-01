@@ -36,7 +36,7 @@ fun FluxPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        expandedTitle = "Marbles Generator",
+        expandedTitle = "Warbles",
         showCollapsedHeader = showCollapsedHeader,
     ) {
         val state by flux.stateFlow.collectAsState()

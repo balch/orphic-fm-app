@@ -19,5 +19,5 @@ enum class WarpsSource(val displayName: String) {
     LFO("LFO"),
     RESONATOR("Rings"),
     WARPS("Feedback"),
-    FLUX("Marbles")
+    FLUX("Warbles")
 }

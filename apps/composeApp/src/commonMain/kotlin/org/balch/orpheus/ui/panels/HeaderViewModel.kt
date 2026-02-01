@@ -42,7 +42,6 @@ data class HeaderPanelUiState(
         val DEFAULT_EXPANSION_STATE: PersistentMap<PanelId, Boolean> = persistentMapOf(
             PanelId.PRESETS to false,
             PanelId.MIDI to false,
-            PanelId.STEREO to false,
             PanelId.VIZ to true,
             PanelId.EVO to false,
             PanelId.LFO to false,
@@ -52,7 +51,7 @@ data class HeaderPanelUiState(
             PanelId.AI to false,
             PanelId.DRUMS to false,
             PanelId.LOOPER to false,
-            PanelId.PATTERN to false,
+            PanelId.BEATS to false,
             PanelId.WARPS to false
         )
     }
@@ -97,7 +96,7 @@ class HeaderViewModel(
         // Subscribe to panel expansion events
         viewModelScope.launch {
             panelExpansionEventBus.events.collect { event ->
-                log.debug { "HeaderViewModel: ${event.panelId.displayName} -> ${if (event.expand) "EXPAND" else "COLLAPSE"}" }
+                log.debug { "HeaderViewModel: ${event.panelId.name} -> ${if (event.expand) "EXPAND" else "COLLAPSE"}" }
                 setExpanded(event.panelId, event.expand)
             }
         }
@@ -107,7 +106,7 @@ class HeaderViewModel(
      * Set the expansion state of a panel.
      */
     fun setExpanded(panelId: PanelId, expanded: Boolean) {
-        log.debug { "HeaderViewModel: setExpanded(${panelId.displayName}, $expanded)" }
+        log.debug { "HeaderViewModel: setExpanded(${panelId.name}, $expanded)" }
         _uiState.update { state ->
             state.copy(
                 expandedPanels = state.expandedPanels.put(panelId, expanded)

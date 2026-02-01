@@ -6,7 +6,7 @@ import ai.koog.agents.core.dsl.extension.nodeExecuteMultipleTools
 import ai.koog.agents.core.dsl.extension.nodeLLMCompressHistory
 import ai.koog.agents.core.dsl.extension.nodeLLMRequestMultiple
 import ai.koog.agents.core.dsl.extension.nodeLLMSendMultipleToolResults
-import ai.koog.agents.core.dsl.extension.onAssistantMessage
+import ai.koog.agents.core.dsl.extension.onMultipleAssistantMessages
 import ai.koog.agents.core.dsl.extension.onMultipleToolCalls
 import ai.koog.agents.core.environment.ReceivedToolResult
 import ai.koog.agents.core.tools.Tool
@@ -239,8 +239,8 @@ class OrpheusAgentConfig @Inject constructor(
 
         edge(
             nodeRequestLLM forwardTo nodeAssistantMessage
-                    transformed { it.first() }
-                    onAssistantMessage { true }
+                    onMultipleAssistantMessages { true }
+                    transformed { it.first().content }
         )
 
         edge(nodeAssistantMessage forwardTo nodeRequestLLM)
@@ -271,8 +271,8 @@ class OrpheusAgentConfig @Inject constructor(
 
         edge(
             nodeSendToolResultMultiple forwardTo nodeAssistantMessage
-                    transformed { it.first() }
-                    onAssistantMessage { true }
+                    onMultipleAssistantMessages { true }
+                    transformed { it.first().content }
         )
     }
 }

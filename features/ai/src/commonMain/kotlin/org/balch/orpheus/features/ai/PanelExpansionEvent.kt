@@ -1,5 +1,6 @@
 package org.balch.orpheus.features.ai
 
+import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
@@ -11,25 +12,42 @@ import kotlinx.coroutines.flow.asSharedFlow
 /**
  * Available panels that can be expanded/collapsed.
  */
-enum class PanelId(val displayName: String) {
-    PRESETS("Presets"),
-    MIDI("MIDI"),
-    STEREO("Stereo"),
-    VIZ("Visualization"),
-    EVO("Evolution"),
-    LFO("Hyper LFO"),
-    DELAY("Mod Delay"),
-    DISTORTION("Distortion"),
-    RESONATOR("Rings Resonator"),
-    CODE("Live Code"),
-    AI("AI Options"),
-    DRUMS("808 Drums"),
-    GRAINS("Grains"),
-    LOOPER("Loop"),
-    PATTERN("Topographic"),
-    WARPS("Warps"),
-    FLUX("Flux Generator"),
-    ROUTER("Pulse Router")
+@LLMDescription("Panels in the app the can be expanded or collapsed.")
+enum class PanelId {
+    @LLMDescription("Panel allowing user to select a patch")
+    PRESETS,
+    @LLMDescription("Assign MIDI commands to control the synthesizer")
+    MIDI,
+    @LLMDescription("Display visualizations linked to the sound in the background")
+    VIZ,
+    @LLMDescription("Algorithmic Evolution Panel")
+    EVO,
+    @LLMDescription("Provide wave patterns to produce sounds")
+    LFO,
+    @LLMDescription("Add repeating lines to sounds")
+    DELAY,
+    @LLMDescription("Control volume characteristics of sounds")
+    DISTORTION,
+    @LLMDescription("Add texture to sounds")
+    RESONATOR,
+    @LLMDescription("Tidal Coding Panel for REPL")
+    CODE,
+    @LLMDescription("Panel allowing user to select a patch")
+    AI,
+    @LLMDescription("Drum Patterns Panel")
+    BEATS,
+    @LLMDescription("Drum Tuning Panel")
+    DRUMS,
+    @LLMDescription("Granular Molecule Synthesis")
+    GRAINS,
+    @LLMDescription("Record and replay audio")
+    LOOPER,
+    @LLMDescription("Cross Modulation")
+    WARPS,
+    @LLMDescription("Random music generator")
+    FLUX,
+    @LLMDescription("Assigns sounds to Flux outputs")
+    FLUX_TRIGGERS
 }
 
 /**
@@ -65,7 +83,7 @@ class PanelExpansionEventBus @Inject constructor() {
      * Request that a panel be expanded.
      */
     suspend fun expand(panelId: PanelId) {
-        log.debug { "PanelExpansionEventBus: EXPAND ${panelId.displayName}" }
+        log.debug { "PanelExpansionEventBus: EXPAND ${panelId.name}" }
         _events.emit(PanelExpansionEvent(panelId, expand = true))
     }
     
@@ -73,7 +91,7 @@ class PanelExpansionEventBus @Inject constructor() {
      * Request that a panel be collapsed.
      */
     suspend fun collapse(panelId: PanelId) {
-        log.debug { "PanelExpansionEventBus: COLLAPSE ${panelId.displayName}" }
+        log.debug { "PanelExpansionEventBus: COLLAPSE ${panelId.name}" }
         _events.emit(PanelExpansionEvent(panelId, expand = false))
     }
     
