@@ -2,9 +2,6 @@ package org.balch.orpheus.features.flux
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,7 +14,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.ValueCycleButton
 
-private val ScaleNames = listOf("CHR", "MAJ", "MIN", "PEN", "PHR", "WHO")
+private val ScaleNames = listOf("MAJ", "MIN", "PEN", "PHR", "WHO", "CHR")
 
 /**
  * Flux Panel - Controls for the random melody generator.
@@ -45,8 +42,7 @@ fun FluxPanel(
 
         // Row 1: Main Controls
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Top
         ) {
             // Clock Source (Moved to top)
@@ -97,12 +93,9 @@ fun FluxPanel(
             )
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
         // Row 2: Length and Scale
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
              // Length Knob (1-16)
