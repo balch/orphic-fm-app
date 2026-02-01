@@ -225,15 +225,28 @@ class WarpsProcessor {
     }
 
     private fun xmodXfade(x1: Float, x2: Float, p: Float): Float {
-        // Linear fade for now, should use LUT_XFADE
-        return x1 * (1.0f - p) + x2 * p
+        val gain1 = WarpsTables.interpolate(WarpsTables.LUT_XFADE_IN, p, 256f)
+        val gain2 = WarpsTables.interpolate(WarpsTables.LUT_XFADE_OUT, p, 256f)
+        return x1 * gain1 + x2 * gain2
     }
 
     private fun xmodFold(x1: Float, x2: Float, p: Float): Float {
         var sum = x1 + x2 + x1 * x2 * 0.25f
         sum *= 0.02f + p
-        // Triangle fold approximation: 2 * abs(frac(x + 0.5) - 0.5) * 2 - 1
-        return (abs(((sum + 0.5f) % 1.0f + 1.0f) % 1.0f - 0.5f) - 0.25f) * 4f
+        
+        // kScale calculation from original source: 2048.0f / ((1.0f + 1.0f + 0.25f) * 1.02f)
+        val kScale = 892.3747f 
+        val center = 2048f
+        val index = center + sum * kScale
+        
+        // Manual interpolation since we are indexing directly into the center of the table
+        val intIndex = index.toInt().coerceIn(0, WarpsTables.LUT_BIPOLAR_FOLD.size - 2)
+        val frac = index - intIndex
+        
+        val a = WarpsTables.LUT_BIPOLAR_FOLD[intIndex]
+        val b = WarpsTables.LUT_BIPOLAR_FOLD[intIndex + 1]
+        
+        return a + (b - a) * frac
     }
 
     private fun xmodAnalogRingMod(mod: Float, carrier: Float, p: Float): Float {
