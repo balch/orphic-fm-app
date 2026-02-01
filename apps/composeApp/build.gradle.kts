@@ -143,6 +143,9 @@ compose.desktop {
                 iconFile.set(project.file("src/jvmMain/resources/icon.png"))
             }
         }
+        
+        // Forward debug flags from Gradle to the App
+        jvmArgs += listOf("-Dorpheus.debug.gc=${System.getProperty("orpheus.debug.gc", "false")}")
     }
 }
 

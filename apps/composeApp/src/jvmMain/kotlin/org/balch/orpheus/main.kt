@@ -10,10 +10,12 @@ import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.config.AppConfig
 import org.balch.orpheus.di.OrpheusGraph
 import org.balch.orpheus.ui.theme.OrpheusAssets
+import org.balch.orpheus.util.GcMonitor
 import org.jetbrains.compose.resources.painterResource
 
 fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
+    GcMonitor.install()
 
     application {
         val graph = remember { createGraphFactory<OrpheusGraph.Factory>().create() }
