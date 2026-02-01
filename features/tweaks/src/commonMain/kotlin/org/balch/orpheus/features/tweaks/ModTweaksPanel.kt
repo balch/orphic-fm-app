@@ -147,6 +147,7 @@ fun ModTweaksPanel(
                                 DrumTriggerSource.FLUX_T1 -> "T1"
                                 DrumTriggerSource.FLUX_T2 -> "T2"
                                 DrumTriggerSource.FLUX_T3 -> "T3"
+                                else -> "..."
                             }
                         }
                     )

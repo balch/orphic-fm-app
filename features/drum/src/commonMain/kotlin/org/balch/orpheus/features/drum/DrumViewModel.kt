@@ -32,6 +32,7 @@ data class DrumUiState(
     val bdP4: Float = 0.5f,  // AFM (Attack FM)
     val bdP5: Float = 0.5f,  // Self FM
     val bdTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
+    val bdPitchSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     
     // Snare Drum
     val sdFrequency: Float = 0.4f, // Maps to ~180Hz
@@ -39,6 +40,7 @@ data class DrumUiState(
     val sdDecay: Float = 0.5f,
     val sdP4: Float = 0.5f,  // Snappiness
     val sdTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
+    val sdPitchSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     
     // Hi-Hat
     val hhFrequency: Float = 0.6f, // Maps to ~400Hz
@@ -46,6 +48,7 @@ data class DrumUiState(
     val hhDecay: Float = 0.5f,
     val hhP4: Float = 0.5f,  // Noisiness
     val hhTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
+    val hhPitchSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     
     // Trigger States (Visual Feedback)
     val isBdActive: Boolean = false,
@@ -61,6 +64,7 @@ data class DrumPanelActions(
     val setBdDecay: (Float) -> Unit,
     val setBdP4: (Float) -> Unit,
     val setBdTriggerSource: (DrumTriggerSource) -> Unit,
+    val setBdPitchSource: (DrumTriggerSource) -> Unit,
     val startBdTrigger: () -> Unit,
     val stopBdTrigger: () -> Unit,
     
@@ -70,6 +74,7 @@ data class DrumPanelActions(
     val setSdDecay: (Float) -> Unit,
     val setSdP4: (Float) -> Unit,
     val setSdTriggerSource: (DrumTriggerSource) -> Unit,
+    val setSdPitchSource: (DrumTriggerSource) -> Unit,
     val startSdTrigger: () -> Unit,
     val stopSdTrigger: () -> Unit,
     
@@ -79,6 +84,7 @@ data class DrumPanelActions(
     val setHhDecay: (Float) -> Unit,
     val setHhP4: (Float) -> Unit,
     val setHhTriggerSource: (DrumTriggerSource) -> Unit,
+    val setHhPitchSource: (DrumTriggerSource) -> Unit,
     val startHhTrigger: () -> Unit,
     val stopHhTrigger: () -> Unit,
     
@@ -87,9 +93,9 @@ data class DrumPanelActions(
 ) {
     companion object {
         val EMPTY = DrumPanelActions(
-            {}, {}, {}, {}, {}, {}, {},
-            {}, {}, {}, {}, {}, {}, {},
-            {}, {}, {}, {}, {}, {}, {}, {}
+            {}, {}, {}, {}, {}, {}, {}, {},
+            {}, {}, {}, {}, {}, {}, {}, {},
+            {}, {}, {}, {}, {}, {}, {}, {}, {}
         )
     }
 }
@@ -131,6 +137,10 @@ class DrumViewModel(
             _uiState.update { it.copy(bdTriggerSource = src) }
             synthEngine.setDrumTriggerSource(0, src.ordinal)
         },
+        setBdPitchSource = { src ->
+            _uiState.update { it.copy(bdPitchSource = src) }
+            synthEngine.setDrumPitchSource(0, src.ordinal)
+        },
         startBdTrigger = ::startBdTrigger,
         stopBdTrigger = { _uiState.update { it.copy(isBdActive = false) } },
         
@@ -155,6 +165,10 @@ class DrumViewModel(
             _uiState.update { it.copy(sdTriggerSource = src) }
             synthEngine.setDrumTriggerSource(1, src.ordinal)
         },
+        setSdPitchSource = { src ->
+            _uiState.update { it.copy(sdPitchSource = src) }
+            synthEngine.setDrumPitchSource(1, src.ordinal)
+        },
         startSdTrigger = ::startSdTrigger,
         stopSdTrigger = { _uiState.update { it.copy(isSdActive = false) } },
         
@@ -178,6 +192,10 @@ class DrumViewModel(
         setHhTriggerSource = { src ->
             _uiState.update { it.copy(hhTriggerSource = src) }
             synthEngine.setDrumTriggerSource(2, src.ordinal)
+        },
+        setHhPitchSource = { src ->
+            _uiState.update { it.copy(hhPitchSource = src) }
+            synthEngine.setDrumPitchSource(2, src.ordinal)
         },
         startHhTrigger = ::startHhTrigger,
         stopHhTrigger = { _uiState.update { it.copy(isHhActive = false) } },
@@ -258,6 +276,15 @@ class DrumViewModel(
                 synthEngine.setDrumTriggerSource(0, s.bdTriggerSource.ordinal)
                 synthEngine.setDrumTriggerSource(1, s.sdTriggerSource.ordinal)
                 synthEngine.setDrumTriggerSource(2, s.hhTriggerSource.ordinal)
+                
+                // Initialize pitch sources from defaults (or presets if we added them to presets)
+                // For now presets don't store pitch source so we assume defaults or keep current?
+                // PresetLoader logic above sets them to INTERNAL implicitly by not touching them?
+                // Ah, the copy() in preset loading doesn't set pitch source so it keeps default INTERNAL.
+                // We should push that to engine.
+                synthEngine.setDrumPitchSource(0, s.bdPitchSource.ordinal)
+                synthEngine.setDrumPitchSource(1, s.sdPitchSource.ordinal)
+                synthEngine.setDrumPitchSource(2, s.hhPitchSource.ordinal)
             }
         }
 

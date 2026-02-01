@@ -57,13 +57,18 @@ kotlin {
             }
 
         }
+        
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
     }
 }
 
+// For Compose previews with AGP 9.0 and the android KMP library plugin
+dependencies {
+    androidRuntimeClasspath(libs.findLibrary("compose-ui-tooling").get())
+}
 // Exclude libremidi-panama from test configurations (requires JVM 22+, we use JVM 21)
 configurations.matching { it.name.contains("test", ignoreCase = true) }.all {
-    exclude(group = "dev.atsushieno", module = "libremidi-panama")
+    exclude(group = "dev.atsushino", module = "libremidi-panama")
 }

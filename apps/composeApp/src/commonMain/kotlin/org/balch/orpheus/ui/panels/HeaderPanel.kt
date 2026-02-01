@@ -189,7 +189,7 @@ fun HeaderPanel(
         TriggerRouterPanel(
             drumFeature = drumFeature,
             voiceFeature = voiceFeature,
-            fluxFeature = fluxFeature,
+
             isExpanded = PanelId.FLUX_TRIGGERS.isExpanded(),
             onExpandedChange = { PanelId.FLUX_TRIGGERS.setExpanded(it) },
             modifier = panelModifier(PanelId.FLUX_TRIGGERS.isExpanded(), weight = 0.8f)

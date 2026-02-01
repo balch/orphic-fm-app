@@ -1200,6 +1200,34 @@ class DspSynthEngine(
 
     override fun getDrumTriggerSource(drumIndex: Int): Int = drumTriggerSources.getOrElse(drumIndex) { 0 }
 
+    private val drumPitchSources = IntArray(3) { 0 }
+
+    override fun setDrumPitchSource(drumIndex: Int, sourceIndex: Int) {
+        if (drumIndex !in 0..2) return
+        drumPitchSources[drumIndex] = sourceIndex
+        
+        // Map to pitch modulation inputs
+        // Assuming inputs: pitchBD, pitchSD, pitchHH exist on DrumPlugin/Unit
+        val drumPitchIn = when(drumIndex) {
+            0 -> pluginProvider.drumPlugin.inputs["pitchBD"]
+            1 -> pluginProvider.drumPlugin.inputs["pitchSD"]
+            2 -> pluginProvider.drumPlugin.inputs["pitchHH"]
+            else -> null
+        } ?: return
+        
+        drumPitchIn.disconnectAll()
+        
+        // 0=None, 1=X1, 2=X2, 3=X3
+        when (sourceIndex) {
+            1 -> pluginProvider.fluxPlugin.outputs["outputX1"]?.connect(drumPitchIn)
+            2 -> pluginProvider.fluxPlugin.outputs["output"]?.connect(drumPitchIn) // Auto output is usually normalized 
+            3 -> pluginProvider.fluxPlugin.outputs["outputX3"]?.connect(drumPitchIn)
+            else -> { /* Disconnected */ }
+        }
+    }
+
+    override fun getDrumPitchSource(drumIndex: Int): Int = drumPitchSources.getOrElse(drumIndex) { 0 }
+
     override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) {
         if (quadIndex !in 0..2) return
         quadPitchSources[quadIndex] = sourceIndex
