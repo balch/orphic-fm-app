@@ -70,7 +70,10 @@ fun RotaryKnob(
     knobColor: Color = OrpheusColors.softPurple,
     indicatorColor: Color = OrpheusColors.neonCyan,
     labelColor: Color = progressColor,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    valueFormatter: (Float) -> String = { value -> 
+        ((value * 100).roundToInt() / 100.0).toString() 
+    }
 ) {
     // Sensitivity for drag (pixels per full range)
     val sensitivity = 200f
@@ -264,7 +267,7 @@ fun RotaryKnob(
             )
         }
         Text(
-            text = ((internalValue * 100).roundToInt() / 100.0).toString(),
+            text = valueFormatter(internalValue),
             style = MaterialTheme.typography.labelMedium,
             color = progressColor.lighten(0.3f),
             textAlign = TextAlign.Center,

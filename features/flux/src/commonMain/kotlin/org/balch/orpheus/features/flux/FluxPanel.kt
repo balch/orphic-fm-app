@@ -18,6 +18,8 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.ValueCycleButton
 
+private val ScaleNames = listOf("CHR", "MAJ", "MIN", "PEN", "PHR", "WHO")
+
 /**
  * Flux Panel - Controls for the random melody generator.
  */
@@ -32,7 +34,7 @@ fun FluxPanel(
     CollapsibleColumnPanel(
         modifier = modifier,
         title = "FLUX",
-        color = OrpheusColors.neonCyan,
+        color = OrpheusColors.metallicBlueLight,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
@@ -48,13 +50,23 @@ fun FluxPanel(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Top
         ) {
+            // Clock Source (Moved to top)
+            ValueCycleButton(
+                value = state.clockSource,
+                values = listOf(0, 1),
+                onValueChange = actions.setClockSource,
+                labelProvider = { if (it == 0) "INT" else "LFO" },
+                modifier = Modifier.width(48.dp).height(24.dp).align(Alignment.CenterVertically),
+                color = OrpheusColors.metallicBlueLight
+            )
+
             RotaryKnob(
                 value = state.spread,
                 onValueChange = actions.setSpread,
                 label = "SPREAD",
                 controlId = FluxViewModel.SPREAD,
                 size = 52.dp,
-                progressColor = OrpheusColors.neonMagenta
+                progressColor = OrpheusColors.metallicBlueLight
             )
             
             RotaryKnob(
@@ -63,7 +75,7 @@ fun FluxPanel(
                 label = "BIAS",
                 controlId = FluxViewModel.BIAS,
                 size = 52.dp,
-                progressColor = OrpheusColors.electricBlue
+                progressColor = OrpheusColors.metallicBlueLight
             )
             
             RotaryKnob(
@@ -72,7 +84,7 @@ fun FluxPanel(
                 label = "STEPS",
                 controlId = FluxViewModel.STEPS,
                 size = 52.dp,
-                progressColor = OrpheusColors.synthGreen
+                progressColor = OrpheusColors.metallicBlueLight
             )
             
             RotaryKnob(
@@ -81,7 +93,7 @@ fun FluxPanel(
                 label = "DÉJÀ VU",
                 controlId = FluxViewModel.DEJA_VU,
                 size = 52.dp,
-                progressColor = OrpheusColors.warmGlow
+                progressColor = OrpheusColors.metallicBlueLight
             )
         }
         
@@ -100,7 +112,7 @@ fun FluxPanel(
                 label = "LENGTH",
                 range = 1f..16f,
                 size = 48.dp,
-                progressColor = androidx.compose.ui.graphics.Color.Gray
+                progressColor = OrpheusColors.metallicBlueLight
             )
             
             // Scale Selector
@@ -110,7 +122,8 @@ fun FluxPanel(
                 label = "SCALE",
                 range = 0f..5f,
                 size = 48.dp,
-                progressColor = androidx.compose.ui.graphics.Color.Gray
+                progressColor = OrpheusColors.metallicBlueLight,
+                valueFormatter = { ScaleNames.getOrElse(it.toInt()) { "" } }
             )
             
             // Rate Divider
@@ -120,7 +133,7 @@ fun FluxPanel(
                 label = "RATE",
                 controlId = "flux_rate",
                 size = 48.dp,
-                progressColor = OrpheusColors.synthPink
+                progressColor = OrpheusColors.metallicBlueLight
             )
 
             // Jitter
@@ -130,7 +143,7 @@ fun FluxPanel(
                 label = "JITTER",
                 controlId = "flux_jitter",
                 size = 48.dp,
-                progressColor = OrpheusColors.neonMagenta
+                progressColor = OrpheusColors.metallicBlueLight
             )
 
             // Probability/Gate Bias
@@ -140,7 +153,7 @@ fun FluxPanel(
                 label = "PROB",
                 controlId = "flux_probability",
                 size = 48.dp,
-                progressColor = OrpheusColors.electricBlue
+                progressColor = OrpheusColors.metallicBlueLight
             )
 
             // Gate Length
@@ -149,17 +162,7 @@ fun FluxPanel(
                 onValueChange = { actions.setGateLength(it) },
                 label = "GATE",
                 size = 48.dp,
-                progressColor = OrpheusColors.warmGlow
-            )
-            
-            // Clock Source
-            ValueCycleButton(
-                value = state.clockSource,
-                values = listOf(0, 1),
-                onValueChange = actions.setClockSource,
-                labelProvider = { if (it == 0) "INT" else "LFO" },
-                modifier = Modifier.width(48.dp).height(24.dp),
-                color = OrpheusColors.neonMagenta
+                progressColor = OrpheusColors.metallicBlueLight
             )
         }
     }
