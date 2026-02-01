@@ -109,7 +109,7 @@ class DrumViewModel(
     private val synthEngine: SynthEngine,
     presetLoader: PresetLoader,
     private val synthController: SynthController,
-    private val dispatcherProvider: DispatcherProvider
+    dispatcherProvider: DispatcherProvider
 ) : ViewModel(), DrumFeature {
 
     private val _uiState = MutableStateFlow(DrumUiState())

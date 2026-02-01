@@ -68,7 +68,7 @@ class DebugViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Lazily,
         initialValue = DebugUiState(0f, 0f,)
     )
 

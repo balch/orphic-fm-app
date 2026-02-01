@@ -358,7 +358,7 @@ class AiOptionsViewModel(
         .map { it.messages }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.Lazily,
             initialValue = emptyList()
         )
 
@@ -873,7 +873,7 @@ class AiOptionsViewModel(
         .mapNotNull { it
         }.stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.Lazily,
             initialValue = AiOptionsUiState(
                 availableModels = availableModels,
                 aiStatusMessages = aiStatusMessages,

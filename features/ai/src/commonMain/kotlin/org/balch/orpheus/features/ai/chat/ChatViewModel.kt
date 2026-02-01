@@ -69,7 +69,7 @@ class ChatViewModel(
         .map { it.messages }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.Lazily,
             initialValue = emptyList()
         )
 
@@ -85,7 +85,7 @@ class ChatViewModel(
         .map { it is AgentState.Loading || it.messages.lastOrNull()?.type == ChatMessageType.Loading }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.Lazily,
             initialValue = true
         )
 
@@ -106,7 +106,7 @@ class ChatViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Lazily,
         initialValue = ChatUiState()
     )
 

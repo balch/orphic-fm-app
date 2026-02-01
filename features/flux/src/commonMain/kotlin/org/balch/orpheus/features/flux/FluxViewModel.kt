@@ -157,7 +157,7 @@ class FluxViewModel @Inject constructor(
     .flowOn(dispatcherProvider.io)
     .stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Lazily,
         initialValue = FluxUiState()
     )
 
@@ -171,7 +171,8 @@ class FluxViewModel @Inject constructor(
         rate = engine.getFluxRate(),
         jitter = engine.getFluxJitter(),
         probability = engine.getFluxProbability(),
-        clockSource = engine.getFluxClockSource()
+        clockSource = engine.getFluxClockSource(),
+        gateLength = engine.getFluxGateLength()
     )
 
     private fun reduce(state: FluxUiState, intent: FluxIntent): FluxUiState = when (intent) {

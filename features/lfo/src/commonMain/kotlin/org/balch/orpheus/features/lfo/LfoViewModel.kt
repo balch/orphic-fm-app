@@ -141,7 +141,7 @@ class LfoViewModel(
     .flowOn(dispatcherProvider.io)
     .stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Lazily,
         initialValue = LfoUiState()
     )
 
