@@ -17,8 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.balch.orpheus.core.triggers.DrumTriggerSource
 import org.balch.orpheus.features.drum.DrumFeature
-import org.balch.orpheus.features.drum.DrumTriggerSource
 import org.balch.orpheus.features.drum.DrumViewModel
 import org.balch.orpheus.features.flux.FluxFeature
 import org.balch.orpheus.features.flux.FluxViewModel
@@ -61,9 +61,9 @@ fun TriggerRouterPanel(
             RouterSection(
                 title = "DRUMS",
                 items = listOf(
-                    RoutingItem("BASS", drumState.bdTriggerSource.ordinal, listOf("INT", "T1", "T2", "T3")) { drumActions.setBdTriggerSource(DrumTriggerSource.values()[it]) },
-                    RoutingItem("SNARE", drumState.sdTriggerSource.ordinal, listOf("INT", "T1", "T2", "T3")) { drumActions.setSdTriggerSource(DrumTriggerSource.values()[it]) },
-                    RoutingItem("HIHAT", drumState.hhTriggerSource.ordinal, listOf("INT", "T1", "T2", "T3")) { drumActions.setHhTriggerSource(DrumTriggerSource.values()[it]) }
+                    RoutingItem("BASS", drumState.bdTriggerSource.ordinal, listOf("INT", "T1", "T2", "T3")) { drumActions.setBdTriggerSource(DrumTriggerSource.entries[it]) },
+                    RoutingItem("SNARE", drumState.sdTriggerSource.ordinal, listOf("INT", "T1", "T2", "T3")) { drumActions.setSdTriggerSource(DrumTriggerSource.entries[it]) },
+                    RoutingItem("HIHAT", drumState.hhTriggerSource.ordinal, listOf("INT", "T1", "T2", "T3")) { drumActions.setHhTriggerSource(DrumTriggerSource.entries[it]) }
                 ),
                 color = OrpheusColors.neonMagenta
             )

@@ -50,7 +50,7 @@ kotlin {
                 implementation(libs.ktmidi)
 
                 // AI/koog
-                implementation(libs.koog.agents)
+                api(libs.koog.agents)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.serialization.json)
                 implementation(libs.ktor.client.content.negotiation)

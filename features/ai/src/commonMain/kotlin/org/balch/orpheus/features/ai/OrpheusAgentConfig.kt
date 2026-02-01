@@ -19,6 +19,7 @@ import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.currentKoogModel
 import org.balch.orpheus.core.config.AppConfig
+import kotlin.jvm.JvmSuppressWildcards
 import kotlin.time.ExperimentalTime
 
 /**
@@ -26,7 +27,7 @@ import kotlin.time.ExperimentalTime
  */
 @SingleIn(AppScope::class)
 class OrpheusAgentConfig @Inject constructor(
-    private val toolSet: Set<Tool<*, *>>,
+    private val toolSet: @JvmSuppressWildcards Set<Tool<*, *>>,
     private val aiModelProvider: AiModelProvider,
 ) {
     @OptIn(ExperimentalTime::class)

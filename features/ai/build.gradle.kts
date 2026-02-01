@@ -4,6 +4,7 @@ plugins {
     id("orpheus.kmp.compose")
     alias(libs.plugins.ksp)
     alias(libs.plugins.metro)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -26,7 +27,7 @@ kotlin {
             implementation(libs.liquid)
 
             // AI/koog
-            implementation(libs.koog.agents)
+            api(libs.koog.agents)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.serialization.json)
             implementation(libs.ktor.client.content.negotiation)

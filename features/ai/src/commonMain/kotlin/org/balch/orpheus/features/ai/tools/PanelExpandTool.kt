@@ -8,7 +8,6 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
 import org.balch.orpheus.features.ai.PanelId
 

@@ -37,10 +37,9 @@ import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.model.DefaultMarkdownColors
 import com.mikepenz.markdown.model.DefaultMarkdownTypography
+import org.balch.orpheus.ui.theme.OrpheusAssets
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.jetbrains.compose.resources.painterResource
-import orpheus.features.ai.generated.resources.Res
-import orpheus.ui.theme.generated.resources.orpheus_avatar
 
 /**
  * Chat message bubble for AI conversations.
@@ -119,7 +118,7 @@ fun ChatMessageBubble(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Image(
-                                                    painter = painterResource(orpheus_avatar),
+                                                    painter = painterResource(OrpheusAssets.avatar),
                                                     contentDescription = "Orpheus",
                                                     modifier = Modifier
                                                         .size(24.dp)
@@ -263,7 +262,7 @@ private fun LoadingIndicator(text: String = "Thinking...") {
     ) {
         // Orpheus avatar
         Image(
-            painter = painterResource(Res.drawable.orpheus_avatar),
+            painter = painterResource(OrpheusAssets.avatar),
             contentDescription = "Orpheus",
             modifier = Modifier
                 .size(18.dp)

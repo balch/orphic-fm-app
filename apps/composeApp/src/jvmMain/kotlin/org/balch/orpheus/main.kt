@@ -9,9 +9,8 @@ import com.diamondedge.logging.KmLogging
 import dev.zacsweers.metro.createGraphFactory
 import org.balch.orpheus.core.config.AppConfig
 import org.balch.orpheus.di.OrpheusGraph
+import org.balch.orpheus.ui.theme.OrpheusAssets
 import org.jetbrains.compose.resources.painterResource
-import orpheus.apps.composeapp.generated.resources.Res
-import orpheus.apps.composeapp.generated.resources.icon
 
 fun main() {
     System.setProperty("apple.awt.application.appearance", "system")
@@ -28,7 +27,7 @@ fun main() {
             onCloseRequest = ::exitApplication,
             title = AppConfig.APP_DISPLAY_NAME,
             state = rememberWindowState(width = 1280.dp, height = 800.dp),
-            icon = painterResource(Res.drawable.icon),
+            icon = painterResource(OrpheusAssets.icon),
         ) {
             App(graph)
         }

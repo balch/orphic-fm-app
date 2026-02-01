@@ -33,6 +33,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.findLibrary("kmlogging").get())
+            implementation(libs.findLibrary("metro-runtime").get())
         }
 
         commonTest.dependencies {
@@ -40,6 +41,8 @@ kotlin {
         }
     }
 }
+
+
 
 // Exclude libremidi-panama from test configurations (requires JVM 22+, we use JVM 21)
 configurations.matching { it.name.contains("test", ignoreCase = true) }.all {
