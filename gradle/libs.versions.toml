@@ -3,18 +3,20 @@ agp = "9.0.0"
 android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
-androidx-activity = "1.12.2"
+androidx-activity = "1.12.3"
 androidx-appcompat = "1.7.1"
 androidx-core = "1.17.0"
 androidx-espresso = "3.7.0"
 androidx-lifecycle = "2.9.6"
 androidx-lifecycle-viewmodel = "2.10.0"
 androidx-testExt = "1.3.0"
+composeGradlePlugin = "1.10.0"
 composeHotReload = "1.0.0"
 composeMultiplatform = "1.10.0"
+gradle = "9.0.0"
 junit = "4.13.2"
 kotlin = "2.3.0"
-ksp = "2.3.4"
+ksp = "2.3.5"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.10.0"
 kotlinx-datetime = "0.7.1-0.6.x-compat"
@@ -22,31 +24,46 @@ kotlinx-collections-immutable = "0.4.0"
 liquid = "1.1.1"
 jsyn = "v17.2.0"
 kmlogging = "2.1.0"
+material3Version = "1.9.0"
 media = "1.7.1"
 slf4jApi = "2.0.17"
-logback = "1.5.25"
-metro = "0.10.1"
+logback = "1.5.27"
+metro = "0.10.2"
 ktmidi = "0.11.2"
 coremidi4j = "1.6"
 navigation3 = "1.0.0"
 adaptiveNavigation3 = "1.2.0"
-material3 = "1.5.0-alpha12"
-koog = "0.6.0"
+material3 = "1.5.0-alpha13"
+koog = "0.6.1"
 ktor = "3.4.0"
 buildkonfig = "0.17.1"
 markdown = "0.39.1"
 androidx-benchmark-macro = "1.4.1"
 androidx-profileinstaller = "1.4.1"
 androidx-test-uiautomator = "2.3.0"
+composeIcons = "1.7.3"
 
 [libraries]
 androidx-media = { module = "androidx.media:media", version.ref = "media" }
+compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeGradlePlugin" }
+compose-material-icons = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "composeIcons" }
+compose-compiler-gradle-plugin = { module = "org.jetbrains.kotlin:compose-compiler-gradle-plugin", version.ref = "kotlin" }
+compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "composeGradlePlugin" }
+dev-zacsweers-metro-gradle-plugin = { module = "dev.zacsweers.metro:dev.zacsweers.metro.gradle.plugin", version.ref = "metro" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeGradlePlugin" }
+gradle = { module = "com.android.tools.build:gradle", version.ref = "gradle" }
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+ksp-gradle-plugin = { module = "com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin", version.ref = "ksp" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3Version" }
+metro-gradle-plugin = { module = "dev.zacsweers.metro:metro-gradle-plugin", version.ref = "metro" }
 liquid = { module = "io.github.fletchmckee.liquid:liquid", version.ref = "liquid" }
 jsyn = { module = "com.github.philburk:jsyn", version.ref = "jsyn" }
 kmlogging = { module = "com.diamondedge:logging", version.ref = "kmlogging" }
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeGradlePlugin" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4jApi" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 ktmidi = { module = "dev.atsushieno:ktmidi", version.ref = "ktmidi" }
 ktmidi-jvm-desktop = { module = "dev.atsushieno:ktmidi-jvm-desktop", version.ref = "ktmidi" }
 coremidi4j = { module = "uk.co.xfactory-librarians:coremidi4j", version.ref = "coremidi4j" }
@@ -61,10 +78,13 @@ androidx-testExt-junit = { module = "androidx.test.ext:junit", version.ref = "an
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-espresso" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 metrox-viewmodel-compose = { module = "dev.zacsweers.metro:metrox-viewmodel-compose", version.ref = "metro" }
+metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
+metrox-viewmodel = { module = "dev.zacsweers.metro:metrox-viewmodel", version.ref = "metro" }
 
 # Navigation3
 navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
@@ -92,6 +112,7 @@ androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", 
 # Compose UI Tooling (for previews)
 compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "composeMultiplatform" }
 compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
+ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeGradlePlugin" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
