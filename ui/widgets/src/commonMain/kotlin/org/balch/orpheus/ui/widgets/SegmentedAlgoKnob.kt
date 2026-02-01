@@ -63,7 +63,9 @@ fun SegmentedAlgoKnob(
         Color(0xFFFF5252), // Red - Digital RM
         Color(0xFFFF00FF), // Magenta - XOR
         Color(0xFFBA68C8), // Purple - Compare
-        Color(0xFF4FC3F7)  // Blue - Vocoder
+        Color(0xFF4FC3F7), // Blue - Vocoder
+        Color(0xFF29B6F6), // Blue - Vocoder (Longer Release)
+        Color(0xFFE1F5FE)  // Pale Blue - Freeze
     )
 
     val algoNames = listOf(
@@ -73,7 +75,9 @@ fun SegmentedAlgoKnob(
         "DIGITAL RM",
         "XOR",
         "COMPARE",
-        "VOCODER"
+        "VOCODER",
+        "VOCODER+",
+        "FREEZE"
     )
 
     val learnState = LocalLearnModeState.current
@@ -133,11 +137,8 @@ fun SegmentedAlgoKnob(
                                 while (relAngle < 0) relAngle += 360f
                                 
                                 if (relAngle <= 285f) { // Allow slight overshoot
-                                    val segmentCount = 7
                                     val totalSweep = 270f
-                                    val segmentSweep = totalSweep / (segmentCount - 1)
-                                    val idx = (relAngle / segmentSweep).roundToInt().coerceIn(0, segmentCount - 1)
-                                    val nextValue = idx.toFloat() / (segmentCount - 1)
+                                    val nextValue = (relAngle / totalSweep).coerceIn(0f, 1f)
                                     internalValue = nextValue
                                     onValueChange(nextValue)
                                     return@detectTapGestures
@@ -145,7 +146,7 @@ fun SegmentedAlgoKnob(
                             }
                             
                             // Otherwise step to next (original center tap behavior)
-                            val segmentCount = 7
+                            val segmentCount = 9
                             val currentIdx = (internalValue * (segmentCount - 1)).roundToInt()
                             val nextIdx = (currentIdx + 1) % segmentCount
                             val nextValue = nextIdx.toFloat() / (segmentCount - 1)
@@ -160,7 +161,7 @@ fun SegmentedAlgoKnob(
                 val strokeWidth = 10.dp.toPx()
 
                 // Draw segments background
-                val segmentCount = 7
+                val segmentCount = 9
                 val startAngle = 135f
                 val totalSweep = 270f
                 val segmentSweep = totalSweep / (segmentCount - 1)
@@ -340,6 +341,20 @@ private fun DrawScope.drawIcon(index: Int, color: Color, size: Float) {
                 val h = s * (1f - abs(i) * 0.3f)
                 drawLine(color, Offset(i * s * 0.4f, h), Offset(i * s * 0.4f, -h), 3f)
             }
+        }
+        7 -> { // Vocoder+: Spectrum with decay indiciation (inverted V shape overlay?)
+            for (i in -2..2) {
+                val h = s * (1f - abs(i) * 0.1f) // Fuller spectrum
+                drawLine(color, Offset(i * s * 0.4f, h), Offset(i * s * 0.4f, -h), 3f)
+            }
+        }
+        8 -> { // Freeze: Snowflake / Hold
+             // Horizontal bars for "hold"
+             drawLine(color, Offset(-s * 0.8f, -s * 0.3f), Offset(s * 0.8f, -s * 0.3f), 4f)
+             drawLine(color, Offset(-s * 0.8f, s * 0.3f), Offset(s * 0.8f, s * 0.3f), 4f)
+             // Vertical connectors
+             drawLine(color, Offset(-s * 0.4f, -s * 0.5f), Offset(-s * 0.4f, s * 0.5f), 2f)
+             drawLine(color, Offset(s * 0.4f, -s * 0.5f), Offset(s * 0.4f, s * 0.5f), 2f)
         }
     }
 }

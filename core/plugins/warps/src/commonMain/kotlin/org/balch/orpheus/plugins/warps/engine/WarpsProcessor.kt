@@ -65,7 +65,13 @@ class WarpsProcessor {
         ensureBuffers(size)
         
         // Apply parameter smoothing for click-free changes
-        val targetAlgorithm = parameters.modulationAlgorithm
+        // Apply parameter smoothing for click-free changes
+        // Map 0..1 (9 segments) to 0..1 (DSP range 0..0.75 algos, 0.75..1 vocoder)
+        // Scale by 1.125 (9/8) so that:
+        // - Segments 0-5 (0..0.66) map to 0..0.75 (Algos)
+        // - Segments 6-7 (0.66..0.88) map to 0.75..1.0 (Vocoder)
+        // - Segment 8 (0.88..1.0) clamps to 1.0 (Freeze)
+        val targetAlgorithm = (parameters.modulationAlgorithm * 1.125f).coerceIn(0f, 1f)
         val targetTimbre = parameters.modulationParameter
         
         // Smooth the algorithm parameter to prevent clicks
