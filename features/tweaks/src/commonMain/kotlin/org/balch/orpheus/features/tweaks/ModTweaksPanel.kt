@@ -63,7 +63,7 @@ fun ModTweaksPanel(
         // FM Structure Selector (Centered at top)
         CrossModSelector(
             isCrossQuad = voiceState.fmStructureCrossQuad,
-            onToggle = actions.onFmStructureChange
+            onToggle = actions.setFmStructure
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -76,7 +76,7 @@ fun ModTweaksPanel(
         ) {
             RotaryKnob(
                 value = voiceState.bpm.toFloat(),
-                onValueChange = { actions.onBpmChange(it.toDouble()) },
+                onValueChange = { actions.setBpm(it.toDouble()) },
                 label = "BPM",
                 range = 60f..200f,
                 controlId = ControlIds.BPM,
@@ -86,7 +86,7 @@ fun ModTweaksPanel(
 
             RotaryKnob(
                 value = voiceState.totalFeedback,
-                onValueChange = actions.onTotalFeedbackChange,
+                onValueChange = actions.setTotalFeedback,
                 label = "\u221E\u221E", // infinity",
                 controlId = ControlIds.TOTAL_FEEDBACK,
                 size = 52.dp,
@@ -95,7 +95,7 @@ fun ModTweaksPanel(
 
             RotaryKnob(
                 value = voiceState.vibrato,
-                onValueChange = actions.onVibratoChange,
+                onValueChange = actions.setVibrato,
                 label = "VIB",
                 controlId = ControlIds.VIBRATO,
                 size = 52.dp,
@@ -104,7 +104,7 @@ fun ModTweaksPanel(
 
             RotaryKnob(
                 value = voiceState.voiceCoupling,
-                onValueChange = actions.onVoiceCouplingChange,
+                onValueChange = actions.setVoiceCoupling,
                 label = "COUPLING",
                 controlId = ControlIds.VOICE_COUPLING,
                 size = 52.dp,
@@ -139,7 +139,7 @@ fun ModTweaksPanel(
                     ValueCycleButton(
                         value = DrumTriggerSource.entries.toTypedArray().getOrElse(voiceState.quadTriggerSources.getOrElse(index) { 0 }) { DrumTriggerSource.INTERNAL },
                         values = DrumTriggerSource.entries,
-                        onValueChange = { src -> actions.onQuadTriggerSourceChange(index, src.ordinal) },
+                        onValueChange = { src -> actions.setQuadTriggerSource(index, src.ordinal) },
                         modifier = Modifier.height(24.dp),
                         labelProvider = { src ->
                             when (src) {

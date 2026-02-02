@@ -18,11 +18,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
@@ -31,7 +31,6 @@ import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -53,6 +52,7 @@ data class BeatsUiState(
     val mix: Float = 0.7f
 )
 
+@Immutable
 data class DrumBeatsPanelActions(
     val setX: (Float) -> Unit,
     val setY: (Float) -> Unit,
@@ -77,10 +77,10 @@ typealias DrumBeatsFeature = SynthFeature<BeatsUiState, DrumBeatsPanelActions>
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class DrumBeatsViewModel @Inject constructor(
     private val synthEngine: SynthEngine,
-    presetLoader: PresetLoader,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
     private val globalTempo: GlobalTempo,
+    private val presetLoader: org.balch.orpheus.core.presets.PresetLoader
 ) : ViewModel(), DrumBeatsFeature {
 
     private val patternGenerator = DrumBeatsGenerator { type, acc -> 
@@ -94,22 +94,7 @@ class DrumBeatsViewModel @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    private val presetIntents = presetLoader.presetFlow.map { preset ->
-        val outputMode = DrumBeatsGenerator.OutputMode.entries.getOrElse(preset.beatsOutputMode) { DrumBeatsGenerator.OutputMode.DRUMS }
-        DrumBeatsIntent.Restore(
-            BeatsUiState(
-                x = preset.beatsX,
-                y = preset.beatsY,
-                densities = preset.beatsDensities,
-                bpm = preset.bpm,
-                outputMode = outputMode,
-                euclideanLengths = preset.beatsEuclideanLengths,
-                randomness = preset.beatsRandomness,
-                swing = preset.beatsSwing,
-                mix = preset.beatsMix
-            )
-        )
-    }
+
 
     private val controlIntents = synthController.onControlChange.map { event ->
         val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
@@ -143,9 +128,20 @@ class DrumBeatsViewModel @Inject constructor(
     }
 
     override val stateFlow: StateFlow<BeatsUiState> = flow {
-        // Initial state logic (could load from generic persistence or default)
-        val initial = BeatsUiState()
-        applyFullState(initial)
+        // Initial state logic from preset
+        val preset = presetLoader.presetFlow.first()
+        val initial = BeatsUiState(
+            x = preset.beatsX,
+            y = preset.beatsY,
+            densities = preset.beatsDensities.padEnd(3, 0.5f),
+            bpm = preset.bpm.toFloat(),
+            outputMode = DrumBeatsGenerator.OutputMode.entries.getOrElse(preset.beatsOutputMode) { DrumBeatsGenerator.OutputMode.DRUMS },
+            euclideanLengths = preset.beatsEuclideanLengths.padEnd(3, 16),
+            randomness = preset.beatsRandomness,
+            swing = preset.beatsSwing,
+            mix = preset.beatsMix
+        )
+
         emit(initial)
         
         // Subscribe to GlobalTempo updates
@@ -154,16 +150,19 @@ class DrumBeatsViewModel @Inject constructor(
         }
         
         emitAll(
-            merge(_userIntents, presetIntents, controlIntents, tempoIntents)
+            merge(_userIntents, controlIntents, tempoIntents)
                 .filterNotNull() // Filter out nulls from controlIntents
-                .onEach { intent -> applyToEngine(intent) }
-                .scan(initial) { state, intent -> reduce(state, intent) }
+                .scan(initial) { state, intent ->
+                    val newState = reduce(state, intent)
+                    applyToEngine(newState, intent)
+                    newState
+                }
         )
     }
     .flowOn(dispatcherProvider.io)
     .stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Lazily,
+        started = SharingStarted.Eagerly,
         initialValue = BeatsUiState()
     )
 
@@ -178,7 +177,7 @@ class DrumBeatsViewModel @Inject constructor(
             }
             is DrumBeatsIntent.Run -> {
                 if (state.isRunning != intent.running) {
-                    if (intent.running) startClock() else stopClock()
+                    // Clock start/stop handled by side effect
                 }
                 state.copy(isRunning = intent.running)
             }
@@ -193,17 +192,14 @@ class DrumBeatsViewModel @Inject constructor(
             is DrumBeatsIntent.SetSwing -> state.copy(swing = intent.value)
             is DrumBeatsIntent.SetMix -> state.copy(mix = intent.value)
             is DrumBeatsIntent.Restore -> {
-                // When restoring, we might need to sync clock state if running state changes?
-                // For simplicity, if new state is run=true and we are not running, start.
-                if (intent.state.isRunning && !state.isRunning) startClock()
-                else if (!intent.state.isRunning && state.isRunning) stopClock()
+                // Side effects handled by applyToEngine
                 intent.state
             }
             is DrumBeatsIntent.TickStep -> state.copy(currentStep = intent.step)
         }
     }
 
-    private fun applyToEngine(intent: DrumBeatsIntent) {
+    private fun applyToEngine(state: BeatsUiState, intent: DrumBeatsIntent) {
         when (intent) {
             is DrumBeatsIntent.SetX -> {
                 patternGenerator.setX(intent.value)
@@ -218,8 +214,7 @@ class DrumBeatsViewModel @Inject constructor(
                 if (!intent.fromSequencer) synthEngine.setBeatsDensity(intent.index, intent.value)
             }
             is DrumBeatsIntent.Run -> {
-                // Engine doesn't track running state efficiently, it expects ticks.
-                // However, we can use this to perhaps reset or prepare.
+                if (intent.running) startClock(state) else stopClock()
             }
             is DrumBeatsIntent.SetBpm -> {
                 // Update GlobalTempo so REPL and Flux sync
@@ -270,31 +265,86 @@ class DrumBeatsViewModel @Inject constructor(
         synthEngine.setBeatsSwing(state.swing)
         synthEngine.setBeatsMix(state.mix)
         
-        if (state.isRunning) startClock() else stopClock()
+        if (state.isRunning) startClock(state) else stopClock()
     }
 
     override val actions = DrumBeatsPanelActions(
-        setX = { _userIntents.tryEmit(DrumBeatsIntent.SetX(it)) },
-        setY = { _userIntents.tryEmit(DrumBeatsIntent.SetY(it)) },
-        setDensity = { i, v -> _userIntents.tryEmit(DrumBeatsIntent.SetDensity(i, v)) },
-        setRunning = { _userIntents.tryEmit(DrumBeatsIntent.Run(it)) },
-        setBpm = { _userIntents.tryEmit(DrumBeatsIntent.SetBpm(it)) },
-        setOutputMode = { _userIntents.tryEmit(DrumBeatsIntent.SetOutputMode(it)) },
-        setEuclideanLength = { i, l -> _userIntents.tryEmit(DrumBeatsIntent.SetEuclideanLength(i, l)) },
-        setRandomness = { _userIntents.tryEmit(DrumBeatsIntent.SetRandomness(it)) },
-        setSwing = { _userIntents.tryEmit(DrumBeatsIntent.SetSwing(it)) },
-        setMix = { _userIntents.tryEmit(DrumBeatsIntent.SetMix(it)) }
+        setX = ::setX,
+        setY = ::setY,
+        setDensity = ::setDensity,
+        setRunning = ::setRunning,
+        setBpm = ::setBpm,
+        setOutputMode = ::setOutputMode,
+        setEuclideanLength = ::setEuclideanLength,
+        setRandomness = ::setRandomness,
+        setSwing = ::setSwing,
+        setMix = ::setMix
     )
 
+    fun setX(value: Float) {
+        _userIntents.tryEmit(DrumBeatsIntent.SetX(value))
+        synthController.emitControlChange(ControlIds.BEATS_X, value, ControlEventOrigin.UI)
+    }
+
+    fun setY(value: Float) {
+        _userIntents.tryEmit(DrumBeatsIntent.SetY(value))
+        synthController.emitControlChange(ControlIds.BEATS_Y, value, ControlEventOrigin.UI)
+    }
+
+    fun setDensity(index: Int, value: Float) {
+        _userIntents.tryEmit(DrumBeatsIntent.SetDensity(index, value))
+        synthController.emitControlChange(ControlIds.beatsDensity(index), value, ControlEventOrigin.UI)
+    }
+
+    fun setRunning(running: Boolean) {
+        _userIntents.tryEmit(DrumBeatsIntent.Run(running))
+        synthController.emitControlChange(ControlIds.BEATS_RUN, if (running) 1f else 0f, ControlEventOrigin.UI)
+    }
+
+    fun setBpm(value: Float) {
+        _userIntents.tryEmit(DrumBeatsIntent.SetBpm(value))
+        synthController.emitControlChange(ControlIds.BPM, value, ControlEventOrigin.UI)
+    }
+
+    fun setOutputMode(mode: DrumBeatsGenerator.OutputMode) {
+        _userIntents.tryEmit(DrumBeatsIntent.SetOutputMode(mode))
+        val v = if (mode == DrumBeatsGenerator.OutputMode.EUCLIDEAN) 1f else 0f
+        synthController.emitControlChange(ControlIds.BEATS_MODE, v, ControlEventOrigin.UI)
+    }
+
+    fun setEuclideanLength(index: Int, length: Int) {
+        _userIntents.tryEmit(DrumBeatsIntent.SetEuclideanLength(index, length))
+        val v = (length - 1) / 31f
+        synthController.emitControlChange(ControlIds.beatsEuclideanLength(index), v, ControlEventOrigin.UI)
+    }
+
+    fun setRandomness(value: Float) {
+        _userIntents.tryEmit(DrumBeatsIntent.SetRandomness(value))
+        synthController.emitControlChange(ControlIds.BEATS_RANDOMNESS, value, ControlEventOrigin.UI)
+    }
+
+    fun setSwing(value: Float) {
+        _userIntents.tryEmit(DrumBeatsIntent.SetSwing(value))
+        synthController.emitControlChange(ControlIds.BEATS_SWING, value, ControlEventOrigin.UI)
+    }
+
+    fun setMix(value: Float) {
+        _userIntents.tryEmit(DrumBeatsIntent.SetMix(value))
+        synthController.emitControlChange(ControlIds.BEATS_MIX, value, ControlEventOrigin.UI)
+    }
+
     // Clock Logic (emits TickStep intents)
-    private fun startClock() {
+    private fun startClock(initialState: BeatsUiState) {
         clockJob?.cancel()
         clockJob = viewModelScope.launch(dispatcherProvider.io) {
             // Align start time to current audio time
             var nextTickTime = synthEngine.getCurrentTime()
             
             while (isActive) {
-                // Read current state parameters
+                // We need the LATEST state properties. 
+                // Since stateFlow might be uninitialized, we use a local BPM tracked from intents or the stream.
+                // But let's assume if startClock is called via scan, stateFlow might be ready SOON.
+                // Better yet, let's just use the state passed in and eventually move to a collector.
                 val state = stateFlow.value
                 val bpm = state.bpm
                 val swing = state.swing
@@ -378,4 +428,9 @@ private sealed interface DrumBeatsIntent {
     data class SetMix(val value: Float, val fromSequencer: Boolean = false) : DrumBeatsIntent
     data class Restore(val state: BeatsUiState) : DrumBeatsIntent
     data class TickStep(val step: Int) : DrumBeatsIntent
+}
+
+// Extension function for List padding
+private fun <T> List<T>.padEnd(size: Int, element: T): List<T> {
+    return if (this.size >= size) this.take(size) else this + List(size - this.size) { element }
 }

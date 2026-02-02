@@ -140,7 +140,7 @@ fun CompactLandscapeHeaderPanel(
                         DropdownMenuItem(
                             text = { Text(preset.name, style = MaterialTheme.typography.bodySmall, color = Color.White) },
                             onClick = {
-                                presetActions.onApply(preset)
+                                presetActions.applyPreset(preset)
                                 onPresetDropdownExpandedChange(false)
                             }
                         )
@@ -220,7 +220,7 @@ fun CompactLandscapeHeaderPanel(
             Box(modifier = Modifier.size(36.dp)) {
                 org.balch.orpheus.ui.widgets.RotaryKnob(
                     value = voiceState.masterVolume,
-                    onValueChange = voiceActions.onMasterVolumeChange,
+                    onValueChange = voiceActions.setMasterVolume,
                     range = 0f..1f,
                     size = 36.dp,
                     progressColor = OrpheusColors.neonCyan

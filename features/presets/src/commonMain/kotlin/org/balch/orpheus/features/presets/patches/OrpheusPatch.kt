@@ -5,8 +5,8 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
-import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.core.presets.SynthPreset
 
 /**
  * Warm Pad - Gentle, warm pad with subtle modulation.
@@ -16,7 +16,7 @@ import org.balch.orpheus.core.presets.SynthPatch
 class OrpheusPatch : SynthPatch {
     override val id = "orpheus"
     override val name = "Orpheus"
-    override val preset = DronePreset(
+    override val preset = SynthPreset(
         name = "Orpheus",
         voiceTunes = listOf(
             0.60874975f, 0.68999964f, 0.4812498f, 0.4962499f, 0.63999975f, 0.6599998f,

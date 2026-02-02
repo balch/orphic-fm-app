@@ -26,6 +26,16 @@ interface SynthEngine {
     fun setQuadPitch(quadIndex: Int, pitch: Float) // 0-1, 0.5=Unity
     fun setQuadHold(quadIndex: Int, amount: Float) // 0-1, VCA bias
     fun setQuadVolume(quadIndex: Int, volume: Float) // 0-1, output volume multiplier
+    fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int)
+    fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int)
+    fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) // true = enable envelope retriggering
+
+    fun getQuadPitch(quadIndex: Int): Float
+    fun getQuadHold(quadIndex: Int): Float
+    fun getQuadVolume(quadIndex: Int): Float
+    fun getQuadTriggerSource(quadIndex: Int): Int
+    fun getQuadPitchSource(quadIndex: Int): Int
+    fun getQuadEnvelopeTriggerMode(quadIndex: Int): Boolean
     
     /**
      * Smoothly fade a quad's volume to a target level over a specified duration.
@@ -156,15 +166,10 @@ interface SynthEngine {
     fun getVoiceEnvelopeSpeed(index: Int): Float
     fun getPairSharpness(pairIndex: Int): Float
     fun getDuoModSource(duoIndex: Int): ModSource
-    fun getQuadPitch(quadIndex: Int): Float
-    fun getQuadHold(quadIndex: Int): Float
-    fun getQuadVolume(quadIndex: Int): Float
     fun getFmStructureCrossQuad(): Boolean
     fun getTotalFeedback(): Float
     fun getVibrato(): Float
     fun getVoiceCoupling(): Float
-    fun getQuadPitchSource(quadIndex: Int): Int
-    fun getQuadTriggerSource(quadIndex: Int): Int
 
     fun getDelayTime(index: Int): Float
     fun getDelayFeedback(): Float
@@ -250,10 +255,7 @@ interface SynthEngine {
     fun setDrumPitchSource(drumIndex: Int, sourceIndex: Int)
     fun getDrumPitchSource(drumIndex: Int): Int
     
-    // Voice/Quad Routing
-    fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int)
-    fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int)
-    fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean)
+
 
     // Beat Sequencer (Grids)
     fun setBeatsX(x: Float)

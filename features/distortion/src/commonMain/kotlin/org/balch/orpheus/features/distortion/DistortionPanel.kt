@@ -63,7 +63,7 @@ fun DistortionPanel(
             ) {
                 RotaryKnob(
                     value = uiState.drive,
-                    onValueChange = actions.onDriveChange,
+                    onValueChange = actions.setDrive,
                     label = "DISTORTION",
                     controlId = ControlIds.DRIVE,
                     size = 56.dp,
@@ -71,7 +71,7 @@ fun DistortionPanel(
                 )
                 RotaryKnob(
                     value = uiState.mix,
-                    onValueChange = actions.onMixChange,
+                    onValueChange = actions.setMix,
                     label = "MIX",
                     controlId = ControlIds.DISTORTION_MIX,
                     size = 56.dp,
@@ -86,7 +86,7 @@ fun DistortionPanel(
             ) {
                 RotaryKnob(
                     value = uiState.volume,
-                    onValueChange = actions.onVolumeChange,
+                    onValueChange = actions.setVolume,
                     label = "VOL",
                     controlId = ControlIds.MASTER_VOLUME,
                     size = 56.dp,
@@ -95,7 +95,7 @@ fun DistortionPanel(
                 RotaryKnob(
                     value = (uiState.masterPan + 1f) / 2f,
                     onValueChange = { normalized ->
-                        actions.onMasterPanChange((normalized * 2f) - 1f)
+                        actions.setMasterPan((normalized * 2f) - 1f)
                     },
                     label = "PAN",
                     controlId = "stereo_pan",
@@ -120,7 +120,7 @@ fun DistortionPanel(
                     bottomLabel = "DELAY",
                     isTop = uiState.mode == StereoMode.VOICE_PAN,
                     onToggle = { isVoicePan ->
-                        actions.onModeChange(
+                        actions.setMode(
                             if (isVoicePan) StereoMode.VOICE_PAN else StereoMode.STEREO_DELAYS
                         )
                     },

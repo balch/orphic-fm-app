@@ -12,13 +12,12 @@ import kotlinx.datetime.Clock
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
+import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
-import org.balch.orpheus.core.audio.dsp.lv2.AudioPort
-import org.balch.orpheus.core.audio.dsp.lv2.PluginInfo
-import org.balch.orpheus.core.audio.dsp.lv2.Port
-import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.Lv2DspPlugin
+import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.dsp.PluginInfo
+import org.balch.orpheus.core.audio.dsp.Port
 import org.balch.orpheus.plugins.resonator.ResonatorPlugin
 import kotlin.math.absoluteValue
 import kotlin.math.pow
@@ -53,7 +52,7 @@ class PerStringBenderPlugin(
     private val audioEngine: AudioEngine,
     private val resonatorPlugin: ResonatorPlugin,
     private val dspFactory: DspFactory
-) : Lv2DspPlugin {
+) : DspPlugin {
 
     override val info = PluginInfo(
         uri = "org.balch.orpheus.plugins.perstringbender",

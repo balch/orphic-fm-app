@@ -159,7 +159,7 @@ fun LiveCodePanel(
                                 else OrpheusColors.softPurple.copy(alpha = 0.6f)
                             )
                             .clickable {
-                                if (uiState.isPlaying) actions.onStop() else actions.onExecute()
+                                if (uiState.isPlaying) actions.stop() else actions.execute()
                             }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -189,7 +189,7 @@ fun LiveCodePanel(
                     ExamplesDropdown(
                         modifier = Modifier.padding(end = 8.dp),
                         selectedExample = uiState.selectedExample,
-                        onLoadExample = actions.onLoadExample
+                        onLoadExample = actions.loadExample
                     )
                 }
 
@@ -215,7 +215,7 @@ fun LiveCodePanel(
                             trackWidth = 80,
                             value = ((uiState.bpm - 40) / 200).toFloat().coerceIn(0f, 1f),
                             onValueChange = { frac ->
-                                actions.onBpmChange(40 + (frac * 200).toDouble())
+                                actions.setBpm(40 + (frac * 200).toDouble())
                             },
                             color = OrpheusColors.neonCyan
                         )
@@ -244,7 +244,7 @@ fun LiveCodePanel(
                             trackWidth = 60,
                             value = (uiState.replVolume / 1.5f).coerceIn(0f, 1f),  // 0-150% range
                             onValueChange = { frac ->
-                                actions.onReplVolumeChange(frac * 1.5f)  // 0.0 to 1.5
+                                actions.setReplVolume(frac * 1.5f)  // 0.0 to 1.5
                             },
                             color = OrpheusColors.warmGlow
                         )
@@ -269,10 +269,10 @@ fun LiveCodePanel(
                 ) {
                     BasicTextField(
                         value = uiState.code,
-                        onValueChange = { if (!uiState.isAiGenerating) actions.onCodeChange(it) },
+                        onValueChange = { if (!uiState.isAiGenerating) actions.setCode(it) },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), // Set action to Send
                         keyboardActions = KeyboardActions(
-                            onSend = { actions.onExecuteBlock() }
+                            onSend = { actions.executeBlock() }
                         ),
                         readOnly = uiState.isAiGenerating, // Allow editing while playing for true live coding
                         modifier = Modifier
@@ -290,18 +290,18 @@ fun LiveCodePanel(
                                 if (event.type == KeyEventType.KeyDown) {
                                     when {
                                         (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Enter -> {
-                                            actions.onExecuteBlock()
+                                            actions.executeBlock()
                                             true
                                         }
 
                                         event.isShiftPressed && event.key == Key.Enter -> {
-                                            actions.onExecuteLine()
+                                            actions.executeLine()
                                             true
                                         }
 
                                         (event.isCtrlPressed || event.isMetaPressed) && event.key == Key.Backspace -> {
-                                            actions.onDeleteLine()
-                                            actions.onExecuteBlock()
+                                            actions.deleteLine()
+                                            actions.executeBlock()
                                             true
                                         }
 

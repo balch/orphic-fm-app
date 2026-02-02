@@ -18,17 +18,17 @@ import org.balch.orpheus.core.tempo.GlobalTempo
 @Inject
 class PresetLoader(
     private val engine: SynthEngine,
-    private val globalTempo: GlobalTempo
+    private val globalTempo: GlobalTempo,
 ) {
 
     // Shared flow to broadcast preset changes to ViewModels
     private val _presetFlow =
-        MutableSharedFlow<DronePreset>(
+        MutableSharedFlow<SynthPreset>(
             replay = 1,
             extraBufferCapacity = 1,
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
-    val presetFlow: SharedFlow<DronePreset> = _presetFlow.asSharedFlow()
+    val presetFlow: SharedFlow<SynthPreset> = _presetFlow.asSharedFlow()
 
     /**
      * Apply a preset:
@@ -41,7 +41,7 @@ class PresetLoader(
      * Note: Master Volume is intentionally NOT applied from presets. It is only
      * controllable via direct user interaction.
      */
-    fun applyPreset(preset: DronePreset) {
+    fun applyPreset(preset: SynthPreset) {
         // Update global tempo immediately
         globalTempo.setBpm(preset.bpm.toDouble())
         _presetFlow.tryEmit(preset)
@@ -53,8 +53,8 @@ class PresetLoader(
      * Note: Drum beats are managed by DrumBeatsViewModel and don't have engine getters,
      * so they will use default values here. ViewModels subscribe to presetFlow for full restore.
      */
-    fun currentStateAsPreset(name: String): DronePreset {
-        return DronePreset(
+    fun currentStateAsPreset(name: String): SynthPreset {
+        return SynthPreset(
             name = name,
             voiceTunes = List(12) { i -> engine.getVoiceTune(i) },
             voiceModDepths = List(12) { i -> engine.getVoiceFmDepth(i) },
@@ -149,8 +149,11 @@ class PresetLoader(
             
             // Drum Triggers
             drumBdTriggerSource = engine.getDrumTriggerSource(0),
+            drumBdPitchSource = engine.getDrumPitchSource(0),
             drumSdTriggerSource = engine.getDrumTriggerSource(1),
-            drumHhTriggerSource = engine.getDrumTriggerSource(2)
+            drumSdPitchSource = engine.getDrumPitchSource(1),
+            drumHhTriggerSource = engine.getDrumTriggerSource(2),
+            drumHhPitchSource = engine.getDrumPitchSource(2)
         )
     }
 }

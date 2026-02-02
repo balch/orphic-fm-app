@@ -14,12 +14,10 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
@@ -27,12 +25,11 @@ import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
 
-/** UI state for the Distortion/Volume panel. */
+@Immutable
 data class DistortionUiState(
     val drive: Float = 0.0f,
     val volume: Float = 0.7f,
@@ -45,20 +42,14 @@ data class DistortionUiState(
 
 @Immutable
 data class DistortionPanelActions(
-    val onDriveChange: (Float) -> Unit,
-    val onVolumeChange: (Float) -> Unit,
-    val onMixChange: (Float) -> Unit,
-    val onModeChange: (StereoMode) -> Unit,
-    val onMasterPanChange: (Float) -> Unit,
+    val setDrive: (Float) -> Unit,
+    val setVolume: (Float) -> Unit,
+    val setMix: (Float) -> Unit,
+    val setMode: (StereoMode) -> Unit,
+    val setMasterPan: (Float) -> Unit,
 ) {
     companion object {
-        val EMPTY = DistortionPanelActions(
-            onDriveChange = {},
-            onVolumeChange = {},
-            onMixChange = {},
-            onModeChange = {},
-            onMasterPanChange = {}
-        )
+        val EMPTY = DistortionPanelActions({}, {}, {}, {}, {})
     }
 }
 
@@ -88,17 +79,17 @@ typealias DistortionFeature = SynthFeature<DistortionUiState, DistortionPanelAct
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class DistortionViewModel(
     private val engine: SynthEngine,
-    presetLoader: PresetLoader,
-    synthController: SynthController,
+    private val synthController: SynthController,
+    private val presetLoader: org.balch.orpheus.core.presets.PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), DistortionFeature {
 
     override val actions = DistortionPanelActions(
-        onDriveChange = ::onDriveChange,
-        onVolumeChange = ::onVolumeChange,
-        onMixChange = ::onMixChange,
-        onModeChange = ::onModeChange,
-        onMasterPanChange = ::onMasterPanChange
+        setDrive = ::setDrive,
+        setVolume = ::setVolume,
+        setMix = ::setMix,
+        setMode = ::setMode,
+        setMasterPan = ::setMasterPan
     )
 
     // User intents flow
@@ -108,14 +99,17 @@ class DistortionViewModel(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    // Preset changes -> DistortionIntent.Restore (preserving volume)
+    // Preset changes -> DistortionIntent.Restore
     private val presetIntents = presetLoader.presetFlow.map { preset ->
-        // Master Volume is NEVER set from presets - only user interaction
         DistortionIntent.Restore(
             DistortionUiState(
                 drive = preset.drive,
-                volume = engine.getMasterVolume(),  // Always preserve current
-                mix = preset.distortionMix
+                volume = engine.getMasterVolume(),
+                mix = preset.distortionMix,
+                peak = 0.0f,
+                mode = engine.getStereoMode(),
+                masterPan = engine.getMasterPan(),
+                voicePans = List(8) { engine.getVoicePan(it) }
             )
         )
     }
@@ -126,7 +120,7 @@ class DistortionViewModel(
     }
 
     // Control changes -> DistortionIntent
-    private val controlIntents = synthController.onControlChange.map { event ->
+    private val controlIntents = synthController.onControlChange.mapNotNull { event ->
         val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
         when (event.controlId) {
             ControlIds.MASTER_VOLUME -> DistortionIntent.Volume(event.value)
@@ -141,37 +135,19 @@ class DistortionViewModel(
         }
     }
 
-    override val stateFlow: StateFlow<DistortionUiState> = flow {
-        // Emit initial state from engine
-        val initial = loadInitialState()
-        applyFullState(initial)
-        emit(initial)
-        
-        // Then emit from merged intent sources
-        emitAll(
-            merge(_userIntents, presetIntents, peakIntents, controlIntents)
-                .onEach { intent -> if (intent != null) applyToEngine(intent) }
-                .scan(initial) { state, intent -> if (intent != null) reduce(state, intent) else state }
-        )
-    }
-    .flowOn(dispatcherProvider.io)
-    .stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Lazily,
-        initialValue = DistortionUiState()
-    )
-
-    private fun loadInitialState(): DistortionUiState {
-        return DistortionUiState(
-            drive = engine.getDrive(),
-            volume = engine.getMasterVolume(),
-            mix = engine.getDistortionMix(),
-            peak = 0.0f,
-            mode = engine.getStereoMode(),
-            masterPan = engine.getMasterPan(),
-            voicePans = List(8) { engine.getVoicePan(it) }
-        )
-    }
+    override val stateFlow: StateFlow<DistortionUiState> =
+        merge(_userIntents, presetIntents, peakIntents, controlIntents)
+            .scan(DistortionUiState()) { state, intent ->
+                val newState = reduce(state, intent)
+                applyToEngine(newState, intent)
+                newState
+            }
+            .flowOn(dispatcherProvider.io)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = DistortionUiState()
+            )
 
     // ═══════════════════════════════════════════════════════════
     // REDUCER
@@ -198,7 +174,7 @@ class DistortionViewModel(
     // ENGINE SIDE EFFECTS
     // ═══════════════════════════════════════════════════════════
 
-    private fun applyToEngine(intent: DistortionIntent) {
+    private fun applyToEngine(state: DistortionUiState, intent: DistortionIntent) {
         when (intent) {
             // Skip engine calls for SEQUENCER events - engine is driven by audio-rate automation
             is DistortionIntent.Drive -> if (!intent.fromSequencer) engine.setDrive(intent.value)
@@ -228,27 +204,37 @@ class DistortionViewModel(
     // PUBLIC INTENT METHODS
     // ═══════════════════════════════════════════════════════════
 
-    fun onDriveChange(value: Float) {
-        _userIntents.tryEmit(DistortionIntent.Drive(value))
+    fun setDrive(value: Float) {
+        val fromSequencer = false
+        _userIntents.tryEmit(DistortionIntent.Drive(value, fromSequencer))
+        synthController.emitControlChange(ControlIds.DRIVE, value, ControlEventOrigin.UI)
     }
 
-    fun onVolumeChange(value: Float) {
+    fun setVolume(value: Float) {
         _userIntents.tryEmit(DistortionIntent.Volume(value))
+        synthController.emitControlChange(ControlIds.MASTER_VOLUME, value, ControlEventOrigin.UI)
     }
 
-    fun onMixChange(value: Float) {
-        _userIntents.tryEmit(DistortionIntent.Mix(value))
+    fun setMix(value: Float) {
+        val fromSequencer = false
+        _userIntents.tryEmit(DistortionIntent.Mix(value, fromSequencer))
+        synthController.emitControlChange(ControlIds.DISTORTION_MIX, value, ControlEventOrigin.UI)
     }
 
-    fun onModeChange(mode: StereoMode) {
+    fun setMode(mode: StereoMode) {
         _userIntents.tryEmit(DistortionIntent.SetMode(mode))
+        val value = if (mode == StereoMode.STEREO_DELAYS) 1f else 0f
+        synthController.emitControlChange(ControlIds.STEREO_MODE, value, ControlEventOrigin.UI)
     }
 
-    fun onMasterPanChange(pan: Float) {
+    fun setMasterPan(pan: Float) {
         _userIntents.tryEmit(DistortionIntent.SetMasterPan(pan))
+        // Convert -1..1 to 0..1 for control event
+        val value = (pan + 1f) / 2f
+        synthController.emitControlChange(ControlIds.STEREO_PAN, value, ControlEventOrigin.UI)
     }
 
-    fun onVoicePanChange(index: Int, pan: Float) {
+    fun setVoicePan(index: Int, pan: Float) {
         _userIntents.tryEmit(DistortionIntent.SetVoicePan(index, pan))
     }
 

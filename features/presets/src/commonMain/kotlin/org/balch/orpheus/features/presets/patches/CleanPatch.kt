@@ -5,8 +5,8 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
-import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.core.presets.SynthPreset
 
 /**
  * Clean Patch - Good for REPL
@@ -17,7 +17,7 @@ import org.balch.orpheus.core.presets.SynthPatch
 class CleanPatch : SynthPatch {
     override val id = "clean"
     override val name = "Clean"
-    override val preset = DronePreset(
+    override val preset = SynthPreset(
         name = "Clean",
         // Voice tunes create a minor 7th chord across octaves (Am7 voicing)
         // Low octave (pair 0): A1, C2 (root, minor 3rd)

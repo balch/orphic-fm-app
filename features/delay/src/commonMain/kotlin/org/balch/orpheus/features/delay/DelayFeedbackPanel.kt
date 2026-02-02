@@ -47,7 +47,7 @@ fun DelayFeedbackPanel(
         ) {
             RotaryKnob(
                 value = uiState.mod1,
-                onValueChange = actions.onMod1Change,
+                onValueChange = actions.setMod1,
                 label = "DELAY A",
                 controlId = ControlIds.DELAY_MOD_1,
                 size = 40.dp,
@@ -55,7 +55,7 @@ fun DelayFeedbackPanel(
             )
             RotaryKnob(
                 value = uiState.mod2,
-                onValueChange = actions.onMod2Change,
+                onValueChange = actions.setMod2,
                 label = "DELAY B",
                 controlId = ControlIds.DELAY_MOD_2,
                 size = 40.dp,
@@ -68,7 +68,7 @@ fun DelayFeedbackPanel(
                 topLabel = "LFO",
                 bottomLabel = "SELF",
                 isTop = uiState.isLfoSource,
-                onToggle = { actions.onSourceChange(it) },
+                onToggle = { actions.setSource(it) },
                 color = OrpheusColors.warmGlow
             )
             VerticalToggle(
@@ -78,7 +78,7 @@ fun DelayFeedbackPanel(
                 topLabel = "TRI",
                 bottomLabel = "SQR",
                 isTop = uiState.isTriangleWave,
-                onToggle = { actions.onWaveformChange(it) },
+                onToggle = { actions.setWaveform(it) },
                 color = OrpheusColors.warmGlow
             )
         }
@@ -90,7 +90,7 @@ fun DelayFeedbackPanel(
         ) {
             RotaryKnob(
                 value = uiState.time1,
-                onValueChange = actions.onTime1Change,
+                onValueChange = actions.setTime1,
                 label = "TIME A",
                 controlId = ControlIds.DELAY_TIME_1,
                 size = 40.dp,
@@ -98,7 +98,7 @@ fun DelayFeedbackPanel(
             )
             RotaryKnob(
                 value = uiState.time2,
-                onValueChange = actions.onTime2Change,
+                onValueChange = actions.setTime2,
                 label = "TIME B",
                 controlId = ControlIds.DELAY_TIME_2,
                 size = 40.dp,
@@ -106,7 +106,7 @@ fun DelayFeedbackPanel(
             )
             RotaryKnob(
                 value = uiState.feedback,
-                onValueChange = actions.onFeedbackChange,
+                onValueChange = actions.setFeedback,
                 label = "\u221E", // infinity
                 controlId = ControlIds.DELAY_FEEDBACK,
                 size = 40.dp,
@@ -114,7 +114,7 @@ fun DelayFeedbackPanel(
             )
             RotaryKnob(
                 value = uiState.mix,
-                onValueChange = actions.onMixChange,
+                onValueChange = actions.setMix,
                 label = "MIX",
                 controlId = ControlIds.DELAY_MIX,
                 size = 40.dp,

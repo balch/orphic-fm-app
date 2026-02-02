@@ -66,14 +66,14 @@ fun CompactVoicePanel(
         ) {
             RotaryKnob(
                 value = tune,
-                onValueChange = { actions.onVoiceTuneChange(voiceIndex, it) },
+                onValueChange = { actions.setVoiceTune(voiceIndex, it) },
                 size = 32.dp,
                 progressColor = color,
             )
 
             HoldSwitch(
                 checked = isHolding,
-                onCheckedChange = { actions.onHoldChange(voiceIndex, it) },
+                onCheckedChange = { actions.setHold(voiceIndex, it) },
                 activeColor = color,
                 orientation = SwitchOrientation.Vertical
             )
@@ -83,7 +83,7 @@ fun CompactVoicePanel(
 
         HorizontalMiniSlider(
             value = envelopeSpeed,
-            onValueChange = { actions.onVoiceEnvelopeSpeedChange(voiceIndex, it) },
+            onValueChange = { actions.setVoiceEnvelopeSpeed(voiceIndex, it) },
             leftLabel = "F",
             rightLabel = "S",
             color = color,
@@ -94,14 +94,14 @@ fun CompactVoicePanel(
             size = 36.dp,
             label = "",
             isActive = isActive,
-            onPulseStart = { actions.onPulseStart(voiceIndex) },
+            onPulseStart = { actions.pulseStart(voiceIndex) },
             onPulseEnd = {
-                actions.onPulseEnd(voiceIndex)
-                actions.onWobblePulseEnd(voiceIndex)
+                actions.pulseEnd(voiceIndex)
+                actions.wobblePulseEnd(voiceIndex)
             },
             activeColor = color,
-            onPulseStartWithPosition = { x, y -> actions.onWobblePulseStart(voiceIndex, x, y) },
-            onWobbleMove = { x, y -> actions.onWobbleMove(voiceIndex, x, y) }
+            onPulseStartWithPosition = { x, y -> actions.wobblePulseStart(voiceIndex, x, y) },
+            onWobbleMove = { x, y -> actions.wobbleMove(voiceIndex, x, y) }
         )
     }
 }

@@ -7,15 +7,15 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
- * Android implementation of DronePresetRepository using JSON files.
+ * Android implementation of SynthPresetRepository using JSON files.
  * Stores presets in the app's files directory.
  * Context is injected via DI.
  */
 @Inject
-class AndroidDronePresetRepository(
+class AndroidSynthPresetRepository(
     private val context: Context
-) : DronePresetRepository {
-    private val log = logging("AndroidDronePresetRepository")
+) : SynthPresetRepository {
+    private val log = logging("AndroidSynthPresetRepository")
 
     private val json = Json {
         prettyPrint = true
@@ -36,7 +36,7 @@ class AndroidDronePresetRepository(
         return File(presetsDir, "$safeName.json")
     }
 
-    override suspend fun save(preset: DronePreset) {
+    override suspend fun save(preset: SynthPreset) {
         try {
             val file = fileForPreset(preset.name)
             val jsonString = json.encodeToString(preset)
@@ -47,12 +47,12 @@ class AndroidDronePresetRepository(
         }
     }
 
-    override suspend fun load(name: String): DronePreset? {
+    override suspend fun load(name: String): SynthPreset? {
         return try {
             val file = fileForPreset(name)
             if (file.exists()) {
                 val jsonString = file.readText()
-                json.decodeFromString<DronePreset>(jsonString)
+                json.decodeFromString<SynthPreset>(jsonString)
             } else null
         } catch (e: Exception) {
             log.error { "Failed to load preset '$name': ${e.message}" }
@@ -72,13 +72,13 @@ class AndroidDronePresetRepository(
         }
     }
 
-    override suspend fun list(): List<DronePreset> {
+    override suspend fun list(): List<SynthPreset> {
         return try {
             presetsDir.listFiles()
                 ?.filter { it.extension == "json" }
                 ?.mapNotNull { file ->
                     try {
-                        json.decodeFromString<DronePreset>(file.readText())
+                        json.decodeFromString<SynthPreset>(file.readText())
                     } catch (e: Exception) {
                         null
                     }

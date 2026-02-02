@@ -31,7 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.presets.DronePreset
+import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
@@ -44,8 +44,8 @@ import org.balch.orpheus.ui.widgets.dialogs.PresetNameDialog
  * Preset management properties
  */
 data class PresetProps(
-    val presets: List<DronePreset>,
-    val selectedPreset: DronePreset?,
+    val presets: List<SynthPreset>,
+    val selectedPreset: SynthPreset?,
     val presetActions: PresetPanelActions,
 )
 
@@ -70,7 +70,7 @@ fun PresetsPanel(
     // Extract values from the sealed interface
     val currentState = uiState
     val (presets, selectedPreset) = when (currentState) {
-        is PresetUiState.Loading -> emptyList<DronePreset>() to null
+        is PresetUiState.Loading -> emptyList<SynthPreset>() to null
         is PresetUiState.Loaded -> currentState.presets to currentState.selectedPreset
     }
 
@@ -106,7 +106,7 @@ fun PresetsPanel(
             Button(
                 onClick = {
                     showNewDialog = true
-                    presetProps.presetActions.onDialogActiveChange(true)
+                    presetProps.presetActions.setDialogActive(true)
                 },
                 colors = buttonColors
             ) {
@@ -120,7 +120,7 @@ fun PresetsPanel(
             Button(
                 onClick = {
                     showOverrideDialog = true
-                    presetProps.presetActions.onDialogActiveChange(true)
+                    presetProps.presetActions.setDialogActive(true)
                 },
                 colors = buttonColors,
                 enabled = (presetProps.selectedPreset != null),
@@ -136,7 +136,7 @@ fun PresetsPanel(
             Button(
                 onClick = {
                     showDeleteDialog = true
-                    presetProps.presetActions.onDialogActiveChange(true)
+                    presetProps.presetActions.setDialogActive(true)
                 },
                 enabled = (presetProps.selectedPreset != null),
                 colors = buttonColors,
@@ -181,8 +181,7 @@ fun PresetsPanel(
                                 else Color.Transparent
                             )
                             .clickable {
-                                presetProps.presetActions.onSelect(preset)
-                                presetProps.presetActions.onApply(preset)
+                                presetProps.presetActions.applyPreset(preset)
                             }
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
@@ -205,13 +204,13 @@ fun PresetsPanel(
     if (showNewDialog) {
         PresetNameDialog(
             onConfirm = { name ->
-                presetProps.presetActions.onNew(name)
+                presetProps.presetActions.saveNewPreset(name)
                 showNewDialog = false
-                presetProps.presetActions.onDialogActiveChange(false)
+                presetProps.presetActions.setDialogActive(false)
             },
             onDismiss = {
                 showNewDialog = false
-                presetProps.presetActions.onDialogActiveChange(false)
+                presetProps.presetActions.setDialogActive(false)
             }
         )
     }
@@ -221,13 +220,13 @@ fun PresetsPanel(
             title = "Overwrite Preset",
             message = "Overwrite '${presetProps.selectedPreset?.name ?: ""}'?",
             onConfirm = {
-                presetProps.selectedPreset?.let { presetProps.presetActions.onOverride(it) }
+                presetProps.selectedPreset?.let { presetProps.presetActions.overridePreset(it) }
                 showOverrideDialog = false
-                presetProps.presetActions.onDialogActiveChange(false)
+                presetProps.presetActions.setDialogActive(false)
             },
             onDismiss = {
                 showOverrideDialog = false
-                presetProps.presetActions.onDialogActiveChange(false)
+                presetProps.presetActions.setDialogActive(false)
             },
             isDestructive = true
         )
@@ -238,13 +237,13 @@ fun PresetsPanel(
             title = "Delete Preset",
             message = "Delete '${presetProps.selectedPreset?.name ?: ""}'?",
             onConfirm = {
-                presetProps.selectedPreset?.let { presetProps.presetActions.onDelete(it) }
+                presetProps.selectedPreset?.let { presetProps.presetActions.deletePreset(it) }
                 showDeleteDialog = false
-                presetProps.presetActions.onDialogActiveChange(false)
+                presetProps.presetActions.setDialogActive(false)
             },
             onDismiss = {
                 showDeleteDialog = false
-                presetProps.presetActions.onDialogActiveChange(false)
+                presetProps.presetActions.setDialogActive(false)
             },
             isDestructive = true
         )

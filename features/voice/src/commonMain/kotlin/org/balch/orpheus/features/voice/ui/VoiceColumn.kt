@@ -41,7 +41,7 @@ fun VoiceColumnMod(
     ) {
         RotaryKnob(
             value = modDepth,
-            onValueChange = { voiceActions.onDuoModDepthChange(pairIndex, it) },
+            onValueChange = { voiceActions.setDuoModDepth(pairIndex, it) },
             label = "\u0394",  // delta
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.voiceFmDepth(voiceIndex),
@@ -50,7 +50,7 @@ fun VoiceColumnMod(
         )
         RotaryKnob(
             value = tune,
-            onValueChange = { voiceActions.onVoiceTuneChange(voiceIndex, it) },
+            onValueChange = { voiceActions.setVoiceTune(voiceIndex, it) },
             label = "\u266B", // eighth notes
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.voiceTune(voiceIndex),
@@ -60,7 +60,7 @@ fun VoiceColumnMod(
         // Envelope Speed Slider
         HorizontalEnvelopeSlider(
             value = envSpeed,
-            onValueChange = { voiceActions.onVoiceEnvelopeSpeedChange(voiceIndex, it) },
+            onValueChange = { voiceActions.setVoiceEnvelopeSpeed(voiceIndex, it) },
             color = OrpheusColors.neonCyan,
             controlId = ControlIds.voiceEnvelopeSpeed(voiceIndex)
         )
@@ -87,7 +87,7 @@ fun VoiceColumnSharp(
     ) {
         RotaryKnob(
             value = sharpness,
-            onValueChange = { voiceActions.onPairSharpnessChange(pairIndex, it) },
+            onValueChange = { voiceActions.setPairSharpness(pairIndex, it) },
             label = "\u266F", // sharp
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.pairSharpness(pairIndex),
@@ -96,7 +96,7 @@ fun VoiceColumnSharp(
         )
         RotaryKnob(
             value = tune,
-            onValueChange = { voiceActions.onVoiceTuneChange(voiceIndex, it) },
+            onValueChange = { voiceActions.setVoiceTune(voiceIndex, it) },
             label = "\u266B", // eighth notes
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.voiceTune(voiceIndex),
@@ -106,7 +106,7 @@ fun VoiceColumnSharp(
         // Envelope Speed Slider
         HorizontalEnvelopeSlider(
             value = envSpeed,
-            onValueChange = { voiceActions.onVoiceEnvelopeSpeedChange(voiceIndex, it) },
+            onValueChange = { voiceActions.setVoiceEnvelopeSpeed(voiceIndex, it) },
             color = OrpheusColors.neonCyan,
             controlId = ControlIds.voiceEnvelopeSpeed(voiceIndex)
         )

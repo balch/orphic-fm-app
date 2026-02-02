@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.midi
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
@@ -28,6 +29,7 @@ import org.balch.orpheus.core.midi.MidiMappingStateHolder
 import org.balch.orpheus.core.synthViewModel
 
 /** UI state for the MIDI panel. */
+@Immutable
 data class MidiUiState(
     val deviceName: String? = null,
     val isConnected: Boolean = false,
@@ -75,16 +77,16 @@ class MidiViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Lazily,
+        started = SharingStarted.Eagerly,
         initialValue = MidiUiState()
     )
 
     override val actions: MidiPanelActions = MidiPanelActions(
-        onToggleLearnMode = { toggleLearnMode() },
-        onSaveLearnedMappings = { saveLearnedMappings() },
-        onCancelLearnMode = { cancelLearnMode() },
-        onSelectControlForLearning = { id -> selectControlForLearning(id) },
-        onSelectVoiceForLearning = { idx -> selectVoiceForLearning(idx) },
+        toggleLearnMode = { toggleLearnMode() },
+        saveLearnedMappings = { saveLearnedMappings() },
+        cancelLearnMode = { cancelLearnMode() },
+        selectControlForLearning = { id -> selectControlForLearning(id) },
+        selectVoiceForLearning = { idx -> selectVoiceForLearning(idx) },
         isControlBeingLearned = { id -> isControlBeingLearned(id) },
         isVoiceBeingLearned = { idx -> isVoiceBeingLearned(idx) }
     )
@@ -251,11 +253,11 @@ class MidiViewModel(
             object : MidiFeature {
                 override val stateFlow: StateFlow<MidiUiState> = MutableStateFlow(state)
                 override val actions: MidiPanelActions = MidiPanelActions(
-                    onToggleLearnMode = {},
-                    onSaveLearnedMappings = {},
-                    onCancelLearnMode = {},
-                    onSelectControlForLearning = {},
-                    onSelectVoiceForLearning = {},
+                    toggleLearnMode = {},
+                    saveLearnedMappings = {},
+                    cancelLearnMode = {},
+                    selectControlForLearning = {},
+                    selectVoiceForLearning = {},
                     isControlBeingLearned = { false },
                     isVoiceBeingLearned = { false }
                 )
@@ -268,12 +270,13 @@ class MidiViewModel(
 
 }
 
+@Immutable
 data class MidiPanelActions(
-    val onToggleLearnMode: () -> Unit,
-    val onSaveLearnedMappings: () -> Unit,
-    val onCancelLearnMode: () -> Unit,
-    val onSelectControlForLearning: (String) -> Unit,
-    val onSelectVoiceForLearning: (Int) -> Unit,
+    val toggleLearnMode: () -> Unit,
+    val saveLearnedMappings: () -> Unit,
+    val cancelLearnMode: () -> Unit,
+    val selectControlForLearning: (String) -> Unit,
+    val selectVoiceForLearning: (Int) -> Unit,
     val isControlBeingLearned: (String) -> Boolean,
     val isVoiceBeingLearned: (Int) -> Boolean
 )

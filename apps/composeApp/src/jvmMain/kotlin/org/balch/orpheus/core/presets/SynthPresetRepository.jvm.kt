@@ -6,12 +6,12 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
- * JVM implementation of DronePresetRepository using JSON files.
+ * JVM implementation of SynthPresetRepository using JSON files.
  * Stores presets in ~/.config/orpheus/presets/
  */
 @Inject
-class JvmDronePresetRepository : DronePresetRepository {
-    private val log = logging("JvmDronePresetRepository")
+class JvmSynthPresetRepository : SynthPresetRepository {
+    private val log = logging("JvmSynthPresetRepository")
 
 
     private val json = Json {
@@ -34,7 +34,7 @@ class JvmDronePresetRepository : DronePresetRepository {
         return File(presetsDir, "$safeName.json")
     }
 
-    override suspend fun save(preset: DronePreset) {
+    override suspend fun save(preset: SynthPreset) {
         try {
             val file = fileForPreset(preset.name)
             val jsonString = json.encodeToString(preset)
@@ -45,12 +45,12 @@ class JvmDronePresetRepository : DronePresetRepository {
         }
     }
 
-    override suspend fun load(name: String): DronePreset? {
+    override suspend fun load(name: String): SynthPreset? {
         return try {
             val file = fileForPreset(name)
             if (file.exists()) {
                 val jsonString = file.readText()
-                val preset = json.decodeFromString<DronePreset>(jsonString)
+                val preset = json.decodeFromString<SynthPreset>(jsonString)
                 log.info { "Loaded preset '${name}' from ${file.name}" }
                 preset
             } else {
@@ -75,13 +75,13 @@ class JvmDronePresetRepository : DronePresetRepository {
         }
     }
 
-    override suspend fun list(): List<DronePreset> {
+    override suspend fun list(): List<SynthPreset> {
         return try {
             presetsDir.listFiles()
                 ?.filter { it.extension == "json" }
                 ?.mapNotNull { file ->
                     try {
-                        json.decodeFromString<DronePreset>(file.readText())
+                        json.decodeFromString<SynthPreset>(file.readText())
                     } catch (e: Exception) {
                         log.warn { "Failed to parse preset file ${file.name}: ${e.message}" }
                         null

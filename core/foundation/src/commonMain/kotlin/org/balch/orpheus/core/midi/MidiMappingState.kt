@@ -116,6 +116,8 @@ data class MidiMappingState(
             const val RESONATOR_DAMPING = "resonator_damping"
             const val RESONATOR_POSITION = "resonator_position"
             const val RESONATOR_MIX = "resonator_mix"
+            const val RESONATOR_TARGET_MIX = "resonator_target_mix"
+            const val RESONATOR_SNAP_BACK = "resonator_snap_back"
 
             // Drum controls
             const val DRUM_BD_FREQ = "drum_bd_freq"
@@ -124,18 +126,24 @@ data class MidiMappingState(
             const val DRUM_BD_AFM = "drum_bd_afm"
             const val DRUM_BD_SFM = "drum_bd_sfm"
             const val DRUM_BD_TRIGGER = "drum_bd_trigger"
+            const val DRUM_BD_TRIGGER_SOURCE = "drum_bd_trigger_source"
+            const val DRUM_BD_PITCH_SOURCE = "drum_bd_pitch_source"
 
             const val DRUM_SD_FREQ = "drum_sd_freq"
             const val DRUM_SD_TONE = "drum_sd_tone"
             const val DRUM_SD_DECAY = "drum_sd_decay"
             const val DRUM_SD_SNAPPY = "drum_sd_snappy"
             const val DRUM_SD_TRIGGER = "drum_sd_trigger"
+            const val DRUM_SD_TRIGGER_SOURCE = "drum_sd_trigger_source"
+            const val DRUM_SD_PITCH_SOURCE = "drum_sd_pitch_source"
 
             const val DRUM_HH_FREQ = "drum_hh_freq"
             const val DRUM_HH_TONE = "drum_hh_tone"
             const val DRUM_HH_DECAY = "drum_hh_decay"
             const val DRUM_HH_NOISY = "drum_hh_noisy"
             const val DRUM_HH_TRIGGER = "drum_hh_trigger"
+            const val DRUM_HH_TRIGGER_SOURCE = "drum_hh_trigger_source"
+            const val DRUM_HH_PITCH_SOURCE = "drum_hh_pitch_source"
 
             // Beats/Sequencer controls
             const val BEATS_RUN = "beats_run"
@@ -160,6 +168,30 @@ data class MidiMappingState(
             const val WARPS_CARRIER_SOURCE = "warps_carrier_source"
             const val WARPS_MODULATOR_SOURCE = "warps_modulator_source"
             const val WARPS_MIX = "warps_mix"
+
+            // Grains (Clouds) controls
+            const val GRAINS_POSITION = "grains_position"
+            const val GRAINS_SIZE = "grains_size"
+            const val GRAINS_PITCH = "grains_pitch"
+            const val GRAINS_DENSITY = "grains_density"
+            const val GRAINS_TEXTURE = "grains_texture"
+            const val GRAINS_DRY_WET = "grains_dry_wet"
+            const val GRAINS_FREEZE = "grains_freeze"
+            const val GRAINS_MODE = "grains_mode"
+            const val GRAINS_TRIGGER = "grains_trigger"
+
+            // Flux controls
+            const val FLUX_SPREAD = "flux_spread"
+            const val FLUX_BIAS = "flux_bias"
+            const val FLUX_STEPS = "flux_steps"
+            const val FLUX_DEJA_VU = "flux_deja_vu"
+            const val FLUX_LENGTH = "flux_length"
+            const val FLUX_SCALE = "flux_scale"
+            const val FLUX_RATE = "flux_rate"
+            const val FLUX_JITTER = "flux_jitter"
+            const val FLUX_PROBABILITY = "flux_probability"
+            const val FLUX_CLOCK_SOURCE = "flux_clock_source"
+            const val FLUX_GATE_LENGTH = "flux_gate_length"
         }
     }
 

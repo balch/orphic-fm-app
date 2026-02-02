@@ -16,7 +16,7 @@ interface SynthPatch {
     val name: String
     
     /** The preset data containing all synth parameters */
-    val preset: DronePreset
+    val preset: SynthPreset
     
     /** Whether this is a factory preset (true) or user-created (false) */
     val isFactory: Boolean get() = true

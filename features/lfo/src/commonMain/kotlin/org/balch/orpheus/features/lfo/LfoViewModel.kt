@@ -14,12 +14,10 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
@@ -32,7 +30,7 @@ import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
 
-/** UI state for the Hyper LFO panel. */
+@Immutable
 data class LfoUiState(
     val lfoA: Float = 0.0f,
     val lfoB: Float = 0.0f,
@@ -42,18 +40,13 @@ data class LfoUiState(
 
 @Immutable
 data class LfoPanelActions(
-    val onLfoAChange: (Float) -> Unit,
-    val onLfoBChange: (Float) -> Unit,
-    val onModeChange: (HyperLfoMode) -> Unit,
-    val onLinkChange: (Boolean) -> Unit
+    val setLfoA: (Float) -> Unit,
+    val setLfoB: (Float) -> Unit,
+    val setMode: (HyperLfoMode) -> Unit,
+    val setLink: (Boolean) -> Unit
 ) {
     companion object {
-        val EMPTY = LfoPanelActions(
-            onLfoAChange = {},
-            onLfoBChange = {},
-            onModeChange = {},
-            onLinkChange = {}
-        )
+        val EMPTY = LfoPanelActions({}, {}, {}, {})
     }
 }
 
@@ -78,16 +71,16 @@ typealias LfoFeature = SynthFeature<LfoUiState, LfoPanelActions>
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class LfoViewModel(
     private val engine: SynthEngine,
-    presetLoader: PresetLoader,
-    synthController: SynthController,
+    private val presetLoader: PresetLoader,
+    private val synthController: SynthController,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), LfoFeature {
 
     override val actions = LfoPanelActions(
-        onLfoAChange = ::onLfoAChange,
-        onLfoBChange = ::onLfoBChange,
-        onModeChange = ::onModeChange,
-        onLinkChange = ::onLinkChange
+        setLfoA = ::setLfoA,
+        setLfoB = ::setLfoB,
+        setMode = ::setMode,
+        setLink = ::setLink
     )
 
     // User intents flow
@@ -110,7 +103,7 @@ class LfoViewModel(
     }
 
     // Control changes -> LfoIntent
-    private val controlIntents = synthController.onControlChange.map { event ->
+    private val controlIntents = synthController.onControlChange.mapNotNull { event ->
         val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
         when (event.controlId) {
             ControlIds.HYPER_LFO_A -> LfoIntent.LfoA(event.value, fromSequencer)
@@ -125,34 +118,19 @@ class LfoViewModel(
         }
     }
 
-    override val stateFlow: StateFlow<LfoUiState> = flow {
-        // Emit initial state from engine
-        val initial = loadInitialState()
-        applyFullState(initial)
-        emit(initial)
-        
-        // Then emit from merged intent sources
-        emitAll(
-            merge(_userIntents, presetIntents, controlIntents)
-                .onEach { intent -> if (intent != null) applyToEngine(intent) }
-                .scan(initial) { state, intent -> if (intent != null) reduce(state, intent) else state }
+    override val stateFlow: StateFlow<LfoUiState> =
+        merge(_userIntents, presetIntents, controlIntents)
+        .scan(LfoUiState()) { state, intent ->
+            val newState = reduce(state, intent)
+            applyToEngine(newState, intent)
+            newState
+        }
+        .flowOn(dispatcherProvider.io)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = LfoUiState()
         )
-    }
-    .flowOn(dispatcherProvider.io)
-    .stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Lazily,
-        initialValue = LfoUiState()
-    )
-
-    private fun loadInitialState(): LfoUiState {
-        return LfoUiState(
-            lfoA = engine.getHyperLfoFreq(0),
-            lfoB = engine.getHyperLfoFreq(1),
-            mode = try { HyperLfoMode.entries[engine.getHyperLfoMode()] } catch (_: Exception) { HyperLfoMode.OFF },
-            linkEnabled = engine.getHyperLfoLink()
-        )
-    }
 
     // ═══════════════════════════════════════════════════════════
     // REDUCER
@@ -171,7 +149,7 @@ class LfoViewModel(
     // ENGINE SIDE EFFECTS
     // ═══════════════════════════════════════════════════════════
 
-    private fun applyToEngine(intent: LfoIntent) {
+    private fun applyToEngine(state: LfoUiState, intent: LfoIntent) {
         when (intent) {
             // Skip engine calls for SEQUENCER events - engine is driven by audio-rate automation
             is LfoIntent.LfoA -> if (!intent.fromSequencer) engine.setHyperLfoFreq(0, intent.value)
@@ -193,20 +171,28 @@ class LfoViewModel(
     // PUBLIC INTENT METHODS
     // ═══════════════════════════════════════════════════════════
 
-    fun onLfoAChange(value: Float) {
-        _userIntents.tryEmit(LfoIntent.LfoA(value))
+    fun setLfoA(value: Float) {
+        val fromSequencer = false
+        _userIntents.tryEmit(LfoIntent.LfoA(value, fromSequencer))
+        synthController.emitControlChange(ControlIds.HYPER_LFO_A, value, ControlEventOrigin.UI)
     }
 
-    fun onLfoBChange(value: Float) {
-        _userIntents.tryEmit(LfoIntent.LfoB(value))
+    fun setLfoB(value: Float) {
+        val fromSequencer = false
+        _userIntents.tryEmit(LfoIntent.LfoB(value, fromSequencer))
+        synthController.emitControlChange(ControlIds.HYPER_LFO_B, value, ControlEventOrigin.UI)
     }
 
-    fun onModeChange(mode: HyperLfoMode) {
+    fun setMode(mode: HyperLfoMode) {
         _userIntents.tryEmit(LfoIntent.Mode(mode))
+        val modes = HyperLfoMode.entries
+        val value = if (modes.isNotEmpty()) mode.ordinal.toFloat() / (modes.size - 1) else 0f
+        synthController.emitControlChange(ControlIds.HYPER_LFO_MODE, value, ControlEventOrigin.UI)
     }
 
-    fun onLinkChange(enabled: Boolean) {
+    fun setLink(enabled: Boolean) {
         _userIntents.tryEmit(LfoIntent.Link(enabled))
+        synthController.emitControlChange(ControlIds.HYPER_LFO_LINK, if (enabled) 1f else 0f, ControlEventOrigin.UI)
     }
 
     fun restoreState(state: LfoUiState) {

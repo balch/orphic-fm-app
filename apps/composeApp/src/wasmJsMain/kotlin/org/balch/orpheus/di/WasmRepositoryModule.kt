@@ -6,8 +6,8 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.preferences.WasmAppPreferencesRepository
-import org.balch.orpheus.core.presets.DronePresetRepository
-import org.balch.orpheus.core.presets.WasmDronePresetRepository
+import org.balch.orpheus.core.presets.SynthPresetRepository
+import org.balch.orpheus.core.presets.WasmSynthPresetRepository
 
 /**
  * WASM-specific module providing repository implementations.
@@ -17,7 +17,7 @@ interface WasmRepositoryModule {
     companion object {
         @Provides
         @SingleIn(AppScope::class)
-        fun provideDronePresetRepository(impl: WasmDronePresetRepository): DronePresetRepository = impl
+        fun provideSynthPresetRepository(impl: WasmSynthPresetRepository): SynthPresetRepository = impl
 
         @Provides
         @SingleIn(AppScope::class)

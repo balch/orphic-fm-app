@@ -143,7 +143,7 @@ fun VoiceGroupSectionLayout(
             RotaryKnob(
                 value = voiceState.quadGroupPitches[quadIndex],
                 onValueChange = {
-                    voiceActions.onQuadPitchChange(quadIndex, it)
+                    voiceActions.setQuadPitch(quadIndex, it)
                 },
                 label = "\u266B", // eighth notes
                 labelStyle = MaterialTheme.typography.labelLarge,
@@ -155,7 +155,7 @@ fun VoiceGroupSectionLayout(
             RotaryKnob(
                 value = voiceState.quadGroupHolds[quadIndex],
                 onValueChange = {
-                    voiceActions.onQuadHoldChange(quadIndex, it)
+                    voiceActions.setQuadHold(quadIndex, it)
                 },
                 label = "\u25AC", // tenuto
                 labelStyle = MaterialTheme.typography.labelLarge,
@@ -172,7 +172,7 @@ fun VoiceGroupSectionLayout(
                 ValueCycleButton(
                     value = DrumTriggerSource.values().getOrElse(voiceState.quadTriggerSources.getOrElse(quadIndex) { 0 }) { DrumTriggerSource.INTERNAL },
                     values = DrumTriggerSource.values().toList(),
-                    onValueChange = { src -> voiceActions.onQuadTriggerSourceChange(quadIndex, src.ordinal) },
+                    onValueChange = { src -> voiceActions.setQuadTriggerSource(quadIndex, src.ordinal) },
                     modifier = Modifier.height(20.dp).width(42.dp),
                     labelProvider = { src ->
                         when (src) {
@@ -188,7 +188,7 @@ fun VoiceGroupSectionLayout(
                 ValueCycleButton(
                     value = if (voiceState.quadEnvelopeTriggerModes.getOrElse(quadIndex) { false }) 1 else 0,
                     values = listOf(0, 1),
-                    onValueChange = { voiceActions.onQuadEnvelopeTriggerModeChange(quadIndex, it == 1) },
+                    onValueChange = { voiceActions.setQuadEnvelopeTriggerMode(quadIndex, it == 1) },
                     modifier = Modifier.height(20.dp).width(42.dp),
                     labelProvider = { mode -> if (mode == 1) "TR" else "GT" },
                     color = OrpheusColors.neonCyan

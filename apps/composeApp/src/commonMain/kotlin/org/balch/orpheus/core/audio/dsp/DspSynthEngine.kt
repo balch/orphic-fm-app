@@ -97,6 +97,7 @@ class DspSynthEngine(
     private var fluxClockSource = 0 // 0=Internal, 1=LFO
     private val quadTriggerSources = IntArray(3) { 0 }
     private val quadPitchSources = IntArray(3) { 0 }
+    private val quadEnvelopeTriggerModes = BooleanArray(3)
     private var fluxGateLength = 0.5f
     private var quadEnvelopeTriggerMode = 0 // 0=Gate, 1=Trigger
 
@@ -849,6 +850,8 @@ class DspSynthEngine(
         }
     }
 
+
+
     override fun setVoiceHold(index: Int, amount: Float) {
         voices[index].setHoldLevel(amount.toDouble())
     }
@@ -1283,6 +1286,7 @@ class DspSynthEngine(
 
     override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) {
         if (quadIndex !in 0..2) return
+        quadEnvelopeTriggerModes[quadIndex] = enabled
         val voiceIndices = (quadIndex * 4) until ((quadIndex + 1) * 4)
         for (i in voiceIndices) {
             voices[i].setTriggerMode(enabled)
@@ -1291,6 +1295,7 @@ class DspSynthEngine(
 
     override fun getQuadPitchSource(quadIndex: Int): Int = quadPitchSources.getOrElse(quadIndex) { 0 }
     override fun getQuadTriggerSource(quadIndex: Int): Int = quadTriggerSources.getOrElse(quadIndex) { 0 }
+    override fun getQuadEnvelopeTriggerMode(quadIndex: Int): Boolean = quadEnvelopeTriggerModes.getOrElse(quadIndex) { false }
     
     override fun setFluxClockSource(sourceIndex: Int) {
         fluxClockSource = sourceIndex

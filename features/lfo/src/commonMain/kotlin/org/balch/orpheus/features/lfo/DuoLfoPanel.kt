@@ -70,7 +70,7 @@ fun DuoLfoPanel(
                             HyperLfoMode.OR -> 2
                         },
                     onPositionChange = { pos ->
-                        actions.onModeChange(
+                        actions.setMode(
                             when (pos) {
                                 0 -> HyperLfoMode.AND
                                 1 -> HyperLfoMode.OFF
@@ -85,7 +85,7 @@ fun DuoLfoPanel(
                 // Knobs (Medium size - 56dp)
                 RotaryKnob(
                     value = uiState.lfoA,
-                    onValueChange = actions.onLfoAChange,
+                    onValueChange = actions.setLfoA,
                     label = "RATE 1",
                     controlId = ControlIds.HYPER_LFO_A,
                     size = 64.dp,
@@ -104,13 +104,13 @@ fun DuoLfoPanel(
                     topLabel = "LINK",
                     bottomLabel = "OFF",
                     isTop = uiState.linkEnabled,
-                    onToggle = { actions.onLinkChange(it) },
+                    onToggle = { actions.setLink(it) },
                     color = OrpheusColors.neonCyan,
                     enabled = !learnState.isActive
                 )
                 RotaryKnob(
                     value = uiState.lfoB,
-                    onValueChange = actions.onLfoBChange,
+                    onValueChange = actions.setLfoB,
                     label = "RATE 2",
                     controlId = ControlIds.HYPER_LFO_B,
                     size = 64.dp,

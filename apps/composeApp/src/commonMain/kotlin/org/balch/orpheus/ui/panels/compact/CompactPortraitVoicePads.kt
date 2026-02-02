@@ -104,8 +104,8 @@ fun CompactPortraitVoicePads(
         ) {
             BenderFaderWidget(
                 value = voiceState.bendPosition, // Reflects actual bend position (including AI control)
-                onValueChange = { actions.onBendChange(it) },
-                onRelease = { actions.onBendRelease() },
+                onValueChange = { actions.setBend(it) },
+                onRelease = { actions.releaseBend() },
                 trackHeight = 120, // Use defaults for other params (wider thumb, narrower track)
                 accentColor = OrpheusColors.softPurple
             )
@@ -151,8 +151,8 @@ private fun VoiceColumn(
             quadIndex = quadIndex,
             pitch = voiceState.quadGroupPitches.getOrElse(quadIndex) { 0.5f },
             hold = voiceState.quadGroupHolds.getOrElse(quadIndex) { 0f },
-            onPitchChange = { actions.onQuadPitchChange(quadIndex, it) },
-            onHoldChange = { actions.onQuadHoldChange(quadIndex, it) },
+            onPitchChange = { actions.setQuadPitch(quadIndex, it) },
+            onHoldChange = { actions.setQuadHold(quadIndex, it) },
             color = colors.first()
         )
 
@@ -179,9 +179,9 @@ private fun VoiceColumn(
                     voiceNumber = voiceNumber,
                     tune = voiceInfo?.tune ?: 0.5f,
                     isActive = voiceInfo?.pulse == true,
-                    onTuneChange = { actions.onVoiceTuneChange(voiceIndex, it) },
-                    onPulseStart = { actions.onPulseStart(voiceIndex) },
-                    onPulseEnd = { actions.onPulseEnd(voiceIndex) },
+                    onTuneChange = { actions.setVoiceTune(voiceIndex, it) },
+                    onPulseStart = { actions.pulseStart(voiceIndex) },
+                    onPulseEnd = { actions.pulseEnd(voiceIndex) },
                     color = colors.getOrElse(index) { OrpheusColors.neonCyan },
                     controlId = ControlIds.voiceTune(voiceIndex)
                 )

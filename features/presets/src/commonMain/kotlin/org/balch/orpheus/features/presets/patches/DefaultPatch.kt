@@ -5,8 +5,8 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
-import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.core.presets.SynthPreset
 
 /**
  * Default Patch - A rich, musical starting point optimized for pleasant exploration.
@@ -22,7 +22,7 @@ import org.balch.orpheus.core.presets.SynthPatch
 class DefaultPatch : SynthPatch {
     override val id = "default"
     override val name = "Default"
-    override val preset = DronePreset(
+    override val preset = SynthPreset(
         name = "Default",
         // Voice tunes create a minor 7th chord across octaves (Am7 voicing)
         // Low octave (pair 0): A1, C2 (root, minor 3rd)

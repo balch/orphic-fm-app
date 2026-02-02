@@ -141,11 +141,11 @@ fun TriggerRouterPanel(
                 selectedT = voiceState.quadTriggerSources.getOrElse(0) { 0 },
                 onXSelect = { idx -> 
                     val current = voiceState.quadPitchSources.getOrElse(0) { 0 }
-                    voiceActions.onQuadPitchSourceChange(0, if (current == idx) 0 else idx)
+                    voiceActions.setQuadPitchSource(0, if (current == idx) 0 else idx)
                 },
                 onTSelect = { idx ->
                     val current = voiceState.quadTriggerSources.getOrElse(0) { 0 }
-                    voiceActions.onQuadTriggerSourceChange(0, if (current == idx) 0 else idx)
+                    voiceActions.setQuadTriggerSource(0, if (current == idx) 0 else idx)
                 }
             )
 
@@ -158,11 +158,11 @@ fun TriggerRouterPanel(
                 selectedT = voiceState.quadTriggerSources.getOrElse(1) { 0 },
                 onXSelect = { idx -> 
                     val current = voiceState.quadPitchSources.getOrElse(1) { 0 }
-                    voiceActions.onQuadPitchSourceChange(1, if (current == idx) 0 else idx)
+                    voiceActions.setQuadPitchSource(1, if (current == idx) 0 else idx)
                 },
                 onTSelect = { idx ->
                     val current = voiceState.quadTriggerSources.getOrElse(1) { 0 }
-                    voiceActions.onQuadTriggerSourceChange(1, if (current == idx) 0 else idx)
+                    voiceActions.setQuadTriggerSource(1, if (current == idx) 0 else idx)
                 }
             )
 
@@ -175,11 +175,11 @@ fun TriggerRouterPanel(
                 selectedT = voiceState.quadTriggerSources.getOrElse(2) { 0 },
                 onXSelect = { idx -> 
                     val current = voiceState.quadPitchSources.getOrElse(2) { 0 }
-                    voiceActions.onQuadPitchSourceChange(2, if (current == idx) 0 else idx)
+                    voiceActions.setQuadPitchSource(2, if (current == idx) 0 else idx)
                 },
                 onTSelect = { idx ->
                     val current = voiceState.quadTriggerSources.getOrElse(2) { 0 }
-                    voiceActions.onQuadTriggerSourceChange(2, if (current == idx) 0 else idx)
+                    voiceActions.setQuadTriggerSource(2, if (current == idx) 0 else idx)
                 }
             )
         }

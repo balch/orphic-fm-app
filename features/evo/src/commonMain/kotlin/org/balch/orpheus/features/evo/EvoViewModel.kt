@@ -11,11 +11,16 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
@@ -34,18 +39,19 @@ data class EvoUiState(
     val knob2Value: Float = 0.5f
 )
 
+@Immutable
 data class EvoPanelActions(
-    val onStrategyChange: (AudioEvolutionStrategy) -> Unit,
-    val onEnabledChange: (Boolean) -> Unit,
-    val onKnob1Change: (Float) -> Unit,
-    val onKnob2Change: (Float) -> Unit
+    val setStrategy: (AudioEvolutionStrategy) -> Unit,
+    val setEnabled: (Boolean) -> Unit,
+    val setKnob1: (Float) -> Unit,
+    val setKnob2: (Float) -> Unit
 ) {
     companion object {
         val EMPTY = EvoPanelActions(
-            onStrategyChange = {},
-            onEnabledChange = {},
-            onKnob1Change = {},
-            onKnob2Change = {}
+            setStrategy = {},
+            setEnabled = {},
+            setKnob1 = {},
+            setKnob2 = {}
         )
     }
 }
@@ -67,103 +73,129 @@ class EvoViewModel @Inject constructor(
     private val sortedStrategies = strategies.sortedBy { it.name }
 
     private val _currentStrategy = MutableStateFlow(sortedStrategies.first())
-    
-    private val _uiState = MutableStateFlow(
-        EvoUiState(
+
+    private val _userIntents = MutableSharedFlow<EvoIntent>(
+        replay = 0,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+
+    override val stateFlow: StateFlow<EvoUiState> = flow {
+        val initial = EvoUiState(
+            selectedStrategy = sortedStrategies.first(),
+            strategies = sortedStrategies,
+            isEnabled = false
+        )
+        emit(initial)
+        _userIntents
+            .scan(initial) { state, intent ->
+                val newState = reduce(state, intent)
+                applyToEngine(newState, intent)
+                newState
+            }
+            .collect { emit(it) }
+    }
+    .flowOn(dispatcherProvider.io)
+    .stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = EvoUiState(
             selectedStrategy = sortedStrategies.first(),
             strategies = sortedStrategies,
             isEnabled = false
         )
     )
-    override val stateFlow: StateFlow<EvoUiState> = _uiState.asStateFlow()
 
     private var evoJob: Job? = null
 
     override val actions = EvoPanelActions(
-        onStrategyChange = ::selectStrategy,
-        onEnabledChange = ::setEnabled,
-        onKnob1Change = ::onKnob1Change,
-        onKnob2Change = ::onKnob2Change
+        setStrategy = { _userIntents.tryEmit(EvoIntent.Strategy(it)) },
+        setEnabled = { _userIntents.tryEmit(EvoIntent.Enabled(it)) },
+        setKnob1 = { _userIntents.tryEmit(EvoIntent.Knob1(it)) },
+        setKnob2 = { _userIntents.tryEmit(EvoIntent.Knob2(it)) }
     )
 
     init {
         log.debug { "Initialized with ${sortedStrategies.size} strategies: ${sortedStrategies.map { it.name }}" }
     }
 
-    private fun selectStrategy(strategy: AudioEvolutionStrategy) {
-        if (_currentStrategy.value == strategy) return
-
-        log.debug { "Switching strategy: ${_currentStrategy.value.name} → ${strategy.name}" }
-
-        // Deactivate old strategy
-        _currentStrategy.value.onDeactivate()
-
-        // Activate new strategy
-        strategy.onActivate()
-        _currentStrategy.value = strategy
-
-        // Update UI state
-        _uiState.update { 
-            it.copy(
-                selectedStrategy = strategy,
-                knob1Value = 0.5f,  // Reset knobs on strategy change
-                knob2Value = 0.5f
-            )
+    private fun reduce(state: EvoUiState, intent: EvoIntent): EvoUiState =
+        when (intent) {
+            is EvoIntent.Strategy -> {
+                if (state.selectedStrategy == intent.strategy) state
+                else state.copy(
+                    selectedStrategy = intent.strategy,
+                    knob1Value = 0.5f,
+                    knob2Value = 0.5f
+                )
+            }
+            is EvoIntent.Enabled -> state.copy(isEnabled = intent.enabled)
+            is EvoIntent.Knob1 -> state.copy(knob1Value = intent.value.coerceIn(0f, 1f))
+            is EvoIntent.Knob2 -> state.copy(knob2Value = intent.value.coerceIn(0f, 1f))
+            is EvoIntent.Restore -> intent.state
         }
 
-        // Also set the knob values on the new strategy
-        strategy.setKnob1(0.5f)
-        strategy.setKnob2(0.5f)
+    private fun applyToEngine(state: EvoUiState, intent: EvoIntent) {
+        when (intent) {
+            is EvoIntent.Strategy -> {
+                val old = _currentStrategy.value
+                if (old == intent.strategy) return
+                
+                log.debug { "Switching strategy: ${old.name} → ${intent.strategy.name}" }
+                old.onDeactivate()
+                intent.strategy.onActivate()
+                _currentStrategy.value = intent.strategy
 
-        // Restart loop if running
-        if (_uiState.value.isEnabled) {
-            startEvolutionLoop()
+                // Reset knobs on strategy change
+                intent.strategy.setKnob1(0.5f)
+                intent.strategy.setKnob2(0.5f)
+
+                // Restart loop if running
+                if (state.isEnabled) {
+                    startEvolutionLoop(state)
+                }
+            }
+            is EvoIntent.Enabled -> {
+                log.debug { "Evolution ${if (intent.enabled) "enabled" else "disabled"} with ${_currentStrategy.value.name}" }
+                mediaSessionStateManager.setEvoActive(intent.enabled)
+                
+                if (intent.enabled) {
+                    _currentStrategy.value.onActivate()
+                    startEvolutionLoop(state)
+                } else {
+                    stopEvolutionLoop()
+                    _currentStrategy.value.onDeactivate()
+                }
+            }
+            is EvoIntent.Knob1 -> {
+                _currentStrategy.value.setKnob1(intent.value.coerceIn(0f, 1f))
+            }
+            is EvoIntent.Knob2 -> {
+                _currentStrategy.value.setKnob2(intent.value.coerceIn(0f, 1f))
+            }
+            is EvoIntent.Restore -> {
+                _currentStrategy.value.onDeactivate()
+                intent.state.selectedStrategy.onActivate()
+                _currentStrategy.value = intent.state.selectedStrategy
+                intent.state.selectedStrategy.setKnob1(intent.state.knob1Value)
+                intent.state.selectedStrategy.setKnob2(intent.state.knob2Value)
+                mediaSessionStateManager.setEvoActive(intent.state.isEnabled)
+                if (intent.state.isEnabled) startEvolutionLoop(state) else stopEvolutionLoop()
+            }
         }
     }
 
-    private fun setEnabled(enabled: Boolean) {
-        log.debug { "Evolution ${if (enabled) "enabled" else "disabled"} with ${_currentStrategy.value.name}" }
-        
-        _uiState.update { it.copy(isEnabled = enabled) }
-        
-        // Notify MediaSessionStateManager of Evo activity state
-        mediaSessionStateManager.setEvoActive(enabled)
-        
-        if (enabled) {
-            _currentStrategy.value.onActivate()
-            startEvolutionLoop()
-        } else {
-            stopEvolutionLoop()
-            _currentStrategy.value.onDeactivate()
-        }
-    }
-
-    private fun onKnob1Change(value: Float) {
-        val clamped = value.coerceIn(0f, 1f)
-        _currentStrategy.value.setKnob1(clamped)
-        _uiState.update { it.copy(knob1Value = clamped) }
-    }
-
-    private fun onKnob2Change(value: Float) {
-        val clamped = value.coerceIn(0f, 1f)
-        _currentStrategy.value.setKnob2(clamped)
-        _uiState.update { it.copy(knob2Value = clamped) }
-    }
-
-    private fun startEvolutionLoop() {
+    private fun startEvolutionLoop(initialState: EvoUiState) {
         stopEvolutionLoop()
         
         log.debug { "Starting evolution loop with ${_currentStrategy.value.name}" }
         
         evoJob = viewModelScope.launch(dispatcherProvider.default) {
-            while (isActive && _uiState.value.isEnabled) {
-                val strategy = _currentStrategy.value
+            while (isActive) {
+                val state = stateFlow.value
+                if (!state.isEnabled) break
                 
-                // Double-check before evolving
-                if (!_uiState.value.isEnabled) {
-                    log.debug { "Evolution disabled during loop, breaking" }
-                    break
-                }
+                val strategy = _currentStrategy.value
                 
                 // Execute evolution step
                 try {
@@ -174,7 +206,7 @@ class EvoViewModel @Inject constructor(
 
                 // Calculate delay based on strategy's speed knob
                 // Each strategy handles speed internally, but we use a baseline
-                val knob1 = _uiState.value.knob1Value
+                val knob1 = state.knob1Value
                 // Speed 0.0 = Slow (2000ms), Speed 1.0 = Fast (100ms)
                 val delayMs = (2000f - (knob1 * 1900f)).toLong().coerceAtLeast(100L)
                 delay(delayMs)
@@ -228,4 +260,12 @@ class EvoViewModel @Inject constructor(
         fun feature(): EvoFeature =
             synthViewModel<EvoViewModel, EvoFeature>()
     }
+}
+
+private sealed interface EvoIntent {
+    data class Strategy(val strategy: AudioEvolutionStrategy) : EvoIntent
+    data class Enabled(val enabled: Boolean) : EvoIntent
+    data class Knob1(val value: Float) : EvoIntent
+    data class Knob2(val value: Float) : EvoIntent
+    data class Restore(val state: EvoUiState) : EvoIntent
 }

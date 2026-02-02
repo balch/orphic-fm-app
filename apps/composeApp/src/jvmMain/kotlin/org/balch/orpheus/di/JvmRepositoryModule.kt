@@ -6,8 +6,8 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.preferences.JvmAppPreferencesRepository
-import org.balch.orpheus.core.presets.DronePresetRepository
-import org.balch.orpheus.core.presets.JvmDronePresetRepository
+import org.balch.orpheus.core.presets.JvmSynthPresetRepository
+import org.balch.orpheus.core.presets.SynthPresetRepository
 
 /**
  * JVM-specific module providing repository implementations.
@@ -17,7 +17,7 @@ interface JvmRepositoryModule {
     companion object {
         @Provides
         @SingleIn(AppScope::class)
-        fun provideDronePresetRepository(impl: JvmDronePresetRepository): DronePresetRepository = impl
+        fun provideSynthPresetRepository(impl: JvmSynthPresetRepository): SynthPresetRepository = impl
 
         @Provides
         @SingleIn(AppScope::class)

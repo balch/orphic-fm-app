@@ -19,11 +19,11 @@ import kotlinx.coroutines.sync.withLock
 @SingleIn(AppScope::class)
 @Inject
 class PresetsRepository(
-    private val dronePresetRepository: DronePresetRepository,
+    private val synthPresetRepository: SynthPresetRepository,
     factoryPatches: Set<SynthPatch>
 ) {
     // Factory presets sorted by name
-    private val factoryPresets: List<DronePreset> by lazy {
+    private val factoryPresets: List<SynthPreset> by lazy {
         factoryPatches
             .map { it.preset }
             .sortedBy { it.name }
@@ -35,7 +35,7 @@ class PresetsRepository(
     
     // Cached combined preset list
     private val _allPresets = MutableStateFlow(factoryPresets)
-    val allPresets: StateFlow<List<DronePreset>> = _allPresets.asStateFlow()
+    val allPresets: StateFlow<List<SynthPreset>> = _allPresets.asStateFlow()
     
     private val mutex = Mutex()
     private var isLoaded = false
@@ -44,7 +44,7 @@ class PresetsRepository(
      * Get all presets (factory + user). Loads from storage if not yet loaded.
      * Results are cached for efficient subsequent access.
      */
-    suspend fun getAll(): List<DronePreset> {
+    suspend fun getAll(): List<SynthPreset> {
         ensureLoaded()
         return _allPresets.value
     }
@@ -52,7 +52,7 @@ class PresetsRepository(
     /**
      * Get a preset by name. Returns null if not found.
      */
-    suspend fun getByName(name: String): DronePreset? {
+    suspend fun getByName(name: String): SynthPreset? {
         ensureLoaded()
         return _allPresets.value.find { it.name == name }
     }
@@ -60,7 +60,7 @@ class PresetsRepository(
     /**
      * Get the Default preset. Never returns null since Default is a factory preset.
      */
-    suspend fun getDefault(): DronePreset {
+    suspend fun getDefault(): SynthPreset {
         ensureLoaded()
         return _allPresets.value.find { it.name == "Default" } 
             ?: factoryPresets.first() // Fallback to first factory preset
@@ -79,8 +79,8 @@ class PresetsRepository(
     /**
      * Save a preset (user presets only). Refreshes the cache.
      */
-    suspend fun save(preset: DronePreset) {
-        dronePresetRepository.save(preset)
+    suspend fun save(preset: SynthPreset) {
+        synthPresetRepository.save(preset)
         refreshCache()
     }
     
@@ -88,7 +88,7 @@ class PresetsRepository(
      * Delete a preset (user presets only). Refreshes the cache.
      */
     suspend fun delete(name: String) {
-        dronePresetRepository.delete(name)
+        synthPresetRepository.delete(name)
         refreshCache()
     }
     
@@ -97,7 +97,7 @@ class PresetsRepository(
      */
     suspend fun refreshCache() {
         mutex.withLock {
-            val userPresets = dronePresetRepository.list()
+            val userPresets = synthPresetRepository.list()
             _allPresets.value = factoryPresets + userPresets
             isLoaded = true
         }

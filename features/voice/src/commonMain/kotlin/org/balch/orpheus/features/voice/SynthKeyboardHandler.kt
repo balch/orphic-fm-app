@@ -31,11 +31,11 @@ object SynthKeyboardHandler {
         KeyboardInputHandler.getVoiceFromKey(key)?.let { voiceIndex ->
             if (isKeyDown && !KeyboardInputHandler.isVoiceKeyPressed(voiceIndex)) {
                 KeyboardInputHandler.onVoiceKeyDown(voiceIndex)
-                voiceFeature.actions.onPulseStart(voiceIndex)
+                voiceFeature.actions.pulseStart(voiceIndex)
                 return true
             } else if (isKeyUp) {
                 KeyboardInputHandler.onVoiceKeyUp(voiceIndex)
-                voiceFeature.actions.onPulseEnd(voiceIndex)
+                voiceFeature.actions.pulseEnd(voiceIndex)
                 return true
             }
         }
@@ -70,7 +70,7 @@ object SynthKeyboardHandler {
                     val currentTune = voiceFeature.stateFlow.value.voiceStates[voiceIndex].tune
                     val delta = KeyboardInputHandler.getTuneDelta(keyEvent.isShiftPressed)
                     val newTune = (currentTune + delta).coerceIn(0f, 1f)
-                    voiceFeature.actions.onVoiceTuneChange(voiceIndex, newTune)
+                    voiceFeature.actions.setVoiceTune(voiceIndex, newTune)
                     return true
                 }
 

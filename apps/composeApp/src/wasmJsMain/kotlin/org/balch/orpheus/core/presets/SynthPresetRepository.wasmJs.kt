@@ -9,11 +9,11 @@ import org.w3c.dom.set
 import orpheus.apps.composeapp.generated.resources.Res
 
 /**
- * WASM implementation of DronePresetRepository using browser localStorage.
+ * WASM implementation of SynthPresetRepository using browser localStorage.
  */
 @Inject
-class WasmDronePresetRepository : DronePresetRepository {
-    private val log = logging("WasmDronePresetRepository")
+class WasmSynthPresetRepository : SynthPresetRepository {
+    private val log = logging("WasmSynthPresetRepository")
 
 
     private val json = Json {
@@ -60,7 +60,7 @@ class WasmDronePresetRepository : DronePresetRepository {
         return "$keyPrefix$safeName"
     }
 
-    override suspend fun save(preset: DronePreset) {
+    override suspend fun save(preset: SynthPreset) {
         ensurePresetsInitialized()
         try {
             val key = keyForPreset(preset.name)
@@ -72,13 +72,13 @@ class WasmDronePresetRepository : DronePresetRepository {
         }
     }
 
-    override suspend fun load(name: String): DronePreset? {
+    override suspend fun load(name: String): SynthPreset? {
         ensurePresetsInitialized()
         return try {
             val key = keyForPreset(name)
             val jsonString = localStorage[key]
             if (jsonString != null) {
-                val preset = json.decodeFromString<DronePreset>(jsonString)
+                val preset = json.decodeFromString<SynthPreset>(jsonString)
                 log.info { "Loaded preset '$name'" }
                 preset
             } else {
@@ -102,17 +102,17 @@ class WasmDronePresetRepository : DronePresetRepository {
         }
     }
 
-    override suspend fun list(): List<DronePreset> {
+    override suspend fun list(): List<SynthPreset> {
         ensurePresetsInitialized()
         return try {
-            val presets = mutableListOf<DronePreset>()
+            val presets = mutableListOf<SynthPreset>()
             for (i in 0 until localStorage.length) {
                 val key = localStorage.key(i)
                 if (key != null && key.startsWith(keyPrefix)) {
                     try {
                         val jsonString = localStorage[key]
                         if (jsonString != null) {
-                            presets.add(json.decodeFromString<DronePreset>(jsonString))
+                            presets.add(json.decodeFromString<SynthPreset>(jsonString))
                         }
                     } catch (e: Exception) {
                         log.warn { "Failed to parse preset at key $key: ${e.message}" }

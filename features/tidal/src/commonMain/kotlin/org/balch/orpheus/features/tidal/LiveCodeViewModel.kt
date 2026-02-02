@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.tidal
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
@@ -39,6 +40,7 @@ import org.balch.orpheus.core.tidal.TidalSchedulerState
 /**
  * UI state for the Live Code editor.
  */
+@Immutable
 data class LiveCodeUiState(
     val code: TextFieldValue = TextFieldValue(requireNotNull(LiveCodeViewModel.EXAMPLES["simple"])),
     val selectedExample: String? = "simple",
@@ -53,28 +55,29 @@ data class LiveCodeUiState(
     val isAiGenerating: Boolean = false
 )
 
+@Immutable
 data class LiveCodePanelActions(
-    val onCodeChange: (TextFieldValue) -> Unit,
-    val onExecuteBlock: () -> Unit,
-    val onExecuteLine: () -> Unit,
-    val onBpmChange: (Double) -> Unit,
-    val onReplVolumeChange: (Float) -> Unit,
-    val onExecute: () -> Unit,
-    val onStop: () -> Unit,
-    val onLoadExample: (String) -> Unit,
-    val onDeleteLine: () -> Unit
+    val setCode: (TextFieldValue) -> Unit,
+    val executeBlock: () -> Unit,
+    val executeLine: () -> Unit,
+    val setBpm: (Double) -> Unit,
+    val setReplVolume: (Float) -> Unit,
+    val execute: () -> Unit,
+    val stop: () -> Unit,
+    val loadExample: (String) -> Unit,
+    val deleteLine: () -> Unit
 ) {
     companion object {
         val EMPTY = LiveCodePanelActions(
-            onCodeChange = { },
-            onExecuteBlock = { },
-            onExecuteLine = { },
-            onBpmChange = { },
-            onReplVolumeChange = { },
-            onExecute = { },
-            onStop = { },
-            onLoadExample = { },
-            onDeleteLine = { })
+            setCode = { },
+            executeBlock = { },
+            executeLine = { },
+            setBpm = { },
+            setReplVolume = { },
+            execute = { },
+            stop = { },
+            loadExample = { },
+            deleteLine = { })
     }
 }
 
@@ -115,15 +118,15 @@ class LiveCodeViewModel(
 ) : ViewModel(), LiveCodeFeature {
 
     override val actions = LiveCodePanelActions(
-        onCodeChange = ::updateCode,
-        onExecuteBlock = ::executeBlock,
-        onExecuteLine = ::executeLine,
-        onBpmChange = ::setBpm,
-        onReplVolumeChange = ::setReplVolume,
-        onExecute = ::execute,
-        onStop = ::stop,
-        onLoadExample = ::loadExample,
-        onDeleteLine = ::deleteLine
+        setCode = ::updateCode,
+        executeBlock = ::executeBlock,
+        executeLine = ::executeLine,
+        setBpm = ::setBpm,
+        setReplVolume = ::setReplVolume,
+        execute = ::execute,
+        stop = ::stop,
+        loadExample = ::loadExample,
+        deleteLine = ::deleteLine
     )
     
     private val logger = logging("LiveCodeViewModel")

@@ -8,14 +8,13 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
+import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
+import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
-import org.balch.orpheus.core.audio.dsp.lv2.AudioPort
-import org.balch.orpheus.core.audio.dsp.lv2.ControlPort
-import org.balch.orpheus.core.audio.dsp.lv2.PluginInfo
-import org.balch.orpheus.core.audio.dsp.lv2.Port
-import org.balch.orpheus.core.audio.dsp.plugins.DspPlugin
-import org.balch.orpheus.core.audio.dsp.plugins.Lv2DspPlugin
+import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.dsp.PluginInfo
+import org.balch.orpheus.core.audio.dsp.Port
 
 /**
  * Shared DuoLFO implementation.
@@ -37,8 +36,8 @@ import org.balch.orpheus.core.audio.dsp.plugins.Lv2DspPlugin
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
 class DuoLfoPlugin(
     private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
-): Lv2DspPlugin {
+    dspFactory: DspFactory
+): DspPlugin {
 
     override val info = PluginInfo(
         uri = "org.balch.orpheus.plugins.duolfo",
@@ -282,7 +281,7 @@ class DuoLfoPlugin(
         } else {
             _hyperLfoFreqB = frequency
         }
-        val freqHz = 0.01 + (frequency * 200.0)
+        val freqHz = 0.01 + (frequency * 10.0)
         if (index == 0) {
             inputA.input.set(freqHz)
         } else {

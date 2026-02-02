@@ -63,9 +63,9 @@ fun MidiPanel(
             deviceName = midiState.deviceName,
             isOpen = midiState.isConnected,
             isLearnModeActive = midiState.isLearnModeActive,
-            onLearnToggle = actions.onToggleLearnMode,
-            onLearnSave = actions.onSaveLearnedMappings,
-            onLearnCancel = actions.onCancelLearnMode
+            onLearnToggle = actions.toggleLearnMode,
+            onLearnSave = actions.saveLearnedMappings,
+            onLearnCancel = actions.cancelLearnMode
         ),
     )
 }

@@ -5,8 +5,8 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
-import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.SynthPatch
+import org.balch.orpheus.core.presets.SynthPreset
 
 /**
  * Swirly Dreams - Psychedelic FM modulation with LFO-driven delay.
@@ -16,7 +16,7 @@ import org.balch.orpheus.core.presets.SynthPatch
 class SwirlyDreamsPatch : SynthPatch {
     override val id = "swirly_dreams"
     override val name = "Swirly Dreams"
-    override val preset = DronePreset(
+    override val preset = SynthPreset(
         name = "Swirly Dreams",
         voiceTunes = listOf(0.20f, 0.25f, 0.30f, 0.35f, 0.40f, 0.45f, 0.50f, 0.55f),
         voiceModDepths = listOf(0.6f, 0.5f, 0.6f, 0.5f, 0.6f, 0.5f, 0.6f, 0.5f),

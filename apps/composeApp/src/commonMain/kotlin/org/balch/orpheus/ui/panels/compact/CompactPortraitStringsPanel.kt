@@ -114,7 +114,7 @@ fun CompactStringPanel(
             // Quad 0 Pitch
             RotaryKnob(
                 value = voiceState.quadGroupPitches.getOrElse(0) { 0.5f },
-                onValueChange = { actions.onQuadPitchChange(0, it) },
+                onValueChange = { actions.setQuadPitch(0, it) },
                 label = "PITCH",
                 controlId = ControlIds.quadPitch(0),
                 size = 40.dp,
@@ -123,7 +123,7 @@ fun CompactStringPanel(
             // Quad 0 Hold
             RotaryKnob(
                 value = voiceState.quadGroupHolds.getOrElse(0) { 0f },
-                onValueChange = { actions.onQuadHoldChange(0, it) },
+                onValueChange = { actions.setQuadHold(0, it) },
                 label = "HOLD",
                 controlId = ControlIds.quadHold(0),
                 size = 40.dp,
@@ -160,27 +160,27 @@ fun CompactStringPanel(
                 slideBarPosition = { slideBarAnim.value },
                 onStringStart = { stringIndex, bendAmount, voiceMix ->
                     // First touch - just start bending (no voice triggering)
-                    actions.onStringBendChange(stringIndex, bendAmount, voiceMix)
+                    actions.setStringBend(stringIndex, bendAmount, voiceMix)
                 },
                 onStringBendChange = { stringIndex, bendAmount, voiceMix ->
                     // Continue bending
-                    actions.onStringBendChange(stringIndex, bendAmount, voiceMix)
+                    actions.setStringBend(stringIndex, bendAmount, voiceMix)
                 },
                 onStringBendRelease = { stringIndex ->
                     // Release bend (no voice release)
-                    actions.onStringBendRelease(stringIndex)
+                    actions.releaseStringBend(stringIndex)
                 },
                 onStringTap = { stringIndex, voiceMix ->
                     // Tap triggers a small bend that springs back (no voice pulse)
-                    actions.onStringBendChange(stringIndex, 0.3f, voiceMix)
-                    actions.onStringBendRelease(stringIndex)
+                    actions.setStringBend(stringIndex, 0.3f, voiceMix)
+                    actions.releaseStringBend(stringIndex)
                 },
                 onSlideChange = { yPos, xPos ->
                     // Snap animation to finger position immediately
                     coroutineScope.launch {
                         slideBarAnim.snapTo(yPos)
                     }
-                    actions.onSlideBarChange(yPos, xPos)
+                    actions.setSlideBar(yPos, xPos)
                 },
                 onSlideRelease = {
                     // Animate back to top (0.0) on release
@@ -193,8 +193,8 @@ fun CompactStringPanel(
                             )
                         )
                         // Ensure engine knows we returned to 0
-                        actions.onSlideBarChange(0f, 0.5f)
-                        actions.onSlideBarRelease()
+                        actions.setSlideBar(0f, 0.5f)
+                        actions.releaseSlideBar()
                     }
                 }
             )
@@ -213,7 +213,7 @@ fun CompactStringPanel(
             // Quad 1 Pitch
             RotaryKnob(
                 value = voiceState.quadGroupPitches.getOrElse(1) { 0.5f },
-                onValueChange = { actions.onQuadPitchChange(1, it) },
+                onValueChange = { actions.setQuadPitch(1, it) },
                 label = "PITCH",
                 controlId = ControlIds.quadPitch(1),
                 size = 40.dp,
@@ -222,7 +222,7 @@ fun CompactStringPanel(
             // Quad 1 Hold
             RotaryKnob(
                 value = voiceState.quadGroupHolds.getOrElse(1) { 0f },
-                onValueChange = { actions.onQuadHoldChange(1, it) },
+                onValueChange = { actions.setQuadHold(1, it) },
                 label = "HOLD",
                 controlId = ControlIds.quadHold(1),
                 size = 40.dp,

@@ -61,12 +61,12 @@ fun CenterControlSection(
         Spacer(modifier = Modifier.height(80.dp))
         CrossModSelector(
             isCrossQuad = voiceState.fmStructureCrossQuad,
-            onToggle = actions.onFmStructureChange
+            onToggle = actions.setFmStructure
         )
         Spacer(modifier = Modifier.weight(.1f))
         RotaryKnob(
             value = voiceState.totalFeedback,
-            onValueChange = actions.onTotalFeedbackChange,
+            onValueChange = actions.setTotalFeedback,
             label = "\u221E\u221E", // infinity",
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.TOTAL_FEEDBACK,
@@ -76,7 +76,7 @@ fun CenterControlSection(
         Spacer(modifier = Modifier.weight(.1f))
         RotaryKnob(
             value = voiceState.vibrato,
-            onValueChange = actions.onVibratoChange,
+            onValueChange = actions.setVibrato,
             label = "\u2307",
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.VIBRATO,
@@ -86,7 +86,7 @@ fun CenterControlSection(
         Spacer(modifier = Modifier.weight(.1f))
         RotaryKnob(
             value = voiceState.voiceCoupling,
-            onValueChange = actions.onVoiceCouplingChange,
+            onValueChange = actions.setVoiceCoupling,
             label = "\u2A1D",  // join
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.VOICE_COUPLING,

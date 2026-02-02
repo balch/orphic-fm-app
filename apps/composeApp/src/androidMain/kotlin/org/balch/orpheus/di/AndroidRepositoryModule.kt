@@ -8,8 +8,8 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.preferences.AndroidAppPreferencesRepository
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
-import org.balch.orpheus.core.presets.AndroidDronePresetRepository
-import org.balch.orpheus.core.presets.DronePresetRepository
+import org.balch.orpheus.core.presets.AndroidSynthPresetRepository
+import org.balch.orpheus.core.presets.SynthPresetRepository
 
 /**
  * Android-specific module providing repository implementations.
@@ -21,7 +21,7 @@ interface AndroidRepositoryModule {
     companion object {
         @Provides
         @SingleIn(AppScope::class)
-        fun provideDronePresetRepository(impl: AndroidDronePresetRepository): DronePresetRepository = impl
+        fun provideSynthPresetRepository(impl: AndroidSynthPresetRepository): SynthPresetRepository = impl
 
         @Provides
         @SingleIn(AppScope::class)

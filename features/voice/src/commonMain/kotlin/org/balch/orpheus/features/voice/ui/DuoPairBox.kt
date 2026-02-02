@@ -86,7 +86,7 @@ fun DuoPairBox(
             org.balch.orpheus.ui.widgets.ModSourceSelector(
                 activeSource = duoModSource,
                 onSourceChange = { newSource ->
-                    voiceActions.onDuoModSourceChange(pairIndex, newSource)
+                    voiceActions.setDuoModSource(pairIndex, newSource)
                 },
                 color = color,
                 controlId = ControlIds.duoModSource(pairIndex)
@@ -125,7 +125,7 @@ fun DuoPairBox(
                         voiceA + 1,
                         voiceStateA.isHolding,
                         {
-                            voiceActions.onHoldChange(
+                            voiceActions.setHold(
                                 voiceA,
                                 it
                             )
@@ -135,13 +135,13 @@ fun DuoPairBox(
                     PulseButton(
                         modifier = Modifier.offset(y = (-2).dp),
                         onPulseStart = {
-                            voiceActions.onPulseStart(
+                            voiceActions.pulseStart(
                                 voiceA
                             )
                         },
                         onPulseEnd = {
-                            voiceActions.onPulseEnd(voiceA)
-                            voiceActions.onWobblePulseEnd(voiceA)
+                            voiceActions.pulseEnd(voiceA)
+                            voiceActions.wobblePulseEnd(voiceA)
                         },
                         size = 28.dp,
                         label = "",
@@ -156,10 +156,10 @@ fun DuoPairBox(
                                 .selectVoiceForLearning(voiceA)
                         },
                         onPulseStartWithPosition = { x, y ->
-                            voiceActions.onWobblePulseStart(voiceA, x, y)
+                            voiceActions.wobblePulseStart(voiceA, x, y)
                         },
                         onWobbleMove = { x, y ->
-                            voiceActions.onWobbleMove(voiceA, x, y)
+                            voiceActions.wobbleMove(voiceA, x, y)
                         }
                     )
                 }
@@ -194,7 +194,7 @@ fun DuoPairBox(
                         voiceB + 1,
                         voiceStateB.isHolding,
                         {
-                            voiceActions.onHoldChange(
+                            voiceActions.setHold(
                             voiceB,
                                 it
                             )
@@ -204,13 +204,13 @@ fun DuoPairBox(
                     PulseButton(
                         modifier = Modifier.offset(y = (-2).dp),
                         onPulseStart = {
-                            voiceActions.onPulseStart(
+                            voiceActions.pulseStart(
                                 voiceB
                             )
                         },
                         onPulseEnd = {
-                            voiceActions.onPulseEnd(voiceB)
-                            voiceActions.onWobblePulseEnd(voiceB)
+                            voiceActions.pulseEnd(voiceB)
+                            voiceActions.wobblePulseEnd(voiceB)
                         },
                         size = 28.dp,
                         label = "",
@@ -225,10 +225,10 @@ fun DuoPairBox(
                                 .selectVoiceForLearning(voiceB)
                         },
                         onPulseStartWithPosition = { x, y ->
-                            voiceActions.onWobblePulseStart(voiceB, x, y)
+                            voiceActions.wobblePulseStart(voiceB, x, y)
                         },
                         onWobbleMove = { x, y ->
-                            voiceActions.onWobbleMove(voiceB, x, y)
+                            voiceActions.wobbleMove(voiceB, x, y)
                         }
                     )
                 }

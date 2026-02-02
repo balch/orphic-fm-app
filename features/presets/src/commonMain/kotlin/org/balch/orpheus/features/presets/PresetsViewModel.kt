@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.presets
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
@@ -22,49 +23,50 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
-import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
+import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.core.synthViewModel
 
 /** UI state for the Presets panel. */
+@Immutable
 sealed interface PresetUiState {
     data object Loading : PresetUiState
     data class Loaded(
-        val presets: List<DronePreset> = emptyList(),
-        val selectedPreset: DronePreset? = null,
+        val presets: List<SynthPreset> = emptyList(),
+        val selectedPreset: SynthPreset? = null,
         val factoryPresetNames: Set<String> = emptySet() // Track which presets are factory (read-only)
     ): PresetUiState
 }
 
+@Immutable
 data class PresetPanelActions(
-    val onPresetSelect: (DronePreset) -> Unit,
-    val onSelect: (DronePreset) -> Unit,
-    val onNew: (String) -> Unit,
-    val onOverride: (DronePreset) -> Unit,
-    val onDelete: (DronePreset) -> Unit,
-    val onApply: (DronePreset) -> Unit,
-    val onDialogActiveChange: (Boolean) -> Unit = {} // Called when naming dialog opens/closes
+    val selectPreset: (SynthPreset) -> Unit,
+    val applyPreset: (SynthPreset) -> Unit,
+    val saveNewPreset: (String) -> Unit,
+    val overridePreset: (SynthPreset) -> Unit,
+    val deletePreset: (SynthPreset) -> Unit,
+    val setDialogActive: (Boolean) -> Unit = {} // Called when naming dialog opens/closes
 ) {
     companion object {
         val EMPTY = PresetPanelActions(
-            onPresetSelect = {},
-            onSelect = {},
-            onNew = {},
-            onOverride = {},
-            onDelete = {},
-            onApply = {}
+            selectPreset = {},
+            applyPreset = {},
+            saveNewPreset = {},
+            overridePreset = {},
+            deletePreset = {},
+            setDialogActive = {}
         )
     }
 }
 
 private sealed interface PresetIntent {
-    data class SelectPreset(val preset: DronePreset?) : PresetIntent
-    data class ApplyPreset(val preset: DronePreset) : PresetIntent
+    data class SelectPreset(val preset: SynthPreset?) : PresetIntent
+    data class ApplyPreset(val preset: SynthPreset) : PresetIntent
     data class SaveNewPreset(val name: String) : PresetIntent
-    data class OverridePreset(val preset: DronePreset) : PresetIntent
-    data class DeletePreset(val preset: DronePreset) : PresetIntent
-    data class RefreshPresets(val presets: List<DronePreset>, val selectName: String? = null) : PresetIntent
+    data class OverridePreset(val preset: SynthPreset) : PresetIntent
+    data class DeletePreset(val preset: SynthPreset) : PresetIntent
+    data class RefreshPresets(val presets: List<SynthPreset>, val selectName: String? = null) : PresetIntent
 }
 
 typealias PresetsFeature = SynthFeature<PresetUiState, PresetPanelActions>
@@ -85,12 +87,12 @@ class PresetsViewModel(
 ) : ViewModel(), PresetsFeature {
 
     override val actions = PresetPanelActions(
-        onPresetSelect = ::selectPreset,
-        onSelect = ::applyPreset,
-        onNew = ::saveNewPreset,
-        onOverride = ::overridePreset,
-        onDelete = ::deletePreset,
-        onApply = ::applyPreset
+        selectPreset = ::selectPreset,
+        applyPreset = ::applyPreset,
+        saveNewPreset = ::saveNewPreset,
+        overridePreset = ::overridePreset,
+        deletePreset = ::deletePreset,
+        setDialogActive = { /* noop by default */ }
     )
 
     private val log = logging("PresetsViewModel")
@@ -152,13 +154,13 @@ class PresetsViewModel(
     }
 
     /** Check if a preset is a factory preset (read-only) */
-    fun isFactoryPreset(preset: DronePreset): Boolean = presetsRepository.isFactoryPreset(preset.name)
+    fun isFactoryPreset(preset: SynthPreset): Boolean = presetsRepository.isFactoryPreset(preset.name)
 
-    fun selectPreset(preset: DronePreset?) {
+    fun selectPreset(preset: SynthPreset?) {
         _userIntents.tryEmit(PresetIntent.SelectPreset(preset))
     }
 
-    fun applyPreset(preset: DronePreset) {
+    fun applyPreset(preset: SynthPreset) {
         _userIntents.tryEmit(PresetIntent.ApplyPreset(preset))
     }
 
@@ -166,11 +168,11 @@ class PresetsViewModel(
         _userIntents.tryEmit(PresetIntent.SaveNewPreset(name))
     }
 
-    fun overridePreset(preset: DronePreset) {
+    fun overridePreset(preset: SynthPreset) {
         _userIntents.tryEmit(PresetIntent.OverridePreset(preset))
     }
 
-    fun deletePreset(preset: DronePreset) {
+    fun deletePreset(preset: SynthPreset) {
         _userIntents.tryEmit(PresetIntent.DeletePreset(preset))
     }
     

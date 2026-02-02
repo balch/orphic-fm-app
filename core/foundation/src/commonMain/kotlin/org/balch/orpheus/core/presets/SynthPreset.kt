@@ -7,10 +7,10 @@ import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.WarpsSource
 
 /**
- * Represents a saved Orpheus Drone preset containing all synthesizer parameters.
+ * Represents a saved Orpheus Synth preset containing all synthesizer parameters.
  */
 @Serializable
-data class DronePreset(
+data class SynthPreset(
     val name: String,
 
     // Voice parameters (8 voices)
@@ -50,6 +50,9 @@ data class DronePreset(
     val quadGroupPitches: List<Float> = List(3) { 0.5f },
     val quadGroupHolds: List<Float> = List(3) { 0.0f },
     val quadGroupVolumes: List<Float> = List(3) { 1.0f },
+    val quadTriggerSources: List<Int> = List(3) { 0 },
+    val quadPitchSources: List<Int> = List(3) { 0 },
+    val quadEnvelopeTriggerModes: List<Boolean> = List(3) { false },
 
     // Resonator (Rings)
     val resonatorMode: Int = 0,        // 0=Modal, 1=String, 2=Sympathetic
@@ -79,8 +82,13 @@ data class DronePreset(
     val drumHhP4: Float = 0.5f,
     
     val drumBdTriggerSource: Int = 0, // 0=Internal, 1=FluxT1, 2=FluxT2, 3=FluxT3
+    val drumBdPitchSource: Int = 0,
+    
     val drumSdTriggerSource: Int = 0,
+    val drumSdPitchSource: Int = 0,
+    
     val drumHhTriggerSource: Int = 0,
+    val drumHhPitchSource: Int = 0,
     
     val drumsBypass: Boolean = true,
 

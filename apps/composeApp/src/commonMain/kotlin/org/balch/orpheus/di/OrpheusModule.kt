@@ -14,7 +14,7 @@ import org.balch.orpheus.core.midi.createMidiAccess
  * Module providing core dependencies for the Orpheus application. Used by Metro DI to provide
  * singleton instances of infrastructure components.
  * 
- * Note: DronePresetRepository and AppPreferencesRepository are now provided via
+ * Note: SynthPresetRepository and AppPreferencesRepository are now provided via
  * @ContributesBinding from platform-specific implementations.
  */
 @ContributesTo(AppScope::class)

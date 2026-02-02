@@ -64,7 +64,7 @@ fun EvoPanel(
         StrategyDropdown(
             selectedStrategy = uiState.selectedStrategy,
             strategies = uiState.strategies,
-            onStrategySelected = evoFeature.actions.onStrategyChange,
+            onStrategySelected = evoFeature.actions.setStrategy,
             color = accentColor,
         )
 
@@ -76,7 +76,7 @@ fun EvoPanel(
             // Knob 1 - Label from strategy
             RotaryKnob(
                 value = uiState.knob1Value,
-                onValueChange = evoFeature.actions.onKnob1Change,
+                onValueChange = evoFeature.actions.setKnob1,
                 label = if (uiState.isEnabled) uiState.selectedStrategy.knob1Label else "-",
                 controlId = ControlIds.EVO_DEPTH,
                 size = 64.dp,
@@ -88,7 +88,7 @@ fun EvoPanel(
             // Knob 2 - Label from strategy
             RotaryKnob(
                 value = uiState.knob2Value,
-                onValueChange = evoFeature.actions.onKnob2Change,
+                onValueChange = evoFeature.actions.setKnob2,
                 label = if (uiState.isEnabled) uiState.selectedStrategy.knob2Label else "-",
                 controlId = ControlIds.EVO_RATE,
                 size = 64.dp,
@@ -104,7 +104,7 @@ fun EvoPanel(
             startLabel = "OFF",
             isStart = !uiState.isEnabled,
             onToggle = {
-                evoFeature.actions.onEnabledChange(!it)
+                evoFeature.actions.setEnabled(!it)
             },
             color = accentColor,
         )

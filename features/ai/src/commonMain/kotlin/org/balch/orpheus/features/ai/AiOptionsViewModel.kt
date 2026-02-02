@@ -41,9 +41,9 @@ import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.media.PlaybackMode
-import org.balch.orpheus.core.presets.DronePreset
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
+import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.core.tidal.ReplCodeEvent
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
@@ -358,7 +358,7 @@ class AiOptionsViewModel(
         .map { it.messages }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.Lazily,
+            started = SharingStarted.Eagerly,
             initialValue = emptyList()
         )
 
@@ -548,7 +548,7 @@ class AiOptionsViewModel(
     }
 
     @OptIn(ExperimentalTime::class)
-    private fun generateRandomSoloPreset(): DronePreset {
+    private fun generateRandomSoloPreset(): SynthPreset {
         val r = Random
         
         // Solo/Lead characteristics:
@@ -557,7 +557,7 @@ class AiOptionsViewModel(
         // - Specific spatial effects (Ping-pong delay)
         // - Presence (Drive/Distortion)
         
-        return DronePreset(
+        return SynthPreset(
             name = "Solo Session ${Clock.System.now().epochSeconds}",
             
             // Unison with very slight detune for thickness
@@ -868,12 +868,11 @@ class AiOptionsViewModel(
             isUserProvidedKey = aiKeyRepository.isUserProvidedKey,
             selectedModel = aiModelProvider.selectedModel.value
         )
-
     }
         .mapNotNull { it
         }.stateIn(
             scope = viewModelScope,
-            started = SharingStarted.Lazily,
+            started = SharingStarted.Eagerly,
             initialValue = AiOptionsUiState(
                 availableModels = availableModels,
                 aiStatusMessages = aiStatusMessages,

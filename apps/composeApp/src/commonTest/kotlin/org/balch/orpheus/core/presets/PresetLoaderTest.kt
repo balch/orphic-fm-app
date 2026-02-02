@@ -10,7 +10,7 @@ class PresetLoaderTest {
     fun testApplyPresetEmitsToFlow() {
         val engine = TestSynthEngine()
         val loader = PresetLoader(engine)
-        val preset = DronePreset(name = "Test Preset")
+        val preset = SynthPreset(name = "Test Preset")
 
         loader.applyPreset(preset)
 

@@ -14,19 +14,17 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.WarpsSource
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -82,8 +80,8 @@ typealias WarpsFeature = SynthFeature<WarpsUiState, WarpsPanelActions>
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class WarpsViewModel(
     private val engine: SynthEngine,
-    presetLoader: PresetLoader,
-    synthController: SynthController,
+    private val synthController: SynthController,
+    presetLoader: org.balch.orpheus.core.presets.PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), WarpsFeature {
 
@@ -120,20 +118,20 @@ class WarpsViewModel(
     }
 
     // Control changes -> WarpsIntent
-    private val controlIntents = synthController.onControlChange.map { event ->
+    private val controlIntents = synthController.onControlChange.mapNotNull { event ->
         val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
         when (event.controlId) {
-            Ids.ALGORITHM -> WarpsIntent.Algorithm(event.value, fromSequencer)
-            Ids.TIMBRE -> WarpsIntent.Timbre(event.value, fromSequencer)
-            Ids.CARRIER_LEVEL -> WarpsIntent.CarrierLevel(event.value, fromSequencer)
-            Ids.MODULATOR_LEVEL -> WarpsIntent.ModulatorLevel(event.value, fromSequencer)
-            Ids.MIX -> WarpsIntent.Mix(event.value, fromSequencer)
-            Ids.CARRIER_SOURCE -> {
+            ControlIds.WARPS_ALGORITHM -> WarpsIntent.Algorithm(event.value, fromSequencer)
+            ControlIds.WARPS_TIMBRE -> WarpsIntent.Timbre(event.value, fromSequencer)
+            ControlIds.WARPS_CARRIER_LEVEL -> WarpsIntent.CarrierLevel(event.value, fromSequencer)
+            ControlIds.WARPS_MODULATOR_LEVEL -> WarpsIntent.ModulatorLevel(event.value, fromSequencer)
+            ControlIds.WARPS_MIX -> WarpsIntent.Mix(event.value, fromSequencer)
+            ControlIds.WARPS_CARRIER_SOURCE -> {
                 val sources = WarpsSource.entries.toTypedArray()
                 val index = (event.value * (sources.size - 1)).toInt().coerceIn(0, sources.size - 1)
                 WarpsIntent.CarrierSource(sources[index])
             }
-            Ids.MODULATOR_SOURCE -> {
+            ControlIds.WARPS_MODULATOR_SOURCE -> {
                 val sources = WarpsSource.entries.toTypedArray()
                 val index = (event.value * (sources.size - 1)).toInt().coerceIn(0, sources.size - 1)
                 WarpsIntent.ModulatorSource(sources[index])
@@ -142,45 +140,19 @@ class WarpsViewModel(
         }
     }
 
-    override val stateFlow: StateFlow<WarpsUiState> = flow {
-        // Emit initial state from engine
-        val initial = loadInitialState()
-        applyFullState(initial)
-        emit(initial)
-        
-        // Then emit from merged intent sources
-        emitAll(
-            merge(_userIntents, presetIntents, controlIntents)
-                .onEach { intent -> if (intent != null) applyToEngine(intent) }
-                .scan(initial) { state, intent -> if (intent != null) reduce(state, intent) else state }
+    override val stateFlow: StateFlow<WarpsUiState> =
+        merge(_userIntents, presetIntents, controlIntents)
+        .scan(WarpsUiState()) { state, intent ->
+            val newState = reduce(state, intent)
+            applyToEngine(newState, intent)
+            newState
+        }
+        .flowOn(dispatcherProvider.io)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = WarpsUiState()
         )
-    }
-    .flowOn(dispatcherProvider.io)
-    .stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Lazily,
-        initialValue = WarpsUiState()
-    )
-
-    private fun loadInitialState(): WarpsUiState {
-        return WarpsUiState(
-            algorithm = engine.getWarpsAlgorithm(),
-            timbre = engine.getWarpsTimbre(),
-            carrierLevel = engine.getWarpsLevel1(),
-            modulatorLevel = engine.getWarpsLevel2(),
-            carrierSource = try { 
-                WarpsSource.entries[engine.getWarpsCarrierSource()] 
-            } catch (_: Exception) { 
-                WarpsSource.SYNTH 
-            },
-            modulatorSource = try { 
-                WarpsSource.entries[engine.getWarpsModulatorSource()] 
-            } catch (_: Exception) { 
-                WarpsSource.DRUMS 
-            },
-            mix = engine.getWarpsMix()
-        )
-    }
 
     // ═══════════════════════════════════════════════════════════
     // REDUCER
@@ -202,7 +174,7 @@ class WarpsViewModel(
     // ENGINE SIDE EFFECTS
     // ═══════════════════════════════════════════════════════════
 
-    private fun applyToEngine(intent: WarpsIntent) {
+    private fun applyToEngine(state: WarpsUiState, intent: WarpsIntent) {
         when (intent) {
             // Skip engine calls for SEQUENCER events - engine is driven by audio-rate automation
             is WarpsIntent.Algorithm -> if (!intent.fromSequencer) engine.setWarpsAlgorithm(intent.value)
@@ -231,46 +203,54 @@ class WarpsViewModel(
     // ═══════════════════════════════════════════════════════════
 
     fun onAlgorithmChange(value: Float) {
-        _userIntents.tryEmit(WarpsIntent.Algorithm(value))
+        val fromSequencer = false // UI actions are not from sequencer
+        _userIntents.tryEmit(WarpsIntent.Algorithm(value, fromSequencer))
+        synthController.emitControlChange(ControlIds.WARPS_ALGORITHM, value, ControlEventOrigin.UI)
     }
 
     fun onTimbreChange(value: Float) {
-        _userIntents.tryEmit(WarpsIntent.Timbre(value))
+        val fromSequencer = false
+        _userIntents.tryEmit(WarpsIntent.Timbre(value, fromSequencer))
+        synthController.emitControlChange(ControlIds.WARPS_TIMBRE, value, ControlEventOrigin.UI)
     }
 
     fun onCarrierLevelChange(value: Float) {
-        _userIntents.tryEmit(WarpsIntent.CarrierLevel(value))
+        val fromSequencer = false
+        _userIntents.tryEmit(WarpsIntent.CarrierLevel(value, fromSequencer))
+        synthController.emitControlChange(ControlIds.WARPS_CARRIER_LEVEL, value, ControlEventOrigin.UI)
     }
 
     fun onModulatorLevelChange(value: Float) {
-        _userIntents.tryEmit(WarpsIntent.ModulatorLevel(value))
+        val fromSequencer = false
+        _userIntents.tryEmit(WarpsIntent.ModulatorLevel(value, fromSequencer))
+        synthController.emitControlChange(ControlIds.WARPS_MODULATOR_LEVEL, value, ControlEventOrigin.UI)
     }
 
     fun onCarrierSourceChange(source: WarpsSource) {
         _userIntents.tryEmit(WarpsIntent.CarrierSource(source))
+        val sources = WarpsSource.entries.toTypedArray()
+        val value = if (sources.size > 1) source.ordinal.toFloat() / (sources.size - 1) else 0f
+        synthController.emitControlChange(ControlIds.WARPS_CARRIER_SOURCE, value, ControlEventOrigin.UI)
     }
 
     fun onModulatorSourceChange(source: WarpsSource) {
         _userIntents.tryEmit(WarpsIntent.ModulatorSource(source))
+        val sources = WarpsSource.entries.toTypedArray()
+        val value = if (sources.size > 1) source.ordinal.toFloat() / (sources.size - 1) else 0f
+        synthController.emitControlChange(ControlIds.WARPS_MODULATOR_SOURCE, value, ControlEventOrigin.UI)
     }
 
     fun onMixChange(value: Float) {
-        _userIntents.tryEmit(WarpsIntent.Mix(value))
+        val fromSequencer = false
+        _userIntents.tryEmit(WarpsIntent.Mix(value, fromSequencer))
+        synthController.emitControlChange(ControlIds.WARPS_MIX, value, ControlEventOrigin.UI)
     }
 
     fun restoreState(state: WarpsUiState) {
         _userIntents.tryEmit(WarpsIntent.Restore(state))
     }
 
-    companion object Ids {
-        // Control IDs for MIDI mapping
-        const val ALGORITHM = "warps_algorithm"
-        const val TIMBRE = "warps_timbre"
-        const val CARRIER_LEVEL = "warps_carrier_level"
-        const val MODULATOR_LEVEL = "warps_modulator_level"
-        const val CARRIER_SOURCE = "warps_carrier_source"
-        const val MODULATOR_SOURCE = "warps_modulator_source"
-        const val MIX = "warps_mix"
+    companion object {
 
         fun previewFeature(state: WarpsUiState = WarpsUiState()): WarpsFeature =
             object : WarpsFeature {

@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -60,7 +61,7 @@ fun FluxPanel(
                 value = state.spread,
                 onValueChange = actions.setSpread,
                 label = "SPREAD",
-                controlId = FluxViewModel.SPREAD,
+                controlId = ControlIds.FLUX_SPREAD,
                 size = 52.dp,
                 progressColor = OrpheusColors.metallicBlueLight
             )
@@ -69,7 +70,7 @@ fun FluxPanel(
                 value = state.bias,
                 onValueChange = actions.setBias,
                 label = "BIAS",
-                controlId = FluxViewModel.BIAS,
+                controlId = ControlIds.FLUX_BIAS,
                 size = 52.dp,
                 progressColor = OrpheusColors.metallicBlueLight
             )
@@ -78,7 +79,7 @@ fun FluxPanel(
                 value = state.steps,
                 onValueChange = actions.setSteps,
                 label = "STEPS",
-                controlId = FluxViewModel.STEPS,
+                controlId = ControlIds.FLUX_STEPS,
                 size = 52.dp,
                 progressColor = OrpheusColors.metallicBlueLight
             )
@@ -87,7 +88,7 @@ fun FluxPanel(
                 value = state.dejaVu,
                 onValueChange = actions.setDejaVu,
                 label = "DÉJÀ VU",
-                controlId = FluxViewModel.DEJA_VU,
+                controlId = ControlIds.FLUX_DEJA_VU,
                 size = 52.dp,
                 progressColor = OrpheusColors.metallicBlueLight
             )
@@ -124,7 +125,7 @@ fun FluxPanel(
                 value = state.rate,
                 onValueChange = { actions.setRate(it) },
                 label = "RATE",
-                controlId = "flux_rate",
+                controlId = ControlIds.FLUX_RATE,
                 size = 48.dp,
                 progressColor = OrpheusColors.metallicBlueLight
             )
@@ -132,9 +133,9 @@ fun FluxPanel(
             // Jitter
             RotaryKnob(
                 value = state.jitter,
-                onValueChange = { actions.setJitter(it) },
+                onValueChange = actions.setJitter,
                 label = "JITTER",
-                controlId = "flux_jitter",
+                controlId = ControlIds.FLUX_JITTER,
                 size = 48.dp,
                 progressColor = OrpheusColors.metallicBlueLight
             )
@@ -142,9 +143,9 @@ fun FluxPanel(
             // Probability/Gate Bias
             RotaryKnob(
                 value = state.probability,
-                onValueChange = { actions.setProbability(it) },
+                onValueChange = actions.setProbability,
                 label = "PROB",
-                controlId = "flux_probability",
+                controlId = ControlIds.FLUX_PROBABILITY,
                 size = 48.dp,
                 progressColor = OrpheusColors.metallicBlueLight
             )

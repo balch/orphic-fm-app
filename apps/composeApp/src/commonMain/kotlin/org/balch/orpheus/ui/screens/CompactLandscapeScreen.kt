@@ -179,14 +179,14 @@ private fun CompactLandscapeLayout(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RotaryKnob(
                     value = voiceState.quadGroupPitches[0],
-                    onValueChange = { voiceActions.onQuadPitchChange(0, it) },
+                    onValueChange = { voiceActions.setQuadPitch(0, it) },
                     label = "Pitch",
                     size = 38.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
                 RotaryKnob(
                     value = voiceState.quadGroupHolds[0],
-                    onValueChange = { voiceActions.onQuadHoldChange(0, it) },
+                    onValueChange = { voiceActions.setQuadHold(0, it) },
                     label = "Hold",
                     size = 38.dp,
                     progressColor = OrpheusColors.neonMagenta
@@ -208,14 +208,14 @@ private fun CompactLandscapeLayout(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RotaryKnob(
                     value = voiceState.quadGroupPitches[1],
-                    onValueChange = { voiceActions.onQuadPitchChange(1, it) },
+                    onValueChange = { voiceActions.setQuadPitch(1, it) },
                     label = "Pitch",
                     size = 38.dp,
                     progressColor = OrpheusColors.synthGreen
                 )
                 RotaryKnob(
                     value = voiceState.quadGroupHolds[1],
-                    onValueChange = { voiceActions.onQuadHoldChange(1, it) },
+                    onValueChange = { voiceActions.setQuadHold(1, it) },
                     label = "Hold",
                     size = 38.dp,
                     progressColor = OrpheusColors.synthGreen
