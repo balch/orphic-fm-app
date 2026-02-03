@@ -7,6 +7,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import org.balch.orpheus.core.audio.dsp.Port
 import org.balch.orpheus.core.controller.SynthControllerPlugin
 
 /**
@@ -109,6 +110,18 @@ class SynthController @Inject constructor(
         // Delegate to plugins. First handler wins (or all can handle if we want).
         // For now, we allow all plugins to observe, but they can return 'true' to signal intent.
         plugins.forEach { it.onControlChange(event) }
+    }
+
+    /**
+     * Emit a control change event using a Port definition.
+     * Convenience method to use the port's symbol as the control ID.
+     */
+    fun emitControlChange(
+        port: Port, 
+        value: Float, 
+        origin: ControlEventOrigin = ControlEventOrigin.UI
+    ) {
+        emitControlChange(port.symbol, value, origin)
     }
 
     /**

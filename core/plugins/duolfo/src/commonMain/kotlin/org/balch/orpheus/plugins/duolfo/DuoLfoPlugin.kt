@@ -275,13 +275,15 @@ class DuoLfoPlugin(
         fmGain.inputB.set(if (enabled) 10.0 else 0.0)
     }
 
+    private val frequencyMultipliers = listOf(7.0, 110.0)
+
     fun setFreq(index: Int, frequency: Float) {
         if (index == 0) {
             _hyperLfoFreqA = frequency
         } else {
             _hyperLfoFreqB = frequency
         }
-        val freqHz = 0.01 + (frequency * 10.0)
+        val freqHz = 0.01 + (frequency * frequencyMultipliers[index])
         if (index == 0) {
             inputA.input.set(freqHz)
         } else {
