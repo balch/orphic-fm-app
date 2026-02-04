@@ -11,4 +11,5 @@ dependencies {
     // KSP and Metro for orpheus.kmp.library convention plugin
     implementation(libs.ksp.gradle.plugin)
     implementation(libs.dev.zacsweers.metro.gradle.plugin)
+    implementation(libs.kotlin.serialization.gradle.plugin)
 }

@@ -26,7 +26,34 @@ enum class DrumSymbol(
     override val symbol: Symbol,
     override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
 ) : PortSymbol {
-    MIX("mix", "Mix")
+    MIX("mix", "Mix"),
+    // Synthesis Parameters (prefix with drum type: bd_, sd_, hh_)
+    BD_FREQ("bd_freq", "BD Frequency"),
+    BD_TONE("bd_tone", "BD Tone"),
+    BD_DECAY("bd_decay", "BD Decay"),
+    BD_P4("bd_p4", "BD P4"),
+    BD_P5("bd_p5", "BD P5"),
+    
+    SD_FREQ("sd_freq", "SD Frequency"),
+    SD_TONE("sd_tone", "SD Tone"),
+    SD_DECAY("sd_decay", "SD Decay"),
+    SD_P4("sd_p4", "SD P4"),
+    
+    HH_FREQ("hh_freq", "HH Frequency"),
+    HH_TONE("hh_tone", "HH Tone"),
+    HH_DECAY("hh_decay", "HH Decay"),
+    HH_P4("hh_p4", "HH P4"),
+    
+    // Routing
+    BD_TRIGGER_SRC("bd_trigger_src", "BD Trigger Source"),
+    BD_PITCH_SRC("bd_pitch_src", "BD Pitch Source"),
+    SD_TRIGGER_SRC("sd_trigger_src", "SD Trigger Source"),
+    SD_PITCH_SRC("sd_pitch_src", "SD Pitch Source"),
+    HH_TRIGGER_SRC("hh_trigger_src", "HH Trigger Source"),
+    HH_PITCH_SRC("hh_pitch_src", "HH Pitch Source"),
+    
+    // Bypass
+    BYPASS("bypass", "Bypass")
 }
 
 /**
@@ -59,6 +86,20 @@ class DrumPlugin(
     private val decays = FloatArray(3) { 0.5f }
     private val p4s = FloatArray(3) { 0.5f }
     private val p5s = FloatArray(3) { 0.5f }
+    
+    // Routing state (facade for engine)
+    private val triggerSources = IntArray(3)
+    private val pitchSources = IntArray(3)
+    private var _bypass = true
+    
+    interface Listener {
+        fun onRoutingChange(drumIndex: Int, type: String, value: Int)
+        fun onBypassChange(bypass: Boolean)
+    }
+    
+    private var listener: Listener? = null
+    
+    fun setListener(l: Listener) { listener = l }
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 2) {
@@ -73,6 +114,44 @@ class DrumPlugin(
                 drumGainRight.inputB.set(finalGain.toDouble())
             }
         }
+        
+        bool(DrumSymbol.BYPASS) {
+            default = true
+            get { _bypass }
+            set {
+                _bypass = it
+                listener?.onBypassChange(it)
+            }
+        }
+        
+        // BD
+        float(DrumSymbol.BD_FREQ) { get { frequencies[0] }; set { setParameters(0, it, tones[0], decays[0], p4s[0], p5s[0]) } }
+        float(DrumSymbol.BD_TONE) { get { tones[0] }; set { setParameters(0, frequencies[0], it, decays[0], p4s[0], p5s[0]) } }
+        float(DrumSymbol.BD_DECAY) { get { decays[0] }; set { setParameters(0, frequencies[0], tones[0], it, p4s[0], p5s[0]) } }
+        float(DrumSymbol.BD_P4) { get { p4s[0] }; set { setParameters(0, frequencies[0], tones[0], decays[0], it, p5s[0]) } }
+        float(DrumSymbol.BD_P5) { get { p5s[0] }; set { setParameters(0, frequencies[0], tones[0], decays[0], p4s[0], it) } }
+        
+        // SD
+        float(DrumSymbol.SD_FREQ) { get { frequencies[1] }; set { setParameters(1, it, tones[1], decays[1], p4s[1], p5s[1]) } }
+        float(DrumSymbol.SD_TONE) { get { tones[1] }; set { setParameters(1, frequencies[1], it, decays[1], p4s[1], p5s[1]) } }
+        float(DrumSymbol.SD_DECAY) { get { decays[1] }; set { setParameters(1, frequencies[1], tones[1], it, p4s[1], p5s[1]) } }
+        float(DrumSymbol.SD_P4) { get { p4s[1] }; set { setParameters(1, frequencies[1], tones[1], decays[1], it, p5s[1]) } }
+        
+        // HH
+        float(DrumSymbol.HH_FREQ) { get { frequencies[2] }; set { setParameters(2, it, tones[2], decays[2], p4s[2], p5s[2]) } }
+        float(DrumSymbol.HH_TONE) { get { tones[2] }; set { setParameters(2, frequencies[2], it, decays[2], p4s[2], p5s[2]) } }
+        float(DrumSymbol.HH_DECAY) { get { decays[2] }; set { setParameters(2, frequencies[2], tones[2], it, p4s[2], p5s[2]) } }
+        float(DrumSymbol.HH_P4) { get { p4s[2] }; set { setParameters(2, frequencies[2], tones[2], decays[2], it, p5s[2]) } }
+        
+        // Routing
+        int(DrumSymbol.BD_TRIGGER_SRC) { get { triggerSources[0] }; set { triggerSources[0] = it; listener?.onRoutingChange(0, "trigger", it) } }
+        int(DrumSymbol.BD_PITCH_SRC) { get { pitchSources[0] }; set { pitchSources[0] = it; listener?.onRoutingChange(0, "pitch", it) } }
+        
+        int(DrumSymbol.SD_TRIGGER_SRC) { get { triggerSources[1] }; set { triggerSources[1] = it; listener?.onRoutingChange(1, "trigger", it) } }
+        int(DrumSymbol.SD_PITCH_SRC) { get { pitchSources[1] }; set { pitchSources[1] = it; listener?.onRoutingChange(1, "pitch", it) } }
+        
+        int(DrumSymbol.HH_TRIGGER_SRC) { get { triggerSources[2] }; set { triggerSources[2] = it; listener?.onRoutingChange(2, "trigger", it) } }
+        int(DrumSymbol.HH_PITCH_SRC) { get { pitchSources[2] }; set { pitchSources[2] = it; listener?.onRoutingChange(2, "pitch", it) } }
     }
 
     private val audioPorts = listOf(
@@ -179,4 +258,12 @@ class DrumPlugin(
     fun getDecay(type: Int) = decays.getOrElse(type) { 0.5f }
     fun getP4(type: Int) = p4s.getOrElse(type) { 0.5f }
     fun getP5(type: Int) = p5s.getOrElse(type) { 0.5f }
+    
+    // Setters for syncing
+    fun setRouting(drumIndex: Int, type: String, value: Int) {
+        if (type == "trigger") triggerSources[drumIndex] = value
+        if (type == "pitch") pitchSources[drumIndex] = value
+    }
+    
+    fun setBypass(bypass: Boolean) { _bypass = bypass }
 }

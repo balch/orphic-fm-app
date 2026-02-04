@@ -3,6 +3,10 @@ package org.balch.orpheus.core.presets
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
+import org.balch.orpheus.core.audio.dsp.PortValue
 import java.io.File
 
 /**
@@ -17,6 +21,13 @@ class JvmSynthPresetRepository : SynthPresetRepository {
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
+        serializersModule = SerializersModule {
+            polymorphic(PortValue::class) {
+                subclass(PortValue.FloatValue::class)
+                subclass(PortValue.IntValue::class)
+                subclass(PortValue.BoolValue::class)
+            }
+        }
     }
 
     private val presetsDir: File by lazy {

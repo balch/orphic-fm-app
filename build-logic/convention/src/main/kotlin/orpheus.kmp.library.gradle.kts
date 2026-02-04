@@ -12,6 +12,7 @@ plugins {
     id("com.android.kotlin.multiplatform.library")
     id("com.google.devtools.ksp")
     id("dev.zacsweers.metro")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 // Access version catalog

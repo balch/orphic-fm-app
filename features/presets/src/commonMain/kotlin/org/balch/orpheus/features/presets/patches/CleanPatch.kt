@@ -61,8 +61,8 @@ class CleanPatch : SynthPatch {
             put("$delayUri:${DelaySymbol.MOD_DEPTH_2.symbol}", PortValue.FloatValue(0f))
             put("$delayUri:${DelaySymbol.FEEDBACK.symbol}", PortValue.FloatValue(0f))
             put("$delayUri:${DelaySymbol.MIX.symbol}", PortValue.FloatValue(0f))
-            put("$delayUri:mod_source_is_lfo", PortValue.BoolValue(true)) // Not in DelaySymbol yet?
-            put("$delayUri:lfo_wave_is_triangle", PortValue.BoolValue(true)) // Not in DelaySymbol yet?
+            put("$delayUri:${DelaySymbol.MOD_SOURCE.symbol}", PortValue.BoolValue(true))
+            put("$delayUri:${DelaySymbol.LFO_WAVEFORM.symbol}", PortValue.BoolValue(true))
 
             // Global
             val distUri = DistortionPlugin.URI

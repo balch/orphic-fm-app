@@ -140,6 +140,27 @@ class PortsBuilder(private val startIndex: Int = 0) {
             init()
         }
     }
+
+    /** Define a float port using raw string symbol */
+    fun float(symbol: Symbol, init: FloatPort.() -> Unit) {
+        _defs += FloatPort(symbol).apply {
+            init() // name defaults to capitalized symbol
+        }
+    }
+
+    /** Define an int port using raw string symbol */
+    fun int(symbol: Symbol, init: IntPort.() -> Unit) {
+        _defs += IntPort(symbol).apply {
+            init()
+        }
+    }
+
+    /** Define a boolean port using raw string symbol */
+    fun bool(symbol: Symbol, init: BoolPort.() -> Unit) {
+        _defs += BoolPort(symbol).apply {
+            init()
+        }
+    }
     
     // Generic accessors
     fun getValue(symbol: Symbol): PortValue? = 

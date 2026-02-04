@@ -12,6 +12,7 @@ plugins {
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 // Access version catalog
@@ -70,5 +71,5 @@ dependencies {
 }
 // Exclude libremidi-panama from test configurations (requires JVM 22+, we use JVM 21)
 configurations.matching { it.name.contains("test", ignoreCase = true) }.all {
-    exclude(group = "dev.atsushino", module = "libremidi-panama")
+    exclude(group = "dev.atsushieno", module = "libremidi-panama")
 }

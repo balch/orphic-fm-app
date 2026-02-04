@@ -54,8 +54,8 @@ class SwirlyDreamsPatch : SynthPatch {
             put("$delayUri:${DelaySymbol.MOD_DEPTH_2.symbol}", PortValue.FloatValue(0.6f))
             put("$delayUri:${DelaySymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.65f))
             put("$delayUri:${DelaySymbol.MIX.symbol}", PortValue.FloatValue(0.5f))
-            put("$delayUri:mod_source_is_lfo", PortValue.BoolValue(true)) // Not in DelaySymbol yet?
-            put("$delayUri:lfo_wave_is_triangle", PortValue.BoolValue(true)) // Not in DelaySymbol yet?
+            put("$delayUri:${DelaySymbol.MOD_SOURCE.symbol}", PortValue.BoolValue(true))
+            put("$delayUri:${DelaySymbol.LFO_WAVEFORM.symbol}", PortValue.BoolValue(true))
 
             val distUri = DistortionPlugin.URI
             put("$distUri:${DistortionSymbol.DRIVE.symbol}", PortValue.FloatValue(0.2f))

@@ -20,6 +20,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.debug.DebugViewModel.Companion.POLL_INTERVAL_MS
+import org.balch.orpheus.plugins.voice.VoicePlugin
 import kotlin.math.pow
 
 /**
@@ -198,6 +199,47 @@ class DspSynthEngine(
         
         // Initialize all plugins (sets up internal wiring)
         pluginProvider.plugins.forEach { it.initialize() }
+
+        // Register Voice Plugin Listener
+        pluginProvider.voicePlugin.setListener(object : VoicePlugin.Listener {
+            override fun onVoiceParamChange(index: Int, param: String, value: Any) {
+                when (param) {
+                    "tune" -> setVoiceTune(index, value as Float)
+                    "mod_depth" -> setVoiceFmDepth(index, value as Float) // Assuming mod_depth maps to fmDepth? Or mod_depth is generic?
+                                    // SynthPreset.kt says `voiceModDepths` maps to `mod_depth_$i`.
+                                    // DspSynthEngine has `setVoiceFmDepth`. Let's assume they map.
+                    "env_speed" -> setVoiceEnvelopeSpeed(index, value as Float)
+                    "sharpness" -> setPairSharpness(index, value as Float)
+                    "duo_mod_source" -> setDuoModSource(index, ModSource.entries[value as Int])
+                    "quad_pitch" -> setQuadPitch(index, value as Float)
+                    "quad_hold" -> setQuadHold(index, value as Float)
+                    "quad_volume" -> setQuadVolume(index, value as Float)
+                    "quad_trigger_source" -> setQuadTriggerSource(index, value as Int)
+                    "quad_pitch_source" -> setQuadPitchSource(index, value as Int)
+                    "quad_env_trigger_mode" -> setQuadEnvelopeTriggerMode(index, value as Boolean)
+                }
+            }
+
+            override fun onGlobalParamChange(param: String, value: Any) {
+                when (param) {
+                    "fm_structure" -> setFmStructure(value as Boolean)
+                    "total_feedback" -> setTotalFeedback(value as Float)
+                    "vibrato" -> setVibrato(value as Float)
+                    "coupling" -> setVoiceCoupling(value as Float)
+                }
+            }
+        })
+
+        // Register Drum Plugin Listener
+        pluginProvider.drumPlugin.setListener(object : org.balch.orpheus.plugins.drum.DrumPlugin.Listener {
+            override fun onRoutingChange(drumIndex: Int, type: String, value: Int) {
+                if (type == "trigger") setDrumTriggerSource(drumIndex, value)
+                if (type == "pitch") setDrumPitchSource(drumIndex, value)
+            }
+            override fun onBypassChange(bypass: Boolean) {
+                setDrumsBypass(bypass)
+            }
+        })
 
         // TOTAL FB: StereoPlugin.peak → scaled → HyperLfo.feedbackInput
         pluginProvider.stereoPlugin.outputs["peakOutput"]?.connect(totalFbGain.inputA)
@@ -634,6 +676,7 @@ class DspSynthEngine(
     
     override fun setDrumsBypass(bypass: Boolean) {
         _drumsBypass = bypass
+        pluginProvider.drumPlugin.setBypass(bypass)
         if (bypass) {
             drumChainGainL.inputB.set(0.0)
             drumChainGainR.inputB.set(0.0)
@@ -707,7 +750,11 @@ class DspSynthEngine(
     override fun getStereoMode(): StereoMode = _stereoMode
 
     // Vibrato delegation
-    override fun setVibrato(amount: Float) { pluginProvider.vibratoPlugin.setDepth(amount) }
+    // Vibrato delegation
+    override fun setVibrato(amount: Float) {
+        pluginProvider.vibratoPlugin.setDepth(amount)
+        pluginProvider.voicePlugin.setVibrato(amount)
+    }
     override fun getVibrato(): Float = pluginProvider.vibratoPlugin.getDepth()
     
     // Bender delegation
@@ -760,6 +807,7 @@ class DspSynthEngine(
         _voiceTune[index] = tune
         voiceTuneCache[index] = tune.toDouble()
         updateVoiceFrequency(index)
+        pluginProvider.voicePlugin.setTune(index, tune)
     }
 
     private fun updateVoiceFrequency(index: Int) {
@@ -788,11 +836,13 @@ class DspSynthEngine(
     override fun setVoiceFmDepth(index: Int, amount: Float) {
         _voiceFmDepth[index] = amount
         voices[index].fmDepth.set(amount.toDouble())
+        pluginProvider.voicePlugin.setModDepth(index, amount)
     }
 
     override fun setVoiceEnvelopeSpeed(index: Int, speed: Float) {
         _voiceEnvelopeSpeed[index] = speed
         voices[index].setEnvelopeSpeed(speed)
+        pluginProvider.voicePlugin.setEnvSpeed(index, speed)
     }
 
     override fun setPairSharpness(pairIndex: Int, sharpness: Float) {
@@ -801,6 +851,7 @@ class DspSynthEngine(
         val voiceB = voiceA + 1
         voices[voiceA].sharpness.set(sharpness.toDouble())
         voices[voiceB].sharpness.set(sharpness.toDouble())
+        pluginProvider.voicePlugin.setPairSharpness(pairIndex, sharpness)
     }
 
     override fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {
@@ -823,6 +874,7 @@ class DspSynthEngine(
         for (i in startVoice until startVoice + 4) {
             updateVoiceFrequency(i)
         }
+        pluginProvider.voicePlugin.setQuadPitch(quadIndex, pitch)
     }
 
     override fun setQuadHold(quadIndex: Int, amount: Float) {
@@ -832,6 +884,7 @@ class DspSynthEngine(
         for (i in startVoice until startVoice + 4) {
             voices[i].setHoldLevel(amount.toDouble())
         }
+        pluginProvider.voicePlugin.setQuadHold(quadIndex, amount)
     }
 
     override fun setQuadVolume(quadIndex: Int, volume: Float) {
@@ -840,6 +893,7 @@ class DspSynthEngine(
         for (i in startVoice until startVoice + 4) {
             voices[i].setVolume(volume.toDouble())
         }
+        pluginProvider.voicePlugin.setQuadVolume(quadIndex, volume)
     }
 
     override fun fadeQuadVolume(quadIndex: Int, targetVolume: Float, durationSeconds: Float) {
@@ -868,6 +922,7 @@ class DspSynthEngine(
 
     override fun setDuoModSource(duoIndex: Int, source: ModSource) {
         _duoModSource[duoIndex] = source
+        pluginProvider.voicePlugin.setDuoModSource(duoIndex, source.ordinal)
         val voiceA = duoIndex * 2
         val voiceB = voiceA + 1
 
@@ -919,12 +974,14 @@ class DspSynthEngine(
 
     override fun setFmStructure(crossQuad: Boolean) {
         _fmStructureCrossQuad = crossQuad
+        pluginProvider.voicePlugin.setFmStructure(crossQuad)
     }
 
     override fun setTotalFeedback(amount: Float) {
         _totalFeedback = amount
         val scaledAmount = amount * 20.0
         totalFbGain.inputB.set(scaledAmount)
+        pluginProvider.voicePlugin.setTotalFeedback(amount)
     }
 
     override fun setVoiceCoupling(amount: Float) {
@@ -933,6 +990,7 @@ class DspSynthEngine(
         voices.forEach { voice ->
             voice.couplingDepth.set(depthHz)
         }
+        pluginProvider.voicePlugin.setCoupling(amount)
     }
 
     // Test tone
@@ -1234,6 +1292,7 @@ class DspSynthEngine(
     override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) {
         if (quadIndex !in 0..2) return
         quadPitchSources[quadIndex] = sourceIndex
+        pluginProvider.voicePlugin.setQuadPitchSource(quadIndex, sourceIndex)
         
         val voiceIndices = (quadIndex * 4) until ((quadIndex + 1) * 4)
         
@@ -1265,6 +1324,7 @@ class DspSynthEngine(
     override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) {
         if (quadIndex !in 0..2) return
         quadTriggerSources[quadIndex] = sourceIndex
+        pluginProvider.voicePlugin.setQuadTriggerSource(quadIndex, sourceIndex)
         
         val voiceIndices = (quadIndex * 4) until ((quadIndex + 1) * 4)
         
@@ -1287,6 +1347,7 @@ class DspSynthEngine(
     override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) {
         if (quadIndex !in 0..2) return
         quadEnvelopeTriggerModes[quadIndex] = enabled
+        pluginProvider.voicePlugin.setQuadEnvTriggerMode(quadIndex, enabled)
         val voiceIndices = (quadIndex * 4) until ((quadIndex + 1) * 4)
         for (i in voiceIndices) {
             voices[i].setTriggerMode(enabled)

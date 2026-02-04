@@ -32,7 +32,9 @@ enum class DelaySymbol(
     TIME_2("time_2", "Time 2"),
     MOD_DEPTH_1("mod_depth_1", "Mod Depth 1"),
     MOD_DEPTH_2("mod_depth_2", "Mod Depth 2"),
-    STEREO_MODE("stereo_mode", "Stereo Mode")
+    STEREO_MODE("stereo_mode", "Stereo Mode"),
+    MOD_SOURCE("mod_source_is_lfo", "Mod Source is LFO"),
+    LFO_WAVEFORM("lfo_wave_is_triangle", "LFO Waveform is Triangle")
 }
 
 /**
@@ -99,6 +101,8 @@ class DelayPlugin(
     private var _modDepth1 = 0f
     private var _modDepth2 = 0f
     private var _stereoMode = false
+    private var _modSourceIsLfo = true
+    private var _lfoWaveformIsTriangle = true
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 7) {
@@ -168,6 +172,22 @@ class DelayPlugin(
                 _stereoMode = it
                 updateStereoGains()
             }
+        }
+
+        bool(DelaySymbol.MOD_SOURCE) {
+            default = true
+            get { _modSourceIsLfo }
+            set {
+                _modSourceIsLfo = it
+                setModSourceInternal(0, it)
+                setModSourceInternal(1, it)
+            }
+        }
+
+        bool(DelaySymbol.LFO_WAVEFORM) {
+            default = true
+            get { _lfoWaveformIsTriangle }
+            set { _lfoWaveformIsTriangle = it }
         }
     }
 
@@ -319,6 +339,11 @@ class DelayPlugin(
     }
 
     fun setModSource(index: Int, isLfo: Boolean) {
+        // Update port value (which updates internal state)
+        portDefs.setValue(DelaySymbol.MOD_SOURCE, PortValue.BoolValue(isLfo))
+    }
+
+    private fun setModSourceInternal(index: Int, isLfo: Boolean) {
         val targetConverter = if (index == 0) lfoToUnipolar1 else lfoToUnipolar2
         targetConverter.inputA.disconnectAll()
         if (isLfo) {
@@ -360,5 +385,11 @@ class DelayPlugin(
         else -> 0f
     }
     
-    fun getModSourceIsLfo(index: Int): Boolean = true // TODO: track source
+    fun getModSourceIsLfo(index: Int): Boolean = _modSourceIsLfo
+    
+    fun setLfoWaveform(isTriangle: Boolean) {
+        portDefs.setValue(DelaySymbol.LFO_WAVEFORM, PortValue.BoolValue(isTriangle))
+    }
+    
+    fun getLfoWaveform(): Boolean = _lfoWaveformIsTriangle
 }

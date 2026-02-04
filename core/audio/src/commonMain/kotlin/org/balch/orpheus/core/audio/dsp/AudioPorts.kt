@@ -4,6 +4,7 @@ package org.balch.orpheus.core.audio.dsp
  * Base interface for all audio signal connections.
  * Represents a point where audio signals can be read from (output) or written to (input).
  */
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -34,12 +35,15 @@ data class AudioPort(
 @Serializable
 sealed class PortValue {
     @Serializable
+    @SerialName("float")
     data class FloatValue(val value: Float) : PortValue()
     
     @Serializable
+    @SerialName("int")
     data class IntValue(val value: Int) : PortValue()
     
     @Serializable
+    @SerialName("bool")
     data class BoolValue(val value: Boolean) : PortValue()
     
     fun asFloat(): Float = when (this) {
