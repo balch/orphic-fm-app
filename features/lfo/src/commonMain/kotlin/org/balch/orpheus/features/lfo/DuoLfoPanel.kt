@@ -3,8 +3,6 @@ package org.balch.orpheus.features.lfo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -17,10 +15,11 @@ import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
+import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
+import org.balch.orpheus.ui.widgets.HorizontalToggle
 import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.balch.orpheus.ui.widgets.Vertical3WaySwitch
-import org.balch.orpheus.ui.widgets.VerticalToggle
+import org.balch.orpheus.ui.widgets.Switch3WayState
 import org.balch.orpheus.ui.widgets.learnable
 
 /**
@@ -59,30 +58,27 @@ fun DuoLfoPanel(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // 3-way AND/OFF/OR Switch (Left)
-                Vertical3WaySwitch(
+                // 3-way AND/OFF/OR Switch (Left) - Horizontal
+                HorizontalSwitch3Way(
                     modifier =
                         Modifier
                             .learnable(ControlIds.HYPER_LFO_MODE, learnState),
-                    topLabel = "AND",
-                    bottomLabel = "OR",
-                    position =
-                        when (uiState.mode) {
-                            HyperLfoMode.AND -> 0
-                            HyperLfoMode.OFF -> 1
-                            HyperLfoMode.OR -> 2
-                        },
-                    onPositionChange = { pos ->
-                        actions.setMode(
-                            when (pos) {
-                                0 -> HyperLfoMode.AND
-                                1 -> HyperLfoMode.OFF
-                                else -> HyperLfoMode.OR
-                            }
-                        )
+                    startText = "&&",
+                    endText = "||",
+                    state = when (uiState.mode) {
+                        HyperLfoMode.AND -> Switch3WayState.START
+                        HyperLfoMode.OFF -> Switch3WayState.MIDDLE
+                        HyperLfoMode.OR -> Switch3WayState.END
+                    },
+                    onStateChange = { newState ->
+                        val newMode = when (newState) {
+                            Switch3WayState.START -> HyperLfoMode.AND
+                            Switch3WayState.MIDDLE -> HyperLfoMode.OFF
+                            Switch3WayState.END -> HyperLfoMode.OR
+                        }
+                        actions.setMode(newMode)
                     },
                     color = OrpheusColors.neonCyan,
-                    enabled = !learnState.isActive
                 )
 
                 // Knobs (Medium size - 56dp)
@@ -97,13 +93,11 @@ fun DuoLfoPanel(
                         else OrpheusColors.neonCyan.copy(alpha = 0.4f)
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
                 HorizontalMiniSlider(
                     value = uiState.lfoAMultiplier,
                     onValueChange = actions.setLfoAMultiplier,
-                    leftLabel = "F",
-                    rightLabel = "S",
+                    leftLabel = "🐇", // Fast
+                    rightLabel = "🐢", // Slow
                     color = OrpheusColors.neonCyan,
                     trackWidth = 48
                 )
@@ -112,15 +106,14 @@ fun DuoLfoPanel(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // LINK Vertical Switch (Right)
-                VerticalToggle(
+                // LINK Toggle (Right) - Horizontal
+                HorizontalToggle(
                     modifier = Modifier.learnable(ControlIds.HYPER_LFO_LINK, learnState),
-                    topLabel = "LINK",
-                    bottomLabel = "OFF",
-                    isTop = uiState.linkEnabled,
+                    startLabel = "🔗", // Link
+                    endLabel = "○", // Off (or ∅)
+                    isStart = uiState.linkEnabled,
                     onToggle = { actions.setLink(it) },
-                    color = OrpheusColors.neonCyan,
-                    enabled = !learnState.isActive
+                    color = OrpheusColors.neonCyan
                 )
                 RotaryKnob(
                     value = uiState.lfoB,
@@ -133,13 +126,11 @@ fun DuoLfoPanel(
                         else OrpheusColors.neonCyan.copy(alpha = 0.4f)
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
                 HorizontalMiniSlider(
                     value = uiState.lfoBMultiplier,
                     onValueChange = actions.setLfoBMultiplier,
-                    leftLabel = "F",
-                    rightLabel = "S",
+                    leftLabel = "🐇", // Fast
+                    rightLabel = "🐢", // Slow
                     color = OrpheusColors.neonCyan,
                     trackWidth = 48
                 )

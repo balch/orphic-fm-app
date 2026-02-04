@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -56,31 +55,35 @@ class VibratoPlugin(
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 1) {
-        float(VibratoSymbol.DEPTH) {
-            default = 0f
-            get { _depth }
-            set {
-                _depth = it
-                val depthHz = it * 20.0
-                depthGain.inputB.set(depthHz)
+        controlPort(VibratoSymbol.DEPTH) {
+            floatType {
+                default = 0f
+                get { _depth }
+                set {
+                    _depth = it
+                    val depthHz = it * 20.0
+                    depthGain.inputB.set(depthHz)
+                }
             }
         }
         
-        float(VibratoSymbol.RATE) {
-            default = 5.0f; min = 0.1f; max = 20.0f
-            get { _rate }
-            set {
-                _rate = it
-                lfo.frequency.set(it.toDouble())
+        controlPort(VibratoSymbol.RATE) {
+            floatType {
+                default = 5.0f; min = 0.1f; max = 20.0f
+                get { _rate }
+                set {
+                    _rate = it
+                    lfo.frequency.set(it.toDouble())
+                }
             }
         }
     }
 
-    private val audioPorts = listOf(
-        AudioPort(0, "output", "Output", false)
-    )
+    private val audioPorts = ports {
+        audioPort { index = 0; symbol = "output"; name = "Output"; isInput = false }
+    }
 
-    override val ports: List<Port> = audioPorts + portDefs.ports
+    override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
     override val audioUnits: List<AudioUnit> = listOf(
         lfo, depthGain

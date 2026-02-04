@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -76,59 +75,75 @@ class GrainsPlugin(
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 4) {
-        float(GrainsSymbol.POSITION) {
-            default = 0.2f
-            get { _position }
-            set { _position = it; grains.position.set(it.toDouble()) }
+        controlPort(GrainsSymbol.POSITION) {
+            floatType {
+                default = 0.2f
+                get { _position }
+                set { _position = it; grains.position.set(it.toDouble()) }
+            }
         }
         
-        float(GrainsSymbol.SIZE) {
-            get { _size }
-            set { _size = it; grains.size.set(it.toDouble()) }
+        controlPort(GrainsSymbol.SIZE) {
+            floatType {
+                get { _size }
+                set { _size = it; grains.size.set(it.toDouble()) }
+            }
         }
         
-        float(GrainsSymbol.PITCH) {
-            default = 0.0f; min = -1f; max = 1f
-            get { _pitch }
-            set { _pitch = it; grains.pitch.set(it.toDouble()) }
+        controlPort(GrainsSymbol.PITCH) {
+            floatType {
+                default = 0.0f; min = -1f; max = 1f
+                get { _pitch }
+                set { _pitch = it; grains.pitch.set(it.toDouble()) }
+            }
         }
         
-        float(GrainsSymbol.DENSITY) {
-            get { _density }
-            set { _density = it; grains.density.set(it.toDouble()) }
+        controlPort(GrainsSymbol.DENSITY) {
+            floatType {
+                get { _density }
+                set { _density = it; grains.density.set(it.toDouble()) }
+            }
         }
         
-        float(GrainsSymbol.TEXTURE) {
-            get { _texture }
-            set { _texture = it; grains.texture.set(it.toDouble()) }
+        controlPort(GrainsSymbol.TEXTURE) {
+            floatType {
+                get { _texture }
+                set { _texture = it; grains.texture.set(it.toDouble()) }
+            }
         }
         
-        float(GrainsSymbol.DRY_WET) {
-            get { _dryWet }
-            set { _dryWet = it; grains.dryWet.set(it.toDouble()) }
+        controlPort(GrainsSymbol.DRY_WET) {
+            floatType {
+                get { _dryWet }
+                set { _dryWet = it; grains.dryWet.set(it.toDouble()) }
+            }
         }
         
-        bool(GrainsSymbol.FREEZE) {
-            get { _freeze }
-            set { _freeze = it; grains.freeze.set(if (it) 1.0 else 0.0) }
+        controlPort(GrainsSymbol.FREEZE) {
+            boolType {
+                get { _freeze }
+                set { _freeze = it; grains.freeze.set(if (it) 1.0 else 0.0) }
+            }
         }
         
-        int(GrainsSymbol.MODE) {
-            min = 0; max = 2
-            options = listOf("Granular", "Reverse", "Shimmer")
-            get { _mode }
-            set { _mode = it; grains.setMode(it) }
+        controlPort(GrainsSymbol.MODE) {
+            intType {
+                min = 0; max = 2
+                options = listOf("Granular", "Reverse", "Shimmer")
+                get { _mode }
+                set { _mode = it; grains.setMode(it) }
+            }
         }
     }
 
-    private val audioPorts = listOf(
-        AudioPort(0, "in_l", "Input Left", true),
-        AudioPort(1, "in_r", "Input Right", true),
-        AudioPort(2, "out_l", "Output Left", false),
-        AudioPort(3, "out_r", "Output Right", false)
-    )
+    private val audioPorts = ports {
+        audioPort { index = 0; symbol = "in_l"; name = "Input Left"; isInput = true }
+        audioPort { index = 1; symbol = "in_r"; name = "Input Right"; isInput = true }
+        audioPort { index = 2; symbol = "out_l"; name = "Output Left"; isInput = false }
+        audioPort { index = 3; symbol = "out_r"; name = "Output Right"; isInput = false }
+    }
 
-    override val ports: List<Port> = audioPorts + portDefs.ports
+    override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
     override val audioUnits: List<AudioUnit> = listOf(grains)
 

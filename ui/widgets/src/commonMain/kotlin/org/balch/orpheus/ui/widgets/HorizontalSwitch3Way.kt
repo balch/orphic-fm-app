@@ -97,7 +97,7 @@ fun HorizontalSwitch3Way(
             Box(
                 modifier = Modifier
                     .width(40.dp) // Match HorizontalToggle width
-                    .height(12.dp) // Match HorizontalToggle height
+                    .height(16.dp) // Match HorizontalToggle height
                     .clip(RoundedCornerShape(6.dp))
                     .background(color.copy(alpha = 0.2f))
             ) {

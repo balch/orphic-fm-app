@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -86,75 +85,95 @@ class FluxPlugin(
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 8) {
-        float(FluxSymbol.SPREAD) {
-            default = 0.5f
-            get { _spread }
-            set { _spread = it; flux.spread.set(it.toDouble()) }
+        controlPort(FluxSymbol.SPREAD) {
+            floatType {
+                default = 0.5f
+                get { _spread }
+                set { _spread = it; flux.spread.set(it.toDouble()) }
+            }
         }
         
-        float(FluxSymbol.BIAS) {
-            get { _bias }
-            set { _bias = it; flux.bias.set(it.toDouble()) }
+        controlPort(FluxSymbol.BIAS) {
+            floatType {
+                get { _bias }
+                set { _bias = it; flux.bias.set(it.toDouble()) }
+            }
         }
         
-        float(FluxSymbol.STEPS) {
-            get { _steps }
-            set { _steps = it; flux.steps.set(it.toDouble()) }
+        controlPort(FluxSymbol.STEPS) {
+            floatType {
+                get { _steps }
+                set { _steps = it; flux.steps.set(it.toDouble()) }
+            }
         }
         
-        float(FluxSymbol.DEJAVU) {
-            default = 0f
-            get { _dejaVu }
-            set { _dejaVu = it; flux.dejaVu.set(it.toDouble()) }
+        controlPort(FluxSymbol.DEJAVU) {
+            floatType {
+                default = 0f
+                get { _dejaVu }
+                set { _dejaVu = it; flux.dejaVu.set(it.toDouble()) }
+            }
         }
         
-        int(FluxSymbol.LENGTH) {
-            default = 8; min = 1; max = 16
-            get { _length }
-            set { _length = it; flux.length.set(it.toDouble()) }
+        controlPort(FluxSymbol.LENGTH) {
+            intType {
+                default = 8; min = 1; max = 16
+                get { _length }
+                set { _length = it; flux.length.set(it.toDouble()) }
+            }
         }
         
-        int(FluxSymbol.SCALE) {
-            min = 0; max = 5
-            options = listOf("Major", "Minor", "Pentatonic", "Phrygian", "Dorian", "Chromatic")
-            get { _scale }
-            set { _scale = it; flux.setScale(it) }
+        controlPort(FluxSymbol.SCALE) {
+            intType {
+                min = 0; max = 5
+                options = listOf("Major", "Minor", "Pentatonic", "Phrygian", "Dorian", "Chromatic")
+                get { _scale }
+                set { _scale = it; flux.setScale(it) }
+            }
         }
         
-        float(FluxSymbol.RATE) {
-            get { _rate }
-            set { _rate = it; flux.rate.set(it.toDouble()) }
+        controlPort(FluxSymbol.RATE) {
+            floatType {
+                get { _rate }
+                set { _rate = it; flux.rate.set(it.toDouble()) }
+            }
         }
         
-        float(FluxSymbol.JITTER) {
-            default = 0f
-            get { _jitter }
-            set { _jitter = it; flux.jitter.set(it.toDouble()) }
+        controlPort(FluxSymbol.JITTER) {
+            floatType {
+                default = 0f
+                get { _jitter }
+                set { _jitter = it; flux.jitter.set(it.toDouble()) }
+            }
         }
         
-        float(FluxSymbol.PROBABILITY) {
-            get { _probability }
-            set { _probability = it; flux.probability.set(it.toDouble()) }
+        controlPort(FluxSymbol.PROBABILITY) {
+            floatType {
+                get { _probability }
+                set { _probability = it; flux.probability.set(it.toDouble()) }
+            }
         }
         
-        float(FluxSymbol.GATE_LENGTH) {
-            get { _gateLength }
-            set { _gateLength = it; flux.gateLength.set(it.toDouble()) }
+        controlPort(FluxSymbol.GATE_LENGTH) {
+            floatType {
+                get { _gateLength }
+                set { _gateLength = it; flux.gateLength.set(it.toDouble()) }
+            }
         }
     }
 
-    private val audioPorts = listOf(
-        AudioPort(0, "clock", "Clock In", true),
-        AudioPort(1, "out", "Gate", false),
-        AudioPort(2, "cv", "CV", false),
-        AudioPort(3, "cv_x1", "CV X1", false),
-        AudioPort(4, "cv_x3", "CV X3", false),
-        AudioPort(5, "trig_t1", "Trig T1", false),
-        AudioPort(6, "trig_t2", "Trig T2", false),
-        AudioPort(7, "trig_t3", "Trig T3", false)
-    )
+    private val audioPorts = ports {
+        audioPort { index = 0; symbol = "clock"; name = "Clock In"; isInput = true }
+        audioPort { index = 1; symbol = "out"; name = "Gate"; isInput = false }
+        audioPort { index = 2; symbol = "cv"; name = "CV"; isInput = false }
+        audioPort { index = 3; symbol = "cv_x1"; name = "CV X1"; isInput = false }
+        audioPort { index = 4; symbol = "cv_x3"; name = "CV X3"; isInput = false }
+        audioPort { index = 5; symbol = "trig_t1"; name = "Trig T1"; isInput = false }
+        audioPort { index = 6; symbol = "trig_t2"; name = "Trig T2"; isInput = false }
+        audioPort { index = 7; symbol = "trig_t3"; name = "Trig T3"; isInput = false }
+    }
 
-    override val ports: List<Port> = audioPorts + portDefs.ports
+    override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
     override val audioUnits: List<AudioUnit> = listOf(flux)
 

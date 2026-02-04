@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -116,69 +115,97 @@ class DuoLfoPlugin(
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 6) {
-        int(DuoLfoSymbol.MODE) {
-            default = 1; min = 0; max = 2
-            options = listOf("AND", "OFF", "OR")
-            get { _mode }
-            set {
-                _mode = it
-                when (it) {
-                    0 -> { isAndMode = true; updateOutput() }
-                    1 -> { outputProxy.input.disconnectAll(); outputProxy.input.set(0.0) }
-                    2 -> { isAndMode = false; updateOutput() }
+        controlPort(DuoLfoSymbol.MODE) {
+            intType {
+                default = 1; min = 0; max = 2
+                options = listOf("AND", "OFF", "OR")
+                get { _mode }
+                set {
+                    _mode = it
+                    when (it) {
+                        0 -> {
+                            isAndMode = true; updateOutput()
+                        }
+                        1 -> {
+                            outputProxy.input.disconnectAll(); outputProxy.input.set(0.0)
+                        }
+                        2 -> {
+                            isAndMode = false; updateOutput()
+                        }
+                    }
                 }
             }
         }
-        
-        bool(DuoLfoSymbol.LINK) {
-            get { _link }
-            set {
-                _link = it
-                fmGain.inputB.set(if (it) 10.0 else 0.0)
-            }
-        }
-        
-        bool(DuoLfoSymbol.TRIANGLE_MODE) {
-            default = true
-            get { _triangleMode }
-            set {
-                if (isTriangleMode != it) {
-                    isTriangleMode = it
-                    _triangleMode = it
-                    updateOutput()
+
+        controlPort(DuoLfoSymbol.LINK) {
+            boolType {
+                get { _link }
+                set {
+                    _link = it
+                    fmGain.inputB.set(if (it) 10.0 else 0.0)
                 }
             }
         }
-        
-        float(DuoLfoSymbol.FREQ_A) {
-            get { _freqA }
-            set {
-                _freqA = it
-                val freqHz = 0.01 + it
-                inputA.input.set(freqHz)
+
+        controlPort(DuoLfoSymbol.TRIANGLE_MODE) {
+            boolType {
+                default = true
+                get { _triangleMode }
+                set {
+                    if (isTriangleMode != it) {
+                        isTriangleMode = it
+                        _triangleMode = it
+                        updateOutput()
+                    }
+                }
             }
         }
-        
-        float(DuoLfoSymbol.FREQ_B) {
-            get { _freqB }
-            set {
-                _freqB = it
-                val freqHz = 0.01 + it
-                inputB.input.set(freqHz)
+
+        controlPort(DuoLfoSymbol.FREQ_A) {
+            floatType {
+                get { _freqA }
+                set {
+                    _freqA = it
+                    val freqHz = 0.01 + it
+                    inputA.input.set(freqHz)
+                }
+            }
+        }
+
+        controlPort(DuoLfoSymbol.FREQ_B) {
+            floatType {
+                get { _freqB }
+                set {
+                    _freqB = it
+                    val freqHz = 0.01 + it
+                    inputB.input.set(freqHz)
+                }
             }
         }
     }
 
-    private val audioPorts = listOf(
-        AudioPort(0, "freq_a", "Frequency A", true),
-        AudioPort(1, "freq_b", "Frequency B", true),
-        AudioPort(2, "feedback", "Feedback", true),
-        AudioPort(3, "out", "Output", false),
-        AudioPort(4, "out_a", "Output A", false),
-        AudioPort(5, "out_b", "Output B", false)
-    )
+    private val audioPorts = ports {
+        audioPort {
+            index = 0; symbol = "freq_a"; name = "Frequency A"; isInput = true
+        }
+        audioPort {
+            index = 1; symbol = "freq_b"; name = "Frequency B"; isInput = true
+        }
+        audioPort {
+            index = 2; symbol = "feedback"; name = "Feedback"; isInput = true
+        }
+        audioPort {
+            index = 3; symbol = "out"; name = "Output"; isInput = false
+        }
+        audioPort {
+            index = 4; symbol = "out_a"; name = "Output A"; isInput = false
+        }
+        audioPort {
+            index = 5; symbol = "out_b"; name = "Output B"; isInput = false
+        }
+    }
 
-    override val ports: List<Port> = audioPorts + portDefs.ports
+    override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
     override val audioUnits: List<AudioUnit> = listOf(
         inputA, inputB, outputProxy, outputAProxy, outputBProxy, feedbackProxy,

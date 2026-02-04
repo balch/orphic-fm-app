@@ -8,12 +8,12 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.ports
 
 /**
  * DSP Plugin for Native Audio Looper.
@@ -41,15 +41,17 @@ class LooperPlugin(
         author = "Balch"
     )
 
-    override val ports: List<Port> = listOf(
-        AudioPort(0, "in_l", "Input Left", true),
-        AudioPort(1, "in_r", "Input Right", true),
-        AudioPort(2, "out_l", "Output Left", false),
-        AudioPort(3, "out_r", "Output Right", false),
+    private val audioPorts = ports {
+        audioPort { index = 0; symbol = "in_l"; name = "Input Left"; isInput = true }
+        audioPort { index = 1; symbol = "in_r"; name = "Input Right"; isInput = true }
+        audioPort { index = 2; symbol = "out_l"; name = "Output Left"; isInput = false }
+        audioPort { index = 3; symbol = "out_r"; name = "Output Right"; isInput = false }
         // Gates can be treated as audio ports for sample-accurate control or control ports
-        AudioPort(4, "record_gate", "Record Gate", true),
-        AudioPort(5, "play_gate", "Play Gate", true)
-    )
+        audioPort { index = 4; symbol = "record_gate"; name = "Record Gate"; isInput = true }
+        audioPort { index = 5; symbol = "play_gate"; name = "Play Gate"; isInput = true }
+    }
+
+    override val ports: List<Port> = audioPorts.ports
 
     private val looper = dspFactory.createLooperUnit()
     

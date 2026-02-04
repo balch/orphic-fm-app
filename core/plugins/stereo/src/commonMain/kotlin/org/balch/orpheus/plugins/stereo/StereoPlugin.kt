@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -86,60 +85,66 @@ class StereoPlugin(
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 5) {
-        float(StereoSymbol.MASTER_PAN) {
-            default = 0f; min = -1f; max = 1f
-            get { _masterPan }
-            set {
-                _masterPan = it.coerceIn(-1f, 1f)
-                val angle = ((it + 1f) / 2f) * (PI / 2).toFloat()
-                val leftGain = cos(angle.toDouble())
-                val rightGain = sin(angle.toDouble())
-                masterPanLeft.inputB.set(leftGain)
-                masterPanRight.inputB.set(rightGain)
+        controlPort(StereoSymbol.MASTER_PAN) {
+            floatType {
+                default = 0f; min = -1f; max = 1f
+                get { _masterPan }
+                set {
+                    _masterPan = it.coerceIn(-1f, 1f)
+                    val angle = ((it + 1f) / 2f) * (PI / 2).toFloat()
+                    val leftGain = cos(angle.toDouble())
+                    val rightGain = sin(angle.toDouble())
+                    masterPanLeft.inputB.set(leftGain)
+                    masterPanRight.inputB.set(rightGain)
+                }
             }
         }
         
-        float(StereoSymbol.MASTER_VOL) {
-            default = 0.7f
-            get { _masterVolume }
-            set {
-                _masterVolume = it
-                masterGainLeft.inputB.set(it.toDouble())
-                masterGainRight.inputB.set(it.toDouble())
+        controlPort(StereoSymbol.MASTER_VOL) {
+            floatType {
+                default = 0.7f
+                get { _masterVolume }
+                set {
+                    _masterVolume = it
+                    masterGainLeft.inputB.set(it.toDouble())
+                    masterGainRight.inputB.set(it.toDouble())
+                }
             }
         }
         
         // Voice pans 0-11
         for (i in 0 until 12) {
-            float(StereoSymbol.entries[i + 2]) { // Skip MASTER_PAN and MASTER_VOL
-                default = when(i) {
-                    2 -> -0.3f; 3 -> -0.3f; 4 -> 0.3f; 5 -> 0.3f
-                    6 -> -0.7f; 7 -> 0.7f
-                    else -> 0f
-                }
-                min = -1f; max = 1f
-                get { _voicePan[i] }
-                set {
-                    _voicePan[i] = it.coerceIn(-1f, 1f)
-                    val angle = ((it + 1f) / 2f) * (PI / 2).toFloat()
-                    val leftGain = cos(angle.toDouble())
-                    val rightGain = sin(angle.toDouble())
-                    voicePanLeft[i].inputB.set(leftGain)
-                    voicePanRight[i].inputB.set(rightGain)
+            controlPort(StereoSymbol.entries[i + 2]) { // Skip MASTER_PAN and MASTER_VOL
+                floatType {
+                    default = when(i) {
+                        2 -> -0.3f; 3 -> -0.3f; 4 -> 0.3f; 5 -> 0.3f
+                        6 -> -0.7f; 7 -> 0.7f
+                        else -> 0f
+                    }
+                    min = -1f; max = 1f
+                    get { _voicePan[i] }
+                    set {
+                        _voicePan[i] = it.coerceIn(-1f, 1f)
+                        val angle = ((it + 1f) / 2f) * (PI / 2).toFloat()
+                        val leftGain = cos(angle.toDouble())
+                        val rightGain = sin(angle.toDouble())
+                        voicePanLeft[i].inputB.set(leftGain)
+                        voicePanRight[i].inputB.set(rightGain)
+                    }
                 }
             }
         }
     }
 
-    private val audioPorts = buildList {
-        add(AudioPort(0, "in_l", "Left Input", true))
-        add(AudioPort(1, "in_r", "Right Input", true))
-        add(AudioPort(2, "out_l", "Left Output", false))
-        add(AudioPort(3, "out_r", "Right Output", false))
-        add(AudioPort(4, "peak", "Peak Monitor", false))
+    private val audioPorts = ports {
+        audioPort { index = 0; symbol = "in_l"; name = "Left Input"; isInput = true }
+        audioPort { index = 1; symbol = "in_r"; name = "Right Input"; isInput = true }
+        audioPort { index = 2; symbol = "out_l"; name = "Left Output"; isInput = false }
+        audioPort { index = 3; symbol = "out_r"; name = "Right Output"; isInput = false }
+        audioPort { index = 4; symbol = "peak"; name = "Peak Monitor"; isInput = false }
     }
 
-    override val ports: List<Port> = audioPorts + portDefs.ports
+    override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
     override val audioUnits: List<AudioUnit> = listOf(
         stereoSumLeft, stereoSumRight,

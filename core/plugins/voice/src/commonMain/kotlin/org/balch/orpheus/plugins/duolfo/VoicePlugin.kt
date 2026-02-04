@@ -1,4 +1,4 @@
-package org.balch.orpheus.plugins.voice
+package org.balch.orpheus.plugins.duolfo
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
@@ -73,31 +73,37 @@ class VoicePlugin : DspPlugin {
     private val portDefs = ports(startIndex = 0) {
         // Voice Params (0-7 + extras)
         for (i in 0 until 12) {
-            float("tune_$i") {
-                default = 0.5f
-                get { _tune[i] }
-                set { 
-                    if (_tune[i] != it) {
-                        _tune[i] = it
-                        listener?.onVoiceParamChange(i, "tune", it)
+            controlPort("tune_$i") {
+                floatType {
+                    default = 0.5f
+                    get { _tune[i] }
+                    set { 
+                        if (_tune[i] != it) {
+                            _tune[i] = it
+                            listener?.onVoiceParamChange(i, "tune", it)
+                        }
                     }
                 }
             }
-            float("mod_depth_$i") {
-                get { _modDepth[i] }
-                set {
-                    if (_modDepth[i] != it) {
-                        _modDepth[i] = it
-                        listener?.onVoiceParamChange(i, "mod_depth", it)
+            controlPort("mod_depth_$i") {
+                floatType {
+                    get { _modDepth[i] }
+                    set {
+                        if (_modDepth[i] != it) {
+                            _modDepth[i] = it
+                            listener?.onVoiceParamChange(i, "mod_depth", it)
+                        }
                     }
                 }
             }
-            float("env_speed_$i") {
-                get { _envSpeed[i] }
-                set {
-                    if (_envSpeed[i] != it) {
-                        _envSpeed[i] = it
-                        listener?.onVoiceParamChange(i, "env_speed", it)
+            controlPort("env_speed_$i") {
+                floatType {
+                    get { _envSpeed[i] }
+                    set {
+                        if (_envSpeed[i] != it) {
+                            _envSpeed[i] = it
+                            listener?.onVoiceParamChange(i, "env_speed", it)
+                        }
                     }
                 }
             }
@@ -105,104 +111,128 @@ class VoicePlugin : DspPlugin {
         
         // Pair Params (0-5)
         for (i in 0 until 6) {
-            float("pair_sharpness_$i") {
-                get { _pairSharpness[i] }
-                set {
-                    _pairSharpness[i] = it
-                    listener?.onVoiceParamChange(i, "sharpness", it)
+            controlPort("pair_sharpness_$i") {
+                floatType {
+                    get { _pairSharpness[i] }
+                    set {
+                        _pairSharpness[i] = it
+                        listener?.onVoiceParamChange(i, "sharpness", it)
+                    }
                 }
             }
-            int("duo_mod_source_$i") {
-                get { _duoModSource[i] }
-                set {
-                    _duoModSource[i] = it
-                    listener?.onVoiceParamChange(i, "duo_mod_source", it)
+            controlPort("duo_mod_source_$i") {
+                intType {
+                    get { _duoModSource[i] }
+                    set {
+                        _duoModSource[i] = it
+                        listener?.onVoiceParamChange(i, "duo_mod_source", it)
+                    }
                 }
             }
         }
         
         // Global
-        bool(VoiceSymbol.FM_STRUCTURE_CROSS_QUAD) {
-            get { _fmStructureCrossQuad }
-            set {
-                if (_fmStructureCrossQuad != it) {
-                    _fmStructureCrossQuad = it
-                    listener?.onGlobalParamChange("fm_structure", it)
+        controlPort(VoiceSymbol.FM_STRUCTURE_CROSS_QUAD) {
+            boolType {
+                get { _fmStructureCrossQuad }
+                set {
+                    if (_fmStructureCrossQuad != it) {
+                        _fmStructureCrossQuad = it
+                        listener?.onGlobalParamChange("fm_structure", it)
+                    }
                 }
             }
         }
-        float(VoiceSymbol.TOTAL_FEEDBACK) {
-            get { _totalFeedback }
-            set {
-                if (_totalFeedback != it) {
-                    _totalFeedback = it
-                    listener?.onGlobalParamChange("total_feedback", it)
+        controlPort(VoiceSymbol.TOTAL_FEEDBACK) {
+            floatType {
+                get { _totalFeedback }
+                set {
+                    if (_totalFeedback != it) {
+                        _totalFeedback = it
+                        listener?.onGlobalParamChange("total_feedback", it)
+                    }
                 }
             }
         }
-        float(VoiceSymbol.VIBRATO) {
-            get { _vibrato }
-            set {
-                if (_vibrato != it) {
-                    _vibrato = it
-                    listener?.onGlobalParamChange("vibrato", it)
+        controlPort(VoiceSymbol.VIBRATO) {
+            floatType {
+                get { _vibrato }
+                set {
+                    if (_vibrato != it) {
+                        _vibrato = it
+                        listener?.onGlobalParamChange("vibrato", it)
+                    }
                 }
             }
         }
-        float(VoiceSymbol.COUPLING) {
-            get { _coupling }
-            set {
-                if (_coupling != it) {
-                    _coupling = it
-                    listener?.onGlobalParamChange("coupling", it)
+        controlPort(VoiceSymbol.COUPLING) {
+            floatType {
+                get { _coupling }
+                set {
+                    if (_coupling != it) {
+                        _coupling = it
+                        listener?.onGlobalParamChange("coupling", it)
+                    }
                 }
             }
         }
         
         // Quad Params (0-2)
         for (i in 0 until 3) {
-            float("quad_pitch_$i") {
-                default = 0.5f
-                get { _quadPitch[i] }
-                set {
-                    _quadPitch[i] = it
-                    listener?.onVoiceParamChange(i, "quad_pitch", it)
+            controlPort("quad_pitch_$i") {
+                floatType {
+                    default = 0.5f
+                    get { _quadPitch[i] }
+                    set {
+                        _quadPitch[i] = it
+                        listener?.onVoiceParamChange(i, "quad_pitch", it)
+                    }
                 }
             }
-            float("quad_hold_$i") {
-                get { _quadHold[i] }
-                set {
-                    _quadHold[i] = it
-                    listener?.onVoiceParamChange(i, "quad_hold", it)
+            controlPort("quad_hold_$i") {
+                floatType {
+                    get { _quadHold[i] }
+                    set {
+                        _quadHold[i] = it
+                        listener?.onVoiceParamChange(i, "quad_hold", it)
+                    }
                 }
             }
-            float("quad_volume_$i") {
-                default = 1.0f
-                get { _quadVolume[i] }
-                set {
-                    _quadVolume[i] = it
-                    listener?.onVoiceParamChange(i, "quad_volume", it)
+            controlPort("quad_volume_$i") {
+                floatType {
+                    default = 1.0f
+                    get { _quadVolume[i] }
+                    set {
+                        _quadVolume[i] = it
+                        listener?.onVoiceParamChange(i, "quad_volume", it)
+                    }
                 }
             }
-            int("quad_trigger_source_$i") {
-                get { _quadTriggerSource[i] }
-                set {
-                    _quadTriggerSource[i] = it
-                    listener?.onVoiceParamChange(i, "quad_trigger_source", it)
+            controlPort("quad_trigger_source_$i") {
+                intType {
+                    get { _quadTriggerSource[i] }
+                    set {
+                        _quadTriggerSource[i] = it
+                        listener?.onVoiceParamChange(i, "quad_trigger_source", it)
+                    }
                 }
             }
-            int("quad_pitch_source_$i") {
-                get { _quadPitchSource[i] }
-                set {
-                    _quadPitchSource[i] = it
-                    listener?.onVoiceParamChange(i, "quad_pitch_source", it)
+            controlPort("quad_pitch_source_$i") {
+                intType {
+                    get { _quadPitchSource[i] }
+                    set {
+                        _quadPitchSource[i] = it
+                        listener?.onVoiceParamChange(i, "quad_pitch_source", it)
+                    }
                 }
             }
-            bool("quad_env_trigger_mode_$i") {
-                get { _quadEnvTriggerMode[i] }
-                set {
-                    _quadEnvTriggerMode[i] = it
-                    listener?.onVoiceParamChange(i, "quad_env_trigger_mode", it)
+            controlPort("quad_env_trigger_mode_$i") {
+                boolType {
+                    get { _quadEnvTriggerMode[i] }
+                    set {
+                        _quadEnvTriggerMode[i] = it
+                        listener?.onVoiceParamChange(i, "quad_env_trigger_mode", it)
+                    }
                 }
             }
         }

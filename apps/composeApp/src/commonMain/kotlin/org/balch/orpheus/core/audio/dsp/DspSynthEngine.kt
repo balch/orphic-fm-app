@@ -20,7 +20,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.debug.DebugViewModel.Companion.POLL_INTERVAL_MS
-import org.balch.orpheus.plugins.voice.VoicePlugin
+import org.balch.orpheus.plugins.duolfo.VoicePlugin
 import kotlin.math.pow
 
 /**

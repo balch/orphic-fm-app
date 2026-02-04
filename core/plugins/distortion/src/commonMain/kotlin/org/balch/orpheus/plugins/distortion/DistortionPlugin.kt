@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -85,50 +84,56 @@ class DistortionPlugin(
 
     // Type-safe DSL port definitions  
     private val portDefs = ports(startIndex = 4) {
-        float(DistortionSymbol.DRIVE) {
-            default = 0.0f
-            get { _drive }
-            set {
-                _drive = it
-                val driveVal = 1.0 + (it * 14.0)
-                limiterLeft.drive.set(driveVal)
-                limiterRight.drive.set(driveVal)
+        controlPort(DistortionSymbol.DRIVE) {
+            floatType {
+                default = 0.0f
+                get { _drive }
+                set {
+                    _drive = it
+                    val driveVal = 1.0 + (it * 14.0)
+                    limiterLeft.drive.set(driveVal)
+                    limiterRight.drive.set(driveVal)
+                }
             }
         }
         
-        float(DistortionSymbol.MIX) {
-            get { _mix }
-            set {
-                _mix = it
-                val distortedLevel = it
-                val cleanLevel = 1.0f - it
-                cleanPathGainLeft.inputB.set(cleanLevel.toDouble())
-                cleanPathGainRight.inputB.set(cleanLevel.toDouble())
-                distortedPathGainLeft.inputB.set(distortedLevel.toDouble())
-                distortedPathGainRight.inputB.set(distortedLevel.toDouble())
+        controlPort(DistortionSymbol.MIX) {
+            floatType {
+                get { _mix }
+                set {
+                    _mix = it
+                    val distortedLevel = it
+                    val cleanLevel = 1.0f - it
+                    cleanPathGainLeft.inputB.set(cleanLevel.toDouble())
+                    cleanPathGainRight.inputB.set(cleanLevel.toDouble())
+                    distortedPathGainLeft.inputB.set(distortedLevel.toDouble())
+                    distortedPathGainRight.inputB.set(distortedLevel.toDouble())
+                }
             }
         }
         
-        float(DistortionSymbol.DRY_LEVEL) {
-            default = 1.0f
-            get { _dryLevel }
-            set {
-                _dryLevel = it
-                val level = it.toDouble()
-                dryGainLeft.inputB.set(level)
-                dryGainRight.inputB.set(level)
+        controlPort(DistortionSymbol.DRY_LEVEL) {
+            floatType {
+                default = 1.0f
+                get { _dryLevel }
+                set {
+                    _dryLevel = it
+                    val level = it.toDouble()
+                    dryGainLeft.inputB.set(level)
+                    dryGainRight.inputB.set(level)
+                }
             }
         }
     }
 
-    private val audioPorts = listOf(
-        AudioPort(0, "in_l", "Input Left", true),
-        AudioPort(1, "in_r", "Input Right", true),
-        AudioPort(2, "out_l", "Output Left", false),
-        AudioPort(3, "out_r", "Output Right", false)
-    )
+    private val audioPorts = ports {
+        audioPort { index = 0; symbol = "in_l"; name = "Input Left"; isInput = true }
+        audioPort { index = 1; symbol = "in_r"; name = "Input Right"; isInput = true }
+        audioPort { index = 2; symbol = "out_l"; name = "Output Left"; isInput = false }
+        audioPort { index = 3; symbol = "out_r"; name = "Output Right"; isInput = false }
+    }
 
-    override val ports: List<Port> = audioPorts + portDefs.ports
+    override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
     override val audioUnits: List<AudioUnit> = listOf(
         drySumLeft, drySumRight,

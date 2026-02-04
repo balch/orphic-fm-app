@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -104,73 +103,89 @@ class ResonatorPlugin(
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 8) {
-        int(ResonatorSymbol.MODE) {
-            min = 0; max = 5
-            options = listOf("Modal", "String", "Sympathetic", "Modaloid", "Stringoid", "Sympatheroid")
-            get { _mode }
-            set { _mode = it; resonator.setMode(it) }
-        }
-        
-        float(ResonatorSymbol.TARGET_MIX) {
-            default = 0f
-            get { _targetMix }
-            set { _targetMix = it.coerceIn(0f, 1f); applyTargetMixRouting() }
-        }
-        
-        float(ResonatorSymbol.STRUCTURE) {
-            default = 0.25f
-            get { _structure }
-            set { _structure = it; resonator.setStructure(it) }
-        }
-        
-        float(ResonatorSymbol.BRIGHTNESS) {
-            get { _brightness }
-            set { _brightness = it; resonator.setBrightness(it) }
-        }
-        
-        float(ResonatorSymbol.DAMPING) {
-            default = 0.3f
-            get { _damping }
-            set { _damping = it; resonator.setDamping(it) }
-        }
-        
-        float(ResonatorSymbol.POSITION) {
-            get { _position }
-            set { _position = it; resonator.setPosition(it) }
-        }
-        
-        float(ResonatorSymbol.MIX) {
-            default = 0.0f
-            get { _mix }
-            set {
-                _mix = it.coerceIn(0f, 1f)
-                val wetLevel = it.toDouble()
-                val dryLevel = (1.0 - it).toDouble()
-                wetGainL.inputB.set(wetLevel)
-                wetGainR.inputB.set(wetLevel)
-                dryGainL.inputB.set(dryLevel)
-                dryGainR.inputB.set(dryLevel)
+        controlPort(ResonatorSymbol.MODE) {
+            intType {
+                min = 0; max = 5
+                options = listOf("Modal", "String", "Sympathetic", "Modaloid", "Stringoid", "Sympatheroid")
+                get { _mode }
+                set { _mode = it; resonator.setMode(it) }
             }
         }
         
-        bool(ResonatorSymbol.SNAP_BACK) {
-            get { _snapBack }
-            set { _snapBack = it }
+        controlPort(ResonatorSymbol.TARGET_MIX) {
+            floatType {
+                default = 0f
+                get { _targetMix }
+                set { _targetMix = it.coerceIn(0f, 1f); applyTargetMixRouting() }
+            }
+        }
+        
+        controlPort(ResonatorSymbol.STRUCTURE) {
+            floatType {
+                default = 0.25f
+                get { _structure }
+                set { _structure = it; resonator.setStructure(it) }
+            }
+        }
+        
+        controlPort(ResonatorSymbol.BRIGHTNESS) {
+            floatType {
+                get { _brightness }
+                set { _brightness = it; resonator.setBrightness(it) }
+            }
+        }
+        
+        controlPort(ResonatorSymbol.DAMPING) {
+            floatType {
+                default = 0.3f
+                get { _damping }
+                set { _damping = it; resonator.setDamping(it) }
+            }
+        }
+        
+        controlPort(ResonatorSymbol.POSITION) {
+            floatType {
+                get { _position }
+                set { _position = it; resonator.setPosition(it) }
+            }
+        }
+        
+        controlPort(ResonatorSymbol.MIX) {
+            floatType {
+                default = 0.0f
+                get { _mix }
+                set {
+                    _mix = it.coerceIn(0f, 1f)
+                    val wetLevel = it.toDouble()
+                    val dryLevel = (1.0 - it).toDouble()
+                    wetGainL.inputB.set(wetLevel)
+                    wetGainR.inputB.set(wetLevel)
+                    dryGainL.inputB.set(dryLevel)
+                    dryGainR.inputB.set(dryLevel)
+                }
+            }
+        }
+        
+        controlPort(ResonatorSymbol.SNAP_BACK) {
+            boolType {
+                get { _snapBack }
+                set { _snapBack = it }
+            }
         }
     }
 
-    private val audioPorts = listOf(
-        AudioPort(0, "drum_l", "Drum Left", true),
-        AudioPort(1, "drum_r", "Drum Right", true),
-        AudioPort(2, "synth_l", "Synth Left", true),
-        AudioPort(3, "synth_r", "Synth Right", true),
-        AudioPort(4, "out_l", "Output Left", false),
-        AudioPort(5, "out_r", "Output Right", false),
-        AudioPort(6, "aux_l", "Aux Left", false),
-        AudioPort(7, "aux_r", "Aux Right", false)
-    )
+    private val audioPorts = ports {
+        audioPort { index = 0; symbol = "drum_l"; name = "Drum Left"; isInput = true }
+        audioPort { index = 1; symbol = "drum_r"; name = "Drum Right"; isInput = true }
+        audioPort { index = 2; symbol = "synth_l"; name = "Synth Left"; isInput = true }
+        audioPort { index = 3; symbol = "synth_r"; name = "Synth Right"; isInput = true }
+        audioPort { index = 4; symbol = "out_l"; name = "Output Left"; isInput = false }
+        audioPort { index = 5; symbol = "out_r"; name = "Output Right"; isInput = false }
+        audioPort { index = 6; symbol = "aux_l"; name = "Aux Left"; isInput = false }
+        audioPort { index = 7; symbol = "aux_r"; name = "Aux Right"; isInput = false }
+    }
 
-    override val ports: List<Port> = audioPorts + portDefs.ports
+    override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
     override val audioUnits: List<AudioUnit> = listOf(
         resonator,

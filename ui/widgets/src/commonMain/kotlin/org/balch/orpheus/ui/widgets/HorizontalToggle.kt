@@ -67,7 +67,7 @@ fun HorizontalToggle(
             Box(
                 modifier = Modifier
                     .width(40.dp)
-                    .height(12.dp)
+                    .height(16.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .background(color.copy(alpha = 0.2f)),
                 contentAlignment = if (isStart) Alignment.CenterStart else Alignment.CenterEnd

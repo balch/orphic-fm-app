@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -100,93 +99,105 @@ class BenderPlugin(
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 3) {
-        float(BenderSymbol.BEND) {
-            default = 0f; min = -1f; max = 1f
-            get { _bendAmount }
-            set {
-                val wasActive = _bendAmount.absoluteValue > 0.05f
-                _bendAmount = it.coerceIn(-1f, 1f)
-                val isActive = _bendAmount.absoluteValue > 0.05f
-                
-                val normalizedBend = _bendAmount
-                val tensionCurve = normalizedBend * (1.0 + normalizedBend.absoluteValue * 0.5)
-                val semitones = tensionCurve * _maxBendSemitones
-                val frequencyMultiplier = 2.0.pow(semitones / 12.0) - 1.0
-                
-                bendInputProxy.input.set(normalizedBend.toDouble())
-                bendDepthGain.inputB.set(frequencyMultiplier)
-                
-                val randomIntensity = _randomDepth * normalizedBend.absoluteValue * 0.1
-                randomDepthGain.inputB.set(randomIntensity.toDouble())
-                
-                val timbreAmount = normalizedBend.absoluteValue * _timbreModulation
-                timbreModGain.inputB.set(timbreAmount.toDouble())
-                
-                val lfoRate = 1.5 + (normalizedBend.absoluteValue * 3.0)
-                randomLfo.frequency.set(lfoRate)
-                
-                val tensionFreq = 300.0 + (normalizedBend.absoluteValue * 200.0)
-                tensionOsc.frequency.set(tensionFreq)
-                
-                val tensionLevel = normalizedBend.absoluteValue * _tensionVolume
-                tensionGain.inputB.set(tensionLevel.toDouble())
-                
-                if (isActive && !wasActive) {
-                    tensionEnvelope.input.set(1.0)
-                    _wasActive = true
-                } else if (!isActive && wasActive) {
-                    tensionEnvelope.input.set(0.0)
-                }
-                
-                if (!isActive && _wasActive) {
-                    springEnvelope.input.set(1.0)
-                    springEnvelope.input.set(0.0)
-                    _wasActive = false
+        controlPort(BenderSymbol.BEND) {
+            floatType {
+                default = 0f; min = -1f; max = 1f
+                get { _bendAmount }
+                set {
+                    val wasActive = _bendAmount.absoluteValue > 0.05f
+                    _bendAmount = it.coerceIn(-1f, 1f)
+                    val isActive = _bendAmount.absoluteValue > 0.05f
+                    
+                    val normalizedBend = _bendAmount
+                    val tensionCurve = normalizedBend * (1.0 + normalizedBend.absoluteValue * 0.5)
+                    val semitones = tensionCurve * _maxBendSemitones
+                    val frequencyMultiplier = 2.0.pow(semitones / 12.0) - 1.0
+                    
+                    bendInputProxy.input.set(normalizedBend.toDouble())
+                    bendDepthGain.inputB.set(frequencyMultiplier)
+                    
+                    val randomIntensity = _randomDepth * normalizedBend.absoluteValue * 0.1
+                    randomDepthGain.inputB.set(randomIntensity.toDouble())
+                    
+                    val timbreAmount = normalizedBend.absoluteValue * _timbreModulation
+                    timbreModGain.inputB.set(timbreAmount.toDouble())
+                    
+                    val lfoRate = 1.5 + (normalizedBend.absoluteValue * 3.0)
+                    randomLfo.frequency.set(lfoRate)
+                    
+                    val tensionFreq = 300.0 + (normalizedBend.absoluteValue * 200.0)
+                    tensionOsc.frequency.set(tensionFreq)
+                    
+                    val tensionLevel = normalizedBend.absoluteValue * _tensionVolume
+                    tensionGain.inputB.set(tensionLevel.toDouble())
+                    
+                    if (isActive && !wasActive) {
+                        tensionEnvelope.input.set(1.0)
+                        _wasActive = true
+                    } else if (!isActive && wasActive) {
+                        tensionEnvelope.input.set(0.0)
+                    }
+                    
+                    if (!isActive && _wasActive) {
+                        springEnvelope.input.set(1.0)
+                        springEnvelope.input.set(0.0)
+                        _wasActive = false
+                    }
                 }
             }
         }
         
-        float(BenderSymbol.MAX_BEND) {
-            default = 24f; min = 1f; max = 48f
-            get { _maxBendSemitones }
-            set { _maxBendSemitones = it }
-        }
-        
-        float(BenderSymbol.RANDOM_DEPTH) {
-            default = 0.1f
-            get { _randomDepth }
-            set { _randomDepth = it }
-        }
-        
-        float(BenderSymbol.TIMBRE_MOD) {
-            default = 0.3f
-            get { _timbreModulation }
-            set { _timbreModulation = it }
-        }
-        
-        float(BenderSymbol.SPRING_VOL) {
-            default = 0.4f
-            get { _springVolume }
-            set {
-                _springVolume = it
-                springGain.inputB.set(it.toDouble())
+        controlPort(BenderSymbol.MAX_BEND) {
+            floatType {
+                default = 24f; min = 1f; max = 48f
+                get { _maxBendSemitones }
+                set { _maxBendSemitones = it }
             }
         }
         
-        float(BenderSymbol.TENSION_VOL) {
-            default = 0.015f; min = 0f; max = 0.1f
-            get { _tensionVolume }
-            set { _tensionVolume = it }
+        controlPort(BenderSymbol.RANDOM_DEPTH) {
+            floatType {
+                default = 0.1f
+                get { _randomDepth }
+                set { _randomDepth = it }
+            }
+        }
+        
+        controlPort(BenderSymbol.TIMBRE_MOD) {
+            floatType {
+                default = 0.3f
+                get { _timbreModulation }
+                set { _timbreModulation = it }
+            }
+        }
+        
+        controlPort(BenderSymbol.SPRING_VOL) {
+            floatType {
+                default = 0.4f
+                get { _springVolume }
+                set {
+                    _springVolume = it
+                    springGain.inputB.set(it.toDouble())
+                }
+            }
+        }
+        
+        controlPort(BenderSymbol.TENSION_VOL) {
+            floatType {
+                default = 0.015f; min = 0f; max = 0.1f
+                get { _tensionVolume }
+                set { _tensionVolume = it }
+            }
         }
     }
 
-    private val audioPorts = listOf(
-        AudioPort(0, "pitch_out", "Pitch Output", false),
-        AudioPort(1, "timbre_out", "Timbre Output", false),
-        AudioPort(2, "audio_out", "Audio Output", false)
-    )
+    private val audioPorts = ports {
+        audioPort { index = 0; symbol = "pitch_out"; name = "Pitch Output"; isInput = false }
+        audioPort { index = 1; symbol = "timbre_out"; name = "Timbre Output"; isInput = false }
+        audioPort { index = 2; symbol = "audio_out"; name = "Audio Output"; isInput = false }
+    }
 
-    override val ports: List<Port> = audioPorts + portDefs.ports
+    override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
     override val audioUnits: List<AudioUnit> = listOf(
         bendInputProxy, bendDepthGain, nonlinearMixer,

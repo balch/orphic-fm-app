@@ -8,6 +8,7 @@ import org.balch.orpheus.plugins.delay.DelayPlugin
 import org.balch.orpheus.plugins.distortion.DistortionPlugin
 import org.balch.orpheus.plugins.drum.DrumPlugin
 import org.balch.orpheus.plugins.duolfo.DuoLfoPlugin
+import org.balch.orpheus.plugins.duolfo.VoicePlugin
 import org.balch.orpheus.plugins.flux.FluxPlugin
 import org.balch.orpheus.plugins.grains.GrainsPlugin
 import org.balch.orpheus.plugins.looper.LooperPlugin
@@ -15,7 +16,6 @@ import org.balch.orpheus.plugins.perstringbender.PerStringBenderPlugin
 import org.balch.orpheus.plugins.resonator.ResonatorPlugin
 import org.balch.orpheus.plugins.stereo.StereoPlugin
 import org.balch.orpheus.plugins.vibrato.VibratoPlugin
-import org.balch.orpheus.plugins.voice.VoicePlugin
 import org.balch.orpheus.plugins.warps.WarpsPlugin
 
 @Inject

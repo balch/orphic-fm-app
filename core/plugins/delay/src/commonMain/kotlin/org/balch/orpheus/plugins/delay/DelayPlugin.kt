@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
@@ -106,102 +105,120 @@ class DelayPlugin(
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 7) {
-        float(DelaySymbol.FEEDBACK) {
-            default = 0.5f
-            get { _feedback }
-            set { 
-                _feedback = it
-                val fb = it.coerceIn(0f, 1f) * 0.95
-                delay1FeedbackGain.inputB.set(fb)
-                delay2FeedbackGain.inputB.set(fb)
+        controlPort(DelaySymbol.FEEDBACK) {
+            floatType {
+                default = 0.5f
+                get { _feedback }
+                set { 
+                    _feedback = it
+                    val fb = it.coerceIn(0f, 1f) * 0.95
+                    delay1FeedbackGain.inputB.set(fb)
+                    delay2FeedbackGain.inputB.set(fb)
+                }
             }
         }
         
-        float(DelaySymbol.MIX) {
-            get { _mix }
-            set {
-                _mix = it.coerceIn(0f, 1f)
-                updateStereoGains()
+        controlPort(DelaySymbol.MIX) {
+            floatType {
+                get { _mix }
+                set {
+                    _mix = it.coerceIn(0f, 1f)
+                    updateStereoGains()
+                }
             }
         }
         
-        float(DelaySymbol.TIME_1) {
-            default = 0.3f
-            get { _time1 }
-            set {
-                _time1 = it
-                val seconds = 0.01 + (it.coerceIn(0f, 1f) * 1.99)
-                delay1TimeRamp.input.set(seconds)
+        controlPort(DelaySymbol.TIME_1) {
+            floatType {
+                default = 0.3f
+                get { _time1 }
+                set {
+                    _time1 = it
+                    val seconds = 0.01 + (it.coerceIn(0f, 1f) * 1.99)
+                    delay1TimeRamp.input.set(seconds)
+                }
             }
         }
         
-        float(DelaySymbol.TIME_2) {
-            default = 0.3f
-            get { _time2 }
-            set {
-                _time2 = it
-                val seconds = 0.01 + (it.coerceIn(0f, 1f) * 1.99)
-                delay2TimeRamp.input.set(seconds)
+        controlPort(DelaySymbol.TIME_2) {
+            floatType {
+                default = 0.3f
+                get { _time2 }
+                set {
+                    _time2 = it
+                    val seconds = 0.01 + (it.coerceIn(0f, 1f) * 1.99)
+                    delay2TimeRamp.input.set(seconds)
+                }
             }
         }
         
-        float(DelaySymbol.MOD_DEPTH_1) {
-            default = 0f
-            get { _modDepth1 }
-            set {
-                _modDepth1 = it
-                val depth = it.coerceIn(0f, 1f) * 0.1
-                delay1ModDepthRamp.input.set(depth)
+        controlPort(DelaySymbol.MOD_DEPTH_1) {
+            floatType {
+                default = 0f
+                get { _modDepth1 }
+                set {
+                    _modDepth1 = it
+                    val depth = it.coerceIn(0f, 1f) * 0.1
+                    delay1ModDepthRamp.input.set(depth)
+                }
             }
         }
         
-        float(DelaySymbol.MOD_DEPTH_2) {
-            default = 0f
-            get { _modDepth2 }
-            set {
-                _modDepth2 = it
-                val depth = it.coerceIn(0f, 1f) * 0.1
-                delay2ModDepthRamp.input.set(depth)
+        controlPort(DelaySymbol.MOD_DEPTH_2) {
+            floatType {
+                default = 0f
+                get { _modDepth2 }
+                set {
+                    _modDepth2 = it
+                    val depth = it.coerceIn(0f, 1f) * 0.1
+                    delay2ModDepthRamp.input.set(depth)
+                }
             }
         }
         
-        bool(DelaySymbol.STEREO_MODE) {
-            default = false
-            get { _stereoMode }
-            set {
-                _stereoMode = it
-                updateStereoGains()
+        controlPort(DelaySymbol.STEREO_MODE) {
+            boolType {
+                default = false
+                get { _stereoMode }
+                set {
+                    _stereoMode = it
+                    updateStereoGains()
+                }
             }
         }
 
-        bool(DelaySymbol.MOD_SOURCE) {
-            default = true
-            get { _modSourceIsLfo }
-            set {
-                _modSourceIsLfo = it
-                setModSourceInternal(0, it)
-                setModSourceInternal(1, it)
+        controlPort(DelaySymbol.MOD_SOURCE) {
+            boolType {
+                default = true
+                get { _modSourceIsLfo }
+                set {
+                    _modSourceIsLfo = it
+                    setModSourceInternal(0, it)
+                    setModSourceInternal(1, it)
+                }
             }
         }
 
-        bool(DelaySymbol.LFO_WAVEFORM) {
-            default = true
-            get { _lfoWaveformIsTriangle }
-            set { _lfoWaveformIsTriangle = it }
+        controlPort(DelaySymbol.LFO_WAVEFORM) {
+            boolType {
+                default = true
+                get { _lfoWaveformIsTriangle }
+                set { _lfoWaveformIsTriangle = it }
+            }
         }
     }
 
-    private val audioPorts = listOf(
-        AudioPort(0, "in_l", "Input Left", true),
-        AudioPort(1, "in_r", "Input Right", true),
-        AudioPort(2, "lfo_in", "LFO Input", true),
-        AudioPort(3, "wet_1_l", "Wet 1 Left", false),
-        AudioPort(4, "wet_1_r", "Wet 1 Right", false),
-        AudioPort(5, "wet_2_l", "Wet 2 Left", false),
-        AudioPort(6, "wet_2_r", "Wet 2 Right", false)
-    )
+    private val audioPorts = ports {
+        audioPort { index = 0; symbol = "in_l"; name = "Input Left"; isInput = true }
+        audioPort { index = 1; symbol = "in_r"; name = "Input Right"; isInput = true }
+        audioPort { index = 2; symbol = "lfo_in"; name = "LFO Input"; isInput = true }
+        audioPort { index = 3; symbol = "wet_1_l"; name = "Wet 1 Left"; isInput = false }
+        audioPort { index = 4; symbol = "wet_1_r"; name = "Wet 1 Right"; isInput = false }
+        audioPort { index = 5; symbol = "wet_2_l"; name = "Wet 2 Left"; isInput = false }
+        audioPort { index = 6; symbol = "wet_2_r"; name = "Wet 2 Right"; isInput = false }
+    }
 
-    override val ports: List<Port> = audioPorts + portDefs.ports
+    override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
 
     override val audioUnits: List<AudioUnit> = listOf(

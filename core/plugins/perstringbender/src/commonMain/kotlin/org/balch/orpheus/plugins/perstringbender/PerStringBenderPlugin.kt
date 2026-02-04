@@ -12,12 +12,12 @@ import kotlinx.datetime.Clock
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.ports
 import org.balch.orpheus.plugins.resonator.ResonatorPlugin
 import kotlin.math.absoluteValue
 import kotlin.math.pow
@@ -60,18 +60,20 @@ class PerStringBenderPlugin(
         author = "Balch"
     )
 
-    override val ports: List<Port> = buildList {
+    private val audioPorts = ports {
         // Voice Bend Outputs (0-7)
         for (i in 0..7) {
-            add(AudioPort(i, "bend_$i", "Bend Voice $i", false))
+            audioPort { index = i; symbol = "bend_$i"; name = "Bend Voice $i"; isInput = false }
         }
         // Voice Mix Outputs (8-15)
         for (i in 0..7) {
-            add(AudioPort(8 + i, "mix_$i", "Mix Voice $i", false))
+            audioPort { index = 8 + i; symbol = "mix_$i"; name = "Mix Voice $i"; isInput = false }
         }
         // Audio Output (16)
-        add(AudioPort(16, "audio_out", "Audio Output", false))
+        audioPort { index = 16; symbol = "audio_out"; name = "Audio Output"; isInput = false }
     }
+
+    override val ports: List<Port> = audioPorts.ports
 
     companion object {
         private const val NUM_STRINGS = 4

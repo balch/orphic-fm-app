@@ -31,7 +31,7 @@ sealed class PortDef<T> {
  * Float port builder with receiver-based configuration.
  */
 @PortsDsl
-class FloatPort(override val symbol: Symbol) : PortDef<Float>() {
+class FloatPortBuilder(override val symbol: Symbol) : PortDef<Float>() {
     override var name: String = symbol.replaceFirstChar { it.uppercase() }
     var default: Float = 0.5f
     var min: Float = 0f
@@ -61,7 +61,7 @@ class FloatPort(override val symbol: Symbol) : PortDef<Float>() {
  * Int port builder with receiver-based configuration.
  */
 @PortsDsl
-class IntPort(override val symbol: Symbol) : PortDef<Int>() {
+class IntPortBuilder(override val symbol: Symbol) : PortDef<Int>() {
     override var name: String = symbol.replaceFirstChar { it.uppercase() }
     var default: Int = 0
     var min: Int = 0
@@ -88,7 +88,7 @@ class IntPort(override val symbol: Symbol) : PortDef<Int>() {
  * Boolean port builder with receiver-based configuration.
  */
 @PortsDsl
-class BoolPort(override val symbol: Symbol) : PortDef<Boolean>() {
+class BoolPortBuilder(override val symbol: Symbol) : PortDef<Boolean>() {
     override var name: String = symbol.replaceFirstChar { it.uppercase() }
     var default: Boolean = false
     
@@ -108,68 +108,123 @@ class BoolPort(override val symbol: Symbol) : PortDef<Boolean>() {
 }
 
 /**
+ * Builder for audio port definitions.
+ */
+@PortsDsl
+class AudioPortBuilder {
+    var index: Int = 0
+    var symbol: String = ""
+    var name: String = ""
+    var isInput: Boolean = true
+    
+    fun toAudioPort(): AudioPort = AudioPort(index, symbol, name, isInput)
+}
+
+/**
+ * Builder for control port type selection.
+ * Allows syntax: controlPort(Symbol) { floatType { ... } }
+ */
+@PortsDsl
+class ControlPortTypeBuilder(private val sym: PortSymbol) {
+    internal var portDef: PortDef<*>? = null
+    
+    /** Define a float type control port */
+    fun floatType(init: FloatPortBuilder.() -> Unit) {
+        val s = sym.symbol
+        val d = sym.displayName
+        portDef = FloatPortBuilder(s).apply {
+            name = d
+            init()
+        }
+    }
+    
+    /** Define an int type control port */
+    fun intType(init: IntPortBuilder.() -> Unit) {
+        val s = sym.symbol
+        val d = sym.displayName
+        portDef = IntPortBuilder(s).apply {
+            name = d
+            init()
+        }
+    }
+    
+    /** Define a boolean type control port */
+    fun boolType(init: BoolPortBuilder.() -> Unit) {
+        val s = sym.symbol
+        val d = sym.displayName
+        portDef = BoolPortBuilder(s).apply {
+            name = d
+            init()
+        }
+    }
+}
+
+/**
+ * Builder for control port type selection using raw string symbol.
+ */
+@PortsDsl
+class ControlPortTypeBuilderRaw(private val symbol: String) {
+    internal var portDef: PortDef<*>? = null
+    
+    /** Define a float type control port */
+    fun floatType(init: FloatPortBuilder.() -> Unit) {
+        portDef = FloatPortBuilder(symbol).apply { init() }
+    }
+    
+    /** Define an int type control port */
+    fun intType(init: IntPortBuilder.() -> Unit) {
+        portDef = IntPortBuilder(symbol).apply { init() }
+    }
+    
+    /** Define a boolean type control port */
+    fun boolType(init: BoolPortBuilder.() -> Unit) {
+        portDef = BoolPortBuilder(symbol).apply { init() }
+    }
+}
+
+/**
  * Main DSL builder for port definitions.
  */
 @PortsDsl
 class PortsBuilder(private val startIndex: Int = 0) {
-    private val _defs = mutableListOf<PortDef<*>>()
+    private val _controlDefs = mutableListOf<PortDef<*>>()
+    private val _audioDefs = mutableListOf<AudioPortBuilder>()
     
-    val ports: List<ControlPort> 
-        get() = _defs.mapIndexed { i, def -> def.toControlPort(startIndex + i) }
+    val controlPorts: List<ControlPort> 
+        get() = _controlDefs.mapIndexed { i, def -> def.toControlPort(startIndex + i) }
     
-    /** Define a float port using type-safe enum symbol */
-    fun float(sym: PortSymbol, init: FloatPort.() -> Unit) {
-        _defs += FloatPort(sym.symbol).apply { 
-            name = sym.displayName
-            init()
-        }
-    }
+    val audioPorts: List<AudioPort>
+        get() = _audioDefs.map { it.toAudioPort() }
     
-    /** Define an int port using type-safe enum symbol */
-    fun int(sym: PortSymbol, init: IntPort.() -> Unit) {
-        _defs += IntPort(sym.symbol).apply {
-            name = sym.displayName
-            init()
-        }
+    val ports: List<Port>
+        get() = audioPorts + controlPorts
+    
+    /** Define a control port using type-safe enum symbol with nested type */
+    fun controlPort(sym: PortSymbol, init: ControlPortTypeBuilder.() -> Unit) {
+        val builder = ControlPortTypeBuilder(sym).apply(init)
+        builder.portDef?.let { _controlDefs += it }
     }
     
-    /** Define a boolean port using type-safe enum symbol */
-    fun bool(sym: PortSymbol, init: BoolPort.() -> Unit) {
-        _defs += BoolPort(sym.symbol).apply {
-            name = sym.displayName  
-            init()
-        }
+    /** Define a control port using raw string symbol with nested type */
+    fun controlPort(symbol: String, init: ControlPortTypeBuilderRaw.() -> Unit) {
+        val builder = ControlPortTypeBuilderRaw(symbol).apply(init)
+        builder.portDef?.let { _controlDefs += it }
     }
-
-    /** Define a float port using raw string symbol */
-    fun float(symbol: Symbol, init: FloatPort.() -> Unit) {
-        _defs += FloatPort(symbol).apply {
-            init() // name defaults to capitalized symbol
-        }
+    
+    /** Define an audio port */
+    fun audioPort(init: AudioPortBuilder.() -> Unit) {
+        _audioDefs += AudioPortBuilder().apply(init)
     }
-
-    /** Define an int port using raw string symbol */
-    fun int(symbol: Symbol, init: IntPort.() -> Unit) {
-        _defs += IntPort(symbol).apply {
-            init()
-        }
-    }
-
-    /** Define a boolean port using raw string symbol */
-    fun bool(symbol: Symbol, init: BoolPort.() -> Unit) {
-        _defs += BoolPort(symbol).apply {
-            init()
-        }
-    }
+    
     
     // Generic accessors
     fun getValue(symbol: Symbol): PortValue? = 
-        _defs.find { it.symbol == symbol }?.getValue()
+        _controlDefs.find { it.symbol == symbol }?.getValue()
     
     fun getValue(sym: PortSymbol): PortValue? = getValue(sym.symbol)
     
     fun setValue(symbol: Symbol, value: PortValue): Boolean {
-        val def = _defs.find { it.symbol == symbol } ?: return false
+        val def = _controlDefs.find { it.symbol == symbol } ?: return false
         def.setValue(value)
         return true
     }
