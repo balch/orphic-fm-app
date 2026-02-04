@@ -10,11 +10,31 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.PortSymbol
+import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.audio.dsp.ports
+
+/**
+ * Exhaustive enum of all Grains plugin port symbols.
+ */
+enum class GrainsSymbol(
+    override val symbol: Symbol,
+    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
+) : PortSymbol {
+    POSITION("position", "Position"),
+    SIZE("size", "Size"),
+    PITCH("pitch", "Pitch"),
+    DENSITY("density", "Density"),
+    TEXTURE("texture", "Texture"),
+    DRY_WET("dry_wet", "Dry/Wet"),
+    FREEZE("freeze", "Freeze"),
+    MODE("mode", "Mode")
+}
 
 /**
  * Grains Texture Synthesizer Plugin.
@@ -24,13 +44,9 @@ import org.balch.orpheus.core.audio.dsp.Port
  * 1: Right Input (Audio)
  * 2: Output Left (Audio)
  * 3: Output Right (Audio)
- * 4: Position (Control Input, 0..1)
- * 5: Size (Control Input, 0..1)
- * 6: Pitch (Control Input, -1..1)
- * 7: Density (Control Input, 0..1)
- * 8: Texture (Control Input, 0..1)
- * 9: Dry/Wet (Control Input, 0..1)
- * 10: Freeze (Control Input, bool)
+ * 
+ * Controls (via DSL):
+ * - position, size, pitch, density, texture, dry_wet, freeze, mode
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -46,21 +62,73 @@ class GrainsPlugin(
         author = "Balch"
     )
 
-    override val ports: List<Port> = listOf(
+    private val grains = dspFactory.createGrainsUnit()
+
+    // Internal state
+    private var _position = 0.2f
+    private var _size = 0.5f
+    private var _pitch = 0.0f
+    private var _density = 0.5f
+    private var _texture = 0.5f
+    private var _dryWet = 0.5f
+    private var _freeze = false
+    private var _mode = 0
+
+    // Type-safe DSL port definitions
+    private val portDefs = ports(startIndex = 4) {
+        float(GrainsSymbol.POSITION) {
+            default = 0.2f
+            get { _position }
+            set { _position = it; grains.position.set(it.toDouble()) }
+        }
+        
+        float(GrainsSymbol.SIZE) {
+            get { _size }
+            set { _size = it; grains.size.set(it.toDouble()) }
+        }
+        
+        float(GrainsSymbol.PITCH) {
+            default = 0.0f; min = -1f; max = 1f
+            get { _pitch }
+            set { _pitch = it; grains.pitch.set(it.toDouble()) }
+        }
+        
+        float(GrainsSymbol.DENSITY) {
+            get { _density }
+            set { _density = it; grains.density.set(it.toDouble()) }
+        }
+        
+        float(GrainsSymbol.TEXTURE) {
+            get { _texture }
+            set { _texture = it; grains.texture.set(it.toDouble()) }
+        }
+        
+        float(GrainsSymbol.DRY_WET) {
+            get { _dryWet }
+            set { _dryWet = it; grains.dryWet.set(it.toDouble()) }
+        }
+        
+        bool(GrainsSymbol.FREEZE) {
+            get { _freeze }
+            set { _freeze = it; grains.freeze.set(if (it) 1.0 else 0.0) }
+        }
+        
+        int(GrainsSymbol.MODE) {
+            min = 0; max = 2
+            options = listOf("Granular", "Reverse", "Shimmer")
+            get { _mode }
+            set { _mode = it; grains.setMode(it) }
+        }
+    }
+
+    private val audioPorts = listOf(
         AudioPort(0, "in_l", "Input Left", true),
         AudioPort(1, "in_r", "Input Right", true),
         AudioPort(2, "out_l", "Output Left", false),
-        AudioPort(3, "out_r", "Output Right", false),
-        ControlPort(4, "position", "Position", 0.2f, 0f, 1f),
-        ControlPort(5, "size", "Size", 0.5f, 0f, 1f),
-        ControlPort(6, "pitch", "Pitch", 0.0f, -1f, 1f),
-        ControlPort(7, "density", "Density", 0.5f, 0f, 1f),
-        ControlPort(8, "texture", "Texture", 0.5f, 0f, 1f),
-        ControlPort(9, "dry_wet", "Dry/Wet", 0.5f, 0f, 1f),
-        ControlPort(10, "freeze", "Freeze", 0.0f, 0f, 1f)
+        AudioPort(3, "out_r", "Output Right", false)
     )
 
-    private val grains = dspFactory.createGrainsUnit()
+    override val ports: List<Port> = audioPorts + portDefs.ports
 
     override val audioUnits: List<AudioUnit> = listOf(grains)
 
@@ -95,5 +163,12 @@ class GrainsPlugin(
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
 
-    fun setMode(mode: Int) { grains.setMode(mode) }
+    // Generic port value accessors delegating to DSL builder
+    override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
+    override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
+
+    // Legacy setter for backward compatibility
+    fun setMode(mode: Int) {
+        portDefs.setValue(GrainsSymbol.MODE, PortValue.IntValue(mode))
+    }
 }

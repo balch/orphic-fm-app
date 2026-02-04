@@ -10,21 +10,27 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.PortSymbol
+import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.audio.dsp.ports
+
+/**
+ * Exhaustive enum of all Drum plugin port symbols.
+ */
+enum class DrumSymbol(
+    override val symbol: Symbol,
+    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
+) : PortSymbol {
+    MIX("mix", "Mix")
+}
 
 /**
  * DSP Plugin for specialized 808-style drum synthesis.
- * 
- * Uses the DrumUnit which wraps AnalogBassDrum, AnalogSnareDrum, and MetallicHiHat.
- * 
- * Port Map:
- * 0: Output Left (Audio)
- * 1: Output Right (Audio)
- * 2: Mix (Control Input, 0..1)
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -40,23 +46,46 @@ class DrumPlugin(
         author = "Balch"
     )
 
-    override val ports: List<Port> = listOf(
-        AudioPort(0, "out_l", "Output Left", false),
-        AudioPort(1, "out_r", "Output Right", false),
-        ControlPort(2, "mix", "Mix", 0.7f, 0f, 1f)
-    )
-
     private val drumUnit = dspFactory.createDrumUnit()
     
     // Stereo output gain for drums
     private val drumGainLeft = dspFactory.createMultiply()
     private val drumGainRight = dspFactory.createMultiply()
 
+    // Internal state
+    private var _mix = 0.7f
+    private val frequencies = FloatArray(3) { 0.5f }
+    private val tones = FloatArray(3) { 0.5f }
+    private val decays = FloatArray(3) { 0.5f }
+    private val p4s = FloatArray(3) { 0.5f }
+    private val p5s = FloatArray(3) { 0.5f }
+
+    // Type-safe DSL port definitions
+    private val portDefs = ports(startIndex = 2) {
+        float(DrumSymbol.MIX) {
+            default = 0.7f
+            get { _mix }
+            set {
+                _mix = it.coerceIn(0f, 1f)
+                val baseGain = 1.6f
+                val finalGain = baseGain * it
+                drumGainLeft.inputB.set(finalGain.toDouble())
+                drumGainRight.inputB.set(finalGain.toDouble())
+            }
+        }
+    }
+
+    private val audioPorts = listOf(
+        AudioPort(0, "out_l", "Output Left", false),
+        AudioPort(1, "out_r", "Output Right", false)
+    )
+
+    override val ports: List<Port> = audioPorts + portDefs.ports
+
     override val audioUnits: List<AudioUnit> = listOf(
         drumUnit, drumGainLeft, drumGainRight
     )
     
-    // Backwards compatibility maps
     override val outputs: Map<String, AudioOutput> = mapOf(
         "outputLeft" to drumGainLeft.output,
         "outputRight" to drumGainRight.output
@@ -72,7 +101,7 @@ class DrumPlugin(
         drumUnit.output.connect(drumGainLeft.inputA)
         drumUnit.output.connect(drumGainRight.inputA)
         
-        updateGains()
+        portDefs.setValue(DrumSymbol.MIX, PortValue.FloatValue(_mix))
         
         audioUnits.forEach { audioEngine.addUnit(it) }
     }
@@ -81,28 +110,13 @@ class DrumPlugin(
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
 
-    private var mix = 0.7f
-    
-    fun setMix(value: Float) {
-        mix = value.coerceIn(0f, 1f)
-        updateGains()
-    }
-    
-    fun getMix(): Float = mix
-    
-    private fun updateGains() {
-        val baseGain = 1.6f
-        val finalGain = baseGain * mix
-        drumGainLeft.inputB.set(finalGain.toDouble())
-        drumGainRight.inputB.set(finalGain.toDouble())
-    }
+    // Generic port value accessors delegating to DSL builder
+    override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
+    override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    // State duplication for persistence
-    private val frequencies = FloatArray(3) { 0.5f }
-    private val tones = FloatArray(3) { 0.5f }
-    private val decays = FloatArray(3) { 0.5f }
-    private val p4s = FloatArray(3) { 0.5f }
-    private val p5s = FloatArray(3) { 0.5f }
+    // Legacy setter for backward compatibility
+    fun setMix(value: Float) = portDefs.setValue(DrumSymbol.MIX, PortValue.FloatValue(value))
+    fun getMix(): Float = _mix
 
     fun trigger(
         type: Int,

@@ -32,9 +32,11 @@ import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.AiProvider
+import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.SynthOrchestrator
+import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
@@ -54,10 +56,14 @@ import org.balch.orpheus.features.ai.generative.SoloAgentConfig
 import org.balch.orpheus.features.ai.generative.SynthControlAgent
 import org.balch.orpheus.features.ai.tools.ReplExecuteArgs
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
+import org.balch.orpheus.plugins.delay.DelayPlugin
+import org.balch.orpheus.plugins.delay.DelaySymbol
+import org.balch.orpheus.plugins.distortion.DistortionPlugin
+import org.balch.orpheus.plugins.distortion.DistortionSymbol
+import org.balch.orpheus.plugins.duolfo.DuoLfoPlugin
+import org.balch.orpheus.plugins.duolfo.DuoLfoSymbol
 import kotlin.random.Random
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-
 
 /**
  * UI State for AI Options.
@@ -511,9 +517,13 @@ class AiOptionsViewModel(
                 
                 // Fade in: Apply preset with Quad Volumes = 0, then ramp up to 1.0
                 // Master Volume is not affected by presets (user control only)
-                val presetWithZeroQuadVol = soloPreset.copy(
-                    quadGroupVolumes = listOf(0f, 0f, 0f)
-                )
+                val presetWithZeroQuadVol = soloPreset.let { p ->
+                    val newMap = p.portValues.toMutableMap()
+                    newMap["org.balch.orpheus.plugins.voice:quad_volume_0"] = PortValue.FloatValue(0f)
+                    newMap["org.balch.orpheus.plugins.voice:quad_volume_1"] = PortValue.FloatValue(0f)
+                    newMap["org.balch.orpheus.plugins.voice:quad_volume_2"] = PortValue.FloatValue(0f)
+                    p.copy(portValues = newMap)
+                }
                 
                 presetLoader.applyPreset(presetWithZeroQuadVol)
                 log.debug { "Applied solo preset: ${soloPreset.name} (fading in)" }
@@ -558,45 +568,63 @@ class AiOptionsViewModel(
         // - Presence (Drive/Distortion)
         
         return SynthPreset(
-            name = "Solo Session ${Clock.System.now().epochSeconds}",
-            
-            // Unison with very slight detune for thickness
-            voiceTunes = List(12) { 
-                0.5f + (r.nextFloat() - 0.5f) * 0.01f 
+            name = "Solo Session ${kotlinx.datetime.Clock.System.now().toEpochMilliseconds() / 1000}",
+            portValues = buildMap {
+                 // Unison with very slight detune for thickness
+                 val tunes = List(12) { 0.5f + (r.nextFloat() - 0.5f) * 0.01f }
+                 tunes.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:tune_$i", PortValue.FloatValue(v)) }
+
+                 // Bright timber
+                 val modDepths = List(12) { 0.3f + r.nextFloat() * 0.5f }
+                 modDepths.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:mod_depth_$i", PortValue.FloatValue(v)) }
+
+                 // Fast attack/decay for lead lines
+                 val envSpeeds = List(12) { r.nextFloat() * 0.2f }
+                 envSpeeds.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:env_speed_$i", PortValue.FloatValue(v)) }
+
+                 // Sharp waveforms
+                 val sharpness = List(6) { 0.5f + r.nextFloat() * 0.5f }
+                 sharpness.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_sharpness_$i", PortValue.FloatValue(v)) }
+
+                 // Mostly FM for metallic/bell/lead tones
+                 val modSources = List(6) { if (r.nextFloat() > 0.8) ModSource.LFO else ModSource.VOICE_FM }
+                 modSources.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_mod_source_$i", PortValue.IntValue(v.ordinal)) }
+                 
+                 // Ping-pong delay style
+                 val delayUri = DelayPlugin.URI
+                 put("$delayUri:${DelaySymbol.TIME_1.symbol}", PortValue.FloatValue(0.25f))
+                 put("$delayUri:${DelaySymbol.TIME_2.symbol}", PortValue.FloatValue(0.375f))
+                 put("$delayUri:${DelaySymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.3f + r.nextFloat() * 0.2f))
+                 put("$delayUri:${DelaySymbol.MIX.symbol}", PortValue.FloatValue(0.3f + r.nextFloat() * 0.2f))
+                 put("$delayUri:${DelaySymbol.MOD_DEPTH_1.symbol}", PortValue.FloatValue(0f)) // Defaults
+                 put("$delayUri:${DelaySymbol.MOD_DEPTH_2.symbol}", PortValue.FloatValue(0f)) // Defaults
+                 put("$delayUri:mod_source_is_lfo", PortValue.BoolValue(true))
+                 put("$delayUri:lfo_wave_is_triangle", PortValue.BoolValue(true))
+                 
+                 // Lead presence
+                 val distUri = DistortionPlugin.URI
+                 put("$distUri:${DistortionSymbol.DRIVE.symbol}", PortValue.FloatValue(0.4f + r.nextFloat() * 0.4f))
+                 put("$distUri:${DistortionSymbol.MIX.symbol}", PortValue.FloatValue(0.2f + r.nextFloat() * 0.3f))
+                 
+                 put("org.balch.orpheus.plugins.voice:vibrato", PortValue.FloatValue(0.3f + r.nextFloat() * 0.4f))
+                 put("org.balch.orpheus.plugins.voice:coupling", PortValue.FloatValue(0.2f + r.nextFloat() * 0.3f))
+                 
+                 // Standard FM structure usually
+                 put("org.balch.orpheus.plugins.voice:fm_structure_cross_quad", PortValue.BoolValue(false))
+                 put("org.balch.orpheus.plugins.voice:total_feedback", PortValue.FloatValue(0.0f))
+
+                 // Reset quads (no hold/drone by default)
+                 List(3) { 0.5f }.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:quad_pitch_$i", PortValue.FloatValue(v)) }
+                 List(3) { 0.0f }.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:quad_hold_$i", PortValue.FloatValue(v)) }
+                 
+                 // Defaults for params not explicitly randomized but needed for fullness
+                 val lfoUri = DuoLfoPlugin.URI
+                 put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.0f))
+                 put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.0f))
+                 put("$lfoUri:${DuoLfoSymbol.MODE.symbol}", PortValue.IntValue(HyperLfoMode.OFF.ordinal))
+                 put("$lfoUri:${DuoLfoSymbol.LINK.symbol}", PortValue.BoolValue(false))
             },
-            
-            // Bright timber
-            voiceModDepths = List(12) { 0.3f + r.nextFloat() * 0.5f },
-            
-            // Fast attack/decay for lead lines
-            voiceEnvelopeSpeeds = List(12) { r.nextFloat() * 0.2f },
-            
-            // Sharp waveforms
-            pairSharpness = List(6) { 0.5f + r.nextFloat() * 0.5f },
-            
-            // Mostly FM for metallic/bell/lead tones
-            duoModSources = List(6) { 
-                if (r.nextFloat() > 0.8) ModSource.LFO else ModSource.VOICE_FM 
-            },
-            
-            // Ping-pong delay style
-            delayTime1 = 0.25f, // 1/4 note approx
-            delayTime2 = 0.375f, // Dotted 1/4 approx
-            delayFeedback = 0.3f + r.nextFloat() * 0.2f,
-            delayMix = 0.3f + r.nextFloat() * 0.2f,
-            
-            // Lead presence
-            drive = 0.4f + r.nextFloat() * 0.4f,
-            distortionMix = 0.2f + r.nextFloat() * 0.3f, // Some edge
-            vibrato = 0.3f + r.nextFloat() * 0.4f, // Expressive vibrato
-            voiceCoupling = 0.2f + r.nextFloat() * 0.3f,
-            
-            // Standard FM structure usually
-            fmStructureCrossQuad = false,
-            
-            // Reset quads (no hold/drone by default)
-            quadGroupPitches = List(3) { 0.5f },
-            quadGroupHolds = List(3) { 0.0f },
+            createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         )
     }
 

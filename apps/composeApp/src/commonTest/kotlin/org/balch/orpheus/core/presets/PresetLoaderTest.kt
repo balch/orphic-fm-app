@@ -9,7 +9,7 @@ class PresetLoaderTest {
     @Test
     fun testApplyPresetEmitsToFlow() {
         val engine = TestSynthEngine()
-        val loader = PresetLoader(engine)
+        val loader = PresetLoaderV1(engine)
         val preset = SynthPreset(name = "Test Preset")
 
         loader.applyPreset(preset)
@@ -25,7 +25,7 @@ class PresetLoaderTest {
         engine.setDrive(0.5f)
         engine.setVoiceTune(0, 0.9f)
 
-        val loader = PresetLoader(engine)
+        val loader = PresetLoaderV1(engine)
         val preset = loader.currentStateAsPreset("Captured Preset")
 
         assertEquals("Captured Preset", preset.name)

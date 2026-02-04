@@ -31,6 +31,14 @@ import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.presets.beatsDensities
+import org.balch.orpheus.core.presets.beatsEuclideanLengths
+import org.balch.orpheus.core.presets.beatsMix
+import org.balch.orpheus.core.presets.beatsOutputMode
+import org.balch.orpheus.core.presets.beatsRandomness
+import org.balch.orpheus.core.presets.beatsSwing
+import org.balch.orpheus.core.presets.beatsX
+import org.balch.orpheus.core.presets.beatsY
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel

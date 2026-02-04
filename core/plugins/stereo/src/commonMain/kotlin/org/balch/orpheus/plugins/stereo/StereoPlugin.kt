@@ -10,27 +10,43 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.PortSymbol
+import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.audio.dsp.ports
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
+ * Exhaustive enum of all Stereo plugin port symbols.
+ */
+enum class StereoSymbol(
+    override val symbol: Symbol,
+    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
+) : PortSymbol {
+    MASTER_PAN("master_pan", "Master Pan"),
+    MASTER_VOL("master_vol", "Master Volume"),
+    VOICE_PAN_0("voice_pan_0", "Voice 0 Pan"),
+    VOICE_PAN_1("voice_pan_1", "Voice 1 Pan"),
+    VOICE_PAN_2("voice_pan_2", "Voice 2 Pan"),
+    VOICE_PAN_3("voice_pan_3", "Voice 3 Pan"),
+    VOICE_PAN_4("voice_pan_4", "Voice 4 Pan"),
+    VOICE_PAN_5("voice_pan_5", "Voice 5 Pan"),
+    VOICE_PAN_6("voice_pan_6", "Voice 6 Pan"),
+    VOICE_PAN_7("voice_pan_7", "Voice 7 Pan"),
+    VOICE_PAN_8("voice_pan_8", "Voice 8 Pan"),
+    VOICE_PAN_9("voice_pan_9", "Voice 9 Pan"),
+    VOICE_PAN_10("voice_pan_10", "Voice 10 Pan"),
+    VOICE_PAN_11("voice_pan_11", "Voice 11 Pan")
+}
+
+/**
  * Stereo Plugin (Output stage).
- * 
- * Port Map:
- * 0: Left Input (Audio)
- * 1: Right Input (Audio)
- * 2: Left Line Output (Audio)
- * 3: Right Line Output (Audio)
- * 4: Peak Output (Control Output)
- * 5: Master Pan (Control Input, -1..1)
- * 6: Master Volume (Control Input, 0..1)
- * 7..18: Voice Pan (Control Input, -1..1)
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -45,19 +61,6 @@ class StereoPlugin(
         name = "Stereo Output",
         author = "Balch"
     )
-
-    override val ports: List<Port> = buildList {
-        add(AudioPort(0, "in_l", "Left Input", true))
-        add(AudioPort(1, "in_r", "Right Input", true))
-        add(AudioPort(2, "out_l", "Left Output", false))
-        add(AudioPort(3, "out_r", "Right Output", false))
-        add(ControlPort(4, "peak", "Peak Monitor", 0f, 0f, 2f))
-        add(ControlPort(5, "master_pan", "Master Pan", 0f, -1f, 1f))
-        add(ControlPort(6, "master_vol", "Master Volume", 0.7f, 0f, 1f))
-        for (i in 0 until 12) {
-            add(ControlPort(7 + i, "voice_pan_$i", "Voice $i Pan", 0f, -1f, 1f))
-        }
-    }
 
     // Summing buses
     private val stereoSumLeft = dspFactory.createPassThrough()
@@ -76,10 +79,67 @@ class StereoPlugin(
     // Peak monitoring
     private val peakFollower = dspFactory.createPeakFollower()
 
-    // State caches
+    // Internal state
     private val _voicePan = FloatArray(12) { 0f }
     private var _masterPan = 0f
     private var _masterVolume = 0.7f
+
+    // Type-safe DSL port definitions
+    private val portDefs = ports(startIndex = 5) {
+        float(StereoSymbol.MASTER_PAN) {
+            default = 0f; min = -1f; max = 1f
+            get { _masterPan }
+            set {
+                _masterPan = it.coerceIn(-1f, 1f)
+                val angle = ((it + 1f) / 2f) * (PI / 2).toFloat()
+                val leftGain = cos(angle.toDouble())
+                val rightGain = sin(angle.toDouble())
+                masterPanLeft.inputB.set(leftGain)
+                masterPanRight.inputB.set(rightGain)
+            }
+        }
+        
+        float(StereoSymbol.MASTER_VOL) {
+            default = 0.7f
+            get { _masterVolume }
+            set {
+                _masterVolume = it
+                masterGainLeft.inputB.set(it.toDouble())
+                masterGainRight.inputB.set(it.toDouble())
+            }
+        }
+        
+        // Voice pans 0-11
+        for (i in 0 until 12) {
+            float(StereoSymbol.entries[i + 2]) { // Skip MASTER_PAN and MASTER_VOL
+                default = when(i) {
+                    2 -> -0.3f; 3 -> -0.3f; 4 -> 0.3f; 5 -> 0.3f
+                    6 -> -0.7f; 7 -> 0.7f
+                    else -> 0f
+                }
+                min = -1f; max = 1f
+                get { _voicePan[i] }
+                set {
+                    _voicePan[i] = it.coerceIn(-1f, 1f)
+                    val angle = ((it + 1f) / 2f) * (PI / 2).toFloat()
+                    val leftGain = cos(angle.toDouble())
+                    val rightGain = sin(angle.toDouble())
+                    voicePanLeft[i].inputB.set(leftGain)
+                    voicePanRight[i].inputB.set(rightGain)
+                }
+            }
+        }
+    }
+
+    private val audioPorts = buildList {
+        add(AudioPort(0, "in_l", "Left Input", true))
+        add(AudioPort(1, "in_r", "Right Input", true))
+        add(AudioPort(2, "out_l", "Left Output", false))
+        add(AudioPort(3, "out_r", "Right Output", false))
+        add(AudioPort(4, "peak", "Peak Monitor", false))
+    }
+
+    override val ports: List<Port> = audioPorts + portDefs.ports
 
     override val audioUnits: List<AudioUnit> = listOf(
         stereoSumLeft, stereoSumRight,
@@ -126,52 +186,39 @@ class StereoPlugin(
         // Peak follower monitors left channel
         masterGainLeft.output.connect(peakFollower.input)
 
-        // Register with engine
         audioUnits.forEach { audioEngine.addUnit(it) }
 
-        // Default voice pans
-        setVoicePan(0, 0f)
-        setVoicePan(1, 0f)
-        setVoicePan(2, -0.3f)
-        setVoicePan(3, -0.3f)
-        setVoicePan(4, 0.3f)
-        setVoicePan(5, 0.3f)
-        setVoicePan(6, -0.7f)
-        setVoicePan(7, 0.7f)
-        setVoicePan(8, 0f)
-        setVoicePan(9, 0f)
-        setVoicePan(10, 0f)
-        setVoicePan(11, 0f)
+        // Default voice pans via DSL
+        portDefs.setValue(StereoSymbol.VOICE_PAN_0, PortValue.FloatValue(0f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_1, PortValue.FloatValue(0f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_2, PortValue.FloatValue(-0.3f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_3, PortValue.FloatValue(-0.3f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_4, PortValue.FloatValue(0.3f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_5, PortValue.FloatValue(0.3f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_6, PortValue.FloatValue(-0.7f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_7, PortValue.FloatValue(0.7f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_8, PortValue.FloatValue(0f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_9, PortValue.FloatValue(0f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_10, PortValue.FloatValue(0f))
+        portDefs.setValue(StereoSymbol.VOICE_PAN_11, PortValue.FloatValue(0f))
     }
 
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
 
+    // Generic port value accessors delegating to DSL builder
+    override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
+    override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
+
+    // Legacy setters for backward compatibility
     fun setVoicePan(index: Int, pan: Float) {
         if (index !in 0 until 12) return
-        _voicePan[index] = pan.coerceIn(-1f, 1f)
-        val angle = ((pan + 1f) / 2f) * (PI / 2).toFloat()
-        val leftGain = cos(angle.toDouble())
-        val rightGain = sin(angle.toDouble())
-        voicePanLeft[index].inputB.set(leftGain)
-        voicePanRight[index].inputB.set(rightGain)
+        portDefs.setValue(StereoSymbol.entries[index + 2], PortValue.FloatValue(pan))
     }
 
-    fun setMasterPan(pan: Float) {
-        _masterPan = pan.coerceIn(-1f, 1f)
-        val angle = ((pan + 1f) / 2f) * (PI / 2).toFloat()
-        val leftGain = cos(angle.toDouble())
-        val rightGain = sin(angle.toDouble())
-        masterPanLeft.inputB.set(leftGain)
-        masterPanRight.inputB.set(rightGain)
-    }
-
-    fun setMasterVolume(amount: Float) {
-        _masterVolume = amount
-        masterGainLeft.inputB.set(amount.toDouble())
-        masterGainRight.inputB.set(amount.toDouble())
-    }
+    fun setMasterPan(pan: Float) = portDefs.setValue(StereoSymbol.MASTER_PAN, PortValue.FloatValue(pan))
+    fun setMasterVolume(amount: Float) = portDefs.setValue(StereoSymbol.MASTER_VOL, PortValue.FloatValue(amount))
 
     fun getPeak(): Float = peakFollower.getCurrent().toFloat()
     fun getVoicePan(index: Int): Float = _voicePan[index]

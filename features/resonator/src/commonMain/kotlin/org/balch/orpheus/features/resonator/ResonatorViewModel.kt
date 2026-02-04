@@ -24,6 +24,15 @@ import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.presets.resonatorBrightness
+import org.balch.orpheus.core.presets.resonatorDamping
+import org.balch.orpheus.core.presets.resonatorMix
+import org.balch.orpheus.core.presets.resonatorMode
+import org.balch.orpheus.core.presets.resonatorPosition
+import org.balch.orpheus.core.presets.resonatorSnapBack
+import org.balch.orpheus.core.presets.resonatorStructure
+import org.balch.orpheus.core.presets.resonatorTargetMix
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -89,7 +98,7 @@ typealias ResonatorFeature = SynthFeature<ResonatorUiState, ResonatorPanelAction
 class ResonatorViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
-    private val presetLoader: org.balch.orpheus.core.presets.PresetLoader,
+    presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), ResonatorFeature {
 

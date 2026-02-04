@@ -612,7 +612,7 @@ class DspSynthEngine(
     }
     override fun setDelayModDepth(index: Int, amount: Float) = pluginProvider.delayPlugin.setModDepth(index, amount)
     override fun setDelayModSource(index: Int, isLfo: Boolean) = pluginProvider.delayPlugin.setModSource(index, isLfo)
-    override fun setDelayLfoWaveform(isTriangle: Boolean) = pluginProvider.hyperLfo.setTriangleMode(isTriangle)
+    override fun setDelayLfoWaveform(isTriangle: Boolean) { pluginProvider.hyperLfo.setTriangleMode(isTriangle) }
     @Deprecated("Use granular setDelayTime/Feedback instead")
     override fun setDelay(time: Float, feedback: Float) {
         setDelayTime(0, time)
@@ -671,8 +671,8 @@ class DspSynthEngine(
 
     // HyperLFO delegations
     override fun setHyperLfoFreq(index: Int, frequency: Float) = pluginProvider.hyperLfo.setFreq(index, frequency)
-    override fun setHyperLfoMode(mode: Int) = pluginProvider.hyperLfo.setMode(mode)
-    override fun setHyperLfoLink(active: Boolean) = pluginProvider.hyperLfo.setLink(active)
+    override fun setHyperLfoMode(mode: Int) { pluginProvider.hyperLfo.setMode(mode) }
+    override fun setHyperLfoLink(active: Boolean) { pluginProvider.hyperLfo.setLink(active) }
     override fun getHyperLfoFreq(index: Int): Float = pluginProvider.hyperLfo.getFreq(index)
     override fun getHyperLfoMode(): Int = pluginProvider.hyperLfo.getMode()
     override fun getHyperLfoLink(): Boolean = pluginProvider.hyperLfo.getLink()
@@ -694,11 +694,11 @@ class DspSynthEngine(
     override fun getDistortionMix(): Float = pluginProvider.distortionPlugin.getMix()
 
     // Stereo delegations
-    override fun setMasterVolume(amount: Float) = pluginProvider.stereoPlugin.setMasterVolume(amount)
+    override fun setMasterVolume(amount: Float) { pluginProvider.stereoPlugin.setMasterVolume(amount) }
     override fun getMasterVolume(): Float = pluginProvider.stereoPlugin.getMasterVolume()
     override fun setVoicePan(index: Int, pan: Float) = pluginProvider.stereoPlugin.setVoicePan(index, pan)
     override fun getVoicePan(index: Int): Float = pluginProvider.stereoPlugin.getVoicePan(index)
-    override fun setMasterPan(pan: Float) = pluginProvider.stereoPlugin.setMasterPan(pan)
+    override fun setMasterPan(pan: Float) { pluginProvider.stereoPlugin.setMasterPan(pan) }
     override fun getMasterPan(): Float = pluginProvider.stereoPlugin.getMasterPan()
     override fun setStereoMode(mode: StereoMode) {
         _stereoMode = mode
@@ -707,7 +707,7 @@ class DspSynthEngine(
     override fun getStereoMode(): StereoMode = _stereoMode
 
     // Vibrato delegation
-    override fun setVibrato(amount: Float) = pluginProvider.vibratoPlugin.setDepth(amount)
+    override fun setVibrato(amount: Float) { pluginProvider.vibratoPlugin.setDepth(amount) }
     override fun getVibrato(): Float = pluginProvider.vibratoPlugin.getDepth()
     
     // Bender delegation
@@ -1166,7 +1166,7 @@ class DspSynthEngine(
     override fun getResonatorPosition(): Float = pluginProvider.resonatorPlugin.getPosition()
     override fun getResonatorMix(): Float = pluginProvider.resonatorPlugin.getMix()
     override fun getResonatorSnapBack(): Boolean = pluginProvider.resonatorPlugin.getSnapBack()
-    override fun setResonatorSnapBack(enabled: Boolean) = pluginProvider.resonatorPlugin.setSnapBack(enabled)
+    override fun setResonatorSnapBack(enabled: Boolean) { pluginProvider.resonatorPlugin.setSnapBack(enabled) }
 
     override fun getDrumFrequency(type: Int): Float = pluginProvider.drumPlugin.getFrequency(type)
     override fun getDrumTone(type: Int): Float = pluginProvider.drumPlugin.getTone(type)

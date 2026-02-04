@@ -25,6 +25,14 @@ import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.presets.grainsDensity
+import org.balch.orpheus.core.presets.grainsDryWet
+import org.balch.orpheus.core.presets.grainsFreeze
+import org.balch.orpheus.core.presets.grainsMode
+import org.balch.orpheus.core.presets.grainsPitch
+import org.balch.orpheus.core.presets.grainsPosition
+import org.balch.orpheus.core.presets.grainsSize
+import org.balch.orpheus.core.presets.grainsTexture
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel

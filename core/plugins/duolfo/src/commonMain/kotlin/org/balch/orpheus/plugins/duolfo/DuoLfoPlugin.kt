@@ -10,26 +10,38 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.PortSymbol
+import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.audio.dsp.ports
+
+/**
+ * Exhaustive enum of all DuoLfo plugin port symbols.
+ */
+enum class DuoLfoSymbol(
+    override val symbol: Symbol,
+    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
+) : PortSymbol {
+    MODE("mode", "Mode"),
+    LINK("link", "Link"),
+    TRIANGLE_MODE("triangle_mode", "Triangle Mode"),
+    FREQ_A("freq_a", "Frequency A"),
+    FREQ_B("freq_b", "Frequency B")
+}
 
 /**
  * Shared DuoLFO implementation.
  * Two Oscillators (A & B) with logical AND/OR combination.
  * 
  * Port Map:
- * 0: Frequency A Input (Audio)
- * 1: Frequency B Input (Audio)
- * 2: Feedback Input (Audio)
- * 3: Output (Audio)
- * 4: Output A (Audio)
- * 5: Output B (Audio)
- * 6: Mode (Control Input, 0=AND, 1=OFF, 2=OR)
- * 7: Link (Control Input, bool)
- * 8: Triangle Mode (Control Input, bool)
+ * 0-5: Audio ports (freq inputs, feedback, outputs)
+ * 
+ * Controls (via DSL):
+ * - mode (0=AND, 1=OFF, 2=OR), link, triangle_mode, freq_a, freq_b
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -45,17 +57,9 @@ class DuoLfoPlugin(
         author = "Balch"
     )
 
-    override val ports: List<Port> = listOf(
-        AudioPort(0, "freq_a", "Frequency A", true),
-        AudioPort(1, "freq_b", "Frequency B", true),
-        AudioPort(2, "feedback", "Feedback", true),
-        AudioPort(3, "out", "Output", false),
-        AudioPort(4, "out_a", "Output A", false),
-        AudioPort(5, "out_b", "Output B", false),
-        ControlPort(6, "mode", "Mode", 1f, 0f, 2f),
-        ControlPort(7, "link", "Link", 0f, 0f, 1f),
-        ControlPort(8, "triangle_mode", "Triangle Mode", 1f, 0f, 1f)
-    )
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.duolfo"
+    }
 
     // Interface Units (Proxies)
     private val inputA = dspFactory.createPassThrough()
@@ -102,14 +106,81 @@ class DuoLfoPlugin(
     private val lfoMonitor = dspFactory.createPeakFollower()
 
     // Internal State
+    private var _mode = 1
+    private var _link = false
+    private var _triangleMode = true
+    private var _freqA = 0.0f
+    private var _freqB = 0.0f
     private var isAndMode = true
-    private var isTriangleMode = true // Default to triangle for delay mod
-    
-    // Backing fields for persistence getters
-    private var _hyperLfoFreqA = 0.0f
-    private var _hyperLfoFreqB = 0.0f
-    private var _hyperLfoMode = 1
-    private var _hyperLfoLink = false
+    private var isTriangleMode = true
+
+    private val frequencyMultipliers = listOf(7.0, 110.0)
+
+    // Type-safe DSL port definitions
+    private val portDefs = ports(startIndex = 6) {
+        int(DuoLfoSymbol.MODE) {
+            default = 1; min = 0; max = 2
+            options = listOf("AND", "OFF", "OR")
+            get { _mode }
+            set {
+                _mode = it
+                when (it) {
+                    0 -> { isAndMode = true; updateOutput() }
+                    1 -> { outputProxy.input.disconnectAll(); outputProxy.input.set(0.0) }
+                    2 -> { isAndMode = false; updateOutput() }
+                }
+            }
+        }
+        
+        bool(DuoLfoSymbol.LINK) {
+            get { _link }
+            set {
+                _link = it
+                fmGain.inputB.set(if (it) 10.0 else 0.0)
+            }
+        }
+        
+        bool(DuoLfoSymbol.TRIANGLE_MODE) {
+            default = true
+            get { _triangleMode }
+            set {
+                if (isTriangleMode != it) {
+                    isTriangleMode = it
+                    _triangleMode = it
+                    updateOutput()
+                }
+            }
+        }
+        
+        float(DuoLfoSymbol.FREQ_A) {
+            get { _freqA }
+            set {
+                _freqA = it
+                val freqHz = 0.01 + (it * frequencyMultipliers[0])
+                inputA.input.set(freqHz)
+            }
+        }
+        
+        float(DuoLfoSymbol.FREQ_B) {
+            get { _freqB }
+            set {
+                _freqB = it
+                val freqHz = 0.01 + (it * frequencyMultipliers[1])
+                inputB.input.set(freqHz)
+            }
+        }
+    }
+
+    private val audioPorts = listOf(
+        AudioPort(0, "freq_a", "Frequency A", true),
+        AudioPort(1, "freq_b", "Frequency B", true),
+        AudioPort(2, "feedback", "Feedback", true),
+        AudioPort(3, "out", "Output", false),
+        AudioPort(4, "out_a", "Output A", false),
+        AudioPort(5, "out_b", "Output B", false)
+    )
+
+    override val ports: List<Port> = audioPorts + portDefs.ports
 
     override val audioUnits: List<AudioUnit> = listOf(
         inputA, inputB, outputProxy, outputAProxy, outputBProxy, feedbackProxy,
@@ -216,29 +287,9 @@ class DuoLfoPlugin(
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
 
-    fun setMode(mode: Int) {
-        _hyperLfoMode = mode
-        when (mode) {
-            0 -> { // AND
-                isAndMode = true
-                updateOutput()
-            }
-            1 -> { // OFF
-                outputProxy.input.disconnectAll()
-                outputProxy.input.set(0.0)
-            }
-            2 -> { // OR
-                isAndMode = false
-                updateOutput()
-            }
-        }
-    }
-
-    fun setTriangleMode(triangleMode: Boolean) {
-        if (isTriangleMode == triangleMode) return
-        isTriangleMode = triangleMode
-        updateOutput()
-    }
+    // Generic port value accessors delegating to DSL builder
+    override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
+    override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
     private fun updateOutput() {
         outputProxy.input.disconnectAll()
@@ -270,31 +321,21 @@ class DuoLfoPlugin(
         }
     }
 
-    fun setLink(enabled: Boolean) {
-        _hyperLfoLink = enabled
-        fmGain.inputB.set(if (enabled) 10.0 else 0.0)
-    }
-
-    private val frequencyMultipliers = listOf(7.0, 110.0)
-
+    // Legacy setters for backward compatibility
+    fun setMode(mode: Int) = portDefs.setValue(DuoLfoSymbol.MODE, PortValue.IntValue(mode))
+    fun setTriangleMode(triangleMode: Boolean) = portDefs.setValue(DuoLfoSymbol.TRIANGLE_MODE, PortValue.BoolValue(triangleMode))
+    fun setLink(enabled: Boolean) = portDefs.setValue(DuoLfoSymbol.LINK, PortValue.BoolValue(enabled))
     fun setFreq(index: Int, frequency: Float) {
-        if (index == 0) {
-            _hyperLfoFreqA = frequency
-        } else {
-            _hyperLfoFreqB = frequency
-        }
-        val freqHz = 0.01 + (frequency * frequencyMultipliers[index])
-        if (index == 0) {
-            inputA.input.set(freqHz)
-        } else {
-            inputB.input.set(freqHz)
+        when (index) {
+            0 -> portDefs.setValue(DuoLfoSymbol.FREQ_A, PortValue.FloatValue(frequency))
+            1 -> portDefs.setValue(DuoLfoSymbol.FREQ_B, PortValue.FloatValue(frequency))
         }
     }
 
     // Getters for state saving
-    fun getFreq(index: Int): Float = if (index == 0) _hyperLfoFreqA else _hyperLfoFreqB
-    fun getMode(): Int = _hyperLfoMode
-    fun getLink(): Boolean = _hyperLfoLink
+    fun getFreq(index: Int): Float = if (index == 0) _freqA else _freqB
+    fun getMode(): Int = _mode
+    fun getLink(): Boolean = _link
     
     fun getCurrentValue(): Float = lfoMonitor.getCurrent().toFloat().coerceIn(-1f, 1f)
 }

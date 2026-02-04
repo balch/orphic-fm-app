@@ -24,6 +24,18 @@ import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.presets.fluxBias
+import org.balch.orpheus.core.presets.fluxClockSource
+import org.balch.orpheus.core.presets.fluxDejaVu
+import org.balch.orpheus.core.presets.fluxGateLength
+import org.balch.orpheus.core.presets.fluxJitter
+import org.balch.orpheus.core.presets.fluxLength
+import org.balch.orpheus.core.presets.fluxProbability
+import org.balch.orpheus.core.presets.fluxRate
+import org.balch.orpheus.core.presets.fluxScale
+import org.balch.orpheus.core.presets.fluxSpread
+import org.balch.orpheus.core.presets.fluxSteps
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -85,7 +97,7 @@ typealias FluxFeature = SynthFeature<FluxUiState, FluxPanelActions>
 class FluxViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
-    private val presetLoader: org.balch.orpheus.core.presets.PresetLoader,
+    presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), FluxFeature {
 

@@ -109,14 +109,14 @@ class DelayViewModel(
     private val presetIntents = presetLoader.presetFlow.map { preset ->
         DelayIntent.Restore(
             DelayUiState(
-                time1 = preset.delayTime1,
-                time2 = preset.delayTime2,
-                mod1 = preset.delayMod1,
-                mod2 = preset.delayMod2,
-                feedback = preset.delayFeedback,
-                mix = preset.delayMix,
-                isLfoSource = preset.delayModSourceIsLfo,
-                isTriangleWave = preset.delayLfoWaveformIsTriangle
+                time1 = preset.getFloat("org.balch.orpheus.plugins.delay:time_1", 0.3f),
+                time2 = preset.getFloat("org.balch.orpheus.plugins.delay:time_2", 0.3f),
+                mod1 = preset.getFloat("org.balch.orpheus. plugins.delay:mod_depth_1", 0.0f),
+                mod2 = preset.getFloat("org.balch.orpheus.plugins.delay:mod_depth_2", 0.0f),
+                feedback = preset.getFloat("org.balch.orpheus.plugins.delay:feedback", 0.5f),
+                mix = preset.getFloat("org.balch.orpheus.plugins.delay:mix", 0.5f),
+                isLfoSource = true, // Not stored in DSL yet
+                isTriangleWave = true // Not stored in DSL yet
             )
         )
     }

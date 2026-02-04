@@ -27,6 +27,22 @@ import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.audio.wobble.VoiceWobbleController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.presets.duoModSources
+import org.balch.orpheus.core.presets.fmStructureCrossQuad
+import org.balch.orpheus.core.presets.pairSharpness
+import org.balch.orpheus.core.presets.quadEnvelopeTriggerModes
+import org.balch.orpheus.core.presets.quadGroupHolds
+import org.balch.orpheus.core.presets.quadGroupPitches
+import org.balch.orpheus.core.presets.quadGroupVolumes
+import org.balch.orpheus.core.presets.quadPitchSources
+import org.balch.orpheus.core.presets.quadTriggerSources
+import org.balch.orpheus.core.presets.totalFeedback
+import org.balch.orpheus.core.presets.vibrato
+import org.balch.orpheus.core.presets.voiceCoupling
+import org.balch.orpheus.core.presets.voiceEnvelopeSpeeds
+import org.balch.orpheus.core.presets.voiceModDepths
+import org.balch.orpheus.core.presets.voiceTunes
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -113,7 +129,7 @@ class VoiceViewModel(
 
     private val wobbleController: VoiceWobbleController,
     private val globalTempo: GlobalTempo,
-    private val presetLoader: org.balch.orpheus.core.presets.PresetLoader,
+    presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), VoicesFeature {
 

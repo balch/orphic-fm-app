@@ -19,6 +19,10 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
              implementation(project(":features:visualizations")) // For LiquidPreview
+             implementation(libs.kotlinx.datetime)
+             implementation(project(":core:plugins:delay"))
+             implementation(project(":core:plugins:duolfo"))
+             implementation(project(":core:plugins:distortion"))
         }
     }
 }

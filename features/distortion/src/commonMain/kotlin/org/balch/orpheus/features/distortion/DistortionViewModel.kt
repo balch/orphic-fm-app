@@ -25,6 +25,9 @@ import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.presets.distortionMix
+import org.balch.orpheus.core.presets.drive
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -80,7 +83,7 @@ typealias DistortionFeature = SynthFeature<DistortionUiState, DistortionPanelAct
 class DistortionViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
-    private val presetLoader: org.balch.orpheus.core.presets.PresetLoader,
+    presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), DistortionFeature {
 

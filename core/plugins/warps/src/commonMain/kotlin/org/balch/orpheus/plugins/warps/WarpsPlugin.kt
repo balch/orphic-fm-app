@@ -10,11 +10,28 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.PortSymbol
+import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.audio.dsp.ports
+
+/**
+ * Exhaustive enum of all Warps plugin port symbols.
+ */
+enum class WarpsSymbol(
+    override val symbol: Symbol,
+    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
+) : PortSymbol {
+    ALGORITHM("algorithm", "Algorithm"),
+    TIMBRE("timbre", "Timbre"),
+    LEVEL1("level1", "Level 1"),
+    LEVEL2("level2", "Level 2"),
+    MIX("mix", "Mix")
+}
 
 /**
  * Warps Meta-Modulator Plugin.
@@ -24,11 +41,9 @@ import org.balch.orpheus.core.audio.dsp.Port
  * 1: Modulator Input (Audio)
  * 2: Output Left (Audio)
  * 3: Output Right (Audio)
- * 4: Algorithm (Control Input, 0..8)
- * 5: Timbre (Control Input, 0..1)
- * 6: Level 1 (Control Input, 0..1)
- * 7: Level 2 (Control Input, 0..1)
- * 8: Mix (Control Input, 0..1)
+ * 
+ * Controls (via DSL):
+ * - algorithm, timbre, level1, level2, mix
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -42,18 +57,6 @@ class WarpsPlugin(
         uri = "org.balch.orpheus.plugins.warps",
         name = "Warps",
         author = "Balch"
-    )
-
-    override val ports: List<Port> = listOf(
-        AudioPort(0, "carrier", "Carrier", true),
-        AudioPort(1, "modulator", "Modulator", true),
-        AudioPort(2, "out_l", "Output Left", false),
-        AudioPort(3, "out_r", "Output Right", false),
-        ControlPort(4, "algorithm", "Algorithm", 0f, 0f, 8f),
-        ControlPort(5, "timbre", "Timbre", 0.5f, 0f, 1f),
-        ControlPort(6, "level1", "Level 1", 0.5f, 0f, 1f),
-        ControlPort(7, "level2", "Level 2", 0.5f, 0f, 1f),
-        ControlPort(8, "mix", "Mix", 0.5f, 0f, 1f)
     )
 
     private val warps = dspFactory.createWarpsUnit()
@@ -74,10 +77,60 @@ class WarpsPlugin(
     private val dryPassLeft = dspFactory.createPassThrough()
     private val dryPassRight = dspFactory.createPassThrough()
     
-    // State tracking
+    // Internal state
+    private var _algorithm = 0f
+    private var _timbre = 0.5f
+    private var _level1 = 0.5f
+    private var _level2 = 0.5f
+    private var _mix = 0.5f
     private var _carrierSource = 0 // WarpsSource.SYNTH
     private var _modulatorSource = 1 // WarpsSource.DRUMS
-    private var _mix = 0.5f
+    
+    // Type-safe DSL port definitions
+    private val portDefs = ports(startIndex = 4) {
+        float(WarpsSymbol.ALGORITHM) {
+            default = 0f; min = 0f; max = 8f
+            get { _algorithm }
+            set { _algorithm = it; warps.algorithm.set(it.toDouble()) }
+        }
+        
+        float(WarpsSymbol.TIMBRE) {
+            get { _timbre }
+            set { _timbre = it; warps.timbre.set(it.toDouble()) }
+        }
+        
+        float(WarpsSymbol.LEVEL1) {
+            get { _level1 }
+            set { _level1 = it; warps.level1.set(it.toDouble()) }
+        }
+        
+        float(WarpsSymbol.LEVEL2) {
+            get { _level2 }
+            set { _level2 = it; warps.level2.set(it.toDouble()) }
+        }
+        
+        float(WarpsSymbol.MIX) {
+            get { _mix }
+            set {
+                _mix = it
+                val wet = it.toDouble()
+                val dry = (1.0 - it).toDouble()
+                wetGainLeft.inputB.set(wet)
+                wetGainRight.inputB.set(wet)
+                dryGainLeft.inputB.set(dry)
+                dryGainRight.inputB.set(dry)
+            }
+        }
+    }
+
+    private val audioPorts = listOf(
+        AudioPort(0, "carrier", "Carrier", true),
+        AudioPort(1, "modulator", "Modulator", true),
+        AudioPort(2, "out_l", "Output Left", false),
+        AudioPort(3, "out_r", "Output Right", false)
+    )
+
+    override val ports: List<Port> = audioPorts + portDefs.ports
     
     override val audioUnits: List<AudioUnit> = listOf(
         warps, carrierInput, modulatorInput,
@@ -132,20 +185,16 @@ class WarpsPlugin(
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
 
-    fun setAlgorithm(value: Float) = warps.algorithm.set(value.toDouble())
-    fun setTimbre(value: Float) = warps.timbre.set(value.toDouble())
-    fun setLevel1(value: Float) = warps.level1.set(value.toDouble())
-    fun setLevel2(value: Float) = warps.level2.set(value.toDouble())
-    
-    fun setMix(value: Float) {
-        _mix = value
-        val wet = value.toDouble()
-        val dry = (1.0 - value).toDouble()
-        wetGainLeft.inputB.set(wet)
-        wetGainRight.inputB.set(wet)
-        dryGainLeft.inputB.set(dry)
-        dryGainRight.inputB.set(dry)
-    }
+    // Generic port value accessors delegating to DSL builder
+    override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
+    override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
+
+    // Legacy setters for backward compatibility
+    fun setAlgorithm(value: Float) = portDefs.setValue(WarpsSymbol.ALGORITHM, PortValue.FloatValue(value))
+    fun setTimbre(value: Float) = portDefs.setValue(WarpsSymbol.TIMBRE, PortValue.FloatValue(value))
+    fun setLevel1(value: Float) = portDefs.setValue(WarpsSymbol.LEVEL1, PortValue.FloatValue(value))
+    fun setLevel2(value: Float) = portDefs.setValue(WarpsSymbol.LEVEL2, PortValue.FloatValue(value))
+    fun setMix(value: Float) = portDefs.setValue(WarpsSymbol.MIX, PortValue.FloatValue(value))
     
     fun getMix(): Float = _mix
     fun setCarrierSource(source: Int) { _carrierSource = source }

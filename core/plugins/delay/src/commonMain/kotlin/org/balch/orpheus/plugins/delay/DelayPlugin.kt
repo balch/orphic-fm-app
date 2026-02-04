@@ -10,11 +10,30 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.PortSymbol
+import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.audio.dsp.ports
+
+/**
+ * Exhaustive enum of all Delay plugin port symbols.
+ */
+enum class DelaySymbol(
+    override val symbol: Symbol,
+    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
+) : PortSymbol {
+    FEEDBACK("feedback", "Feedback"),
+    MIX("mix", "Mix"),
+    TIME_1("time_1", "Time 1"),
+    TIME_2("time_2", "Time 2"),
+    MOD_DEPTH_1("mod_depth_1", "Mod Depth 1"),
+    MOD_DEPTH_2("mod_depth_2", "Mod Depth 2"),
+    STEREO_MODE("stereo_mode", "Stereo Mode")
+}
 
 /**
  * LV2-style Delay Plugin.
@@ -27,13 +46,9 @@ import org.balch.orpheus.core.audio.dsp.Port
  * 4: Wet 1 Right (Output)
  * 5: Wet 2 Left (Output)
  * 6: Wet 2 Right (Output)
- * 7: Feedback (Control Input, 0..1)
- * 8: Mix (Control Input, 0..1)
- * 9: Time 1 (Control Input, 0..1)
- * 10: Time 2 (Control Input, 0..1)
- * 11: Mod Depth 1 (Control Input, 0..1)
- * 12: Mod Depth 2 (Control Input, 0..1)
- * 13: Stereo Mode (Control Input, 0=Mono, 1=PingPong)
+ * 
+ * Controls (via DSL):
+ * - feedback, mix, time_1, time_2, mod_depth_1, mod_depth_2, stereo_mode
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -44,10 +59,14 @@ class DelayPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.delay",
+        uri = URI,
         name = "Dual Delay",
         author = "Orpheus"
     )
+
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.delay"
+    }
 
     // DSP Units
     private val delay1 = dspFactory.createDelayLine()
@@ -72,25 +91,98 @@ class DelayPlugin(
     private val inputRightProxy = dspFactory.createPassThrough()
     private val lfoInputProxy = dspFactory.createPassThrough()
 
-    override val ports: List<Port> = listOf(
+    // Internal state
+    private var _feedback = 0.5f
+    private var _mix = 0.5f
+    private var _time1 = 0.3f
+    private var _time2 = 0.3f
+    private var _modDepth1 = 0f
+    private var _modDepth2 = 0f
+    private var _stereoMode = false
+
+    // Type-safe DSL port definitions
+    private val portDefs = ports(startIndex = 7) {
+        float(DelaySymbol.FEEDBACK) {
+            default = 0.5f
+            get { _feedback }
+            set { 
+                _feedback = it
+                val fb = it.coerceIn(0f, 1f) * 0.95
+                delay1FeedbackGain.inputB.set(fb)
+                delay2FeedbackGain.inputB.set(fb)
+            }
+        }
+        
+        float(DelaySymbol.MIX) {
+            get { _mix }
+            set {
+                _mix = it.coerceIn(0f, 1f)
+                updateStereoGains()
+            }
+        }
+        
+        float(DelaySymbol.TIME_1) {
+            default = 0.3f
+            get { _time1 }
+            set {
+                _time1 = it
+                val seconds = 0.01 + (it.coerceIn(0f, 1f) * 1.99)
+                delay1TimeRamp.input.set(seconds)
+            }
+        }
+        
+        float(DelaySymbol.TIME_2) {
+            default = 0.3f
+            get { _time2 }
+            set {
+                _time2 = it
+                val seconds = 0.01 + (it.coerceIn(0f, 1f) * 1.99)
+                delay2TimeRamp.input.set(seconds)
+            }
+        }
+        
+        float(DelaySymbol.MOD_DEPTH_1) {
+            default = 0f
+            get { _modDepth1 }
+            set {
+                _modDepth1 = it
+                val depth = it.coerceIn(0f, 1f) * 0.1
+                delay1ModDepthRamp.input.set(depth)
+            }
+        }
+        
+        float(DelaySymbol.MOD_DEPTH_2) {
+            default = 0f
+            get { _modDepth2 }
+            set {
+                _modDepth2 = it
+                val depth = it.coerceIn(0f, 1f) * 0.1
+                delay2ModDepthRamp.input.set(depth)
+            }
+        }
+        
+        bool(DelaySymbol.STEREO_MODE) {
+            default = false
+            get { _stereoMode }
+            set {
+                _stereoMode = it
+                updateStereoGains()
+            }
+        }
+    }
+
+    private val audioPorts = listOf(
         AudioPort(0, "in_l", "Input Left", true),
         AudioPort(1, "in_r", "Input Right", true),
         AudioPort(2, "lfo_in", "LFO Input", true),
         AudioPort(3, "wet_1_l", "Wet 1 Left", false),
         AudioPort(4, "wet_1_r", "Wet 1 Right", false),
         AudioPort(5, "wet_2_l", "Wet 2 Left", false),
-        AudioPort(6, "wet_2_r", "Wet 2 Right", false),
-        ControlPort(7, "feedback", "Feedback", 0.5f, 0f, 1f),
-        ControlPort(8, "mix", "Mix", 0.5f, 0f, 1f),
-        ControlPort(9, "time_1", "Time 1", 0.3f, 0f, 1f),
-        ControlPort(10, "time_2", "Time 2", 0.3f, 0f, 1f),
-        ControlPort(11, "mod_depth_1", "Mod Depth 1", 0f, 0f, 1f),
-        ControlPort(12, "mod_depth_2", "Mod Depth 2", 0f, 0f, 1f),
-        ControlPort(13, "stereo_mode", "Stereo Mode", 0f, 0f, 1f)
+        AudioPort(6, "wet_2_r", "Wet 2 Right", false)
     )
 
-    private var _delayWetLevel = 0.5f
-    private var _stereoDelaysMode = false
+    override val ports: List<Port> = audioPorts + portDefs.ports
+
 
     override val audioUnits: List<AudioUnit> = listOf(
         delay1, delay2, delay1FeedbackGain, delay2FeedbackGain,
@@ -199,26 +291,31 @@ class DelayPlugin(
         // Update control parameters if they are driven by Float data instead of Audio-Rate signals
     }
 
-    // Setters implementation
+    // Generic port value accessors delegating to DSL builder
+    override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
+    override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
+
+    // Legacy setters for backward compatibility
     fun setTime(index: Int, value: Float) {
-        val seconds = 0.01 + (value.coerceIn(0f, 1f) * 1.99)
-        if (index == 0) delay1TimeRamp.input.set(seconds) else delay2TimeRamp.input.set(seconds)
+        when (index) {
+            0 -> portDefs.setValue(DelaySymbol.TIME_1, PortValue.FloatValue(value))
+            1 -> portDefs.setValue(DelaySymbol.TIME_2, PortValue.FloatValue(value))
+        }
     }
 
     fun setFeedback(value: Float) {
-        val fb = value.coerceIn(0f, 1f) * 0.95
-        delay1FeedbackGain.inputB.set(fb)
-        delay2FeedbackGain.inputB.set(fb)
+        portDefs.setValue(DelaySymbol.FEEDBACK, PortValue.FloatValue(value))
     }
 
     fun setMix(value: Float) {
-        _delayWetLevel = value.coerceIn(0f, 1f)
-        updateStereoGains()
+        portDefs.setValue(DelaySymbol.MIX, PortValue.FloatValue(value))
     }
 
     fun setModDepth(index: Int, value: Float) {
-        val depth = value.coerceIn(0f, 1f) * 0.1
-        if (index == 0) delay1ModDepthRamp.input.set(depth) else delay2ModDepthRamp.input.set(depth)
+        when (index) {
+            0 -> portDefs.setValue(DelaySymbol.MOD_DEPTH_1, PortValue.FloatValue(value))
+            1 -> portDefs.setValue(DelaySymbol.MOD_DEPTH_2, PortValue.FloatValue(value))
+        }
     }
 
     fun setModSource(index: Int, isLfo: Boolean) {
@@ -233,13 +330,12 @@ class DelayPlugin(
     }
 
     fun setStereoMode(pingPong: Boolean) {
-        _stereoDelaysMode = pingPong
-        updateStereoGains()
+        portDefs.setValue(DelaySymbol.STEREO_MODE, PortValue.BoolValue(pingPong))
     }
 
     private fun updateStereoGains() {
-        val gain = _delayWetLevel.toDouble()
-        if (_stereoDelaysMode) {
+        val gain = _mix.toDouble()
+        if (_stereoMode) {
             delay1WetLeft.inputB.set(gain); delay1WetRight.inputB.set(0.0)
             delay2WetLeft.inputB.set(0.0); delay2WetRight.inputB.set(gain)
         } else {
@@ -248,10 +344,21 @@ class DelayPlugin(
         }
     }
 
-    // Getters for state saving
-    fun getTime(index: Int): Float = ports.filterIsInstance<ControlPort>().find { it.index == 9 + index }?.default ?: 0.3f
-    fun getFeedback(): Float = ports.filterIsInstance<ControlPort>().find { it.index == 7 }?.default ?: 0.5f
-    fun getMix(): Float = _delayWetLevel
-    fun getModDepth(index: Int): Float = ports.filterIsInstance<ControlPort>().find { it.index == 11 + index }?.default ?: 0f
+    // Legacy getters for state saving
+    fun getTime(index: Int): Float = when (index) {
+        0 -> _time1
+        1 -> _time2
+        else -> 0.3f
+    }
+    
+    fun getFeedback(): Float = _feedback
+    fun getMix(): Float = _mix
+    
+    fun getModDepth(index: Int): Float = when (index) {
+        0 -> _modDepth1
+        1 -> _modDepth2
+        else -> 0f
+    }
+    
     fun getModSourceIsLfo(index: Int): Boolean = true // TODO: track source
 }

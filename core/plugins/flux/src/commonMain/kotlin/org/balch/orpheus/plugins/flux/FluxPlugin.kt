@@ -10,11 +10,34 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.PortSymbol
+import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.audio.dsp.ports
+
+/**
+ * Exhaustive enum of all Flux plugin port symbols.
+ * Provides compile-time safety and IDE auto-completion.
+ */
+enum class FluxSymbol(
+    override val symbol: Symbol,
+    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
+) : PortSymbol {
+    SPREAD("spread", "Spread"),
+    BIAS("bias", "Bias"),
+    STEPS("steps", "Steps"),
+    DEJAVU("dejavu", "Déjà Vu"),
+    LENGTH("length", "Length"),
+    SCALE("scale", "Scale"),
+    RATE("rate", "Rate"),
+    JITTER("jitter", "Jitter"),
+    PROBABILITY("probability", "Probability"),
+    GATE_LENGTH("gatelength", "Gate Length")
+}
 
 /**
  * Flux Generative Sequencer Plugin.
@@ -30,16 +53,8 @@ import org.balch.orpheus.core.audio.dsp.Port
  * 6: Output Trig T2 (Audio)
  * 7: Output Trig T3 (Audio)
  * 
- * Controls:
- * 8: Spread (0..1)
- * 9: Bias (0..1)
- * 10: Steps (0..1)
- * 11: DejaVu (0..1)
- * 12: Length (0..1 -> 1..16)
- * 13: Rate (0..1)
- * 14: Jitter (0..1)
- * 15: Probability (0..1)
- * 16: Gate Length (0..1)
+ * Controls (via DSL):
+ * - spread, bias, steps, dejavu, length, scale, rate, jitter, probability, gatelength
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -55,7 +70,80 @@ class FluxPlugin(
         author = "Balch"
     )
 
-    override val ports: List<Port> = listOf(
+    val flux = dspFactory.createFluxUnit()
+
+    // Internal state tracking
+    private var _spread = 0.5f
+    private var _bias = 0.5f
+    private var _steps = 0.5f
+    private var _dejaVu = 0.0f
+    private var _length = 8
+    private var _scale = 0
+    private var _rate = 0.5f
+    private var _jitter = 0.0f
+    private var _probability = 0.5f
+    private var _gateLength = 0.5f
+
+    // Type-safe DSL port definitions
+    private val portDefs = ports(startIndex = 8) {
+        float(FluxSymbol.SPREAD) {
+            default = 0.5f
+            get { _spread }
+            set { _spread = it; flux.spread.set(it.toDouble()) }
+        }
+        
+        float(FluxSymbol.BIAS) {
+            get { _bias }
+            set { _bias = it; flux.bias.set(it.toDouble()) }
+        }
+        
+        float(FluxSymbol.STEPS) {
+            get { _steps }
+            set { _steps = it; flux.steps.set(it.toDouble()) }
+        }
+        
+        float(FluxSymbol.DEJAVU) {
+            default = 0f
+            get { _dejaVu }
+            set { _dejaVu = it; flux.dejaVu.set(it.toDouble()) }
+        }
+        
+        int(FluxSymbol.LENGTH) {
+            default = 8; min = 1; max = 16
+            get { _length }
+            set { _length = it; flux.length.set(it.toDouble()) }
+        }
+        
+        int(FluxSymbol.SCALE) {
+            min = 0; max = 5
+            options = listOf("Major", "Minor", "Pentatonic", "Phrygian", "Dorian", "Chromatic")
+            get { _scale }
+            set { _scale = it; flux.setScale(it) }
+        }
+        
+        float(FluxSymbol.RATE) {
+            get { _rate }
+            set { _rate = it; flux.rate.set(it.toDouble()) }
+        }
+        
+        float(FluxSymbol.JITTER) {
+            default = 0f
+            get { _jitter }
+            set { _jitter = it; flux.jitter.set(it.toDouble()) }
+        }
+        
+        float(FluxSymbol.PROBABILITY) {
+            get { _probability }
+            set { _probability = it; flux.probability.set(it.toDouble()) }
+        }
+        
+        float(FluxSymbol.GATE_LENGTH) {
+            get { _gateLength }
+            set { _gateLength = it; flux.gateLength.set(it.toDouble()) }
+        }
+    }
+
+    private val audioPorts = listOf(
         AudioPort(0, "clock", "Clock In", true),
         AudioPort(1, "out", "Gate", false),
         AudioPort(2, "cv", "CV", false),
@@ -63,20 +151,10 @@ class FluxPlugin(
         AudioPort(4, "cv_x3", "CV X3", false),
         AudioPort(5, "trig_t1", "Trig T1", false),
         AudioPort(6, "trig_t2", "Trig T2", false),
-        AudioPort(7, "trig_t3", "Trig T3", false),
-        
-        ControlPort(8, "spread", "Spread", 0.5f, 0f, 1f),
-        ControlPort(9, "bias", "Bias", 0.5f, 0f, 1f),
-        ControlPort(10, "steps", "Steps", 0.5f, 0f, 1f),
-        ControlPort(11, "dejavu", "DejaVu", 0f, 0f, 1f),
-        ControlPort(12, "length", "Length", 0.5f, 0f, 1f), // Maps to 1-16
-        ControlPort(13, "rate", "Rate", 0.5f, 0f, 1f),
-        ControlPort(14, "jitter", "Jitter", 0f, 0f, 1f),
-        ControlPort(15, "probability", "Probability", 0.5f, 0f, 1f),
-        ControlPort(16, "gatelength", "Gate Length", 0.5f, 0f, 1f)
+        AudioPort(7, "trig_t3", "Trig T3", false)
     )
 
-    val flux = dspFactory.createFluxUnit()
+    override val ports: List<Port> = audioPorts + portDefs.ports
 
     override val audioUnits: List<AudioUnit> = listOf(flux)
 
@@ -122,17 +200,10 @@ class FluxPlugin(
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
     
-    // Internal state tracking for getters
-    private var _spread = 0.5f
-    private var _bias = 0.5f
-    private var _steps = 0.5f
-    private var _dejaVu = 0.0f
-    private var _length = 8
-    private var _scale = 0
-    private var _rate = 0.5f
-    private var _jitter = 0.0f
-    private var _probability = 0.5f
-    private var _gateLength = 0.5f
+    // Generic port value accessors delegating to DSL builder
+    override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
+    override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
+
 
     fun setRate(value: Float) {
         _rate = value

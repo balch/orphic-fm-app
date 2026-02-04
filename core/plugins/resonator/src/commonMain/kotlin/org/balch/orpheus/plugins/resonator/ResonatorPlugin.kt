@@ -10,31 +10,40 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.PortSymbol
+import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.audio.dsp.ports
+
+/**
+ * Exhaustive enum of all Resonator plugin port symbols.
+ */
+enum class ResonatorSymbol(
+    override val symbol: Symbol,
+    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
+) : PortSymbol {
+    MODE("mode", "Mode"),
+    TARGET_MIX("target_mix", "Target Mix"),
+    STRUCTURE("structure", "Structure"),
+    BRIGHTNESS("brightness", "Brightness"),
+    DAMPING("damping", "Damping"),
+    POSITION("position", "Position"),
+    MIX("mix", "Mix"),
+    SNAP_BACK("snap_back", "Snap Back")
+}
 
 /**
  * Resonator Plugin (Modal synthesis and string).
  * 
  * Port Map:
- * 0: Drum Left (Input)
- * 1: Drum Right (Input)
- * 2: Synth Left (Input)
- * 3: Synth Right (Input)
- * 4: Output Left (Output)
- * 5: Output Right (Output)
- * 6: Aux Left (Output)
- * 7: Aux Right (Output)
- * 8: Mode (Control Input)
- * 9: Target Mix (Control Input, 0..1)
- * 10: Structure (Control Input, 0..1)
- * 11: Brightness (Control Input, 0..1)
- * 12: Damping (Control Input, 0..1)
- * 13: Position (Control Input, 0..1)
- * 14: Mix (Control Input, 0..1)
+ * 0-7: Audio ports (drum in, synth in, outputs, aux)
+ * 
+ * Controls (via DSL):
+ * - mode, target_mix, structure, brightness, damping, position, mix, snap_back
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -48,24 +57,6 @@ class ResonatorPlugin(
         uri = "org.balch.orpheus.plugins.resonator",
         name = "Resonator",
         author = "Balch"
-    )
-
-    override val ports: List<Port> = listOf(
-        AudioPort(0, "drum_l", "Drum Left", true),
-        AudioPort(1, "drum_r", "Drum Right", true),
-        AudioPort(2, "synth_l", "Synth Left", true),
-        AudioPort(3, "synth_r", "Synth Right", true),
-        AudioPort(4, "out_l", "Output Left", false),
-        AudioPort(5, "out_r", "Output Right", false),
-        AudioPort(6, "aux_l", "Aux Left", false),
-        AudioPort(7, "aux_r", "Aux Right", false),
-        ControlPort(8, "mode", "Mode", 0f, 0f, 5f),
-        ControlPort(9, "target_mix", "Target Mix", 0f, 0f, 1f),
-        ControlPort(10, "structure", "Structure", 0.25f, 0f, 1f),
-        ControlPort(11, "brightness", "Brightness", 0.5f, 0f, 1f),
-        ControlPort(12, "damping", "Damping", 0.3f, 0f, 1f),
-        ControlPort(13, "position", "Position", 0.5f, 0f, 1f),
-        ControlPort(14, "mix", "Mix", 0.0f, 0f, 1f)
     )
 
     // Core resonator unit
@@ -101,6 +92,86 @@ class ResonatorPlugin(
     private val finalSumL = dspFactory.createAdd()
     private val finalSumR = dspFactory.createAdd()
 
+    // Internal state
+    private var _mode = 0
+    private var _targetMix = 0.0f
+    private var _structure = 0.25f
+    private var _brightness = 0.5f
+    private var _damping = 0.3f
+    private var _position = 0.5f
+    private var _mix = 0.0f
+    private var _snapBack = false
+
+    // Type-safe DSL port definitions
+    private val portDefs = ports(startIndex = 8) {
+        int(ResonatorSymbol.MODE) {
+            min = 0; max = 5
+            options = listOf("Modal", "String", "Sympathetic", "Modaloid", "Stringoid", "Sympatheroid")
+            get { _mode }
+            set { _mode = it; resonator.setMode(it) }
+        }
+        
+        float(ResonatorSymbol.TARGET_MIX) {
+            default = 0f
+            get { _targetMix }
+            set { _targetMix = it.coerceIn(0f, 1f); applyTargetMixRouting() }
+        }
+        
+        float(ResonatorSymbol.STRUCTURE) {
+            default = 0.25f
+            get { _structure }
+            set { _structure = it; resonator.setStructure(it) }
+        }
+        
+        float(ResonatorSymbol.BRIGHTNESS) {
+            get { _brightness }
+            set { _brightness = it; resonator.setBrightness(it) }
+        }
+        
+        float(ResonatorSymbol.DAMPING) {
+            default = 0.3f
+            get { _damping }
+            set { _damping = it; resonator.setDamping(it) }
+        }
+        
+        float(ResonatorSymbol.POSITION) {
+            get { _position }
+            set { _position = it; resonator.setPosition(it) }
+        }
+        
+        float(ResonatorSymbol.MIX) {
+            default = 0.0f
+            get { _mix }
+            set {
+                _mix = it.coerceIn(0f, 1f)
+                val wetLevel = it.toDouble()
+                val dryLevel = (1.0 - it).toDouble()
+                wetGainL.inputB.set(wetLevel)
+                wetGainR.inputB.set(wetLevel)
+                dryGainL.inputB.set(dryLevel)
+                dryGainR.inputB.set(dryLevel)
+            }
+        }
+        
+        bool(ResonatorSymbol.SNAP_BACK) {
+            get { _snapBack }
+            set { _snapBack = it }
+        }
+    }
+
+    private val audioPorts = listOf(
+        AudioPort(0, "drum_l", "Drum Left", true),
+        AudioPort(1, "drum_r", "Drum Right", true),
+        AudioPort(2, "synth_l", "Synth Left", true),
+        AudioPort(3, "synth_r", "Synth Right", true),
+        AudioPort(4, "out_l", "Output Left", false),
+        AudioPort(5, "out_r", "Output Right", false),
+        AudioPort(6, "aux_l", "Aux Left", false),
+        AudioPort(7, "aux_r", "Aux Right", false)
+    )
+
+    override val ports: List<Port> = audioPorts + portDefs.ports
+
     override val audioUnits: List<AudioUnit> = listOf(
         resonator,
         drumExciteGainL, drumExciteGainR, synthExciteGainL, synthExciteGainR,
@@ -110,7 +181,6 @@ class ResonatorPlugin(
         resoMixL, resoMixR, finalSumL, finalSumR
     )
 
-    // DspPlugin compatibility
     override val inputs: Map<String, AudioInput> = mapOf(
         "drumLeft" to drumExciteGainL.inputA,
         "drumRight" to drumExciteGainR.inputA,
@@ -128,16 +198,6 @@ class ResonatorPlugin(
         "auxLeft" to resonator.auxOutput,
         "auxRight" to resonator.auxOutput
     )
-
-    // State caches
-    private var _mode = 0
-    private var _targetMix = 0.0f
-    private var _structure = 0.25f
-    private var _brightness = 0.5f
-    private var _damping = 0.3f
-    private var _position = 0.5f
-    private var _mix = 0.0f
-    private var _snapBack = false
 
     override fun initialize() {
         // Excitation path: gated sources -> sum -> resonator
@@ -180,24 +240,19 @@ class ResonatorPlugin(
         resonator.setBrightness(_brightness)
         resonator.setDamping(_damping)
         resonator.setPosition(_position)
-        setMix(_mix)
+        portDefs.setValue(ResonatorSymbol.MIX, PortValue.FloatValue(_mix))
         applyTargetMixRouting()
 
-        // Register with engine
         audioUnits.forEach { audioEngine.addUnit(it) }
     }
 
-    override fun onStart() {
-        // No-op
-    }
+    override fun onStart() {}
+    override fun connectPort(index: Int, data: Any) {}
+    override fun run(nFrames: Int) {}
 
-    override fun connectPort(index: Int, data: Any) {
-        // External connections
-    }
-
-    override fun run(nFrames: Int) {
-        // Block processing
-    }
+    // Generic port value accessors delegating to DSL builder
+    override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
+    override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
     private fun applyTargetMixRouting() {
         val drumExcite = if (_targetMix <= 0.5f) 1.0 else (1.0 - (_targetMix.toDouble() - 0.5) * 2.0).coerceIn(0.0, 1.0)
@@ -216,15 +271,8 @@ class ResonatorPlugin(
         synthBypassGainR.inputB.set(synthBypass)
     }
 
-    fun setMode(mode: Int) {
-        _mode = mode
-        resonator.setMode(mode)
-    }
-
-    /**
-     * Compatibility helper for discrete target selection.
-     * 0 = Drums, 1 = Both, 2 = Synth
-     */
+    // Legacy setters for backward compatibility
+    fun setMode(mode: Int) = portDefs.setValue(ResonatorSymbol.MODE, PortValue.IntValue(mode))
     fun setTarget(target: Int) {
         val mix = when (target.coerceIn(0, 2)) {
             0 -> 0.0f
@@ -234,59 +282,22 @@ class ResonatorPlugin(
         }
         setTargetMix(mix)
     }
+    fun setTargetMix(targetMix: Float) = portDefs.setValue(ResonatorSymbol.TARGET_MIX, PortValue.FloatValue(targetMix))
+    fun setStructure(value: Float) = portDefs.setValue(ResonatorSymbol.STRUCTURE, PortValue.FloatValue(value))
+    fun setBrightness(value: Float) = portDefs.setValue(ResonatorSymbol.BRIGHTNESS, PortValue.FloatValue(value))
+    fun setDamping(value: Float) = portDefs.setValue(ResonatorSymbol.DAMPING, PortValue.FloatValue(value))
+    fun setPosition(value: Float) = portDefs.setValue(ResonatorSymbol.POSITION, PortValue.FloatValue(value))
+    fun setMix(value: Float) = portDefs.setValue(ResonatorSymbol.MIX, PortValue.FloatValue(value))
+    fun setSnapBack(enabled: Boolean) = portDefs.setValue(ResonatorSymbol.SNAP_BACK, PortValue.BoolValue(enabled))
 
-    fun setTargetMix(targetMix: Float) {
-        _targetMix = targetMix.coerceIn(0f, 1f)
-        applyTargetMixRouting()
-    }
-
-    fun setStructure(value: Float) {
-        _structure = value
-        resonator.setStructure(value)
-    }
-
-    fun setBrightness(value: Float) {
-        _brightness = value
-        resonator.setBrightness(value)
-    }
-
-    fun setDamping(value: Float) {
-        _damping = value
-        resonator.setDamping(value)
-    }
-
-    fun setPosition(value: Float) {
-        _position = value
-        resonator.setPosition(value)
-    }
-
-    fun setMix(value: Float) {
-        _mix = value.coerceIn(0f, 1f)
-        val wetLevel = _mix.toDouble()
-        val dryLevel = (1.0 - _mix).toDouble()
-        
-        wetGainL.inputB.set(wetLevel)
-        wetGainR.inputB.set(wetLevel)
-        dryGainL.inputB.set(dryLevel)
-        dryGainR.inputB.set(dryLevel)
-    }
-
-    fun setSnapBack(enabled: Boolean) {
-        _snapBack = enabled
-    }
-
-    fun strum(frequency: Float) {
-        resonator.strum(frequency)
-    }
+    fun strum(frequency: Float) = resonator.strum(frequency)
 
     // Getters for state saving
     fun getMode(): Int = _mode
-    fun getTarget(): Int {
-        return when {
-            _targetMix <= 0.3f -> 0
-            _targetMix >= 0.7f -> 2
-            else -> 1
-        }
+    fun getTarget(): Int = when {
+        _targetMix <= 0.3f -> 0
+        _targetMix >= 0.7f -> 2
+        else -> 1
     }
     fun getTargetMix(): Float = _targetMix
     fun getStructure(): Float = _structure

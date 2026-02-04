@@ -24,6 +24,10 @@ kotlin {
             implementation(project(":features:warps")) // For SynthControlTool?
             implementation(project(":features:flux")) // For SynthControlTool?
             implementation(project(":features:voice"))
+            implementation(project(":features:presets"))
+            implementation(project(":core:plugins:delay"))
+            implementation(project(":core:plugins:duolfo"))
+            implementation(project(":core:plugins:distortion"))
             implementation(libs.liquid)
 
             // AI/koog
@@ -34,6 +38,7 @@ kotlin {
             // Markdown rendering (core + Material 3 theme)
             implementation(libs.markdown)
             implementation(libs.markdown.m3)
+            implementation(libs.kotlinx.datetime)
         }
     }
 }

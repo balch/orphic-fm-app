@@ -26,6 +26,10 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.presets.hyperLfoA
+import org.balch.orpheus.core.presets.hyperLfoB
+import org.balch.orpheus.core.presets.hyperLfoLink
+import org.balch.orpheus.core.presets.hyperLfoMode
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel

@@ -50,6 +50,21 @@ interface DspPlugin {
     fun connectPort(index: Int, data: Any)
 
     /**
+     * Set a control port value by symbol.
+     * @param symbol The port symbol (e.g., "feedback", "mix", "spread")
+     * @param value The typed port value
+     * @return true if the port was found and set, false otherwise
+     */
+    fun setPortValue(symbol: Symbol, value: PortValue): Boolean = false
+    
+    /**
+     * Get a control port value by symbol.
+     * @param symbol The port symbol
+     * @return The current value, or null if not found
+     */
+    fun getPortValue(symbol: Symbol): PortValue? = null
+
+    /**
      * Enable processing.
      */
     fun activate() {}

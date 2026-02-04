@@ -24,6 +24,27 @@ import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.presets.drumBdDecay
+import org.balch.orpheus.core.presets.drumBdFrequency
+import org.balch.orpheus.core.presets.drumBdP4
+import org.balch.orpheus.core.presets.drumBdP5
+import org.balch.orpheus.core.presets.drumBdPitchSource
+import org.balch.orpheus.core.presets.drumBdTone
+import org.balch.orpheus.core.presets.drumBdTriggerSource
+import org.balch.orpheus.core.presets.drumHhDecay
+import org.balch.orpheus.core.presets.drumHhFrequency
+import org.balch.orpheus.core.presets.drumHhP4
+import org.balch.orpheus.core.presets.drumHhPitchSource
+import org.balch.orpheus.core.presets.drumHhTone
+import org.balch.orpheus.core.presets.drumHhTriggerSource
+import org.balch.orpheus.core.presets.drumSdDecay
+import org.balch.orpheus.core.presets.drumSdFrequency
+import org.balch.orpheus.core.presets.drumSdP4
+import org.balch.orpheus.core.presets.drumSdPitchSource
+import org.balch.orpheus.core.presets.drumSdTone
+import org.balch.orpheus.core.presets.drumSdTriggerSource
+import org.balch.orpheus.core.presets.drumsBypass
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -145,7 +166,7 @@ typealias DrumFeature = SynthFeature<DrumUiState, DrumPanelActions>
 class DrumViewModel(
     private val synthEngine: SynthEngine,
     private val synthController: SynthController,
-    private val presetLoader: org.balch.orpheus.core.presets.PresetLoader,
+    presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), DrumFeature {
 

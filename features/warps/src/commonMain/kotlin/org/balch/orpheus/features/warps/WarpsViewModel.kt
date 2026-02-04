@@ -25,6 +25,14 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.WarpsSource
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.presets.PresetLoader
+import org.balch.orpheus.core.presets.warpsAlgorithm
+import org.balch.orpheus.core.presets.warpsCarrierLevel
+import org.balch.orpheus.core.presets.warpsCarrierSource
+import org.balch.orpheus.core.presets.warpsMix
+import org.balch.orpheus.core.presets.warpsModulatorLevel
+import org.balch.orpheus.core.presets.warpsModulatorSource
+import org.balch.orpheus.core.presets.warpsTimbre
 import org.balch.orpheus.core.routing.ControlEventOrigin
 import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
@@ -81,7 +89,7 @@ typealias WarpsFeature = SynthFeature<WarpsUiState, WarpsPanelActions>
 class WarpsViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
-    presetLoader: org.balch.orpheus.core.presets.PresetLoader,
+    presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), WarpsFeature {
 

@@ -10,11 +10,26 @@ import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioPort
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
+import org.balch.orpheus.core.audio.dsp.PortSymbol
+import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.audio.dsp.ports
+
+/**
+ * Exhaustive enum of all Distortion plugin port symbols.
+ */
+enum class DistortionSymbol(
+    override val symbol: Symbol,
+    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
+) : PortSymbol {
+    DRIVE("drive", "Drive"),
+    MIX("mix", "Mix"),
+    DRY_LEVEL("dry_level", "Dry Level")
+}
 
 /**
  * LV2-style Distortion Plugin.
@@ -24,9 +39,9 @@ import org.balch.orpheus.core.audio.dsp.Port
  * 1: Audio In Right (Input)
  * 2: Audio Out Left (Output)
  * 3: Audio Out Right (Output)
- * 4: Drive (Control Input, 0..1)
- * 5: Mix (Control Input, 0..1)
- * 6: Dry Level (Control Input, 0..1)
+ * 
+ * Controls (via DSL):
+ * - drive, mix, dry_level
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -43,15 +58,9 @@ class DistortionPlugin(
         version = "1.0.0"
     )
 
-    override val ports: List<Port> = listOf(
-        AudioPort(0, "in_l", "Input Left", true),
-        AudioPort(1, "in_r", "Input Right", true),
-        AudioPort(2, "out_l", "Output Left", false),
-        AudioPort(3, "out_r", "Output Right", false),
-        ControlPort(4, "drive", "Drive", 0.0f, 0f, 1f),
-        ControlPort(5, "mix", "Mix", 0.5f, 0f, 1f),
-        ControlPort(6, "dry_level", "Dry Level", 1.0f, 0f, 1f)
-    )
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.distortion"
+    }
 
     // Internal DSP Units
     private val drySumLeft = dspFactory.createPassThrough()
@@ -68,6 +77,58 @@ class DistortionPlugin(
     private val distortedPathGainRight = dspFactory.createMultiply()
     private val postMixSummerLeft = dspFactory.createAdd()
     private val postMixSummerRight = dspFactory.createAdd()
+
+    // Internal state
+    private var _drive = 0.0f
+    private var _mix = 0.5f
+    private var _dryLevel = 1.0f
+
+    // Type-safe DSL port definitions  
+    private val portDefs = ports(startIndex = 4) {
+        float(DistortionSymbol.DRIVE) {
+            default = 0.0f
+            get { _drive }
+            set {
+                _drive = it
+                val driveVal = 1.0 + (it * 14.0)
+                limiterLeft.drive.set(driveVal)
+                limiterRight.drive.set(driveVal)
+            }
+        }
+        
+        float(DistortionSymbol.MIX) {
+            get { _mix }
+            set {
+                _mix = it
+                val distortedLevel = it
+                val cleanLevel = 1.0f - it
+                cleanPathGainLeft.inputB.set(cleanLevel.toDouble())
+                cleanPathGainRight.inputB.set(cleanLevel.toDouble())
+                distortedPathGainLeft.inputB.set(distortedLevel.toDouble())
+                distortedPathGainRight.inputB.set(distortedLevel.toDouble())
+            }
+        }
+        
+        float(DistortionSymbol.DRY_LEVEL) {
+            default = 1.0f
+            get { _dryLevel }
+            set {
+                _dryLevel = it
+                val level = it.toDouble()
+                dryGainLeft.inputB.set(level)
+                dryGainRight.inputB.set(level)
+            }
+        }
+    }
+
+    private val audioPorts = listOf(
+        AudioPort(0, "in_l", "Input Left", true),
+        AudioPort(1, "in_r", "Input Right", true),
+        AudioPort(2, "out_l", "Output Left", false),
+        AudioPort(3, "out_r", "Output Right", false)
+    )
+
+    override val ports: List<Port> = audioPorts + portDefs.ports
 
     override val audioUnits: List<AudioUnit> = listOf(
         drySumLeft, drySumRight,
@@ -99,10 +160,6 @@ class DistortionPlugin(
     val distortedPathRightGain: AudioInput get() = distortedPathGainRight.inputB
     val dryGainLeftInput: AudioInput get() = dryGainLeft.inputB
     val dryGainRightInput: AudioInput get() = dryGainRight.inputB
-
-    // State caches
-    private var _drive = 0.0f
-    private var _distortionMix = 0.5f
 
     override fun initialize() {
         // Default drive
@@ -156,30 +213,24 @@ class DistortionPlugin(
         // Update control parameters if they are driven by Float data instead of Audio-Rate signals
     }
 
+    // Generic port value accessors delegating to DSL builder
+    override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
+    override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
+
+    // Legacy setters for backward compatibility
     fun setDrive(amount: Float) {
-        _drive = amount
-        val driveVal = 1.0 + (amount * 14.0)
-        limiterLeft.drive.set(driveVal)
-        limiterRight.drive.set(driveVal)
+        portDefs.setValue(DistortionSymbol.DRIVE, PortValue.FloatValue(amount))
     }
 
     fun setMix(amount: Float) {
-        _distortionMix = amount
-        val distortedLevel = amount
-        val cleanLevel = 1.0f - amount
-        cleanPathGainLeft.inputB.set(cleanLevel.toDouble())
-        cleanPathGainRight.inputB.set(cleanLevel.toDouble())
-        distortedPathGainLeft.inputB.set(distortedLevel.toDouble())
-        distortedPathGainRight.inputB.set(distortedLevel.toDouble())
+        portDefs.setValue(DistortionSymbol.MIX, PortValue.FloatValue(amount))
     }
 
     fun setDryLevel(amount: Float) {
-        val level = amount.toDouble()
-        dryGainLeft.inputB.set(level)
-        dryGainRight.inputB.set(level)
+        portDefs.setValue(DistortionSymbol.DRY_LEVEL, PortValue.FloatValue(amount))
     }
 
     // Getters for state saving
     fun getDrive(): Float = _drive
-    fun getMix(): Float = _distortionMix
+    fun getMix(): Float = _mix
 }
