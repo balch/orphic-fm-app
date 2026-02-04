@@ -76,6 +76,8 @@ data class MidiMappingState(
             const val HYPER_LFO_B = "hyper_lfo_b"
             const val HYPER_LFO_MODE = "hyper_lfo_mode"
             const val HYPER_LFO_LINK = "hyper_lfo_link"
+            const val HYPER_LFO_A_MULT = "hyper_lfo_a_mult"
+            const val HYPER_LFO_B_MULT = "hyper_lfo_b_mult"
 
             // Global
             const val MASTER_VOLUME = "master_volume"

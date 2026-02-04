@@ -114,8 +114,6 @@ class DuoLfoPlugin(
     private var isAndMode = true
     private var isTriangleMode = true
 
-    private val frequencyMultipliers = listOf(7.0, 110.0)
-
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 6) {
         int(DuoLfoSymbol.MODE) {
@@ -156,7 +154,7 @@ class DuoLfoPlugin(
             get { _freqA }
             set {
                 _freqA = it
-                val freqHz = 0.01 + (it * frequencyMultipliers[0])
+                val freqHz = 0.01 + it
                 inputA.input.set(freqHz)
             }
         }
@@ -165,7 +163,7 @@ class DuoLfoPlugin(
             get { _freqB }
             set {
                 _freqB = it
-                val freqHz = 0.01 + (it * frequencyMultipliers[1])
+                val freqHz = 0.01 + it
                 inputB.input.set(freqHz)
             }
         }

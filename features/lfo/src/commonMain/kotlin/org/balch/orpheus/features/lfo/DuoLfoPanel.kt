@@ -3,6 +3,8 @@ package org.balch.orpheus.features.lfo
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -14,6 +16,7 @@ import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.Vertical3WaySwitch
@@ -93,6 +96,17 @@ fun DuoLfoPanel(
                         if (isActive) OrpheusColors.neonCyan
                         else OrpheusColors.neonCyan.copy(alpha = 0.4f)
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                HorizontalMiniSlider(
+                    value = uiState.lfoAMultiplier,
+                    onValueChange = actions.setLfoAMultiplier,
+                    leftLabel = "F",
+                    rightLabel = "S",
+                    color = OrpheusColors.neonCyan,
+                    trackWidth = 48
+                )
             }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -117,6 +131,17 @@ fun DuoLfoPanel(
                     progressColor =
                         if (isActive) OrpheusColors.neonCyan
                         else OrpheusColors.neonCyan.copy(alpha = 0.4f)
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                HorizontalMiniSlider(
+                    value = uiState.lfoBMultiplier,
+                    onValueChange = actions.setLfoBMultiplier,
+                    leftLabel = "F",
+                    rightLabel = "S",
+                    color = OrpheusColors.neonCyan,
+                    trackWidth = 48
                 )
             }
         }
