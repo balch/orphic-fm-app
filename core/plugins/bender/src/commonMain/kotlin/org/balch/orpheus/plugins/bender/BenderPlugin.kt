@@ -48,10 +48,14 @@ class BenderPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.bender",
+        uri = URI,
         name = "Bender",
         author = "Balch"
     )
+
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.bender"
+    }
 
     // Control signal path
     private val bendInputProxy = dspFactory.createPassThrough()
@@ -293,14 +297,5 @@ class BenderPlugin(
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    // Legacy setters for backward compatibility
-    fun setBend(amount: Float) = portDefs.setValue(BenderSymbol.BEND, PortValue.FloatValue(amount))
-    fun setMaxBendSemitones(semitones: Float) = portDefs.setValue(BenderSymbol.MAX_BEND, PortValue.FloatValue(semitones))
-    fun setRandomDepth(depth: Float) = portDefs.setValue(BenderSymbol.RANDOM_DEPTH, PortValue.FloatValue(depth))
-    fun setTimbreModulation(amount: Float) = portDefs.setValue(BenderSymbol.TIMBRE_MOD, PortValue.FloatValue(amount))
-    fun setSpringVolume(volume: Float) = portDefs.setValue(BenderSymbol.SPRING_VOL, PortValue.FloatValue(volume))
-    fun setTensionVolume(volume: Float) = portDefs.setValue(BenderSymbol.TENSION_VOL, PortValue.FloatValue(volume))
-    
-    fun getBend(): Float = _bendAmount
     fun getCurrentValue(): Float = bendMonitor.getCurrent().toFloat().coerceIn(-1f, 1f)
 }

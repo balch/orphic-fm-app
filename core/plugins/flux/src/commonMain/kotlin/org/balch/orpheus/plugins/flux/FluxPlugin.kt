@@ -64,10 +64,14 @@ class FluxPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.flux",
+        uri = URI,
         name = "Flux",
         author = "Balch"
     )
+    
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.flux"
+    }
 
     val flux = dspFactory.createFluxUnit()
 
@@ -200,17 +204,17 @@ class FluxPlugin(
     )
 
     override fun initialize() {
-        // Default settings matching DspFluxPlugin
-        setSpread(0.5f)
-        setBias(0.5f)
-        setSteps(0.5f)
-        setDejaVu(0.0f)
-        setLength(8)
-        setScale(0)
-        setRate(0.5f)
-        setJitter(0.0f)
-        setProbability(0.5f)
-        setGateLength(0.5f)
+        // Initialize default values via port API
+        setPortValue("spread", PortValue.FloatValue(0.5f))
+        setPortValue("bias", PortValue.FloatValue(0.5f))
+        setPortValue("steps", PortValue.FloatValue(0.5f))
+        setPortValue("dejavu", PortValue.FloatValue(0.0f))
+        setPortValue("length", PortValue.IntValue(8))
+        setPortValue("scale", PortValue.IntValue(0))
+        setPortValue("rate", PortValue.FloatValue(0.5f))
+        setPortValue("jitter", PortValue.FloatValue(0.0f))
+        setPortValue("probability", PortValue.FloatValue(0.5f))
+        setPortValue("gatelength", PortValue.FloatValue(0.5f))
         
         audioUnits.forEach { audioEngine.addUnit(it) }
     }
@@ -222,65 +226,4 @@ class FluxPlugin(
     // Generic port value accessors delegating to DSL builder
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
-
-
-    fun setRate(value: Float) {
-        _rate = value
-        flux.rate.set(value.toDouble())
-    }
-    
-    fun setSpread(value: Float) {
-        _spread = value
-        flux.spread.set(value.toDouble())
-    }
-    
-    fun setBias(value: Float) {
-        _bias = value
-        flux.bias.set(value.toDouble())
-    }
-    
-    fun setSteps(value: Float) {
-        _steps = value
-        flux.steps.set(value.toDouble())
-    }
-    
-    fun setDejaVu(value: Float) {
-        _dejaVu = value
-        flux.dejaVu.set(value.toDouble())
-    }
-    
-    fun setLength(value: Int) {
-        _length = value
-        flux.length.set(value.toDouble())
-    }
-    
-    fun setScale(index: Int) {
-        _scale = index
-        flux.setScale(index)
-    }
-    
-    fun setJitter(value: Float) {
-        _jitter = value
-        flux.jitter.set(value.toDouble())
-    }
-    
-    fun setProbability(value: Float) {
-        _probability = value
-        flux.probability.set(value.toDouble())
-    }
-    
-    fun setGateLength(value: Float) {
-        _gateLength = value
-        flux.gateLength.set(value.toDouble())
-    }
-    
-    fun getSpread() = _spread
-    fun getBias() = _bias
-    fun getSteps() = _steps
-    fun getDejaVu() = _dejaVu
-    fun getLength() = _length
-    fun getScale() = _scale
-    fun getRate() = _rate
-    fun getJitter() = _jitter
-    fun getProbability() = _probability
 }

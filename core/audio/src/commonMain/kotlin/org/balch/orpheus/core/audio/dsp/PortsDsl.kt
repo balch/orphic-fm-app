@@ -13,6 +13,9 @@ annotation class PortsDsl
 interface PortSymbol {
     val symbol: Symbol
     val displayName: String get() = symbol.replaceFirstChar { it.uppercase() }
+    
+    /** Create qualified symbol "pluginUri:symbol" for use with PortRegistry */
+    fun qualifiedSymbol(pluginUri: String): String = "$pluginUri:$symbol"
 }
 
 /**

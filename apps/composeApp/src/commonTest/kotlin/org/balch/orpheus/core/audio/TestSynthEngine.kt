@@ -3,6 +3,7 @@ package org.balch.orpheus.core.audio
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.balch.orpheus.core.audio.dsp.PortValue
 
 /**
  * Test fake implementation of SynthEngine for unit testing.
@@ -315,5 +316,80 @@ open class TestSynthEngine : SynthEngine {
     override fun getWarpsCarrierSource(): Int = _warpsCarrierSource
     override fun getWarpsModulatorSource(): Int = _warpsModulatorSource
     override fun getWarpsMix(): Float = _warpsMix
+    
+    // Generic Plugin Port Access - stub
+    override fun setPluginPort(pluginUri: String, symbol: String, value: PortValue): Boolean = false
+    override fun getPluginPort(pluginUri: String, symbol: String): PortValue? = null
+    
+    // Drum Routing Stubs
+    private val _drumTriggerSources = IntArray(3)
+    private val _drumPitchSources = IntArray(3)
+    override fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int) { 
+        if (drumIndex in 0..2) _drumTriggerSources[drumIndex] = sourceIndex 
+    }
+    override fun getDrumTriggerSource(drumIndex: Int): Int = _drumTriggerSources.getOrElse(drumIndex) { 0 }
+    override fun setDrumPitchSource(drumIndex: Int, sourceIndex: Int) { 
+        if (drumIndex in 0..2) _drumPitchSources[drumIndex] = sourceIndex 
+    }
+    override fun getDrumPitchSource(drumIndex: Int): Int = _drumPitchSources.getOrElse(drumIndex) { 0 }
+    
+    // Drums Bypass
+    private var _drumsBypass = true
+    override fun setDrumsBypass(bypass: Boolean) { _drumsBypass = bypass }
+    override fun getDrumsBypass(): Boolean = _drumsBypass
+    
+    // Quad Routing Stubs
+    private val _quadTriggerSources = IntArray(3)
+    private val _quadPitchSources = IntArray(3)
+    private val _quadEnvTriggerModes = BooleanArray(3)
+    override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) { 
+        if (quadIndex in 0..2) _quadTriggerSources[quadIndex] = sourceIndex 
+    }
+    override fun getQuadTriggerSource(quadIndex: Int): Int = _quadTriggerSources.getOrElse(quadIndex) { 0 }
+    override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) { 
+        if (quadIndex in 0..2) _quadPitchSources[quadIndex] = sourceIndex 
+    }
+    override fun getQuadPitchSource(quadIndex: Int): Int = _quadPitchSources.getOrElse(quadIndex) { 0 }
+    override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) { 
+        if (quadIndex in 0..2) _quadEnvTriggerModes[quadIndex] = enabled 
+    }
+    override fun getQuadEnvelopeTriggerMode(quadIndex: Int): Boolean = _quadEnvTriggerModes.getOrElse(quadIndex) { false }
+    
+    // Flux Stubs
+    private var _fluxSpread = 0.5f
+    private var _fluxBias = 0.5f
+    private var _fluxSteps = 0.5f
+    private var _fluxDejaVu = 0f
+    private var _fluxLength = 8
+    private var _fluxScale = 0
+    private var _fluxRate = 0.5f
+    private var _fluxJitter = 0f
+    private var _fluxProbability = 0.5f
+    private var _fluxClockSource = 0
+    private var _fluxGateLength = 0.5f
+    
+    override fun setFluxSpread(value: Float) { _fluxSpread = value }
+    override fun setFluxBias(value: Float) { _fluxBias = value }
+    override fun setFluxSteps(value: Float) { _fluxSteps = value }
+    override fun setFluxDejaVu(value: Float) { _fluxDejaVu = value }
+    override fun setFluxLength(value: Int) { _fluxLength = value }
+    override fun setFluxScale(index: Int) { _fluxScale = index }
+    override fun setFluxRate(rate: Float) { _fluxRate = rate }
+    override fun setFluxJitter(value: Float) { _fluxJitter = value }
+    override fun setFluxProbability(value: Float) { _fluxProbability = value }
+    override fun setFluxClockSource(sourceIndex: Int) { _fluxClockSource = sourceIndex }
+    override fun setFluxGateLength(value: Float) { _fluxGateLength = value }
+    
+    override fun getFluxSpread(): Float = _fluxSpread
+    override fun getFluxBias(): Float = _fluxBias
+    override fun getFluxSteps(): Float = _fluxSteps
+    override fun getFluxDejaVu(): Float = _fluxDejaVu
+    override fun getFluxLength(): Int = _fluxLength
+    override fun getFluxScale(): Int = _fluxScale
+    override fun getFluxRate(): Float = _fluxRate
+    override fun getFluxJitter(): Float = _fluxJitter
+    override fun getFluxProbability(): Float = _fluxProbability
+    override fun getFluxClockSource(): Int = _fluxClockSource
+    override fun getFluxGateLength(): Float = _fluxGateLength
 }
 

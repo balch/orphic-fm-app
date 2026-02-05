@@ -56,10 +56,14 @@ class StereoPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.stereo",
+        uri = URI,
         name = "Stereo Output",
         author = "Balch"
     )
+
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.stereo"
+    }
 
     // Summing buses
     private val stereoSumLeft = dspFactory.createPassThrough()
@@ -216,17 +220,6 @@ class StereoPlugin(
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    // Legacy setters for backward compatibility
-    fun setVoicePan(index: Int, pan: Float) {
-        if (index !in 0 until 12) return
-        portDefs.setValue(StereoSymbol.entries[index + 2], PortValue.FloatValue(pan))
-    }
-
-    fun setMasterPan(pan: Float) = portDefs.setValue(StereoSymbol.MASTER_PAN, PortValue.FloatValue(pan))
-    fun setMasterVolume(amount: Float) = portDefs.setValue(StereoSymbol.MASTER_VOL, PortValue.FloatValue(amount))
 
     fun getPeak(): Float = peakFollower.getCurrent().toFloat()
-    fun getVoicePan(index: Int): Float = _voicePan[index]
-    fun getMasterPan(): Float = _masterPan
-    fun getMasterVolume(): Float = _masterVolume
 }

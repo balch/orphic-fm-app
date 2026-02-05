@@ -53,10 +53,14 @@ class ResonatorPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.resonator",
+        uri = URI,
         name = "Resonator",
         author = "Balch"
     )
+
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.resonator"
+    }
 
     // Core resonator unit
     private val resonator = dspFactory.createResonatorUnit()
@@ -286,39 +290,6 @@ class ResonatorPlugin(
         synthBypassGainR.inputB.set(synthBypass)
     }
 
-    // Legacy setters for backward compatibility
-    fun setMode(mode: Int) = portDefs.setValue(ResonatorSymbol.MODE, PortValue.IntValue(mode))
-    fun setTarget(target: Int) {
-        val mix = when (target.coerceIn(0, 2)) {
-            0 -> 0.0f
-            1 -> 0.5f
-            2 -> 1.0f
-            else -> 0.5f
-        }
-        setTargetMix(mix)
-    }
-    fun setTargetMix(targetMix: Float) = portDefs.setValue(ResonatorSymbol.TARGET_MIX, PortValue.FloatValue(targetMix))
-    fun setStructure(value: Float) = portDefs.setValue(ResonatorSymbol.STRUCTURE, PortValue.FloatValue(value))
-    fun setBrightness(value: Float) = portDefs.setValue(ResonatorSymbol.BRIGHTNESS, PortValue.FloatValue(value))
-    fun setDamping(value: Float) = portDefs.setValue(ResonatorSymbol.DAMPING, PortValue.FloatValue(value))
-    fun setPosition(value: Float) = portDefs.setValue(ResonatorSymbol.POSITION, PortValue.FloatValue(value))
-    fun setMix(value: Float) = portDefs.setValue(ResonatorSymbol.MIX, PortValue.FloatValue(value))
-    fun setSnapBack(enabled: Boolean) = portDefs.setValue(ResonatorSymbol.SNAP_BACK, PortValue.BoolValue(enabled))
-
+    // Utility methods
     fun strum(frequency: Float) = resonator.strum(frequency)
-
-    // Getters for state saving
-    fun getMode(): Int = _mode
-    fun getTarget(): Int = when {
-        _targetMix <= 0.3f -> 0
-        _targetMix >= 0.7f -> 2
-        else -> 1
-    }
-    fun getTargetMix(): Float = _targetMix
-    fun getStructure(): Float = _structure
-    fun getBrightness(): Float = _brightness
-    fun getDamping(): Float = _damping
-    fun getPosition(): Float = _position
-    fun getMix(): Float = _mix
-    fun getSnapBack(): Boolean = _snapBack
 }

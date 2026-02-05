@@ -51,7 +51,7 @@ class DuoLfoPlugin(
 ): DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.duolfo",
+        uri = URI,
         name = "Duo LFO",
         author = "Balch"
     )
@@ -346,21 +346,7 @@ class DuoLfoPlugin(
         }
     }
 
-    // Legacy setters for backward compatibility
-    fun setMode(mode: Int) = portDefs.setValue(DuoLfoSymbol.MODE, PortValue.IntValue(mode))
-    fun setTriangleMode(triangleMode: Boolean) = portDefs.setValue(DuoLfoSymbol.TRIANGLE_MODE, PortValue.BoolValue(triangleMode))
-    fun setLink(enabled: Boolean) = portDefs.setValue(DuoLfoSymbol.LINK, PortValue.BoolValue(enabled))
-    fun setFreq(index: Int, frequency: Float) {
-        when (index) {
-            0 -> portDefs.setValue(DuoLfoSymbol.FREQ_A, PortValue.FloatValue(frequency))
-            1 -> portDefs.setValue(DuoLfoSymbol.FREQ_B, PortValue.FloatValue(frequency))
-        }
-    }
 
-    // Getters for state saving
-    fun getFreq(index: Int): Float = if (index == 0) _freqA else _freqB
-    fun getMode(): Int = _mode
-    fun getLink(): Boolean = _link
     
     fun getCurrentValue(): Float = lfoMonitor.getCurrent().toFloat().coerceIn(-1f, 1f)
 }

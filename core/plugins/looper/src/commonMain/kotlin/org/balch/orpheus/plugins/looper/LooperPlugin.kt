@@ -36,10 +36,14 @@ class LooperPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.looper",
+        uri = URI,
         name = "Looper",
         author = "Balch"
     )
+
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.looper"
+    }
 
     private val audioPorts = ports {
         audioPort { index = 0; symbol = "in_l"; name = "Input Left"; isInput = true }

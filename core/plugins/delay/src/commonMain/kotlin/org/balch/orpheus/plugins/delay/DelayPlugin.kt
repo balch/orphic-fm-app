@@ -332,34 +332,7 @@ class DelayPlugin(
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    // Legacy setters for backward compatibility
-    fun setTime(index: Int, value: Float) {
-        when (index) {
-            0 -> portDefs.setValue(DelaySymbol.TIME_1, PortValue.FloatValue(value))
-            1 -> portDefs.setValue(DelaySymbol.TIME_2, PortValue.FloatValue(value))
-        }
-    }
-
-    fun setFeedback(value: Float) {
-        portDefs.setValue(DelaySymbol.FEEDBACK, PortValue.FloatValue(value))
-    }
-
-    fun setMix(value: Float) {
-        portDefs.setValue(DelaySymbol.MIX, PortValue.FloatValue(value))
-    }
-
-    fun setModDepth(index: Int, value: Float) {
-        when (index) {
-            0 -> portDefs.setValue(DelaySymbol.MOD_DEPTH_1, PortValue.FloatValue(value))
-            1 -> portDefs.setValue(DelaySymbol.MOD_DEPTH_2, PortValue.FloatValue(value))
-        }
-    }
-
-    fun setModSource(index: Int, isLfo: Boolean) {
-        // Update port value (which updates internal state)
-        portDefs.setValue(DelaySymbol.MOD_SOURCE, PortValue.BoolValue(isLfo))
-    }
-
+    // Internal helpers for DSL port setters
     private fun setModSourceInternal(index: Int, isLfo: Boolean) {
         val targetConverter = if (index == 0) lfoToUnipolar1 else lfoToUnipolar2
         targetConverter.inputA.disconnectAll()
@@ -369,10 +342,6 @@ class DelayPlugin(
             val attenuatedSelf = if (index == 0) selfMod1Attenuator.output else selfMod2Attenuator.output
             attenuatedSelf.connect(targetConverter.inputA)
         }
-    }
-
-    fun setStereoMode(pingPong: Boolean) {
-        portDefs.setValue(DelaySymbol.STEREO_MODE, PortValue.BoolValue(pingPong))
     }
 
     private fun updateStereoGains() {
@@ -385,28 +354,4 @@ class DelayPlugin(
             delay2WetLeft.inputB.set(gain); delay2WetRight.inputB.set(gain)
         }
     }
-
-    // Legacy getters for state saving
-    fun getTime(index: Int): Float = when (index) {
-        0 -> _time1
-        1 -> _time2
-        else -> 0.3f
-    }
-    
-    fun getFeedback(): Float = _feedback
-    fun getMix(): Float = _mix
-    
-    fun getModDepth(index: Int): Float = when (index) {
-        0 -> _modDepth1
-        1 -> _modDepth2
-        else -> 0f
-    }
-    
-    fun getModSourceIsLfo(index: Int): Boolean = _modSourceIsLfo
-    
-    fun setLfoWaveform(isTriangle: Boolean) {
-        portDefs.setValue(DelaySymbol.LFO_WAVEFORM, PortValue.BoolValue(isTriangle))
-    }
-    
-    fun getLfoWaveform(): Boolean = _lfoWaveformIsTriangle
 }

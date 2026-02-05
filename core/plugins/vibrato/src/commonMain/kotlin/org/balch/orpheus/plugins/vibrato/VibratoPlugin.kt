@@ -41,10 +41,14 @@ class VibratoPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.vibrato",
+        uri = URI,
         name = "Vibrato",
         author = "Balch"
     )
+
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.vibrato"
+    }
 
     private val lfo = dspFactory.createSineOscillator()
     private val depthGain = dspFactory.createMultiply()
@@ -112,7 +116,4 @@ class VibratoPlugin(
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    // Legacy setters for backward compatibility
-    fun setDepth(amount: Float) = portDefs.setValue(VibratoSymbol.DEPTH, PortValue.FloatValue(amount))
-    fun getDepth(): Float = _depth
 }

@@ -67,10 +67,14 @@ class DrumPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.drum",
+        uri = URI,
         name = "Drum Machine",
         author = "Balch"
     )
+
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.drum"
+    }
 
     private val drumUnit = dspFactory.createDrumUnit()
     
@@ -234,9 +238,7 @@ class DrumPlugin(
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    // Legacy setter for backward compatibility
-    fun setMix(value: Float) = portDefs.setValue(DrumSymbol.MIX, PortValue.FloatValue(value))
-    fun getMix(): Float = _mix
+    // Utility methods
 
     fun trigger(
         type: Int,

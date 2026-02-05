@@ -53,10 +53,14 @@ class WarpsPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.warps",
+        uri = URI,
         name = "Warps",
         author = "Balch"
     )
+    
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.warps"
+    }
 
     private val warps = dspFactory.createWarpsUnit()
     
@@ -185,7 +189,7 @@ class WarpsPlugin(
         warps.level1.set(0.5)
         warps.level2.set(0.5)
         
-        setMix(0.5f)
+        setPortValue("mix", PortValue.FloatValue(0.5f))
 
         audioUnits.forEach { audioEngine.addUnit(it) }
     }
@@ -198,14 +202,7 @@ class WarpsPlugin(
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    // Legacy setters for backward compatibility
-    fun setAlgorithm(value: Float) = portDefs.setValue(WarpsSymbol.ALGORITHM, PortValue.FloatValue(value))
-    fun setTimbre(value: Float) = portDefs.setValue(WarpsSymbol.TIMBRE, PortValue.FloatValue(value))
-    fun setLevel1(value: Float) = portDefs.setValue(WarpsSymbol.LEVEL1, PortValue.FloatValue(value))
-    fun setLevel2(value: Float) = portDefs.setValue(WarpsSymbol.LEVEL2, PortValue.FloatValue(value))
-    fun setMix(value: Float) = portDefs.setValue(WarpsSymbol.MIX, PortValue.FloatValue(value))
-    
-    fun getMix(): Float = _mix
+    // Routing methods (still needed for wiring in DspSynthEngine)
     fun setCarrierSource(source: Int) { _carrierSource = source }
     fun getCarrierSource(): Int = _carrierSource
     fun setModulatorSource(source: Int) { _modulatorSource = source }

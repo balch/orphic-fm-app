@@ -1,6 +1,7 @@
 package org.balch.orpheus.core.audio
 
 import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.core.audio.dsp.PortValue
 
 interface SynthEngine {
     fun start()
@@ -159,6 +160,30 @@ interface SynthEngine {
      * Create flows for Distortion, Mode Delay, Quad and Duo Controls
      * See if there is a way to make it generic and let the plugins  handle the flows
      */
+
+    // ═══════════════════════════════════════════════════════════
+    // Generic Plugin Port Access
+    // ═══════════════════════════════════════════════════════════
+    
+    /**
+     * Set a plugin port value by plugin URI and port symbol.
+     * Uses qualified symbol format: "org.balch.orpheus.plugins.grains:position"
+     * 
+     * @param pluginUri The plugin's unique identifier (e.g., "org.balch.orpheus.plugins.grains")
+     * @param symbol The port's symbol (e.g., "position", "mix", "feedback")
+     * @param value The typed port value
+     * @return true if port was found and set
+     */
+    fun setPluginPort(pluginUri: String, symbol: String, value: PortValue): Boolean
+    
+    /**
+     * Get a plugin port value by plugin URI and port symbol.
+     * 
+     * @param pluginUri The plugin's unique identifier
+     * @param symbol The port's symbol
+     * @return The current value, or null if not found
+     */
+    fun getPluginPort(pluginUri: String, symbol: String): PortValue?
 
     // Getters for State Saving
     fun getVoiceTune(index: Int): Float

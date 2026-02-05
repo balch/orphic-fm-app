@@ -51,7 +51,7 @@ class DistortionPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.distortion",
+        uri = URI,
         name = "Distortion",
         author = "Balch",
         version = "1.0.0"
@@ -222,20 +222,5 @@ class DistortionPlugin(
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    // Legacy setters for backward compatibility
-    fun setDrive(amount: Float) {
-        portDefs.setValue(DistortionSymbol.DRIVE, PortValue.FloatValue(amount))
-    }
 
-    fun setMix(amount: Float) {
-        portDefs.setValue(DistortionSymbol.MIX, PortValue.FloatValue(amount))
-    }
-
-    fun setDryLevel(amount: Float) {
-        portDefs.setValue(DistortionSymbol.DRY_LEVEL, PortValue.FloatValue(amount))
-    }
-
-    // Getters for state saving
-    fun getDrive(): Float = _drive
-    fun getMix(): Float = _mix
 }

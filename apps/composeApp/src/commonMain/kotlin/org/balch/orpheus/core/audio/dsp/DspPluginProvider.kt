@@ -23,6 +23,14 @@ import org.balch.orpheus.plugins.warps.WarpsPlugin
 class DspPluginProvider(
     val plugins: Set<DspPlugin>
 ) {
+    /** Lookup plugins by URI for generic port access */
+    private val byUri: Map<String, DspPlugin> by lazy { 
+        plugins.associateBy { it.info.uri } 
+    }
+    
+    /** Get a plugin by its URI */
+    fun getPlugin(uri: String): DspPlugin? = byUri[uri]
+    
     val hyperLfo by lazy { plugins.filterIsInstance<DuoLfoPlugin>().first() }
     val delayPlugin by lazy { plugins.filterIsInstance<DelayPlugin>().first() }
     val distortionPlugin by lazy { plugins.filterIsInstance<DistortionPlugin>().first() }

@@ -33,10 +33,14 @@ enum class VoiceSymbol(
 class VoicePlugin : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.voice",
+        uri = URI,
         name = "Voice Engine",
         author = "Orpheus"
     )
+
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.voice"
+    }
 
     // Listeners for engine updates
     interface Listener {

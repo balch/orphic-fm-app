@@ -56,10 +56,14 @@ class GrainsPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.grains",
+        uri = URI,
         name = "Grains",
         author = "Balch"
     )
+    
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.grains"
+    }
 
     private val grains = dspFactory.createGrainsUnit()
 
@@ -181,9 +185,4 @@ class GrainsPlugin(
     // Generic port value accessors delegating to DSL builder
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
-
-    // Legacy setter for backward compatibility
-    fun setMode(mode: Int) {
-        portDefs.setValue(GrainsSymbol.MODE, PortValue.IntValue(mode))
-    }
 }

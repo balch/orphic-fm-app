@@ -55,7 +55,7 @@ class PerStringBenderPlugin(
 ) : DspPlugin {
 
     override val info = PluginInfo(
-        uri = "org.balch.orpheus.plugins.perstringbender",
+        uri = URI,
         name = "Per-String Bender",
         author = "Balch"
     )
@@ -76,6 +76,7 @@ class PerStringBenderPlugin(
     override val ports: List<Port> = audioPorts.ports
 
     companion object {
+        const val URI = "org.balch.orpheus.plugins.perstringbender"
         private const val NUM_STRINGS = 4
         private const val MAX_BEND_SEMITONES = 12.0 // 1 octave bend range per string
         private const val SPRING_DURATION_MS = 800
