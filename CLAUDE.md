@@ -30,6 +30,35 @@ Orpheus-FM is an 8-oscillator organismic synthesizer built with Kotlin Multiplat
 
 Tests live in `apps/composeApp/src/commonTest/`. There is no CI pipeline; tests are run locally.
 
+## Build & Test
+
+- Always run a build (`./gradlew build` or equivalent) after making multi-file changes to catch type mismatches and compilation errors before presenting work as complete.
+- After refactoring audio routing or signal paths, verify BOTH direct and effect/bus paths are working — this codebase has dual-path audio routing that is easy to partially break.
+
+## Codebase Conventions
+
+- When porting or adding new synth engines, follow the existing pattern: DSP unit class, engine enum registration, UI picker integration, and modulation wiring. Check existing engines (e.g., VirtualAnalogEngine, GranularEngine) as templates.
+- This is a Kotlin Multiplatform project — do NOT use platform-specific APIs (e.g., `isCtrlPressed`) in common source sets without expect/actual declarations.
+
+## Planning & Context
+
+- Before starting a new phase of work, ALWAYS check for existing plan documents in the repo (look for markdown files, PLAN.md, or phase documents). Do NOT ask the user what the plan is if one already exists.
+- When the user references 'Phase N' or 'P1/P2/P3' items, search the codebase for the planning document first.
+
+## Source Research
+
+- When researching external code (e.g., Mutable Instruments Plaits), check if the user has a LOCAL copy of the source before fetching from the web. Ask or search the filesystem first.
+
+## Audio/DSP Debugging
+
+- When user says a sound is 'too high', ask whether they mean pitch or volume before attempting fixes.
+- When fixing audio bugs, test the fix conceptually against ALL audio routing paths (direct output, bus/effect sends, preset loading) before declaring it fixed.
+
+## UI/Compose Guidelines
+
+- Jetpack Compose Popups and dialogs may not propagate CompositionLocals — always verify theme/state access inside Popup composables.
+- When positioning elements within a sub-region (e.g., centering a knob among 4 knobs), calculate layout relative to THAT sub-region, not the full parent panel.
+
 ## Architecture
 
 ### Module Layout
