@@ -21,6 +21,7 @@ import org.balch.orpheus.features.ai.chat.ChatDialog
 import org.balch.orpheus.features.debug.DebugBottomBar
 import org.balch.orpheus.features.debug.DebugViewModel
 import org.balch.orpheus.features.visualizations.VizViewModel
+import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
@@ -55,7 +56,8 @@ fun App(
         OrpheusTheme {
             CompositionLocalProvider(
                 LocalLiquidState provides liquidState,
-                LocalLiquidEffects provides liquidEffects
+                LocalDialogLiquidState provides dialogLiquidState,
+                LocalLiquidEffects provides liquidEffects,
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     // Wrap main content in a liquefiable box for the dialog to "see" through

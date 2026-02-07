@@ -76,6 +76,11 @@ data class VisualizationLiquidEffects(
 val LocalLiquidState = compositionLocalOf<LiquidState?> { null }
 
 /**
+ * CompositionLocal for sharing LiquidState across dialog.
+ */
+val LocalDialogLiquidState = compositionLocalOf<LiquidState?> { null }
+
+/**
  * CompositionLocal for sharing visualization-specific liquid effects across panels.
  */
 val LocalLiquidEffects = compositionLocalOf { VisualizationLiquidEffects.Default }

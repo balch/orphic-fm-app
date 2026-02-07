@@ -4,7 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -14,9 +14,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -28,10 +30,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
-import org.balch.orpheus.ui.infrastructure.LocalLiquidState
-import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
-import org.balch.orpheus.ui.infrastructure.liquidVizEffects
+import io.github.fletchmckee.liquid.liquid
+import io.github.fletchmckee.liquid.rememberLiquidState
+import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.darken
@@ -161,10 +162,7 @@ fun EnginePickerPopup(
 ) {
     val density = LocalDensity.current
     val offsetPx = with(density) { (-(PICKER_SIZE - anchorSize) / 2).roundToPx() }
-
-    // Read composition locals BEFORE Popup (Popup creates a separate composition tree)
-    val liquidState = LocalLiquidState.current
-    val effects = LocalLiquidEffects.current
+    val liquidState = LocalDialogLiquidState.current ?: rememberLiquidState()
 
     Popup(
         alignment = Alignment.TopStart,
@@ -174,159 +172,185 @@ fun EnginePickerPopup(
         Box(
             modifier = modifier
                 .size(PICKER_SIZE)
-                .liquidVizEffects(
-                    liquidState = liquidState,
-                    scope = VisualizationLiquidScope(saturation = 0.7f, contrast = 1.2f),
-                    frostAmount = effects.frostLarge.dp,
-                    color = color,
-                    tintAlpha = 0.15f,
-                    shape = CircleShape,
-                )
+                .liquid(liquidState) {
+                    frost = 4.dp
+                    saturation = .8f
+                    dispersion = 0.2f
+                    refraction = 0.5f
+                    this.shape = shape
+                    tint = OrpheusColors.midnightBlue.copy(alpha = 0.1f) // Glassier effect
+                }
                 .border(1.dp, color.copy(alpha = 0.3f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             val textMeasurer = rememberTextMeasurer()
-            val ring = config.ring
-            val segments = config.segmentCount
-            val sweep = config.sweepDeg
 
             Canvas(modifier = Modifier.size(PICKER_SIZE)) {
-                val cx = size.width / 2f
-                val cy = size.height / 2f
-                val center = Offset(cx, cy)
-                val radius = size.width / 2f
-                val ringRadius = radius * 0.72f
-                val strokeWidth = 14.dp.toPx()
-                val centerRadius = radius * 0.30f
-
-                val activeRingIdx = ring.indexOfFirst { it.ordinal == currentEngine }
-
-                // --- Ring segments ---
-                for (i in 0 until segments) {
-                    val entry = ring[i]
-                    val isHovered = hoveredSegment == i
-                    val isCurrent = i == activeRingIdx
-
-                    val arcStart = -90f + i * sweep
-                    val gap = 8f
-
-                    val arcColor = when {
-                        isHovered -> entry.color
-                        isCurrent -> entry.color.copy(alpha = 0.7f)
-                        else -> entry.color.darken(0.4f).copy(alpha = 0.4f)
-                    }
-
-                    drawArc(
-                        color = arcColor,
-                        startAngle = arcStart + gap / 2f,
-                        sweepAngle = sweep - gap,
-                        useCenter = false,
-                        topLeft = Offset(cx - ringRadius, cy - ringRadius),
-                        size = Size(ringRadius * 2, ringRadius * 2),
-                        style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
-                    )
-
-                    // Glow for hovered segment
-                    if (isHovered) {
-                        drawArc(
-                            color = entry.color.copy(alpha = 0.25f),
-                            startAngle = arcStart + gap / 2f,
-                            sweepAngle = sweep - gap,
-                            useCenter = false,
-                            topLeft = Offset(
-                                cx - ringRadius - 3.dp.toPx(),
-                                cy - ringRadius - 3.dp.toPx()
-                            ),
-                            size = Size(
-                                ringRadius * 2 + 6.dp.toPx(),
-                                ringRadius * 2 + 6.dp.toPx()
-                            ),
-                            style = Stroke(
-                                width = strokeWidth + 6.dp.toPx(),
-                                cap = StrokeCap.Round
-                            )
-                        )
-                    }
-
-                    // Label at ring center
-                    val labelAngle = arcStart + sweep / 2f
-                    val labelRad = (labelAngle * PI / 180f).toFloat()
-                    val lx = cx + ringRadius * cos(labelRad)
-                    val ly = cy + ringRadius * sin(labelRad)
-
-                    val labelStyle = TextStyle(
-                        color = when {
-                            isHovered -> Color.White
-                            isCurrent -> Color.White.copy(alpha = 0.9f)
-                            else -> Color.White.copy(alpha = 0.6f)
-                        },
-                        fontSize = 10.sp,
-                        fontWeight = if (isHovered || isCurrent) FontWeight.Bold
-                            else FontWeight.Normal,
-                    )
-                    val measured = textMeasurer.measure(entry.label, labelStyle)
-                    withTransform({
-                        translate(
-                            lx - measured.size.width / 2f,
-                            ly - measured.size.height / 2f
-                        )
-                    }) {
-                        drawText(measured)
-                    }
-                }
-
-                // --- Center ---
-                val centerHovered = hoveredSegment == -1
-                val centerIsCurrent = currentEngine == config.centerOrdinal
-                val centerHighlighted =
-                    centerHovered || (centerIsCurrent && hoveredSegment == null)
-                val cColor = if (centerHighlighted) color
-                    else color.darken(0.3f).copy(alpha = 0.5f)
-
-                drawCircle(
-                    color = cColor.copy(
-                        alpha = if (centerHighlighted) 0.25f else 0.1f
-                    ),
-                    radius = centerRadius,
-                    center = center,
-                )
-                if (centerHovered) {
-                    drawCircle(
-                        color = color.copy(alpha = 0.35f),
-                        radius = centerRadius * 0.8f,
-                        center = center
-                    )
-                    drawCircle(
-                        color = color.copy(alpha = 0.15f),
-                        radius = centerRadius,
-                        center = center
-                    )
-                }
-                drawCircle(
-                    color = cColor.copy(alpha = 0.5f),
-                    radius = centerRadius,
-                    center = center,
-                    style = Stroke(width = 1.5.dp.toPx())
-                )
-
-                val centerStyle = TextStyle(
-                    color = if (centerHighlighted) Color.White
-                        else Color.White.copy(alpha = 0.5f),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                val cm = textMeasurer.measure(config.centerLabel, centerStyle)
-                withTransform({
-                    translate(
-                        cx - cm.size.width / 2f,
-                        cy - cm.size.height / 2f
-                    )
-                }) {
-                    drawText(cm)
-                }
+                drawRings(config, currentEngine, size, hoveredSegment, textMeasurer)
+                drawCenter(config, currentEngine, size, hoveredSegment, textMeasurer, color)
             }
         }
     }
+}
+
+private fun DrawScope.drawCenter(
+    config: PickerConfig,
+    currentEngine: Int,
+    size: Size,
+    hoveredSegment: Int?,
+    textMeasurer: TextMeasurer,
+    color: Color,
+) {
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val radius = size.width / 2f
+    val center = Offset(cx, cy)
+    val centerRadius = radius * 0.30f
+
+    val centerHovered = hoveredSegment == -1
+    val centerIsCurrent = currentEngine == config.centerOrdinal
+    val centerHighlighted =
+        centerHovered || (centerIsCurrent && hoveredSegment == null)
+    val cColor = if (centerHighlighted) color
+    else color.darken(0.3f).copy(alpha = 0.5f)
+
+    drawCircle(
+        color = cColor.copy(
+            alpha = if (centerHighlighted) 0.25f else 0.1f
+        ),
+        radius = centerRadius,
+        center = center,
+    )
+    if (centerHovered) {
+        drawCircle(
+            color = color.copy(alpha = 0.35f),
+            radius = centerRadius * 0.8f,
+            center = center
+        )
+        drawCircle(
+            color = color.copy(alpha = 0.15f),
+            radius = centerRadius,
+            center = center
+        )
+    }
+    drawCircle(
+        color = cColor.copy(alpha = 0.5f),
+        radius = centerRadius,
+        center = center,
+        style = Stroke(width = 1.5.dp.toPx())
+    )
+
+    val centerStyle = TextStyle(
+        color = if (centerHighlighted) Color.White
+        else Color.White.copy(alpha = 0.5f),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+    )
+    val cm = textMeasurer.measure(config.centerLabel, centerStyle)
+    withTransform({
+        translate(
+            cx - cm.size.width / 2f,
+            cy - cm.size.height / 2f
+        )
+    }) {
+        drawText(cm)
+    }
+}
+
+private fun DrawScope.drawRings(
+    config: PickerConfig,
+    currentEngine: Int,
+    size: Size,
+    hoveredSegment: Int?,
+    textMeasurer: TextMeasurer
+) {
+    val segments = config.segmentCount
+    val sweep = config.sweepDeg
+    val ring = config.ring
+
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val radius = size.width / 2f
+    val center = Offset(cx, cy)
+    val ringRadius = radius * 0.72f
+    val strokeWidth = 14.dp.toPx()
+    val centerRadius = radius * 0.30f
+
+    val activeRingIdx = ring.indexOfFirst { it.ordinal == currentEngine }
+
+    for (i in 0 until segments) {
+        val entry = ring[i]
+        val isHovered = hoveredSegment == i
+        val isCurrent = i == activeRingIdx
+
+        val arcStart = -90f + i * sweep
+        val gap = 8f
+
+        val arcColor = when {
+            isHovered -> entry.color.copy(alpha = 0.7f)
+            isCurrent -> entry.color.copy(alpha = 0.4f)
+            else -> entry.color.darken(0.4f).copy(alpha = 0.4f)
+        }
+
+        drawArc(
+            color = arcColor,
+            startAngle = arcStart + gap / 2f,
+            sweepAngle = sweep - gap,
+            useCenter = false,
+            topLeft = Offset(cx - ringRadius, cy - ringRadius),
+            size = Size(ringRadius * 2, ringRadius * 2),
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
+        )
+
+        // Glow for hovered segment
+        if (isHovered) {
+            drawArc(
+                color = entry.color.copy(alpha = 0.25f),
+                startAngle = arcStart + gap / 2f,
+                sweepAngle = sweep - gap,
+                useCenter = false,
+                topLeft = Offset(
+                    cx - ringRadius - 3.dp.toPx(),
+                    cy - ringRadius - 3.dp.toPx()
+                ),
+                size = Size(
+                    ringRadius * 2 + 6.dp.toPx(),
+                    ringRadius * 2 + 6.dp.toPx()
+                ),
+                style = Stroke(
+                    width = strokeWidth + 6.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            )
+        }
+
+        // Label at ring center
+        val labelAngle = arcStart + sweep / 2f
+        val labelRad = (labelAngle * PI / 180f).toFloat()
+        val lx = cx + ringRadius * cos(labelRad)
+        val ly = cy + ringRadius * sin(labelRad)
+
+        val labelStyle = TextStyle(
+            color = when {
+                isHovered -> Color.White
+                isCurrent -> Color.White.copy(alpha = 0.9f)
+                else -> Color.White.copy(alpha = 0.6f)
+            },
+            fontSize = 10.sp,
+            fontWeight = if (isHovered || isCurrent) FontWeight.Bold
+            else FontWeight.Normal,
+        )
+        val measured = textMeasurer.measure(entry.label, labelStyle)
+        withTransform({
+            translate(
+                lx - measured.size.width / 2f,
+                ly - measured.size.height / 2f
+            )
+        }) {
+            drawText(measured)
+        }
+    }
+
 }
 
 @Preview
@@ -336,8 +360,9 @@ private fun EnginePickerPopupPreview() {
         Box(
             modifier = Modifier
                 .size(200.dp)
-                .background(OrpheusColors.panelBackground)
-                .padding(20.dp),
+                .background(OrpheusColors.blackHoleBackground)
+                .offset(100.dp, 100.dp),
+
             contentAlignment = Alignment.Center
         ) {
             EnginePickerPopup(
