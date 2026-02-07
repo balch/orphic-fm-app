@@ -252,4 +252,12 @@ object OrpheusColors {
     val warpsGreen = Color(0xFF90EE90)           // Primary Warps Green
     val warpsYellow = Color(0xFFFFFF00)          // Bright Yellow for accents
     val warpsDarkGreen = Color(0xFF2E4D2E)       // Darker green for backgrounds
+
+    // Engine Picker Colors
+    val enginePurple = Color(0xFFBA68C8)         // Waveshaping
+    val engineRed = Color(0xFFE57373)            // Virtual Analog
+    val engineBlue = Color(0xFF64B5F6)           // Additive
+    val engineGreen = Color(0xFF81C784)          // Grain
+    val engineYellow = Color(0xFFFFD54F)         // String
+    val engineOrange = Color(0xFFFF8A65)         // Modal
 }

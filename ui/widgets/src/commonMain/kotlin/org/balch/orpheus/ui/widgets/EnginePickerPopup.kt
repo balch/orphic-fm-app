@@ -62,12 +62,14 @@ data class PickerConfig(
 
 val VOICE_PICKER_CONFIG = PickerConfig(
     ring = listOf(
-        PickerEntry("BD",  1, OrpheusColors.neonMagenta),
-        PickerEntry("SD",  2, OrpheusColors.electricBlue),
-        PickerEntry("HH",  3, OrpheusColors.synthGreen),
         PickerEntry("FM",  5, OrpheusColors.warmGlow),
         PickerEntry("NSE", 6, OrpheusColors.neonCyan),
-        PickerEntry("WSH", 7, Color(0xFFBA68C8)),
+        PickerEntry("WSH", 7, OrpheusColors.enginePurple),
+        PickerEntry("VA",  8, OrpheusColors.engineRed),
+        PickerEntry("ADD", 9, OrpheusColors.engineBlue),
+        PickerEntry("GRN", 10, OrpheusColors.engineGreen),
+        PickerEntry("STR", 11, OrpheusColors.engineYellow),
+        PickerEntry("MOD", 12, OrpheusColors.engineOrange),
     ),
     centerLabel = "OSC",
     centerOrdinal = 0,
@@ -79,9 +81,15 @@ private val DRUM_RING = listOf(
     PickerEntry("BD",  0, OrpheusColors.neonMagenta),
     PickerEntry("SD",  1, OrpheusColors.electricBlue),
     PickerEntry("HH",  2, OrpheusColors.synthGreen),
-    PickerEntry("FM",  4, OrpheusColors.warmGlow),
+    PickerEntry("FM",  3, OrpheusColors.warmGlow),
+    PickerEntry("FM2", 4, OrpheusColors.presetOrange),
     PickerEntry("NSE", 5, OrpheusColors.neonCyan),
-    PickerEntry("WSH", 6, Color(0xFFBA68C8)),
+    PickerEntry("WSH", 6, OrpheusColors.enginePurple),
+    PickerEntry("VA",  7, OrpheusColors.engineRed),
+    PickerEntry("ADD", 8, OrpheusColors.engineBlue),
+    PickerEntry("GRN", 9, OrpheusColors.engineGreen),
+    PickerEntry("STR", 10, OrpheusColors.engineYellow),
+    PickerEntry("MOD", 11, OrpheusColors.engineOrange),
 )
 
 /** Drum picker with BD as center default. */
@@ -126,15 +134,17 @@ fun pickerSegmentToOrdinal(segment: Int, config: PickerConfig = VOICE_PICKER_CON
 
 /** Maps a voice engine ordinal to its short display label. */
 fun engineLabel(ordinal: Int): String = when (ordinal) {
-    0 -> "OSC"; 1 -> "BD"; 2 -> "SD"; 3 -> "HH"
+    0 -> "OSC"
     5 -> "FM"; 6 -> "NSE"; 7 -> "WSH"
+    8 -> "VA"; 9 -> "ADD"; 10 -> "GRN"; 11 -> "STR"; 12 -> "MOD"
     else -> "?"
 }
 
 /** Maps a drum engine ordinal (PlaitsEngineId) to its short display label. */
 fun drumEngineLabel(ordinal: Int): String = when (ordinal) {
-    0 -> "BD"; 1 -> "SD"; 2 -> "HH"
-    4 -> "FM"; 5 -> "NSE"; 6 -> "WSH"
+    0 -> "BD"; 1 -> "SD"; 2 -> "HH"; 3 -> "FM"
+    4 -> "FM2"; 5 -> "NSE"; 6 -> "WSH"
+    7 -> "VA"; 8 -> "ADD"; 9 -> "GRN"; 10 -> "STR"; 11 -> "MOD"
     else -> "?"
 }
 

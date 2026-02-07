@@ -22,7 +22,7 @@ class ModalEngine : PlaitsEngine {
     override val id = PlaitsEngineId.MODAL
     override val displayName = id.displayName
     override val alreadyEnveloped = true
-    override val outGain = 0.5f
+    override val outGain = 0.3f
 
     private val voice = ModalVoice()
     private val tempBuffer = FloatArray(MAX_BLOCK_SIZE)
