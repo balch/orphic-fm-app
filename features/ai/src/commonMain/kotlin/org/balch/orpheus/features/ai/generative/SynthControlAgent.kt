@@ -45,6 +45,9 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
+import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
+import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.features.ai.CompositionType
 import org.balch.orpheus.features.ai.tools.ReplExecuteArgs
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
@@ -284,12 +287,12 @@ class SynthControlAgent(
                     .filter { it.origin == ControlEventOrigin.UI }
                     .map { event ->
                         when {
-                            event.controlId == "drive" -> "Drive: ${event.value.format(2)}"
-                            event.controlId == "distortion_mix" -> "Distortion: ${event.value.format(2)}"
-                            event.controlId == "delay_mix" -> "Delay Mix: ${event.value.format(2)}"
-                            event.controlId == "delay_feedback" -> "Delay FB: ${event.value.format(2)}"
-                            event.controlId.startsWith("quad_") && event.controlId.endsWith("_pitch") -> "Quad Pitches"
-                            event.controlId.startsWith("quad_") && event.controlId.endsWith("_hold") -> "Quad Holds"
+                            event.controlId == DistortionSymbol.DRIVE.controlId.key -> "Drive: ${event.value.format(2)}"
+                            event.controlId == DistortionSymbol.MIX.controlId.key -> "Distortion: ${event.value.format(2)}"
+                            event.controlId == DelaySymbol.MIX.controlId.key -> "Delay Mix: ${event.value.format(2)}"
+                            event.controlId == DelaySymbol.FEEDBACK.controlId.key -> "Delay FB: ${event.value.format(2)}"
+                            event.controlId.startsWith(VOICE_URI) && event.controlId.contains("quad_pitch") -> "Quad Pitches"
+                            event.controlId.startsWith(VOICE_URI) && event.controlId.contains("quad_hold") -> "Quad Holds"
                             else -> null
                         }
                     }

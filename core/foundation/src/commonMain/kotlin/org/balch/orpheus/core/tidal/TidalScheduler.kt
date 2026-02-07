@@ -23,6 +23,13 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.plugin.PluginControlId
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
+import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
+import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
+import org.balch.orpheus.core.plugin.symbols.StereoSymbol
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.tempo.GlobalTempo
 import kotlin.math.pow
 
@@ -207,32 +214,22 @@ class TidalScheduler(
         }
         
         // Reset all holds to 0 for the 8 main voices
+        // Per-voice hold has no PluginControlId — use engine directly
         for (i in 0 until 8) {
             synthEngine.setVoiceHold(i, 0f)
-            synthController.emitControlChange("voice_${i}_hold", 0f, ControlEventOrigin.TIDAL)
         }
-        
+
         // Reset quad holds
         for (i in 0 until 3) {
-            synthEngine.setQuadHold(i, 0f)
-            synthController.emitControlChange("quad_${i}_hold", 0f, ControlEventOrigin.TIDAL)
+            synthController.setPluginControl(VoiceSymbol.quadHold(i).controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
         }
-        
+
         // Reset global effects to prevent "static tone"
-        synthEngine.setDrive(0f)
-        synthController.emitControlChange("drive", 0f, ControlEventOrigin.TIDAL)
-        
-        synthEngine.setDistortionMix(0f)
-        synthController.emitControlChange("distortion_mix", 0f, ControlEventOrigin.TIDAL)
-        
-        synthEngine.setVibrato(0f)
-        synthController.emitControlChange("vibrato", 0f, ControlEventOrigin.TIDAL)
-        
-        synthEngine.setDelayFeedback(0f)
-        synthController.emitControlChange("delay_feedback", 0f, ControlEventOrigin.TIDAL)
-        
-        synthEngine.setDelayMix(0f)
-        synthController.emitControlChange("delay_mix", 0f, ControlEventOrigin.TIDAL)
+        synthController.setPluginControl(DistortionSymbol.DRIVE.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
+        synthController.setPluginControl(DistortionSymbol.MIX.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
+        synthController.setPluginControl(VoiceSymbol.VIBRATO.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
+        synthController.setPluginControl(DelaySymbol.FEEDBACK.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
+        synthController.setPluginControl(DelaySymbol.MIX.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
         
         _state.value = _state.value.copy(isPlaying = false)
     }
@@ -540,138 +537,138 @@ class TidalScheduler(
             is TidalEvent.Sample -> { /* Handled by scheduleAudioEvents */ }
             
             is TidalEvent.VoiceTune -> {
-                synthController.emitControlChange(
-                    "voice_${event.voiceIndex}_tune",
-                    event.tune,
+                synthController.setPluginControl(
+                    VoiceSymbol.tune(event.voiceIndex).controlId,
+                    PortValue.FloatValue(event.tune),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setVoiceTune(event.voiceIndex, event.tune)
             }
-            
+
             is TidalEvent.VoiceHold -> {
-                synthController.emitControlChange(
-                    "voice_${event.voiceIndex}_hold",
-                    event.amount,
-                    ControlEventOrigin.TIDAL
-                )
+                // Per-voice hold has no PluginControlId — use engine directly
                 synthEngine.setVoiceHold(event.voiceIndex, event.amount)
             }
-            
+
             is TidalEvent.QuadPitch -> {
-                synthController.emitControlChange(
-                    "quad_${event.quadIndex}_pitch",
-                    event.pitch,
+                synthController.setPluginControl(
+                    VoiceSymbol.quadPitch(event.quadIndex).controlId,
+                    PortValue.FloatValue(event.pitch),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setQuadPitch(event.quadIndex, event.pitch)
             }
-            
+
             is TidalEvent.QuadHold -> {
-                synthController.emitControlChange(
-                    "quad_${event.quadIndex}_hold",
-                    event.amount,
+                synthController.setPluginControl(
+                    VoiceSymbol.quadHold(event.quadIndex).controlId,
+                    PortValue.FloatValue(event.amount),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setQuadHold(event.quadIndex, event.amount)
             }
-            
+
             is TidalEvent.DelayTime -> {
-                synthController.emitControlChange(
-                    "delay_${event.delayIndex}_time",
-                    event.time,
+                val symbol = if (event.delayIndex == 0) DelaySymbol.TIME_1 else DelaySymbol.TIME_2
+                synthController.setPluginControl(
+                    symbol.controlId,
+                    PortValue.FloatValue(event.time),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setDelayTime(event.delayIndex, event.time)
             }
-            
+
             is TidalEvent.DelayFeedback -> {
-                synthController.emitControlChange(
-                    "delay_feedback",
-                    event.amount,
+                synthController.setPluginControl(
+                    DelaySymbol.FEEDBACK.controlId,
+                    PortValue.FloatValue(event.amount),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setDelayFeedback(event.amount)
             }
-            
+
             is TidalEvent.DelayMix -> {
-                synthController.emitControlChange(
-                    "delay_mix",
-                    event.amount,
+                synthController.setPluginControl(
+                    DelaySymbol.MIX.controlId,
+                    PortValue.FloatValue(event.amount),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setDelayMix(event.amount)
             }
-            
+
             is TidalEvent.LfoFreq -> {
-                synthController.emitControlChange(
-                    "lfo_${event.lfoIndex}_freq",
-                    event.frequency,
+                val symbol = if (event.lfoIndex == 0) DuoLfoSymbol.FREQ_A else DuoLfoSymbol.FREQ_B
+                synthController.setPluginControl(
+                    symbol.controlId,
+                    PortValue.FloatValue(event.frequency),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setHyperLfoFreq(event.lfoIndex, event.frequency)
             }
-            
+
             is TidalEvent.Drive -> {
-                synthController.emitControlChange(
-                    "drive",
-                    event.amount,
+                synthController.setPluginControl(
+                    DistortionSymbol.DRIVE.controlId,
+                    PortValue.FloatValue(event.amount),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setDrive(event.amount)
             }
-            
+
             is TidalEvent.DistortionMix -> {
-                synthController.emitControlChange(
-                    "distortion_mix",
-                    event.amount,
+                synthController.setPluginControl(
+                    DistortionSymbol.MIX.controlId,
+                    PortValue.FloatValue(event.amount),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setDistortionMix(event.amount)
             }
-            
+
             is TidalEvent.Vibrato -> {
-                synthController.emitControlChange(
-                    "vibrato",
-                    event.amount,
+                synthController.setPluginControl(
+                    VoiceSymbol.VIBRATO.controlId,
+                    PortValue.FloatValue(event.amount),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setVibrato(event.amount)
             }
-            
+
             is TidalEvent.VoicePan -> {
-                synthEngine.setVoicePan(event.voiceIndex, event.pan)
-            }
-            
-            is TidalEvent.VoiceEnvSpeed -> {
-                synthController.emitControlChange(
-                    "voice_${event.voiceIndex}_env_speed",
-                    event.speed,
+                synthController.setPluginControl(
+                    StereoSymbol.entries[StereoSymbol.VOICE_PAN_0.ordinal + event.voiceIndex].controlId,
+                    PortValue.FloatValue(event.pan),
                     ControlEventOrigin.TIDAL
                 )
-                synthEngine.setVoiceEnvelopeSpeed(event.voiceIndex, event.speed)
             }
-            
+
+            is TidalEvent.VoiceEnvSpeed -> {
+                synthController.setPluginControl(
+                    VoiceSymbol.envSpeed(event.voiceIndex).controlId,
+                    PortValue.FloatValue(event.speed),
+                    ControlEventOrigin.TIDAL
+                )
+            }
+
             is TidalEvent.DuoMod -> {
                 val modSource = when (event.source.lowercase()) {
                     "fm" -> org.balch.orpheus.core.audio.ModSource.VOICE_FM
                     "lfo" -> org.balch.orpheus.core.audio.ModSource.LFO
                     else -> org.balch.orpheus.core.audio.ModSource.OFF
                 }
-                synthEngine.setDuoModSource(event.duoIndex, modSource)
-            }
-            
-            is TidalEvent.PairSharp -> {
-                synthEngine.setPairSharpness(event.pairIndex, event.sharpness)
-            }
-            
-            is TidalEvent.Control -> {
-                synthController.emitControlChange(
-                    event.controlId,
-                    event.value,
+                synthController.setPluginControl(
+                    VoiceSymbol.duoModSource(event.duoIndex).controlId,
+                    PortValue.IntValue(modSource.ordinal),
                     ControlEventOrigin.TIDAL
                 )
-                // We don't call engine directly here as we don't know the mapping,
-                // the ViewModels or SynthControllerPlugins will handle it.
+            }
+
+            is TidalEvent.PairSharp -> {
+                synthController.setPluginControl(
+                    VoiceSymbol.pairSharpness(event.pairIndex).controlId,
+                    PortValue.FloatValue(event.sharpness),
+                    ControlEventOrigin.TIDAL
+                )
+            }
+
+            is TidalEvent.Control -> {
+                // Try to parse as a PluginControlId key (e.g., "org.balch.orpheus.plugins.voice:tune_0")
+                val pluginId = PluginControlId.parse(event.controlId)
+                if (pluginId != null) {
+                    synthController.setPluginControl(pluginId, PortValue.FloatValue(event.value), ControlEventOrigin.TIDAL)
+                } else {
+                    // Legacy fallback for unrecognized control IDs
+                    synthController.emitControlChange(event.controlId, event.value, ControlEventOrigin.TIDAL)
+                }
             }
         }
     }

@@ -10,42 +10,51 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.plugin.PluginControlId
+import org.balch.orpheus.core.plugin.PortSymbol
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
+import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
+import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
+import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
+import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
 
 @Serializable
 data class SynthControlArgs(
     @property:LLMDescription("""
         Control ID for the synth parameter. Valid controls include:
-        
+
         GLOBAL: VIBRATO, DRIVE, DISTORTION_MIX, VOICE_COUPLING, TOTAL_FEEDBACK
-        
+
         VOICES (1-8): VOICE_TUNE_1..8, VOICE_FM_DEPTH_1..8, VOICE_ENV_SPEED_1..8
-        
+
         QUADS: QUAD_PITCH_1..3, QUAD_HOLD_1..3, QUAD_VOLUME_1..3
-        
+
         PAIRS: DUO_MOD_SOURCE_1..4, PAIR_SHARPNESS_1..4
-        
+
         LFO: HYPER_LFO_A, HYPER_LFO_B, HYPER_LFO_MODE, HYPER_LFO_LINK
-        
+
         DELAY: DELAY_TIME_1/2, DELAY_MOD_1/2, DELAY_FEEDBACK, DELAY_MIX, DELAY_MOD_SOURCE, DELAY_LFO_WAVEFORM
-        
+
         RESONATOR: RESONATOR_MODE, RESONATOR_STRUCTURE, RESONATOR_BRIGHTNESS, RESONATOR_DAMPING, RESONATOR_POSITION, RESONATOR_MIX
-        
+
         MATRIX (Warps Cross-Modulation):
         - MATRIX_ALGORITHM: 0.0-0.875 in 0.125 steps (Crossfade, Fold, Ring Mod, XOR, Comparator, Vocoder, Chebyshev, Freq Shift)
         - MATRIX_TIMBRE: Algorithm-specific tone (0-1)
         - MATRIX_CARRIER_LEVEL, MATRIX_MODULATOR_LEVEL: Input volumes (0-1)
         - MATRIX_CARRIER_SOURCE, MATRIX_MODULATOR_SOURCE: Audio routing (0=Synth, 0.5=Drums, 1=REPL)
         - MATRIX_MIX: Dry/wet blend (0=bypass, 1=fully processed)
-        
+
         BENDER: Special pitch bend control (-1.0 to +1.0)
-        
+
         Use uppercase names (e.g., MATRIX_ALGORITHM, VOICE_TUNE_1).
     """)
     val controlId: String,
-    
+
     @property:LLMDescription("""
         Value for the control parameter (0.0 to 1.0, except BENDER which uses -1.0 to +1.0).
-        
+
         Special cases:
         - MATRIX_ALGORITHM: 0.0=Crossfade, 0.125=Fold, 0.25=RingMod, 0.375=XOR, 0.5=Comparator, 0.625=Vocoder, 0.75=Chebyshev, 0.875=FreqShift
         - MATRIX_*_SOURCE: 0=Synth, 0.5=Drums, 1=REPL patterns
@@ -63,23 +72,23 @@ data class SynthControlResult(val success: Boolean, val message: String)
 /**
  * Tool for controlling synth parameters via the SynthController.
  * Uses linear ramping for smooth transitions when AI changes values.
- * 
+ *
  * ## Tuning Voices to Musical Notes
- * 
+ *
  * VOICE_TUNE_1 through VOICE_TUNE_12 control voice pitch using a 0.0-1.0 range.
- * 
+ *
  * **Base Frequency Formula:**
  * `frequency = 55Hz × 2^(tune × 4)`
- * 
+ *
  * **Key Values:**
  * - 0.0 = A1 (55 Hz)
  * - 0.5 = A3 (220 Hz) ← "Unity" point
  * - 1.0 = A5 (880 Hz)
- * 
+ *
  * **Semitone Calculation:**
  * To tune to a specific note relative to A3 (at tune=0.5):
  * `tuneValue = 0.5 + (semitones / 48.0)`
- * 
+ *
  * **Common Musical Notes (relative to A3):**
  * - A3 (unity) = 0.500
  * - B3 (+2 semi) = 0.542
@@ -90,14 +99,14 @@ data class SynthControlResult(val success: Boolean, val message: String)
  * - G4 (+10 semi) = 0.708
  * - A4 (+12 semi) = 0.750
  * - C5 (+15 semi) = 0.812
- * 
+ *
  * **Voice Pitch Multipliers:**
  * Each voice has a built-in pitch multiplier:
  * - Voices 1-2: 0.5× (one octave lower)
  * - Voices 3-6: 1.0× (as calculated)
  * - Voices 7-8: 2.0× (one octave higher)
  * - Voices 9-12: 1.0× (as calculated)
- * 
+ *
  * So voices 7-8 at tune=0.5 play A4 (440Hz, concert pitch).
  */
 @ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
@@ -112,13 +121,13 @@ class SynthControlTool @Inject constructor(
         Use this to adjust the sound based on user requests.
         Values should be between 0.0 and 1.0 (except BENDER which uses -1.0 to +1.0).
         For DUO_MOD_SOURCE: 0.0=VoiceFM, 0.5=Off, 1.0=LFO.
-        
+
         VOICE TUNING TO MUSICAL NOTES:
         VOICE_TUNE uses 0.0-1.0 where 0.5 = A3 (220Hz).
         To tune to other notes: tuneValue = 0.5 + (semitones from A3 / 48.0)
         Common notes: C4=0.562, D4=0.604, E4=0.646, F4=0.667, G4=0.708, A4=0.750
         Note: Voices 7-8 have 2x pitch multiplier, so at 0.5 they play A4 (440Hz concert pitch).
-        
+
         BENDER SPECIAL CONTROL:
         The BENDER creates expressive pitch glides with a spring-loaded feel. Perfect for:
         - Whale song effects: Slow sweeps from 0.0 to ±0.3 with gradual return to center
@@ -126,7 +135,7 @@ class SynthControlTool @Inject constructor(
         - Sirens: Oscillate between -0.5 and +0.5 at varying speeds
         - Tension/release: Pull to extreme (+1.0 or -1.0), hold, then release to 0.0 for spring sound
         Use BENDER when you want to create organic, gliding pitch movements.
-        
+
         RESONATOR (Rings Physical Modeling):
         Physical modeling resonator ported from Mutable Instruments Rings.
         Perfect for adding metallic, string-like, or bell tones to your sound:
@@ -136,20 +145,20 @@ class SynthControlTool @Inject constructor(
         - RESONATOR_DAMPING: Decay time (0=long sustain, 1=quick decay)
         - RESONATOR_POSITION: Excitation point (0=edge, 0.5=center, 1=opposite edge)
         - RESONATOR_MIX: Dry/wet blend (0=dry/off, 1=fully resonated)
-        
+
         RESONATOR SOUND DESIGN TIPS:
         - Modal mode: Bell-like tones, struck metal/glass character
         - String mode: Plucked guitar/harp sounds with realistic decay
         - Sympathetic: Sitar-like with drone strings that ring in sympathy
         - Low structure + high brightness = shimmering, crystalline
         - High structure + low brightness = deep, gong-like rumble
-        
+
         ⚠️ RESONATOR MODE CHANGE PROCEDURE:
         1. Lower RESONATOR_MIX to 0.1 first (avoids jarring transition)
         2. Change RESONATOR_MODE
         3. Slowly ramp RESONATOR_MIX back to desired level
         Avoid sustained high brightness + high structure (causes listener fatigue).
-        
+
         MATRIX (Meta-Modulator):
         Signal routing and cross-modulation matrix ported from Mutable Instruments Warps (Parasites firmware).
         Cross-modulates carrier and modulator signals using 8 different algorithms:
@@ -168,7 +177,7 @@ class SynthControlTool @Inject constructor(
         - MATRIX_CARRIER_SOURCE: Carrier audio source (0=Synth, 0.5=Drums, 1=REPL)
         - MATRIX_MODULATOR_SOURCE: Modulator audio source (0=Synth, 0.5=Drums, 1=REPL)
         - MATRIX_MIX: Dry/wet blend (0=dry/bypass, 1=fully processed)
-        
+
         MATRIX SOUND DESIGN TIPS:
         - Crossfade: Use for smooth transitions between sources
         - Cross-folding: Creates rich harmonics, great for aggressive sounds
@@ -181,151 +190,150 @@ class SynthControlTool @Inject constructor(
     """.trimIndent()
 ) {
     // Track current values for each control to enable smooth ramping
-    private val currentValues = mutableMapOf<String, Float>()
-    
+    private val currentValues = mutableMapOf<PluginControlId, Float>()
+
     // Ramp configuration: 500ms over ~25 steps = 20ms per step
     private val rampDurationMs = 500L
     private val rampSteps = 25
+
+    /**
+     * Resolve a friendly AI control name to its PortSymbol.
+     * Returns null for special controls (BENDER) or unknown IDs.
+     */
+    private fun resolvePortSymbol(id: String): PortSymbol? = when (id) {
+        // Global
+        "VIBRATO" -> VoiceSymbol.VIBRATO
+        "DRIVE" -> DistortionSymbol.DRIVE
+        "DISTORTION_MIX" -> DistortionSymbol.MIX
+        "VOICE_COUPLING" -> VoiceSymbol.COUPLING
+        "TOTAL_FEEDBACK" -> VoiceSymbol.TOTAL_FEEDBACK
+
+        // Quad controls (1-indexed AI → 0-indexed symbol)
+        "QUAD_PITCH_1" -> VoiceSymbol.quadPitch(0)
+        "QUAD_PITCH_2" -> VoiceSymbol.quadPitch(1)
+        "QUAD_PITCH_3" -> VoiceSymbol.quadPitch(2)
+        "QUAD_HOLD_1" -> VoiceSymbol.quadHold(0)
+        "QUAD_HOLD_2" -> VoiceSymbol.quadHold(1)
+        "QUAD_HOLD_3" -> VoiceSymbol.quadHold(2)
+        "QUAD_VOLUME_1" -> VoiceSymbol.quadVolume(0)
+        "QUAD_VOLUME_2" -> VoiceSymbol.quadVolume(1)
+        "QUAD_VOLUME_3" -> VoiceSymbol.quadVolume(2)
+
+        // Duo mod sources (1-indexed → 0-indexed)
+        "DUO_MOD_SOURCE_1" -> VoiceSymbol.duoModSource(0)
+        "DUO_MOD_SOURCE_2" -> VoiceSymbol.duoModSource(1)
+        "DUO_MOD_SOURCE_3" -> VoiceSymbol.duoModSource(2)
+        "DUO_MOD_SOURCE_4" -> VoiceSymbol.duoModSource(3)
+        "DUO_MOD_SOURCE_5" -> VoiceSymbol.duoModSource(4)
+        "DUO_MOD_SOURCE_6" -> VoiceSymbol.duoModSource(5)
+
+        // Pair sharpness (1-indexed → 0-indexed)
+        "PAIR_SHARPNESS_1" -> VoiceSymbol.pairSharpness(0)
+        "PAIR_SHARPNESS_2" -> VoiceSymbol.pairSharpness(1)
+        "PAIR_SHARPNESS_3" -> VoiceSymbol.pairSharpness(2)
+        "PAIR_SHARPNESS_4" -> VoiceSymbol.pairSharpness(3)
+        "PAIR_SHARPNESS_5" -> VoiceSymbol.pairSharpness(4)
+        "PAIR_SHARPNESS_6" -> VoiceSymbol.pairSharpness(5)
+
+        // LFO controls
+        "HYPER_LFO_A", "LFO_A" -> DuoLfoSymbol.FREQ_A
+        "HYPER_LFO_B", "LFO_B" -> DuoLfoSymbol.FREQ_B
+        "HYPER_LFO_MODE" -> DuoLfoSymbol.MODE
+        "HYPER_LFO_LINK" -> DuoLfoSymbol.LINK
+
+        // Delay controls
+        "DELAY_TIME_1" -> DelaySymbol.TIME_1
+        "DELAY_TIME_2" -> DelaySymbol.TIME_2
+        "DELAY_MOD_1" -> DelaySymbol.MOD_DEPTH_1
+        "DELAY_MOD_2" -> DelaySymbol.MOD_DEPTH_2
+        "DELAY_FEEDBACK" -> DelaySymbol.FEEDBACK
+        "DELAY_MIX" -> DelaySymbol.MIX
+        "DELAY_MOD_SOURCE" -> DelaySymbol.MOD_SOURCE
+        "DELAY_LFO_WAVEFORM" -> DelaySymbol.LFO_WAVEFORM
+
+        // Resonator (Rings) controls
+        "RESONATOR_MODE" -> ResonatorSymbol.MODE
+        "RESONATOR_STRUCTURE" -> ResonatorSymbol.STRUCTURE
+        "RESONATOR_BRIGHTNESS" -> ResonatorSymbol.BRIGHTNESS
+        "RESONATOR_DAMPING" -> ResonatorSymbol.DAMPING
+        "RESONATOR_POSITION" -> ResonatorSymbol.POSITION
+        "RESONATOR_MIX" -> ResonatorSymbol.MIX
+
+        // Warps (Meta-Modulator) controls — aliased as MATRIX for AI
+        "MATRIX_ALGORITHM", "WARPS_ALGORITHM" -> WarpsSymbol.ALGORITHM
+        "MATRIX_TIMBRE", "WARPS_TIMBRE" -> WarpsSymbol.TIMBRE
+        "MATRIX_CARRIER_LEVEL", "WARPS_CARRIER_LEVEL" -> WarpsSymbol.LEVEL1
+        "MATRIX_MODULATOR_LEVEL", "WARPS_MODULATOR_LEVEL" -> WarpsSymbol.LEVEL2
+        "MATRIX_CARRIER_SOURCE", "WARPS_CARRIER_SOURCE" -> WarpsSymbol.CARRIER_SOURCE
+        "MATRIX_MODULATOR_SOURCE", "WARPS_MODULATOR_SOURCE" -> WarpsSymbol.MODULATOR_SOURCE
+        "MATRIX_MIX", "WARPS_MIX" -> WarpsSymbol.MIX
+
+        // Per-voice controls (VOICE_TUNE_1 through VOICE_TUNE_12, etc.)
+        else -> {
+            val voiceTuneMatch = Regex("VOICE_TUNE_(\\d+)").find(id)
+            val voiceFmMatch = Regex("VOICE_FM_DEPTH_(\\d+)").find(id)
+            val voiceEnvMatch = Regex("VOICE_ENV_SPEED_(\\d+)").find(id)
+
+            when {
+                voiceTuneMatch != null -> {
+                    val idx = voiceTuneMatch.groupValues[1].toInt() - 1
+                    VoiceSymbol.tune(idx)
+                }
+                voiceFmMatch != null -> {
+                    val idx = voiceFmMatch.groupValues[1].toInt() - 1
+                    VoiceSymbol.modDepth(idx)
+                }
+                voiceEnvMatch != null -> {
+                    val idx = voiceEnvMatch.groupValues[1].toInt() - 1
+                    VoiceSymbol.envSpeed(idx)
+                }
+                else -> null
+            }
+        }
+    }
 
     override suspend fun execute(args: SynthControlArgs): SynthControlResult {
         // Special handling for BENDER - uses -1 to +1 range
         if (args.controlId.uppercase() == "BENDER") {
             return executeBend(args.value)
         }
-        
+
         val normalizedValue = args.value.coerceIn(0f, 1f)
-        
-        // Map friendly aliases to actual system IDs (which are lowercase)
-        val targetId = when (val id = args.controlId.uppercase()) {
-            // Quad controls
-            "QUAD_PITCH_1" -> "quad_0_pitch"
-            "QUAD_PITCH_2" -> "quad_1_pitch"
-            "QUAD_PITCH_3" -> "quad_2_pitch"
-            "QUAD_HOLD_1" -> "quad_0_hold"
-            "QUAD_HOLD_2" -> "quad_1_hold"
-            "QUAD_HOLD_3" -> "quad_2_hold"
 
-            "QUAD_VOLUME_1" -> "quad_0_volume"
-            "QUAD_VOLUME_2" -> "quad_1_volume"
-            "QUAD_VOLUME_3" -> "quad_2_volume"
-            
-            // Duo mod sources
-            "DUO_MOD_SOURCE_1" -> "pair_0_mod_source"
-            "DUO_MOD_SOURCE_2" -> "pair_1_mod_source"
-            "DUO_MOD_SOURCE_3" -> "pair_2_mod_source"
-            "DUO_MOD_SOURCE_4" -> "pair_3_mod_source"
-            "DUO_MOD_SOURCE_5" -> "pair_4_mod_source"
-            "DUO_MOD_SOURCE_6" -> "pair_5_mod_source"
-            
-            // Pair sharpness
-            "PAIR_SHARPNESS_1" -> "pair_0_sharpness"
-            "PAIR_SHARPNESS_2" -> "pair_1_sharpness"
-            "PAIR_SHARPNESS_3" -> "pair_2_sharpness"
-            "PAIR_SHARPNESS_4" -> "pair_3_sharpness"
-            "PAIR_SHARPNESS_5" -> "pair_4_sharpness"
-            "PAIR_SHARPNESS_6" -> "pair_5_sharpness"
+        val portSymbol = resolvePortSymbol(args.controlId.uppercase())
+            ?: return SynthControlResult(
+                success = false,
+                message = "Unknown control: ${args.controlId}"
+            )
 
-            // LFO controls - use ControlIds constants
-            "HYPER_LFO_A", "LFO_A" -> "hyper_lfo_a"
-            "HYPER_LFO_B", "LFO_B" -> "hyper_lfo_b"
-            "HYPER_LFO_MODE" -> "hyper_lfo_mode"
-            "HYPER_LFO_LINK" -> "hyper_lfo_link"
-            
-            // Delay controls - use ControlIds constants
-            "DELAY_TIME_1" -> "delay_time_1"
-            "DELAY_TIME_2" -> "delay_time_2"
-            "DELAY_MOD_1" -> "delay_mod_1"
-            "DELAY_MOD_2" -> "delay_mod_2"
-            "DELAY_MOD_SOURCE" -> "delay_mod_source"
-            "DELAY_LFO_WAVEFORM" -> "delay_lfo_waveform"
-
-            // Drum controls
-            "DRUM_BD_FREQ" -> "drum_bd_freq"
-            "DRUM_BD_TONE" -> "drum_bd_tone"
-            "DRUM_BD_DECAY" -> "drum_bd_decay"
-            "DRUM_BD_AFM", "DRUM_BD_ATTACK_FM" -> "drum_bd_afm"
-            "DRUM_BD_SFM", "DRUM_BD_SELF_FM" -> "drum_bd_sfm"
-            "DRUM_BD_TRIGGER" -> "drum_bd_trigger"
-
-            "DRUM_SD_FREQ" -> "drum_sd_freq"
-            "DRUM_SD_TONE" -> "drum_sd_tone"
-            "DRUM_SD_DECAY" -> "drum_sd_decay"
-            "DRUM_SD_SNAPPY", "DRUM_SD_SNAPPINESS" -> "drum_sd_snappy"
-            "DRUM_SD_TRIGGER" -> "drum_sd_trigger"
-
-            "DRUM_HH_FREQ" -> "drum_hh_freq"
-            "DRUM_HH_TONE" -> "drum_hh_tone"
-            "DRUM_HH_DECAY" -> "drum_hh_decay"
-            "DRUM_HH_NOISY", "DRUM_HH_NOISINESS" -> "drum_hh_noisy"
-            "DRUM_HH_TRIGGER" -> "drum_hh_trigger"
-            
-            // Resonator (Rings) controls
-            "RESONATOR_MODE" -> "resonator_mode"
-            "RESONATOR_STRUCTURE" -> "resonator_structure"
-            "RESONATOR_BRIGHTNESS" -> "resonator_brightness"
-            "RESONATOR_DAMPING" -> "resonator_damping"
-            "RESONATOR_POSITION" -> "resonator_position"
-            "RESONATOR_MIX" -> "resonator_mix"
-            
-            // Warps (Meta-Modulator) controls - aliased as MATRIX for AI
-            "MATRIX_ALGORITHM", "WARPS_ALGORITHM" -> "warps_algorithm"
-            "MATRIX_TIMBRE", "WARPS_TIMBRE" -> "warps_timbre"
-            "MATRIX_CARRIER_LEVEL", "WARPS_CARRIER_LEVEL" -> "warps_carrier_level"
-            "MATRIX_MODULATOR_LEVEL", "WARPS_MODULATOR_LEVEL" -> "warps_modulator_level"
-            "MATRIX_CARRIER_SOURCE", "WARPS_CARRIER_SOURCE" -> "warps_carrier_source"
-            "MATRIX_MODULATOR_SOURCE", "WARPS_MODULATOR_SOURCE" -> "warps_modulator_source"
-            "MATRIX_MIX", "WARPS_MIX" -> "warps_mix"
-            
-            // Per-voice controls (VOICE_TUNE_1 through VOICE_TUNE_12, etc.)
-            else -> {
-                val voiceTuneMatch = Regex("VOICE_TUNE_(\\d+)").find(id)
-                val voiceFmMatch = Regex("VOICE_FM_DEPTH_(\\d+)").find(id)
-                val voiceEnvMatch = Regex("VOICE_ENV_SPEED_(\\d+)").find(id)
-                
-                when {
-                    voiceTuneMatch != null -> {
-                        val idx = voiceTuneMatch.groupValues[1].toInt() - 1 // Convert 1-based to 0-based
-                        "voice_${idx}_tune"
-                    }
-                    voiceFmMatch != null -> {
-                        val idx = voiceFmMatch.groupValues[1].toInt() - 1 // Convert 1-based to 0-based
-                        "voice_${idx}_fm_depth"
-                    }
-                    voiceEnvMatch != null -> {
-                        val idx = voiceEnvMatch.groupValues[1].toInt() - 1 // Convert 1-based to 0-based
-                        "voice_${idx}_env_speed"
-                    }
-                    else -> args.controlId.lowercase()
-                }
-            }
-        }
+        val targetId = portSymbol.controlId
 
         // Get current value (or use 0.5 as default starting point)
         val startValue = currentValues[targetId] ?: 0.5f
         val stepDelayMs = rampDurationMs / rampSteps
-        
+
         // Linear ramp from current to target
         for (step in 1..rampSteps) {
             val t = step.toFloat() / rampSteps
             val interpolatedValue = startValue + (normalizedValue - startValue) * t
-            
-            synthController.emitControlChange(
-                controlId = targetId,
-                value = interpolatedValue,
+
+            synthController.setPluginControl(
+                id = targetId,
+                value = PortValue.FloatValue(interpolatedValue),
                 origin = ControlEventOrigin.AI
             )
-            
+
             if (step < rampSteps) {
                 delay(stepDelayMs)
             }
         }
-        
+
         // Update tracked value
         currentValues[targetId] = normalizedValue
-        
+
         return SynthControlResult(
             success = true,
-            message = "Ramped $targetId to ${(normalizedValue * 100).toInt()}%"
+            message = "Ramped ${portSymbol.displayName} to ${(normalizedValue * 100).toInt()}%"
         )
     }
 
@@ -336,36 +344,41 @@ class SynthControlTool @Inject constructor(
      */
     private suspend fun executeBend(targetValue: Float): SynthControlResult {
         val normalizedValue = targetValue.coerceIn(-1f, 1f)
-        
+
         // Get current bend value (or use 0f as default starting point - center)
-        val startValue = currentValues["bender"] ?: 0f
+        val startValue = currentValues[BENDER_KEY] ?: 0f
         val stepDelayMs = rampDurationMs / rampSteps
-        
+
         // Smooth ramp from current to target
         for (step in 1..rampSteps) {
             val t = step.toFloat() / rampSteps
             val interpolatedValue = startValue + (normalizedValue - startValue) * t
-            
+
             synthController.emitBendChange(interpolatedValue)
-            
+
             if (step < rampSteps) {
                 delay(stepDelayMs)
             }
         }
-        
+
         // Update tracked value
-        currentValues["bender"] = normalizedValue
-        
+        currentValues[BENDER_KEY] = normalizedValue
+
         // Format the message based on bend direction
         val direction = when {
             normalizedValue > 0.1f -> "up"
             normalizedValue < -0.1f -> "down"
             else -> "center"
         }
-        
+
         return SynthControlResult(
             success = true,
             message = "Bent pitch $direction to ${(normalizedValue * 100).toInt()}%"
         )
+    }
+
+    companion object {
+        /** Synthetic key for the bender (not a real plugin port) */
+        private val BENDER_KEY = PluginControlId("bender", "bend")
     }
 }
