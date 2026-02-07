@@ -13,27 +13,11 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-/**
- * Exhaustive enum of all Resonator plugin port symbols.
- */
-enum class ResonatorSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    MODE("mode", "Mode"),
-    TARGET_MIX("target_mix", "Target Mix"),
-    STRUCTURE("structure", "Structure"),
-    BRIGHTNESS("brightness", "Brightness"),
-    DAMPING("damping", "Damping"),
-    POSITION("position", "Position"),
-    MIX("mix", "Mix"),
-    SNAP_BACK("snap_back", "Snap Back")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.RESONATOR_URI
+import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 
 /**
  * Resonator Plugin (Modal synthesis and string).
@@ -59,7 +43,7 @@ class ResonatorPlugin(
     )
 
     companion object {
-        const val URI = "org.balch.orpheus.plugins.resonator"
+        const val URI = RESONATOR_URI
     }
 
     // Core resonator unit

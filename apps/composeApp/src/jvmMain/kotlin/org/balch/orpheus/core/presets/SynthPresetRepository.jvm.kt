@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
-import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.plugin.PortValue
 import java.io.File
 
 /**

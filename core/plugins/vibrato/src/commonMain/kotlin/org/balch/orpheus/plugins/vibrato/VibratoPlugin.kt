@@ -13,21 +13,11 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-/**
- * Exhaustive enum of all Vibrato plugin port symbols.
- */
-enum class VibratoSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    DEPTH("depth", "Depth"),
-    RATE("rate", "Rate")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.VIBRATO_URI
+import org.balch.orpheus.core.plugin.symbols.VibratoSymbol
 
 /**
  * Vibrato Plugin (Global pitch wobble).
@@ -47,7 +37,7 @@ class VibratoPlugin(
     )
 
     companion object {
-        const val URI = "org.balch.orpheus.plugins.vibrato"
+        const val URI = VIBRATO_URI
     }
 
     private val lfo = dspFactory.createSineOscillator()

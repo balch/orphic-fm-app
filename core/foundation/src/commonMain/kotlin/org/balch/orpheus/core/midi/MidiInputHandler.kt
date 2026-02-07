@@ -3,8 +3,8 @@ package org.balch.orpheus.core.midi
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.core.controller.ControlEventOrigin
+import org.balch.orpheus.core.controller.SynthController
 import kotlin.math.roundToInt
 
 /**

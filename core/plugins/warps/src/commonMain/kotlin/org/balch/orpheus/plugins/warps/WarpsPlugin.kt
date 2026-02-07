@@ -13,24 +13,11 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-/**
- * Exhaustive enum of all Warps plugin port symbols.
- */
-enum class WarpsSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    ALGORITHM("algorithm", "Algorithm"),
-    TIMBRE("timbre", "Timbre"),
-    LEVEL1("level1", "Level 1"),
-    LEVEL2("level2", "Level 2"),
-    MIX("mix", "Mix")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.WARPS_URI
+import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
 
 /**
  * Warps Meta-Modulator Plugin.
@@ -59,7 +46,7 @@ class WarpsPlugin(
     )
     
     companion object {
-        const val URI = "org.balch.orpheus.plugins.warps"
+        const val URI = WARPS_URI
     }
 
     private val warps = dspFactory.createWarpsUnit()

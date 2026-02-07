@@ -18,6 +18,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.core.pluginApi)
             implementation(project(":features:midi"))
             implementation(project(":features:drum"))
         }

@@ -29,8 +29,8 @@ class PresetLoaderTest {
         val preset = loader.currentStateAsPreset("Captured Preset")
 
         assertEquals("Captured Preset", preset.name)
-        assertEquals(0.5f, preset.drive)
-        assertEquals(0.9f, preset.voiceTunes[0])
-        assertEquals(0.5f, preset.voiceTunes[1]) // Default from TestSynthEngine
+        assertEquals(0.5f, preset.getFloat("org.balch.orpheus.plugins.distortion:drive"))
+        assertEquals(0.9f, preset.getFloat("org.balch.orpheus.plugins.voice:tune_0", 0.5f))
+        assertEquals(0.5f, preset.getFloat("org.balch.orpheus.plugins.voice:tune_1", 0.5f)) // Default from TestSynthEngine
     }
 }

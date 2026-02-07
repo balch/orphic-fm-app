@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.widgets.HorizontalSlidingSwitch
+import org.balch.orpheus.ui.widgets.HorizontalToggle
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
@@ -52,28 +52,15 @@ fun DrumsPanel(
                 .widthIn(max = 400.dp)
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            // Routing Switch
-            Row(
+            // Routing Toggle: MAIN (direct to stereo) vs FX (through effects chain)
+            HorizontalToggle(
                 modifier = Modifier.padding(bottom = 12.dp, start = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "ROUTING",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = OrpheusColors.warmGlow.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(end = 12.dp)
-                )
-
-                HorizontalSlidingSwitch(
-                    isLeft = state.drumsBypass,
-                    onToggle = { isMain -> actions.setDrumsBypass(isMain) },
-                    leftLabel = "MAIN",
-                    rightLabel = "FX",
-                    activeColor = OrpheusColors.ninersRed,
-                    width = 90.dp,
-                    height = 24.dp,
-                )
-            }
+                startLabel = "MAIN",
+                endLabel = "FX",
+                isStart = state.drumsBypass,
+                onToggle = { actions.setDrumsBypass(it) },
+                color = OrpheusColors.ninersRed
+            )
 
             // Header Row for common parameters
             HeaderRow()

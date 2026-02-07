@@ -14,9 +14,9 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.controller.ControlEventOrigin
+import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.features.evo.AudioEvolutionStrategy
 import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.PI

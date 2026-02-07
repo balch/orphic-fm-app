@@ -45,6 +45,6 @@ class DrumPresetBugTest {
         // Now it should stay as 0.5f because MockDrumEngine.getDrumFrequency 
         // returns what was set (normalized), and SynthEngine.setDrumTone 
         // now expects normalized values.
-        assertEquals(0.5f, preset.drumBdFrequency, "Drum BD frequency should be stored as normalized 0..1 value")
+        assertEquals(0.5f, preset.getFloat("org.balch.orpheus.plugins.drum:bd_freq", 0.6f), "Drum BD frequency should be stored as normalized 0..1 value")
     }
 }

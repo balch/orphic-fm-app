@@ -1,9 +1,9 @@
 package org.balch.orpheus.core.tidal
 
 import org.balch.orpheus.core.audio.TestSynthEngine
+import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.TestDispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
-import org.balch.orpheus.core.routing.SynthController
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContains

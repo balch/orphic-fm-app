@@ -16,7 +16,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(projects.core.plugins.resonator)
+            implementation(projects.core.pluginApi)
         }
     }
 }

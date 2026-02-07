@@ -11,21 +11,11 @@ import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-enum class VoiceSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    // Global
-    FM_STRUCTURE_CROSS_QUAD("fm_structure_cross_quad", "FM Cross Quad"),
-    TOTAL_FEEDBACK("total_feedback", "Total Feedback"),
-    VIBRATO("vibrato", "Vibrato"),
-    COUPLING("coupling", "Voice Coupling")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.VOICE_URI
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 
 @Inject
 @SingleIn(AppScope::class)
@@ -39,7 +29,7 @@ class VoicePlugin : DspPlugin {
     )
 
     companion object {
-        const val URI = "org.balch.orpheus.plugins.voice"
+        const val URI = VOICE_URI
     }
 
     // Listeners for engine updates
@@ -75,13 +65,13 @@ class VoicePlugin : DspPlugin {
     private val _quadEnvTriggerMode = BooleanArray(3)
 
     private val portDefs = ports(startIndex = 0) {
-        // Voice Params (0-7 + extras)
+        // Voice Params (0-11)
         for (i in 0 until 12) {
-            controlPort("tune_$i") {
+            controlPort(VoiceSymbol.tune(i)) {
                 floatType {
                     default = 0.5f
                     get { _tune[i] }
-                    set { 
+                    set {
                         if (_tune[i] != it) {
                             _tune[i] = it
                             listener?.onVoiceParamChange(i, "tune", it)
@@ -89,7 +79,7 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
-            controlPort("mod_depth_$i") {
+            controlPort(VoiceSymbol.modDepth(i)) {
                 floatType {
                     get { _modDepth[i] }
                     set {
@@ -100,7 +90,7 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
-            controlPort("env_speed_$i") {
+            controlPort(VoiceSymbol.envSpeed(i)) {
                 floatType {
                     get { _envSpeed[i] }
                     set {
@@ -112,10 +102,10 @@ class VoicePlugin : DspPlugin {
                 }
             }
         }
-        
+
         // Pair Params (0-5)
         for (i in 0 until 6) {
-            controlPort("pair_sharpness_$i") {
+            controlPort(VoiceSymbol.pairSharpness(i)) {
                 floatType {
                     get { _pairSharpness[i] }
                     set {
@@ -124,7 +114,7 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
-            controlPort("duo_mod_source_$i") {
+            controlPort(VoiceSymbol.duoModSource(i)) {
                 intType {
                     get { _duoModSource[i] }
                     set {
@@ -183,7 +173,7 @@ class VoicePlugin : DspPlugin {
         
         // Quad Params (0-2)
         for (i in 0 until 3) {
-            controlPort("quad_pitch_$i") {
+            controlPort(VoiceSymbol.quadPitch(i)) {
                 floatType {
                     default = 0.5f
                     get { _quadPitch[i] }
@@ -193,7 +183,7 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
-            controlPort("quad_hold_$i") {
+            controlPort(VoiceSymbol.quadHold(i)) {
                 floatType {
                     get { _quadHold[i] }
                     set {
@@ -202,7 +192,7 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
-            controlPort("quad_volume_$i") {
+            controlPort(VoiceSymbol.quadVolume(i)) {
                 floatType {
                     default = 1.0f
                     get { _quadVolume[i] }
@@ -212,7 +202,7 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
-            controlPort("quad_trigger_source_$i") {
+            controlPort(VoiceSymbol.quadTriggerSource(i)) {
                 intType {
                     get { _quadTriggerSource[i] }
                     set {
@@ -221,7 +211,7 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
-            controlPort("quad_pitch_source_$i") {
+            controlPort(VoiceSymbol.quadPitchSource(i)) {
                 intType {
                     get { _quadPitchSource[i] }
                     set {
@@ -230,7 +220,7 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
-            controlPort("quad_env_trigger_mode_$i") {
+            controlPort(VoiceSymbol.quadEnvTriggerMode(i)) {
                 boolType {
                     get { _quadEnvTriggerMode[i] }
                     set {

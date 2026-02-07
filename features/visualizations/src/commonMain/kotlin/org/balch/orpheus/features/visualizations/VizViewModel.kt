@@ -14,10 +14,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
-import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.visualizations.viz.OffViz
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects

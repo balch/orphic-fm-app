@@ -7,6 +7,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.ports.PortRegistry
 import org.balch.orpheus.core.tempo.GlobalTempo
 
@@ -19,6 +20,7 @@ import org.balch.orpheus.core.tempo.GlobalTempo
 class PresetLoader(
     private val portRegistry: PortRegistry,
     private val globalTempo: GlobalTempo,
+    private val synthController: SynthController,
 ) {
 
     // Shared flow to broadcast preset changes to ViewModels
@@ -39,7 +41,10 @@ class PresetLoader(
         
         // Restore all port values via registry
         portRegistry.restoreState(preset.portValues)
-        
+
+        // Sync StateFlows with engine state set by restoreState
+        synthController.refreshControlFlows()
+
         // Broadcast to ViewModels for UI updates
         _presetFlow.tryEmit(preset)
     }

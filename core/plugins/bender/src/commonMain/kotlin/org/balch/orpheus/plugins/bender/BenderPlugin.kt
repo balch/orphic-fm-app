@@ -13,28 +13,14 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.BENDER_URI
+import org.balch.orpheus.core.plugin.symbols.BenderSymbol
 import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlin.random.Random
-
-/**
- * Exhaustive enum of all Bender plugin port symbols.
- */
-enum class BenderSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    BEND("bend", "Bend"),
-    MAX_BEND("max_bend", "Max Bend Semitones"),
-    RANDOM_DEPTH("random_depth", "Random Depth"),
-    TIMBRE_MOD("timbre_mod", "Timbre Modulation"),
-    SPRING_VOL("spring_vol", "Spring Volume"),
-    TENSION_VOL("tension_vol", "Tension Volume")
-}
 
 /**
  * Bender Plugin (Pitch and timbre bending with spring/tension effects).
@@ -54,7 +40,7 @@ class BenderPlugin(
     )
 
     companion object {
-        const val URI = "org.balch.orpheus.plugins.bender"
+        const val URI = BENDER_URI
     }
 
     // Control signal path

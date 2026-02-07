@@ -1,22 +1,10 @@
-package org.balch.orpheus.core.audio.dsp
+package org.balch.orpheus.core.plugin
 
 /**
  * Marks DSL scope to prevent accidental access to outer receivers.
  */
 @DslMarker
 annotation class PortsDsl
-
-/**
- * Interface for port symbols - each plugin defines its own enum implementing this.
- * Provides compile-time safety and auto-completion.
- */
-interface PortSymbol {
-    val symbol: Symbol
-    val displayName: String get() = symbol.replaceFirstChar { it.uppercase() }
-    
-    /** Create qualified symbol "pluginUri:symbol" for use with PortRegistry */
-    fun qualifiedSymbol(pluginUri: String): String = "$pluginUri:$symbol"
-}
 
 /**
  * Base class for port definitions with embedded getter/setter.

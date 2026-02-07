@@ -42,9 +42,9 @@ import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.ai.currentKoogModel
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.controller.ControlEventOrigin
+import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.features.ai.CompositionType
 import org.balch.orpheus.features.ai.tools.ReplExecuteArgs
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool

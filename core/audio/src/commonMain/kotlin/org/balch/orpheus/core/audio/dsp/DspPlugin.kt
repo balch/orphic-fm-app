@@ -1,23 +1,5 @@
 package org.balch.orpheus.core.audio.dsp
 
-import kotlinx.serialization.Serializable
-
-/**
- * Base interface for DSP plugin modules.
- * 
- * Plugins are self-contained audio processing blocks that expose:
- * - Audio units for engine registration
- * - Named input/output ports for inter-plugin wiring
- * - Lifecycle hooks for initialization and start/stop
- */
-@Serializable
-data class PluginInfo(
-    val uri: String,
-    val name: String,
-    val author: String,
-    val version: String = "1.0.0"
-)
-
 /**
  * Base interface for DSP plugin modules.
  * 

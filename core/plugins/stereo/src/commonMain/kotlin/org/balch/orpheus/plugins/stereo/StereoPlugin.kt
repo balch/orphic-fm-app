@@ -13,36 +13,14 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.STEREO_URI
+import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
-
-/**
- * Exhaustive enum of all Stereo plugin port symbols.
- */
-enum class StereoSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    MASTER_PAN("master_pan", "Master Pan"),
-    MASTER_VOL("master_vol", "Master Volume"),
-    VOICE_PAN_0("voice_pan_0", "Voice 0 Pan"),
-    VOICE_PAN_1("voice_pan_1", "Voice 1 Pan"),
-    VOICE_PAN_2("voice_pan_2", "Voice 2 Pan"),
-    VOICE_PAN_3("voice_pan_3", "Voice 3 Pan"),
-    VOICE_PAN_4("voice_pan_4", "Voice 4 Pan"),
-    VOICE_PAN_5("voice_pan_5", "Voice 5 Pan"),
-    VOICE_PAN_6("voice_pan_6", "Voice 6 Pan"),
-    VOICE_PAN_7("voice_pan_7", "Voice 7 Pan"),
-    VOICE_PAN_8("voice_pan_8", "Voice 8 Pan"),
-    VOICE_PAN_9("voice_pan_9", "Voice 9 Pan"),
-    VOICE_PAN_10("voice_pan_10", "Voice 10 Pan"),
-    VOICE_PAN_11("voice_pan_11", "Voice 11 Pan")
-}
 
 /**
  * Stereo Plugin (Output stage).
@@ -62,7 +40,7 @@ class StereoPlugin(
     )
 
     companion object {
-        const val URI = "org.balch.orpheus.plugins.stereo"
+        const val URI = STEREO_URI
     }
 
     // Summing buses

@@ -3,11 +3,11 @@ package org.balch.orpheus.core.audio
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.plugin.PortValue
 
 /**
  * Test fake implementation of SynthEngine for unit testing.
- * 
+ *
  * All methods are stubs that track values for verification.
  * Override specific properties/methods as needed in tests.
  */
@@ -32,8 +32,6 @@ open class TestSynthEngine : SynthEngine {
     var _delayFeedback = 0.5f
     var _delayMix = 0.5f
     val _delayModDepth = FloatArray(2) { 0f }
-    val _delayModSourceIsLfo = BooleanArray(2) { true }
-    var _delayLfoWaveformIsTriangle = true
     val _hyperLfoFreq = FloatArray(2) { 0f }
     var _hyperLfoMode = 1 // OFF
     var _hyperLfoLink = false
@@ -72,8 +70,6 @@ open class TestSynthEngine : SynthEngine {
     override fun getDelayFeedback(): Float = _delayFeedback
     override fun getDelayMix(): Float = _delayMix
     override fun getDelayModDepth(index: Int): Float = _delayModDepth[index]
-    override fun getDelayModSourceIsLfo(index: Int): Boolean = _delayModSourceIsLfo[index]
-    override fun getDelayLfoWaveformIsTriangle(): Boolean = _delayLfoWaveformIsTriangle
     override fun getHyperLfoFreq(index: Int): Float = _hyperLfoFreq[index]
     override fun getHyperLfoMode(): Int = _hyperLfoMode
     override fun getHyperLfoLink(): Boolean = _hyperLfoLink
@@ -106,13 +102,6 @@ open class TestSynthEngine : SynthEngine {
     override fun setDelayFeedback(amount: Float) { _delayFeedback = amount }
     override fun setDelayMix(amount: Float) { _delayMix = amount }
     override fun setDelayModDepth(index: Int, amount: Float) { _delayModDepth[index] = amount }
-    override fun setDelayModSource(index: Int, isLfo: Boolean) { _delayModSourceIsLfo[index] = isLfo }
-    override fun setDelayLfoWaveform(isTriangle: Boolean) { _delayLfoWaveformIsTriangle = isTriangle }
-    override fun setDelay(time: Float, feedback: Float) {
-        _delayTime[0] = time
-        _delayTime[1] = time
-        _delayFeedback = feedback
-    }
     override fun setHyperLfoFreq(index: Int, frequency: Float) { _hyperLfoFreq[index] = frequency }
     override fun setHyperLfoMode(mode: Int) { _hyperLfoMode = mode }
     override fun setHyperLfoLink(active: Boolean) { _hyperLfoLink = active }
@@ -139,14 +128,6 @@ open class TestSynthEngine : SynthEngine {
     override val voiceLevelsFlow: StateFlow<FloatArray> = _voiceLevelsFlow.asStateFlow()
     override val lfoOutputFlow: StateFlow<Float> = _lfoOutputFlow.asStateFlow()
     override val masterLevelFlow: StateFlow<Float> = _masterLevelFlow.asStateFlow()
-    
-    // Additional required flows
-    override val driveFlow: StateFlow<Float> = MutableStateFlow(0f).asStateFlow()
-    override val distortionMixFlow: StateFlow<Float> = MutableStateFlow(0.5f).asStateFlow()
-    override val delayMixFlow: StateFlow<Float> = MutableStateFlow(0.5f).asStateFlow()
-    override val delayFeedbackFlow: StateFlow<Float> = MutableStateFlow(0.5f).asStateFlow()
-    override val quadPitchFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(3) { 0.5f }).asStateFlow()
-    override val quadHoldFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(3)).asStateFlow()
 
     // Test helpers to emit flow values
     fun emitPeak(value: Float) { _peakFlow.value = value }
@@ -154,62 +135,28 @@ open class TestSynthEngine : SynthEngine {
     fun emitVoiceLevels(levels: FloatArray) { _voiceLevelsFlow.value = levels }
     fun emitLfoOutput(value: Float) { _lfoOutputFlow.value = value }
     fun emitMasterLevel(value: Float) { _masterLevelFlow.value = value }
-    
+
     // Bender methods
     private var _bend: Float = 0f
     private val _bendFlow = MutableStateFlow(0f)
     override fun setBend(amount: Float) { _bend = amount; _bendFlow.value = amount }
     override fun getBend(): Float = _bend
     override val bendFlow: StateFlow<Float> = _bendFlow.asStateFlow()
-    
+
     // String bend methods
     override fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float) {}
     override fun releaseStringBend(stringIndex: Int): Int = 250
     override fun resetStringBenders() {}
-    
+
     // Slide bar methods
     override fun setSlideBar(yPosition: Float, xPosition: Float) {}
     override fun releaseSlideBar() {}
-    
+
     // Drum trigger
     override fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {}
     override fun triggerDrum(type: Int, accent: Float) {}
     override fun setDrumTone(type: Int, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {}
-    
-    // Resonator (Rings) stub implementations
-    private var _resonatorMode = 0
-    private var _resonatorTarget = 1  // 0=Drums, 1=Both, 2=Synth
-    private var _resonatorTargetMix = 0.5f  // Continuous mix
-    private var _resonatorStructure = 0.25f
-    private var _resonatorBrightness = 0.5f
-    private var _resonatorDamping = 0.3f
-    private var _resonatorPosition = 0.5f
-    private var _resonatorMix = 0.5f
-    
-    override fun setResonatorMode(mode: Int) { _resonatorMode = mode }
-    override fun setResonatorTarget(target: Int) { _resonatorTarget = target }
-    override fun setResonatorTargetMix(targetMix: Float) { _resonatorTargetMix = targetMix }
-    override fun setResonatorStructure(value: Float) { _resonatorStructure = value }
-    override fun setResonatorBrightness(value: Float) { _resonatorBrightness = value }
-    override fun setResonatorDamping(value: Float) { _resonatorDamping = value }
-    override fun setResonatorPosition(value: Float) { _resonatorPosition = value }
-    override fun setResonatorMix(value: Float) { _resonatorMix = value }
-    override fun strumResonator(frequency: Float) {}
-    
-    override fun getResonatorMode(): Int = _resonatorMode
-    override fun getResonatorTarget(): Int = _resonatorTarget
-    override fun getResonatorTargetMix(): Float = _resonatorTargetMix
-    override fun getResonatorStructure(): Float = _resonatorStructure
-    override fun getResonatorBrightness(): Float = _resonatorBrightness
-    override fun getResonatorDamping(): Float = _resonatorDamping
-    override fun getResonatorPosition(): Float = _resonatorPosition
-    override fun getResonatorMix(): Float = _resonatorMix
-    
-    // Stub implementations for new methods
-    private var _resonatorSnapBack = false
-    override fun getResonatorSnapBack(): Boolean = _resonatorSnapBack
-    override fun setResonatorSnapBack(enabled: Boolean) { _resonatorSnapBack = enabled }
-    
+
     // Drum stub params
     private val _drumFreq = FloatArray(3)
     private val _drumTone = FloatArray(3)
@@ -222,68 +169,7 @@ open class TestSynthEngine : SynthEngine {
     override fun getDrumDecay(type: Int): Float = _drumDecay.getOrElse(type) { 0f }
     override fun getDrumP4(type: Int): Float = _drumP4.getOrElse(type) { 0f }
     override fun getDrumP5(type: Int): Float = _drumP5.getOrElse(type) { 0f }
-    
-    // Beat Sequencer Stubs
-    private var _beatsX = 0.5f
-    private var _beatsY = 0.5f
-    private val _beatsDensities = FloatArray(3) { 0.5f }
-    private var _beatsBpm = 120f
-    private var _beatsMode = 0
-    private val _beatsLengths = IntArray(3) { 16 }
-    private var _beatsRandomness = 0f
-    private var _beatsSwing = 0f
-    
-    override fun setBeatsX(x: Float) { _beatsX = x }
-    override fun getBeatsX(): Float = _beatsX
-    override fun setBeatsY(y: Float) { _beatsY = y }
-    override fun getBeatsY(): Float = _beatsY
-    override fun setBeatsDensity(index: Int, density: Float) { if (index in 0..2) _beatsDensities[index] = density }
-    override fun getBeatsDensity(index: Int): Float = _beatsDensities.getOrElse(index) { 0.5f }
-    override fun setBeatsBpm(bpm: Float) { _beatsBpm = bpm }
-    override fun getBeatsBpm(): Float = _beatsBpm
-    override fun setBeatsOutputMode(mode: Int) { _beatsMode = mode }
-    override fun getBeatsOutputMode(): Int = _beatsMode
-    override fun setBeatsEuclideanLength(index: Int, length: Int) { if (index in 0..2) _beatsLengths[index] = length }
-    override fun getBeatsEuclideanLength(index: Int): Int = _beatsLengths.getOrElse(index) { 16 }
-    override fun setBeatsRandomness(randomness: Float) { _beatsRandomness = randomness }
-    override fun getBeatsRandomness(): Float = _beatsRandomness
-    override fun setBeatsSwing(swing: Float) { _beatsSwing = swing }
-    override fun getBeatsSwing(): Float = _beatsSwing
-    
-    private var _beatsMix = 0.7f
-    override fun setBeatsMix(mix: Float) { _beatsMix = mix }
-    override fun getBeatsMix(): Float = _beatsMix
 
-    // Clouds Stubs
-    private var _cloudsPosition = 0f
-    private var _cloudsSize = 0f
-    private var _cloudsPitch = 0f
-    private var _cloudsDensity = 0f
-    private var _cloudsTexture = 0f
-    private var _cloudsDryWet = 0f
-    private var _cloudsFreeze = false
-    
-    override fun setGrainsPosition(value: Float) { _cloudsPosition = value }
-    override fun setGrainsSize(value: Float) { _cloudsSize = value }
-    override fun setGrainsPitch(value: Float) { _cloudsPitch = value }
-    override fun setGrainsDensity(value: Float) { _cloudsDensity = value }
-    override fun setGrainsTexture(value: Float) { _cloudsTexture = value }
-    override fun setGrainsDryWet(value: Float) { _cloudsDryWet = value }
-    override fun setGrainsFreeze(frozen: Boolean) { _cloudsFreeze = frozen }
-    override fun setGrainsTrigger(trigger: Boolean) {}
-
-    override fun getGrainsPosition(): Float = _cloudsPosition
-    override fun getGrainsSize(): Float = _cloudsSize
-    override fun getGrainsPitch(): Float = _cloudsPitch
-    override fun getGrainsDensity(): Float = _cloudsDensity
-    override fun getGrainsTexture(): Float = _cloudsTexture
-    override fun getGrainsDryWet(): Float = _cloudsDryWet
-    override fun getGrainsFreeze(): Boolean = _cloudsFreeze
-    
-    private var _cloudsMode = 0
-    override fun setGrainsMode(mode: Int) { _cloudsMode = mode }
-    override fun getGrainsMode(): Int = _cloudsMode
-    
     // Looper stubs
     override fun setLooperRecord(recording: Boolean) {}
     override fun setLooperPlay(playing: Boolean) {}
@@ -291,105 +177,25 @@ open class TestSynthEngine : SynthEngine {
     override fun clearLooper() {}
     override fun getLooperPosition(): Float = 0f
     override fun getLooperDuration(): Double = 0.0
-    
-    // Warps stubs
-    private var _warpsAlgorithm = 0f
-    private var _warpsTimbre = 0.5f
-    private var _warpsLevel1 = 0.5f
-    private var _warpsLevel2 = 0.5f
-    private var _warpsCarrierSource = 0
-    private var _warpsModulatorSource = 1
-    private var _warpsMix = 0.5f
-    
-    override fun setWarpsAlgorithm(value: Float) { _warpsAlgorithm = value }
-    override fun setWarpsTimbre(value: Float) { _warpsTimbre = value }
-    override fun setWarpsLevel1(value: Float) { _warpsLevel1 = value }
-    override fun setWarpsLevel2(value: Float) { _warpsLevel2 = value }
-    override fun setWarpsCarrierSource(source: Int) { _warpsCarrierSource = source }
-    override fun setWarpsModulatorSource(source: Int) { _warpsModulatorSource = source }
-    override fun setWarpsMix(value: Float) { _warpsMix = value }
-    
-    override fun getWarpsAlgorithm(): Float = _warpsAlgorithm
-    override fun getWarpsTimbre(): Float = _warpsTimbre
-    override fun getWarpsLevel1(): Float = _warpsLevel1
-    override fun getWarpsLevel2(): Float = _warpsLevel2
-    override fun getWarpsCarrierSource(): Int = _warpsCarrierSource
-    override fun getWarpsModulatorSource(): Int = _warpsModulatorSource
-    override fun getWarpsMix(): Float = _warpsMix
-    
+
     // Generic Plugin Port Access - stub
     override fun setPluginPort(pluginUri: String, symbol: String, value: PortValue): Boolean = false
     override fun getPluginPort(pluginUri: String, symbol: String): PortValue? = null
-    
-    // Drum Routing Stubs
-    private val _drumTriggerSources = IntArray(3)
-    private val _drumPitchSources = IntArray(3)
-    override fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int) { 
-        if (drumIndex in 0..2) _drumTriggerSources[drumIndex] = sourceIndex 
-    }
-    override fun getDrumTriggerSource(drumIndex: Int): Int = _drumTriggerSources.getOrElse(drumIndex) { 0 }
-    override fun setDrumPitchSource(drumIndex: Int, sourceIndex: Int) { 
-        if (drumIndex in 0..2) _drumPitchSources[drumIndex] = sourceIndex 
-    }
-    override fun getDrumPitchSource(drumIndex: Int): Int = _drumPitchSources.getOrElse(drumIndex) { 0 }
-    
-    // Drums Bypass
-    private var _drumsBypass = true
-    override fun setDrumsBypass(bypass: Boolean) { _drumsBypass = bypass }
-    override fun getDrumsBypass(): Boolean = _drumsBypass
-    
+
     // Quad Routing Stubs
     private val _quadTriggerSources = IntArray(3)
     private val _quadPitchSources = IntArray(3)
     private val _quadEnvTriggerModes = BooleanArray(3)
-    override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) { 
-        if (quadIndex in 0..2) _quadTriggerSources[quadIndex] = sourceIndex 
+    override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) {
+        if (quadIndex in 0..2) _quadTriggerSources[quadIndex] = sourceIndex
     }
     override fun getQuadTriggerSource(quadIndex: Int): Int = _quadTriggerSources.getOrElse(quadIndex) { 0 }
-    override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) { 
-        if (quadIndex in 0..2) _quadPitchSources[quadIndex] = sourceIndex 
+    override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) {
+        if (quadIndex in 0..2) _quadPitchSources[quadIndex] = sourceIndex
     }
     override fun getQuadPitchSource(quadIndex: Int): Int = _quadPitchSources.getOrElse(quadIndex) { 0 }
-    override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) { 
-        if (quadIndex in 0..2) _quadEnvTriggerModes[quadIndex] = enabled 
+    override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) {
+        if (quadIndex in 0..2) _quadEnvTriggerModes[quadIndex] = enabled
     }
     override fun getQuadEnvelopeTriggerMode(quadIndex: Int): Boolean = _quadEnvTriggerModes.getOrElse(quadIndex) { false }
-    
-    // Flux Stubs
-    private var _fluxSpread = 0.5f
-    private var _fluxBias = 0.5f
-    private var _fluxSteps = 0.5f
-    private var _fluxDejaVu = 0f
-    private var _fluxLength = 8
-    private var _fluxScale = 0
-    private var _fluxRate = 0.5f
-    private var _fluxJitter = 0f
-    private var _fluxProbability = 0.5f
-    private var _fluxClockSource = 0
-    private var _fluxGateLength = 0.5f
-    
-    override fun setFluxSpread(value: Float) { _fluxSpread = value }
-    override fun setFluxBias(value: Float) { _fluxBias = value }
-    override fun setFluxSteps(value: Float) { _fluxSteps = value }
-    override fun setFluxDejaVu(value: Float) { _fluxDejaVu = value }
-    override fun setFluxLength(value: Int) { _fluxLength = value }
-    override fun setFluxScale(index: Int) { _fluxScale = index }
-    override fun setFluxRate(rate: Float) { _fluxRate = rate }
-    override fun setFluxJitter(value: Float) { _fluxJitter = value }
-    override fun setFluxProbability(value: Float) { _fluxProbability = value }
-    override fun setFluxClockSource(sourceIndex: Int) { _fluxClockSource = sourceIndex }
-    override fun setFluxGateLength(value: Float) { _fluxGateLength = value }
-    
-    override fun getFluxSpread(): Float = _fluxSpread
-    override fun getFluxBias(): Float = _fluxBias
-    override fun getFluxSteps(): Float = _fluxSteps
-    override fun getFluxDejaVu(): Float = _fluxDejaVu
-    override fun getFluxLength(): Int = _fluxLength
-    override fun getFluxScale(): Int = _fluxScale
-    override fun getFluxRate(): Float = _fluxRate
-    override fun getFluxJitter(): Float = _fluxJitter
-    override fun getFluxProbability(): Float = _fluxProbability
-    override fun getFluxClockSource(): Int = _fluxClockSource
-    override fun getFluxGateLength(): Float = _fluxGateLength
 }
-

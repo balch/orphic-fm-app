@@ -8,9 +8,8 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.core.controller.ControlEventOrigin
+import org.balch.orpheus.core.controller.SynthController
 
 @Serializable
 data class SynthControlArgs(

@@ -18,13 +18,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.controller.ControlEventOrigin
+import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
 import org.balch.orpheus.core.tempo.GlobalTempo
-
 import kotlin.math.pow
 
 /**

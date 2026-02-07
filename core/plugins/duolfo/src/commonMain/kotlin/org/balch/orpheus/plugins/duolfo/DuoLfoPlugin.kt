@@ -13,24 +13,11 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
-import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-/**
- * Exhaustive enum of all DuoLfo plugin port symbols.
- */
-enum class DuoLfoSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    MODE("mode", "Mode"),
-    LINK("link", "Link"),
-    TRIANGLE_MODE("triangle_mode", "Triangle Mode"),
-    FREQ_A("freq_a", "Frequency A"),
-    FREQ_B("freq_b", "Frequency B")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.Symbol
+import org.balch.orpheus.core.plugin.symbols.DUO_LFO_URI
+import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 
 /**
  * Shared DuoLFO implementation.
@@ -57,7 +44,7 @@ class DuoLfoPlugin(
     )
 
     companion object {
-        const val URI = "org.balch.orpheus.plugins.duolfo"
+        const val URI = DUO_LFO_URI
     }
 
     // Interface Units (Proxies)

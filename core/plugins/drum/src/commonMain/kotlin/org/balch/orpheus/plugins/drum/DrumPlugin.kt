@@ -13,47 +13,11 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-/**
- * Exhaustive enum of all Drum plugin port symbols.
- */
-enum class DrumSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    MIX("mix", "Mix"),
-    // Synthesis Parameters (prefix with drum type: bd_, sd_, hh_)
-    BD_FREQ("bd_freq", "BD Frequency"),
-    BD_TONE("bd_tone", "BD Tone"),
-    BD_DECAY("bd_decay", "BD Decay"),
-    BD_P4("bd_p4", "BD P4"),
-    BD_P5("bd_p5", "BD P5"),
-    
-    SD_FREQ("sd_freq", "SD Frequency"),
-    SD_TONE("sd_tone", "SD Tone"),
-    SD_DECAY("sd_decay", "SD Decay"),
-    SD_P4("sd_p4", "SD P4"),
-    
-    HH_FREQ("hh_freq", "HH Frequency"),
-    HH_TONE("hh_tone", "HH Tone"),
-    HH_DECAY("hh_decay", "HH Decay"),
-    HH_P4("hh_p4", "HH P4"),
-    
-    // Routing
-    BD_TRIGGER_SRC("bd_trigger_src", "BD Trigger Source"),
-    BD_PITCH_SRC("bd_pitch_src", "BD Pitch Source"),
-    SD_TRIGGER_SRC("sd_trigger_src", "SD Trigger Source"),
-    SD_PITCH_SRC("sd_pitch_src", "SD Pitch Source"),
-    HH_TRIGGER_SRC("hh_trigger_src", "HH Trigger Source"),
-    HH_PITCH_SRC("hh_pitch_src", "HH Pitch Source"),
-    
-    // Bypass
-    BYPASS("bypass", "Bypass")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.DRUM_URI
+import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 
 /**
  * DSP Plugin for specialized 808-style drum synthesis.
@@ -73,7 +37,7 @@ class DrumPlugin(
     )
 
     companion object {
-        const val URI = "org.balch.orpheus.plugins.drum"
+        const val URI = DRUM_URI
     }
 
     private val drumUnit = dspFactory.createDrumUnit()

@@ -3,6 +3,7 @@ package org.balch.orpheus.core.audio.dsp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import org.balch.orpheus.plugins.beats.BeatsPlugin
 import org.balch.orpheus.plugins.bender.BenderPlugin
 import org.balch.orpheus.plugins.delay.DelayPlugin
 import org.balch.orpheus.plugins.distortion.DistortionPlugin
@@ -45,4 +46,5 @@ class DspPluginProvider(
     val warpsPlugin by lazy { plugins.filterIsInstance<WarpsPlugin>().first() }
     val fluxPlugin by lazy { plugins.filterIsInstance<FluxPlugin>().first() }
     val voicePlugin by lazy { plugins.filterIsInstance<VoicePlugin>().first() }
+    val beatsPlugin by lazy { plugins.filterIsInstance<BeatsPlugin>().first() }
 }

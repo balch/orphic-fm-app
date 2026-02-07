@@ -5,8 +5,8 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.plugin.PortValue
 
 /**
  * Registry that aggregates all DspPlugin ports for unified access.

@@ -22,7 +22,6 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -36,13 +35,16 @@ import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.SynthOrchestrator
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.media.PlaybackMode
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
+import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
+import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
 import org.balch.orpheus.core.presets.SynthPreset
@@ -57,11 +59,8 @@ import org.balch.orpheus.features.ai.generative.SynthControlAgent
 import org.balch.orpheus.features.ai.tools.ReplExecuteArgs
 import org.balch.orpheus.features.ai.tools.ReplExecuteTool
 import org.balch.orpheus.plugins.delay.DelayPlugin
-import org.balch.orpheus.plugins.delay.DelaySymbol
 import org.balch.orpheus.plugins.distortion.DistortionPlugin
-import org.balch.orpheus.plugins.distortion.DistortionSymbol
 import org.balch.orpheus.plugins.duolfo.DuoLfoPlugin
-import org.balch.orpheus.plugins.duolfo.DuoLfoSymbol
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 
@@ -122,7 +121,6 @@ typealias AiOptionsFeature = SynthFeature<AiOptionsUiState, AiOptionsPanelAction
  * - REPL: Generate Tidal code patterns
  * - Chat: Open chat dialog
  */
-@Suppress("UNCHECKED_CAST")
 @Inject
 @ViewModelKey(AiOptionsViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
@@ -867,27 +865,33 @@ class AiOptionsViewModel(
         _dialogSize.value = width to height
     }
 
+    private data class AiFeatureFlags(
+        val isDroneActive: Boolean,
+        val isSoloActive: Boolean,
+        val isReplActive: Boolean,
+        val showChatDialog: Boolean
+    )
+
+    private data class AiDialogState(
+        val sessionId: Int,
+        val messages: List<ChatMessage>,
+        val dialogPosition: Pair<Float, Float>,
+        val dialogSize: Pair<Float, Float>
+    )
+
     override val stateFlow: StateFlow<AiOptionsUiState> = combine(
-            listOf(
-            _isDroneActive,
-            _isSoloActive,
-            _isReplActive,
-            _showChatDialog,
-            _sessionId,
-            messages,
-            _dialogPosition,
-            _dialogSize
-            )
-        ) { results ->
+        combine(_isDroneActive, _isSoloActive, _isReplActive, _showChatDialog, ::AiFeatureFlags),
+        combine(_sessionId, messages, _dialogPosition, _dialogSize, ::AiDialogState)
+    ) { flags, dialog ->
         AiOptionsUiState(
-            isDroneActive = results[0] as Boolean,
-            isSoloActive = results[1] as Boolean,
-            isReplActive = results[2] as Boolean,
-            showChatDialog = results[3] as Boolean,
-            sessionId = results[4] as Int,
-            messages = results[5] as List<ChatMessage>,
-            dialogPosition = results[6] as Pair<Float, Float>,
-            dialogSize = results[7] as Pair<Float, Float>,
+            isDroneActive = flags.isDroneActive,
+            isSoloActive = flags.isSoloActive,
+            isReplActive = flags.isReplActive,
+            showChatDialog = flags.showChatDialog,
+            sessionId = dialog.sessionId,
+            messages = dialog.messages,
+            dialogPosition = dialog.dialogPosition,
+            dialogSize = dialog.dialogSize,
             availableModels = availableModels,
             aiStatusMessages = aiStatusMessages,
             aiInputLog = aiInputLog,
@@ -896,53 +900,21 @@ class AiOptionsViewModel(
             isUserProvidedKey = aiKeyRepository.isUserProvidedKey,
             selectedModel = aiModelProvider.selectedModel.value
         )
-    }
-        .mapNotNull { it
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = AiOptionsUiState(
-                availableModels = availableModels,
-                aiStatusMessages = aiStatusMessages,
-                aiInputLog = aiInputLog,
-                aiControlLog = aiControlLog
-            )
-        )
-/*
-        val (drone, solo, repl, chat) = flags
-        val (sessionInfo, modelData) = session
-        val (sessionId, apiKeySet, userKey) = sessionInfo
-        val (model, msgs) = modelData
-        val (pos, size) = layout
-        
-        AiOptionsUiState(
-            isDroneActive = drone,
-            isSoloActive = solo,
-            isReplActive = repl,
-            showChatDialog = chat,
-            sessionId = sessionId,
-            isApiKeySet = apiKeySet,
-            isUserProvidedKey = userKey,
-            selectedModel = model,
-            availableModels = availableModels,
-            messages = msgs,
-            dialogPosition = pos,
-            dialogSize = size,
-            aiStatusMessages = aiStatusMessages,
-            aiInputLog = aiInputLog,
-            aiControlLog = aiControlLog
-        )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         initialValue = AiOptionsUiState(
             availableModels = availableModels,
             aiStatusMessages = aiStatusMessages,
             aiInputLog = aiInputLog,
             aiControlLog = aiControlLog
         )
+    )
 
- */
+    override fun onCleared() {
+        super.onCleared()
+        stopAllAgents()
+    }
 
     companion object {
         fun previewFeature(state: AiOptionsUiState = AiOptionsUiState()): AiOptionsFeature =

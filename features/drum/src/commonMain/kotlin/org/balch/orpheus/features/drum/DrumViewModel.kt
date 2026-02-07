@@ -9,75 +9,53 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.controller.boolSetter
+import org.balch.orpheus.core.controller.enumSetter
+import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.presets.PresetLoader
-import org.balch.orpheus.core.presets.drumBdDecay
-import org.balch.orpheus.core.presets.drumBdFrequency
-import org.balch.orpheus.core.presets.drumBdP4
-import org.balch.orpheus.core.presets.drumBdP5
-import org.balch.orpheus.core.presets.drumBdPitchSource
-import org.balch.orpheus.core.presets.drumBdTone
-import org.balch.orpheus.core.presets.drumBdTriggerSource
-import org.balch.orpheus.core.presets.drumHhDecay
-import org.balch.orpheus.core.presets.drumHhFrequency
-import org.balch.orpheus.core.presets.drumHhP4
-import org.balch.orpheus.core.presets.drumHhPitchSource
-import org.balch.orpheus.core.presets.drumHhTone
-import org.balch.orpheus.core.presets.drumHhTriggerSource
-import org.balch.orpheus.core.presets.drumSdDecay
-import org.balch.orpheus.core.presets.drumSdFrequency
-import org.balch.orpheus.core.presets.drumSdP4
-import org.balch.orpheus.core.presets.drumSdPitchSource
-import org.balch.orpheus.core.presets.drumSdTone
-import org.balch.orpheus.core.presets.drumSdTriggerSource
-import org.balch.orpheus.core.presets.drumsBypass
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.core.triggers.DrumTriggerSource
-import kotlin.math.roundToInt
 
 @Immutable
 data class DrumUiState(
     // Bass Drum
-    val bdFrequency: Float = 0.3f, // Maps to ~50Hz
+    val bdFrequency: Float = 0.3f,
     val bdTone: Float = 0.5f,
     val bdDecay: Float = 0.5f,
-    val bdP4: Float = 0.5f,  // AFM (Attack FM)
-    val bdP5: Float = 0.5f,  // Self FM
+    val bdP4: Float = 0.5f,
+    val bdP5: Float = 0.5f,
     val bdTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     val bdPitchSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
-    
+
     // Snare Drum
-    val sdFrequency: Float = 0.4f, // Maps to ~180Hz
+    val sdFrequency: Float = 0.4f,
     val sdTone: Float = 0.5f,
     val sdDecay: Float = 0.5f,
-    val sdP4: Float = 0.5f,  // Snappiness
+    val sdP4: Float = 0.5f,
     val sdTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     val sdPitchSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
-    
+
     // Hi-Hat
-    val hhFrequency: Float = 0.6f, // Maps to ~400Hz
+    val hhFrequency: Float = 0.6f,
     val hhTone: Float = 0.5f,
     val hhDecay: Float = 0.5f,
-    val hhP4: Float = 0.5f,  // Noisiness
+    val hhP4: Float = 0.5f,
     val hhTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     val hhPitchSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
-    
+
     // Trigger States (Visual Feedback)
     val isBdActive: Boolean = false,
     val isSdActive: Boolean = false,
@@ -86,7 +64,6 @@ data class DrumUiState(
 )
 
 data class DrumPanelActions(
-    // BD actions
     val setBdFrequency: (Float) -> Unit,
     val setBdTone: (Float) -> Unit,
     val setBdDecay: (Float) -> Unit,
@@ -95,8 +72,7 @@ data class DrumPanelActions(
     val setBdPitchSource: (DrumTriggerSource) -> Unit,
     val startBdTrigger: () -> Unit,
     val stopBdTrigger: () -> Unit,
-    
-    // SD actions
+
     val setSdFrequency: (Float) -> Unit,
     val setSdTone: (Float) -> Unit,
     val setSdDecay: (Float) -> Unit,
@@ -105,8 +81,7 @@ data class DrumPanelActions(
     val setSdPitchSource: (DrumTriggerSource) -> Unit,
     val startSdTrigger: () -> Unit,
     val stopSdTrigger: () -> Unit,
-    
-    // HH actions
+
     val setHhFrequency: (Float) -> Unit,
     val setHhTone: (Float) -> Unit,
     val setHhDecay: (Float) -> Unit,
@@ -115,8 +90,7 @@ data class DrumPanelActions(
     val setHhPitchSource: (DrumTriggerSource) -> Unit,
     val startHhTrigger: () -> Unit,
     val stopHhTrigger: () -> Unit,
-    
-    // Global
+
     val setDrumsBypass: (Boolean) -> Unit
 ) {
     companion object {
@@ -130,161 +104,158 @@ data class DrumPanelActions(
 
 /** User intents for the Drum panel. */
 private sealed interface DrumIntent {
-    data class BdFrequency(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
-    data class BdTone(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
-    data class BdDecay(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
-    data class BdP4(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
+    data class BdFrequency(val value: Float) : DrumIntent
+    data class BdTone(val value: Float) : DrumIntent
+    data class BdDecay(val value: Float) : DrumIntent
+    data class BdP4(val value: Float) : DrumIntent
+    data class BdP5(val value: Float) : DrumIntent
     data class BdTriggerSource(val source: DrumTriggerSource) : DrumIntent
     data class BdPitchSource(val source: DrumTriggerSource) : DrumIntent
-    data class BdTrigger(val active: Boolean, val fromSequencer: Boolean = false) : DrumIntent
+    data class BdTrigger(val active: Boolean) : DrumIntent
 
-    data class SdFrequency(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
-    data class SdTone(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
-    data class SdDecay(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
-    data class SdP4(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
+    data class SdFrequency(val value: Float) : DrumIntent
+    data class SdTone(val value: Float) : DrumIntent
+    data class SdDecay(val value: Float) : DrumIntent
+    data class SdP4(val value: Float) : DrumIntent
     data class SdTriggerSource(val source: DrumTriggerSource) : DrumIntent
     data class SdPitchSource(val source: DrumTriggerSource) : DrumIntent
-    data class SdTrigger(val active: Boolean, val fromSequencer: Boolean = false) : DrumIntent
+    data class SdTrigger(val active: Boolean) : DrumIntent
 
-    data class HhFrequency(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
-    data class HhTone(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
-    data class HhDecay(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
-    data class HhP4(val value: Float, val fromSequencer: Boolean = false) : DrumIntent
+    data class HhFrequency(val value: Float) : DrumIntent
+    data class HhTone(val value: Float) : DrumIntent
+    data class HhDecay(val value: Float) : DrumIntent
+    data class HhP4(val value: Float) : DrumIntent
     data class HhTriggerSource(val source: DrumTriggerSource) : DrumIntent
     data class HhPitchSource(val source: DrumTriggerSource) : DrumIntent
-    data class HhTrigger(val active: Boolean, val fromSequencer: Boolean = false) : DrumIntent
+    data class HhTrigger(val active: Boolean) : DrumIntent
 
     data class Bypass(val active: Boolean) : DrumIntent
-    data class Restore(val state: DrumUiState) : DrumIntent
 }
 
 typealias DrumFeature = SynthFeature<DrumUiState, DrumPanelActions>
 
-@Inject
+/**
+ * ViewModel for the Drum Synth panel.
+ *
+ * Uses SynthController.controlFlow() for port-based engine interactions.
+ * Keeps SynthEngine for triggerDrum() (imperative operation).
+ */
 @ViewModelKey(DrumViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class DrumViewModel(
+class DrumViewModel @Inject constructor(
     private val synthEngine: SynthEngine,
     private val synthController: SynthController,
-    presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), DrumFeature {
 
+    // Control flows for Drum plugin ports
+    private val bdFreqId = synthController.controlFlow(DrumSymbol.BD_FREQ.controlId)
+    private val bdToneId = synthController.controlFlow(DrumSymbol.BD_TONE.controlId)
+    private val bdDecayId = synthController.controlFlow(DrumSymbol.BD_DECAY.controlId)
+    private val bdP4Id = synthController.controlFlow(DrumSymbol.BD_P4.controlId)
+    private val bdP5Id = synthController.controlFlow(DrumSymbol.BD_P5.controlId)
+    private val bdTrigSrcId = synthController.controlFlow(DrumSymbol.BD_TRIGGER_SRC.controlId)
+    private val bdPitchSrcId = synthController.controlFlow(DrumSymbol.BD_PITCH_SRC.controlId)
+
+    private val sdFreqId = synthController.controlFlow(DrumSymbol.SD_FREQ.controlId)
+    private val sdToneId = synthController.controlFlow(DrumSymbol.SD_TONE.controlId)
+    private val sdDecayId = synthController.controlFlow(DrumSymbol.SD_DECAY.controlId)
+    private val sdP4Id = synthController.controlFlow(DrumSymbol.SD_P4.controlId)
+    private val sdTrigSrcId = synthController.controlFlow(DrumSymbol.SD_TRIGGER_SRC.controlId)
+    private val sdPitchSrcId = synthController.controlFlow(DrumSymbol.SD_PITCH_SRC.controlId)
+
+    private val hhFreqId = synthController.controlFlow(DrumSymbol.HH_FREQ.controlId)
+    private val hhToneId = synthController.controlFlow(DrumSymbol.HH_TONE.controlId)
+    private val hhDecayId = synthController.controlFlow(DrumSymbol.HH_DECAY.controlId)
+    private val hhP4Id = synthController.controlFlow(DrumSymbol.HH_P4.controlId)
+    private val hhTrigSrcId = synthController.controlFlow(DrumSymbol.HH_TRIGGER_SRC.controlId)
+    private val hhPitchSrcId = synthController.controlFlow(DrumSymbol.HH_PITCH_SRC.controlId)
+
+    private val bypassId = synthController.controlFlow(DrumSymbol.BYPASS.controlId)
+
+    // UI-only intents for triggers (imperative, not port-based)
+    private val uiIntents = MutableSharedFlow<DrumIntent>(extraBufferCapacity = 64)
+
     override val actions = DrumPanelActions(
-        // BD actions
-        setBdFrequency = ::setBdFrequency,
-        setBdTone = ::setBdTone,
-        setBdDecay = ::setBdDecay,
-        setBdP4 = ::setBdP4,
-        setBdTriggerSource = ::setBdTriggerSource,
-        setBdPitchSource = ::setBdPitchSource,
+        setBdFrequency = bdFreqId.floatSetter(),
+        setBdTone = bdToneId.floatSetter(),
+        setBdDecay = bdDecayId.floatSetter(),
+        setBdP4 = bdP4Id.floatSetter(),
+        setBdTriggerSource = bdTrigSrcId.enumSetter(),
+        setBdPitchSource = bdPitchSrcId.enumSetter(),
         startBdTrigger = ::startBdTrigger,
         stopBdTrigger = ::stopBdTrigger,
 
-        // SD actions
-        setSdFrequency = ::setSdFrequency,
-        setSdTone = ::setSdTone,
-        setSdDecay = ::setSdDecay,
-        setSdP4 = ::setSdP4,
-        setSdTriggerSource = ::setSdTriggerSource,
-        setSdPitchSource = ::setSdPitchSource,
+        setSdFrequency = sdFreqId.floatSetter(),
+        setSdTone = sdToneId.floatSetter(),
+        setSdDecay = sdDecayId.floatSetter(),
+        setSdP4 = sdP4Id.floatSetter(),
+        setSdTriggerSource = sdTrigSrcId.enumSetter(),
+        setSdPitchSource = sdPitchSrcId.enumSetter(),
         startSdTrigger = ::startSdTrigger,
         stopSdTrigger = ::stopSdTrigger,
 
-        // HH actions
-        setHhFrequency = ::setHhFrequency,
-        setHhTone = ::setHhTone,
-        setHhDecay = ::setHhDecay,
-        setHhP4 = ::setHhP4,
-        setHhTriggerSource = ::setHhTriggerSource,
-        setHhPitchSource = ::setHhPitchSource,
+        setHhFrequency = hhFreqId.floatSetter(),
+        setHhTone = hhToneId.floatSetter(),
+        setHhDecay = hhDecayId.floatSetter(),
+        setHhP4 = hhP4Id.floatSetter(),
+        setHhTriggerSource = hhTrigSrcId.enumSetter(),
+        setHhPitchSource = hhPitchSrcId.enumSetter(),
         startHhTrigger = ::startHhTrigger,
         stopHhTrigger = ::stopHhTrigger,
 
-        // Global
-        setDrumsBypass = ::setDrumsBypass
+        setDrumsBypass = bypassId.boolSetter()
     )
 
-    private val _userIntents = MutableSharedFlow<DrumIntent>(
-        replay = 0,
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    // Port-based control changes -> intents
+    private val controlIntents = merge(
+        bdFreqId.map { DrumIntent.BdFrequency(it.asFloat()) },
+        bdToneId.map { DrumIntent.BdTone(it.asFloat()) },
+        bdDecayId.map { DrumIntent.BdDecay(it.asFloat()) },
+        bdP4Id.map { DrumIntent.BdP4(it.asFloat()) },
+        bdP5Id.map { DrumIntent.BdP5(it.asFloat()) },
+        bdTrigSrcId.map {
+            val sources = DrumTriggerSource.entries
+            DrumIntent.BdTriggerSource(sources.getOrElse(it.asInt()) { DrumTriggerSource.INTERNAL })
+        },
+        bdPitchSrcId.map {
+            val sources = DrumTriggerSource.entries
+            DrumIntent.BdPitchSource(sources.getOrElse(it.asInt()) { DrumTriggerSource.INTERNAL })
+        },
+
+        sdFreqId.map { DrumIntent.SdFrequency(it.asFloat()) },
+        sdToneId.map { DrumIntent.SdTone(it.asFloat()) },
+        sdDecayId.map { DrumIntent.SdDecay(it.asFloat()) },
+        sdP4Id.map { DrumIntent.SdP4(it.asFloat()) },
+        sdTrigSrcId.map {
+            val sources = DrumTriggerSource.entries
+            DrumIntent.SdTriggerSource(sources.getOrElse(it.asInt()) { DrumTriggerSource.INTERNAL })
+        },
+        sdPitchSrcId.map {
+            val sources = DrumTriggerSource.entries
+            DrumIntent.SdPitchSource(sources.getOrElse(it.asInt()) { DrumTriggerSource.INTERNAL })
+        },
+
+        hhFreqId.map { DrumIntent.HhFrequency(it.asFloat()) },
+        hhToneId.map { DrumIntent.HhTone(it.asFloat()) },
+        hhDecayId.map { DrumIntent.HhDecay(it.asFloat()) },
+        hhP4Id.map { DrumIntent.HhP4(it.asFloat()) },
+        hhTrigSrcId.map {
+            val sources = DrumTriggerSource.entries
+            DrumIntent.HhTriggerSource(sources.getOrElse(it.asInt()) { DrumTriggerSource.INTERNAL })
+        },
+        hhPitchSrcId.map {
+            val sources = DrumTriggerSource.entries
+            DrumIntent.HhPitchSource(sources.getOrElse(it.asInt()) { DrumTriggerSource.INTERNAL })
+        },
+
+        bypassId.map { DrumIntent.Bypass(it.asBoolean()) }
     )
-
-    // Preset changes -> DrumIntent.Restore
-    private val presetIntents = presetLoader.presetFlow.map { preset ->
-        val sources = DrumTriggerSource.entries
-        DrumIntent.Restore(
-            DrumUiState(
-                bdFrequency = preset.drumBdFrequency,
-                bdTone = preset.drumBdTone,
-                bdDecay = preset.drumBdDecay,
-                bdP4 = preset.drumBdP4,
-                bdP5 = preset.drumBdP5,
-                bdTriggerSource = sources.getOrElse(preset.drumBdTriggerSource) { DrumTriggerSource.INTERNAL },
-                bdPitchSource = sources.getOrElse(preset.drumBdPitchSource) { DrumTriggerSource.INTERNAL },
-                
-                sdFrequency = preset.drumSdFrequency,
-                sdTone = preset.drumSdTone,
-                sdDecay = preset.drumSdDecay,
-                sdP4 = preset.drumSdP4,
-                sdTriggerSource = sources.getOrElse(preset.drumSdTriggerSource) { DrumTriggerSource.INTERNAL },
-                sdPitchSource = sources.getOrElse(preset.drumSdPitchSource) { DrumTriggerSource.INTERNAL },
-                
-                hhFrequency = preset.drumHhFrequency,
-                hhTone = preset.drumHhTone,
-                hhDecay = preset.drumHhDecay,
-                hhP4 = preset.drumHhP4,
-                hhTriggerSource = sources.getOrElse(preset.drumHhTriggerSource) { DrumTriggerSource.INTERNAL },
-                hhPitchSource = sources.getOrElse(preset.drumHhPitchSource) { DrumTriggerSource.INTERNAL },
-                
-                drumsBypass = preset.drumsBypass
-            )
-        )
-    }
-
-    // Control changes -> DrumIntent
-    private val controlIntents = synthController.onControlChange.mapNotNull { event ->
-        val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
-        val sources = DrumTriggerSource.entries
-        fun getSource(value: Float) = sources.getOrElse((value * (sources.size - 1)).roundToInt().coerceIn(0, sources.size - 1)) { DrumTriggerSource.INTERNAL }
-
-        when (event.controlId) {
-            ControlIds.DRUM_BD_FREQ -> DrumIntent.BdFrequency(event.value, fromSequencer)
-            ControlIds.DRUM_BD_TONE -> DrumIntent.BdTone(event.value, fromSequencer)
-            ControlIds.DRUM_BD_DECAY -> DrumIntent.BdDecay(event.value, fromSequencer)
-            ControlIds.DRUM_BD_AFM -> DrumIntent.BdP4(event.value, fromSequencer)
-            ControlIds.DRUM_BD_TRIGGER_SOURCE -> DrumIntent.BdTriggerSource(getSource(event.value))
-            ControlIds.DRUM_BD_PITCH_SOURCE -> DrumIntent.BdPitchSource(getSource(event.value))
-            ControlIds.DRUM_BD_TRIGGER -> DrumIntent.BdTrigger(event.value >= 0.5f, fromSequencer)
-
-            ControlIds.DRUM_SD_FREQ -> DrumIntent.SdFrequency(event.value, fromSequencer)
-            ControlIds.DRUM_SD_TONE -> DrumIntent.SdTone(event.value, fromSequencer)
-            ControlIds.DRUM_SD_DECAY -> DrumIntent.SdDecay(event.value, fromSequencer)
-            ControlIds.DRUM_SD_SNAPPY -> DrumIntent.SdP4(event.value, fromSequencer)
-            ControlIds.DRUM_SD_TRIGGER_SOURCE -> DrumIntent.SdTriggerSource(getSource(event.value))
-            ControlIds.DRUM_SD_PITCH_SOURCE -> DrumIntent.SdPitchSource(getSource(event.value))
-            ControlIds.DRUM_SD_TRIGGER -> DrumIntent.SdTrigger(event.value >= 0.5f, fromSequencer)
-
-            ControlIds.DRUM_HH_FREQ -> DrumIntent.HhFrequency(event.value, fromSequencer)
-            ControlIds.DRUM_HH_TONE -> DrumIntent.HhTone(event.value, fromSequencer)
-            ControlIds.DRUM_HH_DECAY -> DrumIntent.HhDecay(event.value, fromSequencer)
-            ControlIds.DRUM_HH_NOISY -> DrumIntent.HhP4(event.value, fromSequencer)
-            ControlIds.DRUM_HH_TRIGGER_SOURCE -> DrumIntent.HhTriggerSource(getSource(event.value))
-            ControlIds.DRUM_HH_PITCH_SOURCE -> DrumIntent.HhPitchSource(getSource(event.value))
-            ControlIds.DRUM_HH_TRIGGER -> DrumIntent.HhTrigger(event.value >= 0.5f, fromSequencer)
-
-            ControlIds.DRUMS_BYPASS -> DrumIntent.Bypass(event.value >= 0.5f)
-            else -> null
-        }
-    }
 
     override val stateFlow: StateFlow<DrumUiState> =
-        merge(_userIntents, presetIntents, controlIntents)
+        merge(controlIntents, uiIntents)
             .scan(DrumUiState()) { state, intent ->
-                val newState = reduce(state, intent)
-                applyToEngine(newState, intent)
-                newState
+                reduce(state, intent)
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
@@ -303,6 +274,7 @@ class DrumViewModel(
             is DrumIntent.BdTone -> state.copy(bdTone = intent.value)
             is DrumIntent.BdDecay -> state.copy(bdDecay = intent.value)
             is DrumIntent.BdP4 -> state.copy(bdP4 = intent.value)
+            is DrumIntent.BdP5 -> state.copy(bdP5 = intent.value)
             is DrumIntent.BdTriggerSource -> state.copy(bdTriggerSource = intent.source)
             is DrumIntent.BdPitchSource -> state.copy(bdPitchSource = intent.source)
             is DrumIntent.BdTrigger -> state.copy(isBdActive = intent.active)
@@ -324,190 +296,25 @@ class DrumViewModel(
             is DrumIntent.HhTrigger -> state.copy(isHhActive = intent.active)
 
             is DrumIntent.Bypass -> state.copy(drumsBypass = intent.active)
-            is DrumIntent.Restore -> intent.state
         }
-
-    // ═══════════════════════════════════════════════════════════
-    // ENGINE SIDE EFFECTS
-    // ═══════════════════════════════════════════════════════════
-
-    private fun applyToEngine(state: DrumUiState, intent: DrumIntent) {
-        when (intent) {
-            is DrumIntent.BdFrequency -> if (!intent.fromSequencer) updateBdParams(state)
-            is DrumIntent.BdTone -> if (!intent.fromSequencer) updateBdParams(state)
-            is DrumIntent.BdDecay -> if (!intent.fromSequencer) updateBdParams(state)
-            is DrumIntent.BdP4 -> if (!intent.fromSequencer) updateBdParams(state)
-            is DrumIntent.BdTriggerSource -> synthEngine.setDrumTriggerSource(0, intent.source.ordinal)
-            is DrumIntent.BdPitchSource -> synthEngine.setDrumPitchSource(0, intent.source.ordinal)
-            is DrumIntent.BdTrigger -> {
-                if (intent.active) synthEngine.triggerDrum(0, 1.0f)
-            }
-
-            is DrumIntent.SdFrequency -> if (!intent.fromSequencer) updateSdParams(state)
-            is DrumIntent.SdTone -> if (!intent.fromSequencer) updateSdParams(state)
-            is DrumIntent.SdDecay -> if (!intent.fromSequencer) updateSdParams(state)
-            is DrumIntent.SdP4 -> if (!intent.fromSequencer) updateSdParams(state)
-            is DrumIntent.SdTriggerSource -> synthEngine.setDrumTriggerSource(1, intent.source.ordinal)
-            is DrumIntent.SdPitchSource -> synthEngine.setDrumPitchSource(1, intent.source.ordinal)
-            is DrumIntent.SdTrigger -> {
-                if (intent.active) synthEngine.triggerDrum(1, 1.0f)
-            }
-
-            is DrumIntent.HhFrequency -> if (!intent.fromSequencer) updateHhParams(state)
-            is DrumIntent.HhTone -> if (!intent.fromSequencer) updateHhParams(state)
-            is DrumIntent.HhDecay -> if (!intent.fromSequencer) updateHhParams(state)
-            is DrumIntent.HhP4 -> if (!intent.fromSequencer) updateHhParams(state)
-            is DrumIntent.HhTriggerSource -> synthEngine.setDrumTriggerSource(2, intent.source.ordinal)
-            is DrumIntent.HhPitchSource -> synthEngine.setDrumPitchSource(2, intent.source.ordinal)
-            is DrumIntent.HhTrigger -> {
-                if (intent.active) synthEngine.triggerDrum(2, 1.0f)
-            }
-
-            is DrumIntent.Bypass -> synthEngine.setDrumsBypass(intent.active)
-            is DrumIntent.Restore -> applyFullState(intent.state)
-        }
-    }
-
-    private fun applyFullState(state: DrumUiState) {
-        updateBdParams(state)
-        updateSdParams(state)
-        updateHhParams(state)
-        synthEngine.setDrumTriggerSource(0, state.bdTriggerSource.ordinal)
-        synthEngine.setDrumPitchSource(0, state.bdPitchSource.ordinal)
-        synthEngine.setDrumTriggerSource(1, state.sdTriggerSource.ordinal)
-        synthEngine.setDrumPitchSource(1, state.sdPitchSource.ordinal)
-        synthEngine.setDrumTriggerSource(2, state.hhTriggerSource.ordinal)
-        synthEngine.setDrumPitchSource(2, state.hhPitchSource.ordinal)
-        synthEngine.setDrumsBypass(state.drumsBypass)
-    }
-
-    private fun updateBdParams(s: DrumUiState) {
-        synthEngine.setDrumTone(0, s.bdFrequency, s.bdTone, s.bdDecay, s.bdP4, s.bdP5)
-    }
-
-    private fun updateSdParams(s: DrumUiState) {
-        synthEngine.setDrumTone(1, s.sdFrequency, s.sdTone, s.sdDecay, s.sdP4, 0.5f)
-    }
-
-    private fun updateHhParams(s: DrumUiState) {
-        synthEngine.setDrumTone(2, s.hhFrequency, s.hhTone, s.hhDecay, s.hhP4, 0.5f)
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // PUBLIC INTENT METHODS
-    // ═══════════════════════════════════════════════════════════
-
-    fun setBdFrequency(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_BD_FREQ, value, ControlEventOrigin.UI)
-    }
-
-    fun setBdTone(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_BD_TONE, value, ControlEventOrigin.UI)
-    }
-
-    fun setBdDecay(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_BD_DECAY, value, ControlEventOrigin.UI)
-    }
-
-    fun setBdP4(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_BD_AFM, value, ControlEventOrigin.UI)
-    }
-
-    fun setBdTriggerSource(source: DrumTriggerSource) {
-        val sources = DrumTriggerSource.entries
-        val v = if (sources.isNotEmpty()) source.ordinal.toFloat() / (sources.size - 1) else 0f
-        synthController.emitControlChange(ControlIds.DRUM_BD_TRIGGER_SOURCE, v, ControlEventOrigin.UI)
-    }
-
-    fun setBdPitchSource(source: DrumTriggerSource) {
-        val sources = DrumTriggerSource.entries
-        val v = if (sources.isNotEmpty()) source.ordinal.toFloat() / (sources.size - 1) else 0f
-        synthController.emitControlChange(ControlIds.DRUM_BD_PITCH_SOURCE, v, ControlEventOrigin.UI)
-    }
 
     fun startBdTrigger() {
-        synthController.emitControlChange(ControlIds.DRUM_BD_TRIGGER, 1f, ControlEventOrigin.UI)
+        synthEngine.triggerDrum(0, 1.0f)
+        uiIntents.tryEmit(DrumIntent.BdTrigger(true))
     }
-
-    fun stopBdTrigger() {
-        synthController.emitControlChange(ControlIds.DRUM_BD_TRIGGER, 0f, ControlEventOrigin.UI)
-    }
-
-    fun setSdFrequency(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_SD_FREQ, value, ControlEventOrigin.UI)
-    }
-
-    fun setSdTone(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_SD_TONE, value, ControlEventOrigin.UI)
-    }
-
-    fun setSdDecay(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_SD_DECAY, value, ControlEventOrigin.UI)
-    }
-
-    fun setSdP4(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_SD_SNAPPY, value, ControlEventOrigin.UI)
-    }
-
-    fun setSdTriggerSource(source: DrumTriggerSource) {
-        val sources = DrumTriggerSource.entries
-        val v = if (sources.isNotEmpty()) source.ordinal.toFloat() / (sources.size - 1) else 0f
-        synthController.emitControlChange(ControlIds.DRUM_SD_TRIGGER_SOURCE, v, ControlEventOrigin.UI)
-    }
-
-    fun setSdPitchSource(source: DrumTriggerSource) {
-        val sources = DrumTriggerSource.entries
-        val v = if (sources.isNotEmpty()) source.ordinal.toFloat() / (sources.size - 1) else 0f
-        synthController.emitControlChange(ControlIds.DRUM_SD_PITCH_SOURCE, v, ControlEventOrigin.UI)
-    }
+    fun stopBdTrigger() { uiIntents.tryEmit(DrumIntent.BdTrigger(false)) }
 
     fun startSdTrigger() {
-        synthController.emitControlChange(ControlIds.DRUM_SD_TRIGGER, 1f, ControlEventOrigin.UI)
+        synthEngine.triggerDrum(1, 1.0f)
+        uiIntents.tryEmit(DrumIntent.SdTrigger(true))
     }
-
-    fun stopSdTrigger() {
-        synthController.emitControlChange(ControlIds.DRUM_SD_TRIGGER, 0f, ControlEventOrigin.UI)
-    }
-
-    fun setHhFrequency(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_HH_FREQ, value, ControlEventOrigin.UI)
-    }
-
-    fun setHhTone(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_HH_TONE, value, ControlEventOrigin.UI)
-    }
-
-    fun setHhDecay(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_HH_DECAY, value, ControlEventOrigin.UI)
-    }
-
-    fun setHhP4(value: Float) {
-        synthController.emitControlChange(ControlIds.DRUM_HH_NOISY, value, ControlEventOrigin.UI)
-    }
-
-    fun setHhTriggerSource(source: DrumTriggerSource) {
-        val sources = DrumTriggerSource.entries
-        val v = if (sources.isNotEmpty()) source.ordinal.toFloat() / (sources.size - 1) else 0f
-        synthController.emitControlChange(ControlIds.DRUM_HH_TRIGGER_SOURCE, v, ControlEventOrigin.UI)
-    }
-
-    fun setHhPitchSource(source: DrumTriggerSource) {
-        val sources = DrumTriggerSource.entries
-        val v = if (sources.isNotEmpty()) source.ordinal.toFloat() / (sources.size - 1) else 0f
-        synthController.emitControlChange(ControlIds.DRUM_HH_PITCH_SOURCE, v, ControlEventOrigin.UI)
-    }
+    fun stopSdTrigger() { uiIntents.tryEmit(DrumIntent.SdTrigger(false)) }
 
     fun startHhTrigger() {
-        synthController.emitControlChange(ControlIds.DRUM_HH_TRIGGER, 1f, ControlEventOrigin.UI)
+        synthEngine.triggerDrum(2, 1.0f)
+        uiIntents.tryEmit(DrumIntent.HhTrigger(true))
     }
-
-    fun stopHhTrigger() {
-        synthController.emitControlChange(ControlIds.DRUM_HH_TRIGGER, 0f, ControlEventOrigin.UI)
-    }
-
-    fun setDrumsBypass(bypass: Boolean) {
-        synthController.emitControlChange(ControlIds.DRUMS_BYPASS, if (bypass) 1f else 0f, ControlEventOrigin.UI)
-    }
+    fun stopHhTrigger() { uiIntents.tryEmit(DrumIntent.HhTrigger(false)) }
 
     companion object {
         fun previewFeature(state: DrumUiState = DrumUiState()): DrumFeature =

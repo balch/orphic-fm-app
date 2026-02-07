@@ -9,24 +9,20 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.controller.boolSetter
+import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.presets.PresetLoader
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.synthViewModel
 
 @Immutable
@@ -59,15 +55,14 @@ data class DelayPanelActions(
 
 /** User intents for the Delay panel. */
 private sealed interface DelayIntent {
-    data class Time1(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
-    data class Time2(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
-    data class Mod1(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
-    data class Mod2(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
-    data class Feedback(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
-    data class Mix(val value: Float, val fromSequencer: Boolean = false) : DelayIntent
+    data class Time1(val value: Float) : DelayIntent
+    data class Time2(val value: Float) : DelayIntent
+    data class Mod1(val value: Float) : DelayIntent
+    data class Mod2(val value: Float) : DelayIntent
+    data class Feedback(val value: Float) : DelayIntent
+    data class Mix(val value: Float) : DelayIntent
     data class Source(val isLfo: Boolean) : DelayIntent
     data class Waveform(val isTriangle: Boolean) : DelayIntent
-    data class Restore(val state: DelayUiState) : DelayIntent
 }
 
 typealias DelayFeature = SynthFeature<DelayUiState, DelayPanelActions>
@@ -75,74 +70,52 @@ typealias DelayFeature = SynthFeature<DelayUiState, DelayPanelActions>
 /**
  * ViewModel for the Mod Delay panel.
  *
- * Uses MVI pattern with flow { emit(initial); emitAll(updates) } for proper WhileSubscribed support.
+ * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
-@Inject
 @ViewModelKey(DelayViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class DelayViewModel(
-    private val engine: SynthEngine,
+class DelayViewModel @Inject constructor(
     private val synthController: SynthController,
-    private val presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), DelayFeature {
 
+    // Control flows for Delay plugin ports
+    private val time1Id = synthController.controlFlow(DelaySymbol.TIME_1.controlId)
+    private val time2Id = synthController.controlFlow(DelaySymbol.TIME_2.controlId)
+    private val mod1Id = synthController.controlFlow(DelaySymbol.MOD_DEPTH_1.controlId)
+    private val mod2Id = synthController.controlFlow(DelaySymbol.MOD_DEPTH_2.controlId)
+    private val feedbackId = synthController.controlFlow(DelaySymbol.FEEDBACK.controlId)
+    private val mixId = synthController.controlFlow(DelaySymbol.MIX.controlId)
+    private val modSourceId = synthController.controlFlow(DelaySymbol.MOD_SOURCE.controlId)
+    private val waveformId = synthController.controlFlow(DelaySymbol.LFO_WAVEFORM.controlId)
+
     override val actions = DelayPanelActions(
-        setTime1 = ::setTime1,
-        setMod1 = ::setMod1,
-        setTime2 = ::setTime2,
-        setMod2 = ::setMod2,
-        setFeedback = ::setFeedback,
-        setMix = ::setMix,
-        setSource = ::setSource,
-        setWaveform = ::setWaveform
+        setTime1 = time1Id.floatSetter(),
+        setMod1 = mod1Id.floatSetter(),
+        setTime2 = time2Id.floatSetter(),
+        setMod2 = mod2Id.floatSetter(),
+        setFeedback = feedbackId.floatSetter(),
+        setMix = mixId.floatSetter(),
+        setSource = modSourceId.boolSetter(),
+        setWaveform = waveformId.boolSetter()
     )
-
-    // User intents flow
-    private val _userIntents = MutableSharedFlow<DelayIntent>(
-        replay = 0,
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-
-    // Preset changes -> DelayIntent.Restore
-    private val presetIntents = presetLoader.presetFlow.map { preset ->
-        DelayIntent.Restore(
-            DelayUiState(
-                time1 = preset.getFloat("org.balch.orpheus.plugins.delay:time_1", 0.3f),
-                time2 = preset.getFloat("org.balch.orpheus.plugins.delay:time_2", 0.3f),
-                mod1 = preset.getFloat("org.balch.orpheus. plugins.delay:mod_depth_1", 0.0f),
-                mod2 = preset.getFloat("org.balch.orpheus.plugins.delay:mod_depth_2", 0.0f),
-                feedback = preset.getFloat("org.balch.orpheus.plugins.delay:feedback", 0.5f),
-                mix = preset.getFloat("org.balch.orpheus.plugins.delay:mix", 0.5f),
-                isLfoSource = true, // Not stored in DSL yet
-                isTriangleWave = true // Not stored in DSL yet
-            )
-        )
-    }
 
     // Control changes -> DelayIntent
-    private val controlIntents = synthController.onControlChange.mapNotNull { event ->
-        val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
-        when (event.controlId) {
-            ControlIds.DELAY_TIME_1 -> DelayIntent.Time1(event.value, fromSequencer)
-            ControlIds.DELAY_TIME_2 -> DelayIntent.Time2(event.value, fromSequencer)
-            ControlIds.DELAY_MOD_1 -> DelayIntent.Mod1(event.value, fromSequencer)
-            ControlIds.DELAY_MOD_2 -> DelayIntent.Mod2(event.value, fromSequencer)
-            ControlIds.DELAY_FEEDBACK -> DelayIntent.Feedback(event.value, fromSequencer)
-            ControlIds.DELAY_MIX -> DelayIntent.Mix(event.value, fromSequencer)
-            ControlIds.DELAY_MOD_SOURCE -> DelayIntent.Source(event.value >= 0.5f)
-            ControlIds.DELAY_LFO_WAVEFORM -> DelayIntent.Waveform(event.value >= 0.5f)
-            else -> null
-        }
-    }
+    private val controlIntents = merge(
+        time1Id.map { DelayIntent.Time1(it.asFloat()) },
+        time2Id.map { DelayIntent.Time2(it.asFloat()) },
+        mod1Id.map { DelayIntent.Mod1(it.asFloat()) },
+        mod2Id.map { DelayIntent.Mod2(it.asFloat()) },
+        feedbackId.map { DelayIntent.Feedback(it.asFloat()) },
+        mixId.map { DelayIntent.Mix(it.asFloat()) },
+        modSourceId.map { DelayIntent.Source(it.asBoolean()) },
+        waveformId.map { DelayIntent.Waveform(it.asBoolean()) }
+    )
 
     override val stateFlow: StateFlow<DelayUiState> =
-        merge(_userIntents, presetIntents, controlIntents)
+        controlIntents
             .scan(DelayUiState()) { state, intent ->
-                val newState = reduce(state, intent)
-                applyToEngine(newState, intent)
-                newState
+                reduce(state, intent)
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
@@ -165,96 +138,7 @@ class DelayViewModel(
             is DelayIntent.Mix -> state.copy(mix = intent.value)
             is DelayIntent.Source -> state.copy(isLfoSource = intent.isLfo)
             is DelayIntent.Waveform -> state.copy(isTriangleWave = intent.isTriangle)
-            is DelayIntent.Restore -> intent.state
         }
-
-    // ═══════════════════════════════════════════════════════════
-    // ENGINE SIDE EFFECTS
-    // ═══════════════════════════════════════════════════════════
-
-    private fun applyToEngine(state: DelayUiState, intent: DelayIntent) {
-        when (intent) {
-            // Skip engine calls for SEQUENCER events - engine is driven by audio-rate automation
-            is DelayIntent.Time1 -> if (!intent.fromSequencer) engine.setDelayTime(0, intent.value)
-            is DelayIntent.Time2 -> if (!intent.fromSequencer) engine.setDelayTime(1, intent.value)
-            is DelayIntent.Mod1 -> if (!intent.fromSequencer) engine.setDelayModDepth(0, intent.value)
-            is DelayIntent.Mod2 -> if (!intent.fromSequencer) engine.setDelayModDepth(1, intent.value)
-            is DelayIntent.Feedback -> if (!intent.fromSequencer) engine.setDelayFeedback(intent.value)
-            is DelayIntent.Mix -> if (!intent.fromSequencer) engine.setDelayMix(intent.value)
-            is DelayIntent.Source -> {
-                engine.setDelayModSource(0, intent.isLfo)
-                engine.setDelayModSource(1, intent.isLfo)
-            }
-            is DelayIntent.Waveform -> engine.setDelayLfoWaveform(intent.isTriangle)
-            is DelayIntent.Restore -> applyFullState(intent.state)
-        }
-    }
-
-    private fun applyFullState(state: DelayUiState) {
-        engine.setDelayTime(0, state.time1)
-        engine.setDelayTime(1, state.time2)
-        engine.setDelayModDepth(0, state.mod1)
-        engine.setDelayModDepth(1, state.mod2)
-        engine.setDelayFeedback(state.feedback)
-        engine.setDelayMix(state.mix)
-        engine.setDelayModSource(0, state.isLfoSource)
-        engine.setDelayModSource(1, state.isLfoSource)
-        engine.setDelayLfoWaveform(state.isTriangleWave)
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // PUBLIC INTENT METHODS
-    // ═══════════════════════════════════════════════════════════
-
-    fun setTime1(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(DelayIntent.Time1(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.DELAY_TIME_1, value, ControlEventOrigin.UI)
-    }
-
-    fun setTime2(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(DelayIntent.Time2(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.DELAY_TIME_2, value, ControlEventOrigin.UI)
-    }
-
-    fun setMod1(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(DelayIntent.Mod1(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.DELAY_MOD_1, value, ControlEventOrigin.UI)
-    }
-
-    fun setMod2(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(DelayIntent.Mod2(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.DELAY_MOD_2, value, ControlEventOrigin.UI)
-    }
-
-    fun setFeedback(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(DelayIntent.Feedback(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.DELAY_FEEDBACK, value, ControlEventOrigin.UI)
-    }
-
-    fun setMix(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(DelayIntent.Mix(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.DELAY_MIX, value, ControlEventOrigin.UI)
-    }
-
-    fun setSource(isLfo: Boolean) {
-        _userIntents.tryEmit(DelayIntent.Source(isLfo))
-        synthController.emitControlChange(ControlIds.DELAY_MOD_SOURCE, if(isLfo) 1.0f else 0.0f, ControlEventOrigin.UI)
-    }
-
-    fun setWaveform(isTriangle: Boolean) {
-        _userIntents.tryEmit(DelayIntent.Waveform(isTriangle))
-        synthController.emitControlChange(ControlIds.DELAY_LFO_WAVEFORM, if(isTriangle) 1.0f else 0.0f, ControlEventOrigin.UI)
-    }
-
-    fun restoreState(state: DelayUiState) {
-        _userIntents.tryEmit(DelayIntent.Restore(state))
-    }
 
     companion object {
         fun previewFeature(state: DelayUiState = DelayUiState()): DelayFeature =

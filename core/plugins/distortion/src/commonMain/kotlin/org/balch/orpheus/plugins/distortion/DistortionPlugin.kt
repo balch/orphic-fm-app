@@ -13,22 +13,11 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-/**
- * Exhaustive enum of all Distortion plugin port symbols.
- */
-enum class DistortionSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    DRIVE("drive", "Drive"),
-    MIX("mix", "Mix"),
-    DRY_LEVEL("dry_level", "Dry Level")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.DISTORTION_URI
+import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 
 /**
  * LV2-style Distortion Plugin.
@@ -58,7 +47,7 @@ class DistortionPlugin(
     )
 
     companion object {
-        const val URI = "org.balch.orpheus.plugins.distortion"
+        const val URI = DISTORTION_URI
     }
 
     // Internal DSP Units

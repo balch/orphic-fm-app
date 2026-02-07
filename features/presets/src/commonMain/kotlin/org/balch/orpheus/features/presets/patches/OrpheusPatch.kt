@@ -5,15 +5,19 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
-import org.balch.orpheus.core.audio.dsp.PortValue
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
+import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
+import org.balch.orpheus.core.plugin.symbols.DrumSymbol
+import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.presets.SynthPatch
 import org.balch.orpheus.core.presets.SynthPreset
+import org.balch.orpheus.plugins.beats.BeatsPlugin
 import org.balch.orpheus.plugins.delay.DelayPlugin
-import org.balch.orpheus.plugins.delay.DelaySymbol
 import org.balch.orpheus.plugins.distortion.DistortionPlugin
-import org.balch.orpheus.plugins.distortion.DistortionSymbol
+import org.balch.orpheus.plugins.drum.DrumPlugin
 import org.balch.orpheus.plugins.duolfo.DuoLfoPlugin
-import org.balch.orpheus.plugins.duolfo.DuoLfoSymbol
 
 /**
  * Warm Pad - Gentle, warm pad with subtle modulation.
@@ -70,6 +74,33 @@ class OrpheusPatch : SynthPatch {
             val distUri = DistortionPlugin.URI
             put("$distUri:${DistortionSymbol.DRIVE.symbol}", PortValue.FloatValue(0.4f))
             put("$distUri:${DistortionSymbol.MIX.symbol}", PortValue.FloatValue(0.6f))
+
+            // Drums — bypassed, deep tuned kit to match the warm Orpheus character
+            val drumUri = DrumPlugin.URI
+            put("$drumUri:${DrumSymbol.BYPASS.symbol}", PortValue.BoolValue(true))
+            put("$drumUri:${DrumSymbol.MIX.symbol}", PortValue.FloatValue(0.75f))
+            put("$drumUri:${DrumSymbol.BD_FREQ.symbol}", PortValue.FloatValue(0.45f))
+            put("$drumUri:${DrumSymbol.BD_TONE.symbol}", PortValue.FloatValue(0.55f))
+            put("$drumUri:${DrumSymbol.BD_DECAY.symbol}", PortValue.FloatValue(0.6f))
+            put("$drumUri:${DrumSymbol.BD_P4.symbol}", PortValue.FloatValue(0.4f))
+            put("$drumUri:${DrumSymbol.BD_P5.symbol}", PortValue.FloatValue(0.6f))
+            put("$drumUri:${DrumSymbol.SD_FREQ.symbol}", PortValue.FloatValue(0.25f))
+            put("$drumUri:${DrumSymbol.SD_TONE.symbol}", PortValue.FloatValue(0.6f))
+            put("$drumUri:${DrumSymbol.SD_DECAY.symbol}", PortValue.FloatValue(0.5f))
+            put("$drumUri:${DrumSymbol.SD_P4.symbol}", PortValue.FloatValue(0.6f))
+            put("$drumUri:${DrumSymbol.HH_FREQ.symbol}", PortValue.FloatValue(0.3f))
+            put("$drumUri:${DrumSymbol.HH_TONE.symbol}", PortValue.FloatValue(0.55f))
+            put("$drumUri:${DrumSymbol.HH_DECAY.symbol}", PortValue.FloatValue(0.4f))
+            put("$drumUri:${DrumSymbol.HH_P4.symbol}", PortValue.FloatValue(0.5f))
+
+            // Beats — laid-back groove with swing
+            val beatsUri = BeatsPlugin.URI
+            put("$beatsUri:${BeatsSymbol.X.symbol}", PortValue.FloatValue(0.6f))
+            put("$beatsUri:${BeatsSymbol.Y.symbol}", PortValue.FloatValue(0.4f))
+            put("$beatsUri:${BeatsSymbol.BPM.symbol}", PortValue.FloatValue(105f))
+            put("$beatsUri:${BeatsSymbol.MIX.symbol}", PortValue.FloatValue(0.75f))
+            put("$beatsUri:${BeatsSymbol.RANDOMNESS.symbol}", PortValue.FloatValue(0.1f))
+            put("$beatsUri:${BeatsSymbol.SWING.symbol}", PortValue.FloatValue(0.15f))
         },
         createdAt = 1767461190433L
     )

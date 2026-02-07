@@ -9,35 +9,20 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.controller.floatSetter
+import org.balch.orpheus.core.controller.intSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.presets.PresetLoader
-import org.balch.orpheus.core.presets.fluxBias
-import org.balch.orpheus.core.presets.fluxClockSource
-import org.balch.orpheus.core.presets.fluxDejaVu
-import org.balch.orpheus.core.presets.fluxGateLength
-import org.balch.orpheus.core.presets.fluxJitter
-import org.balch.orpheus.core.presets.fluxLength
-import org.balch.orpheus.core.presets.fluxProbability
-import org.balch.orpheus.core.presets.fluxRate
-import org.balch.orpheus.core.presets.fluxScale
-import org.balch.orpheus.core.presets.fluxSpread
-import org.balch.orpheus.core.presets.fluxSteps
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 import org.balch.orpheus.core.synthViewModel
 
 @Immutable
@@ -75,10 +60,10 @@ data class FluxPanelActions(
 }
 
 private sealed interface FluxIntent {
-    data class Spread(val value: Float, val fromSequencer: Boolean = false) : FluxIntent
-    data class Bias(val value: Float, val fromSequencer: Boolean = false) : FluxIntent
-    data class Steps(val value: Float, val fromSequencer: Boolean = false) : FluxIntent
-    data class DejaVu(val value: Float, val fromSequencer: Boolean = false) : FluxIntent
+    data class Spread(val value: Float) : FluxIntent
+    data class Bias(val value: Float) : FluxIntent
+    data class Steps(val value: Float) : FluxIntent
+    data class DejaVu(val value: Float) : FluxIntent
     data class Length(val value: Int) : FluxIntent
     data class Scale(val value: Int) : FluxIntent
     data class Rate(val value: Float) : FluxIntent
@@ -86,85 +71,68 @@ private sealed interface FluxIntent {
     data class Probability(val value: Float) : FluxIntent
     data class ClockSource(val value: Int) : FluxIntent
     data class GateLength(val value: Float) : FluxIntent
-    data class Restore(val state: FluxUiState) : FluxIntent
 }
 
 typealias FluxFeature = SynthFeature<FluxUiState, FluxPanelActions>
 
-@Inject
+/**
+ * ViewModel for the Flux Quantized Random Sequencer panel.
+ *
+ * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
+ */
 @ViewModelKey(FluxViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class FluxViewModel(
-    private val engine: SynthEngine,
+class FluxViewModel @Inject constructor(
     private val synthController: SynthController,
-    presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), FluxFeature {
 
+    // Control flows for Flux plugin ports
+    private val spreadId = synthController.controlFlow(FluxSymbol.SPREAD.controlId)
+    private val biasId = synthController.controlFlow(FluxSymbol.BIAS.controlId)
+    private val stepsId = synthController.controlFlow(FluxSymbol.STEPS.controlId)
+    private val dejaVuId = synthController.controlFlow(FluxSymbol.DEJAVU.controlId)
+    private val lengthId = synthController.controlFlow(FluxSymbol.LENGTH.controlId)
+    private val scaleId = synthController.controlFlow(FluxSymbol.SCALE.controlId)
+    private val rateId = synthController.controlFlow(FluxSymbol.RATE.controlId)
+    private val jitterId = synthController.controlFlow(FluxSymbol.JITTER.controlId)
+    private val probabilityId = synthController.controlFlow(FluxSymbol.PROBABILITY.controlId)
+    private val clockSourceId = synthController.controlFlow(FluxSymbol.CLOCK_SOURCE.controlId)
+    private val gateLengthId = synthController.controlFlow(FluxSymbol.GATE_LENGTH.controlId)
+
     override val actions = FluxPanelActions(
-        setSpread = ::setSpread,
-        setBias = ::setBias,
-        setSteps = ::setSteps,
-        setDejaVu = ::setDejaVu,
-        setLength = ::setLength,
-        setScale = ::setScale,
-        setRate = ::setRate,
-        setJitter = ::setJitter,
-        setProbability = ::setProbability,
-        setClockSource = ::setClockSource,
-        setGateLength = ::setGateLength
+        setSpread = spreadId.floatSetter(),
+        setBias = biasId.floatSetter(),
+        setSteps = stepsId.floatSetter(),
+        setDejaVu = dejaVuId.floatSetter(),
+        setLength = lengthId.intSetter(),
+        setScale = scaleId.intSetter(),
+        setRate = rateId.floatSetter(),
+        setJitter = jitterId.floatSetter(),
+        setProbability = probabilityId.floatSetter(),
+        setClockSource = clockSourceId.intSetter(),
+        setGateLength = gateLengthId.floatSetter()
     )
 
-    private val _userIntents = MutableSharedFlow<FluxIntent>(
-        replay = 0,
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    // Control changes -> FluxIntent
+    private val controlIntents = merge(
+        spreadId.map { FluxIntent.Spread(it.asFloat()) },
+        biasId.map { FluxIntent.Bias(it.asFloat()) },
+        stepsId.map { FluxIntent.Steps(it.asFloat()) },
+        dejaVuId.map { FluxIntent.DejaVu(it.asFloat()) },
+        lengthId.map { FluxIntent.Length(it.asInt()) },
+        scaleId.map { FluxIntent.Scale(it.asInt()) },
+        rateId.map { FluxIntent.Rate(it.asFloat()) },
+        jitterId.map { FluxIntent.Jitter(it.asFloat()) },
+        probabilityId.map { FluxIntent.Probability(it.asFloat()) },
+        clockSourceId.map { FluxIntent.ClockSource(it.asInt()) },
+        gateLengthId.map { FluxIntent.GateLength(it.asFloat()) }
     )
-
-    // Preset changes -> FluxIntent.Restore
-    private val presetIntents = presetLoader.presetFlow.map { preset ->
-        FluxIntent.Restore(
-            FluxUiState(
-                spread = preset.fluxSpread,
-                bias = preset.fluxBias,
-                steps = preset.fluxSteps,
-                dejaVu = preset.fluxDejaVu,
-                length = preset.fluxLength,
-                scaleIndex = preset.fluxScale,
-                rate = preset.fluxRate,
-                jitter = preset.fluxJitter,
-                probability = preset.fluxProbability,
-                clockSource = preset.fluxClockSource,
-                gateLength = preset.fluxGateLength
-            )
-        )
-    }
-
-    // Map controller events to intents
-    private val controlIntents = synthController.onControlChange.mapNotNull { event ->
-        val fromSequencer = event.origin == ControlEventOrigin.SEQUENCER
-        when (event.controlId) {
-            ControlIds.FLUX_SPREAD -> FluxIntent.Spread(event.value, fromSequencer)
-            ControlIds.FLUX_BIAS -> FluxIntent.Bias(event.value, fromSequencer)
-            ControlIds.FLUX_STEPS -> FluxIntent.Steps(event.value, fromSequencer)
-            ControlIds.FLUX_DEJA_VU -> FluxIntent.DejaVu(event.value, fromSequencer)
-            ControlIds.FLUX_LENGTH -> FluxIntent.Length(event.value.toInt())
-            ControlIds.FLUX_SCALE -> FluxIntent.Scale(event.value.toInt())
-            ControlIds.FLUX_RATE -> FluxIntent.Rate(event.value)
-            ControlIds.FLUX_JITTER -> FluxIntent.Jitter(event.value)
-            ControlIds.FLUX_PROBABILITY -> FluxIntent.Probability(event.value)
-            ControlIds.FLUX_CLOCK_SOURCE -> FluxIntent.ClockSource(event.value.toInt())
-            ControlIds.FLUX_GATE_LENGTH -> FluxIntent.GateLength(event.value)
-            else -> null
-        }
-    }
 
     override val stateFlow: StateFlow<FluxUiState> =
-        merge(_userIntents, presetIntents, controlIntents)
+        controlIntents
             .scan(FluxUiState()) { state, intent ->
-                val newState = reduce(state, intent)
-                applyToEngine(newState, intent)
-                newState
+                reduce(state, intent)
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
@@ -185,97 +153,6 @@ class FluxViewModel(
         is FluxIntent.Probability -> state.copy(probability = intent.value)
         is FluxIntent.ClockSource -> state.copy(clockSource = intent.value)
         is FluxIntent.GateLength -> state.copy(gateLength = intent.value)
-        is FluxIntent.Restore -> intent.state
-    }
-
-    private fun applyToEngine(state: FluxUiState, intent: FluxIntent) {
-        when (intent) {
-            is FluxIntent.Spread -> if (!intent.fromSequencer) engine.setFluxSpread(intent.value)
-            is FluxIntent.Bias -> if (!intent.fromSequencer) engine.setFluxBias(intent.value)
-            is FluxIntent.Steps -> if (!intent.fromSequencer) engine.setFluxSteps(intent.value)
-            is FluxIntent.DejaVu -> if (!intent.fromSequencer) engine.setFluxDejaVu(intent.value)
-            is FluxIntent.Length -> engine.setFluxLength(intent.value)
-            is FluxIntent.Scale -> engine.setFluxScale(intent.value)
-            is FluxIntent.Rate -> engine.setFluxRate(intent.value)
-            is FluxIntent.Jitter -> engine.setFluxJitter(intent.value)
-            is FluxIntent.Probability -> engine.setFluxProbability(intent.value)
-            is FluxIntent.ClockSource -> engine.setFluxClockSource(intent.value)
-            is FluxIntent.GateLength -> engine.setFluxGateLength(intent.value)
-            is FluxIntent.Restore -> applyFullState(intent.state)
-        }
-    }
-
-    private fun applyFullState(state: FluxUiState) {
-        engine.setFluxSpread(state.spread)
-        engine.setFluxBias(state.bias)
-        engine.setFluxSteps(state.steps)
-        engine.setFluxDejaVu(state.dejaVu)
-        engine.setFluxLength(state.length)
-        engine.setFluxScale(state.scaleIndex)
-        engine.setFluxRate(state.rate)
-        engine.setFluxJitter(state.jitter)
-        engine.setFluxProbability(state.probability)
-        engine.setFluxClockSource(state.clockSource)
-        engine.setFluxGateLength(state.gateLength)
-    }
-
-    fun setSpread(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(FluxIntent.Spread(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.FLUX_SPREAD, value, ControlEventOrigin.UI)
-    }
-
-    fun setBias(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(FluxIntent.Bias(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.FLUX_BIAS, value, ControlEventOrigin.UI)
-    }
-
-    fun setSteps(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(FluxIntent.Steps(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.FLUX_STEPS, value, ControlEventOrigin.UI)
-    }
-
-    fun setDejaVu(value: Float) {
-        val fromSequencer = false
-        _userIntents.tryEmit(FluxIntent.DejaVu(value, fromSequencer))
-        synthController.emitControlChange(ControlIds.FLUX_DEJA_VU, value, ControlEventOrigin.UI)
-    }
-
-    fun setLength(value: Int) {
-        _userIntents.tryEmit(FluxIntent.Length(value))
-        synthController.emitControlChange(ControlIds.FLUX_LENGTH, value.toFloat(), ControlEventOrigin.UI)
-    }
-
-    fun setScale(value: Int) {
-        _userIntents.tryEmit(FluxIntent.Scale(value))
-        synthController.emitControlChange(ControlIds.FLUX_SCALE, value.toFloat(), ControlEventOrigin.UI)
-    }
-
-    fun setRate(value: Float) {
-        _userIntents.tryEmit(FluxIntent.Rate(value))
-        synthController.emitControlChange(ControlIds.FLUX_RATE, value, ControlEventOrigin.UI)
-    }
-
-    fun setJitter(value: Float) {
-        _userIntents.tryEmit(FluxIntent.Jitter(value))
-        synthController.emitControlChange(ControlIds.FLUX_JITTER, value, ControlEventOrigin.UI)
-    }
-
-    fun setProbability(value: Float) {
-        _userIntents.tryEmit(FluxIntent.Probability(value))
-        synthController.emitControlChange(ControlIds.FLUX_PROBABILITY, value, ControlEventOrigin.UI)
-    }
-
-    fun setClockSource(value: Int) {
-        _userIntents.tryEmit(FluxIntent.ClockSource(value))
-        synthController.emitControlChange(ControlIds.FLUX_CLOCK_SOURCE, value.toFloat(), ControlEventOrigin.UI)
-    }
-
-    fun setGateLength(value: Float) {
-        _userIntents.tryEmit(FluxIntent.GateLength(value))
-        synthController.emitControlChange(ControlIds.FLUX_GATE_LENGTH, value, ControlEventOrigin.UI)
     }
 
     companion object {

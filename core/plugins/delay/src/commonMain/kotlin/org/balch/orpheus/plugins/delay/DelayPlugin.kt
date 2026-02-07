@@ -13,28 +13,11 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-/**
- * Exhaustive enum of all Delay plugin port symbols.
- */
-enum class DelaySymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    FEEDBACK("feedback", "Feedback"),
-    MIX("mix", "Mix"),
-    TIME_1("time_1", "Time 1"),
-    TIME_2("time_2", "Time 2"),
-    MOD_DEPTH_1("mod_depth_1", "Mod Depth 1"),
-    MOD_DEPTH_2("mod_depth_2", "Mod Depth 2"),
-    STEREO_MODE("stereo_mode", "Stereo Mode"),
-    MOD_SOURCE("mod_source_is_lfo", "Mod Source is LFO"),
-    LFO_WAVEFORM("lfo_wave_is_triangle", "LFO Waveform is Triangle")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.DELAY_URI
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 
 /**
  * LV2-style Delay Plugin.
@@ -66,7 +49,7 @@ class DelayPlugin(
     )
 
     companion object {
-        const val URI = "org.balch.orpheus.plugins.delay"
+        const val URI = DELAY_URI
     }
 
     // DSP Units

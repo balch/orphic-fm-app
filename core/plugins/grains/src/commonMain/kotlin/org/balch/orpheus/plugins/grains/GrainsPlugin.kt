@@ -13,27 +13,11 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-/**
- * Exhaustive enum of all Grains plugin port symbols.
- */
-enum class GrainsSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    POSITION("position", "Position"),
-    SIZE("size", "Size"),
-    PITCH("pitch", "Pitch"),
-    DENSITY("density", "Density"),
-    TEXTURE("texture", "Texture"),
-    DRY_WET("dry_wet", "Dry/Wet"),
-    FREEZE("freeze", "Freeze"),
-    MODE("mode", "Mode")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.GRAINS_URI
+import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
 
 /**
  * Grains Texture Synthesizer Plugin.
@@ -62,7 +46,7 @@ class GrainsPlugin(
     )
     
     companion object {
-        const val URI = "org.balch.orpheus.plugins.grains"
+        const val URI = GRAINS_URI
     }
 
     private val grains = dspFactory.createGrainsUnit()
@@ -75,6 +59,7 @@ class GrainsPlugin(
     private var _texture = 0.5f
     private var _dryWet = 0.5f
     private var _freeze = false
+    private var _trigger = false
     private var _mode = 0
 
     // Type-safe DSL port definitions
@@ -130,6 +115,13 @@ class GrainsPlugin(
             }
         }
         
+        controlPort(GrainsSymbol.TRIGGER) {
+            boolType {
+                get { _trigger }
+                set { _trigger = it; grains.trigger.set(if (it) 1.0 else 0.0) }
+            }
+        }
+
         controlPort(GrainsSymbol.MODE) {
             intType {
                 min = 0; max = 2

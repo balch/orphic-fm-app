@@ -16,6 +16,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.core.pluginApi)
             implementation(projects.core.plugins.grains)
         }
     }

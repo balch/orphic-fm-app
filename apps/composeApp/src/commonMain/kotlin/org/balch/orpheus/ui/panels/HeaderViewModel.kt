@@ -12,11 +12,14 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.scan
+import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
@@ -33,7 +36,7 @@ data class HeaderPanelUiState(
      * Check if a panel is expanded.
      */
     fun isExpanded(panelId: PanelId): Boolean = expandedPanels[panelId] ?: false
-    
+
     companion object {
         /**
          * Default expansion state for panels.
@@ -72,47 +75,45 @@ data class HeaderPanelActions(
 
 typealias HeaderFeature = SynthFeature<HeaderPanelUiState, HeaderPanelActions>
 
+private data class HeaderIntent(val panelId: PanelId, val expanded: Boolean)
+
 /**
  * ViewModel for the HeaderPanel, managing panel expansion/collapse state.
+ *
+ * Uses declarative merge -> scan -> stateIn pattern for consistency with other ViewModels.
  */
 @Inject
 @ViewModelKey(HeaderViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class HeaderViewModel(
-    private val panelExpansionEventBus: PanelExpansionEventBus
+    panelExpansionEventBus: PanelExpansionEventBus
 ) : ViewModel(), HeaderFeature {
 
     private val log = logging("HeaderViewModel")
 
-    private val _uiState = MutableStateFlow(HeaderPanelUiState())
-    override val stateFlow: StateFlow<HeaderPanelUiState> = _uiState.asStateFlow()
+    private val uiIntents = MutableSharedFlow<HeaderIntent>(extraBufferCapacity = 64)
+
+    private val busIntents = panelExpansionEventBus.events
+        .map { event ->
+            log.debug { "HeaderViewModel: ${event.panelId.name} -> ${if (event.expand) "EXPAND" else "COLLAPSE"}" }
+            HeaderIntent(event.panelId, event.expand)
+        }
+
+    override val stateFlow: StateFlow<HeaderPanelUiState> =
+        merge(uiIntents, busIntents)
+            .scan(HeaderPanelUiState()) { state, intent ->
+                log.debug { "HeaderViewModel: setExpanded(${intent.panelId.name}, ${intent.expanded})" }
+                state.copy(expandedPanels = state.expandedPanels.put(intent.panelId, intent.expanded))
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = HeaderPanelUiState()
+            )
 
     override val actions = HeaderPanelActions(
-        setExpanded = ::setExpanded
+        setExpanded = { panelId, expanded -> uiIntents.tryEmit(HeaderIntent(panelId, expanded)) }
     )
-
-    init {
-        log.debug { "HeaderViewModel: Subscribing to PanelExpansionEventBus" }
-        // Subscribe to panel expansion events
-        viewModelScope.launch {
-            panelExpansionEventBus.events.collect { event ->
-                log.debug { "HeaderViewModel: ${event.panelId.name} -> ${if (event.expand) "EXPAND" else "COLLAPSE"}" }
-                setExpanded(event.panelId, event.expand)
-            }
-        }
-    }
-
-    /**
-     * Set the expansion state of a panel.
-     */
-    fun setExpanded(panelId: PanelId, expanded: Boolean) {
-        log.debug { "HeaderViewModel: setExpanded(${panelId.name}, $expanded)" }
-        _uiState.update { state ->
-            state.copy(
-                expandedPanels = state.expandedPanels.put(panelId, expanded)
-            )
-        }
-    }
 
     companion object {
         fun previewFeature(state: HeaderPanelUiState = HeaderPanelUiState()): HeaderFeature =
@@ -126,4 +127,3 @@ class HeaderViewModel(
             synthViewModel<HeaderViewModel, HeaderFeature>()
     }
 }
-

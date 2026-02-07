@@ -13,30 +13,11 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PluginInfo
 import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.PortSymbol
-import org.balch.orpheus.core.audio.dsp.PortValue
 import org.balch.orpheus.core.audio.dsp.Symbol
 import org.balch.orpheus.core.audio.dsp.ports
-
-/**
- * Exhaustive enum of all Flux plugin port symbols.
- * Provides compile-time safety and IDE auto-completion.
- */
-enum class FluxSymbol(
-    override val symbol: Symbol,
-    override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
-) : PortSymbol {
-    SPREAD("spread", "Spread"),
-    BIAS("bias", "Bias"),
-    STEPS("steps", "Steps"),
-    DEJAVU("dejavu", "Déjà Vu"),
-    LENGTH("length", "Length"),
-    SCALE("scale", "Scale"),
-    RATE("rate", "Rate"),
-    JITTER("jitter", "Jitter"),
-    PROBABILITY("probability", "Probability"),
-    GATE_LENGTH("gatelength", "Gate Length")
-}
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.FLUX_URI
+import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 
 /**
  * Flux Generative Sequencer Plugin.
@@ -70,7 +51,7 @@ class FluxPlugin(
     )
     
     companion object {
-        const val URI = "org.balch.orpheus.plugins.flux"
+        const val URI = FLUX_URI
     }
 
     val flux = dspFactory.createFluxUnit()

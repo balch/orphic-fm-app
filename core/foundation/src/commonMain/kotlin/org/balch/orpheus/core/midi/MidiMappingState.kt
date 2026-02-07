@@ -49,7 +49,11 @@ data class MidiMappingState(
             return "$note$octave"
         }
 
-        // Control ID constants for CC mapping
+        /**
+         * Legacy control ID constants for CC mapping.
+         * New code should prefer PortSymbol.controlId (PluginControlId) for type-safe control routing.
+         * These remain for MIDI mapping, Evo strategies, and Viz until those systems are migrated.
+         */
         object ControlIds {
             // Voice controls (index 0-7)
             fun voiceTune(index: Int) = "voice_${index}_tune"

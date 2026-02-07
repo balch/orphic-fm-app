@@ -146,9 +146,14 @@ class LiveCodeViewModel(
     override val triggers = scheduler.triggers
     
     init {
-        logger.d { "LiveCodeViewModel initialized, subscribing to ReplCodeEventBus" }
-        
-        // Subscribe to intents using scan pattern
+        logger.d { "LiveCodeViewModel initialized" }
+        observeIntents()
+        observeSchedulerState()
+        observeReplCodeEvents()
+        observePlaybackLifecycle()
+    }
+
+    private fun observeIntents() {
         viewModelScope.launch {
             _intents
                 .scan(_uiState.value) { state, intent ->
@@ -158,8 +163,9 @@ class LiveCodeViewModel(
                     _uiState.value = newState
                 }
         }
-        
-        // Subscribe to scheduler state updates
+    }
+
+    private fun observeSchedulerState() {
         viewModelScope.launch {
             scheduler.state.collect { schedState ->
                 val wasPlaying = _uiState.value.isPlaying
@@ -169,17 +175,15 @@ class LiveCodeViewModel(
                     cyclePosition = schedState.cyclePosition,
                     bpm = schedState.bpm
                 )
-                
-                // Notify MediaSessionStateManager when REPL playing state changes
                 if (wasPlaying != schedState.isPlaying) {
                     mediaSessionStateManager.setReplPlaying(schedState.isPlaying)
                 }
             }
         }
-        
-        // Subscribe to AI generated code events
+    }
+
+    private fun observeReplCodeEvents() {
         viewModelScope.launch {
-            logger.d { "Starting ReplCodeEventBus subscription..." }
             replCodeEventBus.events.collect { event ->
                 logger.d { "Received ReplCodeEvent: $event" }
                 when (event) {
@@ -189,12 +193,10 @@ class LiveCodeViewModel(
                     }
                     is ReplCodeEvent.Generating -> {
                         logger.d { "AI is generating code..." }
-                        // Set loading state
                         _uiState.value = _uiState.value.copy(isAiGenerating = true)
                     }
                     is ReplCodeEvent.Failed -> {
                         logger.w { "AI code generation failed: ${event.error}" }
-                        // Clear generating state on failure so UI is not blocked
                         _uiState.value = _uiState.value.copy(
                             isAiGenerating = false,
                             error = event.error
@@ -202,14 +204,14 @@ class LiveCodeViewModel(
                     }
                     is ReplCodeEvent.UserInteraction -> {
                         logger.d { "User took manual control" }
-                        // Clear loading state when user takes control
                         _uiState.value = _uiState.value.copy(isAiGenerating = false)
                     }
                 }
             }
         }
-        
-        // Subscribe to playback lifecycle events (e.g., foreground service stop)
+    }
+
+    private fun observePlaybackLifecycle() {
         viewModelScope.launch {
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
@@ -217,7 +219,7 @@ class LiveCodeViewModel(
                         logger.debug { "Received StopAll event - stopping REPL" }
                         repl.hush()
                         _uiState.value = _uiState.value.copy(
-                            isPlaying = false, 
+                            isPlaying = false,
                             activeSlots = emptySet(),
                             isAiGenerating = false
                         )

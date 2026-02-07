@@ -72,8 +72,6 @@ class EvoViewModel @Inject constructor(
     // Sort strategies alphabetically by name
     private val sortedStrategies = strategies.sortedBy { it.name }
 
-    private val _currentStrategy = MutableStateFlow(sortedStrategies.first())
-
     private val _userIntents = MutableSharedFlow<EvoIntent>(
         replay = 0,
         extraBufferCapacity = 64,
@@ -90,7 +88,7 @@ class EvoViewModel @Inject constructor(
         _userIntents
             .scan(initial) { state, intent ->
                 val newState = reduce(state, intent)
-                applyToEngine(newState, intent)
+                applyToEngine(state, newState, intent)
                 newState
             }
             .collect { emit(it) }
@@ -135,80 +133,74 @@ class EvoViewModel @Inject constructor(
             is EvoIntent.Restore -> intent.state
         }
 
-    private fun applyToEngine(state: EvoUiState, intent: EvoIntent) {
+    private fun applyToEngine(oldState: EvoUiState, newState: EvoUiState, intent: EvoIntent) {
         when (intent) {
             is EvoIntent.Strategy -> {
-                val old = _currentStrategy.value
+                val old = oldState.selectedStrategy
                 if (old == intent.strategy) return
-                
+
                 log.debug { "Switching strategy: ${old.name} → ${intent.strategy.name}" }
                 old.onDeactivate()
                 intent.strategy.onActivate()
-                _currentStrategy.value = intent.strategy
 
                 // Reset knobs on strategy change
                 intent.strategy.setKnob1(0.5f)
                 intent.strategy.setKnob2(0.5f)
 
                 // Restart loop if running
-                if (state.isEnabled) {
-                    startEvolutionLoop(state)
+                if (newState.isEnabled) {
+                    startEvolutionLoop()
                 }
             }
             is EvoIntent.Enabled -> {
-                log.debug { "Evolution ${if (intent.enabled) "enabled" else "disabled"} with ${_currentStrategy.value.name}" }
+                log.debug { "Evolution ${if (intent.enabled) "enabled" else "disabled"} with ${newState.selectedStrategy.name}" }
                 mediaSessionStateManager.setEvoActive(intent.enabled)
-                
+
                 if (intent.enabled) {
-                    _currentStrategy.value.onActivate()
-                    startEvolutionLoop(state)
+                    newState.selectedStrategy.onActivate()
+                    startEvolutionLoop()
                 } else {
                     stopEvolutionLoop()
-                    _currentStrategy.value.onDeactivate()
+                    newState.selectedStrategy.onDeactivate()
                 }
             }
             is EvoIntent.Knob1 -> {
-                _currentStrategy.value.setKnob1(intent.value.coerceIn(0f, 1f))
+                newState.selectedStrategy.setKnob1(intent.value.coerceIn(0f, 1f))
             }
             is EvoIntent.Knob2 -> {
-                _currentStrategy.value.setKnob2(intent.value.coerceIn(0f, 1f))
+                newState.selectedStrategy.setKnob2(intent.value.coerceIn(0f, 1f))
             }
             is EvoIntent.Restore -> {
-                _currentStrategy.value.onDeactivate()
+                oldState.selectedStrategy.onDeactivate()
                 intent.state.selectedStrategy.onActivate()
-                _currentStrategy.value = intent.state.selectedStrategy
                 intent.state.selectedStrategy.setKnob1(intent.state.knob1Value)
                 intent.state.selectedStrategy.setKnob2(intent.state.knob2Value)
                 mediaSessionStateManager.setEvoActive(intent.state.isEnabled)
-                if (intent.state.isEnabled) startEvolutionLoop(state) else stopEvolutionLoop()
+                if (intent.state.isEnabled) startEvolutionLoop() else stopEvolutionLoop()
             }
         }
     }
 
-    private fun startEvolutionLoop(initialState: EvoUiState) {
+    private fun startEvolutionLoop() {
         stopEvolutionLoop()
-        
-        log.debug { "Starting evolution loop with ${_currentStrategy.value.name}" }
-        
+
+        log.debug { "Starting evolution loop with ${stateFlow.value.selectedStrategy.name}" }
+
         evoJob = viewModelScope.launch(dispatcherProvider.default) {
             while (isActive) {
                 val state = stateFlow.value
                 if (!state.isEnabled) break
-                
-                val strategy = _currentStrategy.value
-                
+
                 // Execute evolution step
                 try {
-                    strategy.evolve(synthEngine)
+                    state.selectedStrategy.evolve(synthEngine)
                 } catch (e: Exception) {
                     log.error { "Error during evolution: ${e.message}" }
                 }
 
                 // Calculate delay based on strategy's speed knob
-                // Each strategy handles speed internally, but we use a baseline
-                val knob1 = state.knob1Value
                 // Speed 0.0 = Slow (2000ms), Speed 1.0 = Fast (100ms)
-                val delayMs = (2000f - (knob1 * 1900f)).toLong().coerceAtLeast(100L)
+                val delayMs = (2000f - (state.knob1Value * 1900f)).toLong().coerceAtLeast(100L)
                 delay(delayMs)
             }
             log.debug { "Evolution loop exited normally" }
@@ -226,7 +218,7 @@ class EvoViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopEvolutionLoop()
-        _currentStrategy.value.onDeactivate()
+        stateFlow.value.selectedStrategy.onDeactivate()
         log.debug { "EvoViewModel cleared" }
     }
 

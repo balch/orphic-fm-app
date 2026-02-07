@@ -46,6 +46,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":core:audio"))
             api(project(":core:foundation"))
+            api(project(":core:plugins:beats"))
             api(project(":core:plugins:voice"))
             api(project(":core:plugins:delay"))
             api(project(":core:plugins:distortion"))

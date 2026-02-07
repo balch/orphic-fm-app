@@ -9,7 +9,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,29 +25,19 @@ import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.audio.wobble.VoiceWobbleController
+import org.balch.orpheus.core.controller.ControlEventOrigin
+import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.controller.boolSetter
+import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
-import org.balch.orpheus.core.presets.PresetLoader
-import org.balch.orpheus.core.presets.duoModSources
-import org.balch.orpheus.core.presets.fmStructureCrossQuad
-import org.balch.orpheus.core.presets.pairSharpness
-import org.balch.orpheus.core.presets.quadEnvelopeTriggerModes
-import org.balch.orpheus.core.presets.quadGroupHolds
-import org.balch.orpheus.core.presets.quadGroupPitches
-import org.balch.orpheus.core.presets.quadGroupVolumes
-import org.balch.orpheus.core.presets.quadPitchSources
-import org.balch.orpheus.core.presets.quadTriggerSources
-import org.balch.orpheus.core.presets.totalFeedback
-import org.balch.orpheus.core.presets.vibrato
-import org.balch.orpheus.core.presets.voiceCoupling
-import org.balch.orpheus.core.presets.voiceEnvelopeSpeeds
-import org.balch.orpheus.core.presets.voiceModDepths
-import org.balch.orpheus.core.presets.voiceTunes
-import org.balch.orpheus.core.routing.ControlEventOrigin
-import org.balch.orpheus.core.routing.SynthController
+import org.balch.orpheus.core.plugin.PortValue.BoolValue
+import org.balch.orpheus.core.plugin.PortValue.FloatValue
+import org.balch.orpheus.core.plugin.PortValue.IntValue
+import org.balch.orpheus.core.plugin.symbols.StereoSymbol
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.core.tempo.GlobalTempo
-import kotlin.math.roundToInt
 
 @Immutable
 data class VoiceUiState(
@@ -66,7 +56,7 @@ data class VoiceUiState(
     val voiceCoupling: Float = 0.0f,
     val masterVolume: Float = 0.7f,
     val peakLevel: Float = 0.0f,
-    val bendPosition: Float = 0.0f, // -1 to +1, current bender position for UI display
+    val bendPosition: Float = 0.0f,
     val bpm: Double = 120.0,
     val quadTriggerSources: List<Int> = List(3) { 0 },
     val quadPitchSources: List<Int> = List(3) { 0 },
@@ -102,15 +92,12 @@ private sealed interface VoiceIntent {
     // Global intents
     data class FmStructure(val crossQuad: Boolean) : VoiceIntent
     data class TotalFeedback(val value: Float) : VoiceIntent
-    data class Vibrato(val value: Float, val fromSequencer: Boolean = false) : VoiceIntent
+    data class Vibrato(val value: Float) : VoiceIntent
     data class VoiceCoupling(val value: Float) : VoiceIntent
     data class MasterVolume(val value: Float) : VoiceIntent
     data class PeakLevel(val value: Float) : VoiceIntent
-    data class BendPosition(val value: Float) : VoiceIntent // For UI updates from engine
+    data class BendPosition(val value: Float) : VoiceIntent
     data class SetBpm(val value: Double) : VoiceIntent
-
-    // Restore
-    data class Restore(val state: VoiceUiState) : VoiceIntent
 }
 
 
@@ -118,7 +105,8 @@ typealias VoicesFeature = SynthFeature<VoiceUiState, VoicePanelActions>
 /**
  * ViewModel for voice management.
  *
- * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
+ * Uses MVI pattern with SynthController.controlFlow() for port-based engine interactions.
+ * Keeps SynthEngine dependency for non-port operations (gate, hold, wobble, bend, slide, peak).
  */
 @Inject
 @ViewModelKey(VoiceViewModel::class)
@@ -126,16 +114,79 @@ typealias VoicesFeature = SynthFeature<VoiceUiState, VoicePanelActions>
 class VoiceViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
-
     private val wobbleController: VoiceWobbleController,
     private val globalTempo: GlobalTempo,
-    presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), VoicesFeature {
 
+    // ═══════════════════════════════════════════════════════════
+    // CONTROL FLOWS
+    // ═══════════════════════════════════════════════════════════
+
+    // Per-voice (×12)
+    private val tuneFlows = Array(12) { i -> synthController.controlFlow(VoiceSymbol.tune(i).controlId) }
+    private val modDepthFlows = Array(12) { i -> synthController.controlFlow(VoiceSymbol.modDepth(i).controlId) }
+    private val envSpeedFlows = Array(12) { i -> synthController.controlFlow(VoiceSymbol.envSpeed(i).controlId) }
+
+    // Per-pair (×6)
+    private val pairSharpnessFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairSharpness(i).controlId) }
+    private val duoModSourceFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoModSource(i).controlId) }
+
+    // Per-quad (×3)
+    private val quadPitchFlows = Array(3) { i -> synthController.controlFlow(VoiceSymbol.quadPitch(i).controlId) }
+    private val quadHoldFlows = Array(3) { i -> synthController.controlFlow(VoiceSymbol.quadHold(i).controlId) }
+    private val quadVolumeFlows = Array(3) { i -> synthController.controlFlow(VoiceSymbol.quadVolume(i).controlId) }
+    private val quadTriggerSourceFlows = Array(3) { i -> synthController.controlFlow(VoiceSymbol.quadTriggerSource(i).controlId) }
+    private val quadPitchSourceFlows = Array(3) { i -> synthController.controlFlow(VoiceSymbol.quadPitchSource(i).controlId) }
+    private val quadEnvTriggerModeFlows = Array(3) { i -> synthController.controlFlow(VoiceSymbol.quadEnvTriggerMode(i).controlId) }
+
+    // Global
+    private val fmStructureFlow = synthController.controlFlow(VoiceSymbol.FM_STRUCTURE_CROSS_QUAD.controlId)
+    private val totalFeedbackFlow = synthController.controlFlow(VoiceSymbol.TOTAL_FEEDBACK.controlId)
+    private val vibratoFlow = synthController.controlFlow(VoiceSymbol.VIBRATO.controlId)
+    private val couplingFlow = synthController.controlFlow(VoiceSymbol.COUPLING.controlId)
+    private val masterVolFlow = synthController.controlFlow(StereoSymbol.MASTER_VOL.controlId)
+
+    // ═══════════════════════════════════════════════════════════
+    // INTENTS
+    // ═══════════════════════════════════════════════════════════
+
+    // UI-only intents (non-port state: pulse, hold, peak, bend, bpm)
+    private val uiIntents = MutableSharedFlow<VoiceIntent>(extraBufferCapacity = 256)
+
+    // Port-based control changes -> intents
+    private val controlIntents: Flow<VoiceIntent> = buildList<Flow<VoiceIntent>> {
+        for (i in 0 until 12) {
+            add(tuneFlows[i].map { VoiceIntent.Tune(i, it.asFloat()) })
+            add(modDepthFlows[i].map { VoiceIntent.ModDepth(i, it.asFloat()) })
+            add(envSpeedFlows[i].map { VoiceIntent.EnvelopeSpeed(i, it.asFloat()) })
+        }
+        for (i in 0 until 6) {
+            add(pairSharpnessFlows[i].map { VoiceIntent.PairSharpness(i, it.asFloat()) })
+            add(duoModSourceFlows[i].map {
+                val sources = ModSource.entries
+                val srcIndex = it.asInt().coerceIn(0, sources.size - 1)
+                VoiceIntent.DuoModSource(i, sources[srcIndex])
+            })
+        }
+        for (i in 0 until 3) {
+            add(quadPitchFlows[i].map { VoiceIntent.QuadPitch(i, it.asFloat()) })
+            add(quadHoldFlows[i].map { VoiceIntent.QuadHold(i, it.asFloat()) })
+            add(quadVolumeFlows[i].map { VoiceIntent.QuadVolume(i, it.asFloat()) })
+            add(quadTriggerSourceFlows[i].map { VoiceIntent.QuadTriggerSource(i, it.asInt()) })
+            add(quadPitchSourceFlows[i].map { VoiceIntent.QuadPitchSource(i, it.asInt()) })
+            add(quadEnvTriggerModeFlows[i].map { VoiceIntent.QuadEnvelopeTriggerMode(i, it.asBoolean()) })
+        }
+        add(fmStructureFlow.map { VoiceIntent.FmStructure(it.asBoolean()) })
+        add(totalFeedbackFlow.map { VoiceIntent.TotalFeedback(it.asFloat()) })
+        add(vibratoFlow.map { VoiceIntent.Vibrato(it.asFloat()) })
+        add(couplingFlow.map { VoiceIntent.VoiceCoupling(it.asFloat()) })
+        add(masterVolFlow.map { VoiceIntent.MasterVolume(it.asFloat()) })
+    }.merge()
+
     override val actions: VoicePanelActions = VoicePanelActions(
-        setMasterVolume = ::setMasterVolume,
-        setVibrato = ::setVibrato,
+        setMasterVolume = masterVolFlow.floatSetter(),
+        setVibrato = vibratoFlow.floatSetter(),
         setVoiceTune = ::setVoiceTune,
         setVoiceModDepth = ::setVoiceModDepth,
         setDuoModDepth = ::setDuoModDepth,
@@ -147,9 +198,9 @@ class VoiceViewModel(
         setDuoModSource = ::setDuoModSource,
         setQuadPitch = ::setQuadPitch,
         setQuadHold = ::setQuadHold,
-        setFmStructure = ::setFmStructure,
-        setTotalFeedback = ::setTotalFeedback,
-        setVoiceCoupling = ::setVoiceCoupling,
+        setFmStructure = fmStructureFlow.boolSetter(),
+        setTotalFeedback = totalFeedbackFlow.floatSetter(),
+        setVoiceCoupling = couplingFlow.floatSetter(),
         wobblePulseStart = ::wobblePulseStart,
         wobbleMove = ::wobbleMove,
         wobblePulseEnd = ::wobblePulseEnd,
@@ -165,27 +216,11 @@ class VoiceViewModel(
         setQuadEnvelopeTriggerMode = ::setQuadEnvelopeTriggerMode
     )
 
-    fun setMasterVolume(value: Float) {
-        synthController.emitControlChange(ControlIds.MASTER_VOLUME, value, ControlEventOrigin.UI)
-    }
-
-    private val intents =
-        MutableSharedFlow<VoiceIntent>(
-            replay = 1,
-            extraBufferCapacity = 256,
-            onBufferOverflow = BufferOverflow.DROP_OLDEST
-        )
-
-    // Preset changes -> VoiceIntent.Restore
-    private val presetIntents = presetLoader.presetFlow.map { preset ->
-        VoiceIntent.Restore(loadStateFromPreset(preset))
-    }
-
-    override val stateFlow: StateFlow<VoiceUiState> = 
-        merge(intents, presetIntents)
+    override val stateFlow: StateFlow<VoiceUiState> =
+        merge(controlIntents, uiIntents)
             .scan(VoiceUiState()) { state, intent ->
                 val newState = reduce(state, intent)
-                applyToEngine(newState, intent)
+                applySideEffects(newState, intent)
                 newState
             }
             .flowOn(dispatcherProvider.io)
@@ -195,205 +230,43 @@ class VoiceViewModel(
                 initialValue = VoiceUiState()
             )
 
-    private fun loadStateFromPreset(preset: org.balch.orpheus.core.presets.SynthPreset): VoiceUiState {
-        val voiceTunings = VoiceUiState.DEFAULT_TUNINGS
-        return VoiceUiState(
-            voiceStates = List(12) { i -> VoiceState(index = i, tune = preset.voiceTunes.getOrElse(i) { voiceTunings.getOrElse(i) { 0.5f } }) },
-            voiceModDepths = preset.voiceModDepths.padEnd(12, 0.0f),
-            voiceEnvelopeSpeeds = preset.voiceEnvelopeSpeeds.padEnd(12, 0.0f),
-            pairSharpness = preset.pairSharpness.padEnd(6, 0.0f),
-            duoModSources = preset.duoModSources.padEnd(6, ModSource.OFF),
-            quadGroupPitches = preset.quadGroupPitches.padEnd(3, 0.5f),
-            quadGroupHolds = preset.quadGroupHolds.padEnd(3, 0.0f),
-            quadGroupVolumes = preset.quadGroupVolumes.padEnd(3, 1.0f),
-            quadTriggerSources = preset.quadTriggerSources.padEnd(3, 0),
-            quadPitchSources = preset.quadPitchSources.padEnd(3, 0),
-            quadEnvelopeTriggerModes = preset.quadEnvelopeTriggerModes.padEnd(3, false),
-            
-            fmStructureCrossQuad = preset.fmStructureCrossQuad,
-            totalFeedback = preset.totalFeedback,
-            vibrato = preset.vibrato,
-            voiceCoupling = preset.voiceCoupling,
-            // Master volume usually not in preset, default 0.7f
-            masterVolume = 0.7f,
-            peakLevel = 0.0f,
-            bendPosition = 0.0f,
-            bpm = preset.bpm.toDouble()
-        )
-    }
-
     init {
         viewModelScope.launch(dispatcherProvider.io) {
-
-
-
-
+            // Pulse events
             launch {
                 synthController.onPulseStart.collect { voiceIndex ->
-                    intents.tryEmit(VoiceIntent.PulseStart(voiceIndex))
+                    uiIntents.tryEmit(VoiceIntent.PulseStart(voiceIndex))
                 }
             }
             launch {
                 synthController.onPulseEnd.collect { voiceIndex ->
-                    intents.tryEmit(VoiceIntent.PulseEnd(voiceIndex))
+                    uiIntents.tryEmit(VoiceIntent.PulseEnd(voiceIndex))
                 }
             }
-
-            // Subscribe to control changes for voice-related controls
-            launch {
-                synthController.onControlChange.collect { event ->
-                    handleControlChange(event.controlId, event.value, event.origin)
-                }
-            }
-
-            // Subscribe to peak flow
+            // Peak monitoring
             launch {
                 engine.peakFlow.collect { peak ->
-                    intents.tryEmit(VoiceIntent.PeakLevel(peak))
+                    uiIntents.tryEmit(VoiceIntent.PeakLevel(peak))
                 }
             }
-            
-            // Subscribe to bend changes (for AI-controlled bending)
+            // Bend from AI
             launch {
                 synthController.onBendChange.collect { amount ->
                     setBend(amount)
                 }
             }
-            
-            // Subscribe to bend flow for UI display updates
+            // Bend display
             launch {
                 engine.bendFlow.collect { bendAmount ->
-                    intents.tryEmit(VoiceIntent.BendPosition(bendAmount))
+                    uiIntents.tryEmit(VoiceIntent.BendPosition(bendAmount))
                 }
             }
-            
-            // Subscribe to GlobalTempo
+            // GlobalTempo
             launch {
                 globalTempo.bpm.collect { bpm ->
-                    intents.tryEmit(VoiceIntent.SetBpm(bpm))
+                    uiIntents.tryEmit(VoiceIntent.SetBpm(bpm))
                 }
             }
-        }
-    }
-
-    /**
-     * Routes MIDI control changes to the appropriate voice intents.
-     */
-    private fun handleControlChange(controlId: String, value: Float, origin: ControlEventOrigin = ControlEventOrigin.UI) {
-        val fromSequencer = origin == ControlEventOrigin.SEQUENCER
-        when (controlId) {
-            // Voice tunes
-            ControlIds.voiceTune(0) -> intents.tryEmit(VoiceIntent.Tune(0, value))
-            ControlIds.voiceTune(1) -> intents.tryEmit(VoiceIntent.Tune(1, value))
-            ControlIds.voiceTune(2) -> intents.tryEmit(VoiceIntent.Tune(2, value))
-            ControlIds.voiceTune(3) -> intents.tryEmit(VoiceIntent.Tune(3, value))
-            ControlIds.voiceTune(4) -> intents.tryEmit(VoiceIntent.Tune(4, value))
-            ControlIds.voiceTune(5) -> intents.tryEmit(VoiceIntent.Tune(5, value))
-            ControlIds.voiceTune(6) -> intents.tryEmit(VoiceIntent.Tune(6, value))
-            ControlIds.voiceTune(7) -> intents.tryEmit(VoiceIntent.Tune(7, value))
-
-            // Voice FM depths (duo-level)
-            ControlIds.voiceFmDepth(0), ControlIds.voiceFmDepth(1) -> {
-                intents.tryEmit(VoiceIntent.ModDepth(0, value))
-                intents.tryEmit(VoiceIntent.ModDepth(1, value))
-            }
-            ControlIds.voiceFmDepth(2), ControlIds.voiceFmDepth(3) -> {
-                intents.tryEmit(VoiceIntent.ModDepth(2, value))
-                intents.tryEmit(VoiceIntent.ModDepth(3, value))
-            }
-            ControlIds.voiceFmDepth(4), ControlIds.voiceFmDepth(5) -> {
-                intents.tryEmit(VoiceIntent.ModDepth(4, value))
-                intents.tryEmit(VoiceIntent.ModDepth(5, value))
-            }
-            ControlIds.voiceFmDepth(6), ControlIds.voiceFmDepth(7) -> {
-                intents.tryEmit(VoiceIntent.ModDepth(6, value))
-                intents.tryEmit(VoiceIntent.ModDepth(7, value))
-            }
-
-            // Pair sharpness
-            ControlIds.pairSharpness(0) -> intents.tryEmit(VoiceIntent.PairSharpness(0, value))
-            ControlIds.pairSharpness(1) -> intents.tryEmit(VoiceIntent.PairSharpness(1, value))
-            ControlIds.pairSharpness(2) -> intents.tryEmit(VoiceIntent.PairSharpness(2, value))
-            ControlIds.pairSharpness(3) -> intents.tryEmit(VoiceIntent.PairSharpness(3, value))
-
-            // Advanced FM - Vibrato may be sequenced
-            ControlIds.VIBRATO -> intents.tryEmit(VoiceIntent.Vibrato(value, fromSequencer))
-            ControlIds.VOICE_COUPLING -> intents.tryEmit(VoiceIntent.VoiceCoupling(value))
-            ControlIds.TOTAL_FEEDBACK -> intents.tryEmit(VoiceIntent.TotalFeedback(value))
-            ControlIds.MASTER_VOLUME -> intents.tryEmit(VoiceIntent.MasterVolume(value))
-
-            // Quad controls
-            ControlIds.quadPitch(0) -> intents.tryEmit(VoiceIntent.QuadPitch(0, value))
-            ControlIds.quadPitch(1) -> intents.tryEmit(VoiceIntent.QuadPitch(1, value))
-            ControlIds.quadHold(0) -> intents.tryEmit(VoiceIntent.QuadHold(0, value))
-            ControlIds.quadHold(1) -> intents.tryEmit(VoiceIntent.QuadHold(1, value))
-            ControlIds.quadVolume(0) -> intents.tryEmit(VoiceIntent.QuadVolume(0, value))
-            ControlIds.quadVolume(1) -> intents.tryEmit(VoiceIntent.QuadVolume(1, value))
-            ControlIds.quadVolume(2) -> intents.tryEmit(VoiceIntent.QuadVolume(2, value))
-            
-            ControlIds.FM_STRUCTURE -> intents.tryEmit(VoiceIntent.FmStructure(value > 0.5f))
-
-            else -> handleDynamicControlId(controlId, value)
-        }
-    }
-
-    private fun handleDynamicControlId(controlId: String, value: Float) {
-        when {
-            controlId.startsWith("voice_") && controlId.endsWith("_tune") -> {
-                val index = controlId.removePrefix("voice_").removeSuffix("_tune").toIntOrNull()
-                if (index != null) intents.tryEmit(VoiceIntent.Tune(index, value))
-            }
-
-            controlId.startsWith("voice_") && controlId.endsWith("_fm_depth") -> {
-                val index = controlId.removePrefix("voice_").removeSuffix("_fm_depth").toIntOrNull()
-                if (index != null) intents.tryEmit(VoiceIntent.ModDepth(index, value))
-            }
-
-            controlId.startsWith("voice_") && controlId.endsWith("_env_speed") -> {
-                val index = controlId.removePrefix("voice_").removeSuffix("_env_speed").toIntOrNull()
-                if (index != null) intents.tryEmit(VoiceIntent.EnvelopeSpeed(index, value))
-            }
-
-            controlId.startsWith("voice_") && controlId.endsWith("_hold") -> {
-                val index = controlId.removePrefix("voice_").removeSuffix("_hold").toIntOrNull()
-                // Treat as holding if value > 0.1f (allows continuous control from REPL)
-                if (index != null) intents.tryEmit(VoiceIntent.Hold(index, value > 0.1f))
-            }
-
-            controlId.startsWith("pair_") && controlId.endsWith("_sharpness") -> {
-                val index = controlId.removePrefix("pair_").removeSuffix("_sharpness").toIntOrNull()
-                if (index != null) intents.tryEmit(VoiceIntent.PairSharpness(index, value))
-            }
-
-            controlId.startsWith("pair_") && controlId.endsWith("_mod_source") -> {
-                val index = controlId.removePrefix("pair_").removeSuffix("_mod_source").toIntOrNull()
-                if (index != null) {
-                    val sources = ModSource.entries
-                    val srcIndex = (value * (sources.size - 1)).roundToInt().coerceIn(0, sources.size - 1)
-                    intents.tryEmit(VoiceIntent.DuoModSource(index, sources[srcIndex]))
-                }
-            }
-            
-            // Quad-level hold controls from REPL
-            controlId.startsWith("quad_") && controlId.endsWith("_hold") -> {
-                val index = controlId.removePrefix("quad_").removeSuffix("_hold").toIntOrNull()
-                if (index != null) intents.tryEmit(VoiceIntent.QuadHold(index, value))
-            }
-            
-            // Quad-level pitch controls from REPL
-            controlId.startsWith("quad_") && controlId.endsWith("_pitch") -> {
-                val index = controlId.removePrefix("quad_").removeSuffix("_pitch").toIntOrNull()
-                if (index != null) intents.tryEmit(VoiceIntent.QuadPitch(index, value))
-            }
-            
-            // Quad-level volume controls from AI/REPL
-            controlId.startsWith("quad_") && controlId.endsWith("_volume") -> {
-                val index = controlId.removePrefix("quad_").removeSuffix("_volume").toIntOrNull()
-                if (index != null) intents.tryEmit(VoiceIntent.QuadVolume(index, value))
-            }
-
-            // Fallback for direct param names that might come from AI
-            controlId == "master_volume" -> intents.tryEmit(VoiceIntent.MasterVolume(value))
         }
     }
 
@@ -463,16 +336,10 @@ class VoiceViewModel(
 
             is VoiceIntent.BendPosition ->
                 state.copy(bendPosition = intent.value)
-                
+
             is VoiceIntent.SetBpm ->
                 state.copy(bpm = intent.value)
-
-            is VoiceIntent.Restore -> intent.state
         }
-
-    fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) {
-        intents.tryEmit(VoiceIntent.QuadEnvelopeTriggerMode(quadIndex, enabled))
-    }
 
     // Helper extensions for cleaner state transformations
     private fun VoiceUiState.withVoice(index: Int, transform: (VoiceState) -> VoiceState) =
@@ -505,19 +372,28 @@ class VoiceViewModel(
     private fun VoiceUiState.withQuadPitchSource(quadIndex: Int, sourceIndex: Int) =
         copy(quadPitchSources = quadPitchSources.mapIndexed { i, s -> if (i == quadIndex) sourceIndex else s })
 
-
     // ═══════════════════════════════════════════════════════════
-    // ENGINE SIDE EFFECTS
+    // SIDE EFFECTS (non-port operations only; port-based handled by controlFlows)
     // ═══════════════════════════════════════════════════════════
 
-    private fun applyToEngine(state: VoiceUiState, intent: VoiceIntent) {
+    private fun applySideEffects(state: VoiceUiState, intent: VoiceIntent) {
         when (intent) {
-            is VoiceIntent.Tune -> engine.setVoiceTune(intent.index, intent.value)
-            is VoiceIntent.ModDepth ->
-                engine.setVoiceFmDepth(intent.index, intent.value)
+            is VoiceIntent.PulseStart -> engine.setVoiceGate(intent.index, true)
+            is VoiceIntent.PulseEnd -> engine.setVoiceGate(intent.index, false)
+
+            is VoiceIntent.Hold -> {
+                if (intent.holding) {
+                    // Hold level based on envelope speed: Speed 0 (fast) -> 0.7, Speed 1 (slow) -> 1.0
+                    val envSpeed = state.voiceEnvelopeSpeeds[intent.index]
+                    val holdLevel = 0.7f + (envSpeed * 0.3f)
+                    engine.setVoiceHold(intent.index, holdLevel)
+                } else {
+                    engine.setVoiceHold(intent.index, 0f)
+                    if (!state.voiceStates[intent.index].pulse) engine.setVoiceGate(intent.index, false)
+                }
+            }
 
             is VoiceIntent.EnvelopeSpeed -> {
-                engine.setVoiceEnvelopeSpeed(intent.index, intent.value)
                 // If this voice is currently holding, update its hold level based on new speed
                 if (state.voiceStates[intent.index].isHolding) {
                     val holdLevel = 0.7f + (intent.value * 0.3f)
@@ -525,106 +401,16 @@ class VoiceViewModel(
                 }
             }
 
-            is VoiceIntent.PulseStart -> engine.setVoiceGate(intent.index, true)
-            is VoiceIntent.PulseEnd -> {
-                val voice = state.voiceStates[intent.index]
-                // Always close the gate to trigger envelope release
-                engine.setVoiceGate(intent.index, false)
-                // If holding, the hold level provides the floor that VCA won't go below
-                // (hold level was already set when Hold was activated)
-            }
-
-            is VoiceIntent.Hold -> {
-                if (intent.holding) {
-                    // Set hold level based on envelope speed (same as QuadHold behavior)
-                    // Speed 0 (fast) → 0.7 hold level, Speed 1 (slow) → 1.0 hold level
-                    val envSpeed = state.voiceEnvelopeSpeeds[intent.index]
-                    val holdLevel = 0.7f + (envSpeed * 0.3f)
-                    engine.setVoiceHold(intent.index, holdLevel)
-                } else {
-                    engine.setVoiceHold(intent.index, 0f)
-                    val voice = state.voiceStates[intent.index]
-                    if (!voice.pulse) engine.setVoiceGate(intent.index, false)
-                }
-            }
-
-            is VoiceIntent.PairSharpness ->
-                engine.setPairSharpness(intent.pairIndex, intent.value)
-
-            is VoiceIntent.DuoModSource ->
-                engine.setDuoModSource(intent.pairIndex, intent.source)
-
-            is VoiceIntent.QuadPitch ->
-                engine.setQuadPitch(intent.quadIndex, intent.value)
-
-            is VoiceIntent.QuadHold ->
-                engine.setQuadHold(intent.quadIndex, intent.value)
-
-            is VoiceIntent.QuadVolume ->
-                engine.setQuadVolume(intent.quadIndex, intent.value)
-            
-            is VoiceIntent.QuadTriggerSource ->
-                engine.setQuadTriggerSource(intent.quadIndex, intent.sourceIndex)
-
-            is VoiceIntent.QuadPitchSource ->
-                engine.setQuadPitchSource(intent.quadIndex, intent.sourceIndex)
-
-            is VoiceIntent.QuadEnvelopeTriggerMode ->
-                engine.setQuadEnvelopeTriggerMode(intent.quadIndex, intent.enabled)
-
             is VoiceIntent.FmStructure -> {
-                engine.setFmStructure(intent.crossQuad)
+                // Re-apply duoModSources with VOICE_FM routing (depends on structure flag)
                 state.duoModSources.forEachIndexed { index, source ->
                     if (source == ModSource.VOICE_FM)
                         engine.setDuoModSource(index, source)
                 }
             }
 
-            is VoiceIntent.TotalFeedback -> engine.setTotalFeedback(intent.value)
-            // Skip engine call for SEQUENCER events - engine is driven by audio-rate automation
-            is VoiceIntent.Vibrato -> if (!intent.fromSequencer) engine.setVibrato(intent.value)
-            is VoiceIntent.VoiceCoupling -> engine.setVoiceCoupling(intent.value)
-            is VoiceIntent.MasterVolume -> engine.setMasterVolume(intent.value)
-            is VoiceIntent.PeakLevel -> { /* No side effect, strictly monitoring */ }
-            is VoiceIntent.BendPosition -> { /* No side effect, UI display only - engine already updated via bendFlow */ }
-            is VoiceIntent.SetBpm -> { /* State update only, side effect handled in onBpmChange via GlobalTempo */ }
-            is VoiceIntent.Restore -> applyFullState(intent.state)
+            else -> { /* Port-based side effects handled by controlFlows */ }
         }
-    }
-
-    private fun applyFullState(state: VoiceUiState) {
-        state.voiceStates.forEachIndexed { i, v ->
-            engine.setVoiceTune(i, v.tune)
-            // Restore hold levels
-            if (v.isHolding) {
-                val speed = state.voiceEnvelopeSpeeds[i]
-                val holdLevel = 0.7f + (speed * 0.3f)
-                engine.setVoiceHold(i, holdLevel)
-            } else {
-                engine.setVoiceHold(i, 0f)
-            }
-        }
-        state.voiceModDepths.forEachIndexed { i, d -> engine.setVoiceFmDepth(i, d) }
-        state.pairSharpness.forEachIndexed { i, s -> engine.setPairSharpness(i, s) }
-        state.voiceEnvelopeSpeeds.forEachIndexed { i, s ->
-            engine.setVoiceEnvelopeSpeed(i, s)
-        }
-        state.quadGroupPitches.forEachIndexed { i, p -> engine.setQuadPitch(i, p) }
-        state.quadGroupHolds.forEachIndexed { i, h -> engine.setQuadHold(i, h) }
-        state.quadGroupVolumes.forEachIndexed { i, v -> engine.setQuadVolume(i, v) }
-        state.quadTriggerSources.forEachIndexed { i, s -> engine.setQuadTriggerSource(i, s) }
-        state.quadPitchSources.forEachIndexed { i, s -> engine.setQuadPitchSource(i, s) }
-        state.quadEnvelopeTriggerModes.forEachIndexed { i, m -> engine.setQuadEnvelopeTriggerMode(i, m) }
-        
-        // IMPORTANT: Set FM structure BEFORE duoModSources!
-        // VOICE_FM routing in setDuoModSource depends on the fmStructureCrossQuad flag
-        engine.setFmStructure(state.fmStructureCrossQuad)
-        state.duoModSources.forEachIndexed { i, s -> engine.setDuoModSource(i, s) }
-        
-        engine.setTotalFeedback(state.totalFeedback)
-        engine.setVibrato(state.vibrato)
-        engine.setVoiceCoupling(state.voiceCoupling)
-        engine.setMasterVolume(state.masterVolume)
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -632,228 +418,138 @@ class VoiceViewModel(
     // ═══════════════════════════════════════════════════════════
 
     fun setVoiceTune(index: Int, value: Float) {
-        synthController.emitControlChange(ControlIds.voiceTune(index), value, ControlEventOrigin.UI)
+        tuneFlows[index].value = FloatValue(value)
     }
 
     fun setVoiceModDepth(index: Int, value: Float) {
-        val duoIndex = index / 2
-        synthController.emitControlChange(ControlIds.voiceFmDepth(index), value, ControlEventOrigin.UI)
-        // Also update the pair?
-        // Actually onDuoModDepthChange updates both. 
-        // If we want individual control via UI, we emit individually.
-        // But UI usually calls onDuoModDepthChange.
+        modDepthFlows[index].value = FloatValue(value)
     }
 
     fun setDuoModDepth(duoIndex: Int, value: Float) {
-        // Emit for both voices in the duo
-        synthController.emitControlChange(ControlIds.voiceFmDepth(duoIndex * 2), value, ControlEventOrigin.UI)
-        synthController.emitControlChange(ControlIds.voiceFmDepth(duoIndex * 2 + 1), value, ControlEventOrigin.UI)
+        modDepthFlows[duoIndex * 2].value = FloatValue(value)
+        modDepthFlows[duoIndex * 2 + 1].value = FloatValue(value)
     }
 
     fun setPairSharpness(pairIndex: Int, value: Float) {
-        synthController.emitControlChange(ControlIds.pairSharpness(pairIndex), value, ControlEventOrigin.UI)
+        pairSharpnessFlows[pairIndex].value = FloatValue(value)
     }
 
     fun setVoiceEnvelopeSpeed(index: Int, value: Float) {
-        synthController.emitControlChange(ControlIds.voiceEnvelopeSpeed(index), value, ControlEventOrigin.UI)
+        envSpeedFlows[index].value = FloatValue(value)
     }
 
     fun pulseStart(index: Int) {
-        // Reset per-string benders to ensure clean state when pulsing from voice pads
-        // This handles the case when user switches from strings panel to voice pads
         engine.resetStringBenders()
         synthController.emitPulseStart(index)
     }
-
 
     fun pulseEnd(index: Int) {
         synthController.emitPulseEnd(index)
     }
 
     fun setHold(index: Int, holding: Boolean) {
-        val value = if (holding) 1.0f else 0.0f
-        synthController.emitControlChange(ControlIds.voiceHold(index), value, ControlEventOrigin.UI)
+        uiIntents.tryEmit(VoiceIntent.Hold(index, holding))
     }
 
     fun setDuoModSource(index: Int, source: ModSource) {
-        val sources = ModSource.values()
-        // Map ordinal to 0..1 range approximately to match handleDynamicControlId logic
-        // But handleDynamicControlId does: (value * (sources.size - 1)).roundToInt()
-        // So value should be index / (size - 1)
-        val value = if (sources.size > 1) source.ordinal.toFloat() / (sources.size - 1) else 0f
-        synthController.emitControlChange(ControlIds.duoModSource(index), value, ControlEventOrigin.UI)
+        duoModSourceFlows[index].value = IntValue(source.ordinal)
     }
 
     fun setQuadPitch(index: Int, value: Float) {
-        synthController.emitControlChange(ControlIds.quadPitch(index), value, ControlEventOrigin.UI)
+        quadPitchFlows[index].value = FloatValue(value)
     }
 
     fun setQuadHold(index: Int, value: Float) {
-        synthController.emitControlChange(ControlIds.quadHold(index), value, ControlEventOrigin.UI)
+        quadHoldFlows[index].value = FloatValue(value)
     }
 
     fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) {
-        intents.tryEmit(VoiceIntent.QuadTriggerSource(quadIndex, sourceIndex))
+        quadTriggerSourceFlows[quadIndex].value = IntValue(sourceIndex)
     }
 
     fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) {
-        intents.tryEmit(VoiceIntent.QuadPitchSource(quadIndex, sourceIndex))
+        quadPitchSourceFlows[quadIndex].value = IntValue(sourceIndex)
     }
 
-    fun setFmStructure(crossQuad: Boolean) {
-        val value = if (crossQuad) 1.0f else 0.0f
-        synthController.emitControlChange(ControlIds.FM_STRUCTURE, value, ControlEventOrigin.UI)
+    fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) {
+        quadEnvTriggerModeFlows[quadIndex].value = BoolValue(enabled)
     }
 
-    fun setTotalFeedback(value: Float) {
-        synthController.emitControlChange(ControlIds.TOTAL_FEEDBACK, value, ControlEventOrigin.UI)
-    }
-
-    fun setVoiceCoupling(value: Float) {
-        synthController.emitControlChange(ControlIds.VOICE_COUPLING, value, ControlEventOrigin.UI)
-    }
-
-    fun setVibrato(value: Float) {
-        synthController.emitControlChange(ControlIds.VIBRATO, value, ControlEventOrigin.UI)
-    }
-
-    fun restoreState(state: VoiceUiState) {
-        // Restore assumes full state reset, bypass controller to avoid event storm
-        intents.tryEmit(VoiceIntent.Restore(state))
-    }
-    
     // ═══════════════════════════════════════════════════════════
     // WOBBLE METHODS
     // ═══════════════════════════════════════════════════════════
-    
-    /**
-     * Called when a pulse starts with initial pointer position for wobble tracking.
-     */
+
     fun wobblePulseStart(index: Int, x: Float, y: Float) {
         wobbleController.onPulseStart(index, x, y)
-        // Reset wobble multiplier to 1.0 at start
         engine.setVoiceWobble(index, 0f, wobbleController.config.value.range)
     }
-    
-    /**
-     * Called continuously as finger moves during pulse.
-     * Updates the wobble modulation in real-time.
-     */
+
     fun wobbleMove(index: Int, x: Float, y: Float) {
         val wobbleOffset = wobbleController.onPointerMove(index, x, y)
         val range = wobbleController.config.value.range
         engine.setVoiceWobble(index, wobbleOffset, range)
     }
-    
-    /**
-     * Called when pulse ends.
-     * Captures final wobble state and resets modulation.
-     */
+
     fun wobblePulseEnd(index: Int) {
         wobbleController.onPulseEnd(index)
-        // Reset to unity gain on release
         engine.setVoiceWobble(index, 0f, 0f)
     }
-    
+
     // ═══════════════════════════════════════════════════════════
     // BENDER METHODS
     // ═══════════════════════════════════════════════════════════
-    
-    /**
-     * Called continuously as the bender slider is dragged.
-     * @param amount Bend amount from -1 (down) to +1 (up), 0 = center
-     */
+
     fun setBend(amount: Float) {
-        // Reset per-string benders to ensure clean state when using global bender
-        // This handles the case when user switches from strings panel to voice pads
         engine.resetStringBenders()
-        
         engine.setBend(amount)
-        
-        // Also affect the current visualizer's knob2
-        // Map bend amount (-1 to +1) to knob range (0 to 1)
-        // Center (0) = 0.5, full up (+1) = 1.0, full down (-1) = 0.0
         val vizKnob2Value = (amount + 1f) / 2f
         synthController.emitControlChange(
-            ControlIds.VIZ_KNOB_2, 
-            vizKnob2Value, 
+            ControlIds.VIZ_KNOB_2,
+            vizKnob2Value,
             ControlEventOrigin.UI
         )
     }
 
-    
-    /**
-     * Called when the bender slider is released.
-     * The UI handles the spring animation; this resets the engine state.
-     */
     fun releaseBend() {
         engine.setBend(0f)
-        // Reset viz knob2 to center
         synthController.emitControlChange(ControlIds.VIZ_KNOB_2, 0.5f, ControlEventOrigin.UI)
     }
-    
+
     // ═══════════════════════════════════════════════════════════
     // PER-STRING BENDER METHODS
     // ═══════════════════════════════════════════════════════════
-    
-    /**
-     * Called when a string is bent (during drag).
-     * @param stringIndex 0-3
-     * @param bendAmount Horizontal deflection -1 to +1
-     * @param voiceMix Vertical position 0 to 1 (0=top/voice A, 0.5=center, 1=bottom/voice B)
-     */
+
     fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float) {
         engine.setStringBend(stringIndex, bendAmount, voiceMix)
-        
-        // Map string bends to Viz Knobs
-        // Purple (0) -> Knob 1
-        // Green (3) -> Knob 2
-        // Map -1..1 to 0..1
         val vizValue = (bendAmount + 1f) / 2f
-        
         if (stringIndex == 0) {
             synthController.emitControlChange(ControlIds.VIZ_KNOB_1, vizValue, ControlEventOrigin.UI)
         } else if (stringIndex == 3) {
             synthController.emitControlChange(ControlIds.VIZ_KNOB_2, vizValue, ControlEventOrigin.UI)
         }
     }
-    
-    /**
-     * Called when a string is released. Returns spring duration for UI animation.
-     * @param stringIndex 0-3
-     * @return Spring duration in milliseconds
-     */
+
     fun releaseStringBend(stringIndex: Int): Int {
-        // Reset viz knobs if applicable
         if (stringIndex == 0) {
             synthController.emitControlChange(ControlIds.VIZ_KNOB_1, 0.5f, ControlEventOrigin.UI)
         } else if (stringIndex == 3) {
             synthController.emitControlChange(ControlIds.VIZ_KNOB_2, 0.5f, ControlEventOrigin.UI)
         }
-        
         return engine.releaseStringBend(stringIndex)
     }
-    
+
     // ═══════════════════════════════════════════════════════════
     // SLIDE BAR METHODS
     // ═══════════════════════════════════════════════════════════
-    
-    /**
-     * Called when the slide bar is moved.
-     * @param yPosition 0 to 1 (0=top, 1=bottom) - down = higher pitch
-     * @param xPosition 0 to 1 (horizontal) - wiggling creates vibrato
-     */
+
     fun setSlideBar(yPosition: Float, xPosition: Float) {
         engine.setSlideBar(yPosition, xPosition)
     }
-    
-    /**
-     * Called when the slide bar is released.
-     */
+
     fun releaseSlideBar() {
         engine.releaseSlideBar()
     }
-    
+
     fun setBpm(bpm: Double) {
         globalTempo.setBpm(bpm)
     }
@@ -904,8 +600,8 @@ data class VoicePanelActions(
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
-            setMasterVolume = {}, setVibrato = {}, 
-            setVoiceTune = {_, _ -> }, setVoiceModDepth = {_, _ -> }, 
+            setMasterVolume = {}, setVibrato = {},
+            setVoiceTune = {_, _ -> }, setVoiceModDepth = {_, _ -> },
             setDuoModDepth = {_, _ -> }, setPairSharpness = {_, _ -> },
             setVoiceEnvelopeSpeed = {_, _ -> }, pulseStart = {}, pulseEnd = {},
             setHold = {_, _ -> }, setDuoModSource = {_, _ -> },
@@ -921,9 +617,4 @@ data class VoicePanelActions(
             setQuadEnvelopeTriggerMode = {_, _ -> }
         )
     }
-}
-
-// Extension function for List padding
-private fun <T> List<T>.padEnd(size: Int, element: T): List<T> {
-    return if (this.size >= size) this.take(size) else this + List(size - this.size) { element }
 }
