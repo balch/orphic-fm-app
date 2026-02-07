@@ -88,7 +88,6 @@ fun DrumsPanel(
 
             // BD Row (Red) - I key
             DrumRow(
-                label = "BD",
                 tag = "bd",
                 color = OrpheusColors.ninersRed,
                 frequency = state.bdFrequency,
@@ -111,7 +110,6 @@ fun DrumsPanel(
 
             // SD Row (Gold) - O key
             DrumRow(
-                label = "SD",
                 tag = "sd",
                 color = OrpheusColors.ninersGold,
                 frequency = state.sdFrequency,
@@ -134,7 +132,6 @@ fun DrumsPanel(
 
             // HH Row (White) - P key
             DrumRow(
-                label = "HH",
                 tag = "hh",
                 color = Color.White,
                 frequency = state.hhFrequency,
@@ -187,7 +184,6 @@ private fun LabelHeader(text: String, modifier: Modifier) {
 
 @Composable
 private fun DrumRow(
-    label: String,
     tag: String,
     color: Color,
     frequency: Float,
@@ -217,85 +213,75 @@ private fun DrumRow(
         // Parameter + Trigger Columns
         Row(
             modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Engine picker trigger + label
+            // Engine picker trigger (replaces label)
             var showEnginePicker by remember { mutableStateOf(false) }
             var hoveredSegment by remember { mutableStateOf<Int?>(null) }
-            Box(modifier = Modifier.weight(.6f), contentAlignment = Alignment.CenterStart) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+            Box(
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.15f))
+                        .border(1.dp, color.copy(alpha = 0.4f), CircleShape)
+                        .pointerInput(Unit) {
+                            val pickerRadiusPx = PICKER_SIZE.toPx() / 2f
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                    .also { it.consume() }
+                                showEnginePicker = true
+                                hoveredSegment = null
+
+                                var anyPressed = true
+                                while (anyPressed) {
+                                    val event = awaitPointerEvent()
+                                    val pos = event.changes.firstOrNull()?.position
+                                    if (pos != null) {
+                                        val cx = size.width / 2f
+                                        val cy = size.height / 2f
+                                        val dx = pos.x - cx
+                                        val dy = pos.y - cy
+                                        val dist = sqrt(dx * dx + dy * dy)
+                                        hoveredSegment = computePickerSegment(
+                                            dx, dy, dist, pickerRadiusPx, pickerConfig
+                                        )
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                    anyPressed = event.changes.any { it.pressed }
+                                }
+
+                                val seg = hoveredSegment
+                                if (seg != null) {
+                                    onEngineChange(
+                                        pickerSegmentToOrdinal(seg, pickerConfig)
+                                    )
+                                }
+                                showEnginePicker = false
+                                hoveredSegment = null
+                            }
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = color
+                        text = drumEngineLabel(engine),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = color,
+                        maxLines = 1
                     )
-                    Box {
-                        Box(
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clip(CircleShape)
-                                .background(color.copy(alpha = 0.15f))
-                                .border(1.dp, color.copy(alpha = 0.4f), CircleShape)
-                                .pointerInput(Unit) {
-                                    val pickerRadiusPx = PICKER_SIZE.toPx() / 2f
-                                    awaitEachGesture {
-                                        awaitFirstDown(requireUnconsumed = false)
-                                            .also { it.consume() }
-                                        showEnginePicker = true
-                                        hoveredSegment = null
-
-                                        var anyPressed = true
-                                        while (anyPressed) {
-                                            val event = awaitPointerEvent()
-                                            val pos = event.changes.firstOrNull()?.position
-                                            if (pos != null) {
-                                                val cx = size.width / 2f
-                                                val cy = size.height / 2f
-                                                val dx = pos.x - cx
-                                                val dy = pos.y - cy
-                                                val dist = sqrt(dx * dx + dy * dy)
-                                                hoveredSegment = computePickerSegment(
-                                                    dx, dy, dist, pickerRadiusPx, pickerConfig
-                                                )
-                                            }
-                                            event.changes.forEach { it.consume() }
-                                            anyPressed = event.changes.any { it.pressed }
-                                        }
-
-                                        val seg = hoveredSegment
-                                        if (seg != null) {
-                                            onEngineChange(
-                                                pickerSegmentToOrdinal(seg, pickerConfig)
-                                            )
-                                        }
-                                        showEnginePicker = false
-                                        hoveredSegment = null
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = drumEngineLabel(engine),
-                                fontSize = 7.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = color,
-                                maxLines = 1
-                            )
-                        }
-                        if (showEnginePicker) {
-                            EnginePickerPopup(
-                                currentEngine = engine,
-                                hoveredSegment = hoveredSegment,
-                                color = color,
-                                config = pickerConfig,
-                                anchorSize = 22.dp,
-                            )
-                        }
-                    }
+                }
+                if (showEnginePicker) {
+                    EnginePickerPopup(
+                        currentEngine = engine,
+                        hoveredSegment = hoveredSegment,
+                        color = color,
+                        config = pickerConfig,
+                        anchorSize = 34.dp,
+                    )
                 }
             }
 
@@ -343,7 +329,8 @@ private fun DrumRow(
                     activeColor = color,
                     isLearnMode = learnState.isActive,
                     isLearning = isLearningTrigger,
-                    onLearnSelect = { learnState.onSelectControl(triggerId) }
+                    onLearnSelect = { learnState.onSelectControl(triggerId) },
+                    modifier = Modifier.clip(CircleShape)
                 )
             }
         }
