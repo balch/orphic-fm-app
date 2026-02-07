@@ -22,7 +22,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         ## CONTROLS
         Use CONTROL actions to shape the drone sound.
         Parameters: controlId (string), value (float 0.0-1.0)
-        In DRONE Mode you can only use Quad 3 and Voices 9..12
+        IMPORTANT: In DRONE Mode you can ONLY use Quad 3 controls (QUAD_*_3), Voices 9-12 (VOICE_*_9..12), and Pairs 5-6 (DUO_MOD_SOURCE_5/6, PAIR_SHARPNESS_5/6). Do NOT touch Quad 1, Quad 2, Voices 1-8, or Pairs 1-4 — those belong to the user.
         
         ESSENTIAL CONTROLS for drones:
         - QUAD_VOLUME_3: Volume of drone voices (IMPORTANT: keep at 0.5-0.7 to stay below main volume). Do NOT use MASTER_VOLUME.
@@ -31,7 +31,15 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         - VIBRATO: LFO modulation depth (0.2-0.7).
         - DELAY_FEEDBACK: Echo repeats (0.3-0.8).
         - VOICE_COUPLING: FM modulation brightness (0.1-0.5).
-        - DUO_MOD_SOURCE_5..6: Complex modulation routing (0.0=FM, 1.0=LFO).
+
+        PER-VOICE CONTROLS (Quad 3 = Voices 9-12):
+        - VOICE_TUNE_9, VOICE_TUNE_10, VOICE_TUNE_11, VOICE_TUNE_12: Individual voice tuning (0.5=A3/220Hz). Slight detuning between voices creates rich beating textures.
+        - VOICE_FM_DEPTH_9..12: FM synthesis depth per voice (0=clean, higher=brighter harmonics).
+        - VOICE_ENV_SPEED_9..12: Envelope speed per voice (0=fast/percussive, 1=slow/pad). Use 0.7-1.0 for sustained drones.
+
+        PER-PAIR CONTROLS (Quad 3 = Pairs 5-6):
+        - DUO_MOD_SOURCE_5, DUO_MOD_SOURCE_6: Modulation routing (0.0=FM, 0.5=Off, 1.0=LFO).
+        - PAIR_SHARPNESS_5, PAIR_SHARPNESS_6: Waveform sharpness (0=soft/sine, 1=sharp/saw).
         
         BENDER CONTROL (SPECIAL: uses -1.0 to +1.0 range!):
         - BENDER: Pitch bend with spring-loaded feel (-1.0=down, 0.0=center, +1.0=up)
@@ -137,10 +145,10 @@ data object DroneAgentConfig : SynthControlAgentConfig {
      */
     override val initialMoodPrompts = listOf(
         "Evolve the drone texture: adjust VIBRATO depth or QUAD_PITCH_3 to shift the harmonic character.",
-        "Add more space: increase DELAY_FEEDBACK slightly, maybe reduce DISTORTION. Keep it ethereal.",
+        "Add more space: increase DELAY_FEEDBACK slightly, maybe reduce DRIVE. Keep it ethereal.",
         "Morph the modulation: change DUO_MOD_SOURCE_5 slightly to vary the texture.",
         "Deepen the drone: lower QUAD_PITCH_3 slightly (around 0.2-0.4) for sub-bass weight.",
-        "Create movement: shift VIBRATO and DELAY_TIME values. Make the drone breathe and pulse.",
+        "Create movement: shift VIBRATO and DELAY_TIME_1 values. Make the drone breathe and pulse.",
         "Simplify: reduce VOICE_COUPLING and TOTAL_FEEDBACK. Let the pure tones shine through.",
         
         // Atmospheric environments

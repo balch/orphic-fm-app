@@ -166,6 +166,12 @@ class SynthControlAgent(
                     return
                 }
 
+                // Enforce active quad restriction
+                if (!isControlAllowedForActiveQuads(id.uppercase())) {
+                    log.warn { "Blocked $id - outside active quads ${config.activeQuads}" }
+                    return
+                }
+
                 log.debug { "Executing CONTROL: $id = $value" }
                 emitControl("Set $id: ${value.format(2)}")
                 val result = synthControlTool.execute(SynthControlArgs(id, value))
@@ -204,6 +210,40 @@ class SynthControlAgent(
                 // Ignore
             }
         }
+    }
+
+    /**
+     * Check if a control ID is allowed given the config's activeQuads restriction.
+     * Global/effect controls are always allowed. Voice/pair/quad controls are
+     * only allowed if they belong to one of the active quads.
+     */
+    private fun isControlAllowedForActiveQuads(controlId: String): Boolean {
+        // If all quads are active, everything is allowed
+        if (config.activeQuads.size >= 3) return true
+
+        val quadIndex = controlIdToQuadIndex(controlId)
+            ?: return true // Global/effect controls always allowed
+        return quadIndex in config.activeQuads
+    }
+
+    /**
+     * Map an AI control name to its quad index (0-based), or null for global controls.
+     */
+    private fun controlIdToQuadIndex(id: String): Int? {
+        // Quad controls: QUAD_*_N (1-indexed) → quad N-1
+        val quadMatch = Regex("QUAD_(?:PITCH|HOLD|VOLUME)_(\\d+)").find(id)
+        if (quadMatch != null) return quadMatch.groupValues[1].toInt() - 1
+
+        // Voice controls: VOICE_*_N (1-indexed) → quad (N-1)/4
+        val voiceMatch = Regex("VOICE_(?:TUNE|FM_DEPTH|ENV_SPEED)_(\\d+)").find(id)
+        if (voiceMatch != null) return (voiceMatch.groupValues[1].toInt() - 1) / 4
+
+        // Pair controls: DUO_MOD_SOURCE_N, PAIR_SHARPNESS_N (1-indexed) → quad (N-1)/2
+        val pairMatch = Regex("(?:DUO_MOD_SOURCE|PAIR_SHARPNESS)_(\\d+)").find(id)
+        if (pairMatch != null) return (pairMatch.groupValues[1].toInt() - 1) / 2
+
+        // Global/effect controls (VIBRATO, DRIVE, DELAY_*, RESONATOR_*, MATRIX_*, BENDER, etc.)
+        return null
     }
 
     private fun String.toUserRequestPrompt() = """
