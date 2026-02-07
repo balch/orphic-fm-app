@@ -1,5 +1,8 @@
 package org.balch.orpheus.plugins.drum.engine
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.plugins.plaits.PlaitsEngine
 import org.balch.orpheus.plugins.plaits.PlaitsEngineFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngineId
@@ -8,7 +11,9 @@ import org.balch.orpheus.plugins.plaits.PlaitsEngineId
  * Factory for drum-based [PlaitsEngine] implementations.
  * Creates independent instances of wrapped 808/FM drum engines.
  */
-class DrumEngineFactory : PlaitsEngineFactory {
+@Inject
+@SingleIn(AppScope::class)
+class DrumEngineFactory() : PlaitsEngineFactory {
     override fun create(id: PlaitsEngineId): PlaitsEngine {
         val engine = when (id) {
             PlaitsEngineId.ANALOG_BASS_DRUM -> AnalogBassDrumEngine()

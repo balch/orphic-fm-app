@@ -19,7 +19,7 @@ class FmDrumEngine : PlaitsEngine {
     override val id = PlaitsEngineId.FM_DRUM
     override val displayName = id.displayName
     override val alreadyEnveloped = true
-    override val outGain = 0.8f
+    override val outGain = 0.5f
 
     private val drum = FmDrum(SynthDsp.SAMPLE_RATE)
 
@@ -32,8 +32,10 @@ class FmDrumEngine : PlaitsEngine {
         aux: FloatArray?,
         size: Int
     ): Boolean {
-        // Map MIDI note to 0..1 normalized frequency for FmDrum
-        val f0 = ((params.note - 24f) / 72f).coerceIn(0f, 1f)
+        // Compress voice tuning into bass drum range (f0 0.0–0.25)
+        // Default voice MIDI notes (~47–79) map to deep bass thumps, not melodic pitches
+        val normalizedNote = ((params.note - 36f) / 60f).coerceIn(0f, 1f)
+        val f0 = normalizedNote * 0.25f
         val trigger = params.trigger == TriggerState.RISING_EDGE ||
                 params.trigger == TriggerState.RISING_EDGE_HIGH
 

@@ -94,7 +94,8 @@ class FmDrum(private val sampleRate: Float = 44100f) {
 
         // 3. Compute pitch and phase increment
         var pitch = frequency + (fmAmount * fmValue shr 16)
-        pitch += (auxEnvelopeStrength * auxValue shr 10)
+        // Reduced shift (was shr 10) to tame the attack pitch sweep into bass-thump territory
+        pitch += (auxEnvelopeStrength * auxValue shr 13)
         
         val phaseIncrement = computePhaseIncrement(pitch)
         phase += phaseIncrement.toUInt()

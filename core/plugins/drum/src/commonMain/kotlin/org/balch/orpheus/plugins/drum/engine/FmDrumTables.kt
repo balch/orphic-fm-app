@@ -30,11 +30,15 @@ object FmDrumTables {
     }
 
     // Envelope increments (257 entries)
-    // Using a simple exponential mapping for now to avoid massive text blobs
+    // Maps decay parameter (0-65535, indexed by >>8) to phase increment per sample.
+    // Full 32-bit phase space (0 → 0xFFFFFFFF) must be traversed in ~5ms (fast) to ~2s (slow).
+    // At 44100 Hz: 5ms = 220 samples → increment ≈ 19.5M, 2s = 88200 samples → increment ≈ 48.7K
     val ENV_INCREMENTS = IntArray(257) { i ->
         val x = i / 256.0
-        // From ~1Hz to ~1000Hz equivalent increment
-        (100.0 * 2.0.pow(x * 10.0)).toInt()
+        // Exponential mapping from fast (short) to slow (long) decay
+        // i=0 → slowest (~2s), i=256 → fastest (~5ms)
+        val durationSamples = 88200.0 * 2.0.pow(-x * 4.5) // ~2s down to ~4ms
+        (4294967295.0 / durationSamples).toLong().coerceIn(1, Int.MAX_VALUE.toLong()).toInt()
     }
 
     // Oscillator phase increments mapping MIDI pitch (97 entries)

@@ -16,7 +16,8 @@ import kotlin.math.pow
 class DspVoiceManager @Inject constructor(
     private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory,
-    private val pluginProvider: DspPluginProvider
+    private val pluginProvider: DspPluginProvider,
+    private val engineFactory: PlaitsEngineFactory
 ) {
     // 8 Voices with pitch ranges (0.5=bass, 1.0=mid, 2.0=high)
     val voices = listOf(
@@ -55,7 +56,6 @@ class DspVoiceManager @Inject constructor(
     private var _voiceCoupling = 0.0f
     
     // Plaits engine selection
-    private val engineFactory: PlaitsEngineFactory = PlaitsEngineFactoryImpl()
     private val _pairEngine = IntArray(6)  // 0 = default oscillators
 
     // Quad sources

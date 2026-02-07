@@ -1,5 +1,10 @@
 package org.balch.orpheus.core.audio.dsp
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.plugins.drum.engine.DrumEngineFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngine
 import org.balch.orpheus.plugins.plaits.PlaitsEngineFactory
@@ -12,8 +17,12 @@ import org.balch.orpheus.plugins.plaits.engine.WaveshapingEngine
  * Unified factory for all [PlaitsEngine] implementations.
  * Delegates drum engines to [DrumEngineFactory] and creates pitched engines directly.
  */
-class PlaitsEngineFactoryImpl : PlaitsEngineFactory {
-    private val drumFactory = DrumEngineFactory()
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class, binding = binding<PlaitsEngineFactory>())
+class PlaitsEngineFactoryImpl(
+    private val drumFactory: DrumEngineFactory,
+) : PlaitsEngineFactory {
 
     override fun create(id: PlaitsEngineId): PlaitsEngine {
         return when (id) {

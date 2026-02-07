@@ -27,6 +27,7 @@ interface VoiceActions {
     fun wobblePulseEnd(index: Int)
     fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int)
     fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean)
+    fun setPairEngine(pairIndex: Int, engineOrdinal: Int)
 }
 
 interface MidiActions {
@@ -58,6 +59,7 @@ fun VoicePanelActions.toVoiceActions(): VoiceActions = object : VoiceActions {
     override fun wobblePulseEnd(index: Int) = this@toVoiceActions.wobblePulseEnd(index)
     override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) = this@toVoiceActions.setQuadTriggerSource(quadIndex, sourceIndex)
     override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) = this@toVoiceActions.setQuadEnvelopeTriggerMode(quadIndex, enabled)
+    override fun setPairEngine(pairIndex: Int, engineOrdinal: Int) = this@toVoiceActions.setPairEngine(pairIndex, engineOrdinal)
 }
 
 /**

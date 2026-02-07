@@ -19,7 +19,7 @@ import org.balch.orpheus.core.audio.dsp.ports
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.DRUM_URI
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
-import org.balch.orpheus.plugins.drum.engine.DrumEngineFactory
+import org.balch.orpheus.plugins.plaits.PlaitsEngineFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngineId
 
 /**
@@ -33,7 +33,8 @@ import org.balch.orpheus.plugins.plaits.PlaitsEngineId
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
 class DrumPlugin(
     private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
+    private val dspFactory: DspFactory,
+    private val engineFactory: PlaitsEngineFactory
 ) : DspPlugin {
 
     override val info = PluginInfo(
@@ -53,8 +54,6 @@ class DrumPlugin(
         /** Per-slot output gain for balanced mix */
         private val SLOT_GAINS = floatArrayOf(1.2f, 0.6f, 0.5f)
     }
-
-    private val engineFactory = DrumEngineFactory()
 
     // 3 independent PlaitsUnit slots
     private val slots: Array<PlaitsUnit> = Array(3) { dspFactory.createPlaitsUnit() }
@@ -384,5 +383,7 @@ class DrumPlugin(
         val engineId = entries[engineOrdinal]
         val engine = engineFactory.create(engineId)
         slots[slot].setEngine(engine)
+        slots[slot].setPercussiveMode(!engine.alreadyEnveloped)
+        applyParamsToSlot(slot)
     }
 }

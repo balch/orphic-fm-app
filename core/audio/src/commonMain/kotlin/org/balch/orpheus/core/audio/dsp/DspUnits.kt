@@ -218,6 +218,12 @@ interface PlaitsUnit : AudioUnit {
     /** Trigger a note with given accent */
     fun trigger(accent: Float)
 
+    /**
+     * Enable built-in percussive decay envelope for non-enveloped engines.
+     * Used when hosting pitched engines in drum slots where no external VCA exists.
+     */
+    fun setPercussiveMode(enabled: Boolean) {}
+
     interface Factory { fun create(): PlaitsUnit }
 }
 

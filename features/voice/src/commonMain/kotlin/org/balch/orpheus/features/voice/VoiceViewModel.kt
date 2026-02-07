@@ -58,6 +58,7 @@ data class VoiceUiState(
     val peakLevel: Float = 0.0f,
     val bendPosition: Float = 0.0f,
     val bpm: Double = 120.0,
+    val pairEngines: List<Int> = List(6) { 0 },
     val quadTriggerSources: List<Int> = List(3) { 0 },
     val quadPitchSources: List<Int> = List(3) { 0 },
     val quadEnvelopeTriggerModes: List<Boolean> = listOf(false, false, false)
@@ -80,6 +81,7 @@ private sealed interface VoiceIntent {
     // Pair-level intents
     data class PairSharpness(val pairIndex: Int, val value: Float) : VoiceIntent
     data class DuoModSource(val pairIndex: Int, val source: ModSource) : VoiceIntent
+    data class PairEngine(val pairIndex: Int, val engineOrdinal: Int) : VoiceIntent
 
     // Quad-level intents
     data class QuadPitch(val quadIndex: Int, val value: Float) : VoiceIntent
@@ -131,6 +133,7 @@ class VoiceViewModel(
     // Per-pair (×6)
     private val pairSharpnessFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairSharpness(i).controlId) }
     private val duoModSourceFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoModSource(i).controlId) }
+    private val pairEngineFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairEngine(i).controlId) }
 
     // Per-quad (×3)
     private val quadPitchFlows = Array(3) { i -> synthController.controlFlow(VoiceSymbol.quadPitch(i).controlId) }
@@ -168,6 +171,7 @@ class VoiceViewModel(
                 val srcIndex = it.asInt().coerceIn(0, sources.size - 1)
                 VoiceIntent.DuoModSource(i, sources[srcIndex])
             })
+            add(pairEngineFlows[i].map { VoiceIntent.PairEngine(i, it.asInt()) })
         }
         for (i in 0 until 3) {
             add(quadPitchFlows[i].map { VoiceIntent.QuadPitch(i, it.asFloat()) })
@@ -213,7 +217,8 @@ class VoiceViewModel(
         setBpm = ::setBpm,
         setQuadTriggerSource = ::setQuadTriggerSource,
         setQuadPitchSource = ::setQuadPitchSource,
-        setQuadEnvelopeTriggerMode = ::setQuadEnvelopeTriggerMode
+        setQuadEnvelopeTriggerMode = ::setQuadEnvelopeTriggerMode,
+        setPairEngine = ::setPairEngine
     )
 
     override val stateFlow: StateFlow<VoiceUiState> =
@@ -298,6 +303,9 @@ class VoiceViewModel(
             is VoiceIntent.DuoModSource ->
                 state.withDuoModSource(intent.pairIndex, intent.source)
 
+            is VoiceIntent.PairEngine ->
+                state.withPairEngine(intent.pairIndex, intent.engineOrdinal)
+
             is VoiceIntent.QuadPitch ->
                 state.withQuadPitch(intent.quadIndex, intent.value)
 
@@ -356,6 +364,9 @@ class VoiceViewModel(
 
     private fun VoiceUiState.withDuoModSource(pairIndex: Int, source: ModSource) =
         copy(duoModSources = duoModSources.mapIndexed { i, s -> if (i == pairIndex) source else s })
+
+    private fun VoiceUiState.withPairEngine(pairIndex: Int, engineOrdinal: Int) =
+        copy(pairEngines = pairEngines.mapIndexed { i, e -> if (i == pairIndex) engineOrdinal else e })
 
     private fun VoiceUiState.withQuadPitch(quadIndex: Int, value: Float) =
         copy(quadGroupPitches = quadGroupPitches.mapIndexed { i, p -> if (i == quadIndex) value else p })
@@ -453,6 +464,10 @@ class VoiceViewModel(
 
     fun setDuoModSource(index: Int, source: ModSource) {
         duoModSourceFlows[index].value = IntValue(source.ordinal)
+    }
+
+    fun setPairEngine(pairIndex: Int, engineOrdinal: Int) {
+        pairEngineFlows[pairIndex].value = IntValue(engineOrdinal)
     }
 
     fun setQuadPitch(index: Int, value: Float) {
@@ -596,7 +611,8 @@ data class VoicePanelActions(
     val setBpm: (Double) -> Unit,
     val setQuadTriggerSource: (Int, Int) -> Unit,
     val setQuadPitchSource: (Int, Int) -> Unit,
-    val setQuadEnvelopeTriggerMode: (Int, Boolean) -> Unit
+    val setQuadEnvelopeTriggerMode: (Int, Boolean) -> Unit,
+    val setPairEngine: (Int, Int) -> Unit
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
@@ -614,7 +630,8 @@ data class VoicePanelActions(
             setSlideBar = {_, _ -> }, releaseSlideBar = {},
             setBpm = {}, setQuadTriggerSource = {_, _ -> },
             setQuadPitchSource = {_, _ -> },
-            setQuadEnvelopeTriggerMode = {_, _ -> }
+            setQuadEnvelopeTriggerMode = {_, _ -> },
+            setPairEngine = {_, _ -> }
         )
     }
 }

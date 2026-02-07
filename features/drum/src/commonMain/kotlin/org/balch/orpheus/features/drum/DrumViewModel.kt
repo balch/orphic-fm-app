@@ -24,6 +24,7 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
 import org.balch.orpheus.core.controller.enumSetter
 import org.balch.orpheus.core.controller.floatSetter
+import org.balch.orpheus.core.controller.intSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.synthViewModel
@@ -55,6 +56,11 @@ data class DrumUiState(
     val hhP4: Float = 0.5f,
     val hhTriggerSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
     val hhPitchSource: DrumTriggerSource = DrumTriggerSource.INTERNAL,
+
+    // Engine Selection (PlaitsEngineId ordinals)
+    val bdEngine: Int = 0,
+    val sdEngine: Int = 1,
+    val hhEngine: Int = 2,
 
     // Trigger States (Visual Feedback)
     val isBdActive: Boolean = false,
@@ -91,13 +97,18 @@ data class DrumPanelActions(
     val startHhTrigger: () -> Unit,
     val stopHhTrigger: () -> Unit,
 
+    val setBdEngine: (Int) -> Unit,
+    val setSdEngine: (Int) -> Unit,
+    val setHhEngine: (Int) -> Unit,
+
     val setDrumsBypass: (Boolean) -> Unit
 ) {
     companion object {
         val EMPTY = DrumPanelActions(
             {}, {}, {}, {}, {}, {}, {}, {},
             {}, {}, {}, {}, {}, {}, {}, {},
-            {}, {}, {}, {}, {}, {}, {}, {}, {}
+            {}, {}, {}, {}, {}, {}, {}, {},
+            {}, {}, {}, {}
         )
     }
 }
@@ -128,6 +139,10 @@ private sealed interface DrumIntent {
     data class HhTriggerSource(val source: DrumTriggerSource) : DrumIntent
     data class HhPitchSource(val source: DrumTriggerSource) : DrumIntent
     data class HhTrigger(val active: Boolean) : DrumIntent
+
+    data class BdEngine(val ordinal: Int) : DrumIntent
+    data class SdEngine(val ordinal: Int) : DrumIntent
+    data class HhEngine(val ordinal: Int) : DrumIntent
 
     data class Bypass(val active: Boolean) : DrumIntent
 }
@@ -171,6 +186,10 @@ class DrumViewModel @Inject constructor(
     private val hhTrigSrcId = synthController.controlFlow(DrumSymbol.HH_TRIGGER_SRC.controlId)
     private val hhPitchSrcId = synthController.controlFlow(DrumSymbol.HH_PITCH_SRC.controlId)
 
+    private val bdEngineId = synthController.controlFlow(DrumSymbol.BD_ENGINE.controlId)
+    private val sdEngineId = synthController.controlFlow(DrumSymbol.SD_ENGINE.controlId)
+    private val hhEngineId = synthController.controlFlow(DrumSymbol.HH_ENGINE.controlId)
+
     private val bypassId = synthController.controlFlow(DrumSymbol.BYPASS.controlId)
 
     // UI-only intents for triggers (imperative, not port-based)
@@ -203,6 +222,10 @@ class DrumViewModel @Inject constructor(
         setHhPitchSource = hhPitchSrcId.enumSetter(),
         startHhTrigger = ::startHhTrigger,
         stopHhTrigger = ::stopHhTrigger,
+
+        setBdEngine = bdEngineId.intSetter(),
+        setSdEngine = sdEngineId.intSetter(),
+        setHhEngine = hhEngineId.intSetter(),
 
         setDrumsBypass = bypassId.boolSetter()
     )
@@ -249,6 +272,10 @@ class DrumViewModel @Inject constructor(
             DrumIntent.HhPitchSource(sources.getOrElse(it.asInt()) { DrumTriggerSource.INTERNAL })
         },
 
+        bdEngineId.map { DrumIntent.BdEngine(it.asInt()) },
+        sdEngineId.map { DrumIntent.SdEngine(it.asInt()) },
+        hhEngineId.map { DrumIntent.HhEngine(it.asInt()) },
+
         bypassId.map { DrumIntent.Bypass(it.asBoolean()) }
     )
 
@@ -294,6 +321,10 @@ class DrumViewModel @Inject constructor(
             is DrumIntent.HhTriggerSource -> state.copy(hhTriggerSource = intent.source)
             is DrumIntent.HhPitchSource -> state.copy(hhPitchSource = intent.source)
             is DrumIntent.HhTrigger -> state.copy(isHhActive = intent.active)
+
+            is DrumIntent.BdEngine -> state.copy(bdEngine = intent.ordinal)
+            is DrumIntent.SdEngine -> state.copy(sdEngine = intent.ordinal)
+            is DrumIntent.HhEngine -> state.copy(hhEngine = intent.ordinal)
 
             is DrumIntent.Bypass -> state.copy(drumsBypass = intent.active)
         }

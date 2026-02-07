@@ -9,6 +9,7 @@ import org.balch.orpheus.core.audio.dsp.JsynAudioInput
 import org.balch.orpheus.core.audio.dsp.JsynAudioOutput
 import org.balch.orpheus.core.audio.dsp.PlaitsUnit
 import kotlin.math.absoluteValue
+import kotlin.math.exp
 import kotlin.math.sign
 import kotlin.math.tanh
 
@@ -23,6 +24,7 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
     companion object {
         /** Sub-block size matching Plaits' internal rendering granularity. */
         private const val PLAITS_BLOCK_SIZE = 24
+        private const val SAMPLE_RATE = 44100f
     }
 
     // JSyn ports
@@ -49,6 +51,10 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
     // Edge detection state
     private var lastTriggerValue = 0.0
 
+    // Percussive envelope state
+    @Volatile private var _percussiveMode = false
+    private var envAmplitude = 0f
+
     // Reusable render buffer
     private val renderBuffer = FloatArray(PLAITS_BLOCK_SIZE)
 
@@ -74,6 +80,11 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
         _manualTrigger = true
     }
 
+    override fun setPercussiveMode(enabled: Boolean) {
+        _percussiveMode = enabled
+        if (!enabled) envAmplitude = 0f
+    }
+
     override fun generate(start: Int, end: Int) {
         val outputs = jsynOutput.values
         val trigInputs = jsynTriggerInput.values
@@ -88,6 +99,15 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
 
         val totalSamples = end - start
         var offset = 0
+        val percussive = _percussiveMode
+
+        // Compute per-sample decay coefficient from morph (0..1 → 30ms..2000ms)
+        val decayCoeff = if (percussive) {
+            val decayMs = 30f + _morph * 1970f
+            val decaySamples = decayMs * SAMPLE_RATE / 1000f
+            // exp(-6.9 / N) gives ~0.001 amplitude after N samples (60dB decay)
+            exp(-6.9f / decaySamples)
+        } else 1f
 
         while (offset < totalSamples) {
             val blockSize = minOf(PLAITS_BLOCK_SIZE, totalSamples - offset)
@@ -117,6 +137,11 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
                 }
             }
 
+            // Reset envelope on trigger in percussive mode
+            if (percussive && triggerState == TriggerState.RISING_EDGE) {
+                envAmplitude = 1f
+            }
+
             val params = EngineParameters(
                 trigger = triggerState,
                 note = _note,
@@ -128,10 +153,17 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
 
             eng.render(params, renderBuffer, null, blockSize)
 
-            // Copy to output with gain and soft limiting
+            // Copy to output with gain, envelope, and soft limiting
             val gain = eng.outGain
-            for (j in 0 until blockSize) {
-                outputs[start + offset + j] = softLimit(renderBuffer[j] * gain).toDouble()
+            if (percussive) {
+                for (j in 0 until blockSize) {
+                    outputs[start + offset + j] = softLimit(renderBuffer[j] * gain * envAmplitude).toDouble()
+                    envAmplitude *= decayCoeff
+                }
+            } else {
+                for (j in 0 until blockSize) {
+                    outputs[start + offset + j] = softLimit(renderBuffer[j] * gain).toDouble()
+                }
             }
 
             offset += blockSize
