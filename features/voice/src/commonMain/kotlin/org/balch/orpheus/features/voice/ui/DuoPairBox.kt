@@ -2,8 +2,6 @@ package org.balch.orpheus.features.voice.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,23 +10,17 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -41,14 +33,11 @@ import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.widgets.EnginePickerPopup
-import org.balch.orpheus.ui.widgets.PICKER_SIZE
+import org.balch.orpheus.ui.widgets.EnginePickerButton
+import org.balch.orpheus.ui.widgets.ModSourceSelector
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.balch.orpheus.ui.widgets.computePickerSegment
 import org.balch.orpheus.ui.widgets.engineLabel
-import org.balch.orpheus.ui.widgets.pickerSegmentToOrdinal
-import kotlin.math.sqrt
 
 @Composable
 fun DuoPairBox(
@@ -100,73 +89,8 @@ fun DuoPairBox(
 
             val pairIndex = voiceA / 2
 
-            // Engine selector — press to open radial picker, release to select
-            var showEnginePicker by remember { mutableStateOf(false) }
-            var hoveredSegment by remember { mutableStateOf<Int?>(null) }
-            Box {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(color.copy(alpha = 0.15f))
-                        .border(1.dp, color.copy(alpha = 0.4f), CircleShape)
-                        .pointerInput(Unit) {
-                            val pickerRadiusPx = PICKER_SIZE.toPx() / 2f
-                            awaitEachGesture {
-                                awaitFirstDown(requireUnconsumed = false)
-                                    .also { it.consume() }
-                                showEnginePicker = true
-                                hoveredSegment = null
-
-                                var anyPressed = true
-                                while (anyPressed) {
-                                    val event = awaitPointerEvent()
-                                    val pos = event.changes.firstOrNull()?.position
-                                    if (pos != null) {
-                                        val cx = size.width / 2f
-                                        val cy = size.height / 2f
-                                        val dx = pos.x - cx
-                                        val dy = pos.y - cy
-                                        val dist = sqrt(dx * dx + dy * dy)
-                                        hoveredSegment =
-                                            computePickerSegment(dx, dy, dist, pickerRadiusPx)
-                                    }
-                                    event.changes.forEach { it.consume() }
-                                    anyPressed = event.changes.any { it.pressed }
-                                }
-
-                                val seg = hoveredSegment
-                                if (seg != null) {
-                                    voiceActions.setPairEngine(
-                                        pairIndex,
-                                        pickerSegmentToOrdinal(seg)
-                                    )
-                                }
-                                showEnginePicker = false
-                                hoveredSegment = null
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = engineLabel(pairEngine),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = color,
-                        maxLines = 1
-                    )
-                }
-                if (showEnginePicker) {
-                    EnginePickerPopup(
-                        currentEngine = pairEngine,
-                        hoveredSegment = hoveredSegment,
-                        color = color,
-                    )
-                }
-            }
-
             // Mod Source Selector (Cycles: OFF -> LFO -> FM -> FLUX)
-            org.balch.orpheus.ui.widgets.ModSourceSelector(
+            ModSourceSelector(
                 activeSource = duoModSource,
                 onSourceChange = { newSource ->
                     voiceActions.setDuoModSource(pairIndex, newSource)
@@ -322,15 +246,24 @@ fun DuoPairBox(
             }
             } // end Row
 
-            // Harmonics knob overlaid between the 4 knobs (no layout impact on columns)
-            if (pairEngine != 0) {
+            // Engine picker + harmonics knob overlaid between the 4 knobs
+            Column(
+                modifier = Modifier.align(
+                    BiasAlignment(horizontalBias = 0f, verticalBias = -0.35f)
+                ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                EnginePickerButton(
+                    currentEngine = pairEngine,
+                    onEngineChange = { voiceActions.setPairEngine(voiceA / 2, it) },
+                    color = color,
+                    label = engineLabel(pairEngine),
+                )
                 RotaryKnob(
-                    modifier = Modifier.align(
-                        BiasAlignment(horizontalBias = 0f, verticalBias = -0.35f)
-                    ),
                     value = pairHarmonics,
                     onValueChange = { voiceActions.setPairHarmonics(voiceA / 2, it) },
-                    label = "H",
+                    label = "\u2261",
                     size = 28.dp,
                     progressColor = color
                 )

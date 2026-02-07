@@ -3,13 +3,20 @@ package org.balch.orpheus.ui.widgets
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -17,6 +24,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -40,6 +48,7 @@ import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 // ═══════════════════════════════════════════════════════════
 // Picker configuration
@@ -149,7 +158,93 @@ fun drumEngineLabel(ordinal: Int): String = when (ordinal) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Composable
+// Self-contained button + popup
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Self-contained engine picker button that manages its own popup state and gesture handling.
+ * Press-and-drag to select an engine from the radial popup.
+ */
+@Composable
+fun EnginePickerButton(
+    currentEngine: Int,
+    onEngineChange: (Int) -> Unit,
+    color: Color,
+    label: String,
+    config: PickerConfig = VOICE_PICKER_CONFIG,
+    size: Dp = 28.dp,
+    anchorSize: Dp = size,
+    labelStyle: TextStyle = TextStyle(
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Bold,
+    ),
+    modifier: Modifier = Modifier,
+) {
+    var showEnginePicker by remember { mutableStateOf(false) }
+    var hoveredSegment by remember { mutableStateOf<Int?>(null) }
+    Box(modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.15f))
+                .border(1.dp, color.copy(alpha = 0.4f), CircleShape)
+                .pointerInput(Unit) {
+                    val pickerRadiusPx = PICKER_SIZE.toPx() / 2f
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                            .also { it.consume() }
+                        showEnginePicker = true
+                        hoveredSegment = null
+
+                        var anyPressed = true
+                        while (anyPressed) {
+                            val event = awaitPointerEvent()
+                            val pos = event.changes.firstOrNull()?.position
+                            if (pos != null) {
+                                val cx = this@pointerInput.size.width / 2f
+                                val cy = this@pointerInput.size.height / 2f
+                                val dx = pos.x - cx
+                                val dy = pos.y - cy
+                                val dist = sqrt(dx * dx + dy * dy)
+                                hoveredSegment =
+                                    computePickerSegment(dx, dy, dist, pickerRadiusPx, config)
+                            }
+                            event.changes.forEach { it.consume() }
+                            anyPressed = event.changes.any { it.pressed }
+                        }
+
+                        val seg = hoveredSegment
+                        if (seg != null) {
+                            onEngineChange(pickerSegmentToOrdinal(seg, config))
+                        }
+                        showEnginePicker = false
+                        hoveredSegment = null
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.material3.Text(
+                text = label,
+                style = labelStyle,
+                color = color,
+                maxLines = 1
+            )
+        }
+        if (showEnginePicker) {
+            EnginePickerPopup(
+                currentEngine = currentEngine,
+                hoveredSegment = hoveredSegment,
+                color = color,
+                config = config,
+                anchorSize = anchorSize,
+            )
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Display-only popup
 // ═══════════════════════════════════════════════════════════
 
 /**

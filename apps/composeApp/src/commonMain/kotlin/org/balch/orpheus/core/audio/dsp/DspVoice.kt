@@ -65,6 +65,11 @@ class DspVoice(
     private val fmDepthControl = factory.createMultiply()
     private val fmFreqMixer = factory.createMultiplyAdd() // (FmSignal * 200Hz) + ActualFreq
     private val pitchScaler = factory.createMultiply()    // BaseFreq * PitchMultiplier
+
+    // Self-feedback: oscOutput * feedbackAmount mixed into FM signal path
+    private val feedbackScaler = factory.createMultiply()   // oscOutput * feedbackAmount
+    private val feedbackRamp = factory.createLinearRamp()    // smoothed feedback control
+    private val fmSignalMixer = factory.createAdd()          // externalFM + selfFeedback
     
     // CV Pitch: (CvInput * CvDepth) + ScaledFreq
     private val cvPitchScaler = factory.createMultiply()
@@ -106,6 +111,7 @@ class DspVoice(
     val holdLevel: AudioInput get() = vcaControlMixer.inputB       // Hold/drone level
     val cvPitchInput: AudioInput get() = cvPitchScaler.inputA      // CV input (0-1)
     val cvPitchDepth: AudioInput get() = cvPitchScaler.inputB      // Depth in Hz
+    val feedbackAmount: AudioInput get() = feedbackRamp.input       // Self-feedback (0-1)
 
     // Outputs - volumeGain is the final output stage
     val output: AudioOutput get() = volumeGain.output
@@ -185,6 +191,9 @@ class DspVoice(
         audioEngine.addUnit(fmDepthControl)
         audioEngine.addUnit(fmFreqMixer)
         audioEngine.addUnit(pitchScaler)
+        audioEngine.addUnit(feedbackScaler)
+        audioEngine.addUnit(feedbackRamp)
+        audioEngine.addUnit(fmSignalMixer)
         audioEngine.addUnit(cvPitchScaler)
         audioEngine.addUnit(cvPitchMixer)
         audioEngine.addUnit(directFreqMixer)
@@ -268,7 +277,16 @@ class DspVoice(
         couplingScaler.output.connect(couplingMixer.inputB)
 
         couplingMixer.output.connect(fmFreqMixer.inputC)
-        fmDepthControl.output.connect(fmFreqMixer.inputA)
+
+        // FM signal path: externalFM + selfFeedback → fmFreqMixer
+        fmDepthControl.output.connect(fmSignalMixer.inputA)
+        oscMixer.output.connect(feedbackScaler.inputA)
+        feedbackRamp.time.set(0.02) // 20ms ramp for click-free transitions
+        feedbackRamp.input.set(0.0) // Default: no self-feedback
+        feedbackRamp.output.connect(feedbackScaler.inputB)
+        feedbackScaler.output.connect(fmSignalMixer.inputB)
+        fmSignalMixer.output.connect(fmFreqMixer.inputA)
+
         fmFreqMixer.inputB.set(200.0) // FM Scaling factor
 
         // Connect frequency to both oscillators

@@ -64,7 +64,7 @@ class VoicePlugin : DspPlugin {
     private val _quadPitchSource = IntArray(3)
     private val _quadEnvTriggerMode = BooleanArray(3)
     private val _pairEngine = IntArray(6)
-    private val _pairHarmonics = FloatArray(6) { 0.5f }
+    private val _pairHarmonics = FloatArray(6) { 0.0f }
 
     private val portDefs = ports(startIndex = 0) {
         // Voice Params (0-11)
@@ -138,7 +138,7 @@ class VoicePlugin : DspPlugin {
             }
             controlPort(VoiceSymbol.pairHarmonics(i)) {
                 floatType {
-                    default = 0.5f
+                    default = 0.0f
                     get { _pairHarmonics[i] }
                     set {
                         _pairHarmonics[i] = it

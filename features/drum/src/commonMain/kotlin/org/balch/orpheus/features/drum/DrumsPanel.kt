@@ -1,9 +1,5 @@
 package org.balch.orpheus.features.drum
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
@@ -19,31 +14,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
-import org.balch.orpheus.ui.widgets.EnginePickerPopup
+import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.HorizontalToggle
-import org.balch.orpheus.ui.widgets.PICKER_SIZE
 import org.balch.orpheus.ui.widgets.PickerConfig
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
-import org.balch.orpheus.ui.widgets.computePickerSegment
 import org.balch.orpheus.ui.widgets.drumEngineLabel
-import org.balch.orpheus.ui.widgets.pickerSegmentToOrdinal
-import kotlin.math.sqrt
 
 @Composable
 fun DrumsPanel(
@@ -216,74 +202,16 @@ private fun DrumRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Engine picker trigger (replaces label)
-            var showEnginePicker by remember { mutableStateOf(false) }
-            var hoveredSegment by remember { mutableStateOf<Int?>(null) }
-            Box(
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(color.copy(alpha = 0.15f))
-                        .border(1.dp, color.copy(alpha = 0.4f), CircleShape)
-                        .pointerInput(Unit) {
-                            val pickerRadiusPx = PICKER_SIZE.toPx() / 2f
-                            awaitEachGesture {
-                                awaitFirstDown(requireUnconsumed = false)
-                                    .also { it.consume() }
-                                showEnginePicker = true
-                                hoveredSegment = null
-
-                                var anyPressed = true
-                                while (anyPressed) {
-                                    val event = awaitPointerEvent()
-                                    val pos = event.changes.firstOrNull()?.position
-                                    if (pos != null) {
-                                        val cx = size.width / 2f
-                                        val cy = size.height / 2f
-                                        val dx = pos.x - cx
-                                        val dy = pos.y - cy
-                                        val dist = sqrt(dx * dx + dy * dy)
-                                        hoveredSegment = computePickerSegment(
-                                            dx, dy, dist, pickerRadiusPx, pickerConfig
-                                        )
-                                    }
-                                    event.changes.forEach { it.consume() }
-                                    anyPressed = event.changes.any { it.pressed }
-                                }
-
-                                val seg = hoveredSegment
-                                if (seg != null) {
-                                    onEngineChange(
-                                        pickerSegmentToOrdinal(seg, pickerConfig)
-                                    )
-                                }
-                                showEnginePicker = false
-                                hoveredSegment = null
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = drumEngineLabel(engine),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = color,
-                        maxLines = 1
-                    )
-                }
-                if (showEnginePicker) {
-                    EnginePickerPopup(
-                        currentEngine = engine,
-                        hoveredSegment = hoveredSegment,
-                        color = color,
-                        config = pickerConfig,
-                        anchorSize = 34.dp,
-                    )
-                }
-            }
+            EnginePickerButton(
+                currentEngine = engine,
+                onEngineChange = onEngineChange,
+                color = color,
+                label = drumEngineLabel(engine),
+                config = pickerConfig,
+                size = 36.dp,
+                anchorSize = 34.dp,
+                labelStyle = MaterialTheme.typography.labelMedium,
+            )
 
             KnobGroup(
                 value = frequency,

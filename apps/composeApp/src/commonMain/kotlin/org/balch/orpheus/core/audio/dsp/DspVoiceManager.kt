@@ -57,7 +57,7 @@ class DspVoiceManager @Inject constructor(
     
     // Plaits engine selection
     private val _pairEngine = IntArray(6)  // 0 = default oscillators
-    private val _pairHarmonics = FloatArray(6) { 0.5f }
+    private val _pairHarmonics = FloatArray(6) { 0.0f }
 
     // Quad sources
     private val quadPitchSources = IntArray(3) { 0 }
@@ -382,7 +382,14 @@ class DspVoiceManager @Inject constructor(
             // Restore hold from quad state
             voices[voiceA].setHoldLevel(_quadHold[quadIndex].toDouble())
             voices[voiceB].setHoldLevel(_quadHold[quadIndex].toDouble())
+            // Apply self-feedback from harmonics
+            updateVoiceHarmonics(voiceA)
+            updateVoiceHarmonics(voiceB)
         } else {
+            // Clear self-feedback before switching to Plaits
+            voices[voiceA].feedbackAmount.set(0.0)
+            voices[voiceB].feedbackAmount.set(0.0)
+
             val engineId = PlaitsEngineId.entries[engineOrdinal - 1]
             voices[voiceA].plaits.setEngine(engineFactory.create(engineId))
             voices[voiceB].plaits.setEngine(engineFactory.create(engineId))
@@ -438,8 +445,11 @@ class DspVoiceManager @Inject constructor(
 
     private fun updateVoiceHarmonics(index: Int) {
         val pairIndex = index / 2
-        if (_pairEngine[pairIndex] != 0) {
-            voices[index].plaits.setHarmonics(_pairHarmonics[pairIndex])
+        val value = _pairHarmonics[pairIndex]
+        if (_pairEngine[pairIndex] == 0) {
+            voices[index].feedbackAmount.set(value.toDouble())
+        } else {
+            voices[index].plaits.setHarmonics(value)
         }
     }
 
@@ -453,7 +463,7 @@ class DspVoiceManager @Inject constructor(
         pluginProvider.voicePlugin.setPairHarmonics(pairIndex, value)
     }
 
-    fun getPairHarmonics(pairIndex: Int) = _pairHarmonics.getOrElse(pairIndex) { 0.5f }
+    fun getPairHarmonics(pairIndex: Int) = _pairHarmonics.getOrElse(pairIndex) { 0.0f }
 
     fun getPairEngine(pairIndex: Int) = _pairEngine.getOrElse(pairIndex) { 0 }
 
