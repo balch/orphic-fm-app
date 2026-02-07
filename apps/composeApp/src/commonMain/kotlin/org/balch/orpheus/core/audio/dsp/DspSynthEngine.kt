@@ -152,6 +152,7 @@ class DspSynthEngine @Inject constructor(
                     "sharpness" -> voiceManager.setPairSharpness(index, value as Float)
                     "duo_mod_source" -> voiceManager.setDuoModSource(index, ModSource.entries[value as Int])
                     "pair_engine" -> voiceManager.setPairEngine(index, value as Int)
+                    "pair_harmonics" -> voiceManager.setPairHarmonics(index, value as Float)
                     "quad_pitch" -> voiceManager.setQuadPitch(index, value as Float)
                     "quad_hold" -> voiceManager.setQuadHold(index, value as Float)
                     "quad_volume" -> voiceManager.setQuadVolume(index, value as Float)

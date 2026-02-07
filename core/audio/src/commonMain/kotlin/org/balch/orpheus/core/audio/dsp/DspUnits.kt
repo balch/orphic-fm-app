@@ -224,6 +224,12 @@ interface PlaitsUnit : AudioUnit {
      */
     fun setPercussiveMode(enabled: Boolean) {}
 
+    /** Audio-rate timbre modulation input (additive, -1..1 range) */
+    val timbreInput: AudioInput
+
+    /** Audio-rate morph modulation input (additive, -1..1 range) */
+    val morphInput: AudioInput
+
     interface Factory { fun create(): PlaitsUnit }
 }
 

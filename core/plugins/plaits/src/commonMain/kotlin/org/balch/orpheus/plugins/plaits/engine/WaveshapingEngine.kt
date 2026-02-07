@@ -23,6 +23,7 @@ class WaveshapingEngine : PlaitsEngine {
     override val id = PlaitsEngineId.WAVESHAPING
     override val displayName = id.displayName
     override val alreadyEnveloped = false
+    override val outGain = 0.25f
 
     private val slope = SlopeOscillator()
     private val triangle = SlopeOscillator()

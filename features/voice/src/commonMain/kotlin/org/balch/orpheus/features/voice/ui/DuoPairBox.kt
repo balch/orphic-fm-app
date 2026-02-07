@@ -41,6 +41,7 @@ import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.EnginePickerPopup
+import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.PICKER_SIZE
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.computePickerSegment
@@ -62,6 +63,7 @@ fun DuoPairBox(
     envSpeedB: Float,
     duoModSource: ModSource,
     pairEngine: Int,
+    pairHarmonics: Float,
     midiState: MidiUiState,
     voiceActions: VoiceActions,
     midiActions: MidiActions,
@@ -162,6 +164,17 @@ fun DuoPairBox(
                 }
             }
 
+            // Harmonics knob (visible when Plaits engine active)
+            if (pairEngine != 0) {
+                RotaryKnob(
+                    value = pairHarmonics,
+                    onValueChange = { voiceActions.setPairHarmonics(pairIndex, it) },
+                    label = "H",
+                    size = 22.dp,
+                    progressColor = color
+                )
+            }
+
             // Mod Source Selector (Cycles: OFF -> LFO -> FM -> FLUX)
             org.balch.orpheus.ui.widgets.ModSourceSelector(
                 activeSource = duoModSource,
@@ -193,7 +206,8 @@ fun DuoPairBox(
                     tune = voiceStateA.tune,
                     modDepth = modDepthA,
                     envSpeed = envSpeedA,
-                    voiceActions = voiceActions
+                    voiceActions = voiceActions,
+                    isPlaitsActive = pairEngine != 0
                 )
 
                 // Buttons
@@ -341,6 +355,7 @@ fun DuoPairBoxPreview() {
             envSpeedB = voiceState.voiceEnvelopeSpeeds[1],
             duoModSource = voiceState.duoModSources[0],
             pairEngine = voiceState.pairEngines[0],
+            pairHarmonics = voiceState.pairHarmonics[0],
             midiState = midiState,
             voiceActions = voiceActions,
             midiActions = midiActions,

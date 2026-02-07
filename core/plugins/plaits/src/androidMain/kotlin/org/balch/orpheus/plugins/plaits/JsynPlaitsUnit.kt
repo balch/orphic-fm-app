@@ -30,9 +30,13 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
     // JSyn ports
     private val jsynOutput = UnitOutputPort("Output")
     private val jsynTriggerInput = UnitInputPort("Trigger")
+    private val jsynTimbreInput = UnitInputPort("TimbreMod")
+    private val jsynMorphInput = UnitInputPort("MorphMod")
 
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
     override val triggerInput: AudioInput = JsynAudioInput(jsynTriggerInput)
+    override val timbreInput: AudioInput = JsynAudioInput(jsynTimbreInput)
+    override val morphInput: AudioInput = JsynAudioInput(jsynMorphInput)
 
     // Swappable engine
     @Volatile
@@ -61,6 +65,8 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
     init {
         addPort(jsynOutput)
         addPort(jsynTriggerInput)
+        addPort(jsynTimbreInput)
+        addPort(jsynMorphInput)
     }
 
     override fun setEngine(engine: Any?) {
@@ -88,6 +94,8 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
     override fun generate(start: Int, end: Int) {
         val outputs = jsynOutput.values
         val trigInputs = jsynTriggerInput.values
+        val timbreModValues = jsynTimbreInput.values
+        val morphModValues = jsynMorphInput.values
         val eng = engine
 
         if (eng == null) {
@@ -142,11 +150,15 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
                 envAmplitude = 1f
             }
 
+            // Sample mod inputs once per sub-block (first sample of block)
+            val timbreMod = timbreModValues[start + offset].toFloat()
+            val morphMod = morphModValues[start + offset].toFloat()
+
             val params = EngineParameters(
                 trigger = triggerState,
                 note = _note,
-                timbre = _timbre,
-                morph = _morph,
+                timbre = (_timbre + timbreMod).coerceIn(0f, 1f),
+                morph = (_morph + morphMod).coerceIn(0f, 1f),
                 harmonics = _harmonics,
                 accent = _accent
             )

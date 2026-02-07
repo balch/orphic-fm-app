@@ -59,6 +59,7 @@ data class VoiceUiState(
     val bendPosition: Float = 0.0f,
     val bpm: Double = 120.0,
     val pairEngines: List<Int> = List(6) { 0 },
+    val pairHarmonics: List<Float> = List(6) { 0.5f },
     val quadTriggerSources: List<Int> = List(3) { 0 },
     val quadPitchSources: List<Int> = List(3) { 0 },
     val quadEnvelopeTriggerModes: List<Boolean> = listOf(false, false, false)
@@ -82,6 +83,7 @@ private sealed interface VoiceIntent {
     data class PairSharpness(val pairIndex: Int, val value: Float) : VoiceIntent
     data class DuoModSource(val pairIndex: Int, val source: ModSource) : VoiceIntent
     data class PairEngine(val pairIndex: Int, val engineOrdinal: Int) : VoiceIntent
+    data class PairHarmonics(val pairIndex: Int, val value: Float) : VoiceIntent
 
     // Quad-level intents
     data class QuadPitch(val quadIndex: Int, val value: Float) : VoiceIntent
@@ -134,6 +136,7 @@ class VoiceViewModel(
     private val pairSharpnessFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairSharpness(i).controlId) }
     private val duoModSourceFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoModSource(i).controlId) }
     private val pairEngineFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairEngine(i).controlId) }
+    private val pairHarmonicsFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairHarmonics(i).controlId) }
 
     // Per-quad (×3)
     private val quadPitchFlows = Array(3) { i -> synthController.controlFlow(VoiceSymbol.quadPitch(i).controlId) }
@@ -172,6 +175,7 @@ class VoiceViewModel(
                 VoiceIntent.DuoModSource(i, sources[srcIndex])
             })
             add(pairEngineFlows[i].map { VoiceIntent.PairEngine(i, it.asInt()) })
+            add(pairHarmonicsFlows[i].map { VoiceIntent.PairHarmonics(i, it.asFloat()) })
         }
         for (i in 0 until 3) {
             add(quadPitchFlows[i].map { VoiceIntent.QuadPitch(i, it.asFloat()) })
@@ -218,7 +222,8 @@ class VoiceViewModel(
         setQuadTriggerSource = ::setQuadTriggerSource,
         setQuadPitchSource = ::setQuadPitchSource,
         setQuadEnvelopeTriggerMode = ::setQuadEnvelopeTriggerMode,
-        setPairEngine = ::setPairEngine
+        setPairEngine = ::setPairEngine,
+        setPairHarmonics = ::setPairHarmonics
     )
 
     override val stateFlow: StateFlow<VoiceUiState> =
@@ -306,6 +311,9 @@ class VoiceViewModel(
             is VoiceIntent.PairEngine ->
                 state.withPairEngine(intent.pairIndex, intent.engineOrdinal)
 
+            is VoiceIntent.PairHarmonics ->
+                state.withPairHarmonics(intent.pairIndex, intent.value)
+
             is VoiceIntent.QuadPitch ->
                 state.withQuadPitch(intent.quadIndex, intent.value)
 
@@ -367,6 +375,9 @@ class VoiceViewModel(
 
     private fun VoiceUiState.withPairEngine(pairIndex: Int, engineOrdinal: Int) =
         copy(pairEngines = pairEngines.mapIndexed { i, e -> if (i == pairIndex) engineOrdinal else e })
+
+    private fun VoiceUiState.withPairHarmonics(pairIndex: Int, value: Float) =
+        copy(pairHarmonics = pairHarmonics.mapIndexed { i, h -> if (i == pairIndex) value else h })
 
     private fun VoiceUiState.withQuadPitch(quadIndex: Int, value: Float) =
         copy(quadGroupPitches = quadGroupPitches.mapIndexed { i, p -> if (i == quadIndex) value else p })
@@ -468,6 +479,10 @@ class VoiceViewModel(
 
     fun setPairEngine(pairIndex: Int, engineOrdinal: Int) {
         pairEngineFlows[pairIndex].value = IntValue(engineOrdinal)
+    }
+
+    fun setPairHarmonics(pairIndex: Int, value: Float) {
+        pairHarmonicsFlows[pairIndex].value = FloatValue(value)
     }
 
     fun setQuadPitch(index: Int, value: Float) {
@@ -612,7 +627,8 @@ data class VoicePanelActions(
     val setQuadTriggerSource: (Int, Int) -> Unit,
     val setQuadPitchSource: (Int, Int) -> Unit,
     val setQuadEnvelopeTriggerMode: (Int, Boolean) -> Unit,
-    val setPairEngine: (Int, Int) -> Unit
+    val setPairEngine: (Int, Int) -> Unit,
+    val setPairHarmonics: (Int, Float) -> Unit
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
@@ -631,7 +647,8 @@ data class VoicePanelActions(
             setBpm = {}, setQuadTriggerSource = {_, _ -> },
             setQuadPitchSource = {_, _ -> },
             setQuadEnvelopeTriggerMode = {_, _ -> },
-            setPairEngine = {_, _ -> }
+            setPairEngine = {_, _ -> },
+            setPairHarmonics = {_, _ -> }
         )
     }
 }

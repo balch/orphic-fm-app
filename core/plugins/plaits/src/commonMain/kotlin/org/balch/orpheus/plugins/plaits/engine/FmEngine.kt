@@ -22,6 +22,7 @@ class FmEngine : PlaitsEngine {
     override val id = PlaitsEngineId.FM
     override val displayName = id.displayName
     override val alreadyEnveloped = false
+    override val outGain = 0.3f
 
     // Phase accumulators (wrapping 32-bit integer arithmetic)
     private var carrierPhase: Int = 0

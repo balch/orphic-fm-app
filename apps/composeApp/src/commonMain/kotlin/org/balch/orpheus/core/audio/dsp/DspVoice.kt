@@ -41,6 +41,10 @@ class DspVoice(
     // Plaits engine source
     private val plaitsUnit = factory.createPlaitsUnit()
 
+    // Plaits modulation: modSource * depth → plaits timbre/morph
+    private val timbreModDepth = factory.createMultiply()  // modSource * depth → plaits timbre
+    private val morphModDepth = factory.createMultiply()   // modSource * depth → plaits morph
+
     // Source switching: crossfade between oscillators and Plaits
     private val oscGain = factory.createMultiply()       // oscMixer * (1 or 0)
     private val plaitsGain = factory.createMultiply()     // plaitsUnit * (0 or 1)
@@ -109,6 +113,12 @@ class DspVoice(
 
     // Plaits engine access
     val plaits: PlaitsUnit get() = plaitsUnit
+
+    // Plaits modulation routing
+    val plaitsTimbreModInput: AudioInput get() = timbreModDepth.inputA
+    val plaitsTimbreModAmount: AudioInput get() = timbreModDepth.inputB
+    val plaitsMorphModInput: AudioInput get() = morphModDepth.inputA
+    val plaitsMorphModAmount: AudioInput get() = morphModDepth.inputB
 
     fun setEngineActive(active: Boolean) {
         oscGain.inputB.set(if (active) 0.0 else 1.0)
@@ -185,6 +195,8 @@ class DspVoice(
         audioEngine.addUnit(holdRamp)
         audioEngine.addUnit(vcaControlMixer)
         audioEngine.addUnit(plaitsUnit)
+        audioEngine.addUnit(timbreModDepth)
+        audioEngine.addUnit(morphModDepth)
         audioEngine.addUnit(oscGain)
         audioEngine.addUnit(plaitsGain)
         audioEngine.addUnit(sourceSelector)
@@ -290,6 +302,12 @@ class DspVoice(
         // Gate fanout: splits gate to envelope AND plaits trigger
         gateFanout.output.connect(ampEnv.input)
         gateFanout.output.connect(plaitsUnit.triggerInput)
+
+        // Plaits modulation wiring: modDepth outputs → plaits timbre/morph inputs
+        timbreModDepth.output.connect(plaitsUnit.timbreInput)
+        morphModDepth.output.connect(plaitsUnit.morphInput)
+        plaitsTimbreModAmount.set(0.0)
+        plaitsMorphModAmount.set(0.0)
 
         // VCA inputB = Envelope + HoldLevel (ramped for click-free transitions)
         ampEnv.output.connect(vcaControlMixer.inputA)

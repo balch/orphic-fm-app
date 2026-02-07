@@ -22,6 +22,7 @@ class NoiseEngine : PlaitsEngine {
     override val id = PlaitsEngineId.NOISE
     override val displayName = id.displayName
     override val alreadyEnveloped = false
+    override val outGain = 0.3f
 
     private val clockedNoise = Array(2) { ClockedNoise() }
     private val lpHpFilter = SynthDsp.StateVariableFilter()

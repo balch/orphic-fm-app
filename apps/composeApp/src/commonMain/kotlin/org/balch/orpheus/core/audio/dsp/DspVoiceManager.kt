@@ -57,6 +57,7 @@ class DspVoiceManager @Inject constructor(
     
     // Plaits engine selection
     private val _pairEngine = IntArray(6)  // 0 = default oscillators
+    private val _pairHarmonics = FloatArray(6) { 0.5f }
 
     // Quad sources
     private val quadPitchSources = IntArray(3) { 0 }
@@ -116,12 +117,25 @@ class DspVoiceManager @Inject constructor(
     fun setVoiceFmDepth(index: Int, amount: Float) {
         _voiceFmDepth[index] = amount
         voices[index].fmDepth.set(amount.toDouble())
+        updateVoiceMorph(index)
+        // Update Plaits timbre mod depth when mod source is active
+        val pairIndex = index / 2
+        if (_pairEngine[pairIndex] != 0) {
+            val modSource = _duoModSource[pairIndex]
+            if (modSource == ModSource.LFO || modSource == ModSource.FLUX) {
+                voices[index].plaitsTimbreModAmount.set(amount.toDouble())
+            }
+        }
         pluginProvider.voicePlugin.setModDepth(index, amount)
     }
 
     fun setVoiceEnvelopeSpeed(index: Int, speed: Float) {
         _voiceEnvelopeSpeed[index] = speed
         voices[index].setEnvelopeSpeed(speed)
+        // For drum engines on voices, envSpeed drives morph (internal decay time)
+        if (isDrumEngine(_pairEngine[index / 2])) {
+            voices[index].plaits.setMorph(speed)
+        }
         pluginProvider.voicePlugin.setEnvSpeed(index, speed)
     }
 
@@ -150,6 +164,8 @@ class DspVoiceManager @Inject constructor(
         _quadHold[quadIndex] = amount
         val startVoice = quadIndex * 4
         for (i in startVoice until startVoice + 4) {
+            // Skip voices with active drum engines (hold forced to 1.0)
+            if (isDrumEngine(_pairEngine[i / 2])) continue
             voices[i].setHoldLevel(amount.toDouble())
         }
         pluginProvider.voicePlugin.setQuadHold(quadIndex, amount)
@@ -186,15 +202,27 @@ class DspVoiceManager @Inject constructor(
         pluginProvider.voicePlugin.setDuoModSource(duoIndex, source.ordinal)
         val voiceA = duoIndex * 2
         val voiceB = voiceA + 1
+        val plaitsActive = _pairEngine[duoIndex] != 0
 
         voices[voiceA].modInput.disconnectAll()
         voices[voiceB].modInput.disconnectAll()
+        voices[voiceA].plaitsTimbreModInput.disconnectAll()
+        voices[voiceB].plaitsTimbreModInput.disconnectAll()
 
         when (source) {
-            ModSource.OFF -> { }
+            ModSource.OFF -> {
+                voices[voiceA].plaitsTimbreModAmount.set(0.0)
+                voices[voiceB].plaitsTimbreModAmount.set(0.0)
+            }
             ModSource.LFO -> {
                 pluginProvider.hyperLfo.output.connect(voices[voiceA].modInput)
                 pluginProvider.hyperLfo.output.connect(voices[voiceB].modInput)
+                if (plaitsActive) {
+                    pluginProvider.hyperLfo.output.connect(voices[voiceA].plaitsTimbreModInput)
+                    pluginProvider.hyperLfo.output.connect(voices[voiceB].plaitsTimbreModInput)
+                    voices[voiceA].plaitsTimbreModAmount.set(_voiceFmDepth[voiceA].toDouble())
+                    voices[voiceB].plaitsTimbreModAmount.set(_voiceFmDepth[voiceB].toDouble())
+                }
             }
             ModSource.VOICE_FM -> {
                 if (_fmStructureCrossQuad) {
@@ -224,10 +252,19 @@ class DspVoiceManager @Inject constructor(
                     voices[voiceA].output.connect(voices[voiceB].modInput)
                     voices[voiceB].output.connect(voices[voiceA].modInput)
                 }
+                // No audio-rate Plaits mod for VOICE_FM (oscillator cross-mod only)
+                voices[voiceA].plaitsTimbreModAmount.set(0.0)
+                voices[voiceB].plaitsTimbreModAmount.set(0.0)
             }
             ModSource.FLUX -> {
                 pluginProvider.fluxPlugin.outputs["output"]?.connect(voices[voiceA].modInput)
                 pluginProvider.fluxPlugin.outputs["output"]?.connect(voices[voiceB].modInput)
+                if (plaitsActive) {
+                    pluginProvider.fluxPlugin.outputs["output"]?.connect(voices[voiceA].plaitsTimbreModInput)
+                    pluginProvider.fluxPlugin.outputs["output"]?.connect(voices[voiceB].plaitsTimbreModInput)
+                    voices[voiceA].plaitsTimbreModAmount.set(_voiceFmDepth[voiceA].toDouble())
+                    voices[voiceB].plaitsTimbreModAmount.set(_voiceFmDepth[voiceB].toDouble())
+                }
             }
         }
     }
@@ -335,24 +372,54 @@ class DspVoiceManager @Inject constructor(
         _pairEngine[pairIndex] = engineOrdinal
         val voiceA = pairIndex * 2
         val voiceB = voiceA + 1
+        val quadIndex = voiceA / 4
 
         if (engineOrdinal == 0) {
             voices[voiceA].setEngineActive(false)
             voices[voiceB].setEngineActive(false)
             voices[voiceA].plaits.setEngine(null)
             voices[voiceB].plaits.setEngine(null)
+            // Restore hold from quad state
+            voices[voiceA].setHoldLevel(_quadHold[quadIndex].toDouble())
+            voices[voiceB].setHoldLevel(_quadHold[quadIndex].toDouble())
         } else {
             val engineId = PlaitsEngineId.entries[engineOrdinal - 1]
             voices[voiceA].plaits.setEngine(engineFactory.create(engineId))
             voices[voiceB].plaits.setEngine(engineFactory.create(engineId))
             voices[voiceA].setEngineActive(true)
             voices[voiceB].setEngineActive(true)
+
+            if (isDrumEngine(engineOrdinal)) {
+                // Drum engines have internal envelopes — keep VCA open
+                voices[voiceA].setHoldLevel(1.0)
+                voices[voiceB].setHoldLevel(1.0)
+            } else {
+                // Pitched engine — restore hold from quad state
+                voices[voiceA].setHoldLevel(_quadHold[quadIndex].toDouble())
+                voices[voiceB].setHoldLevel(_quadHold[quadIndex].toDouble())
+            }
+
             updateVoiceFrequency(voiceA)
             updateVoiceFrequency(voiceB)
             updateVoiceTimbre(voiceA)
             updateVoiceTimbre(voiceB)
+            updateVoiceMorph(voiceA)
+            updateVoiceMorph(voiceB)
+            updateVoiceHarmonics(voiceA)
+            updateVoiceHarmonics(voiceB)
+            // Refresh mod source routing for new engine type
+            setDuoModSource(pairIndex, _duoModSource[pairIndex])
         }
         pluginProvider.voicePlugin.setPairEngine(pairIndex, engineOrdinal)
+    }
+
+    private fun isDrumEngine(engineOrdinal: Int): Boolean {
+        if (engineOrdinal == 0) return false
+        return when (PlaitsEngineId.entries[engineOrdinal - 1]) {
+            PlaitsEngineId.ANALOG_BASS_DRUM, PlaitsEngineId.ANALOG_SNARE_DRUM,
+            PlaitsEngineId.METALLIC_HI_HAT, PlaitsEngineId.FM_DRUM -> true
+            else -> false
+        }
     }
 
     private fun updateVoiceTimbre(index: Int) {
@@ -360,6 +427,32 @@ class DspVoiceManager @Inject constructor(
             voices[index].plaits.setTimbre(_pairSharpness[index / 2])
         }
     }
+
+    private fun updateVoiceMorph(index: Int) {
+        val pairIndex = index / 2
+        if (_pairEngine[pairIndex] != 0 && !isDrumEngine(_pairEngine[pairIndex])) {
+            voices[index].plaits.setMorph(_voiceFmDepth[index])
+        }
+    }
+
+    private fun updateVoiceHarmonics(index: Int) {
+        val pairIndex = index / 2
+        if (_pairEngine[pairIndex] != 0) {
+            voices[index].plaits.setHarmonics(_pairHarmonics[pairIndex])
+        }
+    }
+
+    fun setPairHarmonics(pairIndex: Int, value: Float) {
+        if (pairIndex !in 0..5) return
+        _pairHarmonics[pairIndex] = value
+        val voiceA = pairIndex * 2
+        val voiceB = voiceA + 1
+        updateVoiceHarmonics(voiceA)
+        updateVoiceHarmonics(voiceB)
+        pluginProvider.voicePlugin.setPairHarmonics(pairIndex, value)
+    }
+
+    fun getPairHarmonics(pairIndex: Int) = _pairHarmonics.getOrElse(pairIndex) { 0.5f }
 
     fun getPairEngine(pairIndex: Int) = _pairEngine.getOrElse(pairIndex) { 0 }
 

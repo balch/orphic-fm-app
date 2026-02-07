@@ -30,6 +30,7 @@ fun VoiceColumnMod(
     modDepth: Float,
     envSpeed: Float,
     voiceActions: VoiceActions,
+    isPlaitsActive: Boolean = false,
 ) {
     Column(
         modifier =
@@ -42,7 +43,7 @@ fun VoiceColumnMod(
         RotaryKnob(
             value = modDepth,
             onValueChange = { voiceActions.setDuoModDepth(pairIndex, it) },
-            label = "\u0394",  // delta
+            label = if (isPlaitsActive) "M" else "\u0394",
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.voiceFmDepth(voiceIndex),
             size = 28.dp,

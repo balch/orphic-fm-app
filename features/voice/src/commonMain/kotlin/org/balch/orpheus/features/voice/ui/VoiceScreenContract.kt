@@ -28,6 +28,7 @@ interface VoiceActions {
     fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int)
     fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean)
     fun setPairEngine(pairIndex: Int, engineOrdinal: Int)
+    fun setPairHarmonics(pairIndex: Int, value: Float)
 }
 
 interface MidiActions {
@@ -60,6 +61,7 @@ fun VoicePanelActions.toVoiceActions(): VoiceActions = object : VoiceActions {
     override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) = this@toVoiceActions.setQuadTriggerSource(quadIndex, sourceIndex)
     override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) = this@toVoiceActions.setQuadEnvelopeTriggerMode(quadIndex, enabled)
     override fun setPairEngine(pairIndex: Int, engineOrdinal: Int) = this@toVoiceActions.setPairEngine(pairIndex, engineOrdinal)
+    override fun setPairHarmonics(pairIndex: Int, value: Float) = this@toVoiceActions.setPairHarmonics(pairIndex, value)
 }
 
 /**

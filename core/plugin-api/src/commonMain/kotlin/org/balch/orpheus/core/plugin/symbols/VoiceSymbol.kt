@@ -78,6 +78,13 @@ enum class VoiceSymbol(
     PAIR_ENGINE_4("pair_engine_4", displayName = "Pair Engine 4"),
     PAIR_ENGINE_5("pair_engine_5", displayName = "Pair Engine 5"),
 
+    PAIR_HARMONICS_0("pair_harmonics_0", displayName = "Pair Harmonics 0"),
+    PAIR_HARMONICS_1("pair_harmonics_1", displayName = "Pair Harmonics 1"),
+    PAIR_HARMONICS_2("pair_harmonics_2", displayName = "Pair Harmonics 2"),
+    PAIR_HARMONICS_3("pair_harmonics_3", displayName = "Pair Harmonics 3"),
+    PAIR_HARMONICS_4("pair_harmonics_4", displayName = "Pair Harmonics 4"),
+    PAIR_HARMONICS_5("pair_harmonics_5", displayName = "Pair Harmonics 5"),
+
     // Per-quad (×3)
     QUAD_PITCH_0("quad_pitch_0", displayName = "Quad Pitch 0"),
     QUAD_PITCH_1("quad_pitch_1", displayName = "Quad Pitch 1"),
@@ -116,6 +123,7 @@ enum class VoiceSymbol(
         private val pairSharpnesses = arrayOf(PAIR_SHARPNESS_0, PAIR_SHARPNESS_1, PAIR_SHARPNESS_2, PAIR_SHARPNESS_3, PAIR_SHARPNESS_4, PAIR_SHARPNESS_5)
         private val duoModSources = arrayOf(DUO_MOD_SOURCE_0, DUO_MOD_SOURCE_1, DUO_MOD_SOURCE_2, DUO_MOD_SOURCE_3, DUO_MOD_SOURCE_4, DUO_MOD_SOURCE_5)
         private val pairEngines = arrayOf(PAIR_ENGINE_0, PAIR_ENGINE_1, PAIR_ENGINE_2, PAIR_ENGINE_3, PAIR_ENGINE_4, PAIR_ENGINE_5)
+        private val pairHarmonics = arrayOf(PAIR_HARMONICS_0, PAIR_HARMONICS_1, PAIR_HARMONICS_2, PAIR_HARMONICS_3, PAIR_HARMONICS_4, PAIR_HARMONICS_5)
         private val quadPitches = arrayOf(QUAD_PITCH_0, QUAD_PITCH_1, QUAD_PITCH_2)
         private val quadHolds = arrayOf(QUAD_HOLD_0, QUAD_HOLD_1, QUAD_HOLD_2)
         private val quadVolumes = arrayOf(QUAD_VOLUME_0, QUAD_VOLUME_1, QUAD_VOLUME_2)
@@ -129,6 +137,7 @@ enum class VoiceSymbol(
         fun pairSharpness(index: Int): VoiceSymbol = pairSharpnesses[index]
         fun duoModSource(index: Int): VoiceSymbol = duoModSources[index]
         fun pairEngine(index: Int): VoiceSymbol = pairEngines[index]
+        fun pairHarmonics(index: Int): VoiceSymbol = pairHarmonics[index]
         fun quadPitch(index: Int): VoiceSymbol = quadPitches[index]
         fun quadHold(index: Int): VoiceSymbol = quadHolds[index]
         fun quadVolume(index: Int): VoiceSymbol = quadVolumes[index]
