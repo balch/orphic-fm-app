@@ -417,7 +417,8 @@ class DspVoiceManager @Inject constructor(
         if (engineOrdinal == 0) return false
         return when (PlaitsEngineId.entries[engineOrdinal - 1]) {
             PlaitsEngineId.ANALOG_BASS_DRUM, PlaitsEngineId.ANALOG_SNARE_DRUM,
-            PlaitsEngineId.METALLIC_HI_HAT, PlaitsEngineId.FM_DRUM -> true
+            PlaitsEngineId.METALLIC_HI_HAT, PlaitsEngineId.FM_DRUM,
+            PlaitsEngineId.MODAL -> true  // Modal uses internal envelope
             else -> false
         }
     }

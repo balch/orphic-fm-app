@@ -9,8 +9,13 @@ import org.balch.orpheus.plugins.drum.engine.DrumEngineFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngine
 import org.balch.orpheus.plugins.plaits.PlaitsEngineFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngineId
+import org.balch.orpheus.plugins.plaits.engine.AdditiveEngine
 import org.balch.orpheus.plugins.plaits.engine.FmEngine
+import org.balch.orpheus.plugins.plaits.engine.GrainEngine
+import org.balch.orpheus.plugins.plaits.engine.ModalEngine
 import org.balch.orpheus.plugins.plaits.engine.NoiseEngine
+import org.balch.orpheus.plugins.plaits.engine.StringEngine
+import org.balch.orpheus.plugins.plaits.engine.VirtualAnalogEngine
 import org.balch.orpheus.plugins.plaits.engine.WaveshapingEngine
 
 /**
@@ -34,6 +39,11 @@ class PlaitsEngineFactoryImpl(
             PlaitsEngineId.FM -> FmEngine().also { it.init() }
             PlaitsEngineId.NOISE -> NoiseEngine().also { it.init() }
             PlaitsEngineId.WAVESHAPING -> WaveshapingEngine().also { it.init() }
+            PlaitsEngineId.VIRTUAL_ANALOG -> VirtualAnalogEngine().also { it.init() }
+            PlaitsEngineId.ADDITIVE -> AdditiveEngine().also { it.init() }
+            PlaitsEngineId.GRAIN -> GrainEngine().also { it.init() }
+            PlaitsEngineId.STRING -> StringEngine().also { it.init() }
+            PlaitsEngineId.MODAL -> ModalEngine().also { it.init() }
         }
     }
 }

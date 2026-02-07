@@ -14,4 +14,9 @@ enum class PlaitsEngineId(val displayName: String) {
     FM("FM Synthesis"),
     NOISE("Filtered Noise"),
     WAVESHAPING("Waveshaping"),
+    VIRTUAL_ANALOG("Virtual Analog"),
+    ADDITIVE("Additive"),
+    GRAIN("Grain"),
+    STRING("String"),
+    MODAL("Modal"),
 }

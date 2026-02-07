@@ -1,7 +1,6 @@
 package org.balch.orpheus.plugins.plaits
 
 import org.balch.orpheus.core.audio.dsp.synth.SynthDsp
-import kotlin.math.abs
 
 /**
  * Shared DSP primitives for Plaits engine ports.
@@ -123,6 +122,23 @@ object PlaitsDsp {
             return value
         }
     }
+
+    // --- Noise ---
+
+    /**
+     * Sparse impulse generator. Returns a random value when triggered, 0 otherwise.
+     * Ported from plaits/dsp/noise/dust.h.
+     */
+    fun dust(random: Random, frequency: Float): Float {
+        val u = random.getFloat()
+        return if (u < frequency) u / frequency else 0f
+    }
+
+    // --- One-pole filter helper ---
+
+    /** Inline one-pole filter: state = state + coefficient * (input - state). */
+    fun onePole(state: Float, input: Float, coefficient: Float): Float =
+        state + coefficient * (input - state)
 
     // --- Utility ---
 
