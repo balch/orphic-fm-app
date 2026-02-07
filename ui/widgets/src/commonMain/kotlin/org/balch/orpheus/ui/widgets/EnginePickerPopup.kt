@@ -18,9 +18,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -310,7 +311,7 @@ private fun DrawScope.drawCenter(
     val cy = size.height / 2f
     val radius = size.width / 2f
     val center = Offset(cx, cy)
-    val centerRadius = radius * 0.30f
+    val centerRadius = radius * 0.32f
 
     val centerHovered = hoveredSegment == -1
     val centerIsCurrent = currentEngine == config.centerOrdinal
@@ -321,7 +322,7 @@ private fun DrawScope.drawCenter(
 
     drawCircle(
         color = cColor.copy(
-            alpha = if (centerHighlighted) 0.25f else 0.1f
+            alpha = if (centerHighlighted) 0.30f else 0.12f
         ),
         radius = centerRadius,
         center = center,
@@ -362,6 +363,21 @@ private fun DrawScope.drawCenter(
     }
 }
 
+/** Build an annular sector (donut wedge) path between inner and outer radii. */
+private fun annularSectorPath(
+    cx: Float, cy: Float,
+    innerR: Float, outerR: Float,
+    startDeg: Float, sweepDeg: Float,
+): Path = Path().apply {
+    val outerRect = Rect(cx - outerR, cy - outerR, cx + outerR, cy + outerR)
+    val innerRect = Rect(cx - innerR, cy - innerR, cx + innerR, cy + innerR)
+    // Outer arc forward
+    arcTo(outerRect, startDeg, sweepDeg, forceMoveTo = true)
+    // Inner arc backward (closes the donut wedge)
+    arcTo(innerRect, startDeg + sweepDeg, -sweepDeg, forceMoveTo = false)
+    close()
+}
+
 private fun DrawScope.drawRings(
     config: PickerConfig,
     currentEngine: Int,
@@ -376,10 +392,12 @@ private fun DrawScope.drawRings(
     val cx = size.width / 2f
     val cy = size.height / 2f
     val radius = size.width / 2f
-    val center = Offset(cx, cy)
-    val ringRadius = radius * 0.72f
-    val strokeWidth = 14.dp.toPx()
-    val centerRadius = radius * 0.30f
+
+    // Simon-style annular wedges (donut sectors)
+    val outerRadius = radius * 0.92f
+    val innerRadius = radius * 0.35f
+    val gap = 4f
+    val labelRadius = (outerRadius + innerRadius) / 2f
 
     val activeRingIdx = ring.indexOfFirst { it.ordinal == currentEngine }
 
@@ -388,52 +406,41 @@ private fun DrawScope.drawRings(
         val isHovered = hoveredSegment == i
         val isCurrent = i == activeRingIdx
 
-        val arcStart = -90f + i * sweep
-        val gap = 8f
+        val arcStart = -90f + i * sweep + gap / 2f
+        val arcSweep = sweep - gap
 
-        val arcColor = when {
-            isHovered -> entry.color.copy(alpha = 0.7f)
-            isCurrent -> entry.color.copy(alpha = 0.4f)
-            else -> entry.color.darken(0.4f).copy(alpha = 0.4f)
-        }
-
-        drawArc(
-            color = arcColor,
-            startAngle = arcStart + gap / 2f,
-            sweepAngle = sweep - gap,
-            useCenter = false,
-            topLeft = Offset(cx - ringRadius, cy - ringRadius),
-            size = Size(ringRadius * 2, ringRadius * 2),
-            style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
-        )
-
-        // Glow for hovered segment
+        // Glow behind hovered wedge
         if (isHovered) {
-            drawArc(
-                color = entry.color.copy(alpha = 0.25f),
-                startAngle = arcStart + gap / 2f,
-                sweepAngle = sweep - gap,
-                useCenter = false,
-                topLeft = Offset(
-                    cx - ringRadius - 3.dp.toPx(),
-                    cy - ringRadius - 3.dp.toPx()
-                ),
-                size = Size(
-                    ringRadius * 2 + 6.dp.toPx(),
-                    ringRadius * 2 + 6.dp.toPx()
-                ),
-                style = Stroke(
-                    width = strokeWidth + 6.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
+            val glowPath = annularSectorPath(
+                cx, cy, innerRadius - 2.dp.toPx(), outerRadius + 2.dp.toPx(),
+                arcStart - 1f, arcSweep + 2f
             )
+            drawPath(glowPath, color = entry.color.copy(alpha = 0.15f))
         }
 
-        // Label at ring center
-        val labelAngle = arcStart + sweep / 2f
+        // Filled wedge
+        val wedgePath = annularSectorPath(cx, cy, innerRadius, outerRadius, arcStart, arcSweep)
+
+        val wedgeColor = when {
+            isHovered -> entry.color.copy(alpha = 0.45f)
+            isCurrent -> entry.color.copy(alpha = 0.30f)
+            else -> entry.color.darken(0.3f).copy(alpha = 0.15f)
+        }
+        drawPath(wedgePath, color = wedgeColor)
+
+        // Outline stroke for definition
+        val strokeAlpha = when {
+            isHovered -> 0.5f
+            isCurrent -> 0.35f
+            else -> 0.15f
+        }
+        drawPath(wedgePath, color = entry.color.copy(alpha = strokeAlpha), style = Stroke(width = 1.dp.toPx()))
+
+        // Label centered in the wedge
+        val labelAngle = -90f + i * sweep + sweep / 2f
         val labelRad = (labelAngle * PI / 180f).toFloat()
-        val lx = cx + ringRadius * cos(labelRad)
-        val ly = cy + ringRadius * sin(labelRad)
+        val lx = cx + labelRadius * cos(labelRad)
+        val ly = cy + labelRadius * sin(labelRad)
 
         val labelStyle = TextStyle(
             color = when {
@@ -455,7 +462,6 @@ private fun DrawScope.drawRings(
             drawText(measured)
         }
     }
-
 }
 
 @Preview
