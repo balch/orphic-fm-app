@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -41,9 +42,9 @@ import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.EnginePickerPopup
-import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.PICKER_SIZE
 import org.balch.orpheus.ui.widgets.PulseButton
+import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.computePickerSegment
 import org.balch.orpheus.ui.widgets.engineLabel
 import org.balch.orpheus.ui.widgets.pickerSegmentToOrdinal
@@ -164,17 +165,6 @@ fun DuoPairBox(
                 }
             }
 
-            // Harmonics knob (visible when Plaits engine active)
-            if (pairEngine != 0) {
-                RotaryKnob(
-                    value = pairHarmonics,
-                    onValueChange = { voiceActions.setPairHarmonics(pairIndex, it) },
-                    label = "H",
-                    size = 22.dp,
-                    progressColor = color
-                )
-            }
-
             // Mod Source Selector (Cycles: OFF -> LFO -> FM -> FLUX)
             org.balch.orpheus.ui.widgets.ModSourceSelector(
                 activeSource = duoModSource,
@@ -186,14 +176,17 @@ fun DuoPairBox(
             )
         }
 
-        // Main Content: Two Voice Columns side-by-side
-        Row(
-            modifier = Modifier.fillMaxWidth().weight(1f).padding(bottom = 0.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        // Main Content: Two Voice Columns side-by-side with optional center overlay
+        Box(
+            modifier = Modifier.fillMaxWidth().weight(1f)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
             // VOICE A COLUMN
             Column(
-                modifier = Modifier.fillMaxHeight(),
+                modifier = Modifier.fillMaxHeight().weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceEvenly
             ) {
@@ -261,7 +254,7 @@ fun DuoPairBox(
 
             // VOICE B COLUMN
             Column(
-                modifier = Modifier.fillMaxHeight(),
+                modifier = Modifier.fillMaxHeight().weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceEvenly
             ) {
@@ -327,9 +320,23 @@ fun DuoPairBox(
                     )
                 }
             }
-        }
-}
+            } // end Row
 
+            // Harmonics knob overlaid between the 4 knobs (no layout impact on columns)
+            if (pairEngine != 0) {
+                RotaryKnob(
+                    modifier = Modifier.align(
+                        BiasAlignment(horizontalBias = 0f, verticalBias = -0.35f)
+                    ),
+                    value = pairHarmonics,
+                    onValueChange = { voiceActions.setPairHarmonics(voiceA / 2, it) },
+                    label = "H",
+                    size = 28.dp,
+                    progressColor = color
+                )
+            }
+        } // end Box
+    } // end outer Column
 }
 
 @Preview
