@@ -2,10 +2,10 @@ package org.balch.orpheus.features.evo.strategy
 
 /**
  * Breathe Strategy - Cyclic Oscillation
- * 
+ *
  * Oscillates parameters using sine waves for rhythmic, breathing textures.
  * Creates predictable, hypnotic modulation patterns.
- * 
+ *
  * SPEED (Knob 1): Controls oscillation frequency
  * DEPTH (Knob 2): Controls modulation amplitude (how much parameters change)
  */
@@ -16,7 +16,11 @@ import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.PluginControlId
+import org.balch.orpheus.core.plugin.PortValue.FloatValue
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
+import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.evo.AudioEvolutionStrategy
 import org.balch.orpheus.ui.theme.OrpheusColors
 import kotlin.math.PI
@@ -51,8 +55,8 @@ class BreatheStrategy(
         log.debug { "DEPTH set to $depthKnob" }
     }
 
-    private fun emit(controlId: String, value: Float) {
-        synthController.emitControlChange(controlId, value, ControlEventOrigin.EVO)
+    private fun emit(id: PluginControlId, value: Float) {
+        synthController.setPluginControl(id, FloatValue(value), ControlEventOrigin.EVO)
     }
 
     override suspend fun evolve(engine: SynthEngine) {
@@ -75,32 +79,32 @@ class BreatheStrategy(
         val targetDelayMix = 0.2f + (sinA * 0.5f * depth)
         val currentDelayMix = engine.getDelayMix()
         val newDelayMix = currentDelayMix + (targetDelayMix - currentDelayMix) * 0.15f
-        emit(ControlIds.DELAY_MIX, newDelayMix)
+        emit(DelaySymbol.MIX.controlId, newDelayMix)
 
         // Drive breathes with secondary sine (slightly out of phase)
         val targetDrive = 0.1f + (sinB * 0.35f * depth)
         val currentDrive = engine.getDrive()
         val newDrive = currentDrive + (targetDrive - currentDrive) * 0.1f
-        emit(ControlIds.DRIVE, newDrive)
+        emit(DistortionSymbol.DRIVE.controlId, newDrive)
 
         // Quad holds breathe in counterpoint
         val targetHold1 = 0.3f + (sinA * 0.5f * depth)
         val targetHold2 = 0.3f + ((1f - sinA) * 0.5f * depth) // Inverse
-        
+
         val currentHold0 = engine.getQuadHold(0)
         val currentHold1 = engine.getQuadHold(1)
         val newHold0 = currentHold0 + (targetHold1 - currentHold0) * 0.08f
         val newHold1 = currentHold1 + (targetHold2 - currentHold1) * 0.08f
-        emit(ControlIds.quadHold(0), newHold0)
-        emit(ControlIds.quadHold(1), newHold1)
+        emit(VoiceSymbol.quadHold(0).controlId, newHold0)
+        emit(VoiceSymbol.quadHold(1).controlId, newHold1)
 
         // Vibrato breathes with tertiary sine
         val targetVibrato = 0.05f + (sinC * 0.25f * depth)
-        emit(ControlIds.VIBRATO, targetVibrato)
+        emit(VoiceSymbol.VIBRATO.controlId, targetVibrato)
 
         // Log every 20 ticks to avoid spam
         if (tickCount % 20 == 0) {
-            log.debug { 
+            log.debug {
                 "Tick $tickCount: phase=$phase, delayMix=$newDelayMix, drive=$newDrive, vibrato=$targetVibrato"
             }
         }

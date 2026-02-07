@@ -18,6 +18,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+             implementation(project(":core:plugin-api"))
              implementation(project(":features:visualizations"))
         }
     }
