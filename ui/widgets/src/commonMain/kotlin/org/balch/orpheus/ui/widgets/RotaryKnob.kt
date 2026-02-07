@@ -1,7 +1,8 @@
 package org.balch.orpheus.ui.widgets
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -106,19 +108,27 @@ fun RotaryKnob(
                         if (isLearning || !enabled) {
                             return@pointerInput
                         }
-                        detectVerticalDragGestures(
-                            onVerticalDrag = { change, dragAmount ->
-                                change.consume()
-                                // Use vertical drag only for precise control and to allow horizontal swipe
-                                val delta =
-                                    (-dragAmount) * (range.endInclusive - range.start) / sensitivity
-                                val newValue = (internalValue + delta).coerceIn(range)
-                                if (newValue != internalValue) {
-                                    internalValue = newValue
-                                    onValueChange(newValue)
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            var previousY = down.position.y
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull() ?: break
+                                if (!change.pressed) break
+                                val dragAmount = change.position.y - previousY
+                                previousY = change.position.y
+                                if (dragAmount != 0f) {
+                                    change.consume()
+                                    val ctrlMultiplier = if (event.keyboardModifiers.isCtrlPressed) 20f else 1f
+                                    val delta = (-dragAmount) * (range.endInclusive - range.start) / (sensitivity * ctrlMultiplier)
+                                    val newValue = (internalValue + delta).coerceIn(range)
+                                    if (newValue != internalValue) {
+                                        internalValue = newValue
+                                        onValueChange(newValue)
+                                    }
                                 }
                             }
-                        )
+                        }
                     }
             ) {
                 val strokeWidth = size.toPx() * 0.1f
@@ -273,19 +283,29 @@ fun RotaryKnob(
             textAlign = TextAlign.Center,
             maxLines = 1,
             modifier = Modifier.pointerInput(range, sensitivity) {
-                detectVerticalDragGestures(
-                    onVerticalDrag = { change, dragAmount ->
-                        change.consume()
-                        // Fine tune: 10x slower
-                        val fineSensitivity = sensitivity * 10f
-                        val delta = (-dragAmount) * (range.endInclusive - range.start) / fineSensitivity
-                        val newValue = (internalValue + delta).coerceIn(range)
-                        if (newValue != internalValue) {
-                            internalValue = newValue
-                            onValueChange(newValue)
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    var previousY = down.position.y
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+                        if (!change.pressed) break
+                        val dragAmount = change.position.y - previousY
+                        previousY = change.position.y
+                        if (dragAmount != 0f) {
+                            change.consume()
+                            // Fine tune: 10x slower, Ctrl: additional 5x
+                            val ctrlMultiplier = if (event.keyboardModifiers.isCtrlPressed) 20f else 1f
+                            val fineSensitivity = sensitivity * 10f * ctrlMultiplier
+                            val delta = (-dragAmount) * (range.endInclusive - range.start) / fineSensitivity
+                            val newValue = (internalValue + delta).coerceIn(range)
+                            if (newValue != internalValue) {
+                                internalValue = newValue
+                                onValueChange(newValue)
+                            }
                         }
                     }
-                )
+                }
             }
         )
     }
