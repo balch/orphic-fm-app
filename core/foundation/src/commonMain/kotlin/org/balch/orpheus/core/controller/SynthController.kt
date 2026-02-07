@@ -4,6 +4,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.ExperimentalForInheritanceCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -137,7 +138,7 @@ class SynthController @Inject constructor() {
      * Internal implementation of MutableStateFlow that intercepts writes
      * and forwards them to the synth engine via the pluginPortSetter delegate.
      */
-    @OptIn(ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class, ExperimentalForInheritanceCoroutinesApi::class)
     private inner class InterceptingMutableStateFlow(
         private val id: PluginControlId,
         initialValue: PortValue

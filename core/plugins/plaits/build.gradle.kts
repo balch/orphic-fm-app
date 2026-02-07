@@ -4,7 +4,7 @@ plugins {
 
 kotlin {
     androidLibrary {
-        namespace = "org.balch.orpheus.core.plugins.drum"
+        namespace = "org.balch.orpheus.core.plugins.plaits"
     }
 
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
@@ -15,8 +15,6 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":core:audio"))
-            api(project(":core:plugins:plaits"))
-            implementation(libs.kotlinx.serialization.json)
         }
         androidMain.dependencies {
             implementation(libs.jsyn)

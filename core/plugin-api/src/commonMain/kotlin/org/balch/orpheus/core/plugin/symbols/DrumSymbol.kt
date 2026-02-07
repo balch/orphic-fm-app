@@ -30,5 +30,8 @@ enum class DrumSymbol(
     SD_PITCH_SRC("sd_pitch_src", displayName = "SD Pitch Source"),
     HH_TRIGGER_SRC("hh_trigger_src", displayName = "HH Trigger Source"),
     HH_PITCH_SRC("hh_pitch_src", displayName = "HH Pitch Source"),
-    BYPASS("bypass", displayName = "Bypass")
+    BYPASS("bypass", displayName = "Bypass"),
+    BD_ENGINE("bd_engine", displayName = "BD Engine"),
+    SD_ENGINE("sd_engine", displayName = "SD Engine"),
+    HH_ENGINE("hh_engine", displayName = "HH Engine")
 }

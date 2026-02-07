@@ -57,6 +57,7 @@ kotlin {
             api(project(":core:plugins:warps"))
             api(project(":core:plugins:grains"))
             api(project(":core:plugins:drum"))
+            api(project(":core:plugins:plaits"))
             api(project(":core:plugins:duolfo"))
             api(project(":core:plugins:flux"))
             api(project(":core:plugins:looper"))

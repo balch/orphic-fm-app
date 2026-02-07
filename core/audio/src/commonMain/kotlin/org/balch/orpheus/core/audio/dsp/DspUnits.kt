@@ -187,6 +187,41 @@ interface AutomationPlayer : AudioUnit {
 }
 
 /**
+ * Universal Plaits-style synthesis unit.
+ * Wraps a swappable synthesis engine with audio-rate trigger input.
+ */
+interface PlaitsUnit : AudioUnit {
+    /** Audio-rate trigger input for sequencer connectivity */
+    val triggerInput: AudioInput
+
+    /** Set the active engine. Null means silence. */
+    fun setEngine(engine: Any?)
+
+    /** Get the current engine reference. */
+    fun getEngine(): Any?
+
+    /** Set MIDI note number */
+    fun setNote(note: Float)
+
+    /** Set timbre parameter (0..1) */
+    fun setTimbre(timbre: Float)
+
+    /** Set morph parameter (0..1) */
+    fun setMorph(morph: Float)
+
+    /** Set harmonics parameter (0..1) */
+    fun setHarmonics(harmonics: Float)
+
+    /** Set accent level (0..1) */
+    fun setAccent(accent: Float)
+
+    /** Trigger a note with given accent */
+    fun trigger(accent: Float)
+
+    interface Factory { fun create(): PlaitsUnit }
+}
+
+/**
  * Specialized drum synthesis unit.
  */
 interface DrumUnit : AudioUnit {

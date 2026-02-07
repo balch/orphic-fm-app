@@ -21,6 +21,7 @@ interface DspFactory {
     fun createMaximum(): Maximum
     fun createLinearRamp(): LinearRamp
     fun createAutomationPlayer(): AutomationPlayer
+    fun createPlaitsUnit(): PlaitsUnit
     fun createDrumUnit(): DrumUnit
     fun createResonatorUnit(): ResonatorUnit
     fun createGrainsUnit(): GrainsUnit

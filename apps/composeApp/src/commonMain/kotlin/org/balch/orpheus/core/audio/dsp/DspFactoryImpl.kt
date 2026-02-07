@@ -24,6 +24,7 @@ class DspFactoryImpl @Inject constructor(
     private val maximumFactory: Maximum.Factory,
     private val linearRampFactory: LinearRamp.Factory,
     private val automationPlayerFactory: AutomationPlayer.Factory,
+    private val plaitsUnitFactory: PlaitsUnit.Factory,
     private val drumUnitFactory: DrumUnit.Factory,
     private val resonatorUnitFactory: ResonatorUnit.Factory,
     private val grainsUnitFactory: GrainsUnit.Factory,
@@ -48,6 +49,7 @@ class DspFactoryImpl @Inject constructor(
     override fun createMaximum() = maximumFactory.create()
     override fun createLinearRamp() = linearRampFactory.create()
     override fun createAutomationPlayer() = automationPlayerFactory.create()
+    override fun createPlaitsUnit() = plaitsUnitFactory.create()
     override fun createDrumUnit() = drumUnitFactory.create()
     override fun createResonatorUnit() = resonatorUnitFactory.create()
     override fun createGrainsUnit() = grainsUnitFactory.create()

@@ -1,6 +1,4 @@
-import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 /**
  * Convention plugin for Kotlin Multiplatform API-only modules.
@@ -26,7 +24,7 @@ kotlin {
         }
     }
 
-    KotlinPlatformType.jvm {
+    jvm {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
         }
