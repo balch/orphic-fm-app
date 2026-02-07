@@ -63,6 +63,7 @@ class VoicePlugin : DspPlugin {
     private val _quadTriggerSource = IntArray(3)
     private val _quadPitchSource = IntArray(3)
     private val _quadEnvTriggerMode = BooleanArray(3)
+    private val _pairEngine = IntArray(6)
 
     private val portDefs = ports(startIndex = 0) {
         // Voice Params (0-11)
@@ -123,8 +124,19 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
+            controlPort(VoiceSymbol.pairEngine(i)) {
+                intType {
+                    default = 0
+                    min = 0; max = 4
+                    get { _pairEngine[i] }
+                    set {
+                        _pairEngine[i] = it
+                        listener?.onVoiceParamChange(i, "pair_engine", it)
+                    }
+                }
+            }
         }
-        
+
         // Global
         controlPort(VoiceSymbol.FM_STRUCTURE_CROSS_QUAD) {
             boolType {
@@ -251,6 +263,7 @@ class VoicePlugin : DspPlugin {
     fun setEnvSpeed(i: Int, v: Float) { _envSpeed[i] = v }
     fun setPairSharpness(i: Int, v: Float) { _pairSharpness[i] = v }
     fun setDuoModSource(i: Int, v: Int) { _duoModSource[i] = v }
+    fun setPairEngine(i: Int, v: Int) { _pairEngine[i] = v }
     
     fun setFmStructure(v: Boolean) { _fmStructureCrossQuad = v }
     fun setTotalFeedback(v: Float) { _totalFeedback = v }

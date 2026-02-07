@@ -38,6 +38,17 @@ class DspVoice(
     private val volumeRamp = factory.createLinearRamp()  // Smooth volume changes
     private val volumeGain = factory.createMultiply()
 
+    // Plaits engine source
+    private val plaitsUnit = factory.createPlaitsUnit()
+
+    // Source switching: crossfade between oscillators and Plaits
+    private val oscGain = factory.createMultiply()       // oscMixer * (1 or 0)
+    private val plaitsGain = factory.createMultiply()     // plaitsUnit * (0 or 1)
+    private val sourceSelector = factory.createAdd()      // oscGain + plaitsGain → vca
+
+    // Gate fanout: splits gate to envelope AND plaits trigger
+    private val gateFanout = factory.createPassThrough()
+
     // Envelope Follower for voice coupling
     private val envelopeFollower = factory.createPeakFollower()
 
@@ -78,7 +89,7 @@ class DspVoice(
     // Exposed ports for external wiring
     val frequency: AudioInput get() = pitchScaler.inputA           // Base frequency (through pitchScaler)
     val directFrequency: AudioInput get() = directFreqMixer.inputB // Direct Hz (bypasses pitchScaler)
-    val gate: AudioInput get() = ampEnv.input                      // Gate trigger
+    val gate: AudioInput get() = gateFanout.input                  // Gate trigger (fans out to envelope + plaits)
     val modInput: AudioInput get() = fmDepthControl.inputA         // FM signal input
     val fmDepth: AudioInput get() = fmDepthControl.inputB          // FM depth (0-1)
     val sharpness: AudioInput get() = sharpnessProxy.input         // Waveform (0=tri, 1=sq)
@@ -95,6 +106,14 @@ class DspVoice(
     // Outputs - volumeGain is the final output stage
     val output: AudioOutput get() = volumeGain.output
     val envelopeOutput: AudioOutput get() = envelopeFollower.output
+
+    // Plaits engine access
+    val plaits: PlaitsUnit get() = plaitsUnit
+
+    fun setEngineActive(active: Boolean) {
+        oscGain.inputB.set(if (active) 0.0 else 1.0)
+        plaitsGain.inputB.set(if (active) 1.0 else 0.0)
+    }
 
     /**
      * Get the current envelope level (0-1 range) for visualization.
@@ -165,6 +184,11 @@ class DspVoice(
         audioEngine.addUnit(benderMixer)
         audioEngine.addUnit(holdRamp)
         audioEngine.addUnit(vcaControlMixer)
+        audioEngine.addUnit(plaitsUnit)
+        audioEngine.addUnit(oscGain)
+        audioEngine.addUnit(plaitsGain)
+        audioEngine.addUnit(sourceSelector)
+        audioEngine.addUnit(gateFanout)
 
         // Envelope follower setup - longer halflife for better hold/sustain detection
         envelopeFollower.setHalfLife(0.15) // 150ms response time for sustained signals
@@ -254,8 +278,18 @@ class DspVoice(
         // Default CV pitch depth = 0
         cvPitchDepth.set(0.0)
 
-        // Wire: Mixed Oscillator -> VCA inputA
-        oscMixer.output.connect(vca.inputA)
+        // Source switching: oscMixer → oscGain, plaitsUnit → plaitsGain, both → sourceSelector → VCA
+        oscMixer.output.connect(oscGain.inputA)
+        oscGain.inputB.set(1.0)  // Default: oscillators active
+        plaitsUnit.output.connect(plaitsGain.inputA)
+        plaitsGain.inputB.set(0.0)  // Default: Plaits inactive
+        oscGain.output.connect(sourceSelector.inputA)
+        plaitsGain.output.connect(sourceSelector.inputB)
+        sourceSelector.output.connect(vca.inputA)
+
+        // Gate fanout: splits gate to envelope AND plaits trigger
+        gateFanout.output.connect(ampEnv.input)
+        gateFanout.output.connect(plaitsUnit.triggerInput)
 
         // VCA inputB = Envelope + HoldLevel (ramped for click-free transitions)
         ampEnv.output.connect(vcaControlMixer.inputA)

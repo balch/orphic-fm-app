@@ -4,6 +4,9 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.plugins.drum.engine.DrumEngineFactory
+import org.balch.orpheus.plugins.plaits.PlaitsEngineId
+import kotlin.math.log2
 import kotlin.math.pow
 
 /**
@@ -51,6 +54,10 @@ class DspVoiceManager @Inject constructor(
     private var _totalFeedback = 0.0f
     private var _voiceCoupling = 0.0f
     
+    // Plaits engine selection
+    private val engineFactory = DrumEngineFactory()
+    private val _pairEngine = IntArray(6)  // 0 = default oscillators
+
     // Quad sources
     private val quadPitchSources = IntArray(3) { 0 }
     private val quadTriggerSources = IntArray(3) { 0 }
@@ -88,7 +95,13 @@ class DspVoiceManager @Inject constructor(
         val pitchMultiplier = 2.0.pow((quadPitch - 0.5) * 2.0)
         val finalFreq = baseFreq * pitchMultiplier
         voices[index].frequency.set(finalFreq)
-        
+
+        // Update Plaits note (control-rate)
+        if (_pairEngine[index / 2] != 0) {
+            val midiNote = 69.0 + 12.0 * log2(finalFreq / 440.0)
+            voices[index].plaits.setNote(midiNote.toFloat())
+        }
+
         // Update string pluck frequency if this is the primary voice (A) of a pair
         if (index % 2 == 0) {
             val stringIndex = index / 2
@@ -118,6 +131,8 @@ class DspVoiceManager @Inject constructor(
         val voiceB = voiceA + 1
         voices[voiceA].sharpness.set(sharpness.toDouble())
         voices[voiceB].sharpness.set(sharpness.toDouble())
+        updateVoiceTimbre(voiceA)
+        updateVoiceTimbre(voiceB)
         pluginProvider.voicePlugin.setPairSharpness(pairIndex, sharpness)
     }
 
@@ -314,6 +329,39 @@ class DspVoiceManager @Inject constructor(
             voices[i].setTriggerMode(enabled)
         }
     }
+
+    fun setPairEngine(pairIndex: Int, engineOrdinal: Int) {
+        if (pairIndex !in 0..5) return
+        _pairEngine[pairIndex] = engineOrdinal
+        val voiceA = pairIndex * 2
+        val voiceB = voiceA + 1
+
+        if (engineOrdinal == 0) {
+            voices[voiceA].setEngineActive(false)
+            voices[voiceB].setEngineActive(false)
+            voices[voiceA].plaits.setEngine(null)
+            voices[voiceB].plaits.setEngine(null)
+        } else {
+            val engineId = PlaitsEngineId.entries[engineOrdinal - 1]
+            voices[voiceA].plaits.setEngine(engineFactory.create(engineId))
+            voices[voiceB].plaits.setEngine(engineFactory.create(engineId))
+            voices[voiceA].setEngineActive(true)
+            voices[voiceB].setEngineActive(true)
+            updateVoiceFrequency(voiceA)
+            updateVoiceFrequency(voiceB)
+            updateVoiceTimbre(voiceA)
+            updateVoiceTimbre(voiceB)
+        }
+        pluginProvider.voicePlugin.setPairEngine(pairIndex, engineOrdinal)
+    }
+
+    private fun updateVoiceTimbre(index: Int) {
+        if (_pairEngine[index / 2] != 0) {
+            voices[index].plaits.setTimbre(_pairSharpness[index / 2])
+        }
+    }
+
+    fun getPairEngine(pairIndex: Int) = _pairEngine.getOrElse(pairIndex) { 0 }
 
     // Getters
     fun getVoiceTune(index: Int) = _voiceTune[index]
