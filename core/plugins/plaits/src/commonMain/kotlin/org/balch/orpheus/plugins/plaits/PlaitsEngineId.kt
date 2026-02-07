@@ -10,5 +10,8 @@ enum class PlaitsEngineId(val displayName: String) {
     ANALOG_SNARE_DRUM("808 Snare Drum"),
     METALLIC_HI_HAT("808 Hi-Hat"),
     FM_DRUM("FM Drum"),
-    // Future engines added here as ported
+    // Pitched synthesis engines
+    FM("FM Synthesis"),
+    NOISE("Filtered Noise"),
+    WAVESHAPING("Waveshaping"),
 }

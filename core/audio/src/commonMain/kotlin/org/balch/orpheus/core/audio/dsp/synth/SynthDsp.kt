@@ -40,9 +40,12 @@ object SynthDsp {
      * Ported from stmlib/dsp/filter.h
      */
     class StateVariableFilter {
-        private var g: Float = 0f
-        private var r: Float = 0f
-        private var h: Float = 0f
+        var g: Float = 0f
+            private set
+        var r: Float = 0f
+            private set
+        var h: Float = 0f
+            private set
         private var state1: Float = 0f
         private var state2: Float = 0f
 
@@ -63,6 +66,21 @@ object SynthDsp {
         fun setFq(f: Float, resonance: Float) {
             val frequency = f.coerceIn(0f, 0.497f)
             g = tan(PI_F * frequency)
+            r = 1.0f / resonance
+            h = 1.0f / (1.0f + r * g + g * g)
+        }
+
+        /**
+         * Set frequency and resonance using a polynomial tan approximation.
+         * More efficient than [setFq] for per-sample use.
+         * Ported from stmlib set_f_q<FREQUENCY_ACCURATE>.
+         */
+        fun setFqAccurate(f: Float, resonance: Float) {
+            val freq = f.coerceIn(0f, 0.497f)
+            val wc = PI_F * freq
+            val wc2 = wc * wc
+            g = wc * (1f + wc2 * (0.3333314f + wc2 * (0.1333924f +
+                wc2 * (0.0533741f + wc2 * (0.0029005f + wc2 * 0.0095168f)))))
             r = 1.0f / resonance
             h = 1.0f / (1.0f + r * g + g * g)
         }
@@ -108,6 +126,22 @@ object SynthDsp {
             val lp = g * bp + state2
             state2 = g * bp + lp
             return hp
+        }
+
+        /**
+         * Continuous LP→BP→HP morph. mode: 0=LP, 0.5=BP, 1.0=HP.
+         * Ported from stmlib Svf::ProcessMultimodeLPtoHP.
+         */
+        fun processMultimode(input: Float, mode: Float): Float {
+            val hp = (input - r * state1 - g * state1 - state2) * h
+            val bp = g * hp + state1
+            state1 = g * hp + bp
+            val lp = g * bp + state2
+            state2 = g * bp + lp
+            val lpGain = maxOf(1.0f - mode * 2.0f, 0.0f)
+            val bpGain = 1.0f - 2.0f * kotlin.math.abs(mode - 0.5f)
+            val hpGain = minOf(-mode * 2.0f + 1.0f, 0.0f)
+            return lpGain * lp + bpGain * bp + hpGain * hp
         }
 
         data class FilterOutputs(val lp: Float, val bp: Float, val hp: Float)

@@ -4,7 +4,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.ModSource
-import org.balch.orpheus.plugins.drum.engine.DrumEngineFactory
+import org.balch.orpheus.plugins.plaits.PlaitsEngineFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngineId
 import kotlin.math.log2
 import kotlin.math.pow
@@ -55,7 +55,7 @@ class DspVoiceManager @Inject constructor(
     private var _voiceCoupling = 0.0f
     
     // Plaits engine selection
-    private val engineFactory = DrumEngineFactory()
+    private val engineFactory: PlaitsEngineFactory = PlaitsEngineFactoryImpl()
     private val _pairEngine = IntArray(6)  // 0 = default oscillators
 
     // Quad sources

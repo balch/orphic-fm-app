@@ -15,6 +15,7 @@ class DrumEngineFactory : PlaitsEngineFactory {
             PlaitsEngineId.ANALOG_SNARE_DRUM -> AnalogSnareDrumEngine()
             PlaitsEngineId.METALLIC_HI_HAT -> MetallicHiHatEngine()
             PlaitsEngineId.FM_DRUM -> FmDrumEngine()
+            else -> error("DrumEngineFactory does not support $id")
         }
         engine.init()
         return engine
