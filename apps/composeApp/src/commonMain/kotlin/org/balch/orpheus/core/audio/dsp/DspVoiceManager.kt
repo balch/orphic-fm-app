@@ -58,6 +58,8 @@ class DspVoiceManager @Inject constructor(
     // Plaits engine selection
     private val _pairEngine = IntArray(6)  // 0 = default oscillators
     private val _pairHarmonics = FloatArray(6) { 0.0f }
+    private val _pairProsody = FloatArray(6) { 0.5f }
+    private val _pairSpeed = FloatArray(6) { 0.0f }
 
     // Quad sources
     private val quadPitchSources = IntArray(3) { 0 }
@@ -132,8 +134,8 @@ class DspVoiceManager @Inject constructor(
     fun setVoiceEnvelopeSpeed(index: Int, speed: Float) {
         _voiceEnvelopeSpeed[index] = speed
         voices[index].setEnvelopeSpeed(speed)
-        // For drum engines on voices, envSpeed drives morph (internal decay time)
-        if (isDrumEngine(_pairEngine[index / 2])) {
+        // For drum/speech engines, envSpeed drives morph (decay time / phoneme address)
+        if (usesMorphFromEnvSpeed(_pairEngine[index / 2])) {
             voices[index].plaits.setMorph(speed)
         }
         pluginProvider.voicePlugin.setEnvSpeed(index, speed)
@@ -412,20 +414,50 @@ class DspVoiceManager @Inject constructor(
             updateVoiceTimbre(voiceB)
             updateVoiceMorph(voiceA)
             updateVoiceMorph(voiceB)
+            // Sync morph from envSpeed for engines that use envSpeed→morph routing
+            if (usesMorphFromEnvSpeed(engineOrdinal)) {
+                voices[voiceA].plaits.setMorph(_voiceEnvelopeSpeed[voiceA])
+                voices[voiceB].plaits.setMorph(_voiceEnvelopeSpeed[voiceB])
+            }
             updateVoiceHarmonics(voiceA)
             updateVoiceHarmonics(voiceB)
+            // Apply speech-specific parameters when switching to Speech engine
+            if (engineId == PlaitsEngineId.SPEECH) {
+                voices[voiceA].plaits.setSpeechProsody(_pairProsody[pairIndex])
+                voices[voiceB].plaits.setSpeechProsody(_pairProsody[pairIndex])
+                voices[voiceA].plaits.setSpeechSpeed(_pairSpeed[pairIndex])
+                voices[voiceB].plaits.setSpeechSpeed(_pairSpeed[pairIndex])
+            }
             // Refresh mod source routing for new engine type
             setDuoModSource(pairIndex, _duoModSource[pairIndex])
         }
         pluginProvider.voicePlugin.setPairEngine(pairIndex, engineOrdinal)
     }
 
+    /**
+     * Engines with internal amplitude envelopes that need hold=1.0 (VCA always open).
+     * Speech is NOT included: it has alreadyEnveloped=false and needs the external VCA.
+     */
     private fun isDrumEngine(engineOrdinal: Int): Boolean {
         if (engineOrdinal == 0) return false
         return when (PlaitsEngineId.entries[engineOrdinal - 1]) {
             PlaitsEngineId.ANALOG_BASS_DRUM, PlaitsEngineId.ANALOG_SNARE_DRUM,
             PlaitsEngineId.METALLIC_HI_HAT, PlaitsEngineId.FM_DRUM,
-            PlaitsEngineId.MODAL -> true  // Modal uses internal envelope
+            PlaitsEngineId.MODAL -> true
+            else -> false
+        }
+    }
+
+    /**
+     * Engines where envSpeed drives morph (phoneme/decay parameter) rather than fmDepth.
+     * Includes drum engines (morph=decay) and Speech (morph=phoneme/word address).
+     */
+    private fun usesMorphFromEnvSpeed(engineOrdinal: Int): Boolean {
+        if (engineOrdinal == 0) return false
+        return when (PlaitsEngineId.entries[engineOrdinal - 1]) {
+            PlaitsEngineId.ANALOG_BASS_DRUM, PlaitsEngineId.ANALOG_SNARE_DRUM,
+            PlaitsEngineId.METALLIC_HI_HAT, PlaitsEngineId.FM_DRUM,
+            PlaitsEngineId.MODAL, PlaitsEngineId.SPEECH -> true
             else -> false
         }
     }
@@ -438,7 +470,8 @@ class DspVoiceManager @Inject constructor(
 
     private fun updateVoiceMorph(index: Int) {
         val pairIndex = index / 2
-        if (_pairEngine[pairIndex] != 0 && !isDrumEngine(_pairEngine[pairIndex])) {
+        val engineOrd = _pairEngine[pairIndex]
+        if (engineOrd != 0 && !usesMorphFromEnvSpeed(engineOrd)) {
             voices[index].plaits.setMorph(_voiceFmDepth[index])
         }
     }
@@ -464,6 +497,30 @@ class DspVoiceManager @Inject constructor(
     }
 
     fun getPairHarmonics(pairIndex: Int) = _pairHarmonics.getOrElse(pairIndex) { 0.0f }
+
+    fun setPairProsody(pairIndex: Int, value: Float) {
+        if (pairIndex !in 0..5) return
+        _pairProsody[pairIndex] = value
+        val voiceA = pairIndex * 2
+        val voiceB = voiceA + 1
+        voices[voiceA].plaits.setSpeechProsody(value)
+        voices[voiceB].plaits.setSpeechProsody(value)
+        pluginProvider.voicePlugin.setPairProsody(pairIndex, value)
+    }
+
+    fun getPairProsody(pairIndex: Int) = _pairProsody.getOrElse(pairIndex) { 0.5f }
+
+    fun setPairSpeed(pairIndex: Int, value: Float) {
+        if (pairIndex !in 0..5) return
+        _pairSpeed[pairIndex] = value
+        val voiceA = pairIndex * 2
+        val voiceB = voiceA + 1
+        voices[voiceA].plaits.setSpeechSpeed(value)
+        voices[voiceB].plaits.setSpeechSpeed(value)
+        pluginProvider.voicePlugin.setPairSpeed(pairIndex, value)
+    }
+
+    fun getPairSpeed(pairIndex: Int) = _pairSpeed.getOrElse(pairIndex) { 0.0f }
 
     fun getPairEngine(pairIndex: Int) = _pairEngine.getOrElse(pairIndex) { 0 }
 

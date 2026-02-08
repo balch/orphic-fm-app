@@ -81,6 +81,7 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
                  synth.add(unit.scaler)
             }
 
+            is JsynTtsPlayerUnit -> synth.add(unit)
             is com.jsyn.unitgen.UnitGenerator -> synth.add(unit)
         }
     }

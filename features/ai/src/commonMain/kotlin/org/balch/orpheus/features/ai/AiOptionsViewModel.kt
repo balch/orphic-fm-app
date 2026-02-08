@@ -61,6 +61,7 @@ import org.balch.orpheus.plugins.delay.DelayPlugin
 import org.balch.orpheus.plugins.distortion.DistortionPlugin
 import org.balch.orpheus.plugins.duolfo.DuoLfoPlugin
 import kotlin.random.Random
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
@@ -565,7 +566,7 @@ class AiOptionsViewModel(
         // - Presence (Drive/Distortion)
         
         return SynthPreset(
-            name = "Solo Session ${kotlinx.datetime.Clock.System.now().toEpochMilliseconds() / 1000}",
+            name = "Solo Session ${Clock.System.now().toEpochMilliseconds() / 1000}",
             portValues = buildMap {
                  // Unison with very slight detune for thickness
                  val tunes = List(12) { 0.5f + (r.nextFloat() - 0.5f) * 0.01f }
@@ -621,7 +622,7 @@ class AiOptionsViewModel(
                  put("$lfoUri:${DuoLfoSymbol.MODE.symbol}", PortValue.IntValue(HyperLfoMode.OFF.ordinal))
                  put("$lfoUri:${DuoLfoSymbol.LINK.symbol}", PortValue.BoolValue(false))
             },
-            createdAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+            createdAt = Clock.System.now().toEpochMilliseconds()
         )
     }
 

@@ -30,4 +30,6 @@ interface DspFactory {
     fun createClockUnit(): ClockUnit
     fun createFluxUnit(): FluxUnit
     fun createReverbUnit(): ReverbUnit
+    fun createTtsPlayerUnit(): TtsPlayerUnit
+    fun createSpeechEffectsUnit(): SpeechEffectsUnit
 }

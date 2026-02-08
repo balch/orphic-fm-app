@@ -358,6 +358,84 @@ class JsynLooperUnit : LooperUnit {
     override fun getLoopDuration(): Double = loopSampleCount / SAMPLE_RATE
 }
 
+class JsynTtsPlayerUnit : com.jsyn.unitgen.UnitGenerator(), TtsPlayerUnit {
+
+    private val jsynOutputL = com.jsyn.ports.UnitOutputPort("OutputLeft")
+    private val jsynOutputR = com.jsyn.ports.UnitOutputPort("OutputRight")
+
+    override val output: AudioOutput = JsynAudioOutput(jsynOutputL)
+    override val outputRight: AudioOutput = JsynAudioOutput(jsynOutputR)
+
+    private var samples: FloatArray? = null
+    private var playbackRate = 1.0f
+    private var volume = 0.7f
+    private var position = 0.0  // fractional sample position
+    private var playing = false
+
+    init {
+        addPort(jsynOutputL)
+        addPort(jsynOutputR)
+    }
+
+    override fun loadAudio(samples: FloatArray, sampleRate: Int) {
+        this.samples = samples
+        position = 0.0
+    }
+
+    override fun play() {
+        position = 0.0
+        playing = true
+    }
+
+    override fun stop() {
+        playing = false
+    }
+
+    override fun isPlaying(): Boolean = playing
+
+    override fun setRate(rate: Float) {
+        playbackRate = rate.coerceIn(0.25f, 2.0f)
+    }
+
+    override fun setVolume(volume: Float) {
+        this.volume = volume.coerceIn(0f, 1f)
+    }
+
+    override fun generate(start: Int, end: Int) {
+        val outL = jsynOutputL.values
+        val outR = jsynOutputR.values
+        val buf = samples
+
+        if (!playing || buf == null) {
+            for (i in start until end) {
+                outL[i] = 0.0
+                outR[i] = 0.0
+            }
+            return
+        }
+
+        val len = buf.size
+        for (i in start until end) {
+            val intPos = position.toInt()
+            if (intPos >= len - 1) {
+                playing = false
+                for (j in i until end) {
+                    outL[j] = 0.0
+                    outR[j] = 0.0
+                }
+                return
+            }
+            // Linear interpolation
+            val frac = (position - intPos).toFloat()
+            val sample = buf[intPos] * (1f - frac) + buf[intPos + 1] * frac
+            val scaled = (sample * volume).toDouble()
+            outL[i] = scaled
+            outR[i] = scaled
+            position += playbackRate
+        }
+    }
+}
+
 class JsynClockUnit : ClockUnit {
     internal val jsOsc = com.jsyn.unitgen.PulseOscillator()
     internal val scaler = com.jsyn.unitgen.MultiplyAdd()

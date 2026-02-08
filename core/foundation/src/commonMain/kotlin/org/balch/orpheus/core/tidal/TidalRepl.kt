@@ -675,7 +675,7 @@ class TidalRepl(
                 if (pairIndex != null) {
                     if (pairIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Pair index must be 1-4, got: $pairIndex")
                     val engineId = resolveEngineId(engineName)
-                        ?: throw IllegalArgumentException("Line $lineNum: Unknown engine '$engineName'. Use: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable")
+                        ?: throw IllegalArgumentException("Line $lineNum: Unknown engine '$engineName'. Use: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech")
                     val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
                     return Pattern.pure(TidalEvent.PairEngine((pairIndex - 1).coerceIn(0, 3), engineId, listOf(location)))
                 }
@@ -692,7 +692,7 @@ class TidalRepl(
                 if (pairIndex != null) {
                     if (pairIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Pair index must be 1-4, got: $pairIndex")
                     val engineId = resolveEngineId(engineName)
-                        ?: throw IllegalArgumentException("Line $lineNum: Unknown engine '$engineName'. Use: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable")
+                        ?: throw IllegalArgumentException("Line $lineNum: Unknown engine '$engineName'. Use: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech")
                     val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
                     return Pattern.pure(TidalEvent.PairEngine((pairIndex - 1).coerceIn(0, 3), engineId, listOf(location)))
                 }
@@ -1086,6 +1086,7 @@ class TidalRepl(
         "swarm", "swm", "14" -> 14
         "chord", "chd", "15" -> 15
         "wavetable", "wtb", "16" -> 16
+        "speech", "spk", "talk", "17" -> 17
         "bd", "bassdrum", "1" -> 1
         "sd", "snare", "2" -> 2
         "hh", "hihat", "3" -> 3

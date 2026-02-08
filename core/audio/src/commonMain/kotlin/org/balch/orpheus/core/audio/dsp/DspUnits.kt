@@ -224,6 +224,12 @@ interface PlaitsUnit : AudioUnit {
      */
     fun setPercussiveMode(enabled: Boolean) {}
 
+    /** Set speech prosody amount (0..1). Only meaningful for Speech engine. */
+    fun setSpeechProsody(value: Float) {}
+
+    /** Set speech speed (0..1). Only meaningful for Speech engine. */
+    fun setSpeechSpeed(value: Float) {}
+
     /** Audio-rate timbre modulation input (additive, -1..1 range) */
     val timbreInput: AudioInput
 
@@ -428,6 +434,41 @@ interface ReverbUnit : AudioUnit {
     fun clear()
 
     interface Factory { fun create(): ReverbUnit }
+}
+
+/**
+ * TTS sample player unit.
+ * Loads synthesized speech audio and plays it through the effects chain.
+ */
+interface TtsPlayerUnit : AudioUnit {
+    override val output: AudioOutput
+    val outputRight: AudioOutput
+    fun loadAudio(samples: FloatArray, sampleRate: Int)
+    fun play()
+    fun stop()
+    fun isPlaying(): Boolean
+    fun setRate(rate: Float)   // 0.25-2.0, affects speed+pitch
+    fun setVolume(volume: Float) // 0.0-1.0
+    interface Factory { fun create(): TtsPlayerUnit }
+}
+
+/**
+ * Dedicated speech effects chain unit.
+ * Provides phaser, feedback delay, and reverb effects independent of main effects.
+ */
+interface SpeechEffectsUnit : AudioUnit {
+    val inputLeft: AudioInput
+    val inputRight: AudioInput
+    val outputRight: AudioOutput
+
+    /** Phaser intensity 0-1 (0=bypass) */
+    fun setPhaserIntensity(intensity: Float)
+    /** Feedback delay amount 0-1 (0=bypass) */
+    fun setFeedbackAmount(amount: Float)
+    /** Reverb amount 0-1 (0=bypass) */
+    fun setReverbAmount(amount: Float)
+
+    interface Factory { fun create(): SpeechEffectsUnit }
 }
 
 /**

@@ -49,4 +49,5 @@ class DspPluginProvider(
     val voicePlugin by lazy { plugins.filterIsInstance<VoicePlugin>().first() }
     val beatsPlugin by lazy { plugins.filterIsInstance<BeatsPlugin>().first() }
     val reverbPlugin by lazy { plugins.filterIsInstance<ReverbPlugin>().first() }
+    val ttsPlugin by lazy { plugins.filterIsInstance<TtsPlugin>().first() }
 }

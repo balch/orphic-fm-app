@@ -58,7 +58,7 @@ import kotlin.math.sqrt
 /** One entry in the engine ring. */
 data class PickerEntry(val label: String, val ordinal: Int, val color: Color)
 
-/** Configuration for [EnginePickerPopup] describing the ring entries and center. */
+/** Configuration for [VoiceEnginePickerPopup] describing the ring entries and center. */
 data class PickerConfig(
     val ring: List<PickerEntry>,
     val centerLabel: String,
@@ -84,6 +84,7 @@ val VOICE_PICKER_CONFIG = PickerConfig(
         PickerEntry("SWM", 14, OrpheusColors.electricBlue),
         PickerEntry("CHD", 15, OrpheusColors.synthGreen),
         PickerEntry("WTB", 16, OrpheusColors.presetOrange),
+        PickerEntry("SPK", 17, OrpheusColors.warmGlow.copy(alpha = 0.9f)),
     ),
     centerLabel = "OSC",
     centerOrdinal = 0,
@@ -108,6 +109,7 @@ private val DRUM_RING = listOf(
     PickerEntry("SWM", 13, OrpheusColors.electricBlue.copy(alpha = 0.8f)),
     PickerEntry("CHD", 14, OrpheusColors.synthGreen.copy(alpha = 0.8f)),
     PickerEntry("WTB", 15, OrpheusColors.presetOrange.copy(alpha = 0.8f)),
+    PickerEntry("SPK", 16, OrpheusColors.warmGlow.copy(alpha = 0.7f)),
 )
 
 /** Drum picker with BD as center default. */
@@ -122,7 +124,7 @@ val DRUM_HH_PICKER_CONFIG = PickerConfig(DRUM_RING, "HH", 2)
 // ═══════════════════════════════════════════════════════════
 
 /** Picker circle diameter. */
-val PICKER_SIZE: Dp = 160.dp
+val PICKER_SIZE: Dp = 180.dp
 
 /**
  * Determines which segment a pointer at (dx, dy) from the picker center is over.
@@ -155,7 +157,7 @@ fun engineLabel(ordinal: Int): String = when (ordinal) {
     0 -> "OSC"
     5 -> "FM"; 6 -> "NSE"; 7 -> "WSH"
     8 -> "VA"; 9 -> "ADD"; 10 -> "GRN"; 11 -> "STR"; 12 -> "MOD"
-    13 -> "PAR"; 14 -> "SWM"; 15 -> "CHD"; 16 -> "WTB"
+    13 -> "PAR"; 14 -> "SWM"; 15 -> "CHD"; 16 -> "WTB"; 17 -> "SPK"
     else -> "?"
 }
 
@@ -164,7 +166,7 @@ fun drumEngineLabel(ordinal: Int): String = when (ordinal) {
     0 -> "BD"; 1 -> "SD"; 2 -> "HH"; 3 -> "FM"
     4 -> "FM2"; 5 -> "NSE"; 6 -> "WSH"
     7 -> "VA"; 8 -> "ADD"; 9 -> "GRN"; 10 -> "STR"; 11 -> "MOD"
-    12 -> "PAR"; 13 -> "SWM"; 14 -> "CHD"; 15 -> "WTB"
+    12 -> "PAR"; 13 -> "SWM"; 14 -> "CHD"; 15 -> "WTB"; 16 -> "SPK"
     else -> "?"
 }
 
@@ -256,7 +258,7 @@ fun EnginePickerButton(
             )
         }
         if (displayPopup) {
-            EnginePickerPopup(
+            VoiceEnginePickerPopup(
                 currentEngine = currentEngine,
                 hoveredSegment = displaySegment,
                 color = color,
@@ -281,7 +283,7 @@ fun EnginePickerButton(
  * @param anchorSize size of the trigger button so the popup centers over it
  */
 @Composable
-fun EnginePickerPopup(
+fun VoiceEnginePickerPopup(
     currentEngine: Int,
     hoveredSegment: Int?,
     color: Color,
@@ -489,7 +491,7 @@ private fun DrawScope.drawRings(
 
 @Preview
 @Composable
-private fun EnginePickerPopupPreview() {
+private fun VoiceEnginePickerPopupPreview() {
     OrpheusTheme {
         Box(
             modifier = Modifier
@@ -499,7 +501,7 @@ private fun EnginePickerPopupPreview() {
 
             contentAlignment = Alignment.Center
         ) {
-            EnginePickerPopup(
+            VoiceEnginePickerPopup(
                 currentEngine = 0,
                 hoveredSegment = 2,
                 color = OrpheusColors.neonMagenta

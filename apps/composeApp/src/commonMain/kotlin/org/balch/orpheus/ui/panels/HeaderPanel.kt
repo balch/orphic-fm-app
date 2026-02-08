@@ -60,6 +60,9 @@ import org.balch.orpheus.features.resonator.ResonatorViewModel
 import org.balch.orpheus.features.reverb.ReverbFeature
 import org.balch.orpheus.features.reverb.ReverbPanel
 import org.balch.orpheus.features.reverb.ReverbViewModel
+import org.balch.orpheus.features.speech.SpeechFeature
+import org.balch.orpheus.features.speech.SpeechPanel
+import org.balch.orpheus.features.speech.SpeechViewModel
 import org.balch.orpheus.features.tidal.LiveCodeFeature
 import org.balch.orpheus.features.tidal.LiveCodePanel
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
@@ -92,6 +95,7 @@ fun HeaderPanel(
     grainsFeature: GrainsFeature = GrainsViewModel.feature(),
     looperFeature: LooperFeature = LooperViewModel.feature(),
     liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
+    speechFeature: SpeechFeature = SpeechViewModel.feature(),
     aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
     drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
@@ -217,6 +221,14 @@ fun HeaderPanel(
             isExpanded = PanelId.CODE.isExpanded(),
             onExpandedChange = { PanelId.CODE.setExpanded(it) },
             modifier = panelModifier(PanelId.CODE.isExpanded())
+        )
+        // Speech panel
+        SpeechPanel(
+            feature = speechFeature,
+            isExpanded = PanelId.SPEECH.isExpanded(),
+            onExpandedChange = { PanelId.SPEECH.setExpanded(it) },
+            onTextFieldFocusChange = onDialogActiveChange,
+            modifier = panelModifier(PanelId.SPEECH.isExpanded())
         )
         // Drums panel
         DrumsPanel(

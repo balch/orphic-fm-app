@@ -590,3 +590,32 @@ class WebAudioClockUnit(private val context: AudioContext) : ClockUnit {
     override val pulseWidth: AudioInput = WebAudioNodeInput(pwScaler, 0, context)
     override val output: AudioOutput = WebAudioNodeOutput(comparatorShaper)
 }
+
+class WebAudioTtsPlayerUnit(private val context: AudioContext) : TtsPlayerUnit {
+    private val outputGain = context.createGain().also { it.gain.value = 0f }
+
+    override val output: AudioOutput = WebAudioNodeOutput(outputGain)
+    override val outputRight: AudioOutput = WebAudioNodeOutput(outputGain)
+
+    override fun loadAudio(samples: FloatArray, sampleRate: Int) {}
+    override fun play() {}
+    override fun stop() {}
+    override fun isPlaying(): Boolean = false
+    override fun setRate(rate: Float) {}
+    override fun setVolume(volume: Float) {}
+}
+
+class WebAudioSpeechEffectsUnit(private val context: AudioContext) : SpeechEffectsUnit {
+    private val outputGain = context.createGain()
+    private val inL = context.createGain().also { it.connect(outputGain) }
+    private val inR = context.createGain().also { it.connect(outputGain) }
+
+    override val inputLeft: AudioInput = WebAudioNodeInput(inL, 0, context)
+    override val inputRight: AudioInput = WebAudioNodeInput(inR, 0, context)
+    override val output: AudioOutput = WebAudioNodeOutput(outputGain)
+    override val outputRight: AudioOutput = WebAudioNodeOutput(outputGain)
+
+    override fun setPhaserIntensity(intensity: Float) {}
+    override fun setFeedbackAmount(amount: Float) {}
+    override fun setReverbAmount(amount: Float) {}
+}

@@ -49,7 +49,9 @@ enum class PanelId {
     @LLMDescription("Random music generator")
     FLUX,
     @LLMDescription("Assigns sounds to Flux outputs")
-    FLUX_TRIGGERS
+    FLUX_TRIGGERS,
+    @LLMDescription("Speech synthesis panel showing AI speech output")
+    SPEECH
 }
 
 /**

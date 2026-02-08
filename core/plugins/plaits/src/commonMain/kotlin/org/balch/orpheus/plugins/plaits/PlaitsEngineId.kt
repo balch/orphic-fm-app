@@ -23,4 +23,5 @@ enum class PlaitsEngineId(val displayName: String) {
     SWARM("Swarm"),
     CHORD("Chord"),
     WAVETABLE("Wavetable"),
+    SPEECH("Speech"),
 }

@@ -189,6 +189,10 @@ class DspWiringGraph @Inject constructor(
         // Resonator output goes to Distortion input (resonator path continues)
         pluginProvider.resonatorPlugin.outputs["outputLeft"]!!.connect(pluginProvider.distortionPlugin.inputs["inputLeft"]!!)
         pluginProvider.resonatorPlugin.outputs["outputRight"]!!.connect(pluginProvider.distortionPlugin.inputs["inputRight"]!!)
+
+        // TTS Player → Stereo Sum (dedicated effects chain bypasses main distortion/delay/reverb)
+        pluginProvider.ttsPlugin.outputs["output"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.ttsPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
     }
     
     private fun wireDrums() {

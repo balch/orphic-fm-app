@@ -21,6 +21,18 @@ class JsynLooperUnitFactory @Inject constructor() : LooperUnit.Factory {
     override fun create(): LooperUnit = JsynLooperUnit()
 }
 
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
+class JsynTtsPlayerUnitFactory @Inject constructor() : TtsPlayerUnit.Factory {
+    override fun create(): TtsPlayerUnit = JsynTtsPlayerUnit()
+}
+
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
+class JsynSpeechEffectsUnitFactory @Inject constructor() : SpeechEffectsUnit.Factory {
+    override fun create(): SpeechEffectsUnit = JsynSpeechEffectsUnit()
+}
+
 
 
 

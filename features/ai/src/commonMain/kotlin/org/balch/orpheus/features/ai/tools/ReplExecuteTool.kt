@@ -127,7 +127,7 @@ class ReplExecuteTool @Inject constructor(
         - duomod:<duo> <source> - Mod source: fm, off, or lfo
         - sharp:<pair> <val> - Waveform sharpness 0=tri, 1=sq
         - engine:<pair> <name> - Set synthesis engine
-          Names: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable
+          Names: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech
           Example: engine:1 string (set pair 1 to Karplus-Strong strings)
         
         EFFECTS (usually set once, not cycled):

@@ -153,6 +153,7 @@ object OrpheusColors {
     val neonCyanBright = Color(0xFF00E5FF)
 
     val grainsRed = Color(0xFF886767)
+    val speechRose = Color(0xFFE88BA0)
 
     val patchOrange = Color(0xFFFF9500)
     val lfoBackground = Color(0xFF4A4A5A)

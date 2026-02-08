@@ -210,6 +210,12 @@ interface SynthEngine {
     fun getDrumP4(type: Int): Float
     fun getDrumP5(type: Int): Float
 
+    // TTS Player
+    fun loadTtsAudio(samples: FloatArray, sampleRate: Int)
+    fun playTts()
+    fun stopTts()
+    fun isTtsPlaying(): Boolean
+
     // Looper
     fun setLooperRecord(recording: Boolean)
     fun setLooperPlay(playing: Boolean)

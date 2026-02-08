@@ -79,6 +79,7 @@ kotlin {
             api(project(":features:draw"))
             api(project(":features:evo"))
             api(project(":features:tidal"))
+            api(project(":features:speech"))
             api(project(":features:visualizations"))
             api(project(":features:ai"))
             api(project(":features:debug"))

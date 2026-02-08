@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.JsynAudioInput
 import org.balch.orpheus.core.audio.dsp.JsynAudioOutput
 import org.balch.orpheus.core.audio.dsp.PlaitsUnit
+import org.balch.orpheus.plugins.plaits.engine.SpeechEngine
 import kotlin.math.absoluteValue
 import kotlin.math.exp
 import kotlin.math.sign
@@ -48,6 +49,8 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
     @Volatile private var _morph = 0.5f
     @Volatile private var _harmonics = 0.5f
     @Volatile private var _accent = 0.8f
+    @Volatile private var _speechProsody = 0.5f
+    @Volatile private var _speechSpeed = 0.0f
 
     // Manual trigger flag
     @Volatile private var _manualTrigger = false
@@ -85,6 +88,9 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
         _accent = accent
         _manualTrigger = true
     }
+
+    override fun setSpeechProsody(value: Float) { _speechProsody = value }
+    override fun setSpeechSpeed(value: Float) { _speechSpeed = value }
 
     override fun setPercussiveMode(enabled: Boolean) {
         _percussiveMode = enabled
@@ -162,6 +168,12 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
                 harmonics = _harmonics,
                 accent = _accent
             )
+
+            // Apply speech-specific parameters before rendering
+            (eng as? SpeechEngine)?.let {
+                it.prosodyAmount = _speechProsody
+                it.speed = _speechSpeed
+            }
 
             eng.render(params, renderBuffer, null, blockSize)
 

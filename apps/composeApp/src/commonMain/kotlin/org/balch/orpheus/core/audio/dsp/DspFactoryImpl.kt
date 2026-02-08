@@ -32,7 +32,9 @@ class DspFactoryImpl @Inject constructor(
     private val warpsUnitFactory: WarpsUnit.Factory,
     private val clockUnitFactory: ClockUnit.Factory,
     private val fluxUnitFactory: FluxUnit.Factory,
-    private val reverbUnitFactory: ReverbUnit.Factory
+    private val reverbUnitFactory: ReverbUnit.Factory,
+    private val ttsPlayerUnitFactory: TtsPlayerUnit.Factory,
+    private val speechEffectsUnitFactory: SpeechEffectsUnit.Factory
 ) : DspFactory {
     override fun createSineOscillator() = sineFactory.create()
     override fun createTriangleOscillator() = triangleFactory.create()
@@ -59,4 +61,6 @@ class DspFactoryImpl @Inject constructor(
     override fun createClockUnit() = clockUnitFactory.create()
     override fun createFluxUnit() = fluxUnitFactory.create()
     override fun createReverbUnit() = reverbUnitFactory.create()
+    override fun createTtsPlayerUnit() = ttsPlayerUnitFactory.create()
+    override fun createSpeechEffectsUnit() = speechEffectsUnitFactory.create()
 }

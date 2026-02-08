@@ -10,17 +10,18 @@ import org.balch.orpheus.plugins.plaits.PlaitsEngine
 import org.balch.orpheus.plugins.plaits.PlaitsEngineFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngineId
 import org.balch.orpheus.plugins.plaits.engine.AdditiveEngine
+import org.balch.orpheus.plugins.plaits.engine.ChordEngine
 import org.balch.orpheus.plugins.plaits.engine.FmEngine
 import org.balch.orpheus.plugins.plaits.engine.GrainEngine
 import org.balch.orpheus.plugins.plaits.engine.ModalEngine
 import org.balch.orpheus.plugins.plaits.engine.NoiseEngine
-import org.balch.orpheus.plugins.plaits.engine.StringEngine
-import org.balch.orpheus.plugins.plaits.engine.VirtualAnalogEngine
-import org.balch.orpheus.plugins.plaits.engine.ChordEngine
 import org.balch.orpheus.plugins.plaits.engine.ParticleEngine
+import org.balch.orpheus.plugins.plaits.engine.SpeechEngine
+import org.balch.orpheus.plugins.plaits.engine.StringEngine
 import org.balch.orpheus.plugins.plaits.engine.SwarmEngine
-import org.balch.orpheus.plugins.plaits.engine.WavetableEngine
+import org.balch.orpheus.plugins.plaits.engine.VirtualAnalogEngine
 import org.balch.orpheus.plugins.plaits.engine.WaveshapingEngine
+import org.balch.orpheus.plugins.plaits.engine.WavetableEngine
 
 /**
  * Unified factory for all [PlaitsEngine] implementations.
@@ -52,6 +53,7 @@ class PlaitsEngineFactoryImpl(
             PlaitsEngineId.SWARM -> SwarmEngine().also { it.init() }
             PlaitsEngineId.CHORD -> ChordEngine().also { it.init() }
             PlaitsEngineId.WAVETABLE -> WavetableEngine().also { it.init() }
+            PlaitsEngineId.SPEECH -> SpeechEngine().also { it.init() }
         }
     }
 }

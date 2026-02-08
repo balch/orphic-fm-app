@@ -46,3 +46,15 @@ class WebAudioFluxUnitFactory @Inject constructor(private val engine: OrpheusAud
 class WebAudioReverbUnitFactory @Inject constructor(private val engine: OrpheusAudioEngine) : ReverbUnit.Factory {
     override fun create(): ReverbUnit = WebAudioReverbUnit(engine.webAudioContext)
 }
+
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
+class WebAudioTtsPlayerUnitFactory @Inject constructor(private val engine: OrpheusAudioEngine) : TtsPlayerUnit.Factory {
+    override fun create(): TtsPlayerUnit = WebAudioTtsPlayerUnit(engine.webAudioContext)
+}
+
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
+class WebAudioSpeechEffectsUnitFactory @Inject constructor(private val engine: OrpheusAudioEngine) : SpeechEffectsUnit.Factory {
+    override fun create(): SpeechEffectsUnit = WebAudioSpeechEffectsUnit(engine.webAudioContext)
+}

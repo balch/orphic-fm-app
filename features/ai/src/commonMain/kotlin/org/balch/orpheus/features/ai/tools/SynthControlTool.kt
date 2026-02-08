@@ -18,6 +18,7 @@ import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
+import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
 
@@ -32,7 +33,7 @@ data class SynthControlArgs(
 
         QUADS (1-3): QUAD_PITCH_1..3, QUAD_HOLD_1..3, QUAD_VOLUME_1..3
 
-        PAIRS (1-6): DUO_MOD_SOURCE_1..6, PAIR_SHARPNESS_1..6, VOICE_ENGINE_1..6, VOICE_ENGINE_HARMONICS_1..6
+        PAIRS (1-6): DUO_MOD_SOURCE_1..6, PAIR_SHARPNESS_1..6, VOICE_ENGINE_1..6, VOICE_ENGINE_HARMONICS_1..6, VOICE_PROSODY_1..6, VOICE_SPEED_1..6
 
         LFO: HYPER_LFO_A, HYPER_LFO_B, HYPER_LFO_MODE, HYPER_LFO_LINK
 
@@ -48,6 +49,8 @@ data class SynthControlArgs(
         - MATRIX_CARRIER_LEVEL, MATRIX_MODULATOR_LEVEL: Input volumes (0-1)
         - MATRIX_CARRIER_SOURCE, MATRIX_MODULATOR_SOURCE: Audio routing (0=Synth, 0.5=Drums, 1=REPL)
         - MATRIX_MIX: Dry/wet blend (0=bypass, 1=fully processed)
+
+        TTS: TTS_RATE (0.25-2.0, playback speed), TTS_VOLUME (0-1)
 
         BENDER: Special pitch bend control (-1.0 to +1.0)
 
@@ -66,6 +69,7 @@ data class SynthControlArgs(
           14 = Swarm (8-voice sawtooth/sine swarm — thick unison, detuned pads, swelling textures)
           15 = Chord (wavetable + divide-down organ chords — organ, string machine, polyphonic)
           16 = Wavetable (3D wave terrain morphing — evolving timbres, digital, complex)
+          17 = Speech (formant/SAM/LPC vocoder — robotic voice, vowels, word banks)
         Drum engines (use sparingly on voice pairs):
           1 = Analog Bass Drum, 2 = Analog Snare, 3 = Hi-Hat, 4 = FM Drum
 
@@ -73,6 +77,11 @@ data class SynthControlArgs(
         Engine-specific tonal control (0.0-1.0):
           - OSC (engine 0): FM self-feedback amount (0=clean, 1=chaotic)
           - All others: Engine-specific harmonic richness parameter
+
+        SPEECH PARAMETERS (1-6): VOICE_PROSODY_1..6, VOICE_SPEED_1..6
+        Only meaningful when pair engine is set to 17 (Speech):
+          - VOICE_PROSODY: Pitch contour expressiveness (0=flat, 1=expressive)
+          - VOICE_SPEED: Speech rate (0=fast, 1=slow)
 
         VOICE ENGINE SOUND DESIGN TIPS:
           - Use String or Modal for plucked/metallic textures
@@ -303,6 +312,20 @@ class SynthControlTool @Inject constructor(
         "VOICE_ENGINE_HARMONICS_5" -> VoiceSymbol.pairHarmonics(4)
         "VOICE_ENGINE_HARMONICS_6" -> VoiceSymbol.pairHarmonics(5)
 
+        // Speech parameters (1-indexed → 0-indexed)
+        "VOICE_PROSODY_1" -> VoiceSymbol.pairProsody(0)
+        "VOICE_PROSODY_2" -> VoiceSymbol.pairProsody(1)
+        "VOICE_PROSODY_3" -> VoiceSymbol.pairProsody(2)
+        "VOICE_PROSODY_4" -> VoiceSymbol.pairProsody(3)
+        "VOICE_PROSODY_5" -> VoiceSymbol.pairProsody(4)
+        "VOICE_PROSODY_6" -> VoiceSymbol.pairProsody(5)
+        "VOICE_SPEED_1" -> VoiceSymbol.pairSpeed(0)
+        "VOICE_SPEED_2" -> VoiceSymbol.pairSpeed(1)
+        "VOICE_SPEED_3" -> VoiceSymbol.pairSpeed(2)
+        "VOICE_SPEED_4" -> VoiceSymbol.pairSpeed(3)
+        "VOICE_SPEED_5" -> VoiceSymbol.pairSpeed(4)
+        "VOICE_SPEED_6" -> VoiceSymbol.pairSpeed(5)
+
         // LFO controls
         "HYPER_LFO_A", "LFO_A" -> DuoLfoSymbol.FREQ_A
         "HYPER_LFO_B", "LFO_B" -> DuoLfoSymbol.FREQ_B
@@ -324,6 +347,10 @@ class SynthControlTool @Inject constructor(
         "REVERB_TIME" -> ReverbSymbol.TIME
         "REVERB_DAMPING" -> ReverbSymbol.DAMPING
         "REVERB_DIFFUSION" -> ReverbSymbol.DIFFUSION
+
+        // TTS controls
+        "TTS_RATE" -> TtsSymbol.RATE
+        "TTS_VOLUME" -> TtsSymbol.VOLUME
 
         // Resonator (Rings) controls
         "RESONATOR_MODE" -> ResonatorSymbol.MODE

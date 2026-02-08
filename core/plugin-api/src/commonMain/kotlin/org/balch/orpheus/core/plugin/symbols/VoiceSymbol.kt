@@ -85,6 +85,20 @@ enum class VoiceSymbol(
     PAIR_HARMONICS_4("pair_harmonics_4", displayName = "Pair Harmonics 4"),
     PAIR_HARMONICS_5("pair_harmonics_5", displayName = "Pair Harmonics 5"),
 
+    PAIR_PROSODY_0("pair_prosody_0", displayName = "Pair Prosody 0"),
+    PAIR_PROSODY_1("pair_prosody_1", displayName = "Pair Prosody 1"),
+    PAIR_PROSODY_2("pair_prosody_2", displayName = "Pair Prosody 2"),
+    PAIR_PROSODY_3("pair_prosody_3", displayName = "Pair Prosody 3"),
+    PAIR_PROSODY_4("pair_prosody_4", displayName = "Pair Prosody 4"),
+    PAIR_PROSODY_5("pair_prosody_5", displayName = "Pair Prosody 5"),
+
+    PAIR_SPEED_0("pair_speed_0", displayName = "Pair Speed 0"),
+    PAIR_SPEED_1("pair_speed_1", displayName = "Pair Speed 1"),
+    PAIR_SPEED_2("pair_speed_2", displayName = "Pair Speed 2"),
+    PAIR_SPEED_3("pair_speed_3", displayName = "Pair Speed 3"),
+    PAIR_SPEED_4("pair_speed_4", displayName = "Pair Speed 4"),
+    PAIR_SPEED_5("pair_speed_5", displayName = "Pair Speed 5"),
+
     // Per-quad (×3)
     QUAD_PITCH_0("quad_pitch_0", displayName = "Quad Pitch 0"),
     QUAD_PITCH_1("quad_pitch_1", displayName = "Quad Pitch 1"),
@@ -124,6 +138,8 @@ enum class VoiceSymbol(
         private val duoModSources = arrayOf(DUO_MOD_SOURCE_0, DUO_MOD_SOURCE_1, DUO_MOD_SOURCE_2, DUO_MOD_SOURCE_3, DUO_MOD_SOURCE_4, DUO_MOD_SOURCE_5)
         private val pairEngines = arrayOf(PAIR_ENGINE_0, PAIR_ENGINE_1, PAIR_ENGINE_2, PAIR_ENGINE_3, PAIR_ENGINE_4, PAIR_ENGINE_5)
         private val pairHarmonics = arrayOf(PAIR_HARMONICS_0, PAIR_HARMONICS_1, PAIR_HARMONICS_2, PAIR_HARMONICS_3, PAIR_HARMONICS_4, PAIR_HARMONICS_5)
+        private val pairProsodies = arrayOf(PAIR_PROSODY_0, PAIR_PROSODY_1, PAIR_PROSODY_2, PAIR_PROSODY_3, PAIR_PROSODY_4, PAIR_PROSODY_5)
+        private val pairSpeeds = arrayOf(PAIR_SPEED_0, PAIR_SPEED_1, PAIR_SPEED_2, PAIR_SPEED_3, PAIR_SPEED_4, PAIR_SPEED_5)
         private val quadPitches = arrayOf(QUAD_PITCH_0, QUAD_PITCH_1, QUAD_PITCH_2)
         private val quadHolds = arrayOf(QUAD_HOLD_0, QUAD_HOLD_1, QUAD_HOLD_2)
         private val quadVolumes = arrayOf(QUAD_VOLUME_0, QUAD_VOLUME_1, QUAD_VOLUME_2)
@@ -138,6 +154,8 @@ enum class VoiceSymbol(
         fun duoModSource(index: Int): VoiceSymbol = duoModSources[index]
         fun pairEngine(index: Int): VoiceSymbol = pairEngines[index]
         fun pairHarmonics(index: Int): VoiceSymbol = pairHarmonics[index]
+        fun pairProsody(index: Int): VoiceSymbol = pairProsodies[index]
+        fun pairSpeed(index: Int): VoiceSymbol = pairSpeeds[index]
         fun quadPitch(index: Int): VoiceSymbol = quadPitches[index]
         fun quadHold(index: Int): VoiceSymbol = quadHolds[index]
         fun quadVolume(index: Int): VoiceSymbol = quadVolumes[index]

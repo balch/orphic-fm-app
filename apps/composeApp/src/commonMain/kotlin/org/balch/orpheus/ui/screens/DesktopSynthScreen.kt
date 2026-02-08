@@ -16,7 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
@@ -44,6 +48,8 @@ import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.resonator.ResonatorFeature
 import org.balch.orpheus.features.resonator.ResonatorViewModel
+import org.balch.orpheus.features.speech.SpeechFeature
+import org.balch.orpheus.features.speech.SpeechViewModel
 import org.balch.orpheus.features.tidal.LiveCodeFeature
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
 import org.balch.orpheus.features.tweaks.CenterControlSection
@@ -88,6 +94,7 @@ fun DesktopSynthScreen(
     warpsFeature: WarpsFeature = WarpsViewModel.feature(),
     looperFeature: LooperFeature = LooperViewModel.feature(),
     resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
+    speechFeature: SpeechFeature = SpeechViewModel.feature(),
     effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
     isDialogActive: Boolean = false,
     onDialogActiveChange: (Boolean) -> Unit,
@@ -104,6 +111,21 @@ fun DesktopSynthScreen(
                 .focusRequester(focusRequester)
                 .focusable()
                 .onPreviewKeyEvent { event ->
+                    // Spacebar trigger for TTS (when enabled and not editing text)
+                    if (!isDialogActive &&
+                        event.key == Key.Spacebar &&
+                        event.type == KeyEventType.KeyDown &&
+                        speechFeature.stateFlow.value.spacebarTrigger
+                    ) {
+                        val state = speechFeature.stateFlow.value
+                        if (state.isSpeaking || state.isGenerating) {
+                            speechFeature.actions.stop()
+                        } else {
+                            speechFeature.actions.speak()
+                        }
+                        return@onPreviewKeyEvent true
+                    }
+
                     SynthKeyboardHandler.handleKeyEvent(
                         keyEvent = event,
                         voiceFeature = voiceFeature,
@@ -134,6 +156,7 @@ fun DesktopSynthScreen(
                 warpsFeature = warpsFeature,
                 resonatorFeature = resonatorFeature,
                 looperFeature = looperFeature,
+                speechFeature = speechFeature,
                 onDialogActiveChange = onDialogActiveChange,
             )
 
@@ -214,6 +237,7 @@ private fun DesktopSynthScreenPreview(
             warpsFeature = WarpsViewModel.previewFeature(),
             resonatorFeature = ResonatorViewModel.previewFeature(),
             looperFeature = LooperViewModel.previewFeature(),
+            speechFeature = SpeechViewModel.previewFeature(),
             effects = effects,
             onDialogActiveChange = {},
             focusRequester = FocusRequester()

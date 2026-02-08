@@ -65,6 +65,8 @@ class VoicePlugin : DspPlugin {
     private val _quadEnvTriggerMode = BooleanArray(3)
     private val _pairEngine = IntArray(6)
     private val _pairHarmonics = FloatArray(6) { 0.0f }
+    private val _pairProsody = FloatArray(6) { 0.5f }
+    private val _pairSpeed = FloatArray(6) { 0.0f }
 
     private val portDefs = ports(startIndex = 0) {
         // Voice Params (0-11)
@@ -128,7 +130,7 @@ class VoicePlugin : DspPlugin {
             controlPort(VoiceSymbol.pairEngine(i)) {
                 intType {
                     default = 0
-                    min = 0; max = 16
+                    min = 0; max = 17
                     get { _pairEngine[i] }
                     set {
                         _pairEngine[i] = it
@@ -143,6 +145,26 @@ class VoicePlugin : DspPlugin {
                     set {
                         _pairHarmonics[i] = it
                         listener?.onVoiceParamChange(i, "pair_harmonics", it)
+                    }
+                }
+            }
+            controlPort(VoiceSymbol.pairProsody(i)) {
+                floatType {
+                    default = 0.5f
+                    get { _pairProsody[i] }
+                    set {
+                        _pairProsody[i] = it
+                        listener?.onVoiceParamChange(i, "pair_prosody", it)
+                    }
+                }
+            }
+            controlPort(VoiceSymbol.pairSpeed(i)) {
+                floatType {
+                    default = 0.0f
+                    get { _pairSpeed[i] }
+                    set {
+                        _pairSpeed[i] = it
+                        listener?.onVoiceParamChange(i, "pair_speed", it)
                     }
                 }
             }
@@ -276,7 +298,9 @@ class VoicePlugin : DspPlugin {
     fun setDuoModSource(i: Int, v: Int) { _duoModSource[i] = v }
     fun setPairEngine(i: Int, v: Int) { _pairEngine[i] = v }
     fun setPairHarmonics(i: Int, v: Float) { _pairHarmonics[i] = v }
-    
+    fun setPairProsody(i: Int, v: Float) { _pairProsody[i] = v }
+    fun setPairSpeed(i: Int, v: Float) { _pairSpeed[i] = v }
+
     fun setFmStructure(v: Boolean) { _fmStructureCrossQuad = v }
     fun setTotalFeedback(v: Float) { _totalFeedback = v }
     fun setVibrato(v: Float) { _vibrato = v }
