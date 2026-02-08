@@ -49,11 +49,11 @@ import org.balch.orpheus.ui.theme.lighten
 fun CollapsibleColumnPanel(
     modifier: Modifier = Modifier,
     title: String,
+    expandedTitle: String,
     color: Color,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     initialExpanded: Boolean = false,
-    expandedTitle: String? = null,
     showCollapsedHeader: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {

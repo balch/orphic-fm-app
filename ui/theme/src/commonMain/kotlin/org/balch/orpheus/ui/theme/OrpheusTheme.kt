@@ -253,6 +253,10 @@ object OrpheusColors {
     val warpsYellow = Color(0xFFFFFF00)          // Bright Yellow for accents
     val warpsDarkGreen = Color(0xFF2E4D2E)       // Darker green for backgrounds
 
+    // Echo/Reverb Palette
+    val echoLavender = Color(0xFFB39DDB)           // Soft lavender — ethereal reverb trails
+    val echoPeriwinkle = Color(0xFF9FA8DA)         // Cool periwinkle — spacious depth
+
     // Engine Picker Colors
     val enginePurple = Color(0xFFBA68C8)         // Waveshaping
     val engineRed = Color(0xFFE57373)            // Virtual Analog

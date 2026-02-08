@@ -17,6 +17,7 @@ import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
+import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
 
@@ -36,6 +37,8 @@ data class SynthControlArgs(
         LFO: HYPER_LFO_A, HYPER_LFO_B, HYPER_LFO_MODE, HYPER_LFO_LINK
 
         DELAY: DELAY_TIME_1/2, DELAY_MOD_1/2, DELAY_FEEDBACK, DELAY_MIX, DELAY_MOD_SOURCE, DELAY_LFO_WAVEFORM
+
+        REVERB: REVERB_AMOUNT, REVERB_TIME, REVERB_DAMPING, REVERB_DIFFUSION
 
         RESONATOR: RESONATOR_MODE, RESONATOR_STRUCTURE, RESONATOR_BRIGHTNESS, RESONATOR_DAMPING, RESONATOR_POSITION, RESONATOR_MIX
 
@@ -147,7 +150,7 @@ class SynthControlTool @Inject constructor(
     resultSerializer = SynthControlResult.serializer(),
     name = "synth_control",
     description = """
-        Control synthesizer parameters like volume, vibrato, distortion, delay, pan, quad settings, duo mod sources, voice engine selection, and the pitch bender.
+        Control synthesizer parameters like volume, vibrato, distortion, delay, reverb, pan, quad settings, duo mod sources, voice engine selection, and the pitch bender.
         Use this to adjust the sound based on user requests.
         Values should be between 0.0 and 1.0 (except BENDER which uses -1.0 to +1.0).
         For DUO_MOD_SOURCE: 0.0=VoiceFM, 0.5=Off, 1.0=LFO.
@@ -165,6 +168,21 @@ class SynthControlTool @Inject constructor(
         - Sirens: Oscillate between -0.5 and +0.5 at varying speeds
         - Tension/release: Pull to extreme (+1.0 or -1.0), hold, then release to 0.0 for spring sound
         Use BENDER when you want to create organic, gliding pitch movements.
+
+        REVERB (Dattorro Plate Reverb):
+        Lush plate reverb ported from Mutable Instruments Rings. Parallel send alongside delay.
+        - REVERB_AMOUNT: Wet/dry blend (0=dry/off, 0.3=subtle, 0.7=lush, 1=fully wet)
+        - REVERB_TIME: Decay time (0=short room, 0.5=medium hall, 0.9=infinite wash)
+        - REVERB_DAMPING: High-frequency damping (0=bright/open, 0.7=natural, 1=dark/muffled)
+        - REVERB_DIFFUSION: Smearing/density (0=sparse echoes, 0.625=default plate, 1=dense wash)
+
+        REVERB SOUND DESIGN TIPS:
+        - Subtle room: AMOUNT=0.2, TIME=0.3, DAMPING=0.6 — adds space without muddiness
+        - Lush hall: AMOUNT=0.4, TIME=0.6, DAMPING=0.5 — classic reverb tail
+        - Infinite wash: AMOUNT=0.5, TIME=0.9, DAMPING=0.8 — ambient pad reverb
+        - Bright shimmer: AMOUNT=0.3, TIME=0.7, DAMPING=0.2 — open, airy character
+        - Use with DELAY for layered spatial effects (reverb adds depth, delay adds rhythm)
+        - Lower REVERB_AMOUNT when using heavy DELAY to avoid muddiness
 
         RESONATOR (Rings Physical Modeling):
         Physical modeling resonator ported from Mutable Instruments Rings.
@@ -296,6 +314,12 @@ class SynthControlTool @Inject constructor(
         "DELAY_MIX" -> DelaySymbol.MIX
         "DELAY_MOD_SOURCE" -> DelaySymbol.MOD_SOURCE
         "DELAY_LFO_WAVEFORM" -> DelaySymbol.LFO_WAVEFORM
+
+        // Reverb controls
+        "REVERB_AMOUNT" -> ReverbSymbol.AMOUNT
+        "REVERB_TIME" -> ReverbSymbol.TIME
+        "REVERB_DAMPING" -> ReverbSymbol.DAMPING
+        "REVERB_DIFFUSION" -> ReverbSymbol.DIFFUSION
 
         // Resonator (Rings) controls
         "RESONATOR_MODE" -> ResonatorSymbol.MODE

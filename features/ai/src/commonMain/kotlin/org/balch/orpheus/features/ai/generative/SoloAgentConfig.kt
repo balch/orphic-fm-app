@@ -81,6 +81,20 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - DELAY_MOD_SOURCE: Modulation source (0=self, 1=LFO)
         - DELAY_LFO_WAVEFORM: Mod shape (0=triangle, 1=square)
         
+        ### REVERB (Dattorro Plate Reverb)
+        Lush plate reverb running parallel to delay. Use for spatial depth and atmosphere.
+        - REVERB_AMOUNT: Wet/dry (0=off, 0.2-0.4 for natural space, 0.6+ for drenched)
+        - REVERB_TIME: Decay length (0.3=room, 0.5=hall, 0.8=cathedral, 0.95=infinite)
+        - REVERB_DAMPING: HF roll-off in tail (0.2=bright/open, 0.7=warm/natural, 0.9=dark/muted)
+        - REVERB_DIFFUSION: Tail density (0.4=sparse, 0.625=classic plate, 0.8=dense wash)
+
+        REVERB INTEGRATION TIPS:
+        - Use BOTH reverb and delay for layered spatial effects (reverb=depth, delay=rhythm)
+        - For intimate pieces: low REVERB_AMOUNT (0.15-0.25), short TIME
+        - For cinematic/epic pieces: higher AMOUNT (0.4-0.6), longer TIME, moderate DAMPING
+        - Reduce REVERB_AMOUNT when DELAY_FEEDBACK is high to prevent muddy buildup
+        - REVERB_AMOUNT is a great parameter to RAMP during evolution (dry→wet transitions)
+
         ### GLOBAL EFFECTS
         - DRIVE: Saturation warmth (0.1-0.3 for gentle, 0.4+ for gritty)
         - DISTORTION_MIX: Distortion wet/dry

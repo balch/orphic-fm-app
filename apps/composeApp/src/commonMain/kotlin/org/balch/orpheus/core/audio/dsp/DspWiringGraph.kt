@@ -127,6 +127,16 @@ class DspWiringGraph @Inject constructor(
         pluginProvider.distortionPlugin.outputs["outputLeft"]?.connect(pluginProvider.delayPlugin.inputs["inputLeft"]!!)
         pluginProvider.distortionPlugin.outputs["outputRight"]?.connect(pluginProvider.delayPlugin.inputs["inputRight"]!!)
 
+        // Distortion → Reverb (Parallel Send)
+        pluginProvider.distortionPlugin.outputs["outputLeft"]?.connect(pluginProvider.reverbPlugin.inputs["inputLeft"]!!)
+        pluginProvider.distortionPlugin.outputs["outputRight"]?.connect(pluginProvider.reverbPlugin.inputs["inputRight"]!!)
+
+        // Reverb → Stereo Sum AND Looper
+        pluginProvider.reverbPlugin.outputs["outputLeft"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
+        pluginProvider.reverbPlugin.outputs["outputRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
+        pluginProvider.reverbPlugin.outputs["outputLeft"]?.connect(pluginProvider.looperPlugin.inputs["inputLeft"]!!)
+        pluginProvider.reverbPlugin.outputs["outputRight"]?.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
+
         // Delay wet outputs → Stereo sum AND Looper input
         pluginProvider.delayPlugin.outputs["wetLeft"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
         pluginProvider.delayPlugin.outputs["wetRight"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)

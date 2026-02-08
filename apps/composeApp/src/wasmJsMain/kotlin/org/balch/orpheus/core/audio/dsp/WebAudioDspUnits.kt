@@ -516,6 +516,24 @@ class WebAudioGrainsUnit(private val context: AudioContext) : GrainsUnit {
     override fun setMode(mode: Int) {}
 }
 
+class WebAudioReverbUnit(private val context: AudioContext) : ReverbUnit {
+    private val outputGain = context.createGain()
+    private val inL = context.createGain().also { it.connect(outputGain) }
+    private val inR = context.createGain().also { it.connect(outputGain) }
+
+    override val inputLeft: AudioInput = WebAudioNodeInput(inL, 0, context)
+    override val inputRight: AudioInput = WebAudioNodeInput(inR, 0, context)
+    override val output: AudioOutput = WebAudioNodeOutput(outputGain)
+    override val outputRight: AudioOutput = WebAudioNodeOutput(outputGain)
+
+    override fun setAmount(amount: Float) {}
+    override fun setTime(time: Float) {}
+    override fun setDiffusion(diffusion: Float) {}
+    override fun setLp(lp: Float) {}
+    override fun setInputGain(gain: Float) {}
+    override fun clear() {}
+}
+
 class WebAudioWarpsUnit(private val context: AudioContext) : WarpsUnit {
     private val outputGain = context.createGain()
     private val inL = context.createGain().also { it.connect(outputGain) }

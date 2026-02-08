@@ -26,6 +26,8 @@ enum class PanelId {
     LFO,
     @LLMDescription("Add repeating lines to sounds")
     DELAY,
+    @LLMDescription("Add spatial reverb effect")
+    REVERB,
     @LLMDescription("Control volume characteristics of sounds")
     DISTORTION,
     @LLMDescription("Add texture to sounds")

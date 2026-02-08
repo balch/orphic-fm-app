@@ -57,6 +57,9 @@ import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.resonator.ResonatorFeature
 import org.balch.orpheus.features.resonator.ResonatorPanel
 import org.balch.orpheus.features.resonator.ResonatorViewModel
+import org.balch.orpheus.features.reverb.ReverbFeature
+import org.balch.orpheus.features.reverb.ReverbPanel
+import org.balch.orpheus.features.reverb.ReverbViewModel
 import org.balch.orpheus.features.tidal.LiveCodeFeature
 import org.balch.orpheus.features.tidal.LiveCodePanel
 import org.balch.orpheus.features.tidal.LiveCodeViewModel
@@ -83,6 +86,7 @@ fun HeaderPanel(
     evoFeature: EvoFeature = EvoViewModel.feature(),
     lfoFeature: LfoFeature = LfoViewModel.feature(),
     delayFeature: DelayFeature = DelayViewModel.feature(),
+    reverbFeature: ReverbFeature = ReverbViewModel.feature(),
     distortionFeature: DistortionFeature = DistortionViewModel.feature(),
     resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
     grainsFeature: GrainsFeature = GrainsViewModel.feature(),
@@ -150,6 +154,12 @@ fun HeaderPanel(
             isExpanded = PanelId.DELAY.isExpanded(),
             onExpandedChange = { PanelId.DELAY.setExpanded(it) },
             modifier = panelModifier(PanelId.DELAY.isExpanded())
+        )
+        ReverbPanel(
+            feature = reverbFeature,
+            isExpanded = PanelId.REVERB.isExpanded(),
+            onExpandedChange = { PanelId.REVERB.setExpanded(it) },
+            modifier = panelModifier(PanelId.REVERB.isExpanded(), weight = .5f)
         )
         DistortionPanel(
             feature = distortionFeature,

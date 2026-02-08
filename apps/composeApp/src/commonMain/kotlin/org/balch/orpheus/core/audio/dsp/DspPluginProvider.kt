@@ -15,6 +15,7 @@ import org.balch.orpheus.plugins.grains.GrainsPlugin
 import org.balch.orpheus.plugins.looper.LooperPlugin
 import org.balch.orpheus.plugins.perstringbender.PerStringBenderPlugin
 import org.balch.orpheus.plugins.resonator.ResonatorPlugin
+import org.balch.orpheus.plugins.reverb.ReverbPlugin
 import org.balch.orpheus.plugins.stereo.StereoPlugin
 import org.balch.orpheus.plugins.vibrato.VibratoPlugin
 import org.balch.orpheus.plugins.warps.WarpsPlugin
@@ -47,4 +48,5 @@ class DspPluginProvider(
     val fluxPlugin by lazy { plugins.filterIsInstance<FluxPlugin>().first() }
     val voicePlugin by lazy { plugins.filterIsInstance<VoicePlugin>().first() }
     val beatsPlugin by lazy { plugins.filterIsInstance<BeatsPlugin>().first() }
+    val reverbPlugin by lazy { plugins.filterIsInstance<ReverbPlugin>().first() }
 }

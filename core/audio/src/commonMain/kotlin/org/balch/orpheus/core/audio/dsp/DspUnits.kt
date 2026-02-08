@@ -398,6 +398,39 @@ interface LooperUnit : AudioUnit {
 }
 
 /**
+ * Dattorro plate reverb unit (ported from Mutable Instruments Rings).
+ * Stereo in/out reverb with time, damping, diffusion, and amount controls.
+ */
+interface ReverbUnit : AudioUnit {
+    /** Stereo audio inputs */
+    val inputLeft: AudioInput
+    val inputRight: AudioInput
+
+    /** Stereo audio outputs (main output is 'output') */
+    val outputRight: AudioOutput
+
+    /** Set wet/dry amount (0=dry, 1=fully wet) */
+    fun setAmount(amount: Float)
+
+    /** Set reverb time / decay (0-1) */
+    fun setTime(time: Float)
+
+    /** Set high-frequency damping (0=bright, 1=dark) */
+    fun setDiffusion(diffusion: Float)
+
+    /** Set low-pass filter coefficient for decay (0-1) */
+    fun setLp(lp: Float)
+
+    /** Set input gain (0-1) */
+    fun setInputGain(gain: Float)
+
+    /** Clear reverb buffer */
+    fun clear()
+
+    interface Factory { fun create(): ReverbUnit }
+}
+
+/**
  * Mutable Instruments Warps Meta-Modulator Unit.
  * 
  * Blends and combines two audio signals using various cross-modulation

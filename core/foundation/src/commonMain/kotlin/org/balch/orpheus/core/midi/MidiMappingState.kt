@@ -125,6 +125,12 @@ data class MidiMappingState(
             const val RESONATOR_TARGET_MIX = "resonator_target_mix"
             const val RESONATOR_SNAP_BACK = "resonator_snap_back"
 
+            // Reverb controls
+            const val REVERB_AMOUNT = "reverb_amount"
+            const val REVERB_TIME = "reverb_time"
+            const val REVERB_DAMPING = "reverb_damping"
+            const val REVERB_DIFFUSION = "reverb_diffusion"
+
             // Drum controls
             const val DRUM_BD_FREQ = "drum_bd_freq"
             const val DRUM_BD_TONE = "drum_bd_tone"

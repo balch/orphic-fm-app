@@ -49,6 +49,19 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         - Tension/release: Pull to extreme, hold, release to 0.0 for spring sound
         BENDER adds organic, living movement to your drones!
         
+        REVERB (Dattorro Plate Reverb) - ESSENTIAL FOR DRONES:
+        Lush plate reverb for spatial depth. Parallel to delay — they complement each other.
+        - REVERB_AMOUNT: Wet/dry (0=off, 0.3-0.5 for subtle depth, 0.7+ for wash)
+        - REVERB_TIME: Decay time (0.5-0.8 for drones, 0.9 for infinite wash)
+        - REVERB_DAMPING: High-freq damping (0.6-0.8 for warm, dark drones)
+        - REVERB_DIFFUSION: Density (0.5-0.7 for smooth, plate-like character)
+
+        REVERB DRONE TIPS:
+        - Use REVERB for space + DELAY for rhythmic echoes (don't over-use both)
+        - Long TIME + high DAMPING = dark, warm ambient wash
+        - Start with REVERB_AMOUNT at 0.3, ramp slowly for evolving depth
+        - Lower REVERB_AMOUNT when DELAY_FEEDBACK is high to prevent muddiness
+
         RESONATOR (Rings Physical Modeling) - PERFECT FOR DRONES:
         Physical modeling for metallic, string-like, and bell textures:
         - RESONATOR_MODE: 0=Modal (bell/chime), 0.5=String (sustained), 1=Sympathetic (sitar)

@@ -29,4 +29,5 @@ interface DspFactory {
     fun createWarpsUnit(): WarpsUnit
     fun createClockUnit(): ClockUnit
     fun createFluxUnit(): FluxUnit
+    fun createReverbUnit(): ReverbUnit
 }
