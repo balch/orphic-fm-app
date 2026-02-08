@@ -142,6 +142,9 @@ object PlaitsDsp {
 
     // --- Utility ---
 
+    /** Convert semitone offset to frequency ratio. Delegates to SynthDsp. */
+    fun semitonesToRatio(semitones: Float): Float = SynthDsp.semitonesToRatio(semitones)
+
     fun sqrt(x: Float): Float = kotlin.math.sqrt(x)
 
     fun crossfade(a: Float, b: Float, fade: Float): Float = a + (b - a) * fade

@@ -80,6 +80,10 @@ val VOICE_PICKER_CONFIG = PickerConfig(
         PickerEntry("GRN", 10, OrpheusColors.engineGreen),
         PickerEntry("STR", 11, OrpheusColors.engineYellow),
         PickerEntry("MOD", 12, OrpheusColors.engineOrange),
+        PickerEntry("PAR", 13, OrpheusColors.neonMagenta),
+        PickerEntry("SWM", 14, OrpheusColors.electricBlue),
+        PickerEntry("CHD", 15, OrpheusColors.synthGreen),
+        PickerEntry("WTB", 16, OrpheusColors.presetOrange),
     ),
     centerLabel = "OSC",
     centerOrdinal = 0,
@@ -100,6 +104,10 @@ private val DRUM_RING = listOf(
     PickerEntry("GRN", 9, OrpheusColors.engineGreen),
     PickerEntry("STR", 10, OrpheusColors.engineYellow),
     PickerEntry("MOD", 11, OrpheusColors.engineOrange),
+    PickerEntry("PAR", 12, OrpheusColors.neonMagenta.copy(alpha = 0.8f)),
+    PickerEntry("SWM", 13, OrpheusColors.electricBlue.copy(alpha = 0.8f)),
+    PickerEntry("CHD", 14, OrpheusColors.synthGreen.copy(alpha = 0.8f)),
+    PickerEntry("WTB", 15, OrpheusColors.presetOrange.copy(alpha = 0.8f)),
 )
 
 /** Drum picker with BD as center default. */
@@ -147,6 +155,7 @@ fun engineLabel(ordinal: Int): String = when (ordinal) {
     0 -> "OSC"
     5 -> "FM"; 6 -> "NSE"; 7 -> "WSH"
     8 -> "VA"; 9 -> "ADD"; 10 -> "GRN"; 11 -> "STR"; 12 -> "MOD"
+    13 -> "PAR"; 14 -> "SWM"; 15 -> "CHD"; 16 -> "WTB"
     else -> "?"
 }
 
@@ -155,6 +164,7 @@ fun drumEngineLabel(ordinal: Int): String = when (ordinal) {
     0 -> "BD"; 1 -> "SD"; 2 -> "HH"; 3 -> "FM"
     4 -> "FM2"; 5 -> "NSE"; 6 -> "WSH"
     7 -> "VA"; 8 -> "ADD"; 9 -> "GRN"; 10 -> "STR"; 11 -> "MOD"
+    12 -> "PAR"; 13 -> "SWM"; 14 -> "CHD"; 15 -> "WTB"
     else -> "?"
 }
 

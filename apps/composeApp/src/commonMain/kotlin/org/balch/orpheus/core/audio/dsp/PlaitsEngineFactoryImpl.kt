@@ -16,6 +16,10 @@ import org.balch.orpheus.plugins.plaits.engine.ModalEngine
 import org.balch.orpheus.plugins.plaits.engine.NoiseEngine
 import org.balch.orpheus.plugins.plaits.engine.StringEngine
 import org.balch.orpheus.plugins.plaits.engine.VirtualAnalogEngine
+import org.balch.orpheus.plugins.plaits.engine.ChordEngine
+import org.balch.orpheus.plugins.plaits.engine.ParticleEngine
+import org.balch.orpheus.plugins.plaits.engine.SwarmEngine
+import org.balch.orpheus.plugins.plaits.engine.WavetableEngine
 import org.balch.orpheus.plugins.plaits.engine.WaveshapingEngine
 
 /**
@@ -44,6 +48,10 @@ class PlaitsEngineFactoryImpl(
             PlaitsEngineId.GRAIN -> GrainEngine().also { it.init() }
             PlaitsEngineId.STRING -> StringEngine().also { it.init() }
             PlaitsEngineId.MODAL -> ModalEngine().also { it.init() }
+            PlaitsEngineId.PARTICLE -> ParticleEngine().also { it.init() }
+            PlaitsEngineId.SWARM -> SwarmEngine().also { it.init() }
+            PlaitsEngineId.CHORD -> ChordEngine().also { it.init() }
+            PlaitsEngineId.WAVETABLE -> WavetableEngine().also { it.init() }
         }
     }
 }

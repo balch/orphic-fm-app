@@ -128,7 +128,7 @@ class VoicePlugin : DspPlugin {
             controlPort(VoiceSymbol.pairEngine(i)) {
                 intType {
                     default = 0
-                    min = 0; max = 12
+                    min = 0; max = 16
                     get { _pairEngine[i] }
                     set {
                         _pairEngine[i] = it

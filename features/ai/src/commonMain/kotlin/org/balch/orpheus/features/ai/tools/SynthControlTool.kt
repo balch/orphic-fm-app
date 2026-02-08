@@ -62,6 +62,10 @@ data class SynthControlArgs(
           10 = Grain (granular/wavetable — textural, glitchy, evolving sounds)
           11 = String (Karplus-Strong — plucked/bowed strings, realistic decay)
           12 = Modal (physical modeling — resonant surfaces, bells, metallic percussion)
+          13 = Particle (filtered random pulses — crackles, textures, filtered noise clouds)
+          14 = Swarm (8-voice sawtooth/sine swarm — thick unison, detuned pads, swelling textures)
+          15 = Chord (wavetable + divide-down organ chords — organ, string machine, polyphonic)
+          16 = Wavetable (3D wave terrain morphing — evolving timbres, digital, complex)
         Drum engines (use sparingly on voice pairs):
           1 = Analog Bass Drum, 2 = Analog Snare, 3 = Hi-Hat, 4 = FM Drum
 

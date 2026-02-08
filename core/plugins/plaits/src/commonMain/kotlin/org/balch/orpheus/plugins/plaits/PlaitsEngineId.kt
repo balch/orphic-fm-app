@@ -19,4 +19,8 @@ enum class PlaitsEngineId(val displayName: String) {
     GRAIN("Grain"),
     STRING("String"),
     MODAL("Modal"),
+    PARTICLE("Particle"),
+    SWARM("Swarm"),
+    CHORD("Chord"),
+    WAVETABLE("Wavetable"),
 }
