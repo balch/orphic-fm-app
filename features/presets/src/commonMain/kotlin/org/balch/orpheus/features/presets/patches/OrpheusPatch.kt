@@ -57,6 +57,14 @@ class OrpheusPatch : SynthPatch {
             )
             modSources.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_mod_source_$i", PortValue.IntValue(v.ordinal)) }
 
+            // Voice engines — mixed synthesis for layered warmth
+            // 0=Default, 4=FM, 7=VirtualAnalog, 8=Additive, 10=String
+            val engines = listOf(0, 10, 8, 7, 0, 0)
+            engines.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_engine_$i", PortValue.IntValue(v)) }
+
+            val harmonics = listOf(0.15f, 0.45f, 0.6f, 0.35f, 0.0f, 0.0f)
+            harmonics.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_harmonics_$i", PortValue.FloatValue(v)) }
+
             val lfoUri = DuoLfoPlugin.URI
             put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.01f))
             put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.02875f))
