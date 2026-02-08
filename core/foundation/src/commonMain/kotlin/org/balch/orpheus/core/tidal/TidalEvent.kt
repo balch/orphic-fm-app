@@ -316,7 +316,21 @@ sealed class TidalEvent {
         override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
         override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
     }
-    
+
+    /**
+     * Pair engine selection.
+     * @param pairIndex Pair index (0-3, where pair 0 = voices 0-1, etc.)
+     * @param engineId Engine ID: 0=osc, 5=fm, 6=noise, 7=wave, 8=va, 9=additive, 10=grain, 11=string, 12=modal
+     */
+    data class PairEngine(
+        val pairIndex: Int,
+        val engineId: Int,
+        override val locations: List<SourceLocation> = emptyList()
+    ) : TidalEvent() {
+        override fun withLocation(location: SourceLocation) = copy(locations = locations + location)
+        override fun shiftLocations(offset: Int) = copy(locations = locations.map { SourceLocation(it.start + offset, it.end + offset) })
+    }
+
     /**
      * Generic control event for any synthesis parameter.
      * @param controlId Internal ID of the control (e.g. "drum_bd_trigger")
@@ -438,7 +452,12 @@ object Orpheus {
     
     fun voicePan(voiceIndex: Int, pan: Float): Pattern<TidalEvent> =
         Pattern.pure(TidalEvent.VoicePan(voiceIndex, pan))
-    
+
+    // === Pair Engine Selection ===
+
+    fun pairEngine(pairIndex: Int, engineId: Int): Pattern<TidalEvent> =
+        Pattern.pure(TidalEvent.PairEngine(pairIndex, engineId))
+
     // === Generic Control ===
     
     fun control(id: String, value: Float): Pattern<TidalEvent> =

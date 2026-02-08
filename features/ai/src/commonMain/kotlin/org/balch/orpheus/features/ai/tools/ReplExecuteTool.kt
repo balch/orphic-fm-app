@@ -8,7 +8,6 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
 import org.balch.orpheus.core.tidal.ReplResult
 import org.balch.orpheus.core.tidal.TidalRepl
@@ -127,6 +126,9 @@ class ReplExecuteTool @Inject constructor(
         DUO CONTROLS (duo/pair index 1-4):
         - duomod:<duo> <source> - Mod source: fm, off, or lfo
         - sharp:<pair> <val> - Waveform sharpness 0=tri, 1=sq
+        - engine:<pair> <name> - Set synthesis engine
+          Names: osc, fm, noise, wave, va, additive, grain, string, modal
+          Example: engine:1 string (set pair 1 to Karplus-Strong strings)
         
         EFFECTS (usually set once, not cycled):
         - drive:<val> OR distortion:<val> - Distortion (0.0-1.0)

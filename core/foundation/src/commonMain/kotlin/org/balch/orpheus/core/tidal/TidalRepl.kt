@@ -285,7 +285,7 @@ class TidalRepl(
                     // Control commands are recognized by their prefix patterns
                     // Supports both colon syntax (drive:0.4) and space syntax (drive 0.4)
                     val controlNames = "drive|distortion|vibrato|feedback|delay|delaymix|distmix|" +
-                        "hold|tune|pan|quadhold|quadpitch|duomod|sharp|envspeed|drum_|resonator_"
+                        "hold|tune|pan|quadhold|quadpitch|duomod|sharp|envspeed|engine|drum_|resonator_"
                     val isBareControlCommand = trimmed.matches(Regex(
                         "^($controlNames|[a-z0-9_]+)[:\\s][^$]+$"
                     ))
@@ -663,7 +663,42 @@ class TidalRepl(
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
             return Pattern.pure(TidalEvent.PairSharp((pairIndex - 1).coerceIn(0, 3), value.coerceIn(0f, 1f), listOf(location)))
         }
-        
+
+        // engine:<pairIndex> <engineName> - Pair synthesis engine selection
+        if (trimmed.startsWith("engine:") || trimmed.startsWith("engine ")) {
+            val content = if (trimmed.startsWith("engine:")) trimmed.substringAfter("engine:") else trimmed.substringAfter("engine ")
+            val clean = content.trim()
+            val parts = clean.split(" ", limit = 2)
+            if (parts.size >= 2) {
+                val pairIndex = parts[0].replace("\"", "").replace("'", "").toIntOrNull()
+                val engineName = parts[1].replace("\"", "").replace("'", "").lowercase()
+                if (pairIndex != null) {
+                    if (pairIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Pair index must be 1-4, got: $pairIndex")
+                    val engineId = resolveEngineId(engineName)
+                        ?: throw IllegalArgumentException("Line $lineNum: Unknown engine '$engineName'. Use: osc, fm, noise, wave, va, additive, grain, string, modal")
+                    val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+                    return Pattern.pure(TidalEvent.PairEngine((pairIndex - 1).coerceIn(0, 3), engineId, listOf(location)))
+                }
+            }
+        }
+
+        // Handle quoted engine "1 fm"
+        Regex("^engine\\s*\"([^\"]+)\"$").find(trimmed)?.let { match ->
+            val content = match.groupValues[1].trim()
+            val parts = content.split(Regex("\\s+"))
+            if (parts.size >= 2) {
+                val pairIndex = parts[0].toIntOrNull()
+                val engineName = parts[1].lowercase()
+                if (pairIndex != null) {
+                    if (pairIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Pair index must be 1-4, got: $pairIndex")
+                    val engineId = resolveEngineId(engineName)
+                        ?: throw IllegalArgumentException("Line $lineNum: Unknown engine '$engineName'. Use: osc, fm, noise, wave, va, additive, grain, string, modal")
+                    val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
+                    return Pattern.pure(TidalEvent.PairEngine((pairIndex - 1).coerceIn(0, 3), engineId, listOf(location)))
+                }
+            }
+        }
+
         // Check for transformations
         if (trimmed.startsWith("fast ") || trimmed.startsWith("slow ")) {
             return parseTransformation(trimmed, lineNum, trimOffset)
@@ -1031,5 +1066,26 @@ class TidalRepl(
      */
     fun clearConsole() {
         _console.value = emptyList()
+    }
+
+    /**
+     * Resolve an engine name to a voice-pair engine port value.
+     * These are the integer values stored in the PAIR_ENGINE port.
+     */
+    private fun resolveEngineId(name: String): Int? = when (name) {
+        "osc", "default", "0" -> 0
+        "fm", "5" -> 5
+        "noise", "nse", "6" -> 6
+        "wave", "waveshaping", "wsh", "7" -> 7
+        "va", "analog", "8" -> 8
+        "additive", "add", "9" -> 9
+        "grain", "granular", "grn", "10" -> 10
+        "string", "str", "11" -> 11
+        "modal", "mod", "12" -> 12
+        "bd", "bassdrum", "1" -> 1
+        "sd", "snare", "2" -> 2
+        "hh", "hihat", "3" -> 3
+        "fmdrum", "4" -> 4
+        else -> null
     }
 }

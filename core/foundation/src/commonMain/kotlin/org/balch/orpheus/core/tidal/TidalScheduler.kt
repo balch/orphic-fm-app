@@ -501,6 +501,12 @@ class TidalScheduler(
                  }
                  dispatchEvent(event)
              }
+             is TidalEvent.PairEngine -> {
+                 if (event.locations.isNotEmpty()) {
+                     _triggers.tryEmit(TriggerEvent(event.pairIndex * 2, event.locations))
+                 }
+                 dispatchEvent(event)
+             }
              // Global effects - use voice 0 as representative
              is TidalEvent.Drive,
              is TidalEvent.DistortionMix,
@@ -656,6 +662,14 @@ class TidalScheduler(
                 synthController.setPluginControl(
                     VoiceSymbol.pairSharpness(event.pairIndex).controlId,
                     PortValue.FloatValue(event.sharpness),
+                    ControlEventOrigin.TIDAL
+                )
+            }
+
+            is TidalEvent.PairEngine -> {
+                synthController.setPluginControl(
+                    VoiceSymbol.pairEngine(event.pairIndex).controlId,
+                    PortValue.IntValue(event.engineId),
                     ControlEventOrigin.TIDAL
                 )
             }
