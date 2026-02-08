@@ -57,7 +57,8 @@ fun DuoPairBox(
     midiState: MidiUiState,
     voiceActions: VoiceActions,
     midiActions: MidiActions,
-    isVoiceBeingLearned: (Int) -> Boolean
+    isVoiceBeingLearned: (Int) -> Boolean,
+    aiVoiceEngineHighlight: Boolean = false
 ) {
     Column(
         modifier =
@@ -259,6 +260,7 @@ fun DuoPairBox(
                     onEngineChange = { voiceActions.setPairEngine(voiceA / 2, it) },
                     color = color,
                     label = engineLabel(pairEngine),
+                    showExternalSelection = aiVoiceEngineHighlight,
                 )
                 RotaryKnob(
                     value = pairHarmonics,

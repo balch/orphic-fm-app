@@ -142,7 +142,7 @@ class VizViewModel(
 
             // Handle dynamic effects
             if (viz is DynamicVisualization) {
-                dynamicEffectsJob = viewModelScope.launch {
+                dynamicEffectsJob = viewModelScope.launch(dispatcherProvider.default) {
                     viz.liquidEffectsFlow.collect { effects ->
                          _uiState.value = _uiState.value.copy(liquidEffects = effects)
                     }

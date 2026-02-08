@@ -9,11 +9,13 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -35,6 +37,7 @@ import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.StereoSymbol
+import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.core.tempo.GlobalTempo
@@ -62,7 +65,8 @@ data class VoiceUiState(
     val pairHarmonics: List<Float> = List(6) { 0.5f },
     val quadTriggerSources: List<Int> = List(3) { 0 },
     val quadPitchSources: List<Int> = List(3) { 0 },
-    val quadEnvelopeTriggerModes: List<Boolean> = listOf(false, false, false)
+    val quadEnvelopeTriggerModes: List<Boolean> = listOf(false, false, false),
+    val aiVoiceEngineHighlights: List<Boolean> = List(6) { false }
 ) {
     companion object {
         val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
@@ -92,6 +96,9 @@ private sealed interface VoiceIntent {
     data class QuadTriggerSource(val quadIndex: Int, val sourceIndex: Int) : VoiceIntent
     data class QuadPitchSource(val quadIndex: Int, val sourceIndex: Int) : VoiceIntent
     data class QuadEnvelopeTriggerMode(val quadIndex: Int, val enabled: Boolean) : VoiceIntent
+
+    // AI feedback
+    data class AiVoiceEngineHighlight(val pairIndex: Int, val show: Boolean) : VoiceIntent
 
     // Global intents
     data class FmStructure(val crossQuad: Boolean) : VoiceIntent
@@ -277,6 +284,20 @@ class VoiceViewModel(
                     uiIntents.tryEmit(VoiceIntent.SetBpm(bpm))
                 }
             }
+            // AI engine change highlights
+            launch {
+                synthController.onControlChange
+                    .filter { it.origin == ControlEventOrigin.AI }
+                    .filter { it.controlId.startsWith(VOICE_URI) && it.controlId.contains("pair_engine") }
+                    .collect { event ->
+                        val pairIndex = event.controlId.substringAfterLast("_").toIntOrNull()
+                        if (pairIndex != null) {
+                            uiIntents.tryEmit(VoiceIntent.AiVoiceEngineHighlight(pairIndex, true))
+                            delay(2000)
+                            uiIntents.tryEmit(VoiceIntent.AiVoiceEngineHighlight(pairIndex, false))
+                        }
+                    }
+            }
         }
     }
 
@@ -331,6 +352,11 @@ class VoiceViewModel(
 
             is VoiceIntent.QuadEnvelopeTriggerMode ->
                 state.copy(quadEnvelopeTriggerModes = state.quadEnvelopeTriggerModes.toMutableList().also { it[intent.quadIndex] = intent.enabled })
+
+            is VoiceIntent.AiVoiceEngineHighlight ->
+                state.copy(aiVoiceEngineHighlights = state.aiVoiceEngineHighlights.mapIndexed { i, v ->
+                    if (i == intent.pairIndex) intent.show else v
+                })
 
             is VoiceIntent.FmStructure ->
                 state.copy(fmStructureCrossQuad = intent.crossQuad)

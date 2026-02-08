@@ -218,7 +218,8 @@ fun VoiceGroupSectionLayout(
                 midiState = midiState,
                 voiceActions = voiceActions,
                 midiActions = midiActions,
-                isVoiceBeingLearned = isVoiceBeingLearned
+                isVoiceBeingLearned = isVoiceBeingLearned,
+                aiVoiceEngineHighlight = voiceState.aiVoiceEngineHighlights[voiceStartIndex / 2]
             )
             DuoPairBox(
                 voiceA = voiceStartIndex + 2,
@@ -237,7 +238,8 @@ fun VoiceGroupSectionLayout(
                 midiState = midiState,
                 voiceActions = voiceActions,
                 midiActions = midiActions,
-                isVoiceBeingLearned = isVoiceBeingLearned
+                isVoiceBeingLearned = isVoiceBeingLearned,
+                aiVoiceEngineHighlight = voiceState.aiVoiceEngineHighlights[(voiceStartIndex + 2) / 2]
             )
         }
     }

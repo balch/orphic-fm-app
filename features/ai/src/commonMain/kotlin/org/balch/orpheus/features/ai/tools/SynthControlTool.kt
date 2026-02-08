@@ -31,7 +31,7 @@ data class SynthControlArgs(
 
         QUADS (1-3): QUAD_PITCH_1..3, QUAD_HOLD_1..3, QUAD_VOLUME_1..3
 
-        PAIRS (1-6): DUO_MOD_SOURCE_1..6, PAIR_SHARPNESS_1..6
+        PAIRS (1-6): DUO_MOD_SOURCE_1..6, PAIR_SHARPNESS_1..6, VOICE_ENGINE_1..6, VOICE_ENGINE_HARMONICS_1..6
 
         LFO: HYPER_LFO_A, HYPER_LFO_B, HYPER_LFO_MODE, HYPER_LFO_LINK
 
@@ -48,6 +48,35 @@ data class SynthControlArgs(
 
         BENDER: Special pitch bend control (-1.0 to +1.0)
 
+        VOICE ENGINE (1-6): VOICE_ENGINE_1..6
+        Synthesis engine selection per duo pair. Value is an integer engine ID:
+          0 = OSC (default FM oscillators — classic warm Orpheus sound)
+          5 = FM Synthesis (two-operator FM — bells, keys, metallic tones, bright harmonics)
+          6 = Filtered Noise (noise through resonant filter — wind, textures, sweeps, percussion)
+          7 = Waveshaping (wavefolder — harsh to warm distortion, complex harmonics)
+          8 = Virtual Analog (classic subtractive — sawtooth/pulse with filter)
+          9 = Additive (harmonic partials — organ-like, evolving spectral tones)
+          10 = Grain (granular/wavetable — textural, glitchy, evolving sounds)
+          11 = String (Karplus-Strong — plucked/bowed strings, realistic decay)
+          12 = Modal (physical modeling — resonant surfaces, bells, metallic percussion)
+        Drum engines (use sparingly on voice pairs):
+          1 = Analog Bass Drum, 2 = Analog Snare, 3 = Hi-Hat, 4 = FM Drum
+
+        VOICE ENGINE HARMONICS (1-6): VOICE_ENGINE_HARMONICS_1..6
+        Engine-specific tonal control (0.0-1.0):
+          - OSC (engine 0): FM self-feedback amount (0=clean, 1=chaotic)
+          - All others: Engine-specific harmonic richness parameter
+
+        VOICE ENGINE SOUND DESIGN TIPS:
+          - Use String or Modal for plucked/metallic textures
+          - Use FM or Additive for evolving tonal drones
+          - Use Grain for glitchy, textural layers
+          - Use VA for classic analog synth sounds
+          - Use Waveshaping for aggressive, distorted timbres
+          - Combine different engines across pairs for rich layered sounds
+          - PAIR_SHARPNESS controls timbre for the active engine
+          - VOICE_FM_DEPTH controls morph parameter for Plaits engines
+
         Use uppercase names (e.g., MATRIX_ALGORITHM, VOICE_TUNE_1).
     """)
     val controlId: String,
@@ -62,6 +91,7 @@ data class SynthControlArgs(
         - HYPER_LFO_MODE: 0=AND, 0.5=OFF, 1=OR
         - RESONATOR_MODE: 0=Modal (bell), 0.5=String, 1=Sympathetic (sitar)
         - BENDER: -1=full down, 0=center, +1=full up
+        - VOICE_ENGINE: Integer engine ID (0, 5-12 for pitched; 1-4 for drums). NOT 0-1 range.
     """)
     val value: Float
 )
@@ -117,7 +147,7 @@ class SynthControlTool @Inject constructor(
     resultSerializer = SynthControlResult.serializer(),
     name = "synth_control",
     description = """
-        Control synthesizer parameters like volume, vibrato, distortion, delay, pan, quad settings, duo mod sources, and the pitch bender.
+        Control synthesizer parameters like volume, vibrato, distortion, delay, pan, quad settings, duo mod sources, voice engine selection, and the pitch bender.
         Use this to adjust the sound based on user requests.
         Values should be between 0.0 and 1.0 (except BENDER which uses -1.0 to +1.0).
         For DUO_MOD_SOURCE: 0.0=VoiceFM, 0.5=Off, 1.0=LFO.
@@ -235,6 +265,22 @@ class SynthControlTool @Inject constructor(
         "PAIR_SHARPNESS_5" -> VoiceSymbol.pairSharpness(4)
         "PAIR_SHARPNESS_6" -> VoiceSymbol.pairSharpness(5)
 
+        // Voice engine selection (1-indexed → 0-indexed)
+        "VOICE_ENGINE_1" -> VoiceSymbol.pairEngine(0)
+        "VOICE_ENGINE_2" -> VoiceSymbol.pairEngine(1)
+        "VOICE_ENGINE_3" -> VoiceSymbol.pairEngine(2)
+        "VOICE_ENGINE_4" -> VoiceSymbol.pairEngine(3)
+        "VOICE_ENGINE_5" -> VoiceSymbol.pairEngine(4)
+        "VOICE_ENGINE_6" -> VoiceSymbol.pairEngine(5)
+
+        // Voice engine harmonics (1-indexed → 0-indexed)
+        "VOICE_ENGINE_HARMONICS_1" -> VoiceSymbol.pairHarmonics(0)
+        "VOICE_ENGINE_HARMONICS_2" -> VoiceSymbol.pairHarmonics(1)
+        "VOICE_ENGINE_HARMONICS_3" -> VoiceSymbol.pairHarmonics(2)
+        "VOICE_ENGINE_HARMONICS_4" -> VoiceSymbol.pairHarmonics(3)
+        "VOICE_ENGINE_HARMONICS_5" -> VoiceSymbol.pairHarmonics(4)
+        "VOICE_ENGINE_HARMONICS_6" -> VoiceSymbol.pairHarmonics(5)
+
         // LFO controls
         "HYPER_LFO_A", "LFO_A" -> DuoLfoSymbol.FREQ_A
         "HYPER_LFO_B", "LFO_B" -> DuoLfoSymbol.FREQ_B
@@ -307,6 +353,19 @@ class SynthControlTool @Inject constructor(
             )
 
         val targetId = portSymbol.controlId
+
+        // Voice engine selection — set immediately as integer, no ramping
+        val upperControlId = args.controlId.uppercase()
+        if (upperControlId.startsWith("VOICE_ENGINE_") &&
+            !upperControlId.contains("HARMONICS")) {
+            val intValue = args.value.toInt()
+            synthController.setPluginControl(
+                id = targetId,
+                value = PortValue.IntValue(intValue),
+                origin = ControlEventOrigin.AI
+            )
+            return SynthControlResult(success = true, message = "Set ${portSymbol.displayName} to engine $intValue")
+        }
 
         // Get current value (or use 0.5 as default starting point)
         val startValue = currentValues[targetId] ?: 0.5f

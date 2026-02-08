@@ -9,7 +9,6 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -150,7 +149,7 @@ class AiOptionsViewModel(
 
     init {
         // Observe model changes and restart the OrpheusAgent (Chat) when model changes
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             aiModelProvider.selectedModel
                 .drop(1) // Skip initial emission to avoid restart on startup
                 .collect { model ->
@@ -158,9 +157,9 @@ class AiOptionsViewModel(
                     agent.restart()
                 }
         }
-        
+
         // Subscribe to user interaction events to deactivate REPL mode
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             replCodeEventBus.events.collect { event ->
                 if (event is ReplCodeEvent.UserInteraction && _isReplActive.value) {
                     log.debug { "User interaction detected, deactivating REPL mode" }
@@ -168,9 +167,9 @@ class AiOptionsViewModel(
                 }
             }
         }
-        
+
         // Subscribe to playback lifecycle events (e.g., foreground service stop)
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
                     is PlaybackLifecycleEvent.StopAll -> {
@@ -181,9 +180,9 @@ class AiOptionsViewModel(
                 }
             }
         }
-        
+
         // Subscribe to mode change events (from OrpheusAgent tools like StartCompositionTool)
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             modeChangeEventBus.events.collect { event ->
                 when (event) {
                     is ModeChangeEvent.StartComposition -> {
@@ -224,15 +223,15 @@ class AiOptionsViewModel(
         if (_isReplActive.value) {
             log.debug { "Deactivating REPL mode (lifecycle)" }
             _isReplActive.value = false
-            viewModelScope.launch {
-                try {
+            viewModelScope.launch(dispatcherProvider.io) {
+                runCatchingSuspend {
                     replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
-                } catch (e: Exception) {
+                }.onFailure { e ->
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
             }
         }
-        
+
         // Reset playback mode to USER since no AI is active
         synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
     }
@@ -475,10 +474,10 @@ class AiOptionsViewModel(
         val wasReplActive = _isReplActive.value
         if (wasReplActive && !wasActive) {
             _isReplActive.value = false
-            viewModelScope.launch {
-                try {
+            viewModelScope.launch(dispatcherProvider.io) {
+                runCatchingSuspend {
                     replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
-                } catch (e: Exception) {
+                }.onFailure { e ->
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
             }
@@ -690,15 +689,15 @@ class AiOptionsViewModel(
             
             // Immediately open CODE panel and close LFO/DELAY panels
             // This gives instant UI feedback before AI starts generating
-            viewModelScope.launch {
+            viewModelScope.launch(dispatcherProvider.default) {
                 panelExpansionEventBus.expand(PanelId.CODE)
                 panelExpansionEventBus.collapse(PanelId.LFO)
                 panelExpansionEventBus.collapse(PanelId.DELAY)
                 log.debug { "Expanded CODE, collapsed LFO and DELAY panels" }
             }
-            
+
             // Emit generating event immediately so UI shows loading state
-            viewModelScope.launch {
+            viewModelScope.launch(dispatcherProvider.default) {
                 replCodeEventBus.emitGenerating()
             }
             
@@ -741,45 +740,45 @@ class AiOptionsViewModel(
             log.debug { "REPL mode deactivated" }
 
             // Emit UserInteraction to clear the AI generating state
-            viewModelScope.launch {
+            viewModelScope.launch(dispatcherProvider.default) {
                 replCodeEventBus.emitUserInteraction()
             }
-            
+
             // Stop all REPL patterns with ramp down
-            viewModelScope.launch {
-                try {
+            viewModelScope.launch(dispatcherProvider.io) {
+                runCatchingSuspend {
                     // Get current volumes
                     val vol0 = synthEngine.getQuadVolume(0)
                     val vol1 = synthEngine.getQuadVolume(1)
                     val vol2 = synthEngine.getQuadVolume(2)
-                    
+
                     // Fade out using JSyn's LinearRamp for sample-accurate, click-free transitions
                     val fadeDuration = 2.0f  // seconds
                     log.debug { "REPL stop: Fading out quad volumes over ${fadeDuration}s" }
                     synthEngine.fadeQuadVolume(0, 0f, fadeDuration)
                     synthEngine.fadeQuadVolume(1, 0f, fadeDuration)
                     synthEngine.fadeQuadVolume(2, 0f, fadeDuration)
-                    
+
                     // Wait for fade to complete
                     delay((fadeDuration * 1000).toLong())
-                    
+
                     replExecuteTool.execute(
                         ReplExecuteArgs(lines = listOf("hush"))
                     )
                     log.debug { "Hushed REPL patterns" }
-                    
+
                     // Restore volumes after hush (instant, not faded)
                     synthEngine.setQuadVolume(0, vol0)
                     synthEngine.setQuadVolume(1, vol1)
                     synthEngine.setQuadVolume(2, vol2)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
+                }.onFailure { e ->
                     log.warn { "Failed to hush REPL patterns gracefully: ${e.message}" }
                     // Fallback
-                    replExecuteTool.execute(
-                        ReplExecuteArgs(lines = listOf("hush"))
-                    )
+                    runCatchingSuspend {
+                        replExecuteTool.execute(
+                            ReplExecuteArgs(lines = listOf("hush"))
+                        )
+                    }
                 }
             }
         }
@@ -840,7 +839,7 @@ class AiOptionsViewModel(
      * Select a new AI model.
      */
     private fun selectModel(model: AiModel) {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             aiModelProvider.selectModel(model)
             log.debug { "Model selected: ${model.displayName}" }
         }

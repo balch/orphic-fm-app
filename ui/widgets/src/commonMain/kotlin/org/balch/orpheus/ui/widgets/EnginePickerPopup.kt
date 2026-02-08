@@ -179,10 +179,23 @@ fun EnginePickerButton(
         fontSize = 9.sp,
         fontWeight = FontWeight.Bold,
     ),
+    showExternalSelection: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     var showEnginePicker by remember { mutableStateOf(false) }
     var hoveredSegment by remember { mutableStateOf<Int?>(null) }
+
+    // Show popup for either user gesture or external (AI) selection
+    val displayPopup = showEnginePicker || showExternalSelection
+    val displaySegment = when {
+        showExternalSelection && !showEnginePicker -> {
+            // Highlight the current engine's segment in the ring
+            config.ring.indexOfFirst { it.ordinal == currentEngine }
+                .takeIf { it >= 0 } ?: -1  // -1 = center (OSC)
+        }
+        else -> hoveredSegment
+    }
+
     Box(modifier = modifier) {
         Box(
             modifier = Modifier
@@ -232,10 +245,10 @@ fun EnginePickerButton(
                 maxLines = 1
             )
         }
-        if (showEnginePicker) {
+        if (displayPopup) {
             EnginePickerPopup(
                 currentEngine = currentEngine,
-                hoveredSegment = hoveredSegment,
+                hoveredSegment = displaySegment,
                 color = color,
                 config = config,
                 anchorSize = anchorSize,

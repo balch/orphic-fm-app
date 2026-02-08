@@ -238,8 +238,8 @@ class SynthControlAgent(
         val voiceMatch = Regex("VOICE_(?:TUNE|FM_DEPTH|ENV_SPEED)_(\\d+)").find(id)
         if (voiceMatch != null) return (voiceMatch.groupValues[1].toInt() - 1) / 4
 
-        // Pair controls: DUO_MOD_SOURCE_N, PAIR_SHARPNESS_N (1-indexed) → quad (N-1)/2
-        val pairMatch = Regex("(?:DUO_MOD_SOURCE|PAIR_SHARPNESS)_(\\d+)").find(id)
+        // Pair controls: DUO_MOD_SOURCE_N, PAIR_SHARPNESS_N, VOICE_ENGINE_N (1-indexed) → quad (N-1)/2
+        val pairMatch = Regex("(?:DUO_MOD_SOURCE|PAIR_SHARPNESS|VOICE_ENGINE(?:_HARMONICS)?)_(\\d+)").find(id)
         if (pairMatch != null) return (pairMatch.groupValues[1].toInt() - 1) / 2
 
         // Global/effect controls (VIBRATO, DRIVE, DELAY_*, RESONATOR_*, MATRIX_*, BENDER, etc.)

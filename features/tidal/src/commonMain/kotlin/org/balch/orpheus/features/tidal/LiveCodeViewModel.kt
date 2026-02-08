@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -114,7 +115,8 @@ class LiveCodeViewModel(
     private val replCodeEventBus: ReplCodeEventBus,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val mediaSessionStateManager: MediaSessionStateManager,
-    private val synthEngine: SynthEngine
+    private val synthEngine: SynthEngine,
+    private val dispatcherProvider: DispatcherProvider
 ) : ViewModel(), LiveCodeFeature {
 
     override val actions = LiveCodePanelActions(
@@ -154,7 +156,7 @@ class LiveCodeViewModel(
     }
 
     private fun observeIntents() {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             _intents
                 .scan(_uiState.value) { state, intent ->
                     intent?.let { reduce(state, it) } ?: state
@@ -166,7 +168,7 @@ class LiveCodeViewModel(
     }
 
     private fun observeSchedulerState() {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             scheduler.state.collect { schedState ->
                 val wasPlaying = _uiState.value.isPlaying
                 _uiState.value = _uiState.value.copy(
@@ -183,7 +185,7 @@ class LiveCodeViewModel(
     }
 
     private fun observeReplCodeEvents() {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             replCodeEventBus.events.collect { event ->
                 logger.d { "Received ReplCodeEvent: $event" }
                 when (event) {
@@ -212,7 +214,7 @@ class LiveCodeViewModel(
     }
 
     private fun observePlaybackLifecycle() {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
                     is PlaybackLifecycleEvent.StopAll -> {
@@ -507,21 +509,21 @@ class LiveCodeViewModel(
     }
     
     fun execute() {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             replCodeEventBus.emitUserInteraction()
             _intents.value = LiveCodeIntent.Execute
         }
     }
-    
+
     fun executeBlock() {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             replCodeEventBus.emitUserInteraction()
             _intents.value = LiveCodeIntent.ExecuteBlock
         }
     }
-    
+
     fun executeLine() {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             replCodeEventBus.emitUserInteraction()
             _intents.value = LiveCodeIntent.ExecuteLine
         }
@@ -532,7 +534,7 @@ class LiveCodeViewModel(
     }
     
     fun stop() {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             replCodeEventBus.emitUserInteraction()
             _intents.value = LiveCodeIntent.Stop
         }

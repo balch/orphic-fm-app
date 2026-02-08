@@ -83,7 +83,7 @@ typealias GrainsFeature = SynthFeature<GrainsUiState, GrainsPanelActions>
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class GrainsViewModel @Inject constructor(
     private val synthController: SynthController,
-    dispatcherProvider: DispatcherProvider,
+    private val dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), GrainsFeature {
 
     // Control flows for Grains plugin ports
@@ -157,7 +157,7 @@ class GrainsViewModel @Inject constructor(
 
     fun trigger() {
         triggerId.value = BoolValue(true)
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.default) {
             kotlinx.coroutines.delay(20)
             triggerId.value = BoolValue(false)
         }
