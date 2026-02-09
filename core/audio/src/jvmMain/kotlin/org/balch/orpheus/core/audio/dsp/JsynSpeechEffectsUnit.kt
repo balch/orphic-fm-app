@@ -29,6 +29,7 @@ class JsynSpeechEffectsUnit : com.jsyn.unitgen.UnitGenerator(), SpeechEffectsUni
     private val PHASER_STAGES = 6
     private val phaserBuf = FloatArray(PHASER_STAGES)
     private var phaserLfoPhase = 0.0
+    private var phaserG = 0f  // cached allpass coefficient, updated once per block
 
     // --- Feedback delay state (~250ms circular buffer) ---
     private val DELAY_SAMPLES = 11025 // ~250ms at 44100
@@ -78,6 +79,12 @@ class JsynSpeechEffectsUnit : com.jsyn.unitgen.UnitGenerator(), SpeechEffectsUni
         val outL = jsynOutputL.values
         val outR = jsynOutputR.values
 
+        // Update phaser LFO and allpass coefficient once per block
+        if (phaserIntensity > 0.001f) {
+            val blockSamples = end - start
+            updatePhaserCoefficient(blockSamples)
+        }
+
         for (i in start until end) {
             // Sum to mono
             var sample = ((inL[i] + inR[i]) * 0.5).toFloat()
@@ -104,10 +111,14 @@ class JsynSpeechEffectsUnit : com.jsyn.unitgen.UnitGenerator(), SpeechEffectsUni
         }
     }
 
-    private fun processPhaser(input: Float): Float {
-        // Triangle LFO: rate scales with intensity (0.5-8 Hz)
+    /**
+     * Update phaser LFO and allpass coefficient once per block (avoids per-sample tan()).
+     * Advances the LFO phase by the block size to maintain correct timing.
+     */
+    private fun updatePhaserCoefficient(blockSamples: Int) {
         val lfoRate = 0.5 + phaserIntensity * 7.5
-        phaserLfoPhase += lfoRate / 44100.0
+        // Advance LFO to midpoint of block for best approximation
+        phaserLfoPhase += lfoRate / 44100.0 * (blockSamples / 2.0)
         if (phaserLfoPhase >= 1.0) phaserLfoPhase -= 1.0
 
         // Triangle wave 0..1
@@ -118,7 +129,15 @@ class JsynSpeechEffectsUnit : com.jsyn.unitgen.UnitGenerator(), SpeechEffectsUni
         val depth = phaserIntensity
         val fc = 200f + tri * depth * 3800f
         val w = tan((PI * fc / 44100.0).toFloat())
-        val g = (1f - w) / (1f + w)
+        phaserG = (1f - w) / (1f + w)
+
+        // Advance LFO the remaining half
+        phaserLfoPhase += lfoRate / 44100.0 * ((blockSamples + 1) / 2.0)
+        if (phaserLfoPhase >= 1.0) phaserLfoPhase -= 1.0
+    }
+
+    private fun processPhaser(input: Float): Float {
+        val g = phaserG
 
         // 6-stage all-pass chain
         var x = input

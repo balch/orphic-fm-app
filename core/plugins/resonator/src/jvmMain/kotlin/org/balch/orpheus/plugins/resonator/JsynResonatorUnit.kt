@@ -117,21 +117,21 @@ class JsynResonatorUnit : UnitGenerator(), ResonatorUnit {
             
             when (mode) {
                 0 -> { // Modal
-                    val (odd, even) = modalResonator.process(excitation)
-                    outputs[i] = odd.toDouble()
-                    auxOutputs[i] = even.toDouble()
+                    modalResonator.process(excitation)
+                    outputs[i] = modalResonator.outOdd.toDouble()
+                    auxOutputs[i] = modalResonator.outEven.toDouble()
                 }
                 1 -> { // String
-                    val (main, aux) = stringResonator.process(excitation)
-                    outputs[i] = main.toDouble()
-                    auxOutputs[i] = aux.toDouble()
+                    stringResonator.process(excitation)
+                    outputs[i] = stringResonator.outMain.toDouble()
+                    auxOutputs[i] = stringResonator.outAux.toDouble()
                 }
                 2 -> { // Sympathetic (uses both)
                     // Process through modal first, then string
-                    val (modalOdd, modalEven) = modalResonator.process(excitation)
-                    val (stringMain, _) = stringResonator.process(modalOdd)
-                    outputs[i] = stringMain.toDouble()
-                    auxOutputs[i] = modalEven.toDouble()
+                    modalResonator.process(excitation)
+                    stringResonator.process(modalResonator.outOdd)
+                    outputs[i] = stringResonator.outMain.toDouble()
+                    auxOutputs[i] = modalResonator.outEven.toDouble()
                 }
                 else -> {
                     outputs[i] = inputSample.toDouble()

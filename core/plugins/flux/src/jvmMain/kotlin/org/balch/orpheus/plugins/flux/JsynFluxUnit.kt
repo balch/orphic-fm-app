@@ -17,7 +17,7 @@ import org.balch.orpheus.plugins.flux.engine.FluxProcessor
 
 class JsynFluxUnit : UnitGenerator(), FluxUnit {
     
-    private val processor = FluxProcessor(48000f) 
+    private val processor = FluxProcessor(44100f)
     
     // JSyn Ports
     private val jsynClock = UnitInputPort("Clock")

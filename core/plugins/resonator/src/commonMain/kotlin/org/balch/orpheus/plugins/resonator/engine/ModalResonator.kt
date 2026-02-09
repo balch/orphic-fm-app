@@ -48,7 +48,13 @@ class ModalResonator(private val maxModes: Int = 64) {
             var adjusted = value - (value and 1)
             field = min(adjusted, maxModes)
         }
-    
+
+    // Reusable output fields (avoids Pair allocation in audio thread)
+    var outOdd = 0f
+        private set
+    var outEven = 0f
+        private set
+
     private var previousPosition = 0f
     
     /**
@@ -127,11 +133,11 @@ class ModalResonator(private val maxModes: Int = 64) {
     
     /**
      * Process one sample through the resonator.
-     * 
+     * Results are stored in [outOdd] and [outEven] to avoid allocation.
+     *
      * @param input Excitation signal
-     * @return Pair of (odd partials, even partials) for stereo output
      */
-    fun process(input: Float): Pair<Float, Float> {
+    fun process(input: Float) {
         val numModes = computeFilters()
         
         // Cosine oscillator for position-based amplitude modulation
@@ -164,7 +170,8 @@ class ModalResonator(private val maxModes: Int = 64) {
             }
         }
         
-        return Pair(SynthDsp.softClip(odd), SynthDsp.softClip(even))
+        outOdd = SynthDsp.softClip(odd)
+        outEven = SynthDsp.softClip(even)
     }
     
     /**
@@ -182,9 +189,9 @@ class ModalResonator(private val maxModes: Int = 64) {
         size: Int
     ) {
         for (s in 0 until size) {
-            val (odd, even) = process(input[s])
-            outOdd[s] = odd
-            outEven[s] = even
+            process(input[s])
+            outOdd[s] = this.outOdd
+            outEven[s] = this.outEven
         }
     }
 }

@@ -20,6 +20,10 @@ class TanhLimiter : UnitGenerator() {
     val output: UnitOutputPort = UnitOutputPort("Output")
     val drive: UnitInputPort = UnitInputPort("Drive", 1.0) // Default: no extra drive
 
+    // Cached compensation to avoid redundant tanh() per sample
+    private var cachedDrive = 1.0
+    private var cachedCompensation = 1.0
+
     init {
         addPort(input)
         addPort(output)
@@ -33,12 +37,14 @@ class TanhLimiter : UnitGenerator() {
 
         for (i in start until limit) {
             val drv = driveVal[i].coerceIn(1.0, 50.0)
+            // Only recompute compensation when drive changes
+            if (drv != cachedDrive) {
+                cachedDrive = drv
+                cachedCompensation = (1.0 / kotlin.math.tanh(drv.coerceAtMost(3.0))).coerceAtMost(1.5)
+            }
             val inVal = inputList[i] * drv
             // Tanh saturation
-            val saturated = kotlin.math.tanh(inVal)
-            // Compensate volume loss (tanh squashes peaks)
-            val compensation = 1.0 / kotlin.math.tanh(drv.coerceAtMost(3.0))
-            outputList[i] = saturated * compensation.coerceAtMost(1.5)
+            outputList[i] = kotlin.math.tanh(inVal) * cachedCompensation
         }
     }
 }

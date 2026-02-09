@@ -78,6 +78,12 @@ class DattorroReverb {
     private var lpDecay1 = 0f
     private var lpDecay2 = 0f
 
+    // Reusable output fields (avoids Pair allocation in audio thread)
+    var outLeft = 0f
+        private set
+    var outRight = 0f
+        private set
+
     init {
         // LFO frequencies scaled for 44100Hz
         lfo1.initApproximate(0.5f / 44100f * 32f)
@@ -92,12 +98,10 @@ class DattorroReverb {
     }
 
     /**
-     * Process one stereo frame in-place.
-     * @param leftIn left input sample
-     * @param rightIn right input sample
-     * @return Pair(leftOut, rightOut)
+     * Process one stereo frame.
+     * Results are stored in [outLeft] and [outRight] to avoid allocation.
      */
-    fun process(leftIn: Float, rightIn: Float): Pair<Float, Float> {
+    fun process(leftIn: Float, rightIn: Float) {
         val kap = diffusion
         val klp = lp
         val krt = reverbTime
@@ -205,10 +209,8 @@ class DattorroReverb {
         val wetRight = acc * 2f
 
         // ---- Output wet-only (parallel send — dry signal handled externally) ----
-        val leftOut = wetLeft * amount
-        val rightOut = wetRight * amount
-
-        return Pair(leftOut, rightOut)
+        outLeft = wetLeft * amount
+        outRight = wetRight * amount
     }
 
     private fun readBuffer(offset: Int): Float {

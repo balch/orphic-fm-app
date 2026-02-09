@@ -62,8 +62,9 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
     @Volatile private var _percussiveMode = false
     private var envAmplitude = 0f
 
-    // Reusable render buffer
+    // Reusable render buffer and parameters (avoids allocation in audio thread)
     private val renderBuffer = FloatArray(PLAITS_BLOCK_SIZE)
+    private val reusableParams = EngineParameters()
 
     init {
         addPort(jsynOutput)
@@ -160,7 +161,7 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
             val timbreMod = timbreModValues[start + offset].toFloat()
             val morphMod = morphModValues[start + offset].toFloat()
 
-            val params = EngineParameters(
+            reusableParams.set(
                 trigger = triggerState,
                 note = _note,
                 timbre = (_timbre + timbreMod).coerceIn(0f, 1f),
@@ -175,7 +176,7 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
                 it.speed = _speechSpeed
             }
 
-            eng.render(params, renderBuffer, null, blockSize)
+            eng.render(reusableParams, renderBuffer, null, blockSize)
 
             // Copy to output with gain, envelope, and soft limiting
             val gain = eng.outGain

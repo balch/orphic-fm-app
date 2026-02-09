@@ -45,9 +45,9 @@ class JsynReverbUnit : UnitGenerator(), ReverbUnit {
         val outR = jsynOutputR.values
 
         for (i in start until end) {
-            val (left, right) = reverb.process(inL[i].toFloat(), inR[i].toFloat())
-            outL[i] = left.toDouble()
-            outR[i] = right.toDouble()
+            reverb.process(inL[i].toFloat(), inR[i].toFloat())
+            outL[i] = reverb.outLeft.toDouble()
+            outR[i] = reverb.outRight.toDouble()
         }
     }
 }

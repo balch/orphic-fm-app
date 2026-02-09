@@ -51,6 +51,12 @@ class ResonatorString(private val delayLineSize: Int = 2048) {
     private var outSample1 = 0f
     private var auxSample0 = 0f
     private var auxSample1 = 0f
+
+    // Reusable output fields (avoids Pair allocation in audio thread)
+    var outMain = 0f
+        private set
+    var outAux = 0f
+        private set
     
     /**
      * Initialize the string.
@@ -116,11 +122,11 @@ class ResonatorString(private val delayLineSize: Int = 2048) {
     
     /**
      * Process one sample through the string.
-     * 
+     * Results are stored in [outMain] and [outAux] to avoid allocation.
+     *
      * @param input Excitation signal (pluck impulse)
-     * @return Pair of (main output, comb-filtered aux output)
      */
-    fun process(input: Float): Pair<Float, Float> {
+    fun process(input: Float) {
         // Calculate delay in samples from frequency
         var delaySamples = 1f / frequency
         delaySamples = delaySamples.coerceIn(4f, (delayLineSize - 4).toFloat())
@@ -167,7 +173,8 @@ class ResonatorString(private val delayLineSize: Int = 2048) {
         outSample0 = s
         auxSample0 = readDelay(combDelay)
         
-        return Pair(SynthDsp.softClip(outSample0), SynthDsp.softClip(auxSample0))
+        outMain = SynthDsp.softClip(outSample0)
+        outAux = SynthDsp.softClip(auxSample0)
     }
     
     /**
@@ -180,9 +187,9 @@ class ResonatorString(private val delayLineSize: Int = 2048) {
         size: Int
     ) {
         for (i in 0 until size) {
-            val (main, aux) = process(input[i])
-            outMain[i] = main
-            outAux[i] = aux
+            process(input[i])
+            outMain[i] = this.outMain
+            outAux[i] = this.outAux
         }
     }
 }
