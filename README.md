@@ -47,19 +47,19 @@ composeApp/
 ### Desktop (JVM)
 
 ```bash
-./gradlew :composeApp:run
+./gradlew :apps:composeApp:run
 ```
 
 ### Android
 
 Build the debug APK:
 ```bash
-./gradlew :composeApp:assembleDebug
+./gradlew :apps:composeApp:assembleDebug
 ```
 
 Install and run on a connected device or emulator:
 ```bash
-./gradlew :composeApp:installDebug
+./gradlew :apps:composeApp:installDebug
 ```
 
 ### Release Builds
@@ -67,9 +67,9 @@ Install and run on a connected device or emulator:
 #### Desktop (JVM)
 Build dmg (macOS), msi (Windows), or deb (Linux) depending on your OS:
 ```bash
-./gradlew :composeApp:packageReleaseDistributionForCurrentOS
+./gradlew :apps:composeApp:packageReleaseDistributionForCurrentOS
 ```
-The installer will be generated in `composeApp/build/compose/binaries/main-release/`.
+The installer will be generated in `apps/composeApp/build/compose/binaries/main-release/`.
 
 ### Build All
 
