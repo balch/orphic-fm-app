@@ -25,171 +25,179 @@ data class DrumPatch(
 object DrumDefs {
     
     val LIBRARY = mapOf(
-        // === KICKS ===
+        // === KICKS (all use BD 808 engine, type=0) ===
+        // Params: frequency=pitch(norm), envelopeSpeed=decay, sharpness=tone, p4=attackFM, p5=selfFM
         "bd" to DrumPatch(
-            frequency = 55.0f,
-            envelopeSpeed = 0.0f, // Fast attack/decay
-            sharpness = 0.1f,     // Mostly sine/tri for clean low end
-            drive = 0.2f          // Slight saturation
+            frequency = 0.19f,    // ~55Hz, standard kick
+            envelopeSpeed = 0.35f, // Punchy decay
+            sharpness = 0.4f,     // Warm tone
+            drumType = 0,
+            p4 = 0.3f,            // Moderate attack FM
+            p5 = 0.2f             // Low self FM
         ),
         "kick" to DrumPatch(
-            frequency = 50.0f,
-            envelopeSpeed = 0.0f,
-            sharpness = 0.2f,     // A bit more harmonics
-            drive = 0.4f
+            frequency = 0.17f,    // Slightly lower
+            envelopeSpeed = 0.4f, // Rounder decay
+            sharpness = 0.5f,
+            drumType = 0,
+            p4 = 0.4f,
+            p5 = 0.3f
         ),
         "hardkick" to DrumPatch(
-            frequency = 60.0f,
-            envelopeSpeed = 0.0f,
-            sharpness = 0.6f,     // Square-ish for hard techno kick
-            drive = 0.8f
+            frequency = 0.22f,    // Tighter
+            envelopeSpeed = 0.25f, // Snappier
+            sharpness = 0.7f,     // More bite
+            drumType = 0,
+            p4 = 0.7f,            // Heavy attack FM
+            p5 = 0.5f
         ),
-        
-        // === SNARES ===
+        "bd808" to DrumPatch(
+            frequency = 0.19f,
+            envelopeSpeed = 0.5f,
+            sharpness = 0.5f,
+            drumType = 0,
+            p4 = 0.5f,
+            p5 = 0.5f
+        ),
+
+        // === SNARES (all use SD 808 engine, type=1) ===
+        // Params: frequency=pitch(norm), envelopeSpeed=decay, sharpness=tone, p4=snappy
         "sn" to DrumPatch(
-            frequency = 220.0f,
-            envelopeSpeed = 0.0f,
-            sharpness = 0.8f,     // Square/Pulse for noise-like snap
-            fmDepth = 0.3f,       // Add inharmonic frequencies
-            drive = 0.1f
+            frequency = 0.2f,     // Standard snare pitch
+            envelopeSpeed = 0.35f, // Crisp decay
+            sharpness = 0.5f,     // Balanced tone
+            drumType = 1,
+            p4 = 0.6f             // Snappy
         ),
         "sd" to DrumPatch(
-            frequency = 200.0f,
-            envelopeSpeed = 0.05f, // Slightly fuller body
-            sharpness = 0.7f,
-            fmDepth = 0.2f
+            frequency = 0.18f,    // Slightly deeper
+            envelopeSpeed = 0.4f, // Fuller body
+            sharpness = 0.45f,
+            drumType = 1,
+            p4 = 0.5f
         ),
         "rim" to DrumPatch(
-            frequency = 400.0f,
-            envelopeSpeed = 0.0f,
-            sharpness = 0.4f,
-            fmDepth = 0.1f
+            frequency = 0.4f,     // Higher pitch for rimshot
+            envelopeSpeed = 0.15f, // Very tight
+            sharpness = 0.7f,     // Bright
+            drumType = 1,
+            p4 = 0.2f             // Less snappy, more tonal
         ),
-        
-        // === HATS ===
-        "hh" to DrumPatch(
-            frequency = 900.0f,   // Lowered base pitch for metallic body
-            envelopeSpeed = 0.0f, // Very short
-            sharpness = 1.0f,     // Pure square/pulse
-            fmDepth = 0.8f,       // High FM for metallic noise
-            drive = 0.0f
+        "cp" to DrumPatch(
+            frequency = 0.3f,     // Clap pitch
+            envelopeSpeed = 0.3f,
+            sharpness = 0.6f,
+            drumType = 1,
+            p4 = 0.8f             // Very snappy for clap texture
         ),
-        "oh" to DrumPatch( // Open Hat
-            frequency = 900.0f,
-            envelopeSpeed = 0.3f, // Longer decay
-            sharpness = 1.0f,
-            fmDepth = 0.8f
-        ),
-        "hat" to DrumPatch(
-            frequency = 1200.0f,
-            envelopeSpeed = 0.0f,
-            sharpness = 0.9f,
-            fmDepth = 0.7f
-        ),
-        
-        // === TOMS ===
-        "lt" to DrumPatch( // Low Tom
-            frequency = 110.0f,
-            envelopeSpeed = 0.2f, // Resonant decay
-            sharpness = 0.3f,
-            fmDepth = 0.1f
-        ),
-        "mt" to DrumPatch( // Mid Tom
-            frequency = 165.0f,
-            envelopeSpeed = 0.2f,
-            sharpness = 0.3f,
-            fmDepth = 0.1f
-        ),
-        "ht" to DrumPatch( // High Tom
-            frequency = 220.0f,
-            envelopeSpeed = 0.2f,
-            sharpness = 0.3f,
-            fmDepth = 0.1f
-        ),
-        
-        // === PERC ===
-        "cp" to DrumPatch( // Clap
-            frequency = 800.0f,
-            envelopeSpeed = 0.1f, // Spread out snap
-            sharpness = 0.9f,
-            fmDepth = 0.5f,
-            drive = 0.3f
-        ),
-        "cb" to DrumPatch( // Cowbell (808-ish)
-            frequency = 540.0f,   // Standard 808 CB pitch area
-            envelopeSpeed = 0.1f,
-            sharpness = 1.0f,
-            fmDepth = 0.0f        // Square wave body
-        ),
-        "ch" to DrumPatch( // Chime/Metallic
-            frequency = 2000.0f,
-            envelopeSpeed = 0.4f,
-            sharpness = 0.5f,
-            fmDepth = 1.0f        // Max FM for bell tones
-        ),
-        
-        // === 808 ENGINES ===
-        "bd808" to DrumPatch(
-            frequency = 0.1944f, // 55Hz normalized: (55-20)/180
-            envelopeSpeed = 0.5f, // Decay
-            sharpness = 0.5f,     // Tone
-            drumType = 0,
-            p4 = 0.5f, // Attack FM
-            p5 = 0.5f  // Self FM
+        "clap" to DrumPatch(
+            frequency = 0.3f,
+            envelopeSpeed = 0.3f,
+            sharpness = 0.6f,
+            drumType = 1,
+            p4 = 0.8f
         ),
         "sn808" to DrumPatch(
-            frequency = 0.2f, // 180Hz normalized: (180-100)/400
-            envelopeSpeed = 0.5f, // Decay
-            sharpness = 0.5f,     // Tone
+            frequency = 0.2f,
+            envelopeSpeed = 0.5f,
+            sharpness = 0.5f,
             drumType = 1,
-            p4 = 0.5f             // Snappy
+            p4 = 0.5f
+        ),
+
+        // === HATS (all use HH 808 engine, type=2) ===
+        // Params: frequency=pitch(norm), envelopeSpeed=decay, sharpness=tone, p4=noisiness
+        "hh" to DrumPatch(
+            frequency = 0.14f,    // Closed hat pitch
+            envelopeSpeed = 0.2f, // Tight
+            sharpness = 0.5f,
+            drumType = 2,
+            p4 = 0.3f             // Moderate noise
+        ),
+        "hat" to DrumPatch(
+            frequency = 0.2f,     // Brighter hat
+            envelopeSpeed = 0.15f,
+            sharpness = 0.6f,
+            drumType = 2,
+            p4 = 0.25f
+        ),
+        "ch" to DrumPatch(
+            frequency = 0.3f,     // Bright metallic
+            envelopeSpeed = 0.1f, // Very tight
+            sharpness = 0.7f,
+            drumType = 2,
+            p4 = 0.15f            // Low noise, more tonal
+        ),
+        "oh" to DrumPatch(
+            frequency = 0.14f,    // Same pitch as closed
+            envelopeSpeed = 0.6f, // Long decay for open hat
+            sharpness = 0.5f,
+            drumType = 2,
+            p4 = 0.4f             // More noise
+        ),
+        "cb" to DrumPatch(
+            frequency = 0.5f,     // High pitch cowbell
+            envelopeSpeed = 0.25f,
+            sharpness = 0.8f,     // Bright tone
+            drumType = 2,
+            p4 = 0.05f            // Very low noise, tonal
+        ),
+        "cowbell" to DrumPatch(
+            frequency = 0.5f,
+            envelopeSpeed = 0.25f,
+            sharpness = 0.8f,
+            drumType = 2,
+            p4 = 0.05f
         ),
         "hh808" to DrumPatch(
-            frequency = 0.1428f, // 400Hz normalized: (400-300)/700
-            envelopeSpeed = 0.5f, // Decay
-            sharpness = 0.5f,     // Tone
+            frequency = 0.14f,
+            envelopeSpeed = 0.5f,
+            sharpness = 0.5f,
             drumType = 2,
-            p4 = 0.2f             // Noisiness
+            p4 = 0.2f
+        ),
+
+        // === TOMS (use BD engine with higher pitch) ===
+        "lt" to DrumPatch(
+            frequency = 0.35f,    // Low tom
+            envelopeSpeed = 0.45f, // Resonant
+            sharpness = 0.4f,
+            drumType = 0,
+            p4 = 0.2f,
+            p5 = 0.1f
+        ),
+        "mt" to DrumPatch(
+            frequency = 0.5f,     // Mid tom
+            envelopeSpeed = 0.4f,
+            sharpness = 0.4f,
+            drumType = 0,
+            p4 = 0.2f,
+            p5 = 0.1f
+        ),
+        "ht" to DrumPatch(
+            frequency = 0.65f,    // High tom
+            envelopeSpeed = 0.35f,
+            sharpness = 0.45f,
+            drumType = 0,
+            p4 = 0.25f,
+            p5 = 0.15f
         )
     )
     
     /**
-     * Apply a drum patch to a specific voice engine.
+     * Trigger a drum sound using the specialized Plaits drum engines.
+     * All drums route through the 808 engines (BD=0, SD=1, HH=2).
      */
     fun apply(synthEngine: SynthEngine, voiceIndex: Int, patch: DrumPatch) {
-        if (patch.drumType != null) {
-            // Trigger specialized drum engine
-            synthEngine.triggerDrum(
-                patch.drumType,
-                1.0f, // accent
-                patch.frequency,
-                patch.sharpness, // TONE mapped to sharpness
-                patch.envelopeSpeed, // DECAY mapped to envelopeSpeed
-                patch.p4,
-                patch.p5
-            )
-            return
-        }
-
-        val quadIndex = voiceIndex / 4
-        
-        // Envelope: Drum sounds are percussive
-        synthEngine.setVoiceEnvelopeSpeed(voiceIndex, patch.envelopeSpeed)
-        
-        // Waveform/Timbre
-        // Sharpness is applied per pair in SynthEngine, but we effectively set it for the pair
-        // This might conflict if two voices in a pair try to set different sharpnesses.
-        // For now, last writer wins.
-        synthEngine.setPairSharpness(voiceIndex / 2, patch.sharpness)
-        
-        // FM/Timbre Modulation
-        synthEngine.setVoiceFmDepth(voiceIndex, patch.fmDepth)
-        
-        // Drive (Global effect, but we can nudge it? Or maybe per voice drive doesn't exist)
-        // SynthEngine has global setDrive. We shouldn't change global drive per drum hit
-        // as it would affect everything.
-        // TODO: Implement per-voice saturation? For now, we ignore drive or apply it very carefully.
-        // Actually, if we are soloing/playing mostly drums, we could set it?
-        // Risky. Let's skip drive for now to avoid side effects.
+        val type = patch.drumType ?: return
+        synthEngine.triggerDrum(
+            type,
+            1.0f,               // accent
+            patch.frequency,    // normalized pitch
+            patch.sharpness,    // tone
+            patch.envelopeSpeed, // decay
+            patch.p4,
+            patch.p5
+        )
     }
 }

@@ -253,23 +253,13 @@ class TidalScheduler(
         val windowDuration = windowEnd - windowStart
         val cps = _state.value.cps
         
-        // Group by Voice
+        // Group by Voice (Notes and Gates only — Samples use drum engines via triggerVisual)
         // Notes use their channel field for voice assignment (default 0)
         // This allows melodic patterns to play on a single voice with pitch changes
         val voiceEvents = events.mapNotNull { event ->
              when (val value = event.value) {
                  is TidalEvent.Note -> (8 + (value.channel % 4)) to event
                  is TidalEvent.Gate -> value.voiceIndex to event
-                 is TidalEvent.Sample -> {
-                     val idx = when (value.name) {
-                         "bd", "kick" -> 8
-                         "sn", "sd", "snare" -> 9
-                         "hh", "hat", "oh" -> 10
-                         "cp", "clap" -> 11
-                         else -> 8 + (value.n % 4)
-                     }
-                     idx to event
-                 }
                  else -> null
              }
         }.groupBy({ it.first }, { it.second })
@@ -321,19 +311,18 @@ class TidalScheduler(
             noteEvents.sortedBy { it.part.start }.forEach { event ->
                 val eventStartSeconds = (event.part.start / cps) - windowStart
                 val eventDurationSeconds = (event.part.end - event.part.start) / cps
-                
+
                 val tStart = (offsetSec + eventStartSeconds).toFloat()
                 val tEnd = (tStart + eventDurationSeconds).toFloat()
-                
-                // Add Gate Pulse
+
                 // 0 -> 1 at start
                 gateTimes.add(tStart)
                 gateValues.add(1f)
-                
+
                 // 1 -> 0 at end
                 gateTimes.add(tEnd)
                 gateValues.add(0f)
-                
+
                 // Add Freq Step with hold point
                 if (event.value is TidalEvent.Note) {
                     val note = event.value as TidalEvent.Note
@@ -346,17 +335,6 @@ class TidalScheduler(
                     
                     // Hold until note end - ensures the automation player
                     // outputs this frequency throughout the note duration
-                    freqTimes.add(tEnd)
-                    freqValues.add(freq.toFloat())
-                } else if (event.value is TidalEvent.Sample) {
-                    val sample = event.value as TidalEvent.Sample
-                    // Lookup in Drum Library, default to 440Hz if not found
-                    val patch = DrumDefs.LIBRARY[sample.name]
-                    val freq = patch?.frequency?.toDouble() ?: 440.0
-                    
-                    freqTimes.add(tStart)
-                    freqValues.add(freq.toFloat())
-                    
                     freqTimes.add(tEnd)
                     freqValues.add(freq.toFloat())
                 }
@@ -539,8 +517,22 @@ class TidalScheduler(
     private fun dispatchEvent(event: TidalEvent) {
         when (event) {
             is TidalEvent.Note,
-            is TidalEvent.Gate,
-            is TidalEvent.Sample -> { /* Handled by scheduleAudioEvents */ }
+            is TidalEvent.Gate -> { /* Handled by scheduleAudioEvents */ }
+
+            is TidalEvent.Sample -> {
+                // Immediate drum trigger (for "once" commands and bare dispatch)
+                val idx = when (event.name) {
+                    "bd", "kick", "hardkick" -> 8
+                    "sn", "sd", "snare", "rim" -> 9
+                    "hh", "hat", "oh" -> 10
+                    "cp", "clap", "cb", "ch", "cowbell" -> 11
+                    else -> 8 + (event.n % 4)
+                }
+                val patch = DrumDefs.LIBRARY[event.name]
+                if (patch != null) {
+                    DrumDefs.apply(synthEngine, idx, patch)
+                }
+            }
             
             is TidalEvent.VoiceTune -> {
                 synthController.setPluginControl(

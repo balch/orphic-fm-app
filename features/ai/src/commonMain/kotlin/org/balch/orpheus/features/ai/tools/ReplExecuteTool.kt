@@ -73,83 +73,97 @@ class ReplExecuteTool @Inject constructor(
     name = "repl_execute",
     description = """
         Execute Tidal-style REPL code for musical patterns.
-        
+
         IMPORTANT: Pass code as an array of strings in the 'lines' parameter!
         Each array element = one line of code. Lines are joined and executed together.
-        
-        Example call with lines array:
-        { "lines": ["d1 $ note \"c3 e3\"", "d2 $ voices:1 2 3 4", "drive:0.4"] }
-        
-        Use slots d1-d8 for different pattern layers.
-        
-        IMMEDIATE vs CYCLED COMMANDS:
-        - Bare control commands are applied ONCE immediately: drive:0.45, envspeed:1 0.8
-        - Slot assignment (d1 $) cycles the pattern every beat: d1 $ note "c3"
-        - Use bare commands for static settings, slots for rhythmic patterns!
-        - WRONG: once $ drive:0.5 ("once $" does NOT work!)
-        - CORRECT: drive:0.5 (bare command, no prefix)
-        
-        PATTERN TYPES:
-        - note "<notes>" - Melodic notes (octaves 2-6, sharps: c#3, flats: db3)
-        - voices:<indices> - Trigger voice envelopes (indices 1-8)
-        
-        VOICE CONTROLS (voice index 1-8):
-        - tune:<voice> <val> - Voice pitch (see TUNING TO NOTES below)
-        - pan:<voice> <val> - Voice pan (-1.0 to 1.0)
-        - envspeed:<voice> <val> - Envelope speed (0.0=fast, 1.0=slow)
-        
-        TUNING VOICES TO MUSICAL NOTES:
-        The tune command uses 0.0-1.0 where 0.5 = A3 (220Hz).
-        Formula: tuneValue = 0.5 + (semitones from A3 / 48.0)
-        
-        Common note values:
-        - A3 (unity) = 0.500
-        - C4 (+3 semi) = 0.562
-        - D4 (+5 semi) = 0.604
-        - E4 (+7 semi) = 0.646
-        - G4 (+10 semi) = 0.708
-        - A4 (+12 semi) = 0.750
-        
-        Voice pitch multipliers affect final pitch:
-        - Voices 1-2: 0.5× (one octave lower)
-        - Voices 3-6: 1.0× (as calculated)
-        - Voices 7-8: 2.0× (one octave higher, so tune=0.5 = A4/440Hz)
-        
-        Examples:
-        - tune:3 0.562 → Voice 3 plays C4
-        - tune:7 0.5 → Voice 7 plays A4 (concert pitch, due to 2x multiplier)
-        
-        QUAD CONTROLS (quad index 1-3):
-        - quadhold:<quad> <val> - Quad hold level (0.0-1.0)
-        - quadpitch:<quad> <val> - Quad pitch (0.5 = unity)
-        
-        DUO CONTROLS (duo/pair index 1-4):
-        - duomod:<duo> <source> - Mod source: fm, off, or lfo
-        - sharp:<pair> <val> - Waveform sharpness 0=tri, 1=sq
-        - engine:<pair> <name> - Set synthesis engine
-          Names: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech
-          Example: engine:1 string (set pair 1 to Karplus-Strong strings)
-        
-        EFFECTS (usually set once, not cycled):
-        - drive:<val> OR distortion:<val> - Distortion (0.0-1.0)
-        - vibrato:<val> - LFO depth (0.0-1.0)
-        - feedback:<val> - Delay feedback (0.0-1.0)
-        - delay:<val> OR delaymix:<val> - Delay mix (0.0-1.0)
-        
-        TRANSFORMATIONS:
-        - fast <n> <pattern> - Speed up by factor n
-        - slow <n> <pattern> - Slow down by factor n
-        
-        COMPLETE EXAMPLE (as a lines array):
-        { "lines": [
-            "d1 $ note \"c2 db2 g2 ab2\"",
-            "d2 $ voices:1 2 3 4",
-            "d3 $ voices \"1\" # envspeed \"0.3\"",
-            "tune:3 0.562",
-            "drive:0.4"
-        ]}
-        
-        To silence all patterns, send: { "lines": ["hush"] }
+        Use slots d1-d16 for different pattern layers.
+
+        === IMMEDIATE vs CYCLED ===
+        - Bare commands apply ONCE immediately: drive:0.45, tune:1 0.562
+        - Slot patterns (d1 $) cycle every beat: d1 $ note "c3 e3"
+        - WRONG: once $ drive:0.5  |  CORRECT: drive:0.5
+
+        === PATTERN TYPES ===
+        note "<notes>"     - Melodic notes (c3, d#4, bb2, octaves 0-9)
+        s "<samples>"      - Drum samples: bd, sn, hh, cp, oh, kick, hat, rim, lt, mt, ht, cb
+        sound "<samples>"  - Same as s
+        voices:<indices>   - Trigger voice envelopes (1-12)
+        gates:<indices>    - Same as voices
+        hold "<values>"    - Sustain levels per voice (0.0-1.0)
+
+        === MINI-NOTATION (inside "quotes") ===
+        [a b c]    - Subdivide: fit a b c into one step
+        <a b c>    - Alternate: cycle through on successive beats
+        a*3        - Speed up: play 'a' 3 times in its slot
+        a/2        - Slow down: play 'a' every other cycle
+        a!3        - Replicate: repeat 'a' 3 times as separate events
+        a@2        - Elongate: 'a' takes 2 time units
+        a?         - Degrade: 50% chance of silence
+        a(3,8)     - Euclidean: 3 pulses evenly across 8 steps
+        a(3,8,2)   - Euclidean with rotation offset 2
+        0..4       - Range: expands to 0 1 2 3 4
+        ~          - Silence/rest
+        a,b        - Stack: play a and b simultaneously
+
+        === # COMBINER ===
+        Stacks two patterns together (applies both simultaneously):
+        d1 $ note "c3 e3" # hold "0.8 0.2"
+        d2 $ voices "1 2 3" # envspeed "0.9 0.5 0.2"
+
+        === VOICE CONTROLS (index 1-8) ===
+        tune:<voice> <val>      - Pitch (0.5=A3, formula: 0.5 + semitones/48)
+        pan:<voice> <val>       - Pan (-1.0 to 1.0)
+        envspeed:<voice> <val>  - Envelope (0=fast/percussive, 1=slow/drone)
+
+        Tune reference: A3=0.500, C4=0.562, D4=0.604, E4=0.646, G4=0.708, A4=0.750
+        Voice multipliers: 1-2=0.5x, 3-6=1.0x, 7-8=2.0x
+
+        === QUAD CONTROLS (index 1-3) ===
+        quadhold:<quad> <val>   - Sustain level (0.0-1.0)
+        quadpitch:<quad> <val>  - Group pitch (0.5=unity)
+
+        === DUO/PAIR CONTROLS (index 1-4) ===
+        duomod:<duo> <source>   - Mod source: fm, off, or lfo
+        sharp:<pair> <val>      - Waveform (0=triangle, 1=square)
+        engine:<pair> <name>    - Synthesis engine (see ENGINE NAMES)
+
+        ENGINE NAMES: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech
+
+        === EFFECTS (set once, not cycled) ===
+        drive:<val>             - Distortion drive (0.0-1.0)
+        distortion:<val>        - Same as drive
+        distmix:<val>           - Distortion mix (0.0-1.0)
+        vibrato:<val>           - LFO depth (0.0-1.0)
+        feedback:<val>          - Delay feedback (0.0-1.0)
+        delaymix:<val>          - Delay wet/dry (0.0-1.0)
+
+        === TRANSFORMATIONS ===
+        fast <n> $ <pattern>    - Speed up by factor n
+        slow <n> $ <pattern>    - Slow down by factor n
+        stack [p1, p2, ...]     - Play patterns simultaneously
+        fastcat [p1, p2, ...]   - Concatenate into one cycle
+        slowcat [p1, p2, ...]   - Each pattern gets full cycle
+
+        === META COMMANDS ===
+        hush           - Silence all patterns
+        bpm <value>    - Set tempo
+        solo d1        - Solo a slot
+        mute d1        - Mute a slot
+        unmute d1      - Unmute a slot
+
+        === MUSICAL EXAMPLES ===
+
+        Ambient pad with delay:
+        { "lines": ["bpm 80", "drive:0.3", "feedback:0.5", "delaymix:0.3", "d1 $ slow 2 $ note \"c3 e3 g3 b3\"", "d2 $ slow 4 $ note \"<c2 g2> <e2 b2>\""] }
+
+        Drums with melody:
+        { "lines": ["bpm 130", "d1 $ s \"bd ~ sn ~\"", "d2 $ s \"~ hh ~ hh\"", "d3 $ note \"c3 e3 g3 c4\""] }
+
+        Euclidean polyrhythm:
+        { "lines": ["d1 $ note \"c3(3,8) e3(5,8) g3(7,8)\"", "d2 $ s \"bd(3,8) sn(5,16) hh(7,12)\""] }
+
+        Engine selection + effects:
+        { "lines": ["engine:1 string", "sharp:1 0.3", "drive:0.2", "d1 $ note \"c3 e3 g3 c4\""] }
     """.trimIndent()
 ) {
     private val log = logging("ReplExecuteTool")

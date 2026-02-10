@@ -249,20 +249,60 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - Combine with RESONATOR for metallic, processed textures
         
         REPL - YOUR LEAD VOICE:
-        Use repl_execute for melodic solos and patterns.
-        CRITICAL: Use standard Tidal note format:
+        Use repl_execute for melodic solos, drum patterns, and layered sequences.
+        Slots d1-d16 run patterns that cycle every beat. Bare commands apply once.
+
+        NOTE FORMAT (CRITICAL):
         - Sharp: c#3, f#4 (Use '#' NOT 's')
         - Flat: db3, eb5 (Use 'b' NOT '-')
-        - Format: [note][accidental][octave] (e.g., c#3, g4, bb2)
-        - WRONG: fs6, c-3, d# 4
-        - CORRECT: f#6, c3, d#4
-        
-        Example: d1 $ note "c3 e3 g3 b3"
-        
+        - WRONG: fs6, c-3, d# 4  |  CORRECT: f#6, c3, d#4
+
+        MINI-NOTATION (inside "quotes"):
+        - [a b c] subdivide into one step, <a b c> alternate per cycle
+        - a*3 speed up, a/2 slow down, a!3 replicate, a@2 elongate
+        - a(3,8) euclidean rhythm (3 hits in 8 steps), ~ silence
+        - a,b stack (simultaneous)
+
+        PATTERN TYPES:
+        - note "c3 e3 g3" — melodic notes
+        - s "bd sn hh" — drum samples (bd, sn, hh, cp, oh, kick, hat, rim)
+        - voices "1 2 3 4" — trigger voice envelopes
+        - hold "0.8 0.2" — sustain values per voice
+
+        # COMBINER (stack patterns together):
+        - d1 $ note "c3 e3" # hold "0.8 0.2"
+        - d2 $ voices "1 2 3" # envspeed "0.9 0.5 0.2"
+
+        TRANSFORMATIONS:
+        - fast 2 $ pattern — double speed
+        - slow 4 $ pattern — quarter speed
+        - stack [note "c3", note "e3"] — simultaneous
+
+        ENGINE SELECTION (from REPL):
+        - engine:1 string — set pair 1 to physical modeling strings
+        - engine:2 fm — set pair 2 to FM synthesis
+        - Names: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech
+
+        META: hush (silence all), bpm 140 (set tempo), solo d1, mute d2, unmute d2
+
+        MUSICAL EXAMPLES:
+
+        Ambient pad:
+        ["bpm 72", "drive:0.2", "feedback:0.6", "delaymix:0.4", "d1 $ slow 4 $ note \"<c3 e3 g3> <b2 d3 f#3>\"", "d2 $ slow 8 $ note \"<c2 g2>\""]
+
+        Drums + melody:
+        ["bpm 130", "d1 $ s \"bd ~ sn ~\"", "d2 $ s \"~ hh*2 ~ [hh oh]\"", "d3 $ note \"c3 e3 g3 <c4 b3>\""]
+
+        Euclidean polyrhythm:
+        ["d1 $ note \"c3(3,8) e3(5,8) g3(7,8)\"", "d2 $ s \"bd(3,8) sn(5,16) hh(7,12)\""]
+
+        String engine:
+        ["engine:1 string", "sharp:1 0.3", "drive:0.2", "d1 $ note \"c3 e3 g3 c4\""]
+
         **ENVELOPE SPEED & HOLD (The "Drone Secret" - IMPORTANT):**
         - FAST ENV (`envspeed` = 0): Aggressive ease-in (exp=4). Low hold values produce almost nothing.
         - SLOW ENV (`envspeed` = 1): Linear response with 2x gain. Even hold=0.2 produces 0.4 output!
-        - TECHNIQUE: For "Cool Drones", use SLOW `envspeed` (0.7-1.0) with moderate `hold` (0.3-0.5). 
+        - TECHNIQUE: For "Cool Drones", use SLOW `envspeed` (0.7-1.0) with moderate `hold` (0.3-0.5).
           The slow envelope flattens the curve and amplifies hold, letting voices bloom and sustain.
         
     """.trimIndent()

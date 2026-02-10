@@ -171,7 +171,7 @@ fun LiveCodePanel(
                             fontSize = 10.sp
                         )
                         Text(
-                            text = if (uiState.isPlaying) "Pause" else "Play",
+                            text = if (uiState.isPlaying) "Stop" else "Play",
                             color = if (uiState.isPlaying) OrpheusColors.synthGreen else Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium
@@ -183,6 +183,16 @@ fun LiveCodePanel(
                         fontSize = 9.sp,
                         color = if (uiState.isPlaying) OrpheusColors.neonCyan else MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    // Active slots indicator
+                    if (uiState.activeSlots.isNotEmpty()) {
+                        Text(
+                            text = uiState.activeSlots.sorted().joinToString(" "),
+                            fontSize = 8.sp,
+                            color = OrpheusColors.synthGreen.copy(alpha = 0.8f),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
 
                     Spacer(modifier = Modifier.weight(1f))
 
@@ -259,6 +269,19 @@ fun LiveCodePanel(
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
+                // Keyboard shortcut hints
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "\u2318\u23ce Run block  \u21e7\u23ce Run line  \u2318\u232b Delete line",
+                        fontSize = 8.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        maxLines = 1
+                    )
+                }
+
                 // Code editor with AI loading overlay
                 Card(
                     modifier = Modifier.fillMaxSize()
@@ -321,11 +344,11 @@ fun LiveCodePanel(
                             Box {
                                 if (uiState.code.text.isEmpty() && !uiState.isAiGenerating) {
                                     Text(
-                                        text = "# voices:0 1 2 3\n# fast 2 voices:0 1",
+                                        text = "d1 $ note \"c3 e3 g3\"\nd2 $ s \"bd sn hh\"",
                                         style = TextStyle(
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 11.sp,
-                                            color = Color.Transparent
+                                            color = OrpheusColors.neonCyan.copy(alpha = 0.25f)
                                         )
                                     )
                                 }
@@ -362,7 +385,6 @@ fun LiveCodePanel(
                     }
                 }
             }
-
 
             // Error display (inside the main panel)
             if (uiState.error != null) {

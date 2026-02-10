@@ -567,39 +567,161 @@ class LiveCodeViewModel(
          */
         val EXAMPLES = mapOf(
             "simple" to """
-d1 $ voices:1 2 3 4
+d1 $ note "c3 e3 g3 c4"
+d2 $ voices:1 2 3 4
             """.trimIndent(),
-            
+
             "gadda" to """
 bpm 108
 
-# Add some organ-like sustain
-drive:0.55
-distmix:0.55
-feedback:0.3
+# In-A-Gadda-Da-Vida
+drive:0.6
+distmix:0.6
+feedback:0.35
+delaymix:0.2
+
+# VA organ pad on pair 1 (voices 1-2)
+engine:1 va
+sharp:1 0.7
+tune:1 0.354
+tune:2 0.500
+envspeed:1 0.85
+envspeed:2 0.85
+
+# String bass drone on pair 2 (voices 3-4)
+engine:2 string
+tune:3 0.354
+tune:4 0.354
+envspeed:3 0.8
+envspeed:4 0.8
+
+# FM shimmer on pair 3 (voices 5-6)
+engine:3 fm
+tune:5 0.604
+tune:6 0.500
+envspeed:5 0.7
+envspeed:6 0.7
+
+# Drums - rock groove
+d1 $ s "<[bd ~ sn ~] [bd ~ sn ~] [bd ~ sn ~] [bd ~ sn [sn sn]]>"
+d2 $ s "hh hh <hh oh> hh"
+
+# Organ riff - the iconic melody
+d3 $ note "d3 d3 d3 d3 a3 g#3 g3 f#3"
+
+# Bass line
+d4 $ note "d2@4 [a2 g#2 g2 f#2]"
+
+# High doubling (sparse)
+d5 $ note "d4 ~ d4 ~ [a4 g#4 g4 f#4] ~"
+
+# Organ pad drone (pair 1)
+d6 $ voices "1 2" # hold "0.6"
+
+# Bass drone (pair 2)
+d7 $ slow 2 $ voices "3 ~ 4 ~"
+
+# FM texture (pair 3, euclidean)
+d8 $ voices "5(3,8) 6(5,8)"
+            """.trimIndent(),
+
+            "euclidean" to """
+# Euclidean polyrhythms
+d1 $ note "c3(3,8) e3(5,8) g3(7,8)"
+d2 $ s "bd(3,8) sn(5,16) hh(7,12)"
+d3 $ slow 2 $ note "<c2 g2>(3,8)"
+drive:0.3
+feedback:0.4
+delaymix:0.2
+            """.trimIndent(),
+
+            "ambient" to """
+bpm 72
+drive:0.2
+feedback:0.6
+delaymix:0.4
+
+# Slow evolving pads
+d1 $ slow 4 $ note "<c3 e3 g3> <b2 d3 f#3>"
+d2 $ slow 8 $ note "<c2 g2>"
+d3 $ voices "1 ~ 2 ~" # hold "0.8"
+            """.trimIndent(),
+
+            "drums" to """
+bpm 125
+drive:0.3
+distmix:0.35
+feedback:0.2
 delaymix:0.15
 
-d1 $ note "d3 d3 d3 d3 a3 g#3 g3 f#3"
-d2 $ note "d2@4 [a2 g#2 g2 f#2]"
-d3 $ note "d4 ~ d4 ~ [a4 g#4 g4 f#4] ~"
-d4 $ slow 2 $ note "d2 d2 d2 d2 [a2 g#2 g2 f#2] d2 d2 d2"
+# Kick - steady pulse, extra hit every 4th bar
+d1 $ s "<[bd ~ ~ ~ bd ~ ~ ~] [bd ~ ~ ~ bd ~ ~ ~] [bd ~ ~ ~ bd ~ bd ~] [bd ~ bd ~ bd ~ ~ bd]>"
+
+# Snare backbeat + rimshot ghost notes
+d2 $ s "<[~ ~ sn ~ ~ ~ sn ~] [~ ~ sn ~ ~ rim sn ~] [~ ~ sn ~ ~ ~ sn ~] [~ ~ sn ~ rim sn [sn sn] ~]>"
+
+# Hi-hats - 8ths with open hat accents
+d3 $ s "<[hh hh hh hh hh hh hh hh] [hh hh hh hh hh hh oh hh] [hh hh oh hh hh hh hh hh] [hh hh hh hh oh hh oh oh]>"
+
+# Toms fill every 4th cycle
+d4 $ slow 4 $ s "~ ~ ~ [ht ht mt mt lt lt lt bd]"
+
+# Cowbell + clap accents
+d5 $ s "<[~ ~ ~ cb ~ ~ ~ ~] [~ cp ~ ~ ~ ~ cb ~] [~ ~ ~ cb ~ cp ~ ~] [~ cp ~ cb ~ cp cb ~]>"
+
+# String bass follows the groove
+engine:1 string
+tune:1 0.562
+envspeed:1 0.5
+d6 $ voices "1 ~ 1 ~"
             """.trimIndent(),
-            
-            "euclidean" to """
-d1 $ note "c3(3,8) e3(5,8) g3(3,8)"
-d2 $ voices:1(3,8) 2(5,8) 3(3,8) 4(5,8)
+
+            "engines" to """
+bpm 100
+
+# String bass (pair 1, voices 1-2)
+engine:1 string
+tune:1 0.562
+tune:2 0.562
+envspeed:1 0.7
+envspeed:2 0.7
+
+# FM lead (pair 2, voices 3-4)
+engine:2 fm
+tune:3 0.646
+tune:4 0.708
+envspeed:3 0.3
+envspeed:4 0.3
+
+# Modal bells (pair 3, voices 5-6)
+engine:3 modal
+tune:5 0.750
+tune:6 0.562
+envspeed:5 0.2
+envspeed:6 0.2
+
+drive:0.2
+feedback:0.4
+delaymix:0.3
+
+d1 $ slow 2 $ voices "1 ~ 2 ~"
+d2 $ voices "3 ~ 4 3"
+d3 $ voices "5(3,8) 6(5,8)"
+d4 $ s "bd ~ sn ~"
+d5 $ s "~ hh ~ hh"
             """.trimIndent(),
-            
-            "layered" to """
-d1 $ slow 2 note "<c3 e3> <g3 c4>"
-d2 $ fast 2 voices:5 6 7 8
-d3 $ quadhold:1 0.8
-d4 $ quadpitch:1 0.3
-            """.trimIndent(),
-            
-            "evolving" to """
-d1 $ note "[c2 e2 g2]*2"
-d2 $ slow 4 voices:<1 2> <3 4> <5 6>
+
+            "polyrhythm" to """
+bpm 140
+drive:0.3
+feedback:0.35
+delaymix:0.25
+
+# Layered polyrhythmic patterns
+d1 $ note "[c3 e3 g3]*2"
+d2 $ note "c4(3,8) e4(5,8)"
+d3 $ s "bd(3,8) sn(5,16)"
+d4 $ slow 2 $ note "<c2 g2 e2 b2>"
             """.trimIndent()
         )
 
