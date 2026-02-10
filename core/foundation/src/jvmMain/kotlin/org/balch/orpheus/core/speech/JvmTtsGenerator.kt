@@ -5,15 +5,17 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.sound.sampled.AudioSystem
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class JvmTtsGenerator @Inject constructor() : TtsGenerator {
+class JvmTtsGenerator @Inject constructor(
+    private val dispatcherProvider: DispatcherProvider,
+) : TtsGenerator {
 
     private val log = logging("JvmTtsGenerator")
 
@@ -26,7 +28,7 @@ class JvmTtsGenerator @Inject constructor() : TtsGenerator {
         if (!isAvailable) return emptyList()
         cachedVoices?.let { return it }
 
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             try {
                 val process = ProcessBuilder("say", "-v", "?")
                     .redirectErrorStream(true).start()
@@ -44,7 +46,7 @@ class JvmTtsGenerator @Inject constructor() : TtsGenerator {
                     }
                     .distinct()
                 cachedVoices = voices
-                log.info { "Found ${voices.size} TTS voices" }
+                log.d { "Found ${voices.size} TTS voices" }
                 voices
             } catch (e: Exception) {
                 log.warn { "Failed to list voices: ${e.message}" }
@@ -56,7 +58,7 @@ class JvmTtsGenerator @Inject constructor() : TtsGenerator {
     override suspend fun generate(text: String, voice: String?, speakingRate: Int?): TtsAudioResult? {
         if (!isAvailable) return null
 
-        return withContext(Dispatchers.IO) {
+        return withContext(dispatcherProvider.io) {
             var tmpFile: File? = null
             try {
                 tmpFile = File.createTempFile("orpheus_tts_", ".wav")
