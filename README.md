@@ -14,6 +14,7 @@ Under the hood [JSyn](http://www.softsynth.com/jsyn/) does the heavy audio lifti
 
 I had multiple motivations for building this project, but I mainly did it because I've always wanted to build some kind of instrument, and now AI agents make that possible. AI played a big part in the development and it will be interesting to see what happens when Orpheus controls the synth. 
 
+Keep an eye on [Orphic-FM](https://orphic.fm/) for the latest sonic masterpieces from the palette of the Great Orpheus!!!
 ## Screenshots
 |                       Desktop                       |                       Android                       |
 |:---------------------------------------------------:|:---------------------------------------------------:|

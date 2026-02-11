@@ -118,6 +118,7 @@ class WarpsPlugin(
                     wetGainRight.inputB.set(wet)
                     dryGainLeft.inputB.set(dry)
                     dryGainRight.inputB.set(dry)
+                    warps.setBypass(it <= 0.001f)
                 }
             }
         }

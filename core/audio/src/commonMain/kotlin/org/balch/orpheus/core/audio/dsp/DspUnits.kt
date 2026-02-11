@@ -352,6 +352,9 @@ interface GrainsUnit : AudioUnit {
     /** Configure mode (0 = Granular, 1 = Stretch, 2 = Looping Delay, 3 = Spectral) */
     fun setMode(mode: Int)
 
+    /** Enable/disable bypass (zeroes output, preserves state) */
+    fun setBypass(bypass: Boolean) {}
+
     interface Factory { fun create(): GrainsUnit }
 }
 
@@ -433,6 +436,9 @@ interface ReverbUnit : AudioUnit {
     /** Clear reverb buffer */
     fun clear()
 
+    /** Enable/disable bypass (zeroes output, preserves state) */
+    fun setBypass(bypass: Boolean) {}
+
     interface Factory { fun create(): ReverbUnit }
 }
 
@@ -491,6 +497,9 @@ interface WarpsUnit : AudioUnit {
     val timbre: AudioInput    // Timbre / Modulation parameter
     val level1: AudioInput    // Carrier drive
     val level2: AudioInput    // Modulator drive
+
+    /** Enable/disable bypass (zeroes output, preserves state) */
+    fun setBypass(bypass: Boolean) {}
 
     interface Factory { fun create(): WarpsUnit }
 }

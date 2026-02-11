@@ -60,7 +60,7 @@ class ReverbPlugin(
             floatType {
                 default = 0.3f
                 get { _amount }
-                set { _amount = it; reverbUnit.setAmount(it) }
+                set { _amount = it; reverbUnit.setAmount(it); reverbUnit.setBypass(it <= 0.001f) }
             }
         }
 

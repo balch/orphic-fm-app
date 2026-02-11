@@ -104,7 +104,7 @@ class GrainsPlugin(
         controlPort(GrainsSymbol.DRY_WET) {
             floatType {
                 get { _dryWet }
-                set { _dryWet = it; grains.dryWet.set(it.toDouble()) }
+                set { _dryWet = it; grains.dryWet.set(it.toDouble()); grains.setBypass(it <= 0.001f) }
             }
         }
         

@@ -11,8 +11,9 @@ import org.balch.orpheus.core.audio.dsp.WarpsUnit
 import org.balch.orpheus.plugins.warps.engine.WarpsProcessor
 
 class JsynWarpsUnit : UnitGenerator(), WarpsUnit {
-    
+
     private val processor = WarpsProcessor()
+    @Volatile private var bypass = false
     
     // Audio Ports
     private val jsynInputLeft = UnitInputPort("InputLeft")
@@ -62,10 +63,19 @@ class JsynWarpsUnit : UnitGenerator(), WarpsUnit {
         addPort(jsynLevel2)
     }
 
+    override fun setBypass(bypass: Boolean) { this.bypass = bypass }
+
     override fun generate(start: Int, end: Int) {
         val count = end - start
         if (count <= 0) return
-        
+
+        if (bypass) {
+            val outL = jsynOutputLeft.values
+            val outR = jsynOutputRight.values
+            for (i in start until end) { outL[i] = 0.0; outR[i] = 0.0 }
+            return
+        }
+
         if (leftInBuffer.size < count) {
             leftInBuffer = FloatArray(count)
             rightInBuffer = FloatArray(count)

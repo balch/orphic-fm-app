@@ -12,6 +12,7 @@ import org.balch.orpheus.core.audio.dsp.ReverbUnit
 class JsynReverbUnit : UnitGenerator(), ReverbUnit {
 
     private val reverb = DattorroReverb()
+    @Volatile private var bypass = false
 
     // JSyn ports
     private val jsynInputL = UnitInputPort("InputLeft")
@@ -37,12 +38,17 @@ class JsynReverbUnit : UnitGenerator(), ReverbUnit {
     override fun setLp(lp: Float) { reverb.lp = lp }
     override fun setInputGain(gain: Float) { reverb.inputGain = gain }
     override fun clear() { reverb.clear() }
+    override fun setBypass(bypass: Boolean) { this.bypass = bypass }
 
     override fun generate(start: Int, end: Int) {
-        val inL = jsynInputL.values
-        val inR = jsynInputR.values
         val outL = jsynOutputL.values
         val outR = jsynOutputR.values
+        if (bypass) {
+            for (i in start until end) { outL[i] = 0.0; outR[i] = 0.0 }
+            return
+        }
+        val inL = jsynInputL.values
+        val inR = jsynInputR.values
 
         for (i in start until end) {
             reverb.process(inL[i].toFloat(), inR[i].toFloat())

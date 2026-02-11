@@ -19,6 +19,9 @@ interface AudioEngine {
     /** Add a unit to the synthesis graph */
     fun addUnit(unit: AudioUnit)
 
+    /** Enable or disable a unit in the synthesis graph (disabled units output zero) */
+    fun setUnitEnabled(unit: AudioUnit, enabled: Boolean)
+
     /** Master output - connect final audio here */
     val lineOutLeft: AudioInput
     val lineOutRight: AudioInput

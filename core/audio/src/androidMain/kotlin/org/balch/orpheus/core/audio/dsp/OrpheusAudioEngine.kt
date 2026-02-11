@@ -86,7 +86,30 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
         }
     }
 
-
+    override fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {
+        val ug: com.jsyn.unitgen.UnitGenerator? = when (unit) {
+            is JsynMultiplyWrapper -> unit.jsUnit
+            is JsynAddWrapper -> unit.jsUnit
+            is JsynMultiplyAddWrapper -> unit.jsUnit
+            is JsynPassThroughWrapper -> unit.jsUnit
+            is JsynEnvelope -> unit.jsEnv
+            is JsynDelayLine -> unit.jsDelay
+            is JsynPeakFollowerWrapper -> unit.jsPeak
+            is JsynLimiter -> unit.jsLimiter
+            is JsynSineOscillatorWrapper -> unit.jsOsc
+            is JsynTriangleOscillatorWrapper -> unit.jsOsc
+            is JsynSquareOscillatorWrapper -> unit.jsOsc
+            is JsynSawtoothOscillatorWrapper -> unit.jsOsc
+            is JsynMinimumWrapper -> unit.jsUnit
+            is JsynMaximumWrapper -> unit.jsUnit
+            is JsynLinearRampWrapper -> unit.jsRamp
+            is JsynAutomationPlayer -> unit.reader
+            is JsynTtsPlayerUnit -> unit
+            is com.jsyn.unitgen.UnitGenerator -> unit
+            else -> null
+        }
+        ug?.isEnabled = enabled
+    }
 
     override val lineOutLeft: AudioInput
         get() = JsynAudioInput(lineOutLeftProxy.input)

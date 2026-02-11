@@ -61,6 +61,9 @@ class DspVoiceManager @Inject constructor(
     private val _pairProsody = FloatArray(6) { 0.5f }
     private val _pairSpeed = FloatArray(6) { 0.0f }
 
+    // Voice idle tracking (currently no-op — see DspVoice.setIdle comment)
+    private val _voiceIdle = BooleanArray(12) { false }
+
     // Quad sources
     private val quadPitchSources = IntArray(3) { 0 }
     private val quadTriggerSources = IntArray(3) { 0 }
@@ -69,7 +72,7 @@ class DspVoiceManager @Inject constructor(
     fun initialize() {
         // Set defaults
         voices.forEach { it.couplingDepth.set(0.0) }
-        
+
         // Wire voice coupling (default structure)
         for (pairIndex in 0 until 6) {
             val voiceA = voices[pairIndex * 2]
@@ -77,6 +80,21 @@ class DspVoiceManager @Inject constructor(
             voiceA.envelopeOutput.connect(voiceB.couplingInput)
             voiceB.envelopeOutput.connect(voiceA.couplingInput)
         }
+
+        // REPL voices (8-11) start idle — wake-on-gate handles re-enable
+        for (i in 8 until 12) { setVoiceIdle(i, true) }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Voice Idle Control
+    // ═══════════════════════════════════════════════════════════
+
+    fun isVoiceIdle(index: Int): Boolean = _voiceIdle[index]
+
+    fun setVoiceIdle(index: Int, idle: Boolean) {
+        if (_voiceIdle[index] == idle) return
+        _voiceIdle[index] = idle
+        voices[index].setIdle(idle, audioEngine)
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -113,6 +131,7 @@ class DspVoiceManager @Inject constructor(
     }
 
     fun setVoiceGate(index: Int, active: Boolean) {
+        if (active && _voiceIdle[index]) setVoiceIdle(index, false)
         voices[index].gate.set(if (active) 1.0 else 0.0)
     }
 
@@ -168,6 +187,7 @@ class DspVoiceManager @Inject constructor(
         for (i in startVoice until startVoice + 4) {
             // Skip voices with active drum engines (hold forced to 1.0)
             if (isDrumEngine(_pairEngine[i / 2])) continue
+            if (amount > 0.001f && _voiceIdle[i]) setVoiceIdle(i, false)
             voices[i].setHoldLevel(amount.toDouble())
         }
         pluginProvider.voicePlugin.setQuadHold(quadIndex, amount)
@@ -191,6 +211,7 @@ class DspVoiceManager @Inject constructor(
     }
 
     fun setVoiceHold(index: Int, amount: Float) {
+        if (amount > 0.001f && _voiceIdle[index]) setVoiceIdle(index, false)
         voices[index].setHoldLevel(amount.toDouble())
     }
 
@@ -343,13 +364,15 @@ class DspVoiceManager @Inject constructor(
         if (quadIndex !in 0..2) return
         quadTriggerSources[quadIndex] = sourceIndex
         pluginProvider.voicePlugin.setQuadTriggerSource(quadIndex, sourceIndex)
-        
+
         val voiceIndices = (quadIndex * 4) until ((quadIndex + 1) * 4)
-        
+
         for (i in voiceIndices) {
+            // Wake voices if connecting external trigger
+            if (sourceIndex != 0 && _voiceIdle[i]) setVoiceIdle(i, false)
             val voiceIn = voices[i].gate
             voiceIn.disconnectAll()
-            
+
             when (sourceIndex) {
                 1 -> pluginProvider.fluxPlugin.outputs["outputT1"]?.connect(voiceIn)
                 2 -> pluginProvider.fluxPlugin.outputs["outputT2"]?.connect(voiceIn)

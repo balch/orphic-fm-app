@@ -184,16 +184,6 @@ fun LiveCodePanel(
                         color = if (uiState.isPlaying) OrpheusColors.neonCyan else MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    // Active slots indicator
-                    if (uiState.activeSlots.isNotEmpty()) {
-                        Text(
-                            text = uiState.activeSlots.sorted().joinToString(" "),
-                            fontSize = 8.sp,
-                            color = OrpheusColors.synthGreen.copy(alpha = 0.8f),
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
                     Spacer(modifier = Modifier.weight(1f))
 
                     ExamplesDropdown(

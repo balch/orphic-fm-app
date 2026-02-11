@@ -126,6 +126,13 @@ class DspVoice(
     val plaitsMorphModInput: AudioInput get() = morphModDepth.inputA
     val plaitsMorphModAmount: AudioInput get() = morphModDepth.inputB
 
+    fun setIdle(idle: Boolean, audioEngine: AudioEngine) {
+        // No-op: Disabling JSyn UnitGenerators via isEnabled=false does NOT zero their
+        // outputs — it leaves stale values that corrupt the coupling path and cause audio
+        // blowout. The units disabled (volumeGain, envelopeFollower) are trivially cheap,
+        // so the CPU savings were negligible anyway.
+    }
+
     fun setEngineActive(active: Boolean) {
         oscGain.inputB.set(if (active) 0.0 else 1.0)
         plaitsGain.inputB.set(if (active) 1.0 else 0.0)

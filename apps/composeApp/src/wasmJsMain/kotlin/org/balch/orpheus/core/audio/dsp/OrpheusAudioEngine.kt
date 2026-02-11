@@ -61,7 +61,9 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
         // Web Audio units are automatically part of the graph when connected
         // No explicit "add" needed like JSyn
     }
-    
+
+    override fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) { }
+
 
     
     override val lineOutLeft: AudioInput
