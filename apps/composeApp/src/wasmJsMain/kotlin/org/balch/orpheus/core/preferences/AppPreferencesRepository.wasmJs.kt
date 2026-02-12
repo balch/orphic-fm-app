@@ -4,6 +4,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.w3c.dom.get
 import org.w3c.dom.set
 
@@ -23,24 +24,23 @@ class WasmAppPreferencesRepository : AppPreferencesRepository {
     private val settingsKey = "orpheus_app_preferences"
 
     override suspend fun load(): AppPreferences {
-        return try {
+        return runCatchingSuspend {
             val jsonString = localStorage[settingsKey]
             if (jsonString != null) {
                 json.decodeFromString<AppPreferences>(jsonString)
             } else {
                 AppPreferences()
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to load preferences: ${e.message}" }
-            AppPreferences()
-        }
+        }.getOrDefault(AppPreferences())
     }
 
     override suspend fun save(preferences: AppPreferences) {
-        try {
+        runCatchingSuspend {
             val jsonString = json.encodeToString(preferences)
             localStorage[settingsKey] = jsonString
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to save preferences: ${e.message}" }
         }
     }

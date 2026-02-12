@@ -4,6 +4,7 @@ import android.content.Context
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import java.io.File
 
 /**
@@ -37,57 +38,53 @@ class AndroidSynthPresetRepository(
     }
 
     override suspend fun save(preset: SynthPreset) {
-        try {
+        runCatchingSuspend {
             val file = fileForPreset(preset.name)
             val jsonString = json.encodeToString(preset)
             file.writeText(jsonString)
             log.info { "Saved preset '${preset.name}'" }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to save preset '${preset.name}': ${e.message}" }
         }
     }
 
     override suspend fun load(name: String): SynthPreset? {
-        return try {
+        return runCatchingSuspend {
             val file = fileForPreset(name)
             if (file.exists()) {
                 val jsonString = file.readText()
                 json.decodeFromString<SynthPreset>(jsonString)
             } else null
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to load preset '$name': ${e.message}" }
-            null
-        }
+        }.getOrNull()
     }
 
     override suspend fun delete(name: String) {
-        try {
+        runCatchingSuspend {
             val file = fileForPreset(name)
             if (file.exists()) {
                 file.delete()
                 log.info { "Deleted preset '$name'" }
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to delete preset '$name': ${e.message}" }
         }
     }
 
     override suspend fun list(): List<SynthPreset> {
-        return try {
+        return runCatchingSuspend {
             presetsDir.listFiles()
                 ?.filter { it.extension == "json" }
                 ?.mapNotNull { file ->
-                    try {
+                    runCatchingSuspend {
                         json.decodeFromString<SynthPreset>(file.readText())
-                    } catch (e: Exception) {
-                        null
-                    }
+                    }.getOrNull()
                 }
                 ?.sortedByDescending { it.createdAt }
                 ?: emptyList()
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to list presets: ${e.message}" }
-            emptyList()
-        }
+        }.getOrDefault(emptyList())
     }
 }

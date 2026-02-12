@@ -4,6 +4,7 @@ import android.content.Context
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import java.io.File
 
 /**
@@ -29,24 +30,23 @@ class AndroidAppPreferencesRepository(
     }
 
     override suspend fun load(): AppPreferences {
-        return try {
+        return runCatchingSuspend {
             if (settingsFile.exists()) {
                 val jsonString = settingsFile.readText()
                 json.decodeFromString<AppPreferences>(jsonString)
             } else {
                 AppPreferences()
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to load preferences: ${e.message}" }
-            AppPreferences()
-        }
+        }.getOrDefault(AppPreferences())
     }
 
     override suspend fun save(preferences: AppPreferences) {
-        try {
+        runCatchingSuspend {
             val jsonString = json.encodeToString(preferences)
             settingsFile.writeText(jsonString)
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to save preferences: ${e.message}" }
         }
     }

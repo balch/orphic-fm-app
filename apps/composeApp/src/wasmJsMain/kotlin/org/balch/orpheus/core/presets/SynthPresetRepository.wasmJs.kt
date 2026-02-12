@@ -4,6 +4,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.w3c.dom.get
 import org.w3c.dom.set
 import orpheus.apps.composeapp.generated.resources.Res
@@ -38,10 +39,10 @@ class WasmSynthPresetRepository : SynthPresetRepository {
             "Swirly_Dreams.json"
         )
         bundledPresets.forEach { filename ->
-            try {
+            runCatchingSuspend {
                 val presetName = filename.removeSuffix(".json")
                 val key = keyForPreset(presetName)
-                
+
                 if (localStorage[key] == null) {
                     val path = "files/presets/$filename"
                     val bytes = Res.readBytes(path)
@@ -49,7 +50,7 @@ class WasmSynthPresetRepository : SynthPresetRepository {
                     localStorage[key] = jsonString
                     log.debug { "Copied bundled preset: $filename" }
                 }
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 log.error { "Failed to copy bundled preset $filename: ${e.message}" }
             }
         }
@@ -62,19 +63,19 @@ class WasmSynthPresetRepository : SynthPresetRepository {
 
     override suspend fun save(preset: SynthPreset) {
         ensurePresetsInitialized()
-        try {
+        runCatchingSuspend {
             val key = keyForPreset(preset.name)
             val jsonString = json.encodeToString(preset)
             localStorage[key] = jsonString
             log.info { "Saved preset '${preset.name}'" }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to save preset '${preset.name}': ${e.message}" }
         }
     }
 
     override suspend fun load(name: String): SynthPreset? {
         ensurePresetsInitialized()
-        return try {
+        return runCatchingSuspend {
             val key = keyForPreset(name)
             val jsonString = localStorage[key]
             if (jsonString != null) {
@@ -85,44 +86,42 @@ class WasmSynthPresetRepository : SynthPresetRepository {
                 log.debug { "No preset found: '$name'" }
                 null
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to load preset '$name': ${e.message}" }
-            null
-        }
+        }.getOrNull()
     }
 
     override suspend fun delete(name: String) {
         ensurePresetsInitialized()
-        try {
+        runCatchingSuspend {
             val key = keyForPreset(name)
             localStorage.removeItem(key)
             log.info { "Deleted preset '$name'" }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to delete preset '$name': ${e.message}" }
         }
     }
 
     override suspend fun list(): List<SynthPreset> {
         ensurePresetsInitialized()
-        return try {
+        return runCatchingSuspend {
             val presets = mutableListOf<SynthPreset>()
             for (i in 0 until localStorage.length) {
                 val key = localStorage.key(i)
                 if (key != null && key.startsWith(keyPrefix)) {
-                    try {
+                    runCatchingSuspend {
                         val jsonString = localStorage[key]
                         if (jsonString != null) {
                             presets.add(json.decodeFromString<SynthPreset>(jsonString))
                         }
-                    } catch (e: Exception) {
+                    }.onFailure { e ->
                         log.warn { "Failed to parse preset at key $key: ${e.message}" }
                     }
                 }
             }
             presets.sortedByDescending { it.createdAt }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to list presets: ${e.message}" }
-            emptyList()
-        }
+        }.getOrDefault(emptyList())
     }
 }
