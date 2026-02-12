@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -49,7 +49,7 @@ fun DelayFeedbackPanel(
                 value = uiState.mod1,
                 onValueChange = actions.setMod1,
                 label = "DELAY A",
-                controlId = ControlIds.DELAY_MOD_1,
+                controlId = DelaySymbol.MOD_DEPTH_1.controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )
@@ -57,7 +57,7 @@ fun DelayFeedbackPanel(
                 value = uiState.mod2,
                 onValueChange = actions.setMod2,
                 label = "DELAY B",
-                controlId = ControlIds.DELAY_MOD_2,
+                controlId = DelaySymbol.MOD_DEPTH_2.controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )
@@ -92,7 +92,7 @@ fun DelayFeedbackPanel(
                 value = uiState.time1,
                 onValueChange = actions.setTime1,
                 label = "TIME A",
-                controlId = ControlIds.DELAY_TIME_1,
+                controlId = DelaySymbol.TIME_1.controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )
@@ -100,7 +100,7 @@ fun DelayFeedbackPanel(
                 value = uiState.time2,
                 onValueChange = actions.setTime2,
                 label = "TIME B",
-                controlId = ControlIds.DELAY_TIME_2,
+                controlId = DelaySymbol.TIME_2.controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )
@@ -108,7 +108,7 @@ fun DelayFeedbackPanel(
                 value = uiState.feedback,
                 onValueChange = actions.setFeedback,
                 label = "\u221E", // infinity
-                controlId = ControlIds.DELAY_FEEDBACK,
+                controlId = DelaySymbol.FEEDBACK.controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )
@@ -116,7 +116,7 @@ fun DelayFeedbackPanel(
                 value = uiState.mix,
                 onValueChange = actions.setMix,
                 label = "MIX",
-                controlId = ControlIds.DELAY_MIX,
+                controlId = DelaySymbol.MIX.controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )

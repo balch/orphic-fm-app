@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -44,7 +44,7 @@ fun VoiceColumnMod(
             onValueChange = { voiceActions.setPairMorph(pairIndex, it) },
             label = "\u03C8",
             labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = ControlIds.voiceFmDepth(voiceIndex),
+            controlId = VoiceSymbol.pairMorph(pairIndex).controlId.key,
             size = 28.dp,
             progressColor = OrpheusColors.neonMagenta
         )
@@ -53,7 +53,7 @@ fun VoiceColumnMod(
             onValueChange = { voiceActions.setVoiceTune(voiceIndex, it) },
             label = "\u266B", // eighth notes
             labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = ControlIds.voiceTune(voiceIndex),
+            controlId = VoiceSymbol.tune(voiceIndex).controlId.key,
             size = 28.dp,
             progressColor = OrpheusColors.neonCyan
         )
@@ -62,7 +62,7 @@ fun VoiceColumnMod(
             value = envSpeed,
             onValueChange = { voiceActions.setVoiceEnvelopeSpeed(voiceIndex, it) },
             color = OrpheusColors.neonCyan,
-            controlId = ControlIds.voiceEnvelopeSpeed(voiceIndex)
+            controlId = VoiceSymbol.envSpeed(voiceIndex).controlId.key
         )
     }
 }
@@ -90,7 +90,7 @@ fun VoiceColumnSharp(
             onValueChange = { voiceActions.setPairSharpness(pairIndex, it) },
             label = "\u266F", // sharp
             labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = ControlIds.pairSharpness(pairIndex),
+            controlId = VoiceSymbol.pairSharpness(pairIndex).controlId.key,
             size = 28.dp,
             progressColor = OrpheusColors.synthGreen
         )
@@ -99,7 +99,7 @@ fun VoiceColumnSharp(
             onValueChange = { voiceActions.setVoiceTune(voiceIndex, it) },
             label = "\u266B", // eighth notes
             labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = ControlIds.voiceTune(voiceIndex),
+            controlId = VoiceSymbol.tune(voiceIndex).controlId.key,
             size = 28.dp,
             progressColor = OrpheusColors.neonCyan
         )
@@ -108,7 +108,7 @@ fun VoiceColumnSharp(
             value = envSpeed,
             onValueChange = { voiceActions.setVoiceEnvelopeSpeed(voiceIndex, it) },
             color = OrpheusColors.neonCyan,
-            controlId = ControlIds.voiceEnvelopeSpeed(voiceIndex)
+            controlId = VoiceSymbol.envSpeed(voiceIndex).controlId.key
         )
     }
 }

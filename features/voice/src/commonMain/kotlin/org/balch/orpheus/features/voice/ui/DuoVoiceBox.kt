@@ -27,7 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.VoiceState
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.VOICE_URI
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.midi.MidiUiState
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -66,7 +67,6 @@ fun DuoVoiceBox(
             modifier.widthIn(min = 100.dp)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(8.dp))
-                // Removed hardcoded background - let liquid effect from parent show through
                 .border(2.dp, color.copy(alpha = 0.7f), RoundedCornerShape(8.dp))  // Brighter border
                 .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -97,7 +97,7 @@ fun DuoVoiceBox(
                 activeSource = duoModSource,
                 onSourceChange = { voiceActions.setDuoModSource(pairIndex, it) },
                 color = color,
-                controlId = ControlIds.duoModSource(pairIndex)
+                controlId = VoiceSymbol.duoModSource(pairIndex).controlId.key
             )
         }
 
@@ -141,7 +141,7 @@ fun DuoVoiceBox(
                                 it
                             )
                         },
-                        ControlIds.voiceHold(voiceA)
+                        "$VOICE_URI:hold_$voiceA"
                     )
                     PulseButton(
                         modifier = Modifier.offset(y = (-2).dp),
@@ -210,7 +210,7 @@ fun DuoVoiceBox(
                                 it
                             )
                         },
-                        ControlIds.voiceHold(voiceB)
+                        "$VOICE_URI:hold_$voiceB"
                     )
                     PulseButton(
                         modifier = Modifier.offset(y = (-2).dp),

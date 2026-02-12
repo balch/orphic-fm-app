@@ -21,7 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.audio.StereoMode
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
+import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -65,7 +66,7 @@ fun DistortionPanel(
                     value = uiState.drive,
                     onValueChange = actions.setDrive,
                     label = "DISTORTION",
-                    controlId = ControlIds.DRIVE,
+                    controlId = DistortionSymbol.DRIVE.controlId.key,
                     size = 56.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
@@ -73,7 +74,7 @@ fun DistortionPanel(
                     value = uiState.mix,
                     onValueChange = actions.setMix,
                     label = "MIX",
-                    controlId = ControlIds.DISTORTION_MIX,
+                    controlId = DistortionSymbol.MIX.controlId.key,
                     size = 56.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
@@ -88,7 +89,7 @@ fun DistortionPanel(
                     value = uiState.volume,
                     onValueChange = actions.setVolume,
                     label = "VOL",
-                    controlId = ControlIds.MASTER_VOLUME,
+                    controlId = StereoSymbol.MASTER_VOL.controlId.key,
                     size = 56.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )
@@ -98,7 +99,7 @@ fun DistortionPanel(
                         actions.setMasterPan((normalized * 2f) - 1f)
                     },
                     label = "PAN",
-                    controlId = "stereo_pan",
+                    controlId = StereoSymbol.MASTER_PAN.controlId.key,
                     size = 56.dp,
                     progressColor = OrpheusColors.neonMagenta
                 )

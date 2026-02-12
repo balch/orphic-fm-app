@@ -38,7 +38,7 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.VoiceState
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
@@ -116,7 +116,7 @@ fun CompactStringPanel(
                 value = voiceState.quadGroupPitches.getOrElse(0) { 0.5f },
                 onValueChange = { actions.setQuadPitch(0, it) },
                 label = "PITCH",
-                controlId = ControlIds.quadPitch(0),
+                controlId = VoiceSymbol.quadPitch(0).controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.neonMagenta
             )
@@ -125,7 +125,7 @@ fun CompactStringPanel(
                 value = voiceState.quadGroupHolds.getOrElse(0) { 0f },
                 onValueChange = { actions.setQuadHold(0, it) },
                 label = "HOLD",
-                controlId = ControlIds.quadHold(0),
+                controlId = VoiceSymbol.quadHold(0).controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )
@@ -215,7 +215,7 @@ fun CompactStringPanel(
                 value = voiceState.quadGroupPitches.getOrElse(1) { 0.5f },
                 onValueChange = { actions.setQuadPitch(1, it) },
                 label = "PITCH",
-                controlId = ControlIds.quadPitch(1),
+                controlId = VoiceSymbol.quadPitch(1).controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.synthGreen
             )
@@ -224,7 +224,7 @@ fun CompactStringPanel(
                 value = voiceState.quadGroupHolds.getOrElse(1) { 0f },
                 onValueChange = { actions.setQuadHold(1, it) },
                 label = "HOLD",
-                controlId = ControlIds.quadHold(1),
+                controlId = VoiceSymbol.quadHold(1).controlId.key,
                 size = 40.dp,
                 progressColor = OrpheusColors.warmGlow
             )

@@ -32,7 +32,7 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
@@ -590,7 +590,7 @@ class VoiceViewModel(
         engine.setBend(amount)
         val vizKnob2Value = (amount + 1f) / 2f
         synthController.emitControlChange(
-            ControlIds.VIZ_KNOB_2,
+            VizSymbol.KNOB_2.controlId.key,
             vizKnob2Value,
             ControlEventOrigin.UI
         )
@@ -598,7 +598,7 @@ class VoiceViewModel(
 
     fun releaseBend() {
         engine.setBend(0f)
-        synthController.emitControlChange(ControlIds.VIZ_KNOB_2, 0.5f, ControlEventOrigin.UI)
+        synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, 0.5f, ControlEventOrigin.UI)
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -609,17 +609,17 @@ class VoiceViewModel(
         engine.setStringBend(stringIndex, bendAmount, voiceMix)
         val vizValue = (bendAmount + 1f) / 2f
         if (stringIndex == 0) {
-            synthController.emitControlChange(ControlIds.VIZ_KNOB_1, vizValue, ControlEventOrigin.UI)
+            synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, vizValue, ControlEventOrigin.UI)
         } else if (stringIndex == 3) {
-            synthController.emitControlChange(ControlIds.VIZ_KNOB_2, vizValue, ControlEventOrigin.UI)
+            synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, vizValue, ControlEventOrigin.UI)
         }
     }
 
     fun releaseStringBend(stringIndex: Int): Int {
         if (stringIndex == 0) {
-            synthController.emitControlChange(ControlIds.VIZ_KNOB_1, 0.5f, ControlEventOrigin.UI)
+            synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, 0.5f, ControlEventOrigin.UI)
         } else if (stringIndex == 3) {
-            synthController.emitControlChange(ControlIds.VIZ_KNOB_2, 0.5f, ControlEventOrigin.UI)
+            synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, 0.5f, ControlEventOrigin.UI)
         }
         return engine.releaseStringBend(stringIndex)
     }

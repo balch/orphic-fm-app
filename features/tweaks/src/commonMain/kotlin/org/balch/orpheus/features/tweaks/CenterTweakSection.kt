@@ -18,7 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
@@ -69,7 +69,7 @@ fun CenterControlSection(
             onValueChange = actions.setTotalFeedback,
             label = "\u221E\u221E", // infinity",
             labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = ControlIds.TOTAL_FEEDBACK,
+            controlId = VoiceSymbol.TOTAL_FEEDBACK.controlId.key,
             size = 32.dp,
             progressColor = OrpheusColors.neonCyan
         )
@@ -79,7 +79,7 @@ fun CenterControlSection(
             onValueChange = actions.setVibrato,
             label = "\u2307",
             labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = ControlIds.VIBRATO,
+            controlId = VoiceSymbol.VIBRATO.controlId.key,
             size = 32.dp,
             progressColor = OrpheusColors.neonMagenta
         )
@@ -89,7 +89,7 @@ fun CenterControlSection(
             onValueChange = actions.setVoiceCoupling,
             label = "\u2A1D",  // join
             labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = ControlIds.VOICE_COUPLING,
+            controlId = VoiceSymbol.COUPLING.controlId.key,
             size = 32.dp,
             progressColor = OrpheusColors.warmGlow
         )

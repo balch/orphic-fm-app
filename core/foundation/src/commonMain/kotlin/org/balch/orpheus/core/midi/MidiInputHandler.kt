@@ -5,6 +5,9 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
+import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import kotlin.math.roundToInt
 
 /**
@@ -85,8 +88,7 @@ class MidiInputHandler(
     // ═══════════════════════════════════════════════════════════
 
     private fun applyCCToControl(controlId: String, value: Float) {
-        val isCycle = controlId == MidiMappingState.Companion.ControlIds.HYPER_LFO_MODE ||
-                (controlId.startsWith("pair_") && controlId.endsWith("_mod_source"))
+        val isCycle = isCycleControl(controlId)
 
         var effectiveValue = value
 
@@ -125,11 +127,20 @@ class MidiInputHandler(
     }
 
     private fun isCycleControl(controlId: String): Boolean {
-        return controlId == MidiMappingState.Companion.ControlIds.HYPER_LFO_MODE ||
-                (controlId.startsWith("pair_") && controlId.endsWith("_mod_source"))
+        return controlId == DuoLfoSymbol.MODE.controlId.key ||
+                (controlId.startsWith("$VOICE_URI:") && controlId.contains("duo_mod_source"))
     }
 
     private fun dispatchControlChange(controlId: String, value: Float) {
-        synthController.emitControlChange(controlId, value, ControlEventOrigin.MIDI)
+        // Try to route through the typed plugin control system first
+        val routed = synthController.setPluginControlByKey(
+            controlId,
+            PortValue.FloatValue(value),
+            ControlEventOrigin.MIDI
+        )
+        // Fall back to legacy event emission for non-plugin controls
+        if (!routed) {
+            synthController.emitControlChange(controlId, value, ControlEventOrigin.MIDI)
+        }
     }
 }

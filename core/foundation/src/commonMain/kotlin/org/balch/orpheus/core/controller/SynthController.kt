@@ -255,6 +255,21 @@ class SynthController @Inject constructor() {
         return pluginPortGetter?.invoke(id)
     }
 
+    /**
+     * Set a plugin control value by its string key (format "pluginUri:symbol").
+     *
+     * Used by MidiInputHandler to bridge MIDI CC values into the typed plugin control system.
+     *
+     * @param key The control key in "uri:symbol" format
+     * @param value The port value to set
+     * @param origin The source of this change
+     * @return true if the key was parsed and the port was set successfully
+     */
+    fun setPluginControlByKey(key: String, value: PortValue, origin: ControlEventOrigin): Boolean {
+        val id = PluginControlId.parse(key) ?: return false
+        return setPluginControl(id, value, origin)
+    }
+
     // ═══════════════════════════════════════════════════════════
     // LEGACY CONTROL EVENT METHODS
     // ═══════════════════════════════════════════════════════════

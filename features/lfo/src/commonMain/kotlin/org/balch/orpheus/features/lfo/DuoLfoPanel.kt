@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.audio.HyperLfoMode
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
@@ -62,7 +62,7 @@ fun DuoLfoPanel(
                 HorizontalSwitch3Way(
                     modifier =
                         Modifier
-                            .learnable(ControlIds.HYPER_LFO_MODE, learnState),
+                            .learnable(DuoLfoSymbol.MODE.controlId.key, learnState),
                     startText = "&&",
                     endText = "||",
                     state = when (uiState.mode) {
@@ -86,7 +86,7 @@ fun DuoLfoPanel(
                     value = uiState.lfoA,
                     onValueChange = actions.setLfoA,
                     label = "RATE 1",
-                    controlId = ControlIds.HYPER_LFO_A,
+                    controlId = DuoLfoSymbol.FREQ_A.controlId.key,
                     size = 64.dp,
                     progressColor =
                         if (isActive) OrpheusColors.neonCyan
@@ -108,7 +108,7 @@ fun DuoLfoPanel(
             ) {
                 // LINK Toggle (Right) - Horizontal
                 HorizontalToggle(
-                    modifier = Modifier.learnable(ControlIds.HYPER_LFO_LINK, learnState),
+                    modifier = Modifier.learnable(DuoLfoSymbol.LINK.controlId.key, learnState),
                     startLabel = "🔗", // Link
                     endLabel = "○", // Off (or ∅)
                     isStart = uiState.linkEnabled,
@@ -119,7 +119,7 @@ fun DuoLfoPanel(
                     value = uiState.lfoB,
                     onValueChange = actions.setLfoB,
                     label = "RATE 2",
-                    controlId = ControlIds.HYPER_LFO_B,
+                    controlId = DuoLfoSymbol.FREQ_B.controlId.key,
                     size = 64.dp,
                     progressColor =
                         if (isActive) OrpheusColors.neonCyan

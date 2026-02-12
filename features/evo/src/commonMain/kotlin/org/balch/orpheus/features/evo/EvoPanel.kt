@@ -29,7 +29,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.EvoSymbol
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
@@ -78,7 +78,7 @@ fun EvoPanel(
                 value = uiState.knob1Value,
                 onValueChange = evoFeature.actions.setKnob1,
                 label = if (uiState.isEnabled) uiState.selectedStrategy.knob1Label else "-",
-                controlId = ControlIds.EVO_DEPTH,
+                controlId = EvoSymbol.DEPTH.controlId.key,
                 size = 64.dp,
                 progressColor = accentColor,
                 trackColor = accentColor.copy(alpha = 0.3f),
@@ -90,7 +90,7 @@ fun EvoPanel(
                 value = uiState.knob2Value,
                 onValueChange = evoFeature.actions.setKnob2,
                 label = if (uiState.isEnabled) uiState.selectedStrategy.knob2Label else "-",
-                controlId = ControlIds.EVO_RATE,
+                controlId = EvoSymbol.RATE.controlId.key,
                 size = 64.dp,
                 progressColor = accentColor,
                 trackColor = accentColor.copy(alpha = 0.3f),

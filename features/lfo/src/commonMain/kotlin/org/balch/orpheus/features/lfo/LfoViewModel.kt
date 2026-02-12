@@ -77,7 +77,7 @@ class LfoViewModel @Inject constructor(
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), LfoFeature {
 
-    // PluginControlIds for DuoLfo plugin (using plugin-api symbols)
+    // Control flows for DuoLfo plugin (using plugin-api symbols)
     private val freqAId = synthController.controlFlow(DuoLfoSymbol.FREQ_A.controlId)
     private val freqBId = synthController.controlFlow(DuoLfoSymbol.FREQ_B.controlId)
     private val modeId = synthController.controlFlow(DuoLfoSymbol.MODE.controlId)

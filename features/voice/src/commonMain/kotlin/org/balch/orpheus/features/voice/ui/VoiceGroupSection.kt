@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiUiState
@@ -148,7 +148,7 @@ fun VoiceGroupSectionLayout(
                 label = "\u266B", // eighth notes
                 labelStyle = MaterialTheme.typography.labelLarge,
                 labelColor = quadColor,
-                controlId = ControlIds.quadPitch(quadIndex),
+                controlId = VoiceSymbol.quadPitch(quadIndex).controlId.key,
                 size = 36.dp,
                 progressColor = quadColor
             )
@@ -159,7 +159,7 @@ fun VoiceGroupSectionLayout(
                 },
                 label = "\u25AC", // tenuto
                 labelStyle = MaterialTheme.typography.labelLarge,
-                controlId = ControlIds.quadHold(quadIndex),
+                controlId = VoiceSymbol.quadHold(quadIndex).controlId.key,
                 size = 36.dp,
                 progressColor = OrpheusColors.warmGlow
             )

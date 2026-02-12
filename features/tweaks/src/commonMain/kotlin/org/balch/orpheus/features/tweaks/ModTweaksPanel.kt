@@ -20,7 +20,8 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
 import org.balch.orpheus.features.voice.VoicePanelActions
@@ -79,7 +80,7 @@ fun ModTweaksPanel(
                 onValueChange = { actions.setBpm(it.toDouble()) },
                 label = "BPM",
                 range = 60f..200f,
-                controlId = ControlIds.BPM,
+                controlId = BeatsSymbol.BPM.controlId.key,
                 size = 52.dp,
                 progressColor = OrpheusColors.neonMagenta
             )
@@ -88,7 +89,7 @@ fun ModTweaksPanel(
                 value = voiceState.totalFeedback,
                 onValueChange = actions.setTotalFeedback,
                 label = "\u221E\u221E", // infinity",
-                controlId = ControlIds.TOTAL_FEEDBACK,
+                controlId = VoiceSymbol.TOTAL_FEEDBACK.controlId.key,
                 size = 52.dp,
                 progressColor = OrpheusColors.neonCyan
             )
@@ -97,7 +98,7 @@ fun ModTweaksPanel(
                 value = voiceState.vibrato,
                 onValueChange = actions.setVibrato,
                 label = "VIB",
-                controlId = ControlIds.VIBRATO,
+                controlId = VoiceSymbol.VIBRATO.controlId.key,
                 size = 52.dp,
                 progressColor = OrpheusColors.neonMagenta
             )
@@ -106,7 +107,7 @@ fun ModTweaksPanel(
                 value = voiceState.voiceCoupling,
                 onValueChange = actions.setVoiceCoupling,
                 label = "COUPLING",
-                controlId = ControlIds.VOICE_COUPLING,
+                controlId = VoiceSymbol.COUPLING.controlId.key,
                 size = 52.dp,
                 progressColor = OrpheusColors.warmGlow
             )

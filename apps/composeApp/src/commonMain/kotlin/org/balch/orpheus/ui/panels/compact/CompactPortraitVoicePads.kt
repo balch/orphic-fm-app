@@ -23,7 +23,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.core.audio.VoiceState
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
@@ -183,7 +183,7 @@ private fun VoiceColumn(
                     onPulseStart = { actions.pulseStart(voiceIndex) },
                     onPulseEnd = { actions.pulseEnd(voiceIndex) },
                     color = colors.getOrElse(index) { OrpheusColors.neonCyan },
-                    controlId = ControlIds.voiceTune(voiceIndex)
+                    controlId = VoiceSymbol.tune(voiceIndex).controlId.key
                 )
             }
         }
@@ -214,7 +214,7 @@ private fun QuadControls(
             value = pitch,
             onValueChange = onPitchChange,
             label = "PITCH",
-            controlId = ControlIds.quadPitch(quadIndex),
+            controlId = VoiceSymbol.quadPitch(quadIndex).controlId.key,
             size = 36.dp,
             progressColor = color
         )
@@ -222,7 +222,7 @@ private fun QuadControls(
             value = hold,
             onValueChange = onHoldChange,
             label = "HOLD",
-            controlId = ControlIds.quadHold(quadIndex),
+            controlId = VoiceSymbol.quadHold(quadIndex).controlId.key,
             size = 36.dp,
             progressColor = OrpheusColors.warmGlow
         )

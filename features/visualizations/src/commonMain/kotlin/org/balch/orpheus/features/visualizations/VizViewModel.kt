@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.midi.MidiMappingState.Companion.ControlIds
+import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.visualizations.viz.OffViz
@@ -108,13 +108,15 @@ class VizViewModel(
             }
         }
         
-        // Subscribe to control changes for viz knobs
+        // Subscribe to viz knob control flows (bidirectional with MIDI)
         viewModelScope.launch(dispatcherProvider.default) {
-            synthController.onControlChange.collect { event ->
-                when (event.controlId) {
-                    ControlIds.VIZ_KNOB_1 -> onKnob1Change(event.value)
-                    ControlIds.VIZ_KNOB_2 -> onKnob2Change(event.value)
-                }
+            synthController.controlFlow(VizSymbol.KNOB_1.controlId).collect { value ->
+                onKnob1Change(value.asFloat())
+            }
+        }
+        viewModelScope.launch(dispatcherProvider.default) {
+            synthController.controlFlow(VizSymbol.KNOB_2.controlId).collect { value ->
+                onKnob2Change(value.asFloat())
             }
         }
     }
