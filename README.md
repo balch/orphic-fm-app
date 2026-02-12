@@ -102,7 +102,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
-> `local.properties` is gitignored and will not be committed. The keys are injected at build time via [BuildKonfig](https://github.com/nichenqin/buildkonfig). The app builds and runs without them -- the AI agent simply won't be available.
+> `local.properties` is gitignored and will not be committed. The keys are injected at build time via [BuildKonfig](https://github.com/nichenqin/buildkonfig). The app builds and runs without them allowing the user to add their own AI API key at runtime. 
 
 ### Commands
 
@@ -136,7 +136,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 | [Koog](https://github.com/JetBrains/koog) | AI agent framework with Gemini integration |
 | [Ktor](https://ktor.io/) | Kotlin async HTTP client |
 | [KmLogging](https://github.com/DiamondEdge1/KmLogging) | Kotlin Multiplatform structured logging|
-| [Markdown Rende(https://github.com/mikepenz/multiplatform-markdown-renderer) | Multiplatform Markdown rendering for Compose by Mike Penz |
+| [Markdown Renderer](https://github.com/mikepenz/multiplatform-markdown-renderer) | Multiplatform Markdown rendering for Compose by Mike Penz |
 | [BuildKonfig](https://plugins.gradle.org/plugin/com.codingfeline.buildkonfig) | Cross-platform BuildConfig for KMP |
 | [Logback](https://logback.qos.ch/) | JVM logging framework |
 
