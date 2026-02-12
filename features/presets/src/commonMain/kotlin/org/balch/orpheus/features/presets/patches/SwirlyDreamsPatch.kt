@@ -36,6 +36,14 @@ class SwirlyDreamsPatch : SynthPatch {
             val modDepths = listOf(0.6f, 0.5f, 0.6f, 0.5f, 0.6f, 0.5f, 0.6f, 0.5f)
             modDepths.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:mod_depth_$i", PortValue.FloatValue(v)) }
 
+            // Pair morph — heavy detune for swirly chorus-like detuning
+            val pairMorphs = listOf(0.40f, 0.35f, 0.45f, 0.30f)
+            pairMorphs.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_morph_$i", PortValue.FloatValue(v)) }
+
+            // Pair mod depth — deep LFO-driven timbre modulation
+            val pairModDepths = listOf(0.55f, 0.50f, 0.55f, 0.50f)
+            pairModDepths.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_mod_depth_$i", PortValue.FloatValue(v)) }
+
             val envSpeeds = listOf(0.4f, 0.4f, 0.5f, 0.5f, 0.6f, 0.6f, 0.7f, 0.7f)
             envSpeeds.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:env_speed_$i", PortValue.FloatValue(v)) }
 

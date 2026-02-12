@@ -11,6 +11,7 @@ import org.balch.orpheus.core.audio.dsp.PlaitsUnit
 import org.balch.orpheus.plugins.plaits.engine.SpeechEngine
 import kotlin.math.absoluteValue
 import kotlin.math.exp
+import kotlin.math.ln
 import kotlin.math.sign
 import kotlin.math.tanh
 
@@ -26,6 +27,7 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
         /** Sub-block size matching Plaits' internal rendering granularity. */
         private const val PLAITS_BLOCK_SIZE = 24
         private const val SAMPLE_RATE = 44100f
+        private const val LN2 = 0.6931472f
     }
 
     // JSyn ports
@@ -33,9 +35,11 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
     private val jsynTriggerInput = UnitInputPort("Trigger")
     private val jsynTimbreInput = UnitInputPort("TimbreMod")
     private val jsynMorphInput = UnitInputPort("MorphMod")
+    private val jsynFrequencyInput = UnitInputPort("Frequency")
 
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
     override val triggerInput: AudioInput = JsynAudioInput(jsynTriggerInput)
+    override val frequencyInput: AudioInput = JsynAudioInput(jsynFrequencyInput)
     override val timbreInput: AudioInput = JsynAudioInput(jsynTimbreInput)
     override val morphInput: AudioInput = JsynAudioInput(jsynMorphInput)
 
@@ -71,6 +75,7 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
         addPort(jsynTriggerInput)
         addPort(jsynTimbreInput)
         addPort(jsynMorphInput)
+        addPort(jsynFrequencyInput)
     }
 
     override fun setEngine(engine: Any?) {
@@ -103,6 +108,7 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
         val trigInputs = jsynTriggerInput.values
         val timbreModValues = jsynTimbreInput.values
         val morphModValues = jsynMorphInput.values
+        val freqValues = jsynFrequencyInput.values
         val eng = engine
 
         if (eng == null) {
@@ -161,9 +167,15 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
             val timbreMod = timbreModValues[start + offset].toFloat()
             val morphMod = morphModValues[start + offset].toFloat()
 
+            // Convert audio-rate frequency (Hz) to MIDI note, falling back to control-rate _note
+            val freqHz = freqValues[start + offset].toFloat()
+            val note = if (freqHz > 1f) {
+                69f + 12f * ln(freqHz / 440f) / LN2
+            } else _note
+
             reusableParams.set(
                 trigger = triggerState,
-                note = _note,
+                note = note,
                 timbre = (_timbre + timbreMod).coerceIn(0f, 1f),
                 morph = (_morph + morphMod).coerceIn(0f, 1f),
                 harmonics = _harmonics,

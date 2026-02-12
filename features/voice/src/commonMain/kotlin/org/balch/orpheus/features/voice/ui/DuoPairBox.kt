@@ -34,26 +34,27 @@ import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.EnginePickerButton
-import org.balch.orpheus.ui.widgets.ModSourceSelector
+import org.balch.orpheus.ui.widgets.ModFaderSelector
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.engineLabel
 
 @Composable
-fun DuoPairBox(
+fun DuoVoiceBox(
     modifier: Modifier = Modifier,
     voiceA: Int,
     voiceB: Int,
     color: Color,
     voiceStateA: VoiceState,
     voiceStateB: VoiceState,
-    modDepthA: Float,
     sharpness: Float,
     envSpeedA: Float,
     envSpeedB: Float,
     duoModSource: ModSource,
     pairEngine: Int,
     pairHarmonics: Float,
+    pairMorph: Float,
+    pairModDepth: Float,
     midiState: MidiUiState,
     voiceActions: VoiceActions,
     midiActions: MidiActions,
@@ -71,7 +72,7 @@ fun DuoPairBox(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Full-width header bar with Duo label and LFO toggle
+        // Full-width header bar with Duo label, mod depth, and mod source selector
         Row(
             modifier =
                 Modifier.fillMaxWidth()
@@ -90,12 +91,11 @@ fun DuoPairBox(
 
             val pairIndex = voiceA / 2
 
-            // Mod Source Selector (Cycles: OFF -> LFO -> FM -> FLUX)
-            ModSourceSelector(
+            ModFaderSelector(
+                depth = pairModDepth,
+                onDepthChange = { voiceActions.setPairModDepth(pairIndex, it) },
                 activeSource = duoModSource,
-                onSourceChange = { newSource ->
-                    voiceActions.setDuoModSource(pairIndex, newSource)
-                },
+                onSourceChange = { voiceActions.setDuoModSource(pairIndex, it) },
                 color = color,
                 controlId = ControlIds.duoModSource(pairIndex)
             )
@@ -122,10 +122,9 @@ fun DuoPairBox(
                     voiceIndex = voiceA,
                     pairIndex = pairIndex,
                     tune = voiceStateA.tune,
-                    modDepth = modDepthA,
+                    pairMorph = pairMorph,
                     envSpeed = envSpeedA,
                     voiceActions = voiceActions,
-                    isPlaitsActive = pairEngine != 0
                 )
 
                 // Buttons
@@ -276,7 +275,7 @@ fun DuoPairBox(
 
 @Preview
 @Composable
-fun DuoPairBoxPreview() {
+fun DuoVoiceBoxPreview() {
     val voiceFeature = VoiceViewModel.previewFeature()
     val midiFeature = MidiViewModel.previewFeature()
     val voiceState by voiceFeature.stateFlow.collectAsState()
@@ -285,19 +284,20 @@ fun DuoPairBoxPreview() {
     val midiActions = midiFeature.actions.toMidiActions()
 
     LiquidPreviewContainerWithGradient {
-        DuoPairBox(
+        DuoVoiceBox(
             voiceA = 0,
             voiceB = 1,
             color = OrpheusColors.evoGold,
             voiceStateA = voiceState.voiceStates[0],
             voiceStateB = voiceState.voiceStates[1],
-            modDepthA = voiceState.voiceModDepths[0],
             sharpness = voiceState.pairSharpness[0],
             envSpeedA = voiceState.voiceEnvelopeSpeeds[0],
             envSpeedB = voiceState.voiceEnvelopeSpeeds[1],
             duoModSource = voiceState.duoModSources[0],
             pairEngine = voiceState.pairEngines[0],
             pairHarmonics = voiceState.pairHarmonics[0],
+            pairMorph = voiceState.pairMorphs[0],
+            pairModDepth = voiceState.pairModDepths[0],
             midiState = midiState,
             voiceActions = voiceActions,
             midiActions = midiActions,

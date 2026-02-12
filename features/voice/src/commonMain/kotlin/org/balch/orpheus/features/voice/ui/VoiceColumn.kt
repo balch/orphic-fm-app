@@ -27,10 +27,9 @@ fun VoiceColumnMod(
     voiceIndex: Int,
     pairIndex: Int,
     tune: Float,
-    modDepth: Float,
+    pairMorph: Float,
     envSpeed: Float,
     voiceActions: VoiceActions,
-    isPlaitsActive: Boolean = false,
 ) {
     Column(
         modifier =
@@ -41,9 +40,9 @@ fun VoiceColumnMod(
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
         RotaryKnob(
-            value = modDepth,
-            onValueChange = { voiceActions.setDuoModDepth(pairIndex, it) },
-            label = if (isPlaitsActive) "M" else "\u0394",
+            value = pairMorph,
+            onValueChange = { voiceActions.setPairMorph(pairIndex, it) },
+            label = "\u03C8",
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = ControlIds.voiceFmDepth(voiceIndex),
             size = 28.dp,
@@ -126,7 +125,7 @@ fun VoiceColumnModPreview() {
             voiceIndex = 0,
             pairIndex = 0,
             tune = voiceState.voiceStates[0].tune,
-            modDepth = voiceState.voiceModDepths[0],
+            pairMorph = voiceState.pairMorphs[0],
             envSpeed = voiceState.voiceEnvelopeSpeeds[0],
             voiceActions = voiceActions,
             modifier = Modifier.padding(16.dp)

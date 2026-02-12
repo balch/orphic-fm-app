@@ -99,6 +99,20 @@ enum class VoiceSymbol(
     PAIR_SPEED_4("pair_speed_4", displayName = "Pair Speed 4"),
     PAIR_SPEED_5("pair_speed_5", displayName = "Pair Speed 5"),
 
+    PAIR_MORPH_0("pair_morph_0", displayName = "Pair Morph 0"),
+    PAIR_MORPH_1("pair_morph_1", displayName = "Pair Morph 1"),
+    PAIR_MORPH_2("pair_morph_2", displayName = "Pair Morph 2"),
+    PAIR_MORPH_3("pair_morph_3", displayName = "Pair Morph 3"),
+    PAIR_MORPH_4("pair_morph_4", displayName = "Pair Morph 4"),
+    PAIR_MORPH_5("pair_morph_5", displayName = "Pair Morph 5"),
+
+    PAIR_MOD_DEPTH_0("pair_mod_depth_0", displayName = "Pair Mod Depth 0"),
+    PAIR_MOD_DEPTH_1("pair_mod_depth_1", displayName = "Pair Mod Depth 1"),
+    PAIR_MOD_DEPTH_2("pair_mod_depth_2", displayName = "Pair Mod Depth 2"),
+    PAIR_MOD_DEPTH_3("pair_mod_depth_3", displayName = "Pair Mod Depth 3"),
+    PAIR_MOD_DEPTH_4("pair_mod_depth_4", displayName = "Pair Mod Depth 4"),
+    PAIR_MOD_DEPTH_5("pair_mod_depth_5", displayName = "Pair Mod Depth 5"),
+
     // Per-quad (×3)
     QUAD_PITCH_0("quad_pitch_0", displayName = "Quad Pitch 0"),
     QUAD_PITCH_1("quad_pitch_1", displayName = "Quad Pitch 1"),
@@ -140,6 +154,8 @@ enum class VoiceSymbol(
         private val pairHarmonics = arrayOf(PAIR_HARMONICS_0, PAIR_HARMONICS_1, PAIR_HARMONICS_2, PAIR_HARMONICS_3, PAIR_HARMONICS_4, PAIR_HARMONICS_5)
         private val pairProsodies = arrayOf(PAIR_PROSODY_0, PAIR_PROSODY_1, PAIR_PROSODY_2, PAIR_PROSODY_3, PAIR_PROSODY_4, PAIR_PROSODY_5)
         private val pairSpeeds = arrayOf(PAIR_SPEED_0, PAIR_SPEED_1, PAIR_SPEED_2, PAIR_SPEED_3, PAIR_SPEED_4, PAIR_SPEED_5)
+        private val pairMorphs = arrayOf(PAIR_MORPH_0, PAIR_MORPH_1, PAIR_MORPH_2, PAIR_MORPH_3, PAIR_MORPH_4, PAIR_MORPH_5)
+        private val pairModDepths = arrayOf(PAIR_MOD_DEPTH_0, PAIR_MOD_DEPTH_1, PAIR_MOD_DEPTH_2, PAIR_MOD_DEPTH_3, PAIR_MOD_DEPTH_4, PAIR_MOD_DEPTH_5)
         private val quadPitches = arrayOf(QUAD_PITCH_0, QUAD_PITCH_1, QUAD_PITCH_2)
         private val quadHolds = arrayOf(QUAD_HOLD_0, QUAD_HOLD_1, QUAD_HOLD_2)
         private val quadVolumes = arrayOf(QUAD_VOLUME_0, QUAD_VOLUME_1, QUAD_VOLUME_2)
@@ -156,6 +172,8 @@ enum class VoiceSymbol(
         fun pairHarmonics(index: Int): VoiceSymbol = pairHarmonics[index]
         fun pairProsody(index: Int): VoiceSymbol = pairProsodies[index]
         fun pairSpeed(index: Int): VoiceSymbol = pairSpeeds[index]
+        fun pairMorph(index: Int): VoiceSymbol = pairMorphs[index]
+        fun pairModDepth(index: Int): VoiceSymbol = pairModDepths[index]
         fun quadPitch(index: Int): VoiceSymbol = quadPitches[index]
         fun quadHold(index: Int): VoiceSymbol = quadHolds[index]
         fun quadVolume(index: Int): VoiceSymbol = quadVolumes[index]

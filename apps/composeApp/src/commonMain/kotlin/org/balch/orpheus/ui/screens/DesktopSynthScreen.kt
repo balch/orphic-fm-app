@@ -36,6 +36,8 @@ import org.balch.orpheus.features.drum.DrumFeature
 import org.balch.orpheus.features.drum.DrumViewModel
 import org.balch.orpheus.features.evo.EvoFeature
 import org.balch.orpheus.features.evo.EvoViewModel
+import org.balch.orpheus.features.flux.FluxFeature
+import org.balch.orpheus.features.flux.FluxViewModel
 import org.balch.orpheus.features.grains.GrainsFeature
 import org.balch.orpheus.features.grains.GrainsViewModel
 import org.balch.orpheus.features.lfo.LfoFeature
@@ -48,6 +50,8 @@ import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
 import org.balch.orpheus.features.resonator.ResonatorFeature
 import org.balch.orpheus.features.resonator.ResonatorViewModel
+import org.balch.orpheus.features.reverb.ReverbFeature
+import org.balch.orpheus.features.reverb.ReverbViewModel
 import org.balch.orpheus.features.speech.SpeechFeature
 import org.balch.orpheus.features.speech.SpeechViewModel
 import org.balch.orpheus.features.tidal.LiveCodeFeature
@@ -95,6 +99,8 @@ fun DesktopSynthScreen(
     looperFeature: LooperFeature = LooperViewModel.feature(),
     resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
     speechFeature: SpeechFeature = SpeechViewModel.feature(),
+    reverbFeature: ReverbFeature = ReverbViewModel.feature(),
+    fluxFeature: FluxFeature = FluxViewModel.feature(),
     effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
     isDialogActive: Boolean = false,
     onDialogActiveChange: (Boolean) -> Unit,
@@ -141,6 +147,7 @@ fun DesktopSynthScreen(
                 modifier = Modifier.fillMaxWidth()
                     .weight(0.75f),
                 headerFeature = headerFeature,
+                voiceFeature = voiceFeature,
                 grainsFeature = grainsFeature,
                 presetsFeature = presetsFeature,
                 midiFeature = midiFeature,
@@ -157,6 +164,8 @@ fun DesktopSynthScreen(
                 resonatorFeature = resonatorFeature,
                 looperFeature = looperFeature,
                 speechFeature = speechFeature,
+                reverbFeature = reverbFeature,
+                fluxFeature = fluxFeature,
                 onDialogActiveChange = onDialogActiveChange,
             )
 
@@ -238,6 +247,8 @@ private fun DesktopSynthScreenPreview(
             resonatorFeature = ResonatorViewModel.previewFeature(),
             looperFeature = LooperViewModel.previewFeature(),
             speechFeature = SpeechViewModel.previewFeature(),
+            reverbFeature = ReverbViewModel.previewFeature(),
+            fluxFeature = FluxViewModel.previewFeature(),
             effects = effects,
             onDialogActiveChange = {},
             focusRequester = FocusRequester()

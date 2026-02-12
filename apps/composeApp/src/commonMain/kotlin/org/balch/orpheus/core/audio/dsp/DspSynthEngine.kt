@@ -155,6 +155,8 @@ class DspSynthEngine @Inject constructor(
                     "pair_harmonics" -> voiceManager.setPairHarmonics(index, value as Float)
                     "pair_prosody" -> voiceManager.setPairProsody(index, value as Float)
                     "pair_speed" -> voiceManager.setPairSpeed(index, value as Float)
+                    "pair_morph" -> voiceManager.setPairMorph(index, value as Float)
+                    "pair_mod_depth" -> voiceManager.setPairModDepth(index, value as Float)
                     "quad_pitch" -> voiceManager.setQuadPitch(index, value as Float)
                     "quad_hold" -> voiceManager.setQuadHold(index, value as Float)
                     "quad_volume" -> voiceManager.setQuadVolume(index, value as Float)

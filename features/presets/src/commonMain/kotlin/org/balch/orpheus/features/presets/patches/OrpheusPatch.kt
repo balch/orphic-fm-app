@@ -65,6 +65,15 @@ class OrpheusPatch : SynthPatch {
             val harmonics = listOf(0.15f, 0.45f, 0.6f, 0.35f, 0.0f, 0.0f)
             harmonics.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_harmonics_$i", PortValue.FloatValue(v)) }
 
+            // Pair morph — engine 0 gets warm detune, Plaits engines get character
+            // engines: 0=Default, 10=String, 8=Additive, 7=VirtualAnalog, 0, 0
+            val pairMorphs = listOf(0.20f, 0.35f, 0.45f, 0.30f, 0.0f, 0.0f)
+            pairMorphs.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_morph_$i", PortValue.FloatValue(v)) }
+
+            // Pair mod depth — FM depth for engine 0, timbre mod for Plaits
+            val pairModDepths = listOf(0.60f, 0.25f, 0.30f, 0.49f, 0.0f, 0.0f)
+            pairModDepths.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_mod_depth_$i", PortValue.FloatValue(v)) }
+
             val lfoUri = DuoLfoPlugin.URI
             put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.01f))
             put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.02875f))

@@ -6,7 +6,6 @@ import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.plugins.plaits.PlaitsEngineFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngineId
-import kotlin.math.log2
 import kotlin.math.pow
 
 /**
@@ -60,6 +59,8 @@ class DspVoiceManager @Inject constructor(
     private val _pairHarmonics = FloatArray(6) { 0.0f }
     private val _pairProsody = FloatArray(6) { 0.5f }
     private val _pairSpeed = FloatArray(6) { 0.0f }
+    private val _pairMorph = FloatArray(6) { 0.0f }
+    private val _pairModDepth = FloatArray(6) { 0.0f }
 
     // Voice idle tracking (currently no-op — see DspVoice.setIdle comment)
     private val _voiceIdle = BooleanArray(12) { false }
@@ -116,12 +117,7 @@ class DspVoiceManager @Inject constructor(
         val pitchMultiplier = 2.0.pow((quadPitch - 0.5) * 2.0)
         val finalFreq = baseFreq * pitchMultiplier
         voices[index].frequency.set(finalFreq)
-
-        // Update Plaits note (control-rate)
-        if (_pairEngine[index / 2] != 0) {
-            val midiNote = 69.0 + 12.0 * log2(finalFreq / 440.0)
-            voices[index].plaits.setNote(midiNote.toFloat())
-        }
+        // Plaits gets frequency via audio-rate frequencyInput (connected to couplingMixer.output)
 
         // Update string pluck frequency if this is the primary voice (A) of a pair
         if (index % 2 == 0) {
@@ -138,25 +134,12 @@ class DspVoiceManager @Inject constructor(
     fun setVoiceFmDepth(index: Int, amount: Float) {
         _voiceFmDepth[index] = amount
         voices[index].fmDepth.set(amount.toDouble())
-        updateVoiceMorph(index)
-        // Update Plaits timbre mod depth when mod source is active
-        val pairIndex = index / 2
-        if (_pairEngine[pairIndex] != 0) {
-            val modSource = _duoModSource[pairIndex]
-            if (modSource == ModSource.LFO || modSource == ModSource.FLUX) {
-                voices[index].plaitsTimbreModAmount.set(amount.toDouble())
-            }
-        }
         pluginProvider.voicePlugin.setModDepth(index, amount)
     }
 
     fun setVoiceEnvelopeSpeed(index: Int, speed: Float) {
         _voiceEnvelopeSpeed[index] = speed
         voices[index].setEnvelopeSpeed(speed)
-        // For drum/speech engines, envSpeed drives morph (decay time / phoneme address)
-        if (usesMorphFromEnvSpeed(_pairEngine[index / 2])) {
-            voices[index].plaits.setMorph(speed)
-        }
         pluginProvider.voicePlugin.setEnvSpeed(index, speed)
     }
 
@@ -243,8 +226,8 @@ class DspVoiceManager @Inject constructor(
                 if (plaitsActive) {
                     pluginProvider.hyperLfo.output.connect(voices[voiceA].plaitsTimbreModInput)
                     pluginProvider.hyperLfo.output.connect(voices[voiceB].plaitsTimbreModInput)
-                    voices[voiceA].plaitsTimbreModAmount.set(_voiceFmDepth[voiceA].toDouble())
-                    voices[voiceB].plaitsTimbreModAmount.set(_voiceFmDepth[voiceB].toDouble())
+                    voices[voiceA].plaitsTimbreModAmount.set(_pairModDepth[duoIndex].toDouble())
+                    voices[voiceB].plaitsTimbreModAmount.set(_pairModDepth[duoIndex].toDouble())
                 }
             }
             ModSource.VOICE_FM -> {
@@ -275,9 +258,33 @@ class DspVoiceManager @Inject constructor(
                     voices[voiceA].output.connect(voices[voiceB].modInput)
                     voices[voiceB].output.connect(voices[voiceA].modInput)
                 }
-                // No audio-rate Plaits mod for VOICE_FM (oscillator cross-mod only)
-                voices[voiceA].plaitsTimbreModAmount.set(0.0)
-                voices[voiceB].plaitsTimbreModAmount.set(0.0)
+                if (plaitsActive) {
+                    // Plaits bypasses oscillator FM — route cross-voice signal to timbre mod instead
+                    if (_fmStructureCrossQuad) {
+                        when (duoIndex) {
+                            0 -> {
+                                voices[6].output.connect(voices[voiceA].plaitsTimbreModInput)
+                                voices[7].output.connect(voices[voiceB].plaitsTimbreModInput)
+                            }
+                            2 -> {
+                                voices[2].output.connect(voices[voiceA].plaitsTimbreModInput)
+                                voices[3].output.connect(voices[voiceB].plaitsTimbreModInput)
+                            }
+                            else -> {
+                                voices[voiceA].output.connect(voices[voiceB].plaitsTimbreModInput)
+                                voices[voiceB].output.connect(voices[voiceA].plaitsTimbreModInput)
+                            }
+                        }
+                    } else {
+                        voices[voiceA].output.connect(voices[voiceB].plaitsTimbreModInput)
+                        voices[voiceB].output.connect(voices[voiceA].plaitsTimbreModInput)
+                    }
+                    voices[voiceA].plaitsTimbreModAmount.set(_pairModDepth[duoIndex].toDouble())
+                    voices[voiceB].plaitsTimbreModAmount.set(_pairModDepth[duoIndex].toDouble())
+                } else {
+                    voices[voiceA].plaitsTimbreModAmount.set(0.0)
+                    voices[voiceB].plaitsTimbreModAmount.set(0.0)
+                }
             }
             ModSource.FLUX -> {
                 pluginProvider.fluxPlugin.outputs["output"]?.connect(voices[voiceA].modInput)
@@ -285,8 +292,8 @@ class DspVoiceManager @Inject constructor(
                 if (plaitsActive) {
                     pluginProvider.fluxPlugin.outputs["output"]?.connect(voices[voiceA].plaitsTimbreModInput)
                     pluginProvider.fluxPlugin.outputs["output"]?.connect(voices[voiceB].plaitsTimbreModInput)
-                    voices[voiceA].plaitsTimbreModAmount.set(_voiceFmDepth[voiceA].toDouble())
-                    voices[voiceB].plaitsTimbreModAmount.set(_voiceFmDepth[voiceB].toDouble())
+                    voices[voiceA].plaitsTimbreModAmount.set(_pairModDepth[duoIndex].toDouble())
+                    voices[voiceB].plaitsTimbreModAmount.set(_pairModDepth[duoIndex].toDouble())
                 }
             }
         }
@@ -410,10 +417,15 @@ class DspVoiceManager @Inject constructor(
             // Apply self-feedback from harmonics
             updateVoiceHarmonics(voiceA)
             updateVoiceHarmonics(voiceB)
+            // Apply detune from morph (engine 0: morph = detune)
+            applyMorph(pairIndex, voiceA, voiceB)
         } else {
             // Clear self-feedback before switching to Plaits
             voices[voiceA].feedbackAmount.set(0.0)
             voices[voiceB].feedbackAmount.set(0.0)
+            // Reset detune from engine 0
+            voices[voiceA].resetDetune()
+            voices[voiceB].resetDetune()
 
             val engineId = PlaitsEngineId.entries[engineOrdinal - 1]
             voices[voiceA].plaits.setEngine(engineFactory.create(engineId))
@@ -435,13 +447,8 @@ class DspVoiceManager @Inject constructor(
             updateVoiceFrequency(voiceB)
             updateVoiceTimbre(voiceA)
             updateVoiceTimbre(voiceB)
-            updateVoiceMorph(voiceA)
-            updateVoiceMorph(voiceB)
-            // Sync morph from envSpeed for engines that use envSpeed→morph routing
-            if (usesMorphFromEnvSpeed(engineOrdinal)) {
-                voices[voiceA].plaits.setMorph(_voiceEnvelopeSpeed[voiceA])
-                voices[voiceB].plaits.setMorph(_voiceEnvelopeSpeed[voiceB])
-            }
+            // Apply morph from independent pairMorph parameter
+            applyMorph(pairIndex, voiceA, voiceB)
             updateVoiceHarmonics(voiceA)
             updateVoiceHarmonics(voiceB)
             // Apply speech-specific parameters when switching to Speech engine
@@ -451,6 +458,8 @@ class DspVoiceManager @Inject constructor(
                 voices[voiceA].plaits.setSpeechSpeed(_pairSpeed[pairIndex])
                 voices[voiceB].plaits.setSpeechSpeed(_pairSpeed[pairIndex])
             }
+            // Apply mod depth (timbre mod amount for Plaits)
+            applyModDepth(pairIndex, voiceA, voiceB)
             // Refresh mod source routing for new engine type
             setDuoModSource(pairIndex, _duoModSource[pairIndex])
         }
@@ -471,31 +480,9 @@ class DspVoiceManager @Inject constructor(
         }
     }
 
-    /**
-     * Engines where envSpeed drives morph (phoneme/decay parameter) rather than fmDepth.
-     * Includes drum engines (morph=decay) and Speech (morph=phoneme/word address).
-     */
-    private fun usesMorphFromEnvSpeed(engineOrdinal: Int): Boolean {
-        if (engineOrdinal == 0) return false
-        return when (PlaitsEngineId.entries[engineOrdinal - 1]) {
-            PlaitsEngineId.ANALOG_BASS_DRUM, PlaitsEngineId.ANALOG_SNARE_DRUM,
-            PlaitsEngineId.METALLIC_HI_HAT, PlaitsEngineId.FM_DRUM,
-            PlaitsEngineId.MODAL, PlaitsEngineId.SPEECH -> true
-            else -> false
-        }
-    }
-
     private fun updateVoiceTimbre(index: Int) {
         if (_pairEngine[index / 2] != 0) {
             voices[index].plaits.setTimbre(_pairSharpness[index / 2])
-        }
-    }
-
-    private fun updateVoiceMorph(index: Int) {
-        val pairIndex = index / 2
-        val engineOrd = _pairEngine[pairIndex]
-        if (engineOrd != 0 && !usesMorphFromEnvSpeed(engineOrd)) {
-            voices[index].plaits.setMorph(_voiceFmDepth[index])
         }
     }
 
@@ -545,6 +532,58 @@ class DspVoiceManager @Inject constructor(
 
     fun getPairSpeed(pairIndex: Int) = _pairSpeed.getOrElse(pairIndex) { 0.0f }
 
+    fun setPairMorph(pairIndex: Int, value: Float) {
+        if (pairIndex !in 0..5) return
+        _pairMorph[pairIndex] = value
+        val voiceA = pairIndex * 2
+        val voiceB = voiceA + 1
+        applyMorph(pairIndex, voiceA, voiceB)
+        pluginProvider.voicePlugin.setPairMorph(pairIndex, value)
+    }
+
+    fun getPairMorph(pairIndex: Int) = _pairMorph.getOrElse(pairIndex) { 0.0f }
+
+    fun setPairModDepth(pairIndex: Int, value: Float) {
+        if (pairIndex !in 0..5) return
+        _pairModDepth[pairIndex] = value
+        val voiceA = pairIndex * 2
+        val voiceB = voiceA + 1
+        // Set FM depth for both voices in the pair
+        voices[voiceA].fmDepth.set(value.toDouble())
+        voices[voiceB].fmDepth.set(value.toDouble())
+        _voiceFmDepth[voiceA] = value
+        _voiceFmDepth[voiceB] = value
+        applyModDepth(pairIndex, voiceA, voiceB)
+        pluginProvider.voicePlugin.setPairModDepth(pairIndex, value)
+    }
+
+    fun getPairModDepth(pairIndex: Int) = _pairModDepth.getOrElse(pairIndex) { 0.0f }
+
+    private fun applyMorph(pairIndex: Int, voiceA: Int, voiceB: Int) {
+        val value = _pairMorph[pairIndex]
+        if (_pairEngine[pairIndex] == 0) {
+            // Engine 0: detune between pair voices (0→0 cents, 1→50 cents)
+            val detuneCents = value * MAX_DETUNE_CENTS
+            voices[voiceA].setDetune(detuneCents / 2.0)
+            voices[voiceB].setDetune(-detuneCents / 2.0)
+        } else {
+            // Plaits: set morph parameter
+            voices[voiceA].plaits.setMorph(value)
+            voices[voiceB].plaits.setMorph(value)
+        }
+    }
+
+    private fun applyModDepth(pairIndex: Int, voiceA: Int, voiceB: Int) {
+        val value = _pairModDepth[pairIndex]
+        if (_pairEngine[pairIndex] != 0) {
+            val modSource = _duoModSource[pairIndex]
+            if (modSource == ModSource.LFO || modSource == ModSource.FLUX || modSource == ModSource.VOICE_FM) {
+                voices[voiceA].plaitsTimbreModAmount.set(value.toDouble())
+                voices[voiceB].plaitsTimbreModAmount.set(value.toDouble())
+            }
+        }
+    }
+
     fun getPairEngine(pairIndex: Int) = _pairEngine.getOrElse(pairIndex) { 0 }
 
     // Getters
@@ -567,4 +606,8 @@ class DspVoiceManager @Inject constructor(
     fun getVoiceTuneArrayCopy() = _voiceTune.copyOf()
     fun getQuadPitchArrayCopy() = _quadPitch.copyOf()
     fun getQuadHoldArrayCopy() = _quadHold.copyOf()
+
+    companion object {
+        private const val MAX_DETUNE_CENTS = 50.0
+    }
 }

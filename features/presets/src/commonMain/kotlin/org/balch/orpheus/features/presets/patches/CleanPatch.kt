@@ -46,6 +46,10 @@ class CleanPatch : SynthPatch {
             List(4) { 0f }.forEachIndexed { i, v ->
                  put("org.balch.orpheus.plugins.voice:pair_sharpness_$i", PortValue.FloatValue(v))
             }
+            List(4) { 0f }.forEachIndexed { i, v ->
+                 put("org.balch.orpheus.plugins.voice:pair_morph_$i", PortValue.FloatValue(v))
+                 put("org.balch.orpheus.plugins.voice:pair_mod_depth_$i", PortValue.FloatValue(v))
+            }
             List(4) { ModSource.OFF }.forEachIndexed { i, v ->
                  put("org.balch.orpheus.plugins.voice:duo_mod_source_$i", PortValue.IntValue(v.ordinal))
             }

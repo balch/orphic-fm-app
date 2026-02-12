@@ -29,11 +29,11 @@ data class SynthControlArgs(
 
         GLOBAL: VIBRATO, DRIVE, DISTORTION_MIX, VOICE_COUPLING, TOTAL_FEEDBACK
 
-        VOICES (1-12): VOICE_TUNE_1..12, VOICE_FM_DEPTH_1..12, VOICE_ENV_SPEED_1..12
+        VOICES (1-12): VOICE_TUNE_1..12, VOICE_ENV_SPEED_1..12
 
         QUADS (1-3): QUAD_PITCH_1..3, QUAD_HOLD_1..3, QUAD_VOLUME_1..3
 
-        PAIRS (1-6): DUO_MOD_SOURCE_1..6, PAIR_SHARPNESS_1..6, VOICE_ENGINE_1..6, VOICE_ENGINE_HARMONICS_1..6, VOICE_PROSODY_1..6, VOICE_SPEED_1..6
+        PAIRS (1-6): DUO_MOD_SOURCE_1..6, PAIR_SHARPNESS_1..6, VOICE_ENGINE_1..6, VOICE_ENGINE_HARMONICS_1..6, VOICE_MORPH_1..6, VOICE_MOD_DEPTH_1..6, VOICE_PROSODY_1..6, VOICE_SPEED_1..6
 
         LFO: HYPER_LFO_A, HYPER_LFO_B, HYPER_LFO_MODE, HYPER_LFO_LINK
 
@@ -91,7 +91,8 @@ data class SynthControlArgs(
           - Use Waveshaping for aggressive, distorted timbres
           - Combine different engines across pairs for rich layered sounds
           - PAIR_SHARPNESS controls timbre for the active engine
-          - VOICE_FM_DEPTH controls morph parameter for Plaits engines
+          - VOICE_MORPH controls morph/character for Plaits engines (detune for OSC engine 0)
+          - VOICE_MOD_DEPTH controls FM depth (engine 0) or LFO/Flux timbre modulation depth (Plaits)
 
         Use uppercase names (e.g., MATRIX_ALGORITHM, VOICE_TUNE_1).
     """)
@@ -311,6 +312,22 @@ class SynthControlTool @Inject constructor(
         "VOICE_ENGINE_HARMONICS_4" -> VoiceSymbol.pairHarmonics(3)
         "VOICE_ENGINE_HARMONICS_5" -> VoiceSymbol.pairHarmonics(4)
         "VOICE_ENGINE_HARMONICS_6" -> VoiceSymbol.pairHarmonics(5)
+
+        // Voice morph (1-indexed → 0-indexed)
+        "VOICE_MORPH_1" -> VoiceSymbol.pairMorph(0)
+        "VOICE_MORPH_2" -> VoiceSymbol.pairMorph(1)
+        "VOICE_MORPH_3" -> VoiceSymbol.pairMorph(2)
+        "VOICE_MORPH_4" -> VoiceSymbol.pairMorph(3)
+        "VOICE_MORPH_5" -> VoiceSymbol.pairMorph(4)
+        "VOICE_MORPH_6" -> VoiceSymbol.pairMorph(5)
+
+        // Voice mod depth (1-indexed → 0-indexed)
+        "VOICE_MOD_DEPTH_1" -> VoiceSymbol.pairModDepth(0)
+        "VOICE_MOD_DEPTH_2" -> VoiceSymbol.pairModDepth(1)
+        "VOICE_MOD_DEPTH_3" -> VoiceSymbol.pairModDepth(2)
+        "VOICE_MOD_DEPTH_4" -> VoiceSymbol.pairModDepth(3)
+        "VOICE_MOD_DEPTH_5" -> VoiceSymbol.pairModDepth(4)
+        "VOICE_MOD_DEPTH_6" -> VoiceSymbol.pairModDepth(5)
 
         // Speech parameters (1-indexed → 0-indexed)
         "VOICE_PROSODY_1" -> VoiceSymbol.pairProsody(0)

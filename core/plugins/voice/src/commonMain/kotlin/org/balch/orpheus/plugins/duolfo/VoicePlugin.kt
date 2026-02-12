@@ -67,6 +67,8 @@ class VoicePlugin : DspPlugin {
     private val _pairHarmonics = FloatArray(6) { 0.0f }
     private val _pairProsody = FloatArray(6) { 0.5f }
     private val _pairSpeed = FloatArray(6) { 0.0f }
+    private val _pairMorph = FloatArray(6) { 0.0f }
+    private val _pairModDepth = FloatArray(6) { 0.0f }
 
     private val portDefs = ports(startIndex = 0) {
         // Voice Params (0-11)
@@ -165,6 +167,26 @@ class VoicePlugin : DspPlugin {
                     set {
                         _pairSpeed[i] = it
                         listener?.onVoiceParamChange(i, "pair_speed", it)
+                    }
+                }
+            }
+            controlPort(VoiceSymbol.pairMorph(i)) {
+                floatType {
+                    default = 0.0f
+                    get { _pairMorph[i] }
+                    set {
+                        _pairMorph[i] = it
+                        listener?.onVoiceParamChange(i, "pair_morph", it)
+                    }
+                }
+            }
+            controlPort(VoiceSymbol.pairModDepth(i)) {
+                floatType {
+                    default = 0.0f
+                    get { _pairModDepth[i] }
+                    set {
+                        _pairModDepth[i] = it
+                        listener?.onVoiceParamChange(i, "pair_mod_depth", it)
                     }
                 }
             }
@@ -300,6 +322,8 @@ class VoicePlugin : DspPlugin {
     fun setPairHarmonics(i: Int, v: Float) { _pairHarmonics[i] = v }
     fun setPairProsody(i: Int, v: Float) { _pairProsody[i] = v }
     fun setPairSpeed(i: Int, v: Float) { _pairSpeed[i] = v }
+    fun setPairMorph(i: Int, v: Float) { _pairMorph[i] = v }
+    fun setPairModDepth(i: Int, v: Float) { _pairModDepth[i] = v }
 
     fun setFmStructure(v: Boolean) { _fmStructureCrossQuad = v }
     fun setTotalFeedback(v: Float) { _totalFeedback = v }

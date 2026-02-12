@@ -230,6 +230,9 @@ interface PlaitsUnit : AudioUnit {
     /** Set speech speed (0..1). Only meaningful for Speech engine. */
     fun setSpeechSpeed(value: Float) {}
 
+    /** Audio-rate frequency input (Hz). When connected, overrides control-rate setNote(). */
+    val frequencyInput: AudioInput
+
     /** Audio-rate timbre modulation input (additive, -1..1 range) */
     val timbreInput: AudioInput
 

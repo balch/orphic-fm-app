@@ -133,6 +133,19 @@ class DspVoice(
         // so the CPU savings were negligible anyway.
     }
 
+    /**
+     * Apply detune by adjusting the pitch scaler multiplier.
+     * @param cents Detune amount in cents (positive = sharp, negative = flat)
+     */
+    fun setDetune(cents: Double) {
+        pitchScaler.inputB.set(pitchMultiplier * 2.0.pow(cents / 1200.0))
+    }
+
+    /** Reset detune back to the base pitch multiplier. */
+    fun resetDetune() {
+        pitchScaler.inputB.set(pitchMultiplier)
+    }
+
     fun setEngineActive(active: Boolean) {
         oscGain.inputB.set(if (active) 0.0 else 1.0)
         plaitsGain.inputB.set(if (active) 1.0 else 0.0)
@@ -327,6 +340,9 @@ class DspVoice(
         // Gate fanout: splits gate to envelope AND plaits trigger
         gateFanout.output.connect(ampEnv.input)
         gateFanout.output.connect(plaitsUnit.triggerInput)
+
+        // Plaits frequency input: couplingMixer carries full modulated frequency (base*pitch + cv + vibrato + bender + coupling)
+        couplingMixer.output.connect(plaitsUnit.frequencyInput)
 
         // Plaits modulation wiring: modDepth outputs → plaits timbre/morph inputs
         timbreModDepth.output.connect(plaitsUnit.timbreInput)

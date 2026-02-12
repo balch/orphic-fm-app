@@ -201,40 +201,42 @@ fun VoiceGroupSectionLayout(
             modifier = Modifier.fillMaxWidth().weight(1f),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            DuoPairBox(
+            DuoVoiceBox(
                 voiceA = voiceStartIndex,
                 voiceB = voiceStartIndex + 1,
                 color = duoColors[0],
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 voiceStateA = voiceState.voiceStates[voiceStartIndex],
                 voiceStateB = voiceState.voiceStates[voiceStartIndex + 1],
-                modDepthA = voiceState.voiceModDepths[voiceStartIndex],
                 sharpness = voiceState.pairSharpness[voiceStartIndex / 2],
                 envSpeedA = voiceState.voiceEnvelopeSpeeds[voiceStartIndex],
                 envSpeedB = voiceState.voiceEnvelopeSpeeds[voiceStartIndex + 1],
                 duoModSource = voiceState.duoModSources[voiceStartIndex / 2],
                 pairEngine = voiceState.pairEngines[voiceStartIndex / 2],
                 pairHarmonics = voiceState.pairHarmonics[voiceStartIndex / 2],
+                pairMorph = voiceState.pairMorphs[voiceStartIndex / 2],
+                pairModDepth = voiceState.pairModDepths[voiceStartIndex / 2],
                 midiState = midiState,
                 voiceActions = voiceActions,
                 midiActions = midiActions,
                 isVoiceBeingLearned = isVoiceBeingLearned,
                 aiVoiceEngineHighlight = voiceState.aiVoiceEngineHighlights[voiceStartIndex / 2]
             )
-            DuoPairBox(
+            DuoVoiceBox(
                 voiceA = voiceStartIndex + 2,
                 voiceB = voiceStartIndex + 3,
                 color = duoColors[1],
                 modifier = Modifier.weight(1f).fillMaxHeight(),
                 voiceStateA = voiceState.voiceStates[voiceStartIndex + 2],
                 voiceStateB = voiceState.voiceStates[voiceStartIndex + 3],
-                modDepthA = voiceState.voiceModDepths[voiceStartIndex + 2],
                 sharpness = voiceState.pairSharpness[(voiceStartIndex + 2) / 2],
                 envSpeedA = voiceState.voiceEnvelopeSpeeds[voiceStartIndex + 2],
                 envSpeedB = voiceState.voiceEnvelopeSpeeds[voiceStartIndex + 3],
                 duoModSource = voiceState.duoModSources[(voiceStartIndex + 2) / 2],
                 pairEngine = voiceState.pairEngines[(voiceStartIndex + 2) / 2],
                 pairHarmonics = voiceState.pairHarmonics[(voiceStartIndex + 2) / 2],
+                pairMorph = voiceState.pairMorphs[(voiceStartIndex + 2) / 2],
+                pairModDepth = voiceState.pairModDepths[(voiceStartIndex + 2) / 2],
                 midiState = midiState,
                 voiceActions = voiceActions,
                 midiActions = midiActions,
