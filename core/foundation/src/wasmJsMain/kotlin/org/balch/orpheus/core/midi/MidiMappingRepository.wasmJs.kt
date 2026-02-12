@@ -3,6 +3,7 @@ package org.balch.orpheus.core.midi
 import com.diamondedge.logging.logging
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.w3c.dom.get
 import org.w3c.dom.set
 
@@ -26,46 +27,45 @@ actual class MidiMappingRepository actual constructor() {
     }
 
     actual suspend fun save(deviceName: String, mapping: MidiMappingState) {
-        try {
+        runCatchingSuspend {
             val key = keyForDevice(deviceName)
             val jsonString = json.encodeToString(mapping.forPersistence())
             localStorage[key] = jsonString
             log.info { "Saved MIDI mappings for '$deviceName' to localStorage" }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to save MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
     actual suspend fun load(deviceName: String): MidiMappingState? {
-        return try {
+        return runCatchingSuspend {
             val key = keyForDevice(deviceName)
             val jsonString = localStorage[key]
             if (jsonString != null) {
                 val mapping = json.decodeFromString<MidiMappingState>(jsonString)
-                log.info { "Loaded MIDI mappings for '$deviceName' from localStorage" }
+                log.d { "Loaded MIDI mappings for '$deviceName' from localStorage" }
                 mapping
             } else {
                 log.debug { "No saved MIDI mappings for '$deviceName'" }
                 null
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to load MIDI mappings for '$deviceName': ${e.message}" }
-            null
-        }
+        }.getOrNull()
     }
 
     actual suspend fun delete(deviceName: String) {
-        try {
+        runCatchingSuspend {
             val key = keyForDevice(deviceName)
             localStorage.removeItem(key)
             log.info { "Deleted MIDI mappings for '$deviceName'" }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to delete MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
     actual suspend fun listDevices(): List<String> {
-        return try {
+        return runCatchingSuspend {
             val devices = mutableListOf<String>()
             for (i in 0 until localStorage.length) {
                 val key = localStorage.key(i)
@@ -74,9 +74,8 @@ actual class MidiMappingRepository actual constructor() {
                 }
             }
             devices
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to list MIDI mapping devices: ${e.message}" }
-            emptyList()
-        }
+        }.getOrDefault(emptyList())
     }
 }

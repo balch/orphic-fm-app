@@ -2,6 +2,7 @@ package org.balch.orpheus.core.midi
 
 import com.diamondedge.logging.logging
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import java.io.File
 
 /**
@@ -33,55 +34,53 @@ actual class MidiMappingRepository actual constructor() {
     }
 
     actual suspend fun save(deviceName: String, mapping: MidiMappingState) {
-        try {
+        runCatchingSuspend {
             val file = fileForDevice(deviceName)
             val jsonString = json.encodeToString(mapping.forPersistence())
             file.writeText(jsonString)
             log.info { "Saved MIDI mappings for '$deviceName' to ${file.name}" }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to save MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
     actual suspend fun load(deviceName: String): MidiMappingState? {
-        return try {
+        return runCatchingSuspend {
             val file = fileForDevice(deviceName)
             if (file.exists()) {
                 val jsonString = file.readText()
                 val mapping = json.decodeFromString<MidiMappingState>(jsonString)
-                log.info { "Loaded MIDI mappings for '$deviceName' from ${file.name}" }
+                log.d { "Loaded MIDI mappings for '$deviceName' from ${file.name}" }
                 mapping
             } else {
                 log.debug { "No saved MIDI mappings for '$deviceName'" }
                 null
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to load MIDI mappings for '$deviceName': ${e.message}" }
-            null
-        }
+        }.getOrNull()
     }
 
     actual suspend fun delete(deviceName: String) {
-        try {
+        runCatchingSuspend {
             val file = fileForDevice(deviceName)
             if (file.exists()) {
                 file.delete()
                 log.info { "Deleted MIDI mappings for '$deviceName'" }
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to delete MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
     actual suspend fun listDevices(): List<String> {
-        return try {
+        return runCatchingSuspend {
             configDir.listFiles()
                 ?.filter { it.extension == "json" }
                 ?.map { it.nameWithoutExtension }
                 ?: emptyList()
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to list MIDI mapping devices: ${e.message}" }
-            emptyList()
-        }
+        }.getOrDefault(emptyList())
     }
 }

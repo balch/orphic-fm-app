@@ -31,6 +31,7 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
 @Composable
@@ -117,7 +118,7 @@ fun VizPanel(
                 value = uiState.knob1Value,
                 onValueChange = actions.onKnob1Change,
                 label = if (uiState.showKnobs) uiState.selectedViz.knob1Label else "-",
-                controlId = "viz_knob1",
+                controlId = VizSymbol.KNOB_1.controlId.key,
                 size = 64.dp,
                 progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(
                     alpha = 0.3f
@@ -128,7 +129,7 @@ fun VizPanel(
                 value = uiState.knob2Value,
                 onValueChange = actions.onKnob2Change,
                 label = if (uiState.showKnobs) uiState.selectedViz.knob2Label else "-",
-                controlId = "viz_knob2",
+                controlId = VizSymbol.KNOB_2.controlId.key,
                 size = 64.dp,
                 progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(
                     alpha = 0.3f

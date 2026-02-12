@@ -25,8 +25,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.media.MediaSessionStateManager
+import org.balch.orpheus.core.plugin.symbols.EvoSymbol
 import org.balch.orpheus.core.synthViewModel
 
 
@@ -63,6 +65,7 @@ typealias EvoFeature = SynthFeature<EvoUiState, EvoPanelActions>
 class EvoViewModel @Inject constructor(
     strategies: Set<AudioEvolutionStrategy>,
     private val synthEngine: SynthEngine,
+    private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
     private val mediaSessionStateManager: MediaSessionStateManager
 ) : ViewModel(), EvoFeature {
@@ -115,6 +118,18 @@ class EvoViewModel @Inject constructor(
 
     init {
         log.debug { "Initialized with ${sortedStrategies.size} strategies: ${sortedStrategies.map { it.name }}" }
+
+        // Subscribe to MIDI CC changes for evo knobs
+        viewModelScope.launch(dispatcherProvider.default) {
+            synthController.controlFlow(EvoSymbol.DEPTH.controlId).collect { value ->
+                _userIntents.tryEmit(EvoIntent.Knob1(value.asFloat()))
+            }
+        }
+        viewModelScope.launch(dispatcherProvider.default) {
+            synthController.controlFlow(EvoSymbol.RATE.controlId).collect { value ->
+                _userIntents.tryEmit(EvoIntent.Knob2(value.asFloat()))
+            }
+        }
     }
 
     private fun reduce(state: EvoUiState, intent: EvoIntent): EvoUiState =

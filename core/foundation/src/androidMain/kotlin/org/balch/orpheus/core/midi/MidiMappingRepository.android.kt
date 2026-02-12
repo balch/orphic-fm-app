@@ -3,6 +3,7 @@ package org.balch.orpheus.core.midi
 import android.content.Context
 import com.diamondedge.logging.logging
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import java.io.File
 
 /**
@@ -41,7 +42,7 @@ actual class MidiMappingRepository actual constructor() {
     }
 
     actual suspend fun save(deviceName: String, mapping: MidiMappingState) {
-        try {
+        runCatchingSuspend {
             val file = fileForDevice(deviceName) ?: run {
                 log.warn { "MidiMappingRepository not initialized with context" }
                 return
@@ -49,13 +50,13 @@ actual class MidiMappingRepository actual constructor() {
             val jsonString = json.encodeToString(mapping.forPersistence())
             file.writeText(jsonString)
             log.info { "Saved MIDI mappings for '$deviceName'" }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to save MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
     actual suspend fun load(deviceName: String): MidiMappingState? {
-        return try {
+        return runCatchingSuspend {
             val file = fileForDevice(deviceName) ?: run {
                 log.warn { "MidiMappingRepository not initialized with context" }
                 return null
@@ -63,39 +64,37 @@ actual class MidiMappingRepository actual constructor() {
             if (file.exists()) {
                 val jsonString = file.readText()
                 val mapping = json.decodeFromString<MidiMappingState>(jsonString)
-                log.info { "Loaded MIDI mappings for '$deviceName'" }
+                log.d { "Loaded MIDI mappings for '$deviceName'" }
                 mapping
             } else {
                 null
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to load MIDI mappings for '$deviceName': ${e.message}" }
-            null
-        }
+        }.getOrNull()
     }
 
     actual suspend fun delete(deviceName: String) {
-        try {
+        runCatchingSuspend {
             fileForDevice(deviceName)?.let { file ->
                 if (file.exists()) {
                     file.delete()
                     log.info { "Deleted MIDI mappings for '$deviceName'" }
                 }
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to delete MIDI mappings for '$deviceName': ${e.message}" }
         }
     }
 
     actual suspend fun listDevices(): List<String> {
-        return try {
+        return runCatchingSuspend {
             getMappingsDir()?.listFiles()
                 ?.filter { it.extension == "json" }
                 ?.map { it.nameWithoutExtension }
                 ?: emptyList()
-        } catch (e: Exception) {
+        }.onFailure { e ->
             log.error { "Failed to list MIDI mapping devices: ${e.message}" }
-            emptyList()
-        }
+        }.getOrDefault(emptyList())
     }
 }
