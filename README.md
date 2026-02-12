@@ -6,7 +6,7 @@
 An 8-oscillator organismic synthesizer built with Kotlin Multiplatform, targeting Desktop and Android.
 
 ## Overview
-Orphic-FM is a unique, AI assisted, drone synth. Oscillators are hierarchically grouped and cross-modulated until the sound takes on a life of its own. Eight voices pair into four duos, which group into two quads, with modulation layered at every level. Add a dual delay system that can self-oscillate, a plate reverb, stereo distortion, add in AI agent control and things get interesting fast.
+Orphic-FM is an 8-oscillator Synthesizer Emulator combining sounds and harmonics with semi-random math and AI. Oscillators are hierarchically grouped and cross-modulated until the sound takes on a life of its own. Eight voices pair into four duos, which group into two quads, with modulation layered at every level. Add a dual delay system that can self-oscillate, a plate reverb, stereo distortion, add in AI agent control and things get interesting fast.
 
 This instrument is inspired by the [Lyra-8 Orgasmic Synthesizer](https://somasynths.com/lyra-organismic-synthesizer/) and adds 17 additional synthesis engines ported from the awesome OSS [Mutable Instruments' Eurorack firmware](https://github.com/pichenettes/eurorack) -- FM, virtual analog, granular, physical modeling strings, modal resonators, additive, waveshaping, speech synthesis, and four drum engines. These sit alongside the original organismic oscillators and can be swapped per-voice pair.
 
