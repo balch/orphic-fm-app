@@ -135,8 +135,8 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 | [Mutable Instruments Eurorack](https://github.com/pichenettes/eurorack) | Emilie Gillet's open-source module firmware -- Plaits engines, Rings reverb, and drum synthesis ported to Kotlin |
 | [Koog](https://github.com/JetBrains/koog) | AI agent framework with Gemini integration |
 | [Ktor](https://ktor.io/) | Kotlin async HTTP client |
-| [KmLogging](https://github.com/DiamondEdge1/KmLogging) | Kotlin Multiplatform structured logging by Lighthouse Games |
-| [Markdown Renderer](https://github.com/mikepenz/multiplatform-markdown-renderer) | Multiplatform Markdown rendering for Compose by Mike Penz |
+| [KmLogging](https://github.com/DiamondEdge1/KmLogging) | Kotlin Multiplatform structured logging|
+| [Markdown Rende(https://github.com/mikepenz/multiplatform-markdown-renderer) | Multiplatform Markdown rendering for Compose by Mike Penz |
 | [BuildKonfig](https://plugins.gradle.org/plugin/com.codingfeline.buildkonfig) | Cross-platform BuildConfig for KMP |
 | [Logback](https://logback.qos.ch/) | JVM logging framework |
 
