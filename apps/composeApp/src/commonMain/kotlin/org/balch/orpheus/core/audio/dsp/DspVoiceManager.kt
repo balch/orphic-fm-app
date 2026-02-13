@@ -449,6 +449,9 @@ class DspVoiceManager @Inject constructor(
             updateVoiceTimbre(voiceB)
             // Apply morph from independent pairMorph parameter
             applyMorph(pairIndex, voiceA, voiceB)
+            // Restore envelope speeds after engine switch (Speech swaps morph↔envSpeed)
+            voices[voiceA].setEnvelopeSpeed(_voiceEnvelopeSpeed[voiceA])
+            voices[voiceB].setEnvelopeSpeed(_voiceEnvelopeSpeed[voiceB])
             updateVoiceHarmonics(voiceA)
             updateVoiceHarmonics(voiceB)
             // Apply speech-specific parameters when switching to Speech engine
@@ -478,6 +481,12 @@ class DspVoiceManager @Inject constructor(
             PlaitsEngineId.MODAL -> true
             else -> false
         }
+    }
+
+    private fun isSpeechEngine(pairIndex: Int): Boolean {
+        val engineOrdinal = _pairEngine[pairIndex]
+        if (engineOrdinal == 0) return false
+        return PlaitsEngineId.entries[engineOrdinal - 1] == PlaitsEngineId.SPEECH
     }
 
     private fun updateVoiceTimbre(index: Int) {
@@ -566,6 +575,11 @@ class DspVoiceManager @Inject constructor(
             val detuneCents = value * MAX_DETUNE_CENTS
             voices[voiceA].setDetune(detuneCents / 2.0)
             voices[voiceB].setDetune(-detuneCents / 2.0)
+        } else if (isSpeechEngine(pairIndex)) {
+            // Speech: morph controls VCA envelope speed for both voices
+            // (uses applyVcaEnvelopeSpeed to avoid overriding per-voice word selection on Plaits)
+            voices[voiceA].applyVcaEnvelopeSpeed(value)
+            voices[voiceB].applyVcaEnvelopeSpeed(value)
         } else {
             // Plaits: set morph parameter
             voices[voiceA].plaits.setMorph(value)

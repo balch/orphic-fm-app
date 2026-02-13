@@ -398,7 +398,7 @@ class JsynTtsPlayerUnit : com.jsyn.unitgen.UnitGenerator(), TtsPlayerUnit {
     }
 
     override fun setVolume(volume: Float) {
-        this.volume = volume.coerceIn(0f, 1f)
+        this.volume = volume.coerceAtLeast(0f)
     }
 
     override fun generate(start: Int, end: Int) {

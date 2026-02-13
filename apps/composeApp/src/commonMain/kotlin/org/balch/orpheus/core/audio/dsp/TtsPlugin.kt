@@ -39,7 +39,7 @@ class TtsPlugin(
 
     private var _rate = 0.5f
     private var _speed = 0.5f
-    private var _volume = 0.7f
+    private var _volume = 0.5f
     private var _reverb = 0f
     private var _phaser = 0f
     private var _feedback = 0f
@@ -65,9 +65,9 @@ class TtsPlugin(
 
         controlPort(TtsSymbol.VOLUME) {
             floatType {
-                default = 0.7f
+                default = 0.5f
                 get { _volume }
-                set { _volume = it; ttsPlayer.setVolume(it) }
+                set { _volume = it; ttsPlayer.setVolume(it * 3f) }
             }
         }
 
@@ -115,7 +115,7 @@ class TtsPlugin(
 
     override fun initialize() {
         ttsPlayer.setRate(_rate)
-        ttsPlayer.setVolume(_volume)
+        ttsPlayer.setVolume(_volume * 3f)
 
         // Internal wiring: TTS player → speech effects chain
         ttsPlayer.output.connect(speechEffects.inputLeft)

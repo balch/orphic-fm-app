@@ -23,4 +23,7 @@ data class SynthPreset(
 
     fun getBool(key: String, default: Boolean = false): Boolean =
         (portValues[key] as? PortValue.BoolValue)?.value ?: default
+
+    fun getString(key: String, default: String = ""): String =
+        (portValues[key] as? PortValue.StringValue)?.value ?: default
 }

@@ -1,7 +1,6 @@
 package org.balch.orpheus.features.voice
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -25,7 +24,6 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.audio.wobble.VoiceWobbleController
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
@@ -41,79 +39,6 @@ import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.core.tempo.GlobalTempo
-
-@Immutable
-data class VoiceUiState(
-    val voiceStates: List<VoiceState> =
-        List(12) { index -> VoiceState(index = index, tune = DEFAULT_TUNINGS.getOrElse(index) { 0.5f }) },
-    val voiceModDepths: List<Float> = List(12) { 0.0f },
-    val pairSharpness: List<Float> = List(6) { 0.0f },
-    val voiceEnvelopeSpeeds: List<Float> = List(12) { 0.0f },
-    val duoModSources: List<ModSource> = List(6) { ModSource.OFF },
-    val quadGroupPitches: List<Float> = List(3) { 0.5f },
-    val quadGroupHolds: List<Float> = List(3) { 0.0f },
-    val quadGroupVolumes: List<Float> = List(3) { 1.0f },
-    val fmStructureCrossQuad: Boolean = false,
-    val totalFeedback: Float = 0.0f,
-    val vibrato: Float = 0.0f,
-    val voiceCoupling: Float = 0.0f,
-    val masterVolume: Float = 0.7f,
-    val peakLevel: Float = 0.0f,
-    val bendPosition: Float = 0.0f,
-    val bpm: Double = 120.0,
-    val pairEngines: List<Int> = List(6) { 0 },
-    val pairHarmonics: List<Float> = List(6) { 0.5f },
-    val pairMorphs: List<Float> = List(6) { 0.0f },
-    val pairModDepths: List<Float> = List(6) { 0.0f },
-    val quadTriggerSources: List<Int> = List(3) { 0 },
-    val quadPitchSources: List<Int> = List(3) { 0 },
-    val quadEnvelopeTriggerModes: List<Boolean> = listOf(false, false, false),
-    val aiVoiceEngineHighlights: List<Boolean> = List(6) { false }
-) {
-    companion object {
-        val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
-    }
-}
-
-/** User intents for voice management. */
-private sealed interface VoiceIntent {
-    // Voice-level intents
-    data class Tune(val index: Int, val value: Float) : VoiceIntent
-    data class ModDepth(val index: Int, val value: Float) : VoiceIntent
-    data class EnvelopeSpeed(val index: Int, val value: Float) : VoiceIntent
-    data class PulseStart(val index: Int) : VoiceIntent
-    data class PulseEnd(val index: Int) : VoiceIntent
-    data class Hold(val index: Int, val holding: Boolean) : VoiceIntent
-
-    // Pair-level intents
-    data class PairSharpness(val pairIndex: Int, val value: Float) : VoiceIntent
-    data class DuoModSource(val pairIndex: Int, val source: ModSource) : VoiceIntent
-    data class PairEngine(val pairIndex: Int, val engineOrdinal: Int) : VoiceIntent
-    data class PairHarmonics(val pairIndex: Int, val value: Float) : VoiceIntent
-    data class PairMorph(val pairIndex: Int, val value: Float) : VoiceIntent
-    data class PairModDepth(val pairIndex: Int, val value: Float) : VoiceIntent
-
-    // Quad-level intents
-    data class QuadPitch(val quadIndex: Int, val value: Float) : VoiceIntent
-    data class QuadHold(val quadIndex: Int, val value: Float) : VoiceIntent
-    data class QuadVolume(val quadIndex: Int, val value: Float) : VoiceIntent
-    data class QuadTriggerSource(val quadIndex: Int, val sourceIndex: Int) : VoiceIntent
-    data class QuadPitchSource(val quadIndex: Int, val sourceIndex: Int) : VoiceIntent
-    data class QuadEnvelopeTriggerMode(val quadIndex: Int, val enabled: Boolean) : VoiceIntent
-
-    // AI feedback
-    data class AiVoiceEngineHighlight(val pairIndex: Int, val show: Boolean) : VoiceIntent
-
-    // Global intents
-    data class FmStructure(val crossQuad: Boolean) : VoiceIntent
-    data class TotalFeedback(val value: Float) : VoiceIntent
-    data class Vibrato(val value: Float) : VoiceIntent
-    data class VoiceCoupling(val value: Float) : VoiceIntent
-    data class MasterVolume(val value: Float) : VoiceIntent
-    data class PeakLevel(val value: Float) : VoiceIntent
-    data class BendPosition(val value: Float) : VoiceIntent
-    data class SetBpm(val value: Double) : VoiceIntent
-}
 
 
 typealias VoicesFeature = SynthFeature<VoiceUiState, VoicePanelActions>
@@ -246,7 +171,7 @@ class VoiceViewModel(
     override val stateFlow: StateFlow<VoiceUiState> =
         merge(controlIntents, uiIntents)
             .scan(VoiceUiState()) { state, intent ->
-                val newState = reduce(state, intent)
+                val newState = reduceVoiceState(state, intent)
                 applySideEffects(newState, intent)
                 newState
             }
@@ -310,137 +235,6 @@ class VoiceViewModel(
             }
         }
     }
-
-    // ═══════════════════════════════════════════════════════════
-    // REDUCER
-    // ═══════════════════════════════════════════════════════════
-
-    private fun reduce(state: VoiceUiState, intent: VoiceIntent): VoiceUiState =
-        when (intent) {
-            is VoiceIntent.Tune ->
-                state.withVoice(intent.index) { it.copy(tune = intent.value) }
-
-            is VoiceIntent.ModDepth -> state.withModDepth(intent.index, intent.value)
-            is VoiceIntent.EnvelopeSpeed ->
-                state.withEnvelopeSpeed(intent.index, intent.value)
-
-            is VoiceIntent.PulseStart ->
-                state.withVoice(intent.index) { it.copy(pulse = true) }
-
-            is VoiceIntent.PulseEnd ->
-                state.withVoice(intent.index) { it.copy(pulse = false) }
-
-            is VoiceIntent.Hold ->
-                state.withVoice(intent.index) { it.copy(isHolding = intent.holding) }
-
-            is VoiceIntent.PairSharpness ->
-                state.withPairSharpness(intent.pairIndex, intent.value)
-
-            is VoiceIntent.DuoModSource ->
-                state.withDuoModSource(intent.pairIndex, intent.source)
-
-            is VoiceIntent.PairEngine ->
-                state.withPairEngine(intent.pairIndex, intent.engineOrdinal)
-
-            is VoiceIntent.PairHarmonics ->
-                state.withPairHarmonics(intent.pairIndex, intent.value)
-
-            is VoiceIntent.PairMorph ->
-                state.withPairMorph(intent.pairIndex, intent.value)
-
-            is VoiceIntent.PairModDepth ->
-                state.withPairModDepth(intent.pairIndex, intent.value)
-
-            is VoiceIntent.QuadPitch ->
-                state.withQuadPitch(intent.quadIndex, intent.value)
-
-            is VoiceIntent.QuadHold ->
-                state.withQuadHold(intent.quadIndex, intent.value)
-
-            is VoiceIntent.QuadVolume ->
-                state.withQuadVolume(intent.quadIndex, intent.value)
-
-            is VoiceIntent.QuadTriggerSource ->
-                state.withQuadTriggerSource(intent.quadIndex, intent.sourceIndex)
-
-            is VoiceIntent.QuadPitchSource ->
-                state.withQuadPitchSource(intent.quadIndex, intent.sourceIndex)
-
-            is VoiceIntent.QuadEnvelopeTriggerMode ->
-                state.copy(quadEnvelopeTriggerModes = state.quadEnvelopeTriggerModes.toMutableList().also { it[intent.quadIndex] = intent.enabled })
-
-            is VoiceIntent.AiVoiceEngineHighlight ->
-                state.copy(aiVoiceEngineHighlights = state.aiVoiceEngineHighlights.mapIndexed { i, v ->
-                    if (i == intent.pairIndex) intent.show else v
-                })
-
-            is VoiceIntent.FmStructure ->
-                state.copy(fmStructureCrossQuad = intent.crossQuad)
-
-            is VoiceIntent.TotalFeedback ->
-                state.copy(totalFeedback = intent.value)
-
-            is VoiceIntent.Vibrato ->
-                state.copy(vibrato = intent.value)
-
-            is VoiceIntent.VoiceCoupling ->
-                state.copy(voiceCoupling = intent.value)
-
-            is VoiceIntent.MasterVolume ->
-                state.copy(masterVolume = intent.value)
-
-            is VoiceIntent.PeakLevel ->
-                state.copy(peakLevel = intent.value)
-
-            is VoiceIntent.BendPosition ->
-                state.copy(bendPosition = intent.value)
-
-            is VoiceIntent.SetBpm ->
-                state.copy(bpm = intent.value)
-        }
-
-    // Helper extensions for cleaner state transformations
-    private fun VoiceUiState.withVoice(index: Int, transform: (VoiceState) -> VoiceState) =
-        copy(voiceStates = voiceStates.mapIndexed { i, v -> if (i == index) transform(v) else v })
-
-    private fun VoiceUiState.withModDepth(index: Int, value: Float) =
-        copy(voiceModDepths = voiceModDepths.mapIndexed { i, d -> if (i == index) value else d })
-
-    private fun VoiceUiState.withEnvelopeSpeed(index: Int, value: Float) =
-        copy(voiceEnvelopeSpeeds = voiceEnvelopeSpeeds.mapIndexed { i, s -> if (i == index) value else s })
-
-    private fun VoiceUiState.withPairSharpness(pairIndex: Int, value: Float) =
-        copy(pairSharpness = pairSharpness.mapIndexed { i, s -> if (i == pairIndex) value else s })
-
-    private fun VoiceUiState.withDuoModSource(pairIndex: Int, source: ModSource) =
-        copy(duoModSources = duoModSources.mapIndexed { i, s -> if (i == pairIndex) source else s })
-
-    private fun VoiceUiState.withPairEngine(pairIndex: Int, engineOrdinal: Int) =
-        copy(pairEngines = pairEngines.mapIndexed { i, e -> if (i == pairIndex) engineOrdinal else e })
-
-    private fun VoiceUiState.withPairHarmonics(pairIndex: Int, value: Float) =
-        copy(pairHarmonics = pairHarmonics.mapIndexed { i, h -> if (i == pairIndex) value else h })
-
-    private fun VoiceUiState.withPairMorph(pairIndex: Int, value: Float) =
-        copy(pairMorphs = pairMorphs.mapIndexed { i, m -> if (i == pairIndex) value else m })
-
-    private fun VoiceUiState.withPairModDepth(pairIndex: Int, value: Float) =
-        copy(pairModDepths = pairModDepths.mapIndexed { i, d -> if (i == pairIndex) value else d })
-
-    private fun VoiceUiState.withQuadPitch(quadIndex: Int, value: Float) =
-        copy(quadGroupPitches = quadGroupPitches.mapIndexed { i, p -> if (i == quadIndex) value else p })
-
-    private fun VoiceUiState.withQuadHold(quadIndex: Int, value: Float) =
-        copy(quadGroupHolds = quadGroupHolds.mapIndexed { i, h -> if (i == quadIndex) value else h })
-
-    private fun VoiceUiState.withQuadVolume(quadIndex: Int, value: Float) =
-        copy(quadGroupVolumes = quadGroupVolumes.mapIndexed { i, v -> if (i == quadIndex) value else v })
-
-    private fun VoiceUiState.withQuadTriggerSource(quadIndex: Int, sourceIndex: Int) =
-        copy(quadTriggerSources = quadTriggerSources.mapIndexed { i, s -> if (i == quadIndex) sourceIndex else s })
-
-    private fun VoiceUiState.withQuadPitchSource(quadIndex: Int, sourceIndex: Int) =
-        copy(quadPitchSources = quadPitchSources.mapIndexed { i, s -> if (i == quadIndex) sourceIndex else s })
 
     // ═══════════════════════════════════════════════════════════
     // SIDE EFFECTS (non-port operations only; port-based handled by controlFlows)
@@ -649,66 +443,5 @@ class VoiceViewModel(
 
         @Composable
         fun feature(): VoicesFeature = synthViewModel<VoiceViewModel, VoicesFeature>()
-    }
-}
-
-@Immutable
-data class VoicePanelActions(
-    val setMasterVolume: (Float) -> Unit,
-    val setVibrato: (Float) -> Unit,
-    val setVoiceTune: (Int, Float) -> Unit,
-    val setVoiceModDepth: (Int, Float) -> Unit,
-    val setDuoModDepth: (Int, Float) -> Unit,
-    val setPairSharpness: (Int, Float) -> Unit,
-    val setVoiceEnvelopeSpeed: (Int, Float) -> Unit,
-    val pulseStart: (Int) -> Unit,
-    val pulseEnd: (Int) -> Unit,
-    val setHold: (Int, Boolean) -> Unit,
-    val setDuoModSource: (Int, ModSource) -> Unit,
-    val setQuadPitch: (Int, Float) -> Unit,
-    val setQuadHold: (Int, Float) -> Unit,
-    val setFmStructure: (Boolean) -> Unit,
-    val setTotalFeedback: (Float) -> Unit,
-    val setVoiceCoupling: (Float) -> Unit,
-    val wobblePulseStart: (Int, Float, Float) -> Unit,
-    val wobbleMove: (Int, Float, Float) -> Unit,
-    val wobblePulseEnd: (Int) -> Unit,
-    val setBend: (Float) -> Unit,
-    val releaseBend: () -> Unit,
-    val setStringBend: (stringIndex: Int, bendAmount: Float, voiceMix: Float) -> Unit,
-    val releaseStringBend: (stringIndex: Int) -> Int,
-    val setSlideBar: (yPosition: Float, xPosition: Float) -> Unit,
-    val releaseSlideBar: () -> Unit,
-    val setBpm: (Double) -> Unit,
-    val setQuadTriggerSource: (Int, Int) -> Unit,
-    val setQuadPitchSource: (Int, Int) -> Unit,
-    val setQuadEnvelopeTriggerMode: (Int, Boolean) -> Unit,
-    val setPairEngine: (Int, Int) -> Unit,
-    val setPairHarmonics: (Int, Float) -> Unit,
-    val setPairMorph: (Int, Float) -> Unit,
-    val setPairModDepth: (Int, Float) -> Unit
-) {
-    companion object {
-        val EMPTY = VoicePanelActions(
-            setMasterVolume = {}, setVibrato = {},
-            setVoiceTune = {_, _ -> }, setVoiceModDepth = {_, _ -> },
-            setDuoModDepth = {_, _ -> }, setPairSharpness = {_, _ -> },
-            setVoiceEnvelopeSpeed = {_, _ -> }, pulseStart = {}, pulseEnd = {},
-            setHold = {_, _ -> }, setDuoModSource = {_, _ -> },
-            setQuadPitch = {_, _ -> }, setQuadHold = {_, _ -> },
-            setFmStructure = {}, setTotalFeedback = {},
-            setVoiceCoupling = {}, wobblePulseStart = {_, _, _ -> },
-            wobbleMove = {_, _, _ -> }, wobblePulseEnd = {},
-            setBend = {}, releaseBend = {},
-            setStringBend = {_, _, _ -> }, releaseStringBend = { 0 },
-            setSlideBar = {_, _ -> }, releaseSlideBar = {},
-            setBpm = {}, setQuadTriggerSource = {_, _ -> },
-            setQuadPitchSource = {_, _ -> },
-            setQuadEnvelopeTriggerMode = {_, _ -> },
-            setPairEngine = {_, _ -> },
-            setPairHarmonics = {_, _ -> },
-            setPairMorph = {_, _ -> },
-            setPairModDepth = {_, _ -> }
-        )
     }
 }

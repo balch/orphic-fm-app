@@ -381,6 +381,17 @@ class DspVoice(
     }
 
     fun setEnvelopeSpeed(speed: Float) {
+        applyVcaEnvelopeSpeed(speed)
+        // Pipe to Plaits for Speech word override
+        plaitsUnit.setEnvelopeSpeed(speed)
+    }
+
+    /**
+     * Set VCA envelope speed without piping to Plaits.
+     * Used by Speech engine where morph knob controls envelope speed
+     * but must not override per-voice word selection on the Plaits side.
+     */
+    fun applyVcaEnvelopeSpeed(speed: Float) {
         currentEnvelopeSpeed = speed
         // Ease-in curve (quadratic) for more musical feel
         // Lower values give finer fast control, higher values expand to drone

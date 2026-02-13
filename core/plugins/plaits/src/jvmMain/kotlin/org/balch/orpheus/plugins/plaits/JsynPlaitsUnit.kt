@@ -55,6 +55,7 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
     @Volatile private var _accent = 0.8f
     @Volatile private var _speechProsody = 0.5f
     @Volatile private var _speechSpeed = 0.0f
+    @Volatile private var _envSpeed = 0.0f
 
     // Manual trigger flag
     @Volatile private var _manualTrigger = false
@@ -97,6 +98,7 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
 
     override fun setSpeechProsody(value: Float) { _speechProsody = value }
     override fun setSpeechSpeed(value: Float) { _speechSpeed = value }
+    override fun setEnvelopeSpeed(value: Float) { _envSpeed = value }
 
     override fun setPercussiveMode(enabled: Boolean) {
         _percussiveMode = enabled
@@ -183,9 +185,11 @@ class JsynPlaitsUnit : UnitGenerator(), PlaitsUnit {
             )
 
             // Apply speech-specific parameters before rendering
-            (eng as? SpeechEngine)?.let {
-                it.prosodyAmount = _speechProsody
-                it.speed = _speechSpeed
+            if (eng is SpeechEngine) {
+                eng.prosodyAmount = _speechProsody
+                eng.speed = _speechSpeed
+                // Speech engine: use per-voice envSpeed as morph for word selection
+                reusableParams.morph = _envSpeed
             }
 
             eng.render(reusableParams, renderBuffer, null, blockSize)

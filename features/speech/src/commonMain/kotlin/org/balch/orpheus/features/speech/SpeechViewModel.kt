@@ -26,7 +26,10 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.TTS_URI
 import org.balch.orpheus.core.plugin.symbols.TtsSymbol
+import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.speech.SpeechEvent
 import org.balch.orpheus.core.speech.SpeechEventBus
 import org.balch.orpheus.core.speech.TtsGenerator
@@ -36,7 +39,7 @@ import org.balch.orpheus.core.synthViewModel
 data class SpeechUiState(
     val rate: Float = 0.5f,
     val speed: Float = 0.5f,
-    val volume: Float = 0.7f,
+    val volume: Float = 0.5f,
     val reverb: Float = 0f,
     val phaser: Float = 0f,
     val feedback: Float = 0f,
@@ -93,6 +96,7 @@ class SpeechViewModel @Inject constructor(
     private val synthEngine: SynthEngine,
     private val ttsGenerator: TtsGenerator,
     private val speechEventBus: SpeechEventBus,
+    private val presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), SpeechFeature {
 
@@ -159,6 +163,34 @@ class SpeechViewModel @Inject constructor(
             voicesLoadedFlow.value = voices
             if (voices.isNotEmpty() && selectedVoiceFlow.value.isEmpty()) {
                 selectedVoiceFlow.value = voices.first()
+            }
+        }
+
+        // Restore non-plugin state from loaded presets
+        viewModelScope.launch {
+            presetLoader.presetFlow.collect { preset ->
+                preset.getString(KEY_TEXT_INPUT).takeIf { it.isNotEmpty() }
+                    ?.let { textInputFlow.value = it }
+                preset.getString(KEY_SELECTED_VOICE).takeIf { it.isNotEmpty() }
+                    ?.let { selectedVoiceFlow.value = it }
+                spacebarTriggerFlow.value = preset.getBool(KEY_SPACEBAR_TRIGGER)
+            }
+        }
+
+        // Sync non-plugin state to PresetLoader for save
+        viewModelScope.launch {
+            textInputFlow.collect {
+                presetLoader.setFeatureValue(KEY_TEXT_INPUT, PortValue.StringValue(it))
+            }
+        }
+        viewModelScope.launch {
+            selectedVoiceFlow.collect {
+                presetLoader.setFeatureValue(KEY_SELECTED_VOICE, PortValue.StringValue(it))
+            }
+        }
+        viewModelScope.launch {
+            spacebarTriggerFlow.collect {
+                presetLoader.setFeatureValue(KEY_SPACEBAR_TRIGGER, PortValue.BoolValue(it))
             }
         }
     }
@@ -245,6 +277,10 @@ class SpeechViewModel @Inject constructor(
     }
 
     companion object {
+        private const val KEY_TEXT_INPUT = "$TTS_URI:text_input"
+        private const val KEY_SELECTED_VOICE = "$TTS_URI:selected_voice"
+        private const val KEY_SPACEBAR_TRIGGER = "$TTS_URI:spacebar_trigger"
+
         /** Map 0.0-1.0 to 80-300 WPM */
         fun speedToWpm(speed: Float): Int = (80 + speed * 220).toInt()
 

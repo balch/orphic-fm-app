@@ -230,6 +230,9 @@ interface PlaitsUnit : AudioUnit {
     /** Set speech speed (0..1). Only meaningful for Speech engine. */
     fun setSpeechSpeed(value: Float) {}
 
+    /** Per-voice envelope speed. Used by Speech engine to override morph with per-voice word selection. */
+    fun setEnvelopeSpeed(value: Float) {}
+
     /** Audio-rate frequency input (Hz). When connected, overrides control-rate setNote(). */
     val frequencyInput: AudioInput
 
@@ -457,7 +460,7 @@ interface TtsPlayerUnit : AudioUnit {
     fun stop()
     fun isPlaying(): Boolean
     fun setRate(rate: Float)   // 0.25-2.0, affects speed+pitch
-    fun setVolume(volume: Float) // 0.0-1.0
+    fun setVolume(volume: Float) // 0.0+
     interface Factory { fun create(): TtsPlayerUnit }
 }
 

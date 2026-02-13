@@ -41,23 +41,37 @@ sealed class PortValue {
     @Serializable
     @SerialName("bool")
     data class BoolValue(val value: Boolean) : PortValue()
-    
+
+    @Serializable
+    @SerialName("string")
+    data class StringValue(val value: String) : PortValue()
+
     fun asFloat(): Float = when (this) {
         is FloatValue -> value
         is IntValue -> value.toFloat()
         is BoolValue -> if (value) 1f else 0f
+        is StringValue -> 0f
     }
-    
+
     fun asInt(): Int = when (this) {
         is FloatValue -> value.toInt()
         is IntValue -> value
         is BoolValue -> if (value) 1 else 0
+        is StringValue -> 0
     }
-    
+
     fun asBoolean(): Boolean = when (this) {
         is FloatValue -> value > 0.5f
         is IntValue -> value != 0
         is BoolValue -> value
+        is StringValue -> false
+    }
+
+    fun asString(): String = when (this) {
+        is StringValue -> value
+        is FloatValue -> value.toString()
+        is IntValue -> value.toString()
+        is BoolValue -> value.toString()
     }
 }
 

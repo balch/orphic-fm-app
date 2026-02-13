@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.ports.PortRegistry
 import org.balch.orpheus.core.tempo.GlobalTempo
 
@@ -31,6 +32,13 @@ class PresetLoader(
             onBufferOverflow = BufferOverflow.DROP_OLDEST
         )
     val presetFlow: SharedFlow<SynthPreset> = _presetFlow.asSharedFlow()
+
+    // Non-plugin feature state (e.g. text input, voice selection)
+    private val _featureState = mutableMapOf<String, PortValue>()
+
+    fun setFeatureValue(key: String, value: PortValue) {
+        _featureState[key] = value
+    }
 
     /**
      * Apply a preset by restoring all port values via PortRegistry.
@@ -56,7 +64,7 @@ class PresetLoader(
         return SynthPreset(
             name = name,
             bpm = globalTempo.getBpm().toFloat(),
-            portValues = portRegistry.captureState()
+            portValues = portRegistry.captureState() + _featureState
         )
     }
 }

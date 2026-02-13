@@ -129,7 +129,7 @@ class SynthController @Inject constructor() {
     fun controlFlow(id: PluginControlId): MutableStateFlow<PortValue> {
         return _controlFlows.getOrPut(id) {
             // Seed from engine on first access
-            val initialValue = pluginPortGetter?.invoke(id) ?: PortValue.FloatValue(0f)
+            val initialValue = pluginPortGetter?.invoke(id) ?: PortValue.FloatValue(0.5f)
             InterceptingMutableStateFlow(id, initialValue)
         }
     }
