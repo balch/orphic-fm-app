@@ -8,18 +8,17 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
+import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class SpeechPanelRegistration : FeaturePanel {
     override val panelId = PanelId.SPEECH
     override val description = "Speech synthesis panel showing AI speech output"
-    override val position = PanelPosition.END
-    override val linkedFeature: PanelId? = null
     override val weight = 1.0f
-    override val defaultExpanded = false
+    override val label = "Speech"
+    override val color = OrpheusColors.electricBlue
 
     @Composable
     override fun Content(
@@ -40,7 +39,8 @@ class SpeechPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.SPEECH,
-            position = PanelPosition.END,
+            label = "Speech",
+            color = OrpheusColors.electricBlue,
         ) { modifier, isExpanded, onExpandedChange, onDialogActiveChange ->
             SpeechPanel(
                 feature = SpeechViewModel.previewFeature(),

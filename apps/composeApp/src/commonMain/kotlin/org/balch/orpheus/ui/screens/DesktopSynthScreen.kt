@@ -33,7 +33,6 @@ import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.balch.orpheus.core.FeaturePanel
-import org.balch.orpheus.core.sortPanels
 import org.balch.orpheus.features.ai.AiOptionsPanelRegistration
 import org.balch.orpheus.features.beats.BeatsPanelRegistration
 import org.balch.orpheus.features.delay.DelayPanelRegistration
@@ -84,7 +83,7 @@ import kotlin.reflect.KClass
 @Composable
 fun DesktopSynthScreen(
     headerFeature: HeaderFeature = HeaderViewModel.feature(),
-    panels: List<FeaturePanel> = headerFeature.sortedPanels,
+    panels: List<FeaturePanel> = headerFeature.visiblePanels,
     voiceFeature: VoicesFeature = VoiceViewModel.feature(),
     drumFeature: DrumFeature = DrumViewModel.feature(),
     speechFeature: SpeechFeature = SpeechViewModel.feature(),

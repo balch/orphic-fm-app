@@ -6,10 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -18,11 +16,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 class DistortionPanelRegistration : FeaturePanel {
     override val panelId = PanelId.DISTORTION
     override val description = "Control volume characteristics of sounds"
-    override val position = PanelPosition.START
-    override val linkedFeature: PanelId? = null
     override val weight = 0.6f
-    override val defaultExpanded = true
-    override val compactPortrait = CompactPortraitConfig("Distortion", OrpheusColors.neonMagenta, 30)
+    override val label = "Distortion"
+    override val color = OrpheusColors.neonMagenta
 
     @Composable
     override fun Content(
@@ -42,9 +38,9 @@ class DistortionPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.DISTORTION,
-            position = PanelPosition.MID,
             weight = 0.6f,
-            defaultExpanded = true,
+            label = "Distortion",
+            color = OrpheusColors.neonMagenta,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             DistortionPanel(
                 feature = DistortionViewModel.previewFeature(),

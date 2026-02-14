@@ -8,18 +8,17 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
+import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class AiOptionsPanelRegistration : FeaturePanel {
     override val panelId = PanelId.AI
     override val description = "Panel allowing user to select a patch"
-    override val position = PanelPosition.LAST
-    override val linkedFeature: PanelId? = null
     override val weight = 0.6f
-    override val defaultExpanded = false
+    override val label = "AI"
+    override val color = OrpheusColors.electricBlue
 
     @Composable
     override fun Content(
@@ -39,8 +38,9 @@ class AiOptionsPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.AI,
-            position = PanelPosition.LAST,
             weight = 0.6f,
+            label = "AI",
+            color = OrpheusColors.electricBlue,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             AiOptionsPanel(
                 feature = AiOptionsViewModel.previewFeature(),

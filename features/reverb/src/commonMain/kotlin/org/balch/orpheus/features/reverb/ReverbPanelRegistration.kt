@@ -8,18 +8,17 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
+import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class ReverbPanelRegistration : FeaturePanel {
     override val panelId = PanelId.REVERB
     override val description = "Add spatial reverb effect"
-    override val position = PanelPosition.MID
-    override val linkedFeature: PanelId? = null
     override val weight = 0.5f
-    override val defaultExpanded = false
+    override val label = "Reverb"
+    override val color = OrpheusColors.electricBlue
 
     @Composable
     override fun Content(
@@ -39,8 +38,9 @@ class ReverbPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.REVERB,
-            position = PanelPosition.MID,
             weight = 0.5f,
+            label = "Reverb",
+            color = OrpheusColors.electricBlue,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             ReverbPanel(
                 feature = ReverbViewModel.previewFeature(),

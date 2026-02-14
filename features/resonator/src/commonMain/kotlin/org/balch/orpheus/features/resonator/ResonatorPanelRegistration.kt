@@ -6,10 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -18,11 +16,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 class ResonatorPanelRegistration : FeaturePanel {
     override val panelId = PanelId.RESONATOR
     override val description = "Add texture to sounds"
-    override val position = PanelPosition.MID
-    override val linkedFeature: PanelId? = null
     override val weight = 1.0f
-    override val defaultExpanded = false
-    override val compactPortrait = CompactPortraitConfig("Rezo", OrpheusColors.lakersGold, 50)
+    override val label = "Rezo"
+    override val color = OrpheusColors.lakersGold
 
     @Composable
     override fun Content(
@@ -42,7 +38,8 @@ class ResonatorPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.RESONATOR,
-            position = PanelPosition.MID,
+            label = "Rezo",
+            color = OrpheusColors.lakersGold,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             ResonatorPanel(
                 feature = ResonatorViewModel.previewFeature(),

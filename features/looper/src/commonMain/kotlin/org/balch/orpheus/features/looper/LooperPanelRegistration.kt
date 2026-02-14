@@ -8,18 +8,17 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
+import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class LooperPanelRegistration : FeaturePanel {
     override val panelId = PanelId.LOOPER
     override val description = "Record and replay audio"
-    override val position = PanelPosition.END
-    override val linkedFeature: PanelId? = null
     override val weight = 1.0f
-    override val defaultExpanded = false
+    override val label = "Looper"
+    override val color = OrpheusColors.neonCyan
 
     @Composable
     override fun Content(
@@ -39,7 +38,8 @@ class LooperPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.LOOPER,
-            position = PanelPosition.MID,
+            label = "Looper",
+            color = OrpheusColors.neonCyan,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             LooperPanel(
                 feature = LooperViewModel.previewFeature(),

@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.sortCompactPanels
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.features.drum.DrumFeature
@@ -85,10 +84,8 @@ fun CompactPortraitScreen(
     val minTopHeight = 150.dp
     val maxTopHeight = 450.dp
 
-    // Derive compact panels from registered FeaturePanels
-    val compactPanels = remember(headerFeature.sortedPanels) {
-        sortCompactPanels(headerFeature.sortedPanels)
-    }
+    // Derive compact panels from active panel set
+    val compactPanels = headerFeature.visiblePanels
     var selectedPanelId by remember { mutableStateOf(PanelId.EVO) }
 
     // Selected panel for bottom panel switcher

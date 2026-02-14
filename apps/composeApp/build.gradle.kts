@@ -63,6 +63,7 @@ kotlin {
             api(project(":core:plugins:flux"))
             api(project(":core:plugins:looper"))
             api(project(":core:plugins:perstringbender"))
+            api(project(":ui:panels"))
             api(project(":ui:theme"))
             api(project(":ui:widgets"))
             api(project(":features:warps"))

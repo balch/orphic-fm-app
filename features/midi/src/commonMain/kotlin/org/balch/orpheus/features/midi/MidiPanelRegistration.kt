@@ -8,18 +8,17 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
+import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class MidiPanelRegistration : FeaturePanel {
     override val panelId = PanelId.MIDI
     override val description = "Assign MIDI commands to control the synthesizer"
-    override val position = PanelPosition.START
-    override val linkedFeature: PanelId? = null
     override val weight = 0.5f
-    override val defaultExpanded = false
+    override val label = "MIDI"
+    override val color = OrpheusColors.electricBlue
 
     @Composable
     override fun Content(
@@ -39,8 +38,9 @@ class MidiPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.MIDI,
-            position = PanelPosition.START,
             weight = 0.5f,
+            label = "MIDI",
+            color = OrpheusColors.electricBlue,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             MidiPanel(
                 feature = MidiViewModel.previewFeature(),

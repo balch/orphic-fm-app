@@ -6,10 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -18,11 +16,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 class BeatsPanelRegistration : FeaturePanel {
     override val panelId = PanelId.BEATS
     override val description = "Drum Patterns Panel"
-    override val position = PanelPosition.MID
-    override val linkedFeature = PanelId.DRUMS
     override val weight = 1.25f
-    override val defaultExpanded = false
-    override val compactPortrait = CompactPortraitConfig("Sequencer", OrpheusColors.neonCyan, 130)
+    override val label = "Sequencer"
+    override val color = OrpheusColors.neonCyan
 
     @Composable
     override fun Content(
@@ -42,9 +38,9 @@ class BeatsPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.BEATS,
-            position = PanelPosition.END,
-            linkedFeature = PanelId.DRUMS,
             weight = 1.25f,
+            label = "Sequencer",
+            color = OrpheusColors.neonCyan,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             DrumBeatsPanel(
                 drumBeatsFeature = DrumBeatsViewModel.previewFeature(),

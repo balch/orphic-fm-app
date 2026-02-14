@@ -36,10 +36,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.ui.panels.LocalCompactMode
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -75,7 +73,7 @@ fun CompactPanelSwitcher(
         }
     }
 
-    val currentColor = panels.getOrNull(currentIndex)?.compactPortrait?.color ?: Color.White
+    val currentColor = panels.getOrNull(currentIndex)?.color ?: Color.White
 
     Box(modifier = modifier.fillMaxSize()) {
 
@@ -214,8 +212,8 @@ private fun NavigationArrow(
 private fun CompactPanelSwitcherPreview() {
     OrpheusTheme {
         val previewPanels = listOf(
-            previewPanel(PanelId.DELAY, "Delay", OrpheusColors.warmGlow, 0),
-            previewPanel(PanelId.DISTORTION, "Distortion", OrpheusColors.neonMagenta, 10),
+            previewPanel(PanelId.DELAY, "Delay", OrpheusColors.warmGlow),
+            previewPanel(PanelId.DISTORTION, "Distortion", OrpheusColors.neonMagenta),
         )
         var selectedId by remember { mutableStateOf(PanelId.DELAY) }
         CompactPanelSwitcher(
@@ -227,11 +225,11 @@ private fun CompactPanelSwitcherPreview() {
     }
 }
 
-private fun previewPanel(id: PanelId, label: String, color: Color, order: Int) =
+private fun previewPanel(id: PanelId, label: String, color: Color) =
     featurePanelPreview(
         panelId = id,
-        position = PanelPosition.MID,
-        compactPortrait = CompactPortraitConfig(label, color, order),
+        label = label,
+        color = color,
     ) { modifier, _, _, _ ->
         Box(
             modifier = modifier

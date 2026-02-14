@@ -6,10 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -18,11 +16,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 class PresetsPanelRegistration : FeaturePanel {
     override val panelId = PanelId.PRESETS
     override val description = "Panel allowing user to select a patch"
-    override val position = PanelPosition.FIRST
-    override val linkedFeature: PanelId? = null
     override val weight = 1.0f
-    override val defaultExpanded = false
-    override val compactPortrait = CompactPortraitConfig("Preset", OrpheusColors.presetOrange, 10)
+    override val label = "Preset"
+    override val color = OrpheusColors.presetOrange
 
     @Composable
     override fun Content(
@@ -42,7 +38,8 @@ class PresetsPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.PRESETS,
-            position = PanelPosition.FIRST,
+            label = "Preset",
+            color = OrpheusColors.presetOrange,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             PresetsPanel(
                 feature = PresetsViewModel.previewFeature(),

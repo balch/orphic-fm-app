@@ -28,6 +28,7 @@ kotlin {
             implementation(project(":core:plugins:delay"))
             implementation(project(":core:plugins:duolfo"))
             implementation(project(":core:plugins:distortion"))
+            implementation(project(":ui:panels"))
             implementation(libs.liquid)
 
             // AI/koog

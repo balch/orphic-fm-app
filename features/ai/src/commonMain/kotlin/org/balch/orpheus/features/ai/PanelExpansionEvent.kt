@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.panels.PanelSet
 
 /**
  * Event for requesting panel expansion or collapse.
@@ -18,26 +19,43 @@ data class PanelExpansionEvent(
 )
 
 /**
- * Event bus for panel expansion/collapse requests.
- * 
+ * Event for applying a complete panel set configuration.
+ */
+data class PanelSetEvent(
+    val panelSet: PanelSet
+)
+
+/**
+ * Event bus for panel expansion/collapse requests and panel set changes.
+ *
  * This allows AI tools to request that specific panels be expanded or collapsed,
- * enabling seamless UI transitions during AI operations.
+ * or to apply an entire panel set configuration.
  */
 @SingleIn(AppScope::class)
 class PanelExpansionEventBus @Inject constructor() {
-    
+
     private val log = logging("PanelExpansionEventBus")
-    
+
     private val _events = MutableSharedFlow<PanelExpansionEvent>(
         replay = 1,  // Replay last event for late subscribers
         extraBufferCapacity = 5
     )
-    
+
+    private val _panelSetEvents = MutableSharedFlow<PanelSetEvent>(
+        replay = 1,
+        extraBufferCapacity = 5
+    )
+
     /**
      * Flow of panel expansion events.
      */
     val events: SharedFlow<PanelExpansionEvent> = _events.asSharedFlow()
-    
+
+    /**
+     * Flow of panel set events.
+     */
+    val panelSetEvents: SharedFlow<PanelSetEvent> = _panelSetEvents.asSharedFlow()
+
     /**
      * Request that a panel be expanded.
      */
@@ -45,7 +63,7 @@ class PanelExpansionEventBus @Inject constructor() {
         log.debug { "PanelExpansionEventBus: EXPAND ${panelId.id}" }
         _events.emit(PanelExpansionEvent(panelId, expand = true))
     }
-    
+
     /**
      * Request that a panel be collapsed.
      */
@@ -53,11 +71,19 @@ class PanelExpansionEventBus @Inject constructor() {
         log.debug { "PanelExpansionEventBus: COLLAPSE ${panelId.id}" }
         _events.emit(PanelExpansionEvent(panelId, expand = false))
     }
-    
+
     /**
      * Request that multiple panels be expanded.
      */
     suspend fun expandAll(panelIds: List<PanelId>) {
         panelIds.forEach { expand(it) }
+    }
+
+    /**
+     * Apply a complete panel set configuration.
+     */
+    suspend fun applyPanelSet(panelSet: PanelSet) {
+        log.debug { "PanelExpansionEventBus: APPLY SET ${panelSet.name} (${panelSet.panels.size} panels)" }
+        _panelSetEvents.emit(PanelSetEvent(panelSet))
     }
 }

@@ -6,10 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -18,11 +16,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 class EvoPanelRegistration : FeaturePanel {
     override val panelId = PanelId.EVO
     override val description = "Algorithmic Evolution Panel"
-    override val position = PanelPosition.START
-    override val linkedFeature: PanelId? = null
     override val weight = 0.5f
-    override val defaultExpanded = false
-    override val compactPortrait = CompactPortraitConfig("Evo", OrpheusColors.evoGold, 0)
+    override val label = "Evo"
+    override val color = OrpheusColors.evoGold
 
     @Composable
     override fun Content(
@@ -42,8 +38,9 @@ class EvoPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.EVO,
-            position = PanelPosition.START,
             weight = 0.5f,
+            label = "Evo",
+            color = OrpheusColors.evoGold,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             EvoPanel(
                 evoFeature = EvoViewModel.previewFeature(),

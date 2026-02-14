@@ -33,7 +33,6 @@ import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.balch.orpheus.core.FeaturePanel
-import org.balch.orpheus.core.sortPanels
 import org.balch.orpheus.features.ai.AiOptionsPanelRegistration
 import org.balch.orpheus.features.beats.BeatsPanelRegistration
 import org.balch.orpheus.features.delay.DelayPanelRegistration
@@ -105,28 +104,26 @@ private class PreviewMetroViewModelFactory : MetroViewModelFactory() {
         get() = emptyMap()
 }
 
-private fun previewPanels(): List<FeaturePanel> = sortPanels(
-    setOf(
-        PresetsPanelRegistration.preview(),
-        MidiPanelRegistration.preview(),
-        VizPanelRegistration.preview(),
-        EvoPanelRegistration.preview(),
-        LfoPanelRegistration.preview(),
-        DelayPanelRegistration.preview(),
-        ReverbPanelRegistration.preview(),
-        DistortionPanelRegistration.preview(),
-        ResonatorPanelRegistration.preview(),
-        GrainsPanelRegistration.preview(),
-        LooperPanelRegistration.preview(),
-        WarpsPanelRegistration.preview(),
-        TriggerRouterPanelRegistration.preview(),
-        FluxPanelRegistration.preview(),
-        LiveCodePanelRegistration.preview(),
-        SpeechPanelRegistration.preview(),
-        DrumsPanelRegistration.preview(),
-        BeatsPanelRegistration.preview(),
-        AiOptionsPanelRegistration.preview(),
-    )
+private fun previewPanels(): List<FeaturePanel> = listOf(
+    PresetsPanelRegistration.preview(),
+    DistortionPanelRegistration.preview(),
+    EvoPanelRegistration.preview(),
+    MidiPanelRegistration.preview(),
+    VizPanelRegistration.preview(),
+    LfoPanelRegistration.preview(),
+    DelayPanelRegistration.preview(),
+    ReverbPanelRegistration.preview(),
+    ResonatorPanelRegistration.preview(),
+    GrainsPanelRegistration.preview(),
+    WarpsPanelRegistration.preview(),
+    TriggerRouterPanelRegistration.preview(),
+    FluxPanelRegistration.preview(),
+    LooperPanelRegistration.preview(),
+    LiveCodePanelRegistration.preview(),
+    SpeechPanelRegistration.preview(),
+    DrumsPanelRegistration.preview(),
+    BeatsPanelRegistration.preview(),
+    AiOptionsPanelRegistration.preview(),
 )
 
 @Preview(widthDp = 1200, heightDp = 800)

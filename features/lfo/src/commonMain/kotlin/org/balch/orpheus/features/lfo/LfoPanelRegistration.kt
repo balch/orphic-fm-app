@@ -6,10 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -18,11 +16,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 class LfoPanelRegistration : FeaturePanel {
     override val panelId = PanelId.LFO
     override val description = "Provide wave patterns to produce sounds"
-    override val position = PanelPosition.MID
-    override val linkedFeature: PanelId = PanelId("delay")
     override val weight = 0.6f
-    override val defaultExpanded = false
-    override val compactPortrait = CompactPortraitConfig("LFO", OrpheusColors.neonCyan, 90)
+    override val label = "LFO"
+    override val color = OrpheusColors.neonCyan
 
     @Composable
     override fun Content(
@@ -42,8 +38,9 @@ class LfoPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.LFO,
-            position = PanelPosition.START,
             weight = 0.6f,
+            label = "LFO",
+            color = OrpheusColors.neonCyan,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             DuoLfoPanel(
                 feature = LfoViewModel.previewFeature(),

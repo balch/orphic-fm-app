@@ -6,10 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
@@ -18,11 +16,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 class LiveCodePanelRegistration : FeaturePanel {
     override val panelId = PanelId.CODE
     override val description = "Tidal Coding Panel for REPL"
-    override val position = PanelPosition.END
-    override val linkedFeature: PanelId? = null
     override val weight = 1.0f
-    override val defaultExpanded = false
-    override val compactPortrait = CompactPortraitConfig("REPL", OrpheusColors.neonCyan, 110)
+    override val label = "REPL"
+    override val color = OrpheusColors.neonCyan
 
     @Composable
     override fun Content(
@@ -42,7 +38,8 @@ class LiveCodePanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.CODE,
-            position = PanelPosition.END,
+            label = "REPL",
+            color = OrpheusColors.neonCyan,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             LiveCodePanel(
                 feature = LiveCodeViewModel.previewFeature(),

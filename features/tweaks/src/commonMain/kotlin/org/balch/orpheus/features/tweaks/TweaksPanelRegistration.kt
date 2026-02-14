@@ -6,10 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -19,11 +17,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 class TweaksPanelRegistration : FeaturePanel {
     override val panelId = PanelId.TWEAKS
     override val description = "Modulation tweaks panel"
-    override val position = PanelPosition.MID
-    override val linkedFeature: PanelId? = null
     override val weight = 0.5f
-    override val defaultExpanded = false
-    override val compactPortrait = CompactPortraitConfig("Tweaks", OrpheusColors.electricBlue, 40)
+    override val label = "Tweaks"
+    override val color = OrpheusColors.electricBlue
 
     @Composable
     override fun Content(
@@ -43,9 +39,9 @@ class TweaksPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.TWEAKS,
-            position = PanelPosition.MID,
             weight = 0.5f,
-            compactPortrait = CompactPortraitConfig("Tweaks", OrpheusColors.electricBlue, 40),
+            label = "Tweaks",
+            color = OrpheusColors.electricBlue,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             ModTweaksPanel(
                 voiceFeature = VoiceViewModel.previewFeature(),

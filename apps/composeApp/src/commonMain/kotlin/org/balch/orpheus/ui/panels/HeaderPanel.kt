@@ -26,7 +26,7 @@ import org.balch.orpheus.core.FeaturePanel
 fun HeaderPanel(
     modifier: Modifier = Modifier,
     headerFeature: HeaderFeature = HeaderViewModel.feature(),
-    panels: List<FeaturePanel> = headerFeature.sortedPanels,
+    panels: List<FeaturePanel> = headerFeature.visiblePanels,
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
@@ -43,8 +43,9 @@ fun HeaderPanel(
     ) {
         panels.forEach { panel ->
             val isExpanded = uiState.isExpanded(panel.panelId)
+            val weight = uiState.weightOverrides[panel.panelId] ?: panel.weight
             panel.Content(
-                modifier = panelModifier(isExpanded, panel.weight),
+                modifier = panelModifier(isExpanded, weight),
                 isExpanded = isExpanded,
                 onExpandedChange = { headerFeature.actions.setExpanded(panel.panelId, it) },
                 onDialogActiveChange = onDialogActiveChange,
@@ -55,7 +56,7 @@ fun HeaderPanel(
 
 /**
  * Returns the appropriate modifier for a panel based on its expansion state.
- * Expanded panels get weight(1f) to share available space equally.
+ * Expanded panels get weight() to share available space proportionally.
  * Collapsed panels use their intrinsic width (just the header).
  */
 @Composable

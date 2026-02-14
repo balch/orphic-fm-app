@@ -6,10 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.CompactPortraitConfig
 import org.balch.orpheus.core.FeaturePanel
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.PanelPosition
 import org.balch.orpheus.core.featurePanelPreview
 import org.balch.orpheus.features.drum.DrumViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -20,10 +18,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 class TriggerRouterPanelRegistration : FeaturePanel {
     override val panelId = PanelId.FLUX_TRIGGERS
     override val description = "Assigns sounds to Flux outputs"
-    override val position = PanelPosition.MID
-    override val linkedFeature: PanelId? = null
     override val weight = 0.8f
-    override val defaultExpanded = false
+    override val label = "Triggers"
+    override val color = OrpheusColors.neonCyan
 
     @Composable
     override fun Content(
@@ -44,8 +41,9 @@ class TriggerRouterPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.FLUX_TRIGGERS,
-            position = PanelPosition.MID,
             weight = 0.8f,
+            label = "Triggers",
+            color = OrpheusColors.neonCyan,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             TriggerRouterPanel(
                 drumFeature = DrumViewModel.previewFeature(),
@@ -63,11 +61,9 @@ class TriggerRouterPanelRegistration : FeaturePanel {
 class FluxPanelRegistration : FeaturePanel {
     override val panelId = PanelId.FLUX
     override val description = "Random music generator"
-    override val position = PanelPosition.MID
-    override val linkedFeature = PanelId.FLUX_TRIGGERS
     override val weight = 1.0f
-    override val defaultExpanded = false
-    override val compactPortrait = CompactPortraitConfig("Flux", OrpheusColors.neonCyan, 80)
+    override val label = "Flux"
+    override val color = OrpheusColors.neonCyan
 
     @Composable
     override fun Content(
@@ -87,8 +83,8 @@ class FluxPanelRegistration : FeaturePanel {
     companion object {
         fun preview() = featurePanelPreview(
             panelId = PanelId.FLUX,
-            position = PanelPosition.MID,
-            linkedFeature = PanelId.FLUX_TRIGGERS,
+            label = "Flux",
+            color = OrpheusColors.neonCyan,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             FluxPanel(
                 flux = FluxViewModel.previewFeature(),
