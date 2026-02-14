@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,6 +33,12 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.lighten
+
+/**
+ * When `true`, [CollapsibleColumnPanel] hides its collapsed header strip and reduces padding,
+ * equivalent to `showCollapsedHeader = false`. Used by compact portrait mode.
+ */
+val LocalCompactMode = staticCompositionLocalOf { false }
 
 /**
  * Collapsible settings panel for the left side of top row.
@@ -59,6 +66,7 @@ fun CollapsibleColumnPanel(
 ) {
     var internalExpanded by remember { mutableStateOf(initialExpanded) }
     val effectiveExpanded = isExpanded ?: internalExpanded
+    val effectiveShowCollapsedHeader = showCollapsedHeader && !LocalCompactMode.current
 
     val toggleExpanded = {
         val next = !effectiveExpanded
@@ -95,7 +103,7 @@ fun CollapsibleColumnPanel(
     ) {
         Row {
             // [LEFT] Vertical Header Strip (Visible if enabled)
-            if (showCollapsedHeader) {
+            if (effectiveShowCollapsedHeader) {
                 Box(
                     modifier = Modifier
                         .width(collapsedWidth)
@@ -120,7 +128,7 @@ fun CollapsibleColumnPanel(
                         .fillMaxWidth()
                         .padding(
                             vertical =
-                                if (showCollapsedHeader) 16.dp else 4.dp
+                                if (effectiveShowCollapsedHeader) 16.dp else 4.dp
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)

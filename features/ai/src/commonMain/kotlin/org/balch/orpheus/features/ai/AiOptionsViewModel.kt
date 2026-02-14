@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModel

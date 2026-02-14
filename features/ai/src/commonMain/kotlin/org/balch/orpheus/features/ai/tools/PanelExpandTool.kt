@@ -9,7 +9,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
-import org.balch.orpheus.features.ai.PanelId
+import org.balch.orpheus.core.PanelId
 
 /**
  * Tool for expanding or collapsing UI panels.

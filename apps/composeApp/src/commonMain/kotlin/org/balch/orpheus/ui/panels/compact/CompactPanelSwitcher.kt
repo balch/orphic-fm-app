@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,53 +36,33 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.balch.orpheus.core.CompactPortraitConfig
+import org.balch.orpheus.core.FeaturePanel
+import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.PanelPosition
+import org.balch.orpheus.core.featurePanelPreview
+import org.balch.orpheus.ui.panels.LocalCompactMode
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 
 /**
- * Enum representing available compact panels for portrait mode.
- */
-enum class CompactPanelType(val displayName: String, val color: Color) {
-    EVO("Evo", OrpheusColors.evoGold),
-    PRESET("Preset", OrpheusColors.presetOrange),
-    VIZ("Viz", OrpheusColors.vizGreen),
-    DISTORTION("Distortion", OrpheusColors.neonMagenta),
-    TWEAKS("Tweaks", OrpheusColors.electricBlue), // Mod tweaks panel
-    RESONATOR("Rezo", OrpheusColors.lakersGold), // Lakers-themed Resonator
-    GRAINS("Grains", OrpheusColors.grainsRed), 
-    WARPS("Marps", OrpheusColors.warpsGreen),
-    FLUX("Flux", OrpheusColors.neonCyan),
-    LFO("LFO", OrpheusColors.neonCyan),
-    DELAY("Delay", OrpheusColors.warmGlow),
-    REPL("REPL", OrpheusColors.neonCyan),
-    DRUMS("Drums", OrpheusColors.neonMagenta),
-    PATTERN("Sequencer", OrpheusColors.neonCyan),
-}
-
-/**
- * Horizontal swipe-based panel switcher with title and arrow navigation.
- * 
- * Features:
- * - Horizontal swipe gestures to switch panels
- * - Left/right arrow buttons for navigation
- * - Panel title displayed in center
- * - Smooth animated transitions
+ * Horizontal swipe-based panel switcher with arrow navigation.
+ * Panels are provided dynamically via the [FeaturePanel] registration system.
  */
 @Composable
 fun CompactPanelSwitcher(
-    selectedPanel: CompactPanelType,
-    onPanelSelected: (CompactPanelType) -> Unit,
+    panels: List<FeaturePanel>,
+    selectedPanelId: PanelId,
+    onPanelSelected: (PanelId) -> Unit,
     modifier: Modifier = Modifier,
-    content: @Composable (CompactPanelType) -> Unit
 ) {
-    val panels = CompactPanelType.entries
-    val currentIndex = panels.indexOf(selectedPanel)
+    val currentIndex = panels.indexOfFirst { it.panelId == selectedPanelId }.coerceAtLeast(0)
     val pagerState = rememberPagerState(initialPage = currentIndex) {
         panels.size
     }
 
-    LaunchedEffect(selectedPanel) {
-        val targetPage = panels.indexOf(selectedPanel)
+    LaunchedEffect(selectedPanelId) {
+        val targetPage = panels.indexOfFirst { it.panelId == selectedPanelId }.coerceAtLeast(0)
         if (targetPage != pagerState.currentPage) {
             pagerState.animateScrollToPage(targetPage)
         }
@@ -89,10 +70,12 @@ fun CompactPanelSwitcher(
 
     LaunchedEffect(pagerState.currentPage) {
         val currentPanel = panels[pagerState.currentPage]
-        if (currentPanel != selectedPanel) {
-            onPanelSelected(currentPanel)
+        if (currentPanel.panelId != selectedPanelId) {
+            onPanelSelected(currentPanel.panelId)
         }
     }
+
+    val currentColor = panels.getOrNull(currentIndex)?.compactPortrait?.color ?: Color.White
 
     Box(modifier = modifier.fillMaxSize()) {
 
@@ -101,22 +84,39 @@ fun CompactPanelSwitcher(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
         ) { page ->
-            content(panels[page])
+            val panel = panels[page]
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        OrpheusColors.darkVoid.copy(alpha = 0.6f),
+                        RoundedCornerShape(12.dp)
+                    )
+            ) {
+                CompositionLocalProvider(LocalCompactMode provides true) {
+                    panel.Content(
+                        modifier = Modifier.fillMaxSize(),
+                        isExpanded = true,
+                        onExpandedChange = {},
+                        onDialogActiveChange = {},
+                    )
+                }
+            }
         }
 
-        // Navigation header with arrows and title
+        // Navigation header with arrows
         PanelNavigationHeader(
-            panelColor = selectedPanel.color,
+            panelColor = currentColor,
             canGoLeft = currentIndex > 0,
             canGoRight = currentIndex < panels.size - 1,
             onLeftClick = {
                 if (currentIndex > 0) {
-                    onPanelSelected(panels[currentIndex - 1])
+                    onPanelSelected(panels[currentIndex - 1].panelId)
                 }
             },
             onRightClick = {
                 if (currentIndex < panels.size - 1) {
-                    onPanelSelected(panels[currentIndex + 1])
+                    onPanelSelected(panels[currentIndex + 1].panelId)
                 }
             }
         )
@@ -125,7 +125,7 @@ fun CompactPanelSwitcher(
 }
 
 /**
- * Navigation header with panel title and left/right arrows.
+ * Navigation header with left/right arrows.
  */
 @Composable
 private fun PanelNavigationHeader(
@@ -137,7 +137,7 @@ private fun PanelNavigationHeader(
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(8.dp)
-    
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -213,29 +213,40 @@ private fun NavigationArrow(
 @Composable
 private fun CompactPanelSwitcherPreview() {
     OrpheusTheme {
-        var selectedPanel by remember { mutableStateOf(CompactPanelType.DELAY) }
+        val previewPanels = listOf(
+            previewPanel(PanelId.DELAY, "Delay", OrpheusColors.warmGlow, 0),
+            previewPanel(PanelId.DISTORTION, "Distortion", OrpheusColors.neonMagenta, 10),
+        )
+        var selectedId by remember { mutableStateOf(PanelId.DELAY) }
         CompactPanelSwitcher(
-            selectedPanel = selectedPanel,
-            onPanelSelected = { selectedPanel = it },
+            panels = previewPanels,
+            selectedPanelId = selectedId,
+            onPanelSelected = { selectedId = it },
             modifier = Modifier.background(OrpheusColors.darkVoid)
-        ) { panel ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp)
-                    .padding( top = 0.dp)
-                    .background(panel.color.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "${panel.displayName} Panel Content",
-                    color = panel.color,
-                    style = MaterialTheme.typography.headlineSmall
-                )
-            }
-        }
+        )
     }
 }
+
+private fun previewPanel(id: PanelId, label: String, color: Color, order: Int) =
+    featurePanelPreview(
+        panelId = id,
+        position = PanelPosition.MID,
+        compactPortrait = CompactPortraitConfig(label, color, order),
+    ) { modifier, _, _, _ ->
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .background(color.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "$label Panel Content",
+                color = color,
+                style = MaterialTheme.typography.headlineSmall
+            )
+        }
+    }
 
 @Preview(widthDp = 360, heightDp = 60)
 @Composable

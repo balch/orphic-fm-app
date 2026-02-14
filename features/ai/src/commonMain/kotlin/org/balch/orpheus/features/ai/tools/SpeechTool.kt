@@ -16,7 +16,7 @@ import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.speech.SpeechEventBus
 import org.balch.orpheus.core.speech.SpeechVocabulary
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
-import org.balch.orpheus.features.ai.PanelId
+import org.balch.orpheus.core.PanelId
 
 /**
  * AI tool for making the synthesizer speak words using the Plaits Speech engine.

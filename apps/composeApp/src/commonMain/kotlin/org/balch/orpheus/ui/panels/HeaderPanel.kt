@@ -16,64 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.features.ai.AiOptionsFeature
-import org.balch.orpheus.features.ai.AiOptionsPanel
-import org.balch.orpheus.features.ai.AiOptionsViewModel
-import org.balch.orpheus.features.ai.PanelId
-import org.balch.orpheus.features.beats.DrumBeatsFeature
-import org.balch.orpheus.features.beats.DrumBeatsPanel
-import org.balch.orpheus.features.beats.DrumBeatsViewModel
-import org.balch.orpheus.features.delay.DelayFeature
-import org.balch.orpheus.features.delay.DelayFeedbackPanel
-import org.balch.orpheus.features.delay.DelayViewModel
-import org.balch.orpheus.features.distortion.DistortionFeature
-import org.balch.orpheus.features.distortion.DistortionPanel
-import org.balch.orpheus.features.distortion.DistortionViewModel
-import org.balch.orpheus.features.drum.DrumFeature
-import org.balch.orpheus.features.drum.DrumViewModel
-import org.balch.orpheus.features.drum.DrumsPanel
-import org.balch.orpheus.features.evo.EvoFeature
-import org.balch.orpheus.features.evo.EvoPanel
-import org.balch.orpheus.features.evo.EvoViewModel
-import org.balch.orpheus.features.flux.FluxFeature
-import org.balch.orpheus.features.flux.FluxPanel
-import org.balch.orpheus.features.flux.FluxViewModel
-import org.balch.orpheus.features.flux.TriggerRouterPanel
-import org.balch.orpheus.features.grains.GrainsFeature
-import org.balch.orpheus.features.grains.GrainsPanel
-import org.balch.orpheus.features.grains.GrainsViewModel
-import org.balch.orpheus.features.lfo.DuoLfoPanel
-import org.balch.orpheus.features.lfo.LfoFeature
-import org.balch.orpheus.features.lfo.LfoViewModel
-import org.balch.orpheus.features.looper.LooperFeature
-import org.balch.orpheus.features.looper.LooperPanel
-import org.balch.orpheus.features.looper.LooperViewModel
-import org.balch.orpheus.features.midi.MidiFeature
-import org.balch.orpheus.features.midi.MidiPanel
-import org.balch.orpheus.features.midi.MidiViewModel
-import org.balch.orpheus.features.presets.PresetsFeature
-import org.balch.orpheus.features.presets.PresetsPanel
-import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.resonator.ResonatorFeature
-import org.balch.orpheus.features.resonator.ResonatorPanel
-import org.balch.orpheus.features.resonator.ResonatorViewModel
-import org.balch.orpheus.features.reverb.ReverbFeature
-import org.balch.orpheus.features.reverb.ReverbPanel
-import org.balch.orpheus.features.reverb.ReverbViewModel
-import org.balch.orpheus.features.speech.SpeechFeature
-import org.balch.orpheus.features.speech.SpeechPanel
-import org.balch.orpheus.features.speech.SpeechViewModel
-import org.balch.orpheus.features.tidal.LiveCodeFeature
-import org.balch.orpheus.features.tidal.LiveCodePanel
-import org.balch.orpheus.features.tidal.LiveCodeViewModel
-import org.balch.orpheus.features.visualizations.VizFeature
-import org.balch.orpheus.features.visualizations.VizPanel
-import org.balch.orpheus.features.visualizations.VizViewModel
-import org.balch.orpheus.features.voice.VoiceViewModel
-import org.balch.orpheus.features.voice.VoicesFeature
-import org.balch.orpheus.features.warps.WarpsFeature
-import org.balch.orpheus.features.warps.WarpsPanel
-import org.balch.orpheus.features.warps.WarpsViewModel
+import org.balch.orpheus.core.FeaturePanel
 
 /**
  * A container for the top header panel row that manages expansion state
@@ -83,37 +26,12 @@ import org.balch.orpheus.features.warps.WarpsViewModel
 fun HeaderPanel(
     modifier: Modifier = Modifier,
     headerFeature: HeaderFeature = HeaderViewModel.feature(),
-    presetsFeature: PresetsFeature = PresetsViewModel.feature(),
-    midiFeature: MidiFeature = MidiViewModel.feature(),
-    vizFeature: VizFeature = VizViewModel.feature(),
-    evoFeature: EvoFeature = EvoViewModel.feature(),
-    lfoFeature: LfoFeature = LfoViewModel.feature(),
-    delayFeature: DelayFeature = DelayViewModel.feature(),
-    reverbFeature: ReverbFeature = ReverbViewModel.feature(),
-    distortionFeature: DistortionFeature = DistortionViewModel.feature(),
-    resonatorFeature: ResonatorFeature = ResonatorViewModel.feature(),
-    grainsFeature: GrainsFeature = GrainsViewModel.feature(),
-    looperFeature: LooperFeature = LooperViewModel.feature(),
-    liveCodeFeature: LiveCodeFeature = LiveCodeViewModel.feature(),
-    speechFeature: SpeechFeature = SpeechViewModel.feature(),
-    aiOptionsFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
-    drumFeature: DrumFeature = DrumViewModel.feature(),
-    drumBeatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
-    warpsFeature: WarpsFeature = WarpsViewModel.feature(),
-    fluxFeature: FluxFeature = FluxViewModel.feature(),
-    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
+    panels: List<FeaturePanel> = headerFeature.sortedPanels,
     height: Dp = 260.dp,
     onDialogActiveChange: (Boolean) -> Unit = {}
 ) {
     val uiState by headerFeature.stateFlow.collectAsState()
-    val headerActions = headerFeature.actions
     val scrollState = rememberScrollState()
-
-    fun PanelId.setExpanded(expanded: Boolean) {
-        headerActions.setExpanded(this, expanded)
-    }
-
-    fun PanelId.isExpanded(): Boolean = uiState.isExpanded(this)
 
     Row(
         modifier = modifier
@@ -123,137 +41,15 @@ fun HeaderPanel(
         horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        PresetsPanel(
-            feature = presetsFeature,
-            isExpanded = PanelId.PRESETS.isExpanded(),
-            onExpandedChange = { PanelId.PRESETS.setExpanded(it) },
-            modifier = panelModifier(PanelId.PRESETS.isExpanded())
-        )
-        MidiPanel(
-            feature = midiFeature,
-            isExpanded = PanelId.MIDI.isExpanded(),
-            onExpandedChange = { PanelId.MIDI.setExpanded(it) },
-            modifier = panelModifier(PanelId.MIDI.isExpanded(), weight = .5f)
-        )
-        VizPanel(
-            feature = vizFeature,
-            isExpanded = PanelId.VIZ.isExpanded(),
-            onExpandedChange = { PanelId.VIZ.setExpanded(it) },
-            modifier = panelModifier(PanelId.VIZ.isExpanded(), weight = .5f)
-        )
-        EvoPanel(
-            evoFeature = evoFeature,
-            isExpanded = PanelId.EVO.isExpanded(),
-            onExpandedChange = { PanelId.EVO.setExpanded(it) },
-            modifier = panelModifier(PanelId.EVO.isExpanded(), weight = .5f)
-        )
-        DuoLfoPanel(
-            feature = lfoFeature,
-            isExpanded = PanelId.LFO.isExpanded(),
-            onExpandedChange = { PanelId.LFO.setExpanded(it) },
-            modifier = panelModifier(PanelId.LFO.isExpanded(), weight = .6f)
-        )
-        DelayFeedbackPanel(
-            feature = delayFeature,
-            isExpanded = PanelId.DELAY.isExpanded(),
-            onExpandedChange = { PanelId.DELAY.setExpanded(it) },
-            modifier = panelModifier(PanelId.DELAY.isExpanded())
-        )
-        ReverbPanel(
-            feature = reverbFeature,
-            isExpanded = PanelId.REVERB.isExpanded(),
-            onExpandedChange = { PanelId.REVERB.setExpanded(it) },
-            modifier = panelModifier(PanelId.REVERB.isExpanded(), weight = .5f)
-        )
-        DistortionPanel(
-            feature = distortionFeature,
-            isExpanded = PanelId.DISTORTION.isExpanded(),
-            onExpandedChange = { PanelId.DISTORTION.setExpanded(it) },
-            modifier = panelModifier(PanelId.DISTORTION.isExpanded(), weight = .6f)
-        )
-        // Rings Resonator panel
-        ResonatorPanel(
-            feature = resonatorFeature,
-            isExpanded = PanelId.RESONATOR.isExpanded(),
-            onExpandedChange = { PanelId.RESONATOR.setExpanded(it) },
-            modifier = panelModifier(PanelId.RESONATOR.isExpanded())
-        )
-        // Grains Panel
-        GrainsPanel(
-             feature = grainsFeature,
-             isExpanded = PanelId.GRAINS.isExpanded(),
-             onExpandedChange = { PanelId.GRAINS.setExpanded(it) },
-             modifier = panelModifier(PanelId.GRAINS.isExpanded())
-        )
-        // Looper Panel
-        LooperPanel(
-             feature = looperFeature,
-             isExpanded = PanelId.LOOPER.isExpanded(),
-             onExpandedChange = { PanelId.LOOPER.setExpanded(it) },
-             modifier = panelModifier(PanelId.LOOPER.isExpanded())
-        )
-        // Warps Panel
-        WarpsPanel(
-            feature = warpsFeature,
-            isExpanded = PanelId.WARPS.isExpanded(),
-            onExpandedChange = { PanelId.WARPS.setExpanded(it) },
-            modifier = panelModifier(PanelId.WARPS.isExpanded())
-        )
-        // Pulse Router Panel
-        TriggerRouterPanel(
-            drumFeature = drumFeature,
-            voiceFeature = voiceFeature,
-
-            isExpanded = PanelId.FLUX_TRIGGERS.isExpanded(),
-            onExpandedChange = { PanelId.FLUX_TRIGGERS.setExpanded(it) },
-            modifier = panelModifier(PanelId.FLUX_TRIGGERS.isExpanded(), weight = 0.8f)
-        )
-        // Flux Panel
-        FluxPanel(
-            flux = fluxFeature,
-            isExpanded = PanelId.FLUX.isExpanded(),
-            onExpandedChange = { PanelId.FLUX.setExpanded(it) },
-            modifier = panelModifier(PanelId.FLUX.isExpanded())
-        )
-        // Live Coding panel
-        LiveCodePanel(
-            feature = liveCodeFeature,
-            isExpanded = PanelId.CODE.isExpanded(),
-            onExpandedChange = { PanelId.CODE.setExpanded(it) },
-            modifier = panelModifier(PanelId.CODE.isExpanded())
-        )
-        // Speech panel
-        SpeechPanel(
-            feature = speechFeature,
-            isExpanded = PanelId.SPEECH.isExpanded(),
-            onExpandedChange = { PanelId.SPEECH.setExpanded(it) },
-            onTextFieldFocusChange = onDialogActiveChange,
-            modifier = panelModifier(PanelId.SPEECH.isExpanded())
-        )
-        // Drums panel
-        DrumsPanel(
-            drumFeature = drumFeature,
-            isExpanded = PanelId.DRUMS.isExpanded(),
-            onExpandedChange = { PanelId.DRUMS.setExpanded(it) },
-            modifier = panelModifier(PanelId.DRUMS.isExpanded(), weight = 1.15f)
-        )
-        // Pattern panel
-        DrumBeatsPanel(
-            drumBeatsFeature = drumBeatsFeature,
-            isExpanded = PanelId.BEATS.isExpanded(),
-            onExpandedChange = { PanelId.BEATS.setExpanded(it) },
-            modifier = panelModifier(PanelId.BEATS.isExpanded(), weight = 1.25f)
-        )
-        // AI Options panel
-        AiOptionsPanel(
-            feature = aiOptionsFeature,
-            isExpanded = PanelId.AI.isExpanded(),
-            onExpandedChange = { PanelId.AI.setExpanded(it) },
-            modifier = panelModifier(
-                isExpanded = PanelId.AI.isExpanded(),
-                weight = .6f,
+        panels.forEach { panel ->
+            val isExpanded = uiState.isExpanded(panel.panelId)
+            panel.Content(
+                modifier = panelModifier(isExpanded, panel.weight),
+                isExpanded = isExpanded,
+                onExpandedChange = { headerFeature.actions.setExpanded(panel.panelId, it) },
+                onDialogActiveChange = onDialogActiveChange,
             )
-        )
+        }
     }
 }
 

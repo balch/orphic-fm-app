@@ -77,112 +77,84 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 import kotlin.reflect.KClass
 
-/**
- * The desktop screen - injects ViewModels internally and calls Layout.
- * Use DesktopSynthScreenLayout directly for previews with mock features.
- */
+// A minimal mock MidiViewModel that implements the ViewModel interface.
+private class MockMidiViewModel : ViewModel(), MidiFeature {
+    override val stateFlow = MutableStateFlow(MidiUiState(isConnected = true, deviceName = "Mock Device"))
+    override val actions = MidiPanelActions(
+        toggleLearnMode = {},
+        saveLearnedMappings = {},
+        cancelLearnMode = {},
+        selectControlForLearning = {},
+        selectVoiceForLearning = {},
+        isControlBeingLearned = { false },
+        isVoiceBeingLearned = { false }
+    )
+}
+
+// Mock MetroViewModelFactory for previews to satisfy CompositionLocalProvider requirement.
+// This factory provides a minimal mock MidiViewModel when requested by the metroViewModel() helper,
+// preventing a "No MetroViewModelFactory registered" error during preview rendering.
+private class PreviewMetroViewModelFactory : MetroViewModelFactory() {
+    override val viewModelProviders: Map<KClass<out ViewModel>, Provider<ViewModel>>
+        get() = mapOf(
+            MidiViewModel::class to Provider { MockMidiViewModel() as ViewModel }
+        )
+    override val assistedFactoryProviders: Map<KClass<out ViewModel>, Provider<ViewModelAssistedFactory>>
+        get() = emptyMap()
+    override val manualAssistedFactoryProviders: Map<KClass<out ManualViewModelAssistedFactory>, Provider<ManualViewModelAssistedFactory>>
+        get() = emptyMap()
+}
+
+private fun previewPanels(): List<FeaturePanel> = sortPanels(
+    setOf(
+        PresetsPanelRegistration.preview(),
+        MidiPanelRegistration.preview(),
+        VizPanelRegistration.preview(),
+        EvoPanelRegistration.preview(),
+        LfoPanelRegistration.preview(),
+        DelayPanelRegistration.preview(),
+        ReverbPanelRegistration.preview(),
+        DistortionPanelRegistration.preview(),
+        ResonatorPanelRegistration.preview(),
+        GrainsPanelRegistration.preview(),
+        LooperPanelRegistration.preview(),
+        WarpsPanelRegistration.preview(),
+        TriggerRouterPanelRegistration.preview(),
+        FluxPanelRegistration.preview(),
+        LiveCodePanelRegistration.preview(),
+        SpeechPanelRegistration.preview(),
+        DrumsPanelRegistration.preview(),
+        BeatsPanelRegistration.preview(),
+        AiOptionsPanelRegistration.preview(),
+    )
+)
+
+@Preview(widthDp = 1200, heightDp = 800)
 @Composable
-fun DesktopSynthScreen(
-    headerFeature: HeaderFeature = HeaderViewModel.feature(),
-    panels: List<FeaturePanel> = headerFeature.sortedPanels,
-    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
-    drumFeature: DrumFeature = DrumViewModel.feature(),
-    speechFeature: SpeechFeature = SpeechViewModel.feature(),
-    midiFeature: MidiFeature = MidiViewModel.feature(), // Added midiFeature parameter
-    effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
-    isDialogActive: Boolean = false,
-    onDialogActiveChange: (Boolean) -> Unit,
-    focusRequester: FocusRequester = remember { FocusRequester() },
+private fun DesktopSynthScreenPreview(
+    @PreviewParameter(LiquidEffectsProvider::class) effects: VisualizationLiquidEffects,
 ) {
-    // Request focus for keyboard input handling
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .focusRequester(focusRequester)
-                .focusable()
-                .onPreviewKeyEvent { event ->
-                    // Spacebar trigger for TTS (when enabled and not editing text)
-                    if (!isDialogActive &&
-                        event.key == Key.Spacebar &&
-                        event.type == KeyEventType.KeyDown &&
-                        speechFeature.stateFlow.value.spacebarTrigger
-                    ) {
-                        val state = speechFeature.stateFlow.value
-                        if (state.isSpeaking || state.isGenerating) {
-                            speechFeature.actions.stop()
-                        } else {
-                            speechFeature.actions.speak()
-                        }
-                        return@onPreviewKeyEvent true
-                    }
-
-                    SynthKeyboardHandler.handleKeyEvent(
-                        keyEvent = event,
-                        voiceFeature = voiceFeature,
-                        drumFeature = drumFeature,
-                        isDialogActive = isDialogActive
-                    )
-                },
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+    val panels = previewPanels()
+    // Provide a mock MetroViewModelFactory for the preview environment.
+    // This is necessary because some components within DesktopSynthScreen (e.g., MidiViewModel.feature())
+    // expect a MetroViewModelFactory to be available via CompositionLocal, even when
+    // using preview-specific features.
+    CompositionLocalProvider(LocalMetroViewModelFactory provides PreviewMetroViewModelFactory()) {
+        LiquidPreviewContainerWithGradient(
+            effects = effects,
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Header panel
-            HeaderPanel(
-                modifier = Modifier.fillMaxWidth()
-                    .weight(0.75f),
-                headerFeature = headerFeature,
+            DesktopSynthScreen(
+                headerFeature = HeaderViewModel.previewFeature(panels = panels),
                 panels = panels,
-                onDialogActiveChange = onDialogActiveChange,
+                voiceFeature = VoiceViewModel.previewFeature(),
+                drumFeature = DrumViewModel.previewFeature(),
+                speechFeature = SpeechViewModel.previewFeature(),
+                midiFeature = MidiViewModel.previewFeature(), // Pass the preview MidiFeature
+                effects = effects,
+                onDialogActiveChange = {},
+                focusRequester = FocusRequester()
             )
-
-            // Main content area
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            ) {
-                // Voice groups + center controls
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    VoiceGroupSection(
-                        voiceFeature = voiceFeature,
-                        midiFeature = midiFeature, // Pass midiFeature to VoiceGroupSection
-                        quadLabel = "1-4",
-                        quadColor = OrpheusColors.neonMagenta,
-                        voiceStartIndex = 0,
-                        modifier = Modifier.weight(1f),
-                    )
-
-                    CenterControlSection(
-                        voiceFeature = voiceFeature,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .weight(0.4f)
-                    )
-
-                    VoiceGroupSection(
-                        voiceFeature = voiceFeature,
-                        midiFeature = midiFeature, // Pass midiFeature to VoiceGroupSection
-                        quadLabel = "5-8",
-                        quadColor = OrpheusColors.synthGreen,
-                        voiceStartIndex = 4,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                AppTitleTreatment(
-                    modifier = Modifier
-                        .padding(top = 20.dp)
-                        .align(Alignment.TopCenter),
-                    effects = effects,
-                )
-            }
         }
     }
 }

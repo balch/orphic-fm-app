@@ -12,6 +12,7 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,44 +21,24 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.FeaturePanel
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.sortPanels
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
-import org.balch.orpheus.features.ai.PanelId
 
 /**
  * UI state for the HeaderPanel, containing expansion states for all panels.
  */
 @Immutable
 data class HeaderPanelUiState(
-    val expandedPanels: PersistentMap<PanelId, Boolean> = DEFAULT_EXPANSION_STATE
+    val expandedPanels: PersistentMap<PanelId, Boolean> = persistentMapOf()
 ) {
     /**
      * Check if a panel is expanded.
      */
     fun isExpanded(panelId: PanelId): Boolean = expandedPanels[panelId] ?: false
-
-    companion object {
-        /**
-         * Default expansion state for panels.
-         * VIZ, LFO, DELAY, and DISTORTION are expanded by default.
-         */
-        val DEFAULT_EXPANSION_STATE: PersistentMap<PanelId, Boolean> = persistentMapOf(
-            PanelId.PRESETS to false,
-            PanelId.MIDI to false,
-            PanelId.VIZ to true,
-            PanelId.EVO to false,
-            PanelId.LFO to false,
-            PanelId.DELAY to false,
-            PanelId.DISTORTION to true,
-            PanelId.CODE to false,
-            PanelId.AI to false,
-            PanelId.DRUMS to false,
-            PanelId.LOOPER to false,
-            PanelId.BEATS to false,
-            PanelId.WARPS to false
-        )
-    }
 }
 
 /**
@@ -73,7 +54,9 @@ data class HeaderPanelActions(
     }
 }
 
-typealias HeaderFeature = SynthFeature<HeaderPanelUiState, HeaderPanelActions>
+interface HeaderFeature : SynthFeature<HeaderPanelUiState, HeaderPanelActions> {
+    val sortedPanels: List<FeaturePanel>
+}
 
 private data class HeaderIntent(val panelId: PanelId, val expanded: Boolean)
 
@@ -86,10 +69,16 @@ private data class HeaderIntent(val panelId: PanelId, val expanded: Boolean)
 @ViewModelKey(HeaderViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class HeaderViewModel(
-    panelExpansionEventBus: PanelExpansionEventBus
+    panelExpansionEventBus: PanelExpansionEventBus,
+    panels: Set<FeaturePanel>
 ) : ViewModel(), HeaderFeature {
 
     private val log = logging("HeaderViewModel")
+
+    override val sortedPanels: List<FeaturePanel> = sortPanels(panels)
+
+    private val defaultExpansion: PersistentMap<PanelId, Boolean> =
+        panels.associate { it.panelId to it.defaultExpanded }.toPersistentMap()
 
     private val uiIntents = MutableSharedFlow<HeaderIntent>(extraBufferCapacity = 64)
 
@@ -101,14 +90,14 @@ class HeaderViewModel(
 
     override val stateFlow: StateFlow<HeaderPanelUiState> =
         merge(uiIntents, busIntents)
-            .scan(HeaderPanelUiState()) { state, intent ->
+            .scan(HeaderPanelUiState(expandedPanels = defaultExpansion)) { state, intent ->
                 log.debug { "HeaderViewModel: setExpanded(${intent.panelId.name}, ${intent.expanded})" }
                 state.copy(expandedPanels = state.expandedPanels.put(intent.panelId, intent.expanded))
             }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
-                initialValue = HeaderPanelUiState()
+                initialValue = HeaderPanelUiState(expandedPanels = defaultExpansion)
             )
 
     override val actions = HeaderPanelActions(
@@ -116,10 +105,14 @@ class HeaderViewModel(
     )
 
     companion object {
-        fun previewFeature(state: HeaderPanelUiState = HeaderPanelUiState()): HeaderFeature =
+        fun previewFeature(
+            state: HeaderPanelUiState = HeaderPanelUiState(),
+            panels: List<FeaturePanel> = emptyList()
+        ): HeaderFeature =
             object : HeaderFeature {
                 override val stateFlow: StateFlow<HeaderPanelUiState> = MutableStateFlow(state)
                 override val actions: HeaderPanelActions = HeaderPanelActions.EMPTY
+                override val sortedPanels = panels
             }
 
         @Composable
