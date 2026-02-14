@@ -67,7 +67,7 @@ class TtsPlugin(
             floatType {
                 default = 0.5f
                 get { _volume }
-                set { _volume = it; ttsPlayer.setVolume(it * 3f) }
+                set { _volume = it; ttsPlayer.setVolume(it * 7f) }
             }
         }
 
