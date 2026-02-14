@@ -339,34 +339,25 @@ class DspVoiceManager @Inject constructor(
         if (quadIndex !in 0..2) return
         quadPitchSources[quadIndex] = sourceIndex
         pluginProvider.voicePlugin.setQuadPitchSource(quadIndex, sourceIndex)
-        
+
         val voiceIndices = (quadIndex * 4) until ((quadIndex + 1) * 4)
-        
+
         for (i in voiceIndices) {
             val voice = voices[i]
             voice.cvPitchInput.disconnectAll()
-            
+
             // 0=None, 1=X1, 2=X2, 3=X3
+            // CV path is multiplicative: baseFreq * (1 + cvInput) = baseFreq * 2^octaves
+            // Flux outputs 2^(voltage) - 1, so cvInput=0 means no shift
             when (sourceIndex) {
-                1 -> {
-                    pluginProvider.fluxPlugin.outputs["outputX1"]?.connect(voice.cvPitchInput)
-                    voice.cvPitchDepth.set(200.0)
-                }
-                2 -> {
-                    pluginProvider.fluxPlugin.outputs["output"]?.connect(voice.cvPitchInput)
-                    voice.cvPitchDepth.set(200.0)
-                }
-                3 -> {
-                    pluginProvider.fluxPlugin.outputs["outputX3"]?.connect(voice.cvPitchInput)
-                    voice.cvPitchDepth.set(200.0)
-                }
-                else -> {
-                    voice.cvPitchDepth.set(0.0)
-                }
+                1 -> pluginProvider.fluxPlugin.outputs["outputX1"]?.connect(voice.cvPitchInput)
+                2 -> pluginProvider.fluxPlugin.outputs["output"]?.connect(voice.cvPitchInput)
+                3 -> pluginProvider.fluxPlugin.outputs["outputX3"]?.connect(voice.cvPitchInput)
+                // else: disconnected, cvPitchInput defaults to 0 (no shift)
             }
         }
     }
-    
+
     fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) {
         if (quadIndex !in 0..2) return
         quadTriggerSources[quadIndex] = sourceIndex
@@ -615,7 +606,7 @@ class DspVoiceManager @Inject constructor(
     fun getQuadPitchSource(quadIndex: Int) = quadPitchSources.getOrElse(quadIndex) { 0 }
     fun getQuadTriggerSource(quadIndex: Int) = quadTriggerSources.getOrElse(quadIndex) { 0 }
     fun getQuadEnvelopeTriggerMode(quadIndex: Int) = quadEnvelopeTriggerModes.getOrElse(quadIndex) { false }
-    
+
     // Automation helpers
     fun getVoiceTuneArrayCopy() = _voiceTune.copyOf()
     fun getQuadPitchArrayCopy() = _quadPitch.copyOf()

@@ -585,5 +585,29 @@ interface FluxUnit : AudioUnit {
      */
     fun setScale(index: Int)
 
+    /** Set T-generator model (0-6). */
+    fun setTModel(index: Int) {}
+
+    /** Set T-generator range (0=0.25x, 1=1x, 2=4x). */
+    fun setTRange(index: Int) {}
+
+    /** Set pulse width (0.0-1.0). */
+    fun setPulseWidth(value: Float) {}
+
+    /** Set pulse width randomness (0.0-1.0). */
+    fun setPulseWidthStd(value: Float) {}
+
+    /** Set control mode (0=Identical, 1=Bump, 2=Tilt). */
+    fun setControlMode(index: Int) {}
+
+    /** Set voltage range (0=Narrow, 1=Positive, 2=Full). */
+    fun setVoltageRange(index: Int) {}
+
+    /** Set output mix level (0=bypass, 1=full) */
+    fun setMix(mix: Float) {}
+
+    /** Bypass processing — zero all outputs to save CPU when Flux is not in use. */
+    fun setBypass(bypass: Boolean) {}
+
     interface Factory { fun create(): FluxUnit }
 }

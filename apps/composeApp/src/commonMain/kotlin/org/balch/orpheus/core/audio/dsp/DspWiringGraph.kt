@@ -179,8 +179,8 @@ class DspWiringGraph @Inject constructor(
         pluginProvider.warpsPlugin.outputs["output"]?.connect(pluginProvider.delayPlugin.inputs["inputLeft"]!!)
         pluginProvider.warpsPlugin.outputs["outputRight"]?.connect(pluginProvider.delayPlugin.inputs["inputRight"]!!)
 
-        // Flux Clock Wiring (Sync GlobalClock to Flux)
-        globalTempo.getClockOutput().connect(pluginProvider.fluxPlugin.inputs["clock"]!!)
+        // Flux Clock Wiring (quarter-note beat clock, not 24 PPQN)
+        globalTempo.getBeatClockOutput().connect(pluginProvider.fluxPlugin.inputs["clock"]!!)
 
         // Stereo outputs → LineOut
         pluginProvider.stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)

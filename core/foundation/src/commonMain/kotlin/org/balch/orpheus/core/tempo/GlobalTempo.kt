@@ -45,6 +45,12 @@ class GlobalTempo @Inject constructor(
         clock.frequency.set(frequency)
     }
 
+    // Quarter-note clock for Flux (1 pulse per beat, not 24 PPQN)
+    private val beatClock: ClockUnit = dspFactory.createClockUnit().also { clock ->
+        audioEngine.addUnit(clock)
+        clock.frequency.set(120.0 / 60.0) // 2 Hz at 120 BPM
+    }
+
     /**
      * Set the global tempo in BPM (beats per minute).
      * Valid range: 60-200 BPM
@@ -66,6 +72,7 @@ class GlobalTempo @Inject constructor(
         val ppqn = 24
         val frequency = (bpm / 60.0) * ppqn
         clockUnit.frequency.set(frequency)
+        beatClock.frequency.set(bpm / 60.0) // Quarter-note rate
     }
 
     /**
@@ -79,6 +86,12 @@ class GlobalTempo @Inject constructor(
      * that need sample-accurate synchronization.
      */
     fun getClockOutput() = clockUnit.output
+
+    /**
+     * Get a quarter-note clock output (1 pulse per beat).
+     * Use for modules like Flux that expect beat-rate clocking, not 24 PPQN.
+     */
+    fun getBeatClockOutput() = beatClock.output
 
     /**
      * Set the clock pulse width (duty cycle).

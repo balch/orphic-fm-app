@@ -12,13 +12,12 @@ import org.balch.orpheus.plugins.flux.engine.FluxProcessor
 
 /**
  * JVM Implementation of FluxUnit using JSyn.
+ * Delegates entirely to FluxProcessor.process() for block-based audio-rate processing.
  */
-
-
 class JsynFluxUnit : UnitGenerator(), FluxUnit {
-    
+
     private val processor = FluxProcessor(44100f)
-    
+
     // JSyn Ports
     private val jsynClock = UnitInputPort("Clock")
     private val jsynSpread = UnitInputPort("Spread")
@@ -26,21 +25,21 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     private val jsynSteps = UnitInputPort("Steps")
     private val jsynDejaVu = UnitInputPort("DejaVu")
     private val jsynLength = UnitInputPort("Length")
-    private val jsynRate = UnitInputPort("Rate") // Divider control
+    private val jsynRate = UnitInputPort("Rate")
     private val jsynJitter = UnitInputPort("Jitter")
     private val jsynProbability = UnitInputPort("Probability")
     private val jsynGateLength = UnitInputPort("GateLength")
-    
+
     // Output
     private val jsynOutput = UnitOutputPort("Output")
     private val jsynOutputX1 = UnitOutputPort("OutputX1")
     private val jsynOutputX3 = UnitOutputPort("OutputX3")
-    
+
     // Gate Outputs
     private val jsynOutputT1 = UnitOutputPort("OutputT1")
     private val jsynOutputT2 = UnitOutputPort("OutputT2")
     private val jsynOutputT3 = UnitOutputPort("OutputT3")
-    
+
     // AudioUnit Wrapper Ports
     override val clock: AudioInput = JsynAudioInput(jsynClock)
     override val spread: AudioInput = JsynAudioInput(jsynSpread)
@@ -52,25 +51,14 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     override val jitter: AudioInput = JsynAudioInput(jsynJitter)
     override val probability: AudioInput = JsynAudioInput(jsynProbability)
     override val gateLength: AudioInput = JsynAudioInput(jsynGateLength)
-    
+
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
     override val outputX1: AudioOutput = JsynAudioOutput(jsynOutputX1)
     override val outputX3: AudioOutput = JsynAudioOutput(jsynOutputX3)
     override val outputT1: AudioOutput = JsynAudioOutput(jsynOutputT1)
     override val outputT2: AudioOutput = JsynAudioOutput(jsynOutputT2)
     override val outputT3: AudioOutput = JsynAudioOutput(jsynOutputT3)
-    
-    // Internal state for edge detection
-    private var lastClock = 0.0
-    private var clockCounter = 0
-    private var currentDivisor = 24
-    private var isGateActive = false
-    
-    // Internal state for Slew Limiting
-    private var currX1 = 0.5
-    private var currX2 = 0.5
-    private var currX3 = 0.5
-    
+
     init {
         addPort(jsynClock)
         addPort(jsynSpread)
@@ -88,125 +76,71 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         addPort(jsynOutputT1)
         addPort(jsynOutputT2)
         addPort(jsynOutputT3)
-        
+
         // Default values
         jsynSpread.set(0.5)
         jsynBias.set(0.5)
         jsynSteps.set(0.5)
         jsynDejaVu.set(0.0)
         jsynLength.set(8.0)
-        jsynRate.set(0.5) // Default to 1/2 note or similar
+        jsynRate.set(0.5)
         jsynJitter.set(0.0)
         jsynProbability.set(0.5)
         jsynGateLength.set(0.5)
     }
-    
-    override fun setScale(index: Int) {
-        processor.setScale(index)
-    }
-    
-    // Generate method
+
+    @Volatile private var bypass = true
+    @Volatile private var mix = 0.0f
+    override fun setBypass(bypass: Boolean) { this.bypass = bypass }
+    override fun setMix(mix: Float) { this.mix = mix; bypass = mix <= 0.001f; processor.setMix(mix) }
+
+    override fun setScale(index: Int) { processor.setScale(index) }
+    override fun setTModel(index: Int) { processor.setTModel(index) }
+    override fun setTRange(index: Int) { processor.setTRange(index) }
+    override fun setPulseWidth(value: Float) { processor.setPulseWidth(value) }
+    override fun setPulseWidthStd(value: Float) { processor.setPulseWidthStd(value) }
+    override fun setControlMode(index: Int) { processor.setControlMode(index) }
+    override fun setVoltageRange(index: Int) { processor.setVoltageRange(index) }
+
     override fun generate(start: Int, end: Int) {
         val count = end - start
         if (count <= 0) return
-        
-        val clocks = jsynClock.values
-        val spreads = jsynSpread.values
-        val biases = jsynBias.values
-        val steps = jsynSteps.values
-        val dejaVus = jsynDejaVu.values
-        val lengths = jsynLength.values
-        val rates = jsynRate.values
-        val jitters = jsynJitter.values
-        val probabilities = jsynProbability.values
-        val gateLengths = jsynGateLength.values
-        
-        val outputs = jsynOutput.values
-        val outputsX1 = jsynOutputX1.values
-        val outputsX3 = jsynOutputX3.values
-        val outputsT1 = jsynOutputT1.values
-        val outputsT2 = jsynOutputT2.values
-        val outputsT3 = jsynOutputT3.values
-        
-        for (i in 0 until count) {
-            val idx = start + i
-            val currentClock = clocks[idx]
-            
-            // Rising edge detection
-            if (currentClock > 0.1 && lastClock <= 0.1) {
-                val rateVal = rates[idx]
-                currentDivisor = when {
-                    rateVal < 0.05 -> 1   
-                    rateVal < 0.15 -> 6   
-                    rateVal < 0.30 -> 12  
-                    rateVal < 0.50 -> 24  
-                    rateVal < 0.70 -> 48  
-                    rateVal < 0.85 -> 96  
-                    else -> 192           
-                }
-                
-                clockCounter++
-                if (clockCounter >= currentDivisor) {
-                    clockCounter = 0 
-                    
-                    processor.setSpread(spreads[idx].toFloat())
-                    processor.setBias(biases[idx].toFloat())
-                    processor.setSteps(steps[idx].toFloat())
-                    processor.setDejaVu(dejaVus[idx].toFloat())
-                    processor.setLength(lengths[idx].toInt())
-                    processor.setJitter(jitters[idx].toFloat())
-                    processor.setGateProbability(probabilities[idx].toFloat())
-                    
-                    processor.tick()
-                    isGateActive = true
-                }
-            } else if (currentClock < 0.01) {
-                // If the master clock pulse ends, we might still want to keep the Flux gate high 
-                // based on the gateLength setting.
+
+        if (bypass) {
+            for (i in start until end) {
+                jsynOutput.values[i] = 0.0
+                jsynOutputX1.values[i] = 0.0
+                jsynOutputX3.values[i] = 0.0
+                jsynOutputT1.values[i] = 0.0
+                jsynOutputT2.values[i] = 0.0
+                jsynOutputT3.values[i] = 0.0
             }
-            
-            // Handle gate-off based on gateLength percentage of the divisor
-            val gateLenVal = gateLengths[idx]
-            val gateOffThreshold = (currentDivisor * gateLenVal).toInt().coerceAtLeast(1)
-            
-            if (isGateActive && clockCounter >= gateOffThreshold) {
-                processor.tickClockOff()
-                isGateActive = false
-            }
-            
-            lastClock = currentClock
-            
-            // Get Target Voltages from Processor
-            val targetX1 = processor.getX1().toDouble()
-            val targetX2 = processor.getX2().toDouble() // Main
-            val targetX3 = processor.getX3().toDouble()
-            
-            // Calculate Slew / Smoothing
-            // If steps < 0.5, apply lag processing. 
-            // If steps >= 0.5, output is instantaneous (S&H or Quantized).
-            val currentSteps = processor.getSteps()
-            
-            val alpha = if (currentSteps >= 0.5f) {
-                1.0 // Instant change
-            } else {
-                // Map steps 0.0 (Slow) .. 0.5 (Instant)
-                val t = (currentSteps / 0.5f).coerceIn(0.0f, 1.0f)
-                // Use cubic curve for natural feel
-                // Min alpha ~ 0.0005 (slow glide), Max alpha 1.0
-                0.0005 + (1.0 - 0.0005) * (t * t * t * t)
-            }
-            
-            currX1 += (targetX1 - currX1) * alpha
-            currX2 += (targetX2 - currX2) * alpha
-            currX3 += (targetX3 - currX3) * alpha
-            
-            outputs[idx] = currX2
-            outputsX1[idx] = currX1 
-            outputsX3[idx] = currX3
-            
-            outputsT1[idx] = processor.getT1().toDouble()
-            outputsT2[idx] = processor.getT2().toDouble() // Main Clock Gate
-            outputsT3[idx] = processor.getT3().toDouble()
+            return
         }
+
+        // Read control parameters (sample at start of block)
+        processor.setSpread(jsynSpread.values[start].toFloat())
+        processor.setBias(jsynBias.values[start].toFloat())
+        processor.setSteps(jsynSteps.values[start].toFloat())
+        processor.setDejaVu(jsynDejaVu.values[start].toFloat())
+        processor.setLength(jsynLength.values[start].toInt())
+        processor.setRate(jsynRate.values[start].toFloat())
+        processor.setJitter(jsynJitter.values[start].toFloat())
+        processor.setGateProbability(jsynProbability.values[start].toFloat())
+        processor.setPulseWidth(jsynGateLength.values[start].toFloat())
+
+        // Delegate block processing to FluxProcessor
+        processor.process(
+            clockIn = jsynClock.values,
+            outputX1 = jsynOutputX1.values,
+            outputX2 = jsynOutput.values,
+            outputX3 = jsynOutputX3.values,
+            outputT1 = jsynOutputT1.values,
+            outputT2 = jsynOutputT2.values,
+            outputT3 = jsynOutputT3.values,
+            start = start,
+            size = count
+        )
+
     }
 }

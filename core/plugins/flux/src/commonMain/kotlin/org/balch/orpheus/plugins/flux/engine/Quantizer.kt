@@ -111,10 +111,6 @@ class Quantizer {
             var noteIntegral = floor(note).toInt()
             var noteFractional = note - noteIntegral
             
-            if (inputValue < 0.0f) {
-                noteIntegral -= 1
-                noteFractional += 1.0f
-            }
             noteFractional *= baseInterval
             
             // Search for tightest upper/lower bound in active notes

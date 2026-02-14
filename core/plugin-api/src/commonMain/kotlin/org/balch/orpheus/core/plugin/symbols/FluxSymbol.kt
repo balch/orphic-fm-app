@@ -20,5 +20,12 @@ enum class FluxSymbol(
     JITTER("jitter", displayName = "Jitter"),
     PROBABILITY("probability", displayName = "Probability"),
     GATE_LENGTH("gatelength", displayName = "Gate Length"),
-    CLOCK_SOURCE("clock_source", displayName = "Clock Source")
+    CLOCK_SOURCE("clock_source", displayName = "Clock Source"),
+    T_MODEL("t_model", displayName = "T Model"),
+    T_RANGE("t_range", displayName = "T Range"),
+    PULSE_WIDTH("pulse_width", displayName = "Pulse Width"),
+    PULSE_WIDTH_STD("pulse_width_std", displayName = "PW Rand"),
+    CONTROL_MODE("control_mode", displayName = "Control Mode"),
+    VOLTAGE_RANGE("voltage_range", displayName = "Voltage Range"),
+    MIX("mix", displayName = "Mix")
 }

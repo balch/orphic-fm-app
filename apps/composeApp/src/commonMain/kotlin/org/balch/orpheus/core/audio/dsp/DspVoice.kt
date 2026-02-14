@@ -109,8 +109,7 @@ class DspVoice(
     val couplingInput: AudioInput get() = couplingScaler.inputA    // Partner envelope input
     val couplingDepth: AudioInput get() = couplingScaler.inputB    // Coupling depth (Hz range)
     val holdLevel: AudioInput get() = vcaControlMixer.inputB       // Hold/drone level
-    val cvPitchInput: AudioInput get() = cvPitchScaler.inputA      // CV input (0-1)
-    val cvPitchDepth: AudioInput get() = cvPitchScaler.inputB      // Depth in Hz
+    val cvPitchInput: AudioInput get() = cvPitchScaler.inputB      // CV ratio (0 = no shift, 1 = octave up)
     val feedbackAmount: AudioInput get() = feedbackRamp.input       // Self-feedback (0-1)
 
     // Outputs - volumeGain is the final output stage
@@ -278,8 +277,11 @@ class DspVoice(
         // FmDepthControl -> FmFreqMixer.inputA (FM modulation)
         // FmFreqMixer.output -> Both Oscillators
 
-        // Direct frequency mixer: pitchScaler.output + directFrequency -> vibratoMixer
-        // This allows note automation to bypass pitchScaler entirely
+        // CV Pitch: baseFreq + (baseFreq * cvRatio) = baseFreq * (1 + cvRatio)
+        // cvPitchScaler.inputA = pitchScaler.output (base frequency)
+        // cvPitchScaler.inputB = CV ratio from Flux (0=no change, 1=octave up)
+        // When no CV source connected, inputB defaults to 0 → pass-through
+        pitchScaler.output.connect(cvPitchScaler.inputA)
         pitchScaler.output.connect(cvPitchMixer.inputA)
         cvPitchScaler.output.connect(cvPitchMixer.inputB)
         cvPitchMixer.output.connect(directFreqMixer.inputA)
@@ -325,8 +327,8 @@ class DspVoice(
         // Default coupling depth = 0 (no partner influence)
         couplingDepth.set(0.0)
         
-        // Default CV pitch depth = 0
-        cvPitchDepth.set(0.0)
+        // Default CV pitch input = 0 (no pitch shift)
+        cvPitchInput.set(0.0)
 
         // Source switching: oscMixer → oscGain, plaitsUnit → plaitsGain, both → sourceSelector → VCA
         oscMixer.output.connect(oscGain.inputA)

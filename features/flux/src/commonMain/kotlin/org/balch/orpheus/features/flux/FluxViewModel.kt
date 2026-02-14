@@ -36,8 +36,15 @@ data class FluxUiState(
     val rate: Float = 0.5f,
     val jitter: Float = 0.0f,
     val probability: Float = 0.5f,
-    val clockSource: Int = 0, // 0=Internal, 1=LFO
-    val gateLength: Float = 0.5f
+    val clockSource: Int = 0,
+    val gateLength: Float = 0.5f,
+    val tModel: Int = 0,
+    val tRange: Int = 1,
+    val pulseWidth: Float = 0.5f,
+    val pulseWidthStd: Float = 0.0f,
+    val controlMode: Int = 0,
+    val voltageRange: Int = 2,
+    val mix: Float = 0.0f
 )
 
 @Immutable
@@ -52,10 +59,17 @@ data class FluxPanelActions(
     val setJitter: (Float) -> Unit,
     val setProbability: (Float) -> Unit,
     val setClockSource: (Int) -> Unit,
-    val setGateLength: (Float) -> Unit
+    val setGateLength: (Float) -> Unit,
+    val setTModel: (Int) -> Unit,
+    val setTRange: (Int) -> Unit,
+    val setPulseWidth: (Float) -> Unit,
+    val setPulseWidthStd: (Float) -> Unit,
+    val setControlMode: (Int) -> Unit,
+    val setVoltageRange: (Int) -> Unit,
+    val setMix: (Float) -> Unit
 ) {
     companion object {
-        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -71,6 +85,13 @@ private sealed interface FluxIntent {
     data class Probability(val value: Float) : FluxIntent
     data class ClockSource(val value: Int) : FluxIntent
     data class GateLength(val value: Float) : FluxIntent
+    data class TModel(val value: Int) : FluxIntent
+    data class TRange(val value: Int) : FluxIntent
+    data class PulseWidth(val value: Float) : FluxIntent
+    data class PulseWidthStd(val value: Float) : FluxIntent
+    data class ControlMode(val value: Int) : FluxIntent
+    data class VoltageRange(val value: Int) : FluxIntent
+    data class Mix(val value: Float) : FluxIntent
 }
 
 typealias FluxFeature = SynthFeature<FluxUiState, FluxPanelActions>
@@ -99,6 +120,13 @@ class FluxViewModel @Inject constructor(
     private val probabilityId = synthController.controlFlow(FluxSymbol.PROBABILITY.controlId)
     private val clockSourceId = synthController.controlFlow(FluxSymbol.CLOCK_SOURCE.controlId)
     private val gateLengthId = synthController.controlFlow(FluxSymbol.GATE_LENGTH.controlId)
+    private val tModelId = synthController.controlFlow(FluxSymbol.T_MODEL.controlId)
+    private val tRangeId = synthController.controlFlow(FluxSymbol.T_RANGE.controlId)
+    private val pulseWidthId = synthController.controlFlow(FluxSymbol.PULSE_WIDTH.controlId)
+    private val pulseWidthStdId = synthController.controlFlow(FluxSymbol.PULSE_WIDTH_STD.controlId)
+    private val controlModeId = synthController.controlFlow(FluxSymbol.CONTROL_MODE.controlId)
+    private val voltageRangeId = synthController.controlFlow(FluxSymbol.VOLTAGE_RANGE.controlId)
+    private val mixId = synthController.controlFlow(FluxSymbol.MIX.controlId)
 
     override val actions = FluxPanelActions(
         setSpread = spreadId.floatSetter(),
@@ -111,7 +139,14 @@ class FluxViewModel @Inject constructor(
         setJitter = jitterId.floatSetter(),
         setProbability = probabilityId.floatSetter(),
         setClockSource = clockSourceId.intSetter(),
-        setGateLength = gateLengthId.floatSetter()
+        setGateLength = gateLengthId.floatSetter(),
+        setTModel = tModelId.intSetter(),
+        setTRange = tRangeId.intSetter(),
+        setPulseWidth = pulseWidthId.floatSetter(),
+        setPulseWidthStd = pulseWidthStdId.floatSetter(),
+        setControlMode = controlModeId.intSetter(),
+        setVoltageRange = voltageRangeId.intSetter(),
+        setMix = mixId.floatSetter()
     )
 
     // Control changes -> FluxIntent
@@ -126,7 +161,14 @@ class FluxViewModel @Inject constructor(
         jitterId.map { FluxIntent.Jitter(it.asFloat()) },
         probabilityId.map { FluxIntent.Probability(it.asFloat()) },
         clockSourceId.map { FluxIntent.ClockSource(it.asInt()) },
-        gateLengthId.map { FluxIntent.GateLength(it.asFloat()) }
+        gateLengthId.map { FluxIntent.GateLength(it.asFloat()) },
+        tModelId.map { FluxIntent.TModel(it.asInt()) },
+        tRangeId.map { FluxIntent.TRange(it.asInt()) },
+        pulseWidthId.map { FluxIntent.PulseWidth(it.asFloat()) },
+        pulseWidthStdId.map { FluxIntent.PulseWidthStd(it.asFloat()) },
+        controlModeId.map { FluxIntent.ControlMode(it.asInt()) },
+        voltageRangeId.map { FluxIntent.VoltageRange(it.asInt()) },
+        mixId.map { FluxIntent.Mix(it.asFloat()) }
     )
 
     override val stateFlow: StateFlow<FluxUiState> =
@@ -153,6 +195,13 @@ class FluxViewModel @Inject constructor(
         is FluxIntent.Probability -> state.copy(probability = intent.value)
         is FluxIntent.ClockSource -> state.copy(clockSource = intent.value)
         is FluxIntent.GateLength -> state.copy(gateLength = intent.value)
+        is FluxIntent.TModel -> state.copy(tModel = intent.value)
+        is FluxIntent.TRange -> state.copy(tRange = intent.value)
+        is FluxIntent.PulseWidth -> state.copy(pulseWidth = intent.value)
+        is FluxIntent.PulseWidthStd -> state.copy(pulseWidthStd = intent.value)
+        is FluxIntent.ControlMode -> state.copy(controlMode = intent.value)
+        is FluxIntent.VoltageRange -> state.copy(voltageRange = intent.value)
+        is FluxIntent.Mix -> state.copy(mix = intent.value)
     }
 
     companion object {

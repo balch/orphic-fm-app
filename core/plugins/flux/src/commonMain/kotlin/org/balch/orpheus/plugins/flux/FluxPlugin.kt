@@ -67,6 +67,13 @@ class FluxPlugin(
     private var _jitter = 0.0f
     private var _probability = 0.5f
     private var _gateLength = 0.5f
+    private var _tModel = 0
+    private var _tRange = 1
+    private var _pulseWidth = 0.5f
+    private var _pulseWidthStd = 0.0f
+    private var _controlMode = 0
+    private var _voltageRange = 2
+    private var _mix = 0.0f
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 8) {
@@ -145,6 +152,66 @@ class FluxPlugin(
                 set { _gateLength = it; flux.gateLength.set(it.toDouble()) }
             }
         }
+
+        controlPort(FluxSymbol.T_MODEL) {
+            intType {
+                min = 0; max = 6
+                options = listOf("Bernoulli", "Clusters", "Drums", "Ind.Bernoulli", "Divider", "3-State", "Markov")
+                get { _tModel }
+                set { _tModel = it; flux.setTModel(it) }
+            }
+        }
+
+        controlPort(FluxSymbol.T_RANGE) {
+            intType {
+                default = 1; min = 0; max = 2
+                options = listOf("0.25x", "1x", "4x")
+                get { _tRange }
+                set { _tRange = it; flux.setTRange(it) }
+            }
+        }
+
+        controlPort(FluxSymbol.PULSE_WIDTH) {
+            floatType {
+                default = 0.5f
+                get { _pulseWidth }
+                set { _pulseWidth = it; flux.setPulseWidth(it) }
+            }
+        }
+
+        controlPort(FluxSymbol.PULSE_WIDTH_STD) {
+            floatType {
+                default = 0.0f
+                get { _pulseWidthStd }
+                set { _pulseWidthStd = it; flux.setPulseWidthStd(it) }
+            }
+        }
+
+        controlPort(FluxSymbol.CONTROL_MODE) {
+            intType {
+                min = 0; max = 2
+                options = listOf("Identical", "Bump", "Tilt")
+                get { _controlMode }
+                set { _controlMode = it; flux.setControlMode(it) }
+            }
+        }
+
+        controlPort(FluxSymbol.VOLTAGE_RANGE) {
+            intType {
+                default = 2; min = 0; max = 2
+                options = listOf("Narrow", "Positive", "Full")
+                get { _voltageRange }
+                set { _voltageRange = it; flux.setVoltageRange(it) }
+            }
+        }
+
+        controlPort(FluxSymbol.MIX) {
+            floatType {
+                default = 0.0f
+                get { _mix }
+                set { _mix = it; flux.setMix(it) }
+            }
+        }
     }
 
     private val audioPorts = ports {
@@ -196,7 +263,14 @@ class FluxPlugin(
         setPortValue("jitter", PortValue.FloatValue(0.0f))
         setPortValue("probability", PortValue.FloatValue(0.5f))
         setPortValue("gatelength", PortValue.FloatValue(0.5f))
-        
+        setPortValue("t_model", PortValue.IntValue(0))
+        setPortValue("t_range", PortValue.IntValue(1))
+        setPortValue("pulse_width", PortValue.FloatValue(0.5f))
+        setPortValue("pulse_width_std", PortValue.FloatValue(0.0f))
+        setPortValue("control_mode", PortValue.IntValue(0))
+        setPortValue("voltage_range", PortValue.IntValue(2))
+        setPortValue("mix", PortValue.FloatValue(0.0f))
+
         audioUnits.forEach { audioEngine.addUnit(it) }
     }
     

@@ -741,7 +741,7 @@ class DspSynthEngine @Inject constructor(
         fluxIn.disconnectAll()
         when (sourceIndex) {
             1 -> pluginProvider.hyperLfo.output.connect(fluxIn)
-            else -> globalTempo.getClockOutput().connect(fluxIn)
+            else -> globalTempo.getBeatClockOutput().connect(fluxIn)
         }
     }
 
