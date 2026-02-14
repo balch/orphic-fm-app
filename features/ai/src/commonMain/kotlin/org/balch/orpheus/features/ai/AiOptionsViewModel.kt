@@ -13,7 +13,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
@@ -363,7 +362,7 @@ class AiOptionsViewModel(
         .map { it.messages }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.Eagerly,
+            started = this.sharingStrategy,
             initialValue = emptyList()
         )
 
@@ -903,7 +902,7 @@ class AiOptionsViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        started = this.sharingStrategy,
         initialValue = AiOptionsUiState(
             availableModels = availableModels,
             aiStatusMessages = aiStatusMessages,

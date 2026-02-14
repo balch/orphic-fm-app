@@ -28,6 +28,8 @@ import org.balch.orpheus.ui.FactoryPanelSets
 import org.balch.orpheus.core.panels.PanelSet
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
+import org.balch.orpheus.features.evo.EvoPanelActions
+import org.balch.orpheus.features.evo.EvoUiState
 
 /**
  * UI state for the HeaderPanel, containing expansion states and active panel set.
@@ -58,6 +60,9 @@ data class HeaderPanelActions(
 interface HeaderFeature : SynthFeature<HeaderPanelUiState, HeaderPanelActions> {
     val sortedPanels: List<FeaturePanel>
     val visiblePanels: List<FeaturePanel>
+
+    override val sharingStrategy: SharingStarted
+        get() = SharingStarted.Eagerly
 }
 
 private sealed class HeaderIntent {
@@ -142,7 +147,7 @@ class HeaderViewModel(
             }
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                started = this.sharingStrategy,
                 initialValue = initialState
             )
 

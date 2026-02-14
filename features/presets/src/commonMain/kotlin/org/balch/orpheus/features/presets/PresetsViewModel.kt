@@ -13,8 +13,8 @@ import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
@@ -69,7 +69,10 @@ private sealed interface PresetIntent {
     data class RefreshPresets(val presets: List<SynthPreset>, val selectName: String? = null) : PresetIntent
 }
 
-typealias PresetsFeature = SynthFeature<PresetUiState, PresetPanelActions>
+interface PresetsFeature : SynthFeature<PresetUiState, PresetPanelActions> {
+    override val sharingStrategy: SharingStarted
+        get() = SharingStarted.Eagerly
+}
 
 /**
  * ViewModel for the Presets panel.
@@ -132,7 +135,7 @@ class PresetsViewModel(
             .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                started = this.sharingStrategy,
                 initialValue = PresetUiState.Loading
             )
 

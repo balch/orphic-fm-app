@@ -58,7 +58,10 @@ data class EvoPanelActions(
     }
 }
 
-typealias EvoFeature = SynthFeature<EvoUiState, EvoPanelActions>
+interface EvoFeature : SynthFeature<EvoUiState, EvoPanelActions> {
+     override val sharingStrategy: SharingStarted
+        get() = SharingStarted.Eagerly
+}
 
 @ViewModelKey(EvoViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
@@ -99,7 +102,7 @@ class EvoViewModel @Inject constructor(
     .flowOn(dispatcherProvider.io)
     .stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        started = this.sharingStrategy,
         initialValue = EvoUiState(
             selectedStrategy = sortedStrategies.first(),
             strategies = sortedStrategies,

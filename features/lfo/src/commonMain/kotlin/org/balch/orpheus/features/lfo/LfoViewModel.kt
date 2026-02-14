@@ -62,7 +62,10 @@ private sealed interface LfoIntent {
     data class Link(val enabled: Boolean) : LfoIntent
 }
 
-typealias LfoFeature = SynthFeature<LfoUiState, LfoPanelActions>
+interface LfoFeature : SynthFeature<LfoUiState, LfoPanelActions> {
+    override val sharingStrategy: SharingStarted
+        get() = SharingStarted.Eagerly
+}
 
 /**
  * ViewModel for the Hyper LFO panel.
@@ -115,7 +118,7 @@ class LfoViewModel @Inject constructor(
             .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                started = this.sharingStrategy,
                 initialValue = LfoUiState()
             )
 

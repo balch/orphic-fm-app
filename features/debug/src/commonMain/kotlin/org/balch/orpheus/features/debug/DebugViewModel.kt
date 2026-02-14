@@ -9,7 +9,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -68,7 +67,7 @@ class DebugViewModel(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        started = this.sharingStrategy,
         initialValue = DebugUiState(0f, 0f,)
     )
 

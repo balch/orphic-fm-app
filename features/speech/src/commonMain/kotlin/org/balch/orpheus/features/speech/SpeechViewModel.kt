@@ -87,12 +87,15 @@ private sealed interface SpeechIntent {
     data class VoicesLoaded(val voices: List<String>) : SpeechIntent
 }
 
-typealias SpeechFeature = SynthFeature<SpeechUiState, SpeechPanelActions>
+interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
+    override val sharingStrategy: SharingStarted
+        get() = SharingStarted.Eagerly
+}
 
 @ViewModelKey(SpeechViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class SpeechViewModel @Inject constructor(
-    private val synthController: SynthController,
+    synthController: SynthController,
     private val synthEngine: SynthEngine,
     private val ttsGenerator: TtsGenerator,
     private val speechEventBus: SpeechEventBus,
@@ -153,7 +156,7 @@ class SpeechViewModel @Inject constructor(
             .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                started = this.sharingStrategy,
                 initialValue = SpeechUiState(ttsAvailable = ttsGenerator.isAvailable)
             )
 

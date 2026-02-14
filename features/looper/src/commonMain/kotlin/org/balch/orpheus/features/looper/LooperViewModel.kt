@@ -15,7 +15,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
@@ -95,7 +94,7 @@ class LooperViewModel(
             }
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                started = this.sharingStrategy,
                 initialValue = LooperUiState()
             )
 

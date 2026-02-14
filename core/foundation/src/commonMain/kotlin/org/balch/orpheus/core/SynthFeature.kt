@@ -3,6 +3,7 @@ package org.balch.orpheus.core
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 
 
@@ -13,15 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 interface SynthFeature<S, A> {
     val stateFlow: StateFlow<S>
     val actions: A
-}
 
-/**
- * A ViewModel that acts as a SynthFeature.
- * Implementers must provide a stable StateFlow and stable Actions.
- */
-interface SynthViewModel<S, A> : SynthFeature<S, A> {
-    override val stateFlow: StateFlow<S>
-    override val actions: A
+    val sharingStrategy: SharingStarted
+        get() = SharingStarted.WhileSubscribed(5_000)
 }
 
 /**

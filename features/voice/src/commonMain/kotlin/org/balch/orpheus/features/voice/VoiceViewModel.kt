@@ -41,7 +41,10 @@ import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.core.tempo.GlobalTempo
 
 
-typealias VoicesFeature = SynthFeature<VoiceUiState, VoicePanelActions>
+interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
+    override val sharingStrategy: SharingStarted
+        get() = SharingStarted.Eagerly
+}
 /**
  * ViewModel for voice management.
  *
@@ -178,7 +181,7 @@ class VoiceViewModel(
             .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                started = this.sharingStrategy,
                 initialValue = VoiceUiState()
             )
 

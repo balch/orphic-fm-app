@@ -67,7 +67,10 @@ data class DrumBeatsPanelActions(
     }
 }
 
-typealias DrumBeatsFeature = SynthFeature<BeatsUiState, DrumBeatsPanelActions>
+interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
+    override val sharingStrategy: SharingStarted
+        get() = SharingStarted.Eagerly
+}
 
 /**
  * ViewModel for the Drum Beats panel.
@@ -148,7 +151,7 @@ class DrumBeatsViewModel @Inject constructor(
             .flowOn(dispatcherProvider.io)
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                started = this.sharingStrategy,
                 initialValue = BeatsUiState()
             )
 
