@@ -22,24 +22,23 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         ## CONTROLS
         Use CONTROL actions to shape the drone sound.
         Parameters: controlId (string), value (float 0.0-1.0)
-        IMPORTANT: In DRONE Mode you can ONLY use Quad 3 controls (QUAD_*_3), Voices 9-12 (VOICE_*_9..12), and Pairs 5-6 (DUO_MOD_SOURCE_5/6, PAIR_SHARPNESS_5/6). Do NOT touch Quad 1, Quad 2, Voices 1-8, or Pairs 1-4 — those belong to the user.
-        
+        IMPORTANT: In DRONE Mode you can ONLY use Quad 2 controls (voice_quad_*_2), Voices 8-11 (voice_*_8..11), and Pairs 4-5 (voice_pair_sharpness_4/5). Do NOT touch Quad 0, Quad 1, Voices 0-7, or Pairs 0-3 — those belong to the user.
+
         ESSENTIAL CONTROLS for drones:
-        - QUAD_VOLUME_3: Volume of drone voices (IMPORTANT: keep at 0.5-0.7 to stay below main volume). Do NOT use MASTER_VOLUME.
-        - QUAD_PITCH_3: Pitch of the drone layers (0.5 = unity).
-        - QUAD_HOLD_3: Sustain level. (Note: Only effective when ENV_SPEED is high/slow).
-        - VIBRATO: LFO modulation depth (0.2-0.7).
-        - DELAY_FEEDBACK: Echo repeats (0.3-0.8).
-        - VOICE_COUPLING: FM modulation brightness (0.1-0.5).
+        - voice_quad_volume_2: Volume of drone voices (IMPORTANT: keep at 0.5-0.7 to stay below main volume). Do NOT use stereo_master_vol.
+        - voice_quad_pitch_2: Pitch of the drone layers (0.5 = unity).
+        - voice_quad_hold_2: Sustain level. (Note: Only effective when env_speed is high/slow).
+        - voice_vibrato: LFO modulation depth (0.2-0.7).
+        - delay_feedback: Echo repeats (0.3-0.8).
+        - voice_coupling: FM modulation brightness (0.1-0.5).
 
-        PER-VOICE CONTROLS (Quad 3 = Voices 9-12):
-        - VOICE_TUNE_9, VOICE_TUNE_10, VOICE_TUNE_11, VOICE_TUNE_12: Individual voice tuning (0.5=A3/220Hz). Slight detuning between voices creates rich beating textures.
-        - VOICE_FM_DEPTH_9..12: FM synthesis depth per voice (0=clean, higher=brighter harmonics).
-        - VOICE_ENV_SPEED_9..12: Envelope speed per voice (0=fast/percussive, 1=slow/pad). Use 0.7-1.0 for sustained drones.
+        PER-VOICE CONTROLS (Quad 2 = Voices 8-11):
+        - voice_tune_8, voice_tune_9, voice_tune_10, voice_tune_11: Individual voice tuning (0.5=A3/220Hz). Slight detuning between voices creates rich beating textures.
+        - voice_mod_depth_8..11: FM synthesis depth per voice (0=clean, higher=brighter harmonics).
+        - voice_env_speed_8..11: Envelope speed per voice (0=fast/percussive, 1=slow/pad). Use 0.7-1.0 for sustained drones.
 
-        PER-PAIR CONTROLS (Quad 3 = Pairs 5-6):
-        - DUO_MOD_SOURCE_5, DUO_MOD_SOURCE_6: Modulation routing (0.0=FM, 0.5=Off, 1.0=LFO).
-        - PAIR_SHARPNESS_5, PAIR_SHARPNESS_6: Waveform sharpness (0=soft/sine, 1=sharp/saw).
+        PER-PAIR CONTROLS (Quad 2 = Pairs 4-5):
+        - voice_pair_sharpness_4, voice_pair_sharpness_5: Waveform sharpness (0=soft/sine, 1=sharp/saw).
         
         BENDER CONTROL (SPECIAL: uses -1.0 to +1.0 range!):
         - BENDER: Pitch bend with spring-loaded feel (-1.0=down, 0.0=center, +1.0=up)
@@ -51,40 +50,40 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         
         REVERB (Dattorro Plate Reverb) - ESSENTIAL FOR DRONES:
         Lush plate reverb for spatial depth. Parallel to delay — they complement each other.
-        - REVERB_AMOUNT: Wet/dry (0=off, 0.3-0.5 for subtle depth, 0.7+ for wash)
-        - REVERB_TIME: Decay time (0.5-0.8 for drones, 0.9 for infinite wash)
-        - REVERB_DAMPING: High-freq damping (0.6-0.8 for warm, dark drones)
-        - REVERB_DIFFUSION: Density (0.5-0.7 for smooth, plate-like character)
+        - reverb_amount: Wet/dry (0=off, 0.3-0.5 for subtle depth, 0.7+ for wash)
+        - reverb_time: Decay time (0.5-0.8 for drones, 0.9 for infinite wash)
+        - reverb_damping: High-freq damping (0.6-0.8 for warm, dark drones)
+        - reverb_diffusion: Density (0.5-0.7 for smooth, plate-like character)
 
         REVERB DRONE TIPS:
-        - Use REVERB for space + DELAY for rhythmic echoes (don't over-use both)
-        - Long TIME + high DAMPING = dark, warm ambient wash
-        - Start with REVERB_AMOUNT at 0.3, ramp slowly for evolving depth
-        - Lower REVERB_AMOUNT when DELAY_FEEDBACK is high to prevent muddiness
+        - Use reverb for space + delay for rhythmic echoes (don't over-use both)
+        - Long time + high damping = dark, warm ambient wash
+        - Start with reverb_amount at 0.3, ramp slowly for evolving depth
+        - Lower reverb_amount when delay_feedback is high to prevent muddiness
 
-        RESONATOR (Rings Physical Modeling) - PERFECT FOR DRONES:
+        RESONATOR (Physical Modeling) - PERFECT FOR DRONES:
         Physical modeling for metallic, string-like, and bell textures:
-        - RESONATOR_MODE: 0=Modal (bell/chime), 0.5=String (sustained), 1=Sympathetic (sitar)
-        - RESONATOR_STRUCTURE: Harmonic spread (0=focused, 1=wide/bell-like)
-        - RESONATOR_BRIGHTNESS: Tone color (0=dark/muted, 1=bright/shimmery)
-        - RESONATOR_DAMPING: Decay time (0=infinite sustain, 1=quick fade)
-        - RESONATOR_POSITION: Excitation point (0.5=center for fundamental)
-        - RESONATOR_MIX: Blend with dry signal (0=off, 0.2-0.4 for subtle texture, 0.7+ for dominant)
-        
+        - resonator_mode: 0=Modal (bell/chime), 0.5=String (sustained), 1=Sympathetic (sitar)
+        - resonator_structure: Harmonic spread (0=focused, 1=wide/bell-like)
+        - resonator_brightness: Tone color (0=dark/muted, 1=bright/shimmery)
+        - resonator_damping: Decay time (0=infinite sustain, 1=quick fade)
+        - resonator_position: Excitation point (0.5=center for fundamental)
+        - resonator_mix: Blend with dry signal (0=off, 0.2-0.4 for subtle texture, 0.7+ for dominant)
+
         RESONATOR DRONE TIPS:
         - Modal mode + low damping = eternal, singing bell pad
         - Sympathetic mode = sitar-like drone with harmonic richness
         - Combine with BENDER for evolving metallic textures
-        
+
         ⚠️ RESONATOR SAFETY (STOP THE SQUELCH):
-        - 🚫 AVOID: Setting RESONATOR_BRIGHTNESS > 0.7 AND RESONATOR_STRUCTURE > 0.7 at the same time. This creates "squelching" piercing noise.
+        - AVOID: Setting resonator_brightness > 0.7 AND resonator_structure > 0.7 at the same time. This creates "squelching" piercing noise.
         - If you want bright bell tones, use high brightness but moderate structure.
-        - ALWAYS lower RESONATOR_MIX to 0.1 BEFORE changing RESONATOR_MODE.
-        - Balanced drones have RESONATOR_MIX around 0.3-0.5. Values > 0.8 are very aggressive.
+        - ALWAYS lower resonator_mix to 0.1 BEFORE changing resonator_mode.
+        - Balanced drones have resonator_mix around 0.3-0.5. Values > 0.8 are very aggressive.
         
         ## VOLUME BALANCE RULE
         The drone should be a subtle backing layer, NOT the main sound.
-        ALWAYS set QUAD_VOLUME_3 between 0.5 and 0.7 to keep drone volume lower than main voices.
+        ALWAYS set voice_quad_volume_2 between 0.5 and 0.7 to keep drone volume lower than main voices.
         
         ## DRUMS (Generally Not Used in Drone Mode)
         The `drums_control` tool is available but typically NOT used for pure ambient drones.
@@ -95,32 +94,32 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         
         AVOID using BEATS sequencer in drone mode - it breaks the ambient flow.
         
-        MATRIX (Warps Meta-Modulator) - TEXTURAL PROCESSING:
+        MATRIX (Meta-Modulator) - TEXTURAL PROCESSING:
         Cross-modulation for evolving, otherworldly drone textures:
-        - MATRIX_ALGORITHM: Choose processing style (0.0-0.875 in steps of 0.125):
+        - warps_algorithm: Choose processing style (0.0-0.875 in steps of 0.125):
           * 0.000-0.124: Crossfade - Gentle blend between drone layers
           * 0.125-0.249: Cross-folding - Subtle harmonic enrichment
           * 0.625-0.749: Vocoder - Spectral transfer for whispered textures
           * 0.750-0.874: Chebyshev - Warm waveshaping
           * 0.875-1.000: Frequency shifter - Slow inharmonic drifts
-        - MATRIX_TIMBRE: Tonal character (0-1)
-        - MATRIX_CARRIER_SOURCE: 0=Synth, 0.5=Drums, 1=REPL
-        - MATRIX_MODULATOR_SOURCE: 0=Synth, 0.5=Drums, 1=REPL
-        - MATRIX_MIX: Blend (0=bypass, keep LOW for drones: 0.1-0.3)
-        
+        - warps_timbre: Tonal character (0-1)
+        - warps_carrier_source: 0=Synth, 0.5=Drums, 1=REPL
+        - warps_modulator_source: 0=Synth, 0.5=Drums, 1=REPL
+        - warps_mix: Blend (0=bypass, keep LOW for drones: 0.1-0.3)
+
         MATRIX DRONE RECIPES:
         1. **Harmonic Enhancement** (Cross-folding):
-           - MATRIX_ALGORITHM: 0.15, both sources = Synth, MATRIX_MIX: 0.2
+           - warps_algorithm: 0.15, both sources = Synth, warps_mix: 0.2
            - Result: Rich, organ-like overtones
         2. **Spectral Whispers** (Vocoder):
-           - MATRIX_ALGORITHM: 0.65, Carrier=Synth, Modulator=Synth
-           - Add slow REPL pattern, MATRIX_MIX: 0.3
+           - warps_algorithm: 0.65, Carrier=Synth, Modulator=Synth
+           - Add slow REPL pattern, warps_mix: 0.3
            - Result: Formant-filtered, vocal-like drone
         3. **Alien Drift** (Freq Shifter):
-           - MATRIX_ALGORITHM: 0.9, MATRIX_TIMBRE: 0.2-0.4 (slow shift)
+           - warps_algorithm: 0.9, warps_timbre: 0.2-0.4 (slow shift)
            - Result: Slowly drifting inharmonic partials, submarine-like
-        
-        ⚠️ MATRIX IN DRONES: Keep MATRIX_MIX low (0.1-0.3)! Heavy processing breaks the ambient flow.
+
+        ⚠️ MATRIX IN DRONES: Keep warps_mix low (0.1-0.3)! Heavy processing breaks the ambient flow.
         
         **ENVELOPE SPEED & HOLD (The "Drone Secret"):**
         - FAST ENV (`envspeed` = 0): Aggressive ease-in (exp=4). Low hold values produce almost nothing.
@@ -131,9 +130,9 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         - IMPORTANT: At FAST envspeed, hold needs to be ~0.7+ to be noticeable.
         
         ## DRONE SOUND DESIGN TIPS
-        1. Small changes to QUAD_PITCH_3 create detuned beating textures.
-        2. Adjust DUO_MOD_SOURCE_5 or DUO_MOD_SOURCE_6 to morph between FM and LFO textures.
-        3. Use DELAY_FEEDBACK for spatial depth.
+        1. Small changes to voice_quad_pitch_2 create detuned beating textures.
+        2. Adjust voice_pair_sharpness_4 or voice_pair_sharpness_5 to morph waveform textures.
+        3. Use delay_feedback for spatial depth.
         4. Keep evolving slowly - small parameter changes.
         5. Use BENDER for whale-like pitch glides in oceanic/deep themes.
         
@@ -143,13 +142,19 @@ data object DroneAgentConfig : SynthControlAgentConfig {
 
     override val initialPrompt = """
         The system has initialized a unique preset. Now activate the drone.
-        
-        1. Ramp up the drone volume to a backing level (not too loud) (example: QUAD_VOLUME_3 to 0.6).
-           
-        2. Start the sustain engine algo (example: REPL code 'd5 $ quadhold:3 0.8').
-           
-        3. Make a small adjustment to customize the preset (example: QUAD_PITCH_3).
-           
+
+        1. **Pick engines** for pairs 4-5 (voice_pair_engine_4/5) that match the mood prompt:
+           - Ethereal/cosmic → 13 (particle) or 10 (grain)
+           - Warm/organic → 0 (osc) or 8 (va)
+           - Metallic/bells → 12 (modal) or 9 (additive)
+           - Strings/bowed → 11 (string)
+        2. **Set sharpness** (voice_pair_sharpness_4/5) to match mood energy.
+        3. **Set modulation**: voice_mod_depth_8..11 for FM richness, voice_vibrato for movement.
+        4. **Set effects**: reverb_amount/time, delay_feedback/mix, distortion_drive as appropriate.
+        5. **Ramp up volume** (voice_quad_volume_2 to 0.6).
+        6. **Start sustain** (example: REPL code 'd5 $ quadhold:3 0.8').
+        7. Make a small pitch adjustment (voice_quad_pitch_2).
+
         Then provide a STATUS update saying "Drone initialized: [brief description]".
     """.trimIndent()
 
@@ -157,12 +162,12 @@ data object DroneAgentConfig : SynthControlAgentConfig {
      * Mood prompts for drone presets.
      */
     override val initialMoodPrompts = listOf(
-        "Evolve the drone texture: adjust VIBRATO depth or QUAD_PITCH_3 to shift the harmonic character.",
-        "Add more space: increase DELAY_FEEDBACK slightly, maybe reduce DRIVE. Keep it ethereal.",
-        "Morph the modulation: change DUO_MOD_SOURCE_5 slightly to vary the texture.",
-        "Deepen the drone: lower QUAD_PITCH_3 slightly (around 0.2-0.4) for sub-bass weight.",
-        "Create movement: shift VIBRATO and DELAY_TIME_1 values. Make the drone breathe and pulse.",
-        "Simplify: reduce VOICE_COUPLING and TOTAL_FEEDBACK. Let the pure tones shine through.",
+        "Evolve the drone texture: adjust voice_vibrato depth or voice_quad_pitch_2 to shift the harmonic character.",
+        "Add more space: increase delay_feedback slightly, maybe reduce distortion_drive. Keep it ethereal.",
+        "Morph the modulation: change voice_pair_sharpness_4 slightly to vary the texture.",
+        "Deepen the drone: lower voice_quad_pitch_2 slightly (around 0.2-0.4) for sub-bass weight.",
+        "Create movement: shift voice_vibrato and delay_time_1 values. Make the drone breathe and pulse.",
+        "Simplify: reduce voice_coupling and voice_total_feedback. Let the pure tones shine through.",
         
         // Atmospheric environments
         "Subterranean cavern: deep, resonant tones with long delay trails. Emphasize low frequencies and subtle echoes.",

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
@@ -70,6 +72,55 @@ data class DrumBeatsPanelActions(
 interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
+
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.BEATS
+            override val title = "Beats"
+
+            override val markdown = """
+                Algorithmic drum pattern generator with two modes: Drums (X/Y pattern morphing) and Euclidean (mathematically perfect beat distributions). Controls tempo, density, swing, randomness, and pattern mode.
+
+                ## Modes
+                - **Drums**: X/Y morphing across a 2D space of pre-built drum patterns. X selects the pattern family, Y morphs between variations.
+                - **Euclidean**: Distributes hits evenly across a configurable step length for each voice. Creates polyrhythmic patterns.
+
+                ## Controls
+                - **X / Y**: Pattern morphing coordinates (Drums mode).
+                - **BPM**: Tempo in beats per minute (60-200).
+                - **DENSITY (x3)**: Hit density per voice — higher values produce more frequent triggers.
+                - **EUCLIDEAN (x3)**: Step length per voice in Euclidean mode.
+                - **RANDOMNESS**: Chance of random ghost notes or dropped hits.
+                - **SWING**: Timing offset for off-beat notes, adding groove.
+                - **MIX**: Output level of the beat generator.
+                - **MODE**: Switch between Drums and Euclidean modes.
+
+                ## Tips
+                - Start in Drums mode and sweep X/Y for instant pattern exploration.
+                - Switch to Euclidean for precise polyrhythmic layering.
+                - Add SWING for a human feel; increase RANDOMNESS for generative variation.
+            """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                BeatsSymbol.X.controlId.key to "Pattern X coordinate (Drums mode)",
+                BeatsSymbol.Y.controlId.key to "Pattern Y coordinate (Drums mode)",
+                BeatsSymbol.BPM.controlId.key to "Tempo in beats per minute",
+                BeatsSymbol.MIX.controlId.key to "Beat generator output level",
+                BeatsSymbol.RANDOMNESS.controlId.key to "Random ghost note / drop probability",
+                BeatsSymbol.SWING.controlId.key to "Off-beat timing offset for groove",
+                BeatsSymbol.MODE.controlId.key to "Pattern mode (0=Drums, 1=Euclidean)",
+                BeatsSymbol.DENSITY_0.controlId.key to "Hit density for voice 0 (Bass Drum)",
+                BeatsSymbol.DENSITY_1.controlId.key to "Hit density for voice 1 (Snare)",
+                BeatsSymbol.DENSITY_2.controlId.key to "Hit density for voice 2 (Hi-Hat)",
+                BeatsSymbol.EUCLIDEAN_0.controlId.key to "Euclidean step length for voice 0",
+                BeatsSymbol.EUCLIDEAN_1.controlId.key to "Euclidean step length for voice 1",
+                BeatsSymbol.EUCLIDEAN_2.controlId.key to "Euclidean step length for voice 2",
+            )
+        }
+    }
 }
 
 /**
@@ -79,9 +130,11 @@ interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
  * Keeps SynthEngine dependency for triggerDrum (pattern generator callback) and getCurrentTime (clock).
  * PatternGenerator state is updated as a side effect alongside controlFlow-driven state changes.
  */
+@Inject
 @ViewModelKey(DrumBeatsViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class DrumBeatsViewModel @Inject constructor(
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class DrumBeatsViewModel(
     private val synthEngine: SynthEngine,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,

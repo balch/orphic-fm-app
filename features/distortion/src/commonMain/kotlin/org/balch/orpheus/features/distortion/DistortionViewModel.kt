@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
@@ -60,7 +62,38 @@ private sealed interface DistortionIntent {
     data class SetMasterPan(val pan: Float) : DistortionIntent
 }
 
-typealias DistortionFeature = SynthFeature<DistortionUiState, DistortionPanelActions>
+interface DistortionFeature : SynthFeature<DistortionUiState, DistortionPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.DISTORTION
+            override val title = "Drive & Output"
+
+            override val markdown = """
+        Drive/distortion stage and master output controls. Includes drive amount, distortion mix, master volume, and master pan.
+
+        ## Controls
+        - **DRIVE**: Amount of distortion/overdrive applied to the signal.
+        - **MIX**: Dry/wet blend between clean and distorted signal.
+        - **MASTER VOL**: Master output volume level.
+        - **MASTER PAN**: Master stereo panning position.
+
+        ## Tips
+        - Keep DRIVE low for subtle warmth, or push it high for aggressive distortion.
+        - Use MIX to blend distorted signal with the clean original for parallel distortion.
+            """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                DistortionSymbol.DRIVE.controlId.key to "Distortion/overdrive amount",
+                DistortionSymbol.MIX.controlId.key to "Dry/wet blend (clean vs distorted)",
+                StereoSymbol.MASTER_VOL.controlId.key to "Master output volume",
+                StereoSymbol.MASTER_PAN.controlId.key to "Master stereo pan position",
+            )
+        }
+    }
+}
 
 /**
  * ViewModel for the Distortion panel.
@@ -68,9 +101,11 @@ typealias DistortionFeature = SynthFeature<DistortionUiState, DistortionPanelAct
  * Uses MVI pattern with SynthController.controlFlow() for port-based engine interactions.
  * Keeps SynthEngine dependency for peakFlow monitoring and StereoMode (non-port state).
  */
+@Inject
 @ViewModelKey(DistortionViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class DistortionViewModel @Inject constructor(
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*,*>>())
+class DistortionViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
     dispatcherProvider: DispatcherProvider

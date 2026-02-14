@@ -74,6 +74,9 @@ import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
  */
 interface LiveCodeFeature : SynthFeature<LiveCodeUiState, LiveCodePanelActions> {
     val triggers: Flow<TidalScheduler.TriggerEvent>
+
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
 }
 
 /**

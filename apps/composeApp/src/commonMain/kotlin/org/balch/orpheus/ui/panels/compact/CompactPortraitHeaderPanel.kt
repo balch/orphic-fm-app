@@ -22,9 +22,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.rememberLiquidState
-import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.features.distortion.DistortionFeature
-import org.balch.orpheus.features.distortion.DistortionPanelActions
 import org.balch.orpheus.features.distortion.DistortionUiState
 import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
@@ -108,10 +106,7 @@ private fun PeakLed(level: Float) {
 @Preview(widthDp = 360, heightDp = 70)
 @Composable
 private fun CompactPortraitHeaderPanelPreview() {
-    val previewFeature = object : SynthFeature<DistortionUiState, DistortionPanelActions> {
-        override val stateFlow = kotlinx.coroutines.flow.MutableStateFlow(DistortionUiState(peak = 0.5f))
-        override val actions = DistortionPanelActions.EMPTY
-    }
+    val previewFeature = DistortionViewModel.previewFeature(DistortionUiState(peak = 0.5f))
     CompactPortraitHeaderPanel(
         distortionFeature = previewFeature,
         liquidState = rememberLiquidState(),

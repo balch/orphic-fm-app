@@ -61,6 +61,9 @@ interface HeaderFeature : SynthFeature<HeaderPanelUiState, HeaderPanelActions> {
     val sortedPanels: List<FeaturePanel>
     val visiblePanels: List<FeaturePanel>
 
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
+
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
 }

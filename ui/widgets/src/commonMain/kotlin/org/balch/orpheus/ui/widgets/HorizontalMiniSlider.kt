@@ -64,8 +64,11 @@ fun HorizontalMiniSlider(
     // visual: left = 0, right = 1
     var offsetX by remember(value) { mutableFloatStateOf(value * usableRange) }
 
+    // AI tutorial highlight
+    val highlightMod = if (controlId != null) Modifier.highlightable(controlId) else Modifier
+
     val finalModifier = if (controlId != null) {
-        modifier.learnable(controlId, LocalLearnModeState.current)
+        modifier.then(highlightMod).learnable(controlId, LocalLearnModeState.current)
     } else {
         modifier
     }

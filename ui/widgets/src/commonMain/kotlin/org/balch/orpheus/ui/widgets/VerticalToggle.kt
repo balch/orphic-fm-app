@@ -40,8 +40,11 @@ fun VerticalToggle(
     val learnState = LocalLearnModeState.current
     val isActive = learnState.isActive
 
+    // AI tutorial highlight
+    val highlightMod = if (controlId != null) Modifier.highlightable(controlId) else Modifier
+
     val finalModifier = if (controlId != null) {
-        modifier.learnable(controlId, learnState)
+        modifier.then(highlightMod).learnable(controlId, learnState)
     } else {
         modifier
     }

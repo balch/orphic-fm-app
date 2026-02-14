@@ -36,7 +36,10 @@ data class MidiUiState(
     val mappingState: MidiMappingState = MidiMappingState()
 )
 
-typealias MidiFeature = SynthFeature<MidiUiState, MidiPanelActions>
+interface MidiFeature : SynthFeature<MidiUiState, MidiPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
+}
 
 /**
  * ViewModel for the MIDI panel.

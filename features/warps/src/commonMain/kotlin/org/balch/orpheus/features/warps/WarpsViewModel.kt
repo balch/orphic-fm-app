@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.WarpsSource
 import org.balch.orpheus.core.controller.SynthController
@@ -62,17 +64,58 @@ private sealed interface WarpsIntent {
     data class Mix(val value: Float) : WarpsIntent
 }
 
-typealias WarpsFeature = SynthFeature<WarpsUiState, WarpsPanelActions>
+interface WarpsFeature : SynthFeature<WarpsUiState, WarpsPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.WARPS
+            override val title = "Matrix"
+
+            override val markdown = """
+        Cross-modulation matrix with 8 algorithms (Crossfade, Cross-folding, Ring Mod, XOR, Comparator, Vocoder, Chebyshev, Freq Shift). Controls carrier and modulator signals.
+
+        ## Controls
+        - **ALGORITHM**: Selects the modulation algorithm. Sweeps continuously through 8 modes.
+        - **TIMBRE**: Controls the intensity or character of the selected algorithm.
+        - **CARRIER LEVEL**: Input level for the carrier signal.
+        - **MODULATOR LEVEL**: Input level for the modulator signal.
+        - **MIX**: Dry/wet crossfade between the original and processed signal.
+
+        ## Switches
+        - **CARRIER SOURCE**: Selects the carrier input source.
+        - **MODULATOR SOURCE**: Selects the modulator input source.
+
+        ## Tips
+        - Sweep ALGORITHM slowly to morph between modulation types.
+        - Use TIMBRE to add subtle or extreme tonal variation within each algorithm.
+            """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                WarpsSymbol.ALGORITHM.controlId.key to "Modulation algorithm selection (continuous sweep through 8 modes)",
+                WarpsSymbol.TIMBRE.controlId.key to "Intensity/character of the selected algorithm",
+                WarpsSymbol.LEVEL1.controlId.key to "Carrier signal input level",
+                WarpsSymbol.LEVEL2.controlId.key to "Modulator signal input level",
+                WarpsSymbol.MIX.controlId.key to "Dry/wet crossfade",
+                WarpsSymbol.CARRIER_SOURCE.controlId.key to "Carrier input source selection",
+                WarpsSymbol.MODULATOR_SOURCE.controlId.key to "Modulator input source selection",
+            )
+        }
+    }
+}
 
 /**
  * ViewModel for the Warps Meta-Modulator panel.
  *
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
+@Inject
 @ViewModelKey(WarpsViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class WarpsViewModel @Inject constructor(
-    private val synthController: SynthController,
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class WarpsViewModel(
+    synthController: SynthController,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), WarpsFeature {
 

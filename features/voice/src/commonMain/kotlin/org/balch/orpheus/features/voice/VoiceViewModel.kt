@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
@@ -44,6 +46,87 @@ import org.balch.orpheus.core.tempo.GlobalTempo
 interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
+
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.TWEAKS
+            override val title = "Voices"
+
+            override val markdown = """
+                Voice configuration panel for the 12-voice FM synthesizer. Controls tuning, engine selection, harmonics, envelope speed, modulation depth, and coupling for individual voices, pairs, and quads.
+
+                ## Hierarchy
+                - **Voices (x12)**: Individual voice tuning, modulation depth, and envelope speed.
+                - **Pairs (x6)**: Each pair shares an engine, harmonics, morph, sharpness, and pair mod depth.
+                - **Quads (x3)**: Each quad controls pitch offset, hold level, and volume for four voices.
+
+                ## Global Controls
+                - **VIBRATO**: Global vibrato amount applied to all voices.
+                - **COUPLING**: Voice coupling strength — how much neighboring voices influence each other.
+                - **TOTAL_FEEDBACK**: Global FM feedback amount across all voices.
+
+                ## Tips
+                - Use per-pair ENGINE selection to mix different synthesis models across the keyboard.
+                - HARMONICS and MORPH shape the tonal character within each engine.
+                - Adjust ENVELOPE SPEED per-voice for varied articulation across the keyboard.
+                - COUPLING creates organic, chorus-like detuning between voices.
+            """.trimIndent()
+
+            override val portControlKeys = buildMap {
+                // Globals
+                put(VoiceSymbol.VIBRATO.controlId.key, "Global vibrato amount")
+                put(VoiceSymbol.COUPLING.controlId.key, "Voice coupling strength")
+                put(VoiceSymbol.TOTAL_FEEDBACK.controlId.key, "Global FM feedback amount")
+                // Per-voice tuning (x12)
+                for (i in 0 until 12) {
+                    put(VoiceSymbol.tune(i).controlId.key, "Tuning offset for voice $i")
+                }
+                // Per-pair engine (x6)
+                for (i in 0 until 6) {
+                    put(VoiceSymbol.pairEngine(i).controlId.key, "Synthesis engine for pair $i")
+                }
+                // Per-pair harmonics (x6)
+                for (i in 0 until 6) {
+                    put(VoiceSymbol.pairHarmonics(i).controlId.key, "Harmonics for pair $i")
+                }
+                // Per-pair morph (x6)
+                for (i in 0 until 6) {
+                    put(VoiceSymbol.pairMorph(i).controlId.key, "Morph / timbre for pair $i")
+                }
+                // Per-pair sharpness (x6)
+                for (i in 0 until 6) {
+                    put(VoiceSymbol.pairSharpness(i).controlId.key, "Sharpness for pair $i")
+                }
+                // Per-pair mod depth (x6)
+                for (i in 0 until 6) {
+                    put(VoiceSymbol.pairModDepth(i).controlId.key, "Modulation depth for pair $i")
+                }
+                // Per-voice mod depth (x12)
+                for (i in 0 until 12) {
+                    put(VoiceSymbol.modDepth(i).controlId.key, "Modulation depth for voice $i")
+                }
+                // Per-voice envelope speed (x12)
+                for (i in 0 until 12) {
+                    put(VoiceSymbol.envSpeed(i).controlId.key, "Envelope speed for voice $i")
+                }
+                // Per-quad pitch (x3)
+                for (i in 0 until 3) {
+                    put(VoiceSymbol.quadPitch(i).controlId.key, "Pitch offset for quad $i")
+                }
+                // Per-quad hold (x3)
+                for (i in 0 until 3) {
+                    put(VoiceSymbol.quadHold(i).controlId.key, "Hold level for quad $i")
+                }
+                // Per-quad volume (x3)
+                for (i in 0 until 3) {
+                    put(VoiceSymbol.quadVolume(i).controlId.key, "Volume for quad $i")
+                }
+            }
+        }
+    }
 }
 /**
  * ViewModel for voice management.
@@ -54,6 +137,7 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
 @Inject
 @ViewModelKey(VoiceViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
 class VoiceViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,

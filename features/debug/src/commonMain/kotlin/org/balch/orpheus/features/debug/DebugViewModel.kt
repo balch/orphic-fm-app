@@ -36,7 +36,10 @@ data class DebugPanelActions(
     }
 }
 
-typealias DebugFeature = SynthFeature<DebugUiState, DebugPanelActions>
+interface DebugFeature : SynthFeature<DebugUiState, DebugPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
+}
 
 /**
  * ViewModel for the Debug bottom bar.

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.controller.SynthController
@@ -65,6 +67,41 @@ private sealed interface LfoIntent {
 interface LfoFeature : SynthFeature<LfoUiState, LfoPanelActions> {
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
+
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.LFO
+            override val title = "LFO"
+
+            override val markdown = """
+        Dual LFO with two oscillators (A & B) and logical AND/OR combination modes. Controls frequency of each LFO, combination mode, link, and triangle mode.
+
+        ## Controls
+        - **LFO A**: Frequency of LFO oscillator A.
+        - **LFO B**: Frequency of LFO oscillator B.
+
+        ## Switches
+        - **MODE**: Combination mode for the two LFOs (Off, AND, OR, XOR).
+        - **LINK**: Links both LFO frequencies together.
+        - **TRIANGLE**: Selects triangle wave mode for the LFO shape.
+
+        ## Tips
+        - Use LINK to keep both LFOs at the same frequency while adjusting a single knob.
+        - Combine AND/OR modes for complex modulation shapes from two simple LFOs.
+            """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                DuoLfoSymbol.FREQ_A.controlId.key to "Frequency of LFO oscillator A",
+                DuoLfoSymbol.FREQ_B.controlId.key to "Frequency of LFO oscillator B",
+                DuoLfoSymbol.MODE.controlId.key to "Combination mode (Off, AND, OR, XOR)",
+                DuoLfoSymbol.LINK.controlId.key to "Link both LFO frequencies together",
+                DuoLfoSymbol.TRIANGLE_MODE.controlId.key to "Triangle wave mode selection",
+            )
+        }
+    }
 }
 
 /**
@@ -73,9 +110,11 @@ interface LfoFeature : SynthFeature<LfoUiState, LfoPanelActions> {
  * Uses MVI pattern with flow { emit(initial); emitAll(updates) } for proper WhileSubscribed support.
  * Uses SynthController.controlFlow() for all engine interactions.
  */
+@Inject
 @ViewModelKey(LfoViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class LfoViewModel @Inject constructor(
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class LfoViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), LfoFeature {

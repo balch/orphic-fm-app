@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
@@ -61,11 +63,45 @@ data class EvoPanelActions(
 interface EvoFeature : SynthFeature<EvoUiState, EvoPanelActions> {
      override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
+
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.EVO
+            override val title = "Evolution"
+
+            override val markdown = """
+        Automated sound evolution engine. Gradually morphs synth parameters over time using different strategies. Controls depth, rate, and variation.
+
+        ## Controls
+        - **DEPTH**: How far parameters deviate from their current values during evolution.
+        - **RATE**: Speed of the evolution cycle. Higher values = faster parameter changes.
+
+        ## Switches
+        - **STRATEGY**: Selects the evolution algorithm (e.g., Random Walk, Drift, Morph).
+        - **ENABLED**: Toggles the evolution engine on/off.
+
+        ## Tips
+        - Start with low DEPTH for subtle, slow-moving timbral shifts.
+        - Combine with the LFO panel for layered modulation effects.
+            """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                EvoSymbol.DEPTH.controlId.key to "Parameter deviation depth",
+                EvoSymbol.RATE.controlId.key to "Evolution cycle speed",
+                EvoSymbol.VARIATION.controlId.key to "Variation amount / randomness",
+            )
+        }
+    }
 }
 
+@Inject
 @ViewModelKey(EvoViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class EvoViewModel @Inject constructor(
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class EvoViewModel(
     strategies: Set<AudioEvolutionStrategy>,
     private val synthEngine: SynthEngine,
     private val synthController: SynthController,

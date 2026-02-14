@@ -84,8 +84,12 @@ fun RotaryKnob(
     val learnState = LocalLearnModeState.current
     val isLearning = controlId != null && learnState.isLearning(controlId)
 
+    // AI tutorial highlight
+    val highlightMod = if (controlId != null) Modifier.highlightable(controlId) else Modifier
+
     Column(
         modifier = modifier
+            .then(highlightMod)
             .then(
                 if (controlId != null && learnState.isActive) {
                     Modifier.learnable(controlId, learnState)

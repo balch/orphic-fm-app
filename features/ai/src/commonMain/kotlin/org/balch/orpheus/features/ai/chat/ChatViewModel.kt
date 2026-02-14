@@ -39,7 +39,10 @@ data class ChatPanelActions(
     }
 }
 
-typealias ChatFeature = SynthFeature<ChatUiState, ChatPanelActions>
+interface ChatFeature : SynthFeature<ChatUiState, ChatPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
+}
 
 /**
  * ViewModel for the AI chat panel.
@@ -52,16 +55,6 @@ class ChatViewModel(
 ) : ViewModel(), ChatFeature {
 
     /**
-     * Whether the API key is configured.
-     */
-    val isApiKeySet: Boolean get() = agent.isApiKeySet
-
-    /**
-     * The accent color for the panel.
-     */
-    val accentColor: Color = OrpheusColors.warmGlow
-
-    /**
      * Chat messages flow.
      */
     val messages: StateFlow<List<ChatMessage>> = agent.agentFlow
@@ -71,11 +64,6 @@ class ChatViewModel(
             started = this.sharingStrategy,
             initialValue = emptyList()
         )
-
-    /**
-     * Session usage statistics.
-     */
-    val sessionUsage: StateFlow<SessionUsage> = agent.sessionUsage
 
     /**
      * Whether the agent is currently processing.

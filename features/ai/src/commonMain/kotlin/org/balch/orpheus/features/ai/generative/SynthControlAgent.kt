@@ -161,13 +161,13 @@ class SynthControlAgent(
                 val value = valueStr.toFloatOrNull() ?: return
                 
                 // Block Master Volume changes from AI
-                if (id.lowercase() == "master_volume") {
-                    log.warn { "Blocked master_volume change from AI" }
+                if (id == "stereo_master_vol") {
+                    log.warn { "Blocked stereo_master_vol change from AI" }
                     return
                 }
 
                 // Enforce active quad restriction
-                if (!isControlAllowedForActiveQuads(id.uppercase())) {
+                if (!isControlAllowedForActiveQuads(id)) {
                     log.warn { "Blocked $id - outside active quads ${config.activeQuads}" }
                     return
                 }
@@ -188,6 +188,18 @@ class SynthControlAgent(
                 if (code.trim().equals("hush", ignoreCase = true) || code.contains("hush", ignoreCase = true)) {
                     log.warn { "Blocked 'hush' command from AI - continuous playback required" }
                     emitControl("Blocked explicit silence (hush)", isError = false)
+                    return
+                }
+
+                // Block REPL bpm command - it resets the scheduler and kills sound.
+                // AI should use beats_bpm synth control instead.
+                if (code.lines().any { line ->
+                        val t = line.trim().lowercase()
+                        t.startsWith("bpm ") || t.startsWith("bpm:")
+                    }) {
+                    log.warn { "Blocked REPL 'bpm' command from AI - use beats_bpm synth control instead" }
+                    emitControl("Blocked REPL bpm (use beats_bpm control)", isError = false)
+                    injectUserPrompt("REPL 'bpm' command is blocked during compositions. Use synth_control with beats_bpm instead (value = desired BPM, e.g. 120.0).")
                     return
                 }
 
@@ -227,22 +239,22 @@ class SynthControlAgent(
     }
 
     /**
-     * Map an AI control name to its quad index (0-based), or null for global controls.
+     * Map a short-key control name to its quad index (0-based), or null for global controls.
      */
     private fun controlIdToQuadIndex(id: String): Int? {
-        // Quad controls: QUAD_*_N (1-indexed) → quad N-1
-        val quadMatch = Regex("QUAD_(?:PITCH|HOLD|VOLUME)_(\\d+)").find(id)
-        if (quadMatch != null) return quadMatch.groupValues[1].toInt() - 1
+        // Quad controls: voice_quad_{pitch|hold|volume}_N (0-indexed)
+        val quadMatch = Regex("voice_quad_(?:pitch|hold|volume)_(\\d+)").find(id)
+        if (quadMatch != null) return quadMatch.groupValues[1].toInt()
 
-        // Voice controls: VOICE_*_N (1-indexed) → quad (N-1)/4
-        val voiceMatch = Regex("VOICE_(?:TUNE|FM_DEPTH|ENV_SPEED)_(\\d+)").find(id)
-        if (voiceMatch != null) return (voiceMatch.groupValues[1].toInt() - 1) / 4
+        // Voice controls: voice_{tune|mod_depth|env_speed}_N (0-indexed) → quad N/4
+        val voiceMatch = Regex("voice_(?:tune|mod_depth|env_speed)_(\\d+)").find(id)
+        if (voiceMatch != null) return voiceMatch.groupValues[1].toInt() / 4
 
-        // Pair controls: DUO_MOD_SOURCE_N, PAIR_SHARPNESS_N, VOICE_ENGINE_N (1-indexed) → quad (N-1)/2
-        val pairMatch = Regex("(?:DUO_MOD_SOURCE|PAIR_SHARPNESS|VOICE_ENGINE(?:_HARMONICS)?)_(\\d+)").find(id)
-        if (pairMatch != null) return (pairMatch.groupValues[1].toInt() - 1) / 2
+        // Pair controls (0-indexed) → quad N/2
+        val pairMatch = Regex("voice_(?:duo_mod_source|pair_sharpness|pair_engine|pair_harmonics|pair_morph|pair_mod_depth)_(\\d+)").find(id)
+        if (pairMatch != null) return pairMatch.groupValues[1].toInt() / 2
 
-        // Global/effect controls (VIBRATO, DRIVE, DELAY_*, RESONATOR_*, MATRIX_*, BENDER, etc.)
+        // Global/effect controls (voice_vibrato, distortion_*, delay_*, resonator_*, warps_*, etc.)
         return null
     }
 
@@ -462,14 +474,17 @@ class SynthControlAgent(
                                  IMPORTANT: You must rely on the structured output format provided. Do not use native tool calls.
                                  
                                  BEATS/DRUMS CONTROL:
-                                 You can control the Drum Sequencer using the following IDs:
-                                 - BEATS_RUN: 0.0 (Stop) or 1.0 (Start)
-                                 - BEATS_X, BEATS_Y: 0.0 to 1.0 (Topographic Morphing)
-                                 - BEATS_DENSITY_1, BEATS_DENSITY_2, BEATS_DENSITY_3: 0.0 to 1.0 (Density for Kick, Snare, HiHat)
-                                 - BEATS_BPM: 60.0 to 200.0
-                                 - BEATS_MIX: 0.0 to 1.0 (Volume)
-                                 - BEATS_RANDOMNESS, BEATS_SWING
-                                 - BEATS_MODE: 0.0 (Map/Drums) or 1.0 (Euclidean)
+                                 To START beats: set beats_bpm, beats_mix, beats_density_0/1/2, then set beats_run to 1.0.
+                                 To STOP beats: set beats_run to 0.0.
+
+                                 Available controls:
+                                 - beats_run: 1.0 = Start sequencer, 0.0 = Stop sequencer
+                                 - beats_bpm: 60.0 to 200.0 (tempo)
+                                 - beats_mix: 0.0 to 1.0 (volume)
+                                 - beats_x, beats_y: 0.0 to 1.0 (pattern morphing)
+                                 - beats_density_0, beats_density_1, beats_density_2: 0.0 to 1.0 (kick, snare, hi-hat density)
+                                 - beats_randomness, beats_swing
+                                 - beats_mode: 0.0 (Drums) or 1.0 (Euclidean)
                              """.trimIndent())
                         },
                         model = aiModelProvider.currentKoogModel,

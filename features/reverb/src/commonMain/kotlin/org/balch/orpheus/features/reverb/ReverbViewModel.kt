@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import dev.zacsweers.metro.ContributesIntoSet
+import kotlinx.coroutines.flow.SharingStarted
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
@@ -50,12 +53,50 @@ private sealed interface ReverbIntent {
     data class Diffusion(val value: Float) : ReverbIntent
 }
 
-typealias ReverbFeature = SynthFeature<ReverbUiState, ReverbPanelActions>
+interface ReverbFeature : SynthFeature<ReverbUiState, ReverbPanelActions> {
+    override val sharingStrategy: SharingStarted
+        get() = SharingStarted.Eagerly
 
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.REVERB
+            override val title = "Reverb"
+
+            override val markdown = """
+        Algorithmic reverb for adding space and depth to sounds. Ranges from tight rooms to vast cathedral ambiences.
+
+        ## Controls
+        - **AMOUNT**: Overall reverb intensity / wet level. Higher values push more signal into the reverb.
+        - **TIME**: Reverb tail length. Low values give short, tight rooms; high values create expansive halls.
+        - **DAMPING**: High-frequency absorption. Low damping = bright, metallic reflections. High damping = warm, dark tails.
+        - **DIFFUSION**: Density of the reverb reflections. Low diffusion creates audible individual echoes; high diffusion produces a smooth, lush wash.
+
+        ## Tips
+        - For ambient pads, use high TIME and high DIFFUSION with moderate DAMPING.
+        - For percussive sounds, keep TIME short and AMOUNT moderate for a natural room feel.
+        - Combine with Delay for huge, atmospheric soundscapes.
+        - High DAMPING with long TIME creates warm, pad-like tails.
+    """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                ReverbSymbol.AMOUNT.controlId.key to "Reverb intensity / wet level",
+                ReverbSymbol.TIME.controlId.key to "Reverb tail length",
+                ReverbSymbol.DAMPING.controlId.key to "High-frequency absorption in reverb tail",
+                ReverbSymbol.DIFFUSION.controlId.key to "Density of reverb reflections",
+            )
+        }
+    }
+}
+
+@Inject
 @ViewModelKey(ReverbViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class ReverbViewModel @Inject constructor(
-    private val synthController: SynthController,
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class ReverbViewModel(
+    synthController: SynthController,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), ReverbFeature {
 

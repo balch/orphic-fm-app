@@ -13,7 +13,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.synthViewModel
 
-typealias DrawSequencerFeature = SynthFeature<DrawSequencerUiState, DrawSequencerPanelActions>
+interface DrawSequencerFeature: SynthFeature<DrawSequencerUiState, DrawSequencerPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
+}
 
 @Inject
 @ViewModelKey(DrawSequencerViewModel::class)

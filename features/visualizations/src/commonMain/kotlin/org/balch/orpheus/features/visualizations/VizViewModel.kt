@@ -51,7 +51,10 @@ data class VizPanelActions(
     }
 }
 
-typealias VizFeature = SynthFeature<VizUiState, VizPanelActions>
+interface VizFeature : SynthFeature<VizUiState, VizPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
+}
 
 /**
  * ViewModel for managing visualizations.

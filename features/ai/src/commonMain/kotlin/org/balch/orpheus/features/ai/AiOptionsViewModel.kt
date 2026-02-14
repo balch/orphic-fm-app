@@ -110,7 +110,10 @@ data class AiOptionsPanelActions(
     }
 }
 
-typealias AiOptionsFeature = SynthFeature<AiOptionsUiState, AiOptionsPanelActions>
+interface AiOptionsFeature : SynthFeature<AiOptionsUiState, AiOptionsPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
+}
 
 /**
  *ViewModel for the AI Options panel.

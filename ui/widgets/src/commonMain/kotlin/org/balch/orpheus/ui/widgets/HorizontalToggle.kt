@@ -34,12 +34,15 @@ fun HorizontalToggle(
     isStart: Boolean = true,
     onToggle: (Boolean) -> Unit,
     color: Color = OrpheusColors.warmGlow,
+    controlId: String? = null
 ) {
     val maxChars = listOf(startLabel, endLabel).maxOf { it.length }
+    val highlightMod = if (controlId != null) Modifier.highlightable(controlId) else Modifier
 
     // Outer Box for robust click handling and touch target size
     Box(
         modifier = modifier
+            .then(highlightMod)
             .clip(RoundedCornerShape(6.dp))
             .background(OrpheusColors.panelBackground)
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))

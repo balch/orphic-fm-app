@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import dev.zacsweers.metro.ContributesIntoSet
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
@@ -93,17 +95,73 @@ private sealed interface FluxIntent {
     data class Mix(val value: Float) : FluxIntent
 }
 
-typealias FluxFeature = SynthFeature<FluxUiState, FluxPanelActions>
+interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.FLUX
+            override val title = "Flux"
+
+            override val markdown = """
+        Random melody and voltage generator. Produces evolving pitch sequences, gates, and modulation voltages using configurable random distributions.
+
+        ## Controls
+        - **STEPS**: Number of steps in the random sequence (quantized). More steps = longer patterns before repeating.
+        - **SPREAD**: Range of the random distribution. Low = notes clustered together; high = wide melodic leaps.
+        - **BIAS**: Center point of the distribution. Shifts the generated pitches higher or lower.
+        - **DEJA VU**: Pattern memory / repetition probability. Low = always fresh random values; high = repeats previous patterns.
+        - **RATE**: Internal clock speed when using the internal clock source.
+        - **PROBABILITY**: Chance that a step will fire its gate. 1.0 = every step triggers; lower values create sparser rhythms.
+        - **JITTER**: Timing randomness. Adds human-like timing imperfections to the gate outputs.
+        - **PULSE WIDTH**: Duration of the gate pulse as a fraction of the step length.
+        - **PW RAND**: Randomization amount for pulse width. Adds variety to gate lengths.
+        - **MIX**: Controls how much the Flux pitch output affects voice tuning. 0 = off (no pitch modulation), 1 = full random melodies.
+
+        ## Switches
+        - **CLK** (Clock Source): INT = internal clock, EXT = external/tempo-synced clock.
+        - **T MODEL**: Random distribution type (Bernoulli, Cluster, Drum, Independent, Divider, 3-State, Markov).
+        - **T RANGE**: Time range multiplier for the internal clock (1/4x, 1x, 4x).
+        - **SCALE**: Musical scale quantization (Major, Minor, Pentatonic, Phrygian, Whole Tone, Chromatic).
+        - **MODE**: Control voltage behavior mode (Identity, Bump, Tilt).
+        - **V RANGE**: Output voltage range (Narrow, Positive, Full).
+
+        ## Tips
+        - Start with MIX at 0 and slowly increase to hear how random melodies blend with your existing tuning.
+        - Use Pentatonic scale for always-pleasant random melodies.
+        - Low SPREAD + high DEJA VU creates subtle, repetitive motifs.
+        - High SPREAD + Chromatic scale = experimental, atonal sequences.
+        - Pair with Delay and Reverb for ambient generative music.
+    """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                FluxSymbol.STEPS.controlId.key to "Number of steps in the random sequence",
+                FluxSymbol.SPREAD.controlId.key to "Range / width of the random distribution",
+                FluxSymbol.BIAS.controlId.key to "Center point of the pitch distribution",
+                FluxSymbol.DEJAVU.controlId.key to "Pattern memory / repetition probability",
+                FluxSymbol.RATE.controlId.key to "Internal clock speed",
+                FluxSymbol.PROBABILITY.controlId.key to "Gate firing probability per step",
+                FluxSymbol.JITTER.controlId.key to "Timing randomness for gates",
+                FluxSymbol.PULSE_WIDTH.controlId.key to "Gate pulse duration",
+                FluxSymbol.PULSE_WIDTH_STD.controlId.key to "Pulse width randomization amount",
+                FluxSymbol.MIX.controlId.key to "Flux pitch modulation depth",
+            )
+        }
+    }
+}
 
 /**
  * ViewModel for the Flux Quantized Random Sequencer panel.
  *
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
+@Inject
 @ViewModelKey(FluxViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class FluxViewModel @Inject constructor(
-    private val synthController: SynthController,
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class FluxViewModel(
+    synthController: SynthController,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), FluxFeature {
 

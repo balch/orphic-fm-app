@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
@@ -90,11 +92,48 @@ private sealed interface SpeechIntent {
 interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
+
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.SPEECH
+            override val title = "Speech"
+
+            override val markdown = """
+        Text-to-speech synthesizer with pitch, speed, volume, reverb, phaser, and feedback controls. Generates spoken audio from text input.
+
+        ## Controls
+        - **RATE**: Playback rate / pitch of the speech output.
+        - **SPEED**: Words-per-minute speed of the generated speech.
+        - **VOLUME**: Output volume level of the speech synthesizer.
+        - **REVERB**: Amount of reverb effect applied to the speech.
+        - **PHASER**: Amount of phaser effect applied to the speech.
+        - **FEEDBACK**: Feedback amount for the effects chain.
+
+        ## Tips
+        - Adjust RATE to change the pitch character of the spoken output.
+        - Combine REVERB and PHASER for atmospheric spoken-word textures.
+            """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                TtsSymbol.RATE.controlId.key to "Playback rate / pitch",
+                TtsSymbol.SPEED.controlId.key to "Words-per-minute speed",
+                TtsSymbol.VOLUME.controlId.key to "Speech output volume",
+                TtsSymbol.REVERB.controlId.key to "Reverb effect amount",
+                TtsSymbol.PHASER.controlId.key to "Phaser effect amount",
+                TtsSymbol.FEEDBACK.controlId.key to "Effects chain feedback",
+            )
+        }
+    }
 }
 
+@Inject
 @ViewModelKey(SpeechViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class SpeechViewModel @Inject constructor(
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class SpeechViewModel(
     synthController: SynthController,
     private val synthEngine: SynthEngine,
     private val ttsGenerator: TtsGenerator,

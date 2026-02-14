@@ -15,10 +15,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.midi.LearnTarget
+import org.balch.orpheus.features.ai.ControlHighlightEventBus
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.ui.screens.CompactLandscapeScreen
 import org.balch.orpheus.ui.screens.CompactPortraitScreen
 import org.balch.orpheus.ui.screens.DesktopSynthScreen
+import org.balch.orpheus.ui.widgets.HighlightProvider
 import org.balch.orpheus.ui.widgets.LearnModeProvider
 
 /**
@@ -52,6 +54,7 @@ private fun determineLayoutMode(widthDp: Float, heightDp: Float): LayoutMode {
 @Composable
 fun SynthScreen(
     orchestrator: SynthOrchestrator,
+    controlHighlightEventBus: ControlHighlightEventBus,
     onFullyDrawn: () -> Unit = {}
 ) {
     LaunchedEffect(Unit) {
@@ -69,12 +72,15 @@ fun SynthScreen(
     val midiFeature = MidiViewModel.feature()
     val midiState by midiFeature.stateFlow.collectAsState()
 
-    LearnModeProvider(
-        isLearnModeActive = midiState.isLearnModeActive,
-        selectedControlId = (midiState.mappingState.learnTarget as? LearnTarget.Control)?.controlId,
-        onSelectControl = { id -> midiFeature.actions.selectControlForLearning(id) },
-    ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    val highlightedControls by controlHighlightEventBus.highlightedControls.collectAsState()
+
+    HighlightProvider(highlightedControlIds = highlightedControls) {
+        LearnModeProvider(
+            isLearnModeActive = midiState.isLearnModeActive,
+            selectedControlId = (midiState.mappingState.learnTarget as? LearnTarget.Control)?.controlId,
+            onSelectControl = { id -> midiFeature.actions.selectControlForLearning(id) },
+        ) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val layoutMode = determineLayoutMode(maxWidth.value, maxHeight.value)
             
             when (layoutMode) {
@@ -96,5 +102,6 @@ fun SynthScreen(
                 }
             }
         }
+    }
     }
 }

@@ -78,6 +78,7 @@ fun App(
                             Box(modifier = Modifier.weight(1f)) {
                                 SynthScreen(
                                     orchestrator = graph.synthOrchestrator,
+                                    controlHighlightEventBus = graph.controlHighlightEventBus,
                                     onFullyDrawn = onFullyDrawn
                                 )
                             }

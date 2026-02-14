@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
@@ -71,17 +73,60 @@ private sealed interface GrainsIntent {
     data class Mode(val mode: GrainsMode) : GrainsIntent
 }
 
-typealias GrainsFeature = SynthFeature<GrainsUiState, GrainsPanelActions>
+interface GrainsFeature : SynthFeature<GrainsUiState, GrainsPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.GRAINS
+            override val title = "Grains"
+
+            override val markdown = """
+        Granular audio processor. Captures and plays back fragments of sound. Controls position, size, density, texture, pitch, freeze, and dry/wet.
+
+        ## Controls
+        - **POSITION**: Playback position in the audio buffer / delay time.
+        - **SIZE**: Grain size / diffusion amount.
+        - **PITCH**: Pitch shifting amount (semitones).
+        - **DENSITY**: Grain overlap / feedback amount.
+        - **TEXTURE**: Filter character (low-pass to high-pass).
+        - **DRY/WET**: Mix between dry input and granular output.
+
+        ## Switches
+        - **FREEZE**: Captures and loops the current buffer contents.
+        - **MODE**: Processing mode (Granular, Stretch, Looping Delay, Spectral).
+
+        ## Tips
+        - Use FREEZE to capture a moment, then sweep POSITION and SIZE to explore the frozen sound.
+        - Low DENSITY with high TEXTURE creates shimmering, sparse textures.
+            """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                GrainsSymbol.POSITION.controlId.key to "Playback position / delay time",
+                GrainsSymbol.SIZE.controlId.key to "Grain size / diffusion",
+                GrainsSymbol.PITCH.controlId.key to "Pitch shifting (semitones)",
+                GrainsSymbol.DENSITY.controlId.key to "Grain overlap / feedback",
+                GrainsSymbol.TEXTURE.controlId.key to "Filter character (LP to HP)",
+                GrainsSymbol.DRY_WET.controlId.key to "Dry/wet mix",
+                GrainsSymbol.FREEZE.controlId.key to "Freeze/loop the audio buffer",
+                GrainsSymbol.MODE.controlId.key to "Processing mode selection",
+            )
+        }
+    }
+}
 
 /**
  * ViewModel for the Grains Texture Synthesizer panel.
  *
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
+@Inject
 @ViewModelKey(GrainsViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class GrainsViewModel @Inject constructor(
-    private val synthController: SynthController,
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class GrainsViewModel(
+    synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), GrainsFeature {
 

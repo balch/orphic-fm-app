@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import dev.zacsweers.metro.ContributesIntoSet
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
@@ -77,17 +79,66 @@ private sealed interface ResonatorIntent {
     data class SnapBack(val active: Boolean) : ResonatorIntent
 }
 
-typealias ResonatorFeature = SynthFeature<ResonatorUiState, ResonatorPanelActions>
+interface ResonatorFeature : SynthFeature<ResonatorUiState, ResonatorPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.RESONATOR
+            override val title = "Resonator"
+
+            override val markdown = """
+        Physical modeling resonator that transforms any sound into metallic, string-like, or bell tones. Uses modal synthesis to simulate vibrating objects.
+
+        ## Modes
+        - **Modal**: Simulates plates and bells. Produces clear, ringing metallic tones with distinct harmonics.
+        - **String**: Karplus-Strong plucked string model. Creates guitar-like and harp-like tones.
+        - **Sympathetic**: Sitar-like sympathetic resonance. Multiple strings ring in response to the input, creating rich, shimmering textures.
+
+        ## Controls
+        - **MODE**: Selects the resonance model (Modal / String / Sympathetic).
+        - **STRUCTURE**: Harmonic spread and inharmonicity. Low values = clean harmonics; high values = metallic, bell-like inharmonics.
+        - **BRIGHTNESS**: High-frequency content of the resonance. Low = dark and muted; high = bright and shimmery.
+        - **DAMPING**: How quickly the resonance decays. Low = long, ringing sustain; high = quick, percussive decay.
+        - **POSITION**: Where the excitation hits the resonating body. 0.5 = center (strong fundamental). Moving toward edges emphasizes higher harmonics.
+        - **MIX**: Dry/wet blend. 0 = bypass, 0.3-0.5 = subtle texture, 1 = fully resonated.
+
+        ## Safety Warning
+        Avoid setting both BRIGHTNESS and STRUCTURE to high values simultaneously — this can produce piercing high-frequency feedback. If BRIGHTNESS is high, keep STRUCTURE below 0.4.
+
+        ## Tips
+        - For bell tones: Modal mode, moderate STRUCTURE, high BRIGHTNESS, moderate DAMPING.
+        - For plucked guitar: String mode, low STRUCTURE, moderate BRIGHTNESS.
+        - For ambient textures: Sympathetic mode with low MIX for subtle harmonic enrichment.
+        - Always lower MIX before switching modes to avoid clicks.
+    """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                ResonatorSymbol.MODE.controlId.key to "Resonance model: Modal (bell), String (plucked), Sympathetic (sitar)",
+                ResonatorSymbol.STRUCTURE.controlId.key to "Harmonic spread / inharmonicity",
+                ResonatorSymbol.BRIGHTNESS.controlId.key to "High-frequency content of the resonance",
+                ResonatorSymbol.DAMPING.controlId.key to "Resonance decay speed",
+                ResonatorSymbol.POSITION.controlId.key to "Excitation point on the resonating body",
+                ResonatorSymbol.MIX.controlId.key to "Dry/wet blend for the resonator",
+                ResonatorSymbol.TARGET_MIX.controlId.key to "Target mix level for smooth transitions",
+                ResonatorSymbol.SNAP_BACK.controlId.key to "Speed of mix transition back to target",
+            )
+        }
+    }
+}
 
 /**
  * ViewModel for the Rings Resonator panel.
  *
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
+@Inject
 @ViewModelKey(ResonatorViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class ResonatorViewModel @Inject constructor(
-    private val synthController: SynthController,
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class ResonatorViewModel(
+    synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), ResonatorFeature {
 

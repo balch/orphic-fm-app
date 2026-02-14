@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import dev.zacsweers.metro.ContributesIntoSet
+import kotlinx.coroutines.flow.SharingStarted
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
@@ -64,18 +67,61 @@ private sealed interface DelayIntent {
     data class Waveform(val isTriangle: Boolean) : DelayIntent
 }
 
-typealias DelayFeature = SynthFeature<DelayUiState, DelayPanelActions>
+interface DelayFeature : SynthFeature<DelayUiState, DelayPanelActions> {
+
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.DELAY
+            override val title = "Delay"
+
+            override val markdown = """
+        Stereo dual-tap delay with modulation. Creates echo, rhythmic repeats, and shimmering textures.
+
+        ## Controls
+        - **TIME A / TIME B**: Set the delay time for each tap independently. Short times create chorus/flanger effects; longer times create distinct echoes.
+        - **DELAY A / DELAY B** (MOD 1/2): Modulation depth for each delay line. Adds pitch wobble and movement to the echoes.
+        - **FEEDBACK** (shown as the infinity symbol): Controls how many times the echo repeats. Low values give a single slapback; high values create long trails. Be careful above 0.9 — it can self-oscillate.
+        - **MIX**: Dry/wet blend. 0 = no delay, 1 = fully wet.
+        - **MOD SOURCE** toggle (LFO/SELF): Choose whether the modulation comes from the global LFO or from the delay's own feedback path.
+        - **WAVEFORM** toggle (TRI/SQR): Shape of the modulation oscillator. Triangle is smooth; square creates a more dramatic pitch-shift effect.
+
+        ## Tips
+        - Set TIME A and TIME B to slightly different values for a wide stereo spread.
+        - Short delay times (< 0.1) with moderate feedback create metallic resonances.
+        - Use LFO modulation with triangle wave for tape-delay-style warble.
+        - Pair with the Resonator for reverberant delay tails.
+    """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                DelaySymbol.TIME_1.controlId.key to "Delay time for tap A",
+                DelaySymbol.TIME_2.controlId.key to "Delay time for tap B",
+                DelaySymbol.MOD_DEPTH_1.controlId.key to "Modulation depth for delay line A",
+                DelaySymbol.MOD_DEPTH_2.controlId.key to "Modulation depth for delay line B",
+                DelaySymbol.FEEDBACK.controlId.key to "Echo repeats / feedback amount",
+                DelaySymbol.MIX.controlId.key to "Dry/wet blend for the delay effect",
+                DelaySymbol.MOD_SOURCE.controlId.key to "Modulation source (0=self-feedback, 1=LFO)",
+                DelaySymbol.LFO_WAVEFORM.controlId.key to "LFO waveform shape (0=square, 1=triangle)",
+            )
+        }
+    }
+}
 
 /**
  * ViewModel for the Mod Delay panel.
  *
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
+@Inject
 @ViewModelKey(DelayViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class DelayViewModel @Inject constructor(
-    private val synthController: SynthController,
-    dispatcherProvider: DispatcherProvider
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class DelayViewModel(
+    synthController: SynthController,
+    dispatcherProvider: DispatcherProvider,
 ) : ViewModel(), DelayFeature {
 
     // Control flows for Delay plugin ports
@@ -98,7 +144,6 @@ class DelayViewModel @Inject constructor(
         setSource = modSourceId.boolSetter(),
         setWaveform = waveformId.boolSetter()
     )
-
     // Control changes -> DelayIntent
     private val controlIntents = merge(
         time1Id.map { DelayIntent.Time1(it.asFloat()) },

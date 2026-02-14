@@ -56,7 +56,10 @@ private sealed interface LooperIntent {
     data class UpdateProgress(val position: Float, val duration: Double) : LooperIntent
 }
 
-typealias LooperFeature = SynthFeature<LooperUiState, LooperActions>
+interface LooperFeature : SynthFeature<LooperUiState, LooperActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
+}
 
 @Inject
 @ViewModelKey(LooperViewModel::class)

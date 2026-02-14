@@ -72,6 +72,9 @@ private sealed interface PresetIntent {
 interface PresetsFeature : SynthFeature<PresetUiState, PresetPanelActions> {
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
+
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthFeature.SynthControl.Empty
 }
 
 /**

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
@@ -146,7 +148,55 @@ private sealed interface DrumIntent {
     data class Bypass(val active: Boolean) : DrumIntent
 }
 
-typealias DrumFeature = SynthFeature<DrumUiState, DrumPanelActions>
+interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
+    override val synthControl: SynthFeature.SynthControl
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.DRUMS
+            override val title = "Drums"
+
+            override val markdown = """
+                808-style analog drum synthesizer with three voices (Bass Drum, Snare, Hi-Hat). Each voice has frequency, tone, and decay controls plus engine-specific parameters.
+
+                ## Voices
+                - **Bass Drum (BD)**: Deep, punchy kicks. FREQ controls fundamental pitch, TONE shapes body, DECAY sets tail length. P4/P5 are engine-specific parameters.
+                - **Snare Drum (SD)**: Crispy snares. FREQ sets pitch, TONE blends noise/tonal, DECAY sets snap length. P4 is engine-specific.
+                - **Hi-Hat (HH)**: Metallic cymbals. FREQ controls pitch, TONE adjusts brightness, DECAY sets open/closed character. P4 is engine-specific.
+
+                ## Engine Selection
+                Each voice can use a different synthesis engine, changing its tonal character.
+
+                ## Tips
+                - Lower BD FREQ for deep sub-bass kicks; raise for punchy, clicky attacks.
+                - Combine with Beats for algorithmic pattern generation.
+                - Use BYPASS to mute drums without losing your parameter settings.
+            """.trimIndent()
+
+            override val portControlKeys = mapOf(
+                DrumSymbol.BD_FREQ.controlId.key to "Bass drum frequency / pitch",
+                DrumSymbol.BD_TONE.controlId.key to "Bass drum tone / body shape",
+                DrumSymbol.BD_DECAY.controlId.key to "Bass drum decay length",
+                DrumSymbol.BD_P4.controlId.key to "Bass drum engine-specific parameter 4",
+                DrumSymbol.BD_P5.controlId.key to "Bass drum engine-specific parameter 5",
+                DrumSymbol.SD_FREQ.controlId.key to "Snare drum frequency / pitch",
+                DrumSymbol.SD_TONE.controlId.key to "Snare drum tone / noise blend",
+                DrumSymbol.SD_DECAY.controlId.key to "Snare drum decay length",
+                DrumSymbol.SD_P4.controlId.key to "Snare drum engine-specific parameter 4",
+                DrumSymbol.HH_FREQ.controlId.key to "Hi-hat frequency / pitch",
+                DrumSymbol.HH_TONE.controlId.key to "Hi-hat tone / brightness",
+                DrumSymbol.HH_DECAY.controlId.key to "Hi-hat decay length",
+                DrumSymbol.HH_P4.controlId.key to "Hi-hat engine-specific parameter 4",
+                DrumSymbol.BD_ENGINE.controlId.key to "Bass drum synthesis engine selection",
+                DrumSymbol.SD_ENGINE.controlId.key to "Snare drum synthesis engine selection",
+                DrumSymbol.HH_ENGINE.controlId.key to "Hi-hat synthesis engine selection",
+                DrumSymbol.MIX.controlId.key to "Drum mix level",
+                DrumSymbol.BYPASS.controlId.key to "Bypass drums on/off",
+            )
+        }
+    }
+}
 
 /**
  * ViewModel for the Drum Synth panel.
@@ -154,11 +204,13 @@ typealias DrumFeature = SynthFeature<DrumUiState, DrumPanelActions>
  * Uses SynthController.controlFlow() for port-based engine interactions.
  * Keeps SynthEngine for triggerDrum() (imperative operation).
  */
+@Inject
 @ViewModelKey(DrumViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class DrumViewModel @Inject constructor(
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+class DrumViewModel(
     private val synthEngine: SynthEngine,
-    private val synthController: SynthController,
+    synthController: SynthController,
     dispatcherProvider: DispatcherProvider
 ) : ViewModel(), DrumFeature {
 

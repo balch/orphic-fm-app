@@ -36,10 +36,13 @@ fun <T> ValueCycleButton(
     labelProvider: (T) -> String = { it.toString() },
     label: String? = null,
     color: Color = OrpheusColors.warmGlow,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    controlId: String? = null
 ) {
+    val highlightMod = if (controlId != null) Modifier.highlightable(controlId) else Modifier
+
     Column(
-        modifier = modifier,
+        modifier = modifier.then(highlightMod),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (label != null) {
