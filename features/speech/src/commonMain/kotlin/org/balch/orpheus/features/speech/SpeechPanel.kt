@@ -111,7 +111,7 @@ fun SpeechPanel(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.widthIn(max = 240.dp),
             ) {
                 if (uiState.availableVoices.isNotEmpty()) {
                     VoiceSelector(
@@ -470,10 +470,21 @@ private fun SpeechReadout(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
+
+        // Play triangle overlay - only in play button phase
+        if (playAlpha > 0.01f) {
+            Text(
+                modifier = Modifier.align(Alignment.TopEnd),
+                text = "\u25B6",
+                color = color.copy(alpha = (0.7f + glowPulse * 0.3f) * playAlpha),
+                fontSize = 28.sp,
+            )
+        }
+
         // Layer 1: Orpheus avatar - always visible, adjusts per phase
         val avatarAlpha by animateFloatAsState(
             targetValue = when (phase) {
-                ReadoutPhase.PLAY_BUTTON -> 0.6f + glowPulse * 0.3f
+                ReadoutPhase.PLAY_BUTTON -> 0.7f + glowPulse * 0.15f
                 ReadoutPhase.GENERATING -> 0.2f
                 ReadoutPhase.SPEAKING -> 0.15f
                 ReadoutPhase.DONE_HOLD -> 0.12f * doneHoldDim.value
@@ -501,15 +512,6 @@ private fun SpeechReadout(
                 .clip(CircleShape)
                 .alpha(avatarAlpha),
         )
-
-        // Play triangle overlay - only in play button phase
-        if (playAlpha > 0.01f) {
-            Text(
-                text = "\u25B6",
-                color = color.copy(alpha = (0.7f + glowPulse * 0.3f) * playAlpha),
-                fontSize = 28.sp,
-            )
-        }
 
         // Layer 2: Generating animation
         if (dotsAlpha > 0.01f) {
