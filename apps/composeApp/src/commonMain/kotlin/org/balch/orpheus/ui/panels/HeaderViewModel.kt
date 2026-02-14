@@ -84,14 +84,14 @@ class HeaderViewModel(
 
     private val busIntents = panelExpansionEventBus.events
         .map { event ->
-            log.debug { "HeaderViewModel: ${event.panelId.name} -> ${if (event.expand) "EXPAND" else "COLLAPSE"}" }
+            log.debug { "HeaderViewModel: ${event.panelId.id} -> ${if (event.expand) "EXPAND" else "COLLAPSE"}" }
             HeaderIntent(event.panelId, event.expand)
         }
 
     override val stateFlow: StateFlow<HeaderPanelUiState> =
         merge(uiIntents, busIntents)
             .scan(HeaderPanelUiState(expandedPanels = defaultExpansion)) { state, intent ->
-                log.debug { "HeaderViewModel: setExpanded(${intent.panelId.name}, ${intent.expanded})" }
+                log.debug { "HeaderViewModel: setExpanded(${intent.panelId.id}, ${intent.expanded})" }
                 state.copy(expandedPanels = state.expandedPanels.put(intent.panelId, intent.expanded))
             }
             .stateIn(

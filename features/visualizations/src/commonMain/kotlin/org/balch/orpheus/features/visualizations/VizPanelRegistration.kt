@@ -17,6 +17,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class VizPanelRegistration : FeaturePanel {
     override val panelId = PanelId.VIZ
+    override val description = "Display visualizations linked to the sound in the background"
     override val position = PanelPosition.START
     override val linkedFeature: PanelId? = null
     override val weight = 0.5f

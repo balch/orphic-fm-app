@@ -17,6 +17,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class EvoPanelRegistration : FeaturePanel {
     override val panelId = PanelId.EVO
+    override val description = "Algorithmic Evolution Panel"
     override val position = PanelPosition.START
     override val linkedFeature: PanelId? = null
     override val weight = 0.5f

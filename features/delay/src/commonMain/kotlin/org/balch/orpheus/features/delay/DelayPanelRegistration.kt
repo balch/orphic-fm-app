@@ -17,6 +17,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class DelayPanelRegistration : FeaturePanel {
     override val panelId = PanelId.DELAY
+    override val description = "Add repeating lines to sounds"
     override val position = PanelPosition.MID
     override val linkedFeature: PanelId? = null
     override val weight = 1.0f

@@ -17,6 +17,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class WarpsPanelRegistration : FeaturePanel {
     override val panelId = PanelId.WARPS
+    override val description = "Cross Modulation"
     override val position = PanelPosition.MID
     override val linkedFeature: PanelId? = null
     override val weight = 1.0f

@@ -13,7 +13,7 @@ import org.balch.orpheus.core.PanelId
 
 /**
  * Tool for expanding or collapsing UI panels.
- * 
+ *
  * This allows the AI to control panel visibility, for example:
  * - Expand the CODE panel before inserting REPL code
  * - Show the VIZ panel to highlight visual effects
@@ -31,6 +31,9 @@ class PanelExpandTool @Inject constructor(
         Expand or collapse UI panels in the synthesizer interface.
         Use this to show relevant panels before performing actions,
         like expanding the CODE panel before inserting REPL patterns.
+        Available panels: presets, midi, viz, evo, lfo, delay, reverb,
+        distortion, resonator, code, ai, beats, drums, grains, looper,
+        warps, flux, flux_triggers, speech, tweaks.
     """.trimIndent()
 ) {
     private val log = logging("PanelExpandTool")
@@ -38,10 +41,10 @@ class PanelExpandTool @Inject constructor(
     @Serializable
     data class Args(
         @property:LLMDescription("""
-            The panel to expand or collapse
+            The panel ID string to expand or collapse, e.g. "code", "speech", "delay".
         """)
-        val panelId: PanelId,
-        
+        val panelId: String,
+
         @property:LLMDescription("True to expand the panel, false to collapse it. Defaults to true.")
         val expand: Boolean = true
     )
@@ -53,20 +56,20 @@ class PanelExpandTool @Inject constructor(
     )
 
     override suspend fun execute(args: Args): Result {
-        log.debug { "PanelExpandTool: ${args.panelId} expand=${args.expand}" }
+        val panelId = PanelId(args.panelId)
+        log.debug { "PanelExpandTool: ${panelId.id} expand=${args.expand}" }
 
-        val panelId = args.panelId
         if (args.expand) {
             panelExpansionEventBus.expand(panelId)
         } else {
             panelExpansionEventBus.collapse(panelId)
         }
-        
+
         val action = if (args.expand) "expanded" else "collapsed"
-        log.debug { "PanelExpandTool: ${panelId.name} $action" }
+        log.debug { "PanelExpandTool: ${panelId.id} $action" }
         return Result(
             success = true,
-            message = "${panelId.name} panel $action"
+            message = "${panelId.id} panel $action"
         )
     }
 }

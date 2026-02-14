@@ -17,6 +17,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class LiveCodePanelRegistration : FeaturePanel {
     override val panelId = PanelId.CODE
+    override val description = "Tidal Coding Panel for REPL"
     override val position = PanelPosition.END
     override val linkedFeature: PanelId? = null
     override val weight = 1.0f

@@ -18,6 +18,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class TweaksPanelRegistration : FeaturePanel {
     override val panelId = PanelId.TWEAKS
+    override val description = "Modulation tweaks panel"
     override val position = PanelPosition.MID
     override val linkedFeature: PanelId? = null
     override val weight = 0.5f

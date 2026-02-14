@@ -15,6 +15,7 @@ import org.balch.orpheus.core.featurePanelPreview
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class MidiPanelRegistration : FeaturePanel {
     override val panelId = PanelId.MIDI
+    override val description = "Assign MIDI commands to control the synthesizer"
     override val position = PanelPosition.START
     override val linkedFeature: PanelId? = null
     override val weight = 0.5f

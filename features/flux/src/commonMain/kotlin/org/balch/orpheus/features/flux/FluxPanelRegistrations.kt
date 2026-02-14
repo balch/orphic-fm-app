@@ -19,6 +19,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class TriggerRouterPanelRegistration : FeaturePanel {
     override val panelId = PanelId.FLUX_TRIGGERS
+    override val description = "Assigns sounds to Flux outputs"
     override val position = PanelPosition.MID
     override val linkedFeature: PanelId? = null
     override val weight = 0.8f
@@ -61,6 +62,7 @@ class TriggerRouterPanelRegistration : FeaturePanel {
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class FluxPanelRegistration : FeaturePanel {
     override val panelId = PanelId.FLUX
+    override val description = "Random music generator"
     override val position = PanelPosition.MID
     override val linkedFeature = PanelId.FLUX_TRIGGERS
     override val weight = 1.0f

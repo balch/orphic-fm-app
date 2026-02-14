@@ -15,6 +15,7 @@ import org.balch.orpheus.core.featurePanelPreview
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class ReverbPanelRegistration : FeaturePanel {
     override val panelId = PanelId.REVERB
+    override val description = "Add spatial reverb effect"
     override val position = PanelPosition.MID
     override val linkedFeature: PanelId? = null
     override val weight = 0.5f

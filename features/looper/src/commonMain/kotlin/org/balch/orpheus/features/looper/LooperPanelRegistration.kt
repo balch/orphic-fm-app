@@ -15,7 +15,8 @@ import org.balch.orpheus.core.featurePanelPreview
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class LooperPanelRegistration : FeaturePanel {
     override val panelId = PanelId.LOOPER
-    override val position = PanelPosition.MID
+    override val description = "Record and replay audio"
+    override val position = PanelPosition.END
     override val linkedFeature: PanelId? = null
     override val weight = 1.0f
     override val defaultExpanded = false

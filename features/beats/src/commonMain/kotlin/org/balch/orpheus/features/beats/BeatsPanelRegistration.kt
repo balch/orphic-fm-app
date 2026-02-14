@@ -17,7 +17,8 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class BeatsPanelRegistration : FeaturePanel {
     override val panelId = PanelId.BEATS
-    override val position = PanelPosition.END
+    override val description = "Drum Patterns Panel"
+    override val position = PanelPosition.MID
     override val linkedFeature = PanelId.DRUMS
     override val weight = 1.25f
     override val defaultExpanded = false

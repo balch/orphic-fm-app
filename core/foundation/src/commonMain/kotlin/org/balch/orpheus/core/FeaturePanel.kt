@@ -1,55 +1,40 @@
 package org.balch.orpheus.core
 
-import ai.koog.agents.core.tools.annotations.LLMDescription
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import kotlin.jvm.JvmInline
 
 /**
- * Available panels that can be expanded/collapsed.
+ * Identity for a UI panel. Each feature module defines its own ID string.
+ * The companion object provides constants for cross-module references.
  */
-@LLMDescription("Panels in the app the can be expanded or collapsed.")
-enum class PanelId {
-    @LLMDescription("Panel allowing user to select a patch")
-    PRESETS,
-    @LLMDescription("Assign MIDI commands to control the synthesizer")
-    MIDI,
-    @LLMDescription("Display visualizations linked to the sound in the background")
-    VIZ,
-    @LLMDescription("Algorithmic Evolution Panel")
-    EVO,
-    @LLMDescription("Provide wave patterns to produce sounds")
-    LFO,
-    @LLMDescription("Add repeating lines to sounds")
-    DELAY,
-    @LLMDescription("Add spatial reverb effect")
-    REVERB,
-    @LLMDescription("Control volume characteristics of sounds")
-    DISTORTION,
-    @LLMDescription("Add texture to sounds")
-    RESONATOR,
-    @LLMDescription("Tidal Coding Panel for REPL")
-    CODE,
-    @LLMDescription("Panel allowing user to select a patch")
-    AI,
-    @LLMDescription("Drum Patterns Panel")
-    BEATS,
-    @LLMDescription("Drum Tuning Panel")
-    DRUMS,
-    @LLMDescription("Granular Molecule Synthesis")
-    GRAINS,
-    @LLMDescription("Record and replay audio")
-    LOOPER,
-    @LLMDescription("Cross Modulation")
-    WARPS,
-    @LLMDescription("Random music generator")
-    FLUX,
-    @LLMDescription("Assigns sounds to Flux outputs")
-    FLUX_TRIGGERS,
-    @LLMDescription("Speech synthesis panel showing AI speech output")
-    SPEECH,
-    @LLMDescription("Modulation tweaks panel")
-    TWEAKS
+@JvmInline
+value class PanelId(val id: String) {
+    val name: String get() = id
+
+    companion object {
+        val PRESETS = PanelId("presets")
+        val MIDI = PanelId("midi")
+        val VIZ = PanelId("viz")
+        val EVO = PanelId("evo")
+        val LFO = PanelId("lfo")
+        val DELAY = PanelId("delay")
+        val REVERB = PanelId("reverb")
+        val DISTORTION = PanelId("distortion")
+        val RESONATOR = PanelId("resonator")
+        val CODE = PanelId("code")
+        val AI = PanelId("ai")
+        val BEATS = PanelId("beats")
+        val DRUMS = PanelId("drums")
+        val GRAINS = PanelId("grains")
+        val LOOPER = PanelId("looper")
+        val WARPS = PanelId("warps")
+        val FLUX = PanelId("flux")
+        val FLUX_TRIGGERS = PanelId("flux_triggers")
+        val SPEECH = PanelId("speech")
+        val TWEAKS = PanelId("tweaks")
+    }
 }
 
 /**
@@ -72,6 +57,7 @@ data class CompactPortraitConfig(
  */
 interface FeaturePanel {
     val panelId: PanelId
+    val description: String
     val position: PanelPosition
     val linkedFeature: PanelId?
     val weight: Float
@@ -96,8 +82,8 @@ fun sortPanels(panels: Set<FeaturePanel>): List<FeaturePanel> {
     return PanelPosition.entries.flatMap { position ->
         val group = grouped[position] ?: emptyList()
         val (linked, unlinked) = group.partition { it.linkedFeature != null }
-        val sorted = unlinked.sortedBy { it.panelId.name }.toMutableList()
-        for (panel in linked.sortedBy { it.panelId.name }) {
+        val sorted = unlinked.sortedBy { it.panelId.id }.toMutableList()
+        for (panel in linked.sortedBy { it.panelId.id }) {
             val targetIndex = sorted.indexOfFirst { it.panelId == panel.linkedFeature }
             if (targetIndex >= 0) {
                 sorted.add(targetIndex + 1, panel)
@@ -122,6 +108,7 @@ fun sortCompactPanels(panels: Collection<FeaturePanel>): List<FeaturePanel> =
 fun featurePanelPreview(
     panelId: PanelId,
     position: PanelPosition,
+    description: String = "",
     linkedFeature: PanelId? = null,
     weight: Float = 1f,
     defaultExpanded: Boolean = false,
@@ -129,6 +116,7 @@ fun featurePanelPreview(
     content: @Composable (Modifier, Boolean, (Boolean) -> Unit, (Boolean) -> Unit) -> Unit
 ): FeaturePanel = object : FeaturePanel {
     override val panelId = panelId
+    override val description = description
     override val position = position
     override val linkedFeature = linkedFeature
     override val weight = weight

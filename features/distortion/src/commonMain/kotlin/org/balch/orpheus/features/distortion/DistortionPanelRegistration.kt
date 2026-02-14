@@ -17,7 +17,8 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class DistortionPanelRegistration : FeaturePanel {
     override val panelId = PanelId.DISTORTION
-    override val position = PanelPosition.MID
+    override val description = "Control volume characteristics of sounds"
+    override val position = PanelPosition.START
     override val linkedFeature: PanelId? = null
     override val weight = 0.6f
     override val defaultExpanded = true

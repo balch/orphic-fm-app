@@ -17,6 +17,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class ResonatorPanelRegistration : FeaturePanel {
     override val panelId = PanelId.RESONATOR
+    override val description = "Add texture to sounds"
     override val position = PanelPosition.MID
     override val linkedFeature: PanelId? = null
     override val weight = 1.0f

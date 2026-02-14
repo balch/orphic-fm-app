@@ -42,7 +42,7 @@ class PanelExpansionEventBus @Inject constructor() {
      * Request that a panel be expanded.
      */
     suspend fun expand(panelId: PanelId) {
-        log.debug { "PanelExpansionEventBus: EXPAND ${panelId.name}" }
+        log.debug { "PanelExpansionEventBus: EXPAND ${panelId.id}" }
         _events.emit(PanelExpansionEvent(panelId, expand = true))
     }
     
@@ -50,14 +50,14 @@ class PanelExpansionEventBus @Inject constructor() {
      * Request that a panel be collapsed.
      */
     suspend fun collapse(panelId: PanelId) {
-        log.debug { "PanelExpansionEventBus: COLLAPSE ${panelId.name}" }
+        log.debug { "PanelExpansionEventBus: COLLAPSE ${panelId.id}" }
         _events.emit(PanelExpansionEvent(panelId, expand = false))
     }
     
     /**
      * Request that multiple panels be expanded.
      */
-    suspend fun expandAll(vararg panelIds: PanelId) {
+    suspend fun expandAll(panelIds: List<PanelId>) {
         panelIds.forEach { expand(it) }
     }
 }

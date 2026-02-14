@@ -15,6 +15,7 @@ import org.balch.orpheus.core.featurePanelPreview
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class SpeechPanelRegistration : FeaturePanel {
     override val panelId = PanelId.SPEECH
+    override val description = "Speech synthesis panel showing AI speech output"
     override val position = PanelPosition.END
     override val linkedFeature: PanelId? = null
     override val weight = 1.0f

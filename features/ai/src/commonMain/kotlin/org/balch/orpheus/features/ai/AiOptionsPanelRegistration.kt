@@ -15,6 +15,7 @@ import org.balch.orpheus.core.featurePanelPreview
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
 class AiOptionsPanelRegistration : FeaturePanel {
     override val panelId = PanelId.AI
+    override val description = "Panel allowing user to select a patch"
     override val position = PanelPosition.LAST
     override val linkedFeature: PanelId? = null
     override val weight = 0.6f
