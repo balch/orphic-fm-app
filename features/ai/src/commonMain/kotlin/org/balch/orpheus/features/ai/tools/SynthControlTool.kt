@@ -58,7 +58,7 @@ class SynthControlTool @Inject constructor(
     argsSerializer = SynthControlArgs.serializer(),
     resultSerializer = SynthControlResult.serializer(),
     name = "synth_control",
-    description = buildToolDescription(features.map { it.synthControl })
+    description = buildToolDescription(features)
 ) {
     private val controls = features.map { it.synthControl }
 
@@ -187,8 +187,11 @@ class SynthControlTool @Inject constructor(
             return "${uriSuffix}_${id.symbol}"
         }
 
-        private fun buildToolDescription(controls: List<SynthFeature.SynthControl>): String {
-            val sections = controls.sortedBy { it.title }.joinToString("\n\n") { ctrl ->
+        private fun buildToolDescription(features: Set<SynthFeature<*, *>>): String {
+            val sortedFeatures = features.sortedBy { it.synthControl.title }
+
+            val sections = sortedFeatures.joinToString("\n\n") { feature ->
+                val ctrl = feature.synthControl
                 val keys = ctrl.portControlKeys.entries.joinToString("\n") { (fullKey, desc) ->
                     val parsed = PluginControlId.parse(fullKey)
                     val display = if (parsed != null) shortKey(parsed) else fullKey
@@ -197,14 +200,14 @@ class SynthControlTool @Inject constructor(
                 "${ctrl.title} (${ctrl.panelId.id}):\n$keys"
             }
 
-            val keyboardSection = controls
-                .filter { it.keyboardControlKeys.isNotEmpty() }
-                .joinToString("\n") { ctrl ->
-                    val bindings = ctrl.keyboardControlKeys.joinToString(", ") { binding ->
+            val keyboardSection = sortedFeatures
+                .filter { it.keyBindings.isNotEmpty() }
+                .joinToString("\n") { feature ->
+                    val bindings = feature.keyBindings.joinToString(", ") { binding ->
                         val prefix = if (binding.requiresShift) "Shift+" else ""
                         "$prefix${binding.label}: ${binding.description}"
                     }
-                    "${ctrl.title}: $bindings"
+                    "${feature.synthControl.title}: $bindings"
                 }
                 .let {
                     if (it.isNotEmpty()) {

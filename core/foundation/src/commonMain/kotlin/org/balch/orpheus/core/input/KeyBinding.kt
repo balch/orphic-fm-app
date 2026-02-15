@@ -6,10 +6,9 @@ import androidx.compose.ui.input.key.KeyEventType
 /**
  * Describes a single keyboard shortcut binding for a synth feature.
  *
- * Static bindings in [SynthControl.keyboardControlKeys][org.balch.orpheus.core.SynthFeature.SynthControl.keyboardControlKeys]
- * leave [action] null — they serve as documentation for AI agents.
- * Instance-level bindings in [SynthFeature.keyBindings][org.balch.orpheus.core.SynthFeature.keyBindings]
- * provide a non-null [action] wired to the ViewModel.
+ * Each feature's [SynthFeature.keyBindings][org.balch.orpheus.core.SynthFeature.keyBindings]
+ * list provides these with a non-null [action] wired to the ViewModel.
+ * AI tools and documentation consumers read the same list, ignoring [action].
  */
 data class KeyBinding(
     val key: Key,

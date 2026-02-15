@@ -11,17 +11,21 @@ import kotlin.jvm.JvmSuppressWildcards
 /**
  * Registry that indexes [SynthFeature.SynthControl] contributions for lookup and search.
  *
- * Injected with the set of all registered manuals and provides
+ * Injected with the set of all registered features and provides
  * lookup-by-panel, search-by-query, and find-panel-for-control.
  */
 @SingleIn(AppScope::class)
 class UserManualRegistry @Inject constructor(
-    manuals: @JvmSuppressWildcards Set<SynthFeature<*, *>>
+    features: @JvmSuppressWildcards Set<SynthFeature<*, *>>
 ) {
-    private val synthControls = manuals.map { it.synthControl }
+    private val synthControls = features.map { it.synthControl }
 
     private val byPanelId: Map<PanelId, SynthFeature.SynthControl> =
         synthControls.associateBy { it.panelId }
+
+    /** panelId → keyBindings from the owning feature. */
+    private val keyBindingsByPanel: Map<PanelId, List<KeyBinding>> =
+        features.associate { it.synthControl.panelId to it.keyBindings }
 
     private val controlToPanel: Map<String, PanelId> = buildMap {
         for (synthControl in synthControls) {
@@ -55,7 +59,7 @@ class UserManualRegistry @Inject constructor(
                 manual.portControlKeys.any { (k, v) ->
                     k.lowercase().contains(q) || v.lowercase().contains(q)
                 } ||
-                manual.keyboardControlKeys.any { binding ->
+                keyBindingsFor(manual.panelId).any { binding ->
                     binding.label.lowercase().contains(q) ||
                         binding.description.lowercase().contains(q)
                 }
@@ -64,7 +68,7 @@ class UserManualRegistry @Inject constructor(
 
     /** Format keyboard bindings for a panel as a markdown section. */
     fun formatKeyboardBindings(control: SynthFeature.SynthControl): String {
-        val bindings = control.keyboardControlKeys
+        val bindings = keyBindingsFor(control.panelId)
         if (bindings.isEmpty()) return ""
         return "\n\n**Keyboard Shortcuts:**\n" + bindings.joinToString("\n") { binding ->
             "- `${binding.label}`: ${binding.description}"
@@ -74,10 +78,15 @@ class UserManualRegistry @Inject constructor(
     /** Get all keyboard bindings across all features. */
     fun allKeyboardBindings(): List<Pair<String, List<KeyBinding>>> =
         synthControls
-            .filter { it.keyboardControlKeys.isNotEmpty() }
-            .map { it.title to it.keyboardControlKeys }
+            .mapNotNull { ctrl ->
+                val bindings = keyBindingsFor(ctrl.panelId)
+                if (bindings.isNotEmpty()) ctrl.title to bindings else null
+            }
 
     /** List all available panel IDs that have manuals. */
     val availablePanels: List<String>
         get() = byPanelId.keys.map { it.id }.sorted()
+
+    private fun keyBindingsFor(panelId: PanelId): List<KeyBinding> =
+        keyBindingsByPanel[panelId] ?: emptyList()
 }

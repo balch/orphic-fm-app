@@ -25,9 +25,9 @@ interface SynthFeature<S, A> {
         get() = SharingStarted.WhileSubscribed(5_000)
 
     /**
-     * Instance-level key bindings with actions wired to this ViewModel.
-     * Override in ViewModels to provide actionable bindings.
-     * The keyboard handler collects these from all features to build the dispatch map.
+     * Key bindings for this feature, with actions wired to the ViewModel.
+     * The keyboard handler collects these from all features to build the dispatch map,
+     * and AI tools / documentation read them for shortcut descriptions (ignoring [action]).
      */
     val keyBindings: List<KeyBinding>
         get() = emptyList()
@@ -55,14 +55,6 @@ interface SynthFeature<S, A> {
          * These are the actual port keys the AI uses to set synth parameters.
          */
         val portControlKeys: Map<String, String>
-
-        /**
-         * Keyboard shortcuts this feature responds to.
-         * The keyboard handler builds its lookup maps from these bindings,
-         * and AI agents read them to explain shortcuts to users.
-         */
-        val keyboardControlKeys: List<KeyBinding>
-            get() = emptyList()
 
         companion object {
             val Empty = object : SynthControl {

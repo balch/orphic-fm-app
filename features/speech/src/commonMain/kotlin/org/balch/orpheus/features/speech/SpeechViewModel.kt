@@ -129,9 +129,6 @@ interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
                 TtsSymbol.FEEDBACK.controlId.key to "Effects chain feedback",
             )
 
-            override val keyboardControlKeys = listOf(
-                KeyBinding(Key.Spacebar, "Spacebar", "Toggle speak/stop (when spacebar trigger enabled)"),
-            )
         }
     }
 }

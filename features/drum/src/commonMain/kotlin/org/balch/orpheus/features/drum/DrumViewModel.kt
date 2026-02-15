@@ -198,14 +198,6 @@ interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
                 DrumSymbol.BYPASS.controlId.key to "Bypass drums on/off",
             )
 
-            override val keyboardControlKeys = listOf(
-                KeyBinding(Key.Q, "Q", "Bass Drum trigger"),
-                KeyBinding(Key.I, "I", "Bass Drum trigger"),
-                KeyBinding(Key.W, "W", "Snare Drum trigger"),
-                KeyBinding(Key.O, "O", "Snare Drum trigger"),
-                KeyBinding(Key.E, "E", "Hi-Hat trigger"),
-                KeyBinding(Key.P, "P", "Hi-Hat trigger"),
-            )
         }
     }
 }
