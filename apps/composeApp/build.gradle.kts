@@ -26,14 +26,16 @@ kotlin {
         namespace = "org.balch.orpheus.shared"
     }
 
-    wasmJs {
-        browser {
-            commonWebpackConfig {
-                outputFileName = "orpheus.js"
-            }
-        }
-        binaries.executable()
-    }
+    // wasmJs disabled until Metro cross-module aggregation is supported (requires Kotlin 2.3.20+)
+    // See: https://youtrack.jetbrains.com/issue/KT-82395
+    // wasmJs {
+    //     browser {
+    //         commonWebpackConfig {
+    //             outputFileName = "orpheus.js"
+    //         }
+    //     }
+    //     binaries.executable()
+    // }
 
     sourceSets {
         androidMain.dependencies {
@@ -114,10 +116,10 @@ kotlin {
             implementation(libs.slf4j.api)
             implementation(libs.logback.classic)
         }
-        wasmJsMain.dependencies {
-            // ktmidi provides WebMidiAccess for browser MIDI
-            // Web Audio API used directly via Kotlin/JS interop
-        }
+        // wasmJsMain.dependencies {
+        //     // ktmidi provides WebMidiAccess for browser MIDI
+        //     // Web Audio API used directly via Kotlin/JS interop
+        // }
     }
 }
 

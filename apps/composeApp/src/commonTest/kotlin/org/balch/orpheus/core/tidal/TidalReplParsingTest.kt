@@ -4,6 +4,9 @@ import org.balch.orpheus.core.audio.TestSynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.TestDispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.audio.dsp.TestAudioEngine
+import org.balch.orpheus.core.audio.dsp.TestDspFactory
+import org.balch.orpheus.core.tempo.GlobalTempo
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -26,12 +29,13 @@ class TidalReplParsingTest {
         val synthEngine = TestSynthEngine()
         val synthController = SynthController()
         val playbackLifecycleManager = PlaybackLifecycleManager()
+        val globalTempo = GlobalTempo(TestAudioEngine(), TestDspFactory())
         val scheduler = TidalScheduler(
             synthController,
             synthEngine,
             playbackLifecycleManager,
             dispatcherProvider,
-
+            globalTempo,
         )
         repl = TidalRepl(scheduler, dispatcherProvider)
     }

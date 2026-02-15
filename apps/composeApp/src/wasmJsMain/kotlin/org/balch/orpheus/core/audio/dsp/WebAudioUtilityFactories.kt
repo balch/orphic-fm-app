@@ -22,3 +22,9 @@ class WebAudioDrumUnitFactory @Inject constructor(private val engine: OrpheusAud
 class WebAudioClockUnitFactory @Inject constructor(private val engine: OrpheusAudioEngine) : ClockUnit.Factory {
     override fun create(): ClockUnit = WebAudioClockUnit(engine.webAudioContext)
 }
+
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
+class WebAudioPlaitsUnitFactory @Inject constructor(private val engine: OrpheusAudioEngine) : PlaitsUnit.Factory {
+    override fun create(): PlaitsUnit = WebAudioPlaitsUnit(engine.webAudioContext)
+}

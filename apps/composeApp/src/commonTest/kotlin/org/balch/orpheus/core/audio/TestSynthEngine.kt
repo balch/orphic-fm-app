@@ -198,4 +198,10 @@ open class TestSynthEngine : SynthEngine {
         if (quadIndex in 0..2) _quadEnvTriggerModes[quadIndex] = enabled
     }
     override fun getQuadEnvelopeTriggerMode(quadIndex: Int): Boolean = _quadEnvTriggerModes.getOrElse(quadIndex) { false }
+
+    // TTS stubs
+    override fun loadTtsAudio(samples: FloatArray, sampleRate: Int) {}
+    override fun playTts() {}
+    override fun stopTts() {}
+    override fun isTtsPlaying(): Boolean = false
 }

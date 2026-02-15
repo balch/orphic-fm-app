@@ -13,7 +13,7 @@ class GranularProcessorTest {
         
         // Check default parameters
         val p = processor.parameters
-        assertEquals(0.0f, p.position)
+        assertEquals(0.5f, p.position)
         assertEquals(false, p.freeze)
     }
 
@@ -41,20 +41,21 @@ class GranularProcessorTest {
     fun testThroughputDelay() {
         val processor = GranularProcessor()
         processor.init(2)
-        
+
         processor.parameters.dryWet = 0.0f // All Dry
-        
+
         val size = 256
         val inL = FloatArray(size) { 1.0f } // DC
         val inR = FloatArray(size) { -1.0f }
         val outL = FloatArray(size)
         val outR = FloatArray(size)
-        
-        processor.process(inL, inR, outL, outR, size)
-        
-        // Should match input
-        assertEquals(1.0f, outL[0], 0.01f)
-        assertEquals(-1.0f, outR[0], 0.01f)
+
+        // Run enough blocks for the dryWet smoother to settle from 0.5 to 0.0
+        repeat(50) { processor.process(inL, inR, outL, outR, size) }
+
+        // Last sample should be nearly full dry
+        assertEquals(1.0f, outL[size - 1], 0.01f)
+        assertEquals(-1.0f, outR[size - 1], 0.01f)
     }
 
     @Test

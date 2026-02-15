@@ -619,3 +619,22 @@ class WebAudioSpeechEffectsUnit(private val context: AudioContext) : SpeechEffec
     override fun setFeedbackAmount(amount: Float) {}
     override fun setReverbAmount(amount: Float) {}
 }
+
+class WebAudioPlaitsUnit(private val context: AudioContext) : PlaitsUnit {
+    private val outputGain = context.createGain().also { it.gain.value = 0f }
+
+    override val triggerInput: AudioInput = WebAudioManualInput(context) {}
+    override val frequencyInput: AudioInput = WebAudioManualInput(context) {}
+    override val timbreInput: AudioInput = WebAudioManualInput(context) {}
+    override val morphInput: AudioInput = WebAudioManualInput(context) {}
+    override val output: AudioOutput = WebAudioNodeOutput(outputGain)
+
+    override fun setEngine(engine: Any?) {}
+    override fun getEngine(): Any? = null
+    override fun setNote(note: Float) {}
+    override fun setTimbre(timbre: Float) {}
+    override fun setMorph(morph: Float) {}
+    override fun setHarmonics(harmonics: Float) {}
+    override fun setAccent(accent: Float) {}
+    override fun trigger(accent: Float) {}
+}
