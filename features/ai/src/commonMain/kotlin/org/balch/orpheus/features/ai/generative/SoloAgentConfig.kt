@@ -348,8 +348,9 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - SLOW ENV (`envspeed` = 1): Linear response with 2x gain. Even hold=0.2 produces 0.4 output!
         - TECHNIQUE: For "Cool Drones", use SLOW `envspeed` (0.7-1.0) with moderate `hold` (0.3-0.5).
           The slow envelope flattens the curve and amplifies hold, letting voices bloom and sustain.
-        
-    """.trimIndent()
+
+
+""".trimIndent()
 
     override val initialPrompt = """
         Create the following soundscape. Follow the INITIALIZATION CHECKLIST above:

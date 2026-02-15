@@ -31,14 +31,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.toFeature
 import org.balch.orpheus.features.draw.DrawSequencerFeature
 import org.balch.orpheus.features.draw.DrawSequencerViewModel
 import org.balch.orpheus.features.draw.ui.CompactDrawSequencerView
 import org.balch.orpheus.features.draw.ui.ExpandedDrawSequencerScreen
-import org.balch.orpheus.features.drum.DrumFeature
 import org.balch.orpheus.features.drum.DrumViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
+import org.balch.orpheus.features.speech.SpeechViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
@@ -56,7 +58,7 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 
 /**
  * Compact Landscape Layout: Instrument-style design for mobile landscape.
- * 
+ *
  * Layout:
  * - Top: Patch and Viz dropdowns
  * - Left: Quad 1 (voices 1-2 top, 3-4 bottom)
@@ -67,14 +69,17 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 @Composable
 fun CompactLandscapeScreen(
     modifier: Modifier = Modifier,
-    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
-    presetsFeature: PresetsFeature = PresetsViewModel.feature(),
-    vizFeature: VizFeature = VizViewModel.feature(),
-    sequencerFeature: DrawSequencerFeature = DrawSequencerViewModel.feature(),
-    drumFeature: DrumFeature = DrumViewModel.feature(),
+    features: Set<SynthFeature<*, *>>,
 ) {
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
+
+    val voiceFeature: VoicesFeature = features.toFeature()
+    val presetsFeature: PresetsFeature = features.toFeature()
+    val vizFeature: VizFeature = features.toFeature()
+    val sequencerFeature: DrawSequencerFeature = features.toFeature()
+
+    val keyActions = rememberSynthKeyActions(features)
 
     Box(modifier = modifier.fillMaxSize()) {
         CompactLandscapeLayout(
@@ -88,13 +93,12 @@ fun CompactLandscapeScreen(
             onKeyEvent = { event, isDialogActive ->
                 SynthKeyboardHandler.handleKeyEvent(
                     keyEvent = event,
-                    voiceFeature = voiceFeature,
-                    drumFeature = drumFeature,
-                    isDialogActive = isDialogActive
+                    isDialogActive = isDialogActive,
+                    keyActions = keyActions,
                 )
             }
         )
-        
+
         // Expanded Sequencer Screen Overlay
         val sequencerState by sequencerFeature.stateFlow.collectAsState()
         val sequencerActions = sequencerFeature.actions

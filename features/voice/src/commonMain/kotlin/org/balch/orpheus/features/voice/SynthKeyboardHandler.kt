@@ -1,85 +1,74 @@
 package org.balch.orpheus.features.voice
 
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import org.balch.orpheus.core.input.KeyboardInputHandler
-import org.balch.orpheus.features.drum.DrumFeature
+import org.balch.orpheus.core.input.KeyAction
+import org.balch.orpheus.core.input.KeyBinding
 
 /**
- * Handles keyboard events and dispatches to ViewModels.
- * Returns true if the event was consumed.
+ * Pure keyboard dispatcher: maps key events to [KeyAction]s.
+ * Has zero feature-specific knowledge — all wiring lives in the action map
+ * built by `rememberSynthKeyActions()`.
+ *
+ * Respects [KeyBinding.requiresShift] (shift-specific bindings take priority)
+ * and [KeyBinding.eventType] (Trigger actions only fire on the matching event type).
  */
 object SynthKeyboardHandler {
+
+    // Gate press tracking: prevents auto-repeat from re-triggering gates
+    private val pressedGates = mutableSetOf<Int>()
+
     fun handleKeyEvent(
         keyEvent: KeyEvent,
         isDialogActive: Boolean,
-        voiceFeature: VoicesFeature,
-        drumFeature: DrumFeature? = null,
+        keyActions: Map<Key, List<KeyBinding>>,
     ): Boolean {
-
-        // Skip keyboard handling when dialog is active
         if (isDialogActive) return false
 
         val key = keyEvent.key
         val isKeyDown = keyEvent.type == KeyEventType.KeyDown
         val isKeyUp = keyEvent.type == KeyEventType.KeyUp
 
-        // Handle voice trigger keys (A/S/D/F/G/H)
-        KeyboardInputHandler.getVoiceFromKey(key)?.let { voiceIndex ->
-            if (isKeyDown && !KeyboardInputHandler.isVoiceKeyPressed(voiceIndex)) {
-                KeyboardInputHandler.onVoiceKeyDown(voiceIndex)
-                voiceFeature.actions.pulseStart(voiceIndex)
-                return true
-            } else if (isKeyUp) {
-                KeyboardInputHandler.onVoiceKeyUp(voiceIndex)
-                voiceFeature.actions.pulseEnd(voiceIndex)
-                return true
-            }
-        }
+        val bindings = keyActions[key] ?: return false
 
-        // Handle drum trigger keys (J/K/L)
-        if (drumFeature != null) {
-            KeyboardInputHandler.getDrumFromKey(key)?.let { drumIndex ->
-                if (isKeyDown && !KeyboardInputHandler.isDrumKeyPressed(drumIndex)) { // Prevent auto-repeat triggers
-                    KeyboardInputHandler.onDrumKeyDown(drumIndex)
-                    when (drumIndex) {
-                        0 -> drumFeature.actions.startBdTrigger()
-                        1 -> drumFeature.actions.startSdTrigger()
-                        2 -> drumFeature.actions.startHhTrigger()
-                    }
-                    return true
+        // Find best matching binding: prefer shift-specific when shift is pressed,
+        // fall through to non-shift binding otherwise (e.g. gates that don't care about shift).
+        val binding = if (keyEvent.isShiftPressed) {
+            bindings.firstOrNull { it.requiresShift } ?: bindings.firstOrNull { !it.requiresShift }
+        } else {
+            bindings.firstOrNull { !it.requiresShift }
+        } ?: return false
+
+        val action = binding.action ?: return false
+
+        return when (action) {
+            is KeyAction.Gate -> {
+                // Gates always handle both KeyDown and KeyUp regardless of eventType
+                if (isKeyDown && action.id !in pressedGates) {
+                    pressedGates.add(action.id)
+                    action.onDown()
+                    true
                 } else if (isKeyUp) {
-                    KeyboardInputHandler.onDrumKeyUp(drumIndex)
-                    when (drumIndex) {
-                        0 -> drumFeature.actions.stopBdTrigger()
-                        1 -> drumFeature.actions.stopSdTrigger()
-                        2 -> drumFeature.actions.stopHhTrigger()
-                    }
-                    return true
+                    pressedGates.remove(action.id)
+                    action.onUp()
+                    true
+                } else {
+                    // Auto-repeat key down — suppress
+                    isKeyDown
+                }
+            }
+            is KeyAction.Trigger -> {
+                // Triggers fire only on the event type specified by the binding
+                if (keyEvent.type == binding.eventType) {
+                    action.onDown(keyEvent.isShiftPressed)
+                } else {
+                    false
                 }
             }
         }
-
-        // Handle tune adjustment keys (1-8)
-        if (isKeyDown) {
-            KeyboardInputHandler.getTuneVoiceFromKey(key)
-                ?.let { voiceIndex ->
-                    val currentTune = voiceFeature.stateFlow.value.voiceStates[voiceIndex].tune
-                    val delta = KeyboardInputHandler.getTuneDelta(keyEvent.isShiftPressed)
-                    val newTune = (currentTune + delta).coerceIn(0f, 1f)
-                    voiceFeature.actions.setVoiceTune(voiceIndex, newTune)
-                    return true
-                }
-
-            // Handle octave shift (Z/X)
-            if (KeyboardInputHandler.handleOctaveKey(key)) {
-                return true
-            }
-        }
-
-        return false
     }
 }

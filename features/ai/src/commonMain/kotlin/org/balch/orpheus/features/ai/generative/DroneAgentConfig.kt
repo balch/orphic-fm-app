@@ -135,7 +135,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         3. Use delay_feedback for spatial depth.
         4. Keep evolving slowly - small parameter changes.
         5. Use BENDER for whale-like pitch glides in oceanic/deep themes.
-        
+
         ## OUTPUT
         After adjusting parameters, provide a STATUS update describing the soundscape poetically.
     """.trimIndent()

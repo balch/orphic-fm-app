@@ -25,10 +25,12 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.toFeature
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionViewModel
-import org.balch.orpheus.features.drum.DrumFeature
 import org.balch.orpheus.features.drum.DrumViewModel
+import org.balch.orpheus.features.speech.SpeechViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
@@ -62,12 +64,12 @@ import org.balch.orpheus.ui.widgets.VizBackground
 @Composable
 fun CompactPortraitScreen(
     modifier: Modifier = Modifier,
-    headerFeature: HeaderFeature = HeaderViewModel.feature(),
-    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
-    drumFeature: DrumFeature = DrumViewModel.feature(),
-    vizFeature: VizFeature = VizViewModel.feature(),
-    distortionFeature: DistortionFeature = DistortionViewModel.feature(),
+    features: Set<SynthFeature<*, *>>,
 ) {
+    val headerFeature: HeaderFeature = features.toFeature()
+    val voiceFeature: VoicesFeature = features.toFeature()
+    val vizFeature: VizFeature = features.toFeature()
+    val distortionFeature: DistortionFeature = features.toFeature()
 
     val liquidState = LocalLiquidState.current ?: rememberLiquidState()
     val effects = LocalLiquidEffects.current
@@ -93,6 +95,8 @@ fun CompactPortraitScreen(
 
     val vizState by vizFeature.stateFlow.collectAsState()
 
+    val keyActions = rememberSynthKeyActions(features)
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -101,9 +105,8 @@ fun CompactPortraitScreen(
             .onPreviewKeyEvent { event ->
                 SynthKeyboardHandler.handleKeyEvent(
                     keyEvent = event,
-                    voiceFeature = voiceFeature,
-                    drumFeature = drumFeature,
-                    isDialogActive = false
+                    isDialogActive = false,
+                    keyActions = keyActions,
                 )
             }
             .then(
@@ -203,11 +206,14 @@ fun CompactPortraitScreen(
 private fun CompactPortraitLayoutPreview() {
     LiquidPreviewContainerWithGradient() {
         CompactPortraitScreen(
-            headerFeature = HeaderViewModel.previewFeature(),
-            voiceFeature = VoiceViewModel.previewFeature(),
-            drumFeature = DrumViewModel.previewFeature(),
-            vizFeature = VizViewModel.previewFeature(),
-            distortionFeature = DistortionViewModel.previewFeature(),
+            features = setOf(
+                HeaderViewModel.previewFeature(),
+                VoiceViewModel.previewFeature(),
+                DrumViewModel.previewFeature(),
+                SpeechViewModel.previewFeature(),
+                VizViewModel.previewFeature(),
+                DistortionViewModel.previewFeature(),
+            ),
         )
     }
 }

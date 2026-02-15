@@ -24,6 +24,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.input.KeyAction
+import org.balch.orpheus.core.input.KeyBinding
+import org.balch.orpheus.core.input.KeyboardInputHandler
+import androidx.compose.ui.input.key.Key
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.wobble.VoiceWobbleController
@@ -125,6 +129,35 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
                     put(VoiceSymbol.quadVolume(i).controlId.key, "Volume for quad $i")
                 }
             }
+
+            override val keyboardControlKeys = listOf(
+                KeyBinding(Key.A, "A", "Trigger Voice 1"),
+                KeyBinding(Key.S, "S", "Trigger Voice 2"),
+                KeyBinding(Key.D, "D", "Trigger Voice 3"),
+                KeyBinding(Key.F, "F", "Trigger Voice 4"),
+                KeyBinding(Key.G, "G", "Trigger Voice 5"),
+                KeyBinding(Key.H, "H", "Trigger Voice 6"),
+                KeyBinding(Key.J, "J", "Trigger Voice 7"),
+                KeyBinding(Key.K, "K", "Trigger Voice 8"),
+                KeyBinding(Key.One, "1", "Fine tune Voice 1"),
+                KeyBinding(Key.Two, "2", "Fine tune Voice 2"),
+                KeyBinding(Key.Three, "3", "Fine tune Voice 3"),
+                KeyBinding(Key.Four, "4", "Fine tune Voice 4"),
+                KeyBinding(Key.Five, "5", "Fine tune Voice 5"),
+                KeyBinding(Key.Six, "6", "Fine tune Voice 6"),
+                KeyBinding(Key.Seven, "7", "Fine tune Voice 7"),
+                KeyBinding(Key.Eight, "8", "Fine tune Voice 8"),
+                KeyBinding(Key.One, "Shift+1", "Coarse tune Voice 1", requiresShift = true),
+                KeyBinding(Key.Two, "Shift+2", "Coarse tune Voice 2", requiresShift = true),
+                KeyBinding(Key.Three, "Shift+3", "Coarse tune Voice 3", requiresShift = true),
+                KeyBinding(Key.Four, "Shift+4", "Coarse tune Voice 4", requiresShift = true),
+                KeyBinding(Key.Five, "Shift+5", "Coarse tune Voice 5", requiresShift = true),
+                KeyBinding(Key.Six, "Shift+6", "Coarse tune Voice 6", requiresShift = true),
+                KeyBinding(Key.Seven, "Shift+7", "Coarse tune Voice 7", requiresShift = true),
+                KeyBinding(Key.Eight, "Shift+8", "Coarse tune Voice 8", requiresShift = true),
+                KeyBinding(Key.Z, "Z", "Octave down"),
+                KeyBinding(Key.X, "X", "Octave up"),
+            )
         }
     }
 }
@@ -254,6 +287,31 @@ class VoiceViewModel(
         setPairMorph = ::setPairMorph,
         setPairModDepth = ::setPairModDepth
     )
+
+    override val keyBindings: List<KeyBinding> = buildList {
+        // Voice gates (A-K → voices 0-7)
+        val voiceKeys = listOf(Key.A, Key.S, Key.D, Key.F, Key.G, Key.H, Key.J, Key.K)
+        voiceKeys.forEachIndexed { i, key ->
+            add(KeyBinding(key, "${('A' + i)}", "Trigger Voice ${i + 1}",
+                action = KeyAction.Gate(id = i, onDown = { pulseStart(i) }, onUp = { pulseEnd(i) })))
+        }
+        // Tune triggers (1-8, shift-aware for coarse/fine)
+        val tuneKeys = listOf(Key.One, Key.Two, Key.Three, Key.Four, Key.Five, Key.Six, Key.Seven, Key.Eight)
+        tuneKeys.forEachIndexed { i, key ->
+            add(KeyBinding(key, "${i + 1}", "Tune Voice ${i + 1}",
+                action = KeyAction.Trigger { isShiftPressed ->
+                    val currentTune = stateFlow.value.voiceStates[i].tune
+                    val delta = KeyboardInputHandler.getTuneDelta(isShiftPressed)
+                    setVoiceTune(i, (currentTune + delta).coerceIn(0f, 1f))
+                    true
+                }))
+        }
+        // Octave shift (Z/X)
+        add(KeyBinding(Key.Z, "Z", "Octave down",
+            action = KeyAction.Trigger { KeyboardInputHandler.handleOctaveKey(Key.Z); true }))
+        add(KeyBinding(Key.X, "X", "Octave up",
+            action = KeyAction.Trigger { KeyboardInputHandler.handleOctaveKey(Key.X); true }))
+    }
 
     override val stateFlow: StateFlow<VoiceUiState> =
         merge(controlIntents, uiIntents)

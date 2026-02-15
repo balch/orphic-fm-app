@@ -22,4 +22,7 @@ class InjectedViewModelFactory(
     Map<KClass<out ViewModel>, Provider<ViewModelAssistedFactory>>,
     override val manualAssistedFactoryProviders:
     Map<KClass<out ManualViewModelAssistedFactory>, Provider<ManualViewModelAssistedFactory>>,
-) : MetroViewModelFactory()
+) : MetroViewModelFactory() {
+    /** All ViewModel KClasses registered in the factory. */
+    val viewModelKeys: Set<KClass<out ViewModel>> get() = viewModelProviders.keys
+}

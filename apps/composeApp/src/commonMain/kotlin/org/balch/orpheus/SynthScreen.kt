@@ -13,10 +13,12 @@ import androidx.compose.ui.Modifier
 import com.diamondedge.logging.logging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.balch.orpheus.core.toFeature
 import org.balch.orpheus.core.audio.SynthOrchestrator
+import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.core.midi.LearnTarget
+import org.balch.orpheus.di.rememberSynthFeatures
 import org.balch.orpheus.features.ai.ControlHighlightEventBus
-import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.ui.screens.CompactLandscapeScreen
 import org.balch.orpheus.ui.screens.CompactPortraitScreen
 import org.balch.orpheus.ui.screens.DesktopSynthScreen
@@ -37,7 +39,7 @@ private enum class LayoutMode {
 
 /**
  * Determines the appropriate layout mode based on window constraints.
- * 
+ *
  * Compact thresholds:
  * - Width < 600dp OR Height < 400dp -> Compact mode
  * - In compact mode: Width > Height -> Landscape, otherwise Portrait
@@ -69,7 +71,11 @@ fun SynthScreen(
 
     var isDialogActive by remember { mutableStateOf(false) }
 
-    val midiFeature = MidiViewModel.feature()
+    // Auto-discover all SynthFeature ViewModels from the Metro DI graph.
+    // Uses the same ViewModelStore as metroViewModel() — no duplicate instances.
+    val features = rememberSynthFeatures()
+
+    val midiFeature: MidiFeature = features.toFeature()
     val midiState by midiFeature.stateFlow.collectAsState()
 
     val highlightedControls by controlHighlightEventBus.highlightedControls.collectAsState()
@@ -82,20 +88,23 @@ fun SynthScreen(
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val layoutMode = determineLayoutMode(maxWidth.value, maxHeight.value)
-            
+
             when (layoutMode) {
                 LayoutMode.CompactLandscape -> {
                     CompactLandscapeScreen(
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        features = features,
                     )
                 }
                 LayoutMode.CompactPortrait -> {
                     CompactPortraitScreen(
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        features = features,
                     )
                 }
                 LayoutMode.Desktop -> {
                     DesktopSynthScreen(
+                        features = features,
                         isDialogActive = isDialogActive,
                         onDialogActiveChange = { isDialogActive = it },
                     )

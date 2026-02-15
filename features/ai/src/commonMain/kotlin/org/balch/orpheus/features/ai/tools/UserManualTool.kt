@@ -87,9 +87,10 @@ class UserManualTool @Inject constructor(
                         "- `$id`: $desc"
                     }
                 } else ""
+                val keyboardSection = userManualRegistry.formatKeyboardBindings(manual)
                 return Result(
                     found = true,
-                    content = "# ${manual.title}\n\n${manual.markdown}$controlList",
+                    content = "# ${manual.title}\n\n${manual.markdown}$controlList$keyboardSection",
                     availablePanels = available
                 )
             }

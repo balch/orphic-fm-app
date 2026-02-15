@@ -196,6 +196,22 @@ class SynthControlTool @Inject constructor(
                 }
                 "${ctrl.title} (${ctrl.panelId.id}):\n$keys"
             }
+
+            val keyboardSection = controls
+                .filter { it.keyboardControlKeys.isNotEmpty() }
+                .joinToString("\n") { ctrl ->
+                    val bindings = ctrl.keyboardControlKeys.joinToString(", ") { binding ->
+                        val prefix = if (binding.requiresShift) "Shift+" else ""
+                        "$prefix${binding.label}: ${binding.description}"
+                    }
+                    "${ctrl.title}: $bindings"
+                }
+                .let {
+                    if (it.isNotEmpty()) {
+                        "\n\nKEYBOARD SHORTCUTS (for user reference - explain these when users ask how to play):\n$it"
+                    } else ""
+                }
+
             return """
                 Control synth parameters by short key (e.g. reverb_amount, voice_vibrato).
                 Use user_manual tool for detailed docs.
@@ -206,7 +222,7 @@ class SynthControlTool @Inject constructor(
                 $sections
 
                 VOICE TUNING: tune keys use 0.0-1.0 where 0.5=A3 (220Hz).
-                tuneValue = 0.5 + (semitones from A3 / 48.0)
+                tuneValue = 0.5 + (semitones from A3 / 48.0)$keyboardSection
             """.trimIndent()
         }
     }

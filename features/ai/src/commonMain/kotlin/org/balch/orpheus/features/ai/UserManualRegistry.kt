@@ -5,6 +5,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.input.KeyBinding
 import kotlin.jvm.JvmSuppressWildcards
 
 /**
@@ -53,9 +54,28 @@ class UserManualRegistry @Inject constructor(
                 manual.markdown.lowercase().contains(q) ||
                 manual.portControlKeys.any { (k, v) ->
                     k.lowercase().contains(q) || v.lowercase().contains(q)
+                } ||
+                manual.keyboardControlKeys.any { binding ->
+                    binding.label.lowercase().contains(q) ||
+                        binding.description.lowercase().contains(q)
                 }
         }
     }
+
+    /** Format keyboard bindings for a panel as a markdown section. */
+    fun formatKeyboardBindings(control: SynthFeature.SynthControl): String {
+        val bindings = control.keyboardControlKeys
+        if (bindings.isEmpty()) return ""
+        return "\n\n**Keyboard Shortcuts:**\n" + bindings.joinToString("\n") { binding ->
+            "- `${binding.label}`: ${binding.description}"
+        }
+    }
+
+    /** Get all keyboard bindings across all features. */
+    fun allKeyboardBindings(): List<Pair<String, List<KeyBinding>>> =
+        synthControls
+            .filter { it.keyboardControlKeys.isNotEmpty() }
+            .map { it.title to it.keyboardControlKeys }
 
     /** List all available panel IDs that have manuals. */
     val availablePanels: List<String>

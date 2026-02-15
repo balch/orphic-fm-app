@@ -1,11 +1,14 @@
 package org.balch.orpheus.core
 
-import ai.koog.agents.core.tools.ToolArgs
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
+import dev.zacsweers.metro.Assisted
+import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.core.input.KeyBinding
 
 
 /**
@@ -20,6 +23,14 @@ interface SynthFeature<S, A> {
 
     val sharingStrategy: SharingStarted
         get() = SharingStarted.WhileSubscribed(5_000)
+
+    /**
+     * Instance-level key bindings with actions wired to this ViewModel.
+     * Override in ViewModels to provide actionable bindings.
+     * The keyboard handler collects these from all features to build the dispatch map.
+     */
+    val keyBindings: List<KeyBinding>
+        get() = emptyList()
 
     /**
      * Self-registering documentation descriptor for a feature panel.
@@ -45,6 +56,14 @@ interface SynthFeature<S, A> {
          */
         val portControlKeys: Map<String, String>
 
+        /**
+         * Keyboard shortcuts this feature responds to.
+         * The keyboard handler builds its lookup maps from these bindings,
+         * and AI agents read them to explain shortcuts to users.
+         */
+        val keyboardControlKeys: List<KeyBinding>
+            get() = emptyList()
+
         companion object {
             val Empty = object : SynthControl {
                 override val panelId = PanelId("EMPTY")
@@ -54,8 +73,15 @@ interface SynthFeature<S, A> {
             }
         }
     }
-
 }
+
+/** Extract a typed feature from a set. Throws if not found. */
+inline fun <reified T : SynthFeature<*, *>> Set<SynthFeature<*, *>>.toFeature(): T =
+    filterIsInstance<T>().first()
+
+/** Extract a typed feature from a set, or null if not present. */
+inline fun <reified T : SynthFeature<*, *>> Set<SynthFeature<*, *>>.toFeatureOrNull(): T? =
+    filterIsInstance<T>().firstOrNull()
 
 /**
  * Retrieve a ViewModel from the Metro DI graph, returning it as a feature.

@@ -22,8 +22,11 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import androidx.compose.ui.input.key.Key
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.input.KeyAction
+import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
@@ -125,6 +128,10 @@ interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
                 TtsSymbol.PHASER.controlId.key to "Phaser effect amount",
                 TtsSymbol.FEEDBACK.controlId.key to "Effects chain feedback",
             )
+
+            override val keyboardControlKeys = listOf(
+                KeyBinding(Key.Spacebar, "Spacebar", "Toggle speak/stop (when spacebar trigger enabled)"),
+            )
         }
     }
 }
@@ -170,6 +177,19 @@ class SpeechViewModel(
         setSpacebarTrigger = { spacebarTriggerFlow.value = it },
         speak = ::speak,
         stop = ::stopSpeaking,
+    )
+
+    override val keyBindings: List<KeyBinding> = listOf(
+        KeyBinding(Key.Spacebar, "Spacebar", "Toggle speak/stop (when spacebar trigger enabled)",
+            action = KeyAction.Trigger {
+                val state = stateFlow.value
+                if (state.spacebarTrigger) {
+                    if (state.isSpeaking || state.isGenerating) stopSpeaking() else speak()
+                    true
+                } else {
+                    false
+                }
+            }),
     )
 
     private val controlIntents = merge(

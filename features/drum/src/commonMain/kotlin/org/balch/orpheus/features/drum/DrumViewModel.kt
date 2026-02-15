@@ -18,8 +18,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import androidx.compose.ui.input.key.Key
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.input.KeyAction
+import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
@@ -194,6 +197,15 @@ interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
                 DrumSymbol.MIX.controlId.key to "Drum mix level",
                 DrumSymbol.BYPASS.controlId.key to "Bypass drums on/off",
             )
+
+            override val keyboardControlKeys = listOf(
+                KeyBinding(Key.Q, "Q", "Bass Drum trigger"),
+                KeyBinding(Key.I, "I", "Bass Drum trigger"),
+                KeyBinding(Key.W, "W", "Snare Drum trigger"),
+                KeyBinding(Key.O, "O", "Snare Drum trigger"),
+                KeyBinding(Key.E, "E", "Hi-Hat trigger"),
+                KeyBinding(Key.P, "P", "Hi-Hat trigger"),
+            )
         }
     }
 }
@@ -279,6 +291,26 @@ class DrumViewModel(
         setHhEngine = hhEngineId.intSetter(),
 
         setDrumsBypass = bypassId.boolSetter()
+    )
+
+    override val keyBindings: List<KeyBinding> = listOf(
+        // Left-hand drum keys
+        KeyBinding(Key.Q, "Q", "Bass Drum trigger",
+            action = KeyAction.Gate(GATE_ID_BD, onDown = ::startBdTrigger, onUp = ::stopBdTrigger)),
+        KeyBinding(Key.W, "W", "Snare Drum trigger",
+            action = KeyAction.Gate(GATE_ID_SD, onDown = ::startSdTrigger, onUp = ::stopSdTrigger)),
+        KeyBinding(Key.E, "E", "Hi-Hat trigger",
+            action = KeyAction.Gate(GATE_ID_HH, onDown = ::startHhTrigger, onUp = ::stopHhTrigger)),
+        // Right-hand drum keys share gate IDs with left-hand keys for repeat-guard.
+        // Trade-off: if Q and I are held simultaneously, releasing one fires stopBdTrigger
+        // even though the other is still held. Acceptable because simultaneous left/right
+        // triggers for the same drum voice is not a realistic playing scenario.
+        KeyBinding(Key.I, "I", "Bass Drum trigger",
+            action = KeyAction.Gate(GATE_ID_BD, onDown = ::startBdTrigger, onUp = ::stopBdTrigger)),
+        KeyBinding(Key.O, "O", "Snare Drum trigger",
+            action = KeyAction.Gate(GATE_ID_SD, onDown = ::startSdTrigger, onUp = ::stopSdTrigger)),
+        KeyBinding(Key.P, "P", "Hi-Hat trigger",
+            action = KeyAction.Gate(GATE_ID_HH, onDown = ::startHhTrigger, onUp = ::stopHhTrigger)),
     )
 
     // Port-based control changes -> intents
@@ -399,6 +431,10 @@ class DrumViewModel(
     fun stopHhTrigger() { uiIntents.tryEmit(DrumIntent.HhTrigger(false)) }
 
     companion object {
+        private const val GATE_ID_BD = 100
+        private const val GATE_ID_SD = 101
+        private const val GATE_ID_HH = 102
+
         fun previewFeature(state: DrumUiState = DrumUiState()): DrumFeature =
             object : DrumFeature {
                 override val stateFlow: StateFlow<DrumUiState> = MutableStateFlow(state)
