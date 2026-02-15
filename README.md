@@ -87,7 +87,7 @@ Every DSP module implements `DspPlugin` and declares its ports through a type-sa
 |----------|-------|--------|
 | Desktop (JVM) | JSyn | Primary target |
 | Android | JSyn | Full support |
-| wasmJs | Stub | UI only |
+| wasmJs | -- | Disabled (pending Kotlin 2.3.20+ for Metro cross-module aggregation) |
 | iOS | -- | Skeleton |
 
 ## Build & Run

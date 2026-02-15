@@ -62,11 +62,6 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
-        named("jvmTest") {
-            dependencies {
-                implementation(kotlin("test-junit"))
-            }
-        }
     }
 }
 
