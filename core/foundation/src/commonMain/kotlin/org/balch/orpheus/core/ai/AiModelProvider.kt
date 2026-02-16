@@ -33,6 +33,7 @@ enum class AiModel(
     OPUS("opus", "Opus", AiProvider.Anthropic, AnthropicModels.Opus_4_5),
     FLASH_25("flash_25", "Flash 2.5", AiProvider.Google, GoogleModels.Gemini2_5Flash),
     PRO_25("pro_25", "Pro 2.5", AiProvider.Google, GoogleModels.Gemini2_5Pro),
+    PRO_30("pro_30", "Pro 3.0 - Preview", AiProvider.Google, Gemini3_Pro_Preview),
     FLASH_30("flash_30", "Flash 3.0 - Preview", AiProvider.Google, Gemini3_Flash_Preview);
     companion object {
         val DEFAULT = FLASH_30

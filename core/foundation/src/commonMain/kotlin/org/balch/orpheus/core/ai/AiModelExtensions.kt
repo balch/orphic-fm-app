@@ -20,5 +20,21 @@ val Gemini3_Flash_Preview: LLModel = LLModel(
     maxOutputTokens = 65_536,
 )
 
+val Gemini3_Pro_Preview: LLModel = LLModel(
+    provider = LLMProvider.Google,
+    id = "gemini-3-pro-preview",
+    capabilities = listOf(
+        LLMCapability.Temperature,
+        LLMCapability.Completion,
+        LLMCapability.MultipleChoices,
+        LLMCapability.Tools,
+        LLMCapability.ToolChoice,
+        LLMCapability.Schema.JSON.Basic,
+        LLMCapability.Schema.JSON.Standard,
+    ),
+    contextLength = 1_048_576,
+    maxOutputTokens = 65_536,
+)
+
 val AiModelProvider.currentKoogModel: LLModel
     get() = selectedModel.value.llmModel
