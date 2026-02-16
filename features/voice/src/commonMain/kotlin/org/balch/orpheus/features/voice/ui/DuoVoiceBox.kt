@@ -52,10 +52,10 @@ fun DuoVoiceBox(
     envSpeedA: Float,
     envSpeedB: Float,
     duoModSource: ModSource,
-    pairEngine: Int,
-    pairHarmonics: Float,
-    pairMorph: Float,
-    pairModDepth: Float,
+    duoEngine: Int,
+    duoHarmonics: Float,
+    duoMorph: Float,
+    duoModSourceLevel: Float,
     midiState: MidiUiState,
     voiceActions: VoiceActions,
     midiActions: MidiActions,
@@ -89,15 +89,15 @@ fun DuoVoiceBox(
                 color = color
             )
 
-            val pairIndex = voiceA / 2
+            val duoIndex = voiceA / 2
 
             ModFaderSelector(
-                depth = pairModDepth,
-                onDepthChange = { voiceActions.setPairModDepth(pairIndex, it) },
+                depth = duoModSourceLevel,
+                onDepthChange = { voiceActions.setDuoModSourceLevel(duoIndex, it) },
                 activeSource = duoModSource,
-                onSourceChange = { voiceActions.setDuoModSource(pairIndex, it) },
+                onSourceChange = { voiceActions.setDuoModSource(duoIndex, it) },
                 color = color,
-                controlId = VoiceSymbol.duoModSource(pairIndex).controlId.key
+                controlId = VoiceSymbol.duoModSource(duoIndex).controlId.key
             )
         }
 
@@ -115,14 +115,14 @@ fun DuoVoiceBox(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceEvenly
             ) {
-                val pairIndex = voiceA / 2
+                val duoIndex = voiceA / 2
                 // Knobs
                 VoiceColumnMod(
                     modifier = Modifier.weight(1f),
                     voiceIndex = voiceA,
-                    pairIndex = pairIndex,
+                    duoIndex = duoIndex,
                     tune = voiceStateA.tune,
-                    pairMorph = pairMorph,
+                    duoMorph = duoMorph,
                     envSpeed = envSpeedA,
                     voiceActions = voiceActions,
                 )
@@ -182,14 +182,13 @@ fun DuoVoiceBox(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceEvenly
             ) {
-                // Calculate pair index (0-3) from voice A (0,2,4,6)
-                val pairIndex = voiceA / 2
+                val duoIndex = voiceA / 2
 
                 // Knobs
                 VoiceColumnSharp(
                     modifier = Modifier.weight(1f),
                     voiceIndex = voiceB,
-                    pairIndex = pairIndex,
+                    duoIndex = duoIndex,
                     tune = voiceStateB.tune,
                     sharpness = sharpness,
                     envSpeed = envSpeedB,
@@ -255,15 +254,15 @@ fun DuoVoiceBox(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 EnginePickerButton(
-                    currentEngine = pairEngine,
-                    onEngineChange = { voiceActions.setPairEngine(voiceA / 2, it) },
+                    currentEngine = duoEngine,
+                    onEngineChange = { voiceActions.setDuoEngine(voiceA / 2, it) },
                     color = color,
-                    label = engineLabel(pairEngine),
+                    label = engineLabel(duoEngine),
                     showExternalSelection = aiVoiceEngineHighlight,
                 )
                 RotaryKnob(
-                    value = pairHarmonics,
-                    onValueChange = { voiceActions.setPairHarmonics(voiceA / 2, it) },
+                    value = duoHarmonics,
+                    onValueChange = { voiceActions.setDuoHarmonics(voiceA / 2, it) },
                     label = "\u2261",
                     size = 28.dp,
                     progressColor = color
@@ -290,14 +289,14 @@ fun DuoVoiceBoxPreview() {
             color = OrpheusColors.evoGold,
             voiceStateA = voiceState.voiceStates[0],
             voiceStateB = voiceState.voiceStates[1],
-            sharpness = voiceState.pairSharpness[0],
+            sharpness = voiceState.duoSharpness[0],
             envSpeedA = voiceState.voiceEnvelopeSpeeds[0],
             envSpeedB = voiceState.voiceEnvelopeSpeeds[1],
             duoModSource = voiceState.duoModSources[0],
-            pairEngine = voiceState.pairEngines[0],
-            pairHarmonics = voiceState.pairHarmonics[0],
-            pairMorph = voiceState.pairMorphs[0],
-            pairModDepth = voiceState.pairModDepths[0],
+            duoEngine = voiceState.duoEngines[0],
+            duoHarmonics = voiceState.duoHarmonics[0],
+            duoMorph = voiceState.duoMorphs[0],
+            duoModSourceLevel = voiceState.duoModSourceLevels[0],
             midiState = midiState,
             voiceActions = voiceActions,
             midiActions = midiActions,

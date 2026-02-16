@@ -240,7 +240,7 @@ private fun CompactLandscapeLayout(
         ) {
             // Duo 1-2: Magenta Border, Cyan Accents
             CompactDuoLiquidPanel(
-                pairIndex = 0,
+                duoIndex = 0,
                 voiceFeature = voiceFeature,
                 borderColor = OrpheusColors.neonMagenta,
                 liquidState = liquidState,
@@ -250,7 +250,7 @@ private fun CompactLandscapeLayout(
 
             // Duo 3-4: Electric Blue Border, Cyan Accents
             CompactDuoLiquidPanel(
-                pairIndex = 1,
+                duoIndex = 1,
                 voiceFeature = voiceFeature,
                 borderColor = OrpheusColors.electricBlue,
                 liquidState = liquidState,
@@ -260,7 +260,7 @@ private fun CompactLandscapeLayout(
 
             // Duo 5-6: Green Border, Orange Accents (matching uploaded_image_1766749385773.png)
             CompactDuoLiquidPanel(
-                pairIndex = 2,
+                duoIndex = 2,
                 voiceFeature = voiceFeature,
                 borderColor = OrpheusColors.neonOrange,
                 liquidState = liquidState,
@@ -270,7 +270,7 @@ private fun CompactLandscapeLayout(
 
             // Duo 7-8: Green Border, Orange Accents
             CompactDuoLiquidPanel(
-                pairIndex = 3,
+                duoIndex = 3,
                 voiceFeature = voiceFeature,
                 borderColor = OrpheusColors.synthGreen,
                 liquidState = liquidState,

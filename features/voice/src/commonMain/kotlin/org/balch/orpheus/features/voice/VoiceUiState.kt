@@ -9,7 +9,7 @@ data class VoiceUiState(
     val voiceStates: List<VoiceState> =
         List(12) { index -> VoiceState(index = index, tune = DEFAULT_TUNINGS.getOrElse(index) { 0.5f }) },
     val voiceModDepths: List<Float> = List(12) { 0.0f },
-    val pairSharpness: List<Float> = List(6) { 0.0f },
+    val duoSharpness: List<Float> = List(6) { 0.0f },
     val voiceEnvelopeSpeeds: List<Float> = List(12) { 0.0f },
     val duoModSources: List<ModSource> = List(6) { ModSource.OFF },
     val quadGroupPitches: List<Float> = List(3) { 0.5f },
@@ -23,10 +23,10 @@ data class VoiceUiState(
     val peakLevel: Float = 0.0f,
     val bendPosition: Float = 0.0f,
     val bpm: Double = 120.0,
-    val pairEngines: List<Int> = List(6) { 0 },
-    val pairHarmonics: List<Float> = List(6) { 0.5f },
-    val pairMorphs: List<Float> = List(6) { 0.0f },
-    val pairModDepths: List<Float> = List(6) { 0.0f },
+    val duoEngines: List<Int> = List(6) { 0 },
+    val duoHarmonics: List<Float> = List(6) { 0.5f },
+    val duoMorphs: List<Float> = List(6) { 0.0f },
+    val duoModSourceLevels: List<Float> = List(6) { 0.0f },
     val quadTriggerSources: List<Int> = List(3) { 0 },
     val quadPitchSources: List<Int> = List(3) { 0 },
     val quadEnvelopeTriggerModes: List<Boolean> = listOf(false, false, false),
@@ -47,13 +47,13 @@ internal sealed interface VoiceIntent {
     data class PulseEnd(val index: Int) : VoiceIntent
     data class Hold(val index: Int, val holding: Boolean) : VoiceIntent
 
-    // Pair-level intents
-    data class PairSharpness(val pairIndex: Int, val value: Float) : VoiceIntent
-    data class DuoModSource(val pairIndex: Int, val source: ModSource) : VoiceIntent
-    data class PairEngine(val pairIndex: Int, val engineOrdinal: Int) : VoiceIntent
-    data class PairHarmonics(val pairIndex: Int, val value: Float) : VoiceIntent
-    data class PairMorph(val pairIndex: Int, val value: Float) : VoiceIntent
-    data class PairModDepth(val pairIndex: Int, val value: Float) : VoiceIntent
+    // Duo-level intents
+    data class DuoSharpness(val duoIndex: Int, val value: Float) : VoiceIntent
+    data class DuoModSource(val duoIndex: Int, val source: ModSource) : VoiceIntent
+    data class DuoEngine(val duoIndex: Int, val engineOrdinal: Int) : VoiceIntent
+    data class DuoHarmonics(val duoIndex: Int, val value: Float) : VoiceIntent
+    data class DuoMorph(val duoIndex: Int, val value: Float) : VoiceIntent
+    data class DuoModSourceLevel(val duoIndex: Int, val value: Float) : VoiceIntent
 
     // Quad-level intents
     data class QuadPitch(val quadIndex: Int, val value: Float) : VoiceIntent
@@ -64,7 +64,7 @@ internal sealed interface VoiceIntent {
     data class QuadEnvelopeTriggerMode(val quadIndex: Int, val enabled: Boolean) : VoiceIntent
 
     // AI feedback
-    data class AiVoiceEngineHighlight(val pairIndex: Int, val show: Boolean) : VoiceIntent
+    data class AiVoiceEngineHighlight(val duoIndex: Int, val show: Boolean) : VoiceIntent
 
     // Global intents
     data class FmStructure(val crossQuad: Boolean) : VoiceIntent

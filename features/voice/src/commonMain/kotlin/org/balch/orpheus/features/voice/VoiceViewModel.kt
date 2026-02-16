@@ -60,11 +60,11 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
             override val title = "Voices"
 
             override val markdown = """
-                Voice configuration panel for the 12-voice FM synthesizer. Controls tuning, engine selection, harmonics, envelope speed, modulation depth, and coupling for individual voices, pairs, and quads.
+                Voice configuration panel for the 12-voice FM synthesizer. Controls tuning, engine selection, harmonics, envelope speed, modulation depth, duo modulation source, and coupling for individual voices, duos, and quads.
 
                 ## Hierarchy
                 - **Voices (x12)**: Individual voice tuning, modulation depth, and envelope speed.
-                - **Pairs (x6)**: Each pair shares an engine, harmonics, morph, sharpness, and pair mod depth.
+                - **Duos (x6)**: Each duo shares an engine, harmonics, morph, sharpness, duo mod depth, and duo modulation source.
                 - **Quads (x3)**: Each quad controls pitch offset, hold level, and volume for four voices.
 
                 ## Global Controls
@@ -72,11 +72,26 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
                 - **COUPLING**: Voice coupling strength — how much neighboring voices influence each other.
                 - **TOTAL_FEEDBACK**: Global FM feedback amount across all voices.
 
+                ## Duo Modulation Source
+                Each voice duo has TWO controls that work together:
+                - **DUO_MOD_SOURCE** selects WHICH effect: 0=FM, 1=OFF, 2=LFO, 3=FLUX.
+                - **DUO_MOD_SOURCE_LEVEL** controls HOW MUCH of that effect is applied (0.0=none, 1.0=full).
+
+                Always set BOTH when activating a mod source. Setting the source without depth means no audible effect.
+
+                Mod source types:
+                - **0 = FM**: Voice FM synthesis modulation between the two voices in the duo.
+                - **1 = OFF**: No modulation effect applied.
+                - **2 = LFO**: Low-frequency oscillator modulation for rhythmic movement.
+                - **3 = FLUX**: Flux random sequencer — generates evolving pitch sequences and gates. Also requires Flux MIX > 0 to hear pitch effect.
+
                 ## Tips
-                - Use per-pair ENGINE selection to mix different synthesis models across the keyboard.
+                - Use per-duo ENGINE selection to mix different synthesis models across the keyboard.
                 - HARMONICS and MORPH shape the tonal character within each engine.
                 - Adjust ENVELOPE SPEED per-voice for varied articulation across the keyboard.
                 - COUPLING creates organic, chorus-like detuning between voices.
+                - To activate FLUX: set DUO_MOD_SOURCE to 3, set DUO_MOD_SOURCE_LEVEL to 0.3-0.7, and set Flux MIX > 0.
+                - Use LFO (2) for rhythmic tremolo/vibrato, FM (0) for metallic timbres, OFF (1) for clean sound.
             """.trimIndent()
 
             override val portControlKeys = buildMap {
@@ -88,25 +103,29 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
                 for (i in 0 until 12) {
                     put(VoiceSymbol.tune(i).controlId.key, "Tuning offset for voice $i")
                 }
-                // Per-pair engine (x6)
+                // Per-duo engine (x6)
                 for (i in 0 until 6) {
-                    put(VoiceSymbol.pairEngine(i).controlId.key, "Synthesis engine for pair $i")
+                    put(VoiceSymbol.duoEngine(i).controlId.key, "Synthesis engine for duo $i")
                 }
-                // Per-pair harmonics (x6)
+                // Per-duo harmonics (x6)
                 for (i in 0 until 6) {
-                    put(VoiceSymbol.pairHarmonics(i).controlId.key, "Harmonics for pair $i")
+                    put(VoiceSymbol.duoHarmonics(i).controlId.key, "Harmonics for duo $i")
                 }
-                // Per-pair morph (x6)
+                // Per-duo morph (x6)
                 for (i in 0 until 6) {
-                    put(VoiceSymbol.pairMorph(i).controlId.key, "Morph / timbre for pair $i")
+                    put(VoiceSymbol.duoMorph(i).controlId.key, "Morph / timbre for duo $i")
                 }
-                // Per-pair sharpness (x6)
+                // Per-duo sharpness (x6)
                 for (i in 0 until 6) {
-                    put(VoiceSymbol.pairSharpness(i).controlId.key, "Sharpness for pair $i")
+                    put(VoiceSymbol.duoSharpness(i).controlId.key, "Sharpness for duo $i")
                 }
-                // Per-pair mod depth (x6)
+                // Per-duo mod source level (x6)
                 for (i in 0 until 6) {
-                    put(VoiceSymbol.pairModDepth(i).controlId.key, "Modulation depth for pair $i")
+                    put(VoiceSymbol.duoModSourceLevel(i).controlId.key, "Mod source level for duo $i")
+                }
+                // Per-duo mod source (x6): 0=FM, 1=OFF, 2=LFO, 3=FLUX
+                for (i in 0 until 6) {
+                    put(VoiceSymbol.duoModSource(i).controlId.key, "Duo modulation source for duo $i (0=FM, 1=OFF, 2=LFO, 3=FLUX)")
                 }
                 // Per-voice mod depth (x12)
                 for (i in 0 until 12) {
@@ -160,13 +179,13 @@ class VoiceViewModel(
     private val modDepthFlows = Array(12) { i -> synthController.controlFlow(VoiceSymbol.modDepth(i).controlId) }
     private val envSpeedFlows = Array(12) { i -> synthController.controlFlow(VoiceSymbol.envSpeed(i).controlId) }
 
-    // Per-pair (×6)
-    private val pairSharpnessFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairSharpness(i).controlId) }
+    // Per-duo (×6)
+    private val duoSharpnessFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoSharpness(i).controlId) }
     private val duoModSourceFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoModSource(i).controlId) }
-    private val pairEngineFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairEngine(i).controlId) }
-    private val pairHarmonicsFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairHarmonics(i).controlId) }
-    private val pairMorphFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairMorph(i).controlId) }
-    private val pairModDepthFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.pairModDepth(i).controlId) }
+    private val duoEngineFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoEngine(i).controlId) }
+    private val duoHarmonicsFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoHarmonics(i).controlId) }
+    private val duoMorphFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoMorph(i).controlId) }
+    private val duoModSourceLevelFlows = Array(6) { i -> synthController.controlFlow(VoiceSymbol.duoModSourceLevel(i).controlId) }
 
     // Per-quad (×3)
     private val quadPitchFlows = Array(3) { i -> synthController.controlFlow(VoiceSymbol.quadPitch(i).controlId) }
@@ -198,16 +217,16 @@ class VoiceViewModel(
             add(envSpeedFlows[i].map { VoiceIntent.EnvelopeSpeed(i, it.asFloat()) })
         }
         for (i in 0 until 6) {
-            add(pairSharpnessFlows[i].map { VoiceIntent.PairSharpness(i, it.asFloat()) })
+            add(duoSharpnessFlows[i].map { VoiceIntent.DuoSharpness(i, it.asFloat()) })
             add(duoModSourceFlows[i].map {
                 val sources = ModSource.entries
                 val srcIndex = it.asInt().coerceIn(0, sources.size - 1)
                 VoiceIntent.DuoModSource(i, sources[srcIndex])
             })
-            add(pairEngineFlows[i].map { VoiceIntent.PairEngine(i, it.asInt()) })
-            add(pairHarmonicsFlows[i].map { VoiceIntent.PairHarmonics(i, it.asFloat()) })
-            add(pairMorphFlows[i].map { VoiceIntent.PairMorph(i, it.asFloat()) })
-            add(pairModDepthFlows[i].map { VoiceIntent.PairModDepth(i, it.asFloat()) })
+            add(duoEngineFlows[i].map { VoiceIntent.DuoEngine(i, it.asInt()) })
+            add(duoHarmonicsFlows[i].map { VoiceIntent.DuoHarmonics(i, it.asFloat()) })
+            add(duoMorphFlows[i].map { VoiceIntent.DuoMorph(i, it.asFloat()) })
+            add(duoModSourceLevelFlows[i].map { VoiceIntent.DuoModSourceLevel(i, it.asFloat()) })
         }
         for (i in 0 until 3) {
             add(quadPitchFlows[i].map { VoiceIntent.QuadPitch(i, it.asFloat()) })
@@ -230,7 +249,7 @@ class VoiceViewModel(
         setVoiceTune = ::setVoiceTune,
         setVoiceModDepth = ::setVoiceModDepth,
         setDuoModDepth = ::setDuoModDepth,
-        setPairSharpness = ::setPairSharpness,
+        setDuoSharpness = ::setDuoSharpness,
         setVoiceEnvelopeSpeed = ::setVoiceEnvelopeSpeed,
         pulseStart = ::pulseStart,
         pulseEnd = ::pulseEnd,
@@ -254,10 +273,10 @@ class VoiceViewModel(
         setQuadTriggerSource = ::setQuadTriggerSource,
         setQuadPitchSource = ::setQuadPitchSource,
         setQuadEnvelopeTriggerMode = ::setQuadEnvelopeTriggerMode,
-        setPairEngine = ::setPairEngine,
-        setPairHarmonics = ::setPairHarmonics,
-        setPairMorph = ::setPairMorph,
-        setPairModDepth = ::setPairModDepth
+        setDuoEngine = ::setDuoEngine,
+        setDuoHarmonics = ::setDuoHarmonics,
+        setDuoMorph = ::setDuoMorph,
+        setDuoModSourceLevel = ::setDuoModSourceLevel
     )
 
     override val keyBindings: List<KeyBinding> = buildList {
@@ -340,13 +359,13 @@ class VoiceViewModel(
             launch {
                 synthController.onControlChange
                     .filter { it.origin == ControlEventOrigin.AI }
-                    .filter { it.controlId.startsWith(VOICE_URI) && it.controlId.contains("pair_engine") }
+                    .filter { it.controlId.startsWith(VOICE_URI) && it.controlId.contains("duo_engine") }
                     .collect { event ->
-                        val pairIndex = event.controlId.substringAfterLast("_").toIntOrNull()
-                        if (pairIndex != null) {
-                            uiIntents.tryEmit(VoiceIntent.AiVoiceEngineHighlight(pairIndex, true))
+                        val duoIndex = event.controlId.substringAfterLast("_").toIntOrNull()
+                        if (duoIndex != null) {
+                            uiIntents.tryEmit(VoiceIntent.AiVoiceEngineHighlight(duoIndex, true))
                             delay(2000)
-                            uiIntents.tryEmit(VoiceIntent.AiVoiceEngineHighlight(pairIndex, false))
+                            uiIntents.tryEmit(VoiceIntent.AiVoiceEngineHighlight(duoIndex, false))
                         }
                     }
             }
@@ -411,8 +430,8 @@ class VoiceViewModel(
         modDepthFlows[duoIndex * 2 + 1].value = FloatValue(value)
     }
 
-    fun setPairSharpness(pairIndex: Int, value: Float) {
-        pairSharpnessFlows[pairIndex].value = FloatValue(value)
+    fun setDuoSharpness(duoIndex: Int, value: Float) {
+        duoSharpnessFlows[duoIndex].value = FloatValue(value)
     }
 
     fun setVoiceEnvelopeSpeed(index: Int, value: Float) {
@@ -436,20 +455,20 @@ class VoiceViewModel(
         duoModSourceFlows[index].value = IntValue(source.ordinal)
     }
 
-    fun setPairEngine(pairIndex: Int, engineOrdinal: Int) {
-        pairEngineFlows[pairIndex].value = IntValue(engineOrdinal)
+    fun setDuoEngine(duoIndex: Int, engineOrdinal: Int) {
+        duoEngineFlows[duoIndex].value = IntValue(engineOrdinal)
     }
 
-    fun setPairHarmonics(pairIndex: Int, value: Float) {
-        pairHarmonicsFlows[pairIndex].value = FloatValue(value)
+    fun setDuoHarmonics(duoIndex: Int, value: Float) {
+        duoHarmonicsFlows[duoIndex].value = FloatValue(value)
     }
 
-    fun setPairMorph(pairIndex: Int, value: Float) {
-        pairMorphFlows[pairIndex].value = FloatValue(value)
+    fun setDuoMorph(duoIndex: Int, value: Float) {
+        duoMorphFlows[duoIndex].value = FloatValue(value)
     }
 
-    fun setPairModDepth(pairIndex: Int, value: Float) {
-        pairModDepthFlows[pairIndex].value = FloatValue(value)
+    fun setDuoModSourceLevel(duoIndex: Int, value: Float) {
+        duoModSourceLevelFlows[duoIndex].value = FloatValue(value)
     }
 
     fun setQuadPitch(index: Int, value: Float) {

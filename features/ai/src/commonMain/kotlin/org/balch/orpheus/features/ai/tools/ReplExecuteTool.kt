@@ -122,10 +122,10 @@ class ReplExecuteTool @Inject constructor(
         quadhold:<quad> <val>   - Sustain level (0.0-1.0)
         quadpitch:<quad> <val>  - Group pitch (0.5=unity)
 
-        === DUO/PAIR CONTROLS (index 1-4) ===
+        === DUO CONTROLS (index 1-4) ===
         duomod:<duo> <source>   - Mod source: fm, off, or lfo
-        sharp:<pair> <val>      - Waveform (0=triangle, 1=square)
-        engine:<pair> <name>    - Synthesis engine (see ENGINE NAMES)
+        sharp:<duo> <val>       - Waveform (0=triangle, 1=square)
+        engine:<duo> <name>     - Synthesis engine (see ENGINE NAMES)
 
         ENGINE NAMES: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech
 
@@ -144,20 +144,13 @@ class ReplExecuteTool @Inject constructor(
         fastcat [p1, p2, ...]   - Concatenate into one cycle
         slowcat [p1, p2, ...]   - Each pattern gets full cycle
 
-        === META COMMANDS ===
-        hush           - Silence all patterns
-        bpm <value>    - Set tempo
-        solo d1        - Solo a slot
-        mute d1        - Mute a slot
-        unmute d1      - Unmute a slot
-
         === MUSICAL EXAMPLES ===
 
         Ambient pad with delay:
-        { "lines": ["bpm 80", "drive:0.3", "feedback:0.5", "delaymix:0.3", "d1 $ slow 2 $ note \"c3 e3 g3 b3\"", "d2 $ slow 4 $ note \"<c2 g2> <e2 b2>\""] }
+        { "lines": ["drive:0.3", "feedback:0.5", "delaymix:0.3", "d1 $ slow 2 $ note \"c3 e3 g3 b3\"", "d2 $ slow 4 $ note \"<c2 g2> <e2 b2>\""] }
 
         Drums with melody:
-        { "lines": ["bpm 130", "d1 $ s \"bd ~ sn ~\"", "d2 $ s \"~ hh ~ hh\"", "d3 $ note \"c3 e3 g3 c4\""] }
+        { "lines": ["d1 $ s \"bd ~ sn ~\"", "d2 $ s \"~ hh ~ hh\"", "d3 $ note \"c3 e3 g3 c4\""] }
 
         Euclidean polyrhythm:
         { "lines": ["d1 $ note \"c3(3,8) e3(5,8) g3(7,8)\"", "d2 $ s \"bd(3,8) sn(5,16) hh(7,12)\""] }

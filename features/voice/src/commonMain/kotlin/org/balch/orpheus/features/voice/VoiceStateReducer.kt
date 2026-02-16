@@ -21,23 +21,23 @@ internal fun reduceVoiceState(state: VoiceUiState, intent: VoiceIntent): VoiceUi
         is VoiceIntent.Hold ->
             state.withVoice(intent.index) { it.copy(isHolding = intent.holding) }
 
-        is VoiceIntent.PairSharpness ->
-            state.withPairSharpness(intent.pairIndex, intent.value)
+        is VoiceIntent.DuoSharpness ->
+            state.withDuoSharpness(intent.duoIndex, intent.value)
 
         is VoiceIntent.DuoModSource ->
-            state.withDuoModSource(intent.pairIndex, intent.source)
+            state.withDuoModSource(intent.duoIndex, intent.source)
 
-        is VoiceIntent.PairEngine ->
-            state.withPairEngine(intent.pairIndex, intent.engineOrdinal)
+        is VoiceIntent.DuoEngine ->
+            state.withDuoEngine(intent.duoIndex, intent.engineOrdinal)
 
-        is VoiceIntent.PairHarmonics ->
-            state.withPairHarmonics(intent.pairIndex, intent.value)
+        is VoiceIntent.DuoHarmonics ->
+            state.withDuoHarmonics(intent.duoIndex, intent.value)
 
-        is VoiceIntent.PairMorph ->
-            state.withPairMorph(intent.pairIndex, intent.value)
+        is VoiceIntent.DuoMorph ->
+            state.withDuoMorph(intent.duoIndex, intent.value)
 
-        is VoiceIntent.PairModDepth ->
-            state.withPairModDepth(intent.pairIndex, intent.value)
+        is VoiceIntent.DuoModSourceLevel ->
+            state.withDuoModSourceLevel(intent.duoIndex, intent.value)
 
         is VoiceIntent.QuadPitch ->
             state.withQuadPitch(intent.quadIndex, intent.value)
@@ -59,7 +59,7 @@ internal fun reduceVoiceState(state: VoiceUiState, intent: VoiceIntent): VoiceUi
 
         is VoiceIntent.AiVoiceEngineHighlight ->
             state.copy(aiVoiceEngineHighlights = state.aiVoiceEngineHighlights.mapIndexed { i, v ->
-                if (i == intent.pairIndex) intent.show else v
+                if (i == intent.duoIndex) intent.show else v
             })
 
         is VoiceIntent.FmStructure ->
@@ -97,23 +97,23 @@ internal fun VoiceUiState.withModDepth(index: Int, value: Float) =
 internal fun VoiceUiState.withEnvelopeSpeed(index: Int, value: Float) =
     copy(voiceEnvelopeSpeeds = voiceEnvelopeSpeeds.mapIndexed { i, s -> if (i == index) value else s })
 
-internal fun VoiceUiState.withPairSharpness(pairIndex: Int, value: Float) =
-    copy(pairSharpness = pairSharpness.mapIndexed { i, s -> if (i == pairIndex) value else s })
+internal fun VoiceUiState.withDuoSharpness(duoIndex: Int, value: Float) =
+    copy(duoSharpness = duoSharpness.mapIndexed { i, s -> if (i == duoIndex) value else s })
 
-internal fun VoiceUiState.withDuoModSource(pairIndex: Int, source: ModSource) =
-    copy(duoModSources = duoModSources.mapIndexed { i, s -> if (i == pairIndex) source else s })
+internal fun VoiceUiState.withDuoModSource(duoIndex: Int, source: ModSource) =
+    copy(duoModSources = duoModSources.mapIndexed { i, s -> if (i == duoIndex) source else s })
 
-internal fun VoiceUiState.withPairEngine(pairIndex: Int, engineOrdinal: Int) =
-    copy(pairEngines = pairEngines.mapIndexed { i, e -> if (i == pairIndex) engineOrdinal else e })
+internal fun VoiceUiState.withDuoEngine(duoIndex: Int, engineOrdinal: Int) =
+    copy(duoEngines = duoEngines.mapIndexed { i, e -> if (i == duoIndex) engineOrdinal else e })
 
-internal fun VoiceUiState.withPairHarmonics(pairIndex: Int, value: Float) =
-    copy(pairHarmonics = pairHarmonics.mapIndexed { i, h -> if (i == pairIndex) value else h })
+internal fun VoiceUiState.withDuoHarmonics(duoIndex: Int, value: Float) =
+    copy(duoHarmonics = duoHarmonics.mapIndexed { i, h -> if (i == duoIndex) value else h })
 
-internal fun VoiceUiState.withPairMorph(pairIndex: Int, value: Float) =
-    copy(pairMorphs = pairMorphs.mapIndexed { i, m -> if (i == pairIndex) value else m })
+internal fun VoiceUiState.withDuoMorph(duoIndex: Int, value: Float) =
+    copy(duoMorphs = duoMorphs.mapIndexed { i, m -> if (i == duoIndex) value else m })
 
-internal fun VoiceUiState.withPairModDepth(pairIndex: Int, value: Float) =
-    copy(pairModDepths = pairModDepths.mapIndexed { i, d -> if (i == pairIndex) value else d })
+internal fun VoiceUiState.withDuoModSourceLevel(duoIndex: Int, value: Float) =
+    copy(duoModSourceLevels = duoModSourceLevels.mapIndexed { i, d -> if (i == duoIndex) value else d })
 
 internal fun VoiceUiState.withQuadPitch(quadIndex: Int, value: Float) =
     copy(quadGroupPitches = quadGroupPitches.mapIndexed { i, p -> if (i == quadIndex) value else p })

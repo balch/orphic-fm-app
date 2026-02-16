@@ -8,17 +8,24 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.features.ai.ControlHighlightEventBus
+import kotlin.jvm.JvmSuppressWildcards
 
 /**
  * AI tool for highlighting specific controls in the UI with a gold glow.
  *
  * Used during tutorials and explanations to visually point at knobs, toggles,
  * and buttons that the agent is describing.
+ *
+ * Resolves short keys (e.g. "flux_steps") to full PluginControlId keys
+ * (e.g. "org.balch.orpheus.plugins.flux:steps") so they match the UI widget controlIds.
  */
 @ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
 class ControlHighlightTool @Inject constructor(
-    private val controlHighlightEventBus: ControlHighlightEventBus
+    private val controlHighlightEventBus: ControlHighlightEventBus,
+    features: @JvmSuppressWildcards Set<SynthFeature<*, *>>
 ) : Tool<ControlHighlightTool.Args, ControlHighlightTool.Result>(
     argsSerializer = Args.serializer(),
     resultSerializer = Result.serializer(),
@@ -30,6 +37,22 @@ class ControlHighlightTool @Inject constructor(
     """.trimIndent()
 ) {
     private val log = logging("ControlHighlightTool")
+
+    /** Short key → full PluginControlId.key lookup, matching SynthControlTool's format. */
+    private val shortToFullKey: Map<String, String> = buildMap {
+        for (feature in features) {
+            for (fullKey in feature.synthControl.portControlKeys.keys) {
+                val parsed = PluginControlId.parse(fullKey) ?: continue
+                val uriSuffix = parsed.uri.substringAfterLast('.')
+                val shortKey = "${uriSuffix}_${parsed.symbol}"
+                put(shortKey, fullKey)
+            }
+        }
+    }
+
+    /** Resolve a controlId: try short key first, fall back to the raw string. */
+    private fun resolveToFullKey(controlId: String): String =
+        shortToFullKey[controlId] ?: controlId
 
     @Serializable
     data class Args(
@@ -58,10 +81,11 @@ class ControlHighlightTool @Inject constructor(
             return Result(success = false, message = "No controlIds provided and clear=false.")
         }
 
-        controlHighlightEventBus.highlight(args.controlIds.toSet())
+        val resolvedIds = args.controlIds.map { resolveToFullKey(it) }.toSet()
+        controlHighlightEventBus.highlight(resolvedIds)
         return Result(
             success = true,
-            message = "Highlighting ${args.controlIds.size} control(s): ${args.controlIds.joinToString(", ")}"
+            message = "Highlighting ${resolvedIds.size} control(s): ${args.controlIds.joinToString(", ")}"
         )
     }
 }

@@ -57,12 +57,12 @@ enum class VoiceSymbol(
     ENV_SPEED_11("env_speed_11", displayName = "Env Speed 11"),
 
     // Per-pair (×6)
-    PAIR_SHARPNESS_0("pair_sharpness_0", displayName = "Pair Sharpness 0"),
-    PAIR_SHARPNESS_1("pair_sharpness_1", displayName = "Pair Sharpness 1"),
-    PAIR_SHARPNESS_2("pair_sharpness_2", displayName = "Pair Sharpness 2"),
-    PAIR_SHARPNESS_3("pair_sharpness_3", displayName = "Pair Sharpness 3"),
-    PAIR_SHARPNESS_4("pair_sharpness_4", displayName = "Pair Sharpness 4"),
-    PAIR_SHARPNESS_5("pair_sharpness_5", displayName = "Pair Sharpness 5"),
+    DUO_SHARPNESS_0("duo_sharpness_0", displayName = "Duo Sharpness 0"),
+    DUO_SHARPNESS_1("duo_sharpness_1", displayName = "Duo Sharpness 1"),
+    DUO_SHARPNESS_2("duo_sharpness_2", displayName = "Duo Sharpness 2"),
+    DUO_SHARPNESS_3("duo_sharpness_3", displayName = "Duo Sharpness 3"),
+    DUO_SHARPNESS_4("duo_sharpness_4", displayName = "Duo Sharpness 4"),
+    DUO_SHARPNESS_5("duo_sharpness_5", displayName = "Duo Sharpness 5"),
 
     DUO_MOD_SOURCE_0("duo_mod_source_0", displayName = "Duo Mod Source 0"),
     DUO_MOD_SOURCE_1("duo_mod_source_1", displayName = "Duo Mod Source 1"),
@@ -71,47 +71,47 @@ enum class VoiceSymbol(
     DUO_MOD_SOURCE_4("duo_mod_source_4", displayName = "Duo Mod Source 4"),
     DUO_MOD_SOURCE_5("duo_mod_source_5", displayName = "Duo Mod Source 5"),
 
-    PAIR_ENGINE_0("pair_engine_0", displayName = "Pair Engine 0"),
-    PAIR_ENGINE_1("pair_engine_1", displayName = "Pair Engine 1"),
-    PAIR_ENGINE_2("pair_engine_2", displayName = "Pair Engine 2"),
-    PAIR_ENGINE_3("pair_engine_3", displayName = "Pair Engine 3"),
-    PAIR_ENGINE_4("pair_engine_4", displayName = "Pair Engine 4"),
-    PAIR_ENGINE_5("pair_engine_5", displayName = "Pair Engine 5"),
+    DUO_ENGINE_0("duo_engine_0", displayName = "Duo Engine 0"),
+    DUO_ENGINE_1("duo_engine_1", displayName = "Duo Engine 1"),
+    DUO_ENGINE_2("duo_engine_2", displayName = "Duo Engine 2"),
+    DUO_ENGINE_3("duo_engine_3", displayName = "Duo Engine 3"),
+    DUO_ENGINE_4("duo_engine_4", displayName = "Duo Engine 4"),
+    DUO_ENGINE_5("duo_engine_5", displayName = "Duo Engine 5"),
 
-    PAIR_HARMONICS_0("pair_harmonics_0", displayName = "Pair Harmonics 0"),
-    PAIR_HARMONICS_1("pair_harmonics_1", displayName = "Pair Harmonics 1"),
-    PAIR_HARMONICS_2("pair_harmonics_2", displayName = "Pair Harmonics 2"),
-    PAIR_HARMONICS_3("pair_harmonics_3", displayName = "Pair Harmonics 3"),
-    PAIR_HARMONICS_4("pair_harmonics_4", displayName = "Pair Harmonics 4"),
-    PAIR_HARMONICS_5("pair_harmonics_5", displayName = "Pair Harmonics 5"),
+    DUO_HARMONICS_0("duo_harmonics_0", displayName = "Duo Harmonics 0"),
+    DUO_HARMONICS_1("duo_harmonics_1", displayName = "Duo Harmonics 1"),
+    DUO_HARMONICS_2("duo_harmonics_2", displayName = "Duo Harmonics 2"),
+    DUO_HARMONICS_3("duo_harmonics_3", displayName = "Duo Harmonics 3"),
+    DUO_HARMONICS_4("duo_harmonics_4", displayName = "Duo Harmonics 4"),
+    DUO_HARMONICS_5("duo_harmonics_5", displayName = "Duo Harmonics 5"),
 
-    PAIR_PROSODY_0("pair_prosody_0", displayName = "Pair Prosody 0"),
-    PAIR_PROSODY_1("pair_prosody_1", displayName = "Pair Prosody 1"),
-    PAIR_PROSODY_2("pair_prosody_2", displayName = "Pair Prosody 2"),
-    PAIR_PROSODY_3("pair_prosody_3", displayName = "Pair Prosody 3"),
-    PAIR_PROSODY_4("pair_prosody_4", displayName = "Pair Prosody 4"),
-    PAIR_PROSODY_5("pair_prosody_5", displayName = "Pair Prosody 5"),
+    DUO_PROSODY_0("duo_prosody_0", displayName = "Duo Prosody 0"),
+    DUO_PROSODY_1("duo_prosody_1", displayName = "Duo Prosody 1"),
+    DUO_PROSODY_2("duo_prosody_2", displayName = "Duo Prosody 2"),
+    DUO_PROSODY_3("duo_prosody_3", displayName = "Duo Prosody 3"),
+    DUO_PROSODY_4("duo_prosody_4", displayName = "Duo Prosody 4"),
+    DUO_PROSODY_5("duo_prosody_5", displayName = "Duo Prosody 5"),
 
-    PAIR_SPEED_0("pair_speed_0", displayName = "Pair Speed 0"),
-    PAIR_SPEED_1("pair_speed_1", displayName = "Pair Speed 1"),
-    PAIR_SPEED_2("pair_speed_2", displayName = "Pair Speed 2"),
-    PAIR_SPEED_3("pair_speed_3", displayName = "Pair Speed 3"),
-    PAIR_SPEED_4("pair_speed_4", displayName = "Pair Speed 4"),
-    PAIR_SPEED_5("pair_speed_5", displayName = "Pair Speed 5"),
+    DUO_SPEED_0("duo_speed_0", displayName = "Duo Speed 0"),
+    DUO_SPEED_1("duo_speed_1", displayName = "Duo Speed 1"),
+    DUO_SPEED_2("duo_speed_2", displayName = "Duo Speed 2"),
+    DUO_SPEED_3("duo_speed_3", displayName = "Duo Speed 3"),
+    DUO_SPEED_4("duo_speed_4", displayName = "Duo Speed 4"),
+    DUO_SPEED_5("duo_speed_5", displayName = "Duo Speed 5"),
 
-    PAIR_MORPH_0("pair_morph_0", displayName = "Pair Morph 0"),
-    PAIR_MORPH_1("pair_morph_1", displayName = "Pair Morph 1"),
-    PAIR_MORPH_2("pair_morph_2", displayName = "Pair Morph 2"),
-    PAIR_MORPH_3("pair_morph_3", displayName = "Pair Morph 3"),
-    PAIR_MORPH_4("pair_morph_4", displayName = "Pair Morph 4"),
-    PAIR_MORPH_5("pair_morph_5", displayName = "Pair Morph 5"),
+    DUO_MORPH_0("duo_morph_0", displayName = "Duo Morph 0"),
+    DUO_MORPH_1("duo_morph_1", displayName = "Duo Morph 1"),
+    DUO_MORPH_2("duo_morph_2", displayName = "Duo Morph 2"),
+    DUO_MORPH_3("duo_morph_3", displayName = "Duo Morph 3"),
+    DUO_MORPH_4("duo_morph_4", displayName = "Duo Morph 4"),
+    DUO_MORPH_5("duo_morph_5", displayName = "Duo Morph 5"),
 
-    PAIR_MOD_DEPTH_0("pair_mod_depth_0", displayName = "Pair Mod Depth 0"),
-    PAIR_MOD_DEPTH_1("pair_mod_depth_1", displayName = "Pair Mod Depth 1"),
-    PAIR_MOD_DEPTH_2("pair_mod_depth_2", displayName = "Pair Mod Depth 2"),
-    PAIR_MOD_DEPTH_3("pair_mod_depth_3", displayName = "Pair Mod Depth 3"),
-    PAIR_MOD_DEPTH_4("pair_mod_depth_4", displayName = "Pair Mod Depth 4"),
-    PAIR_MOD_DEPTH_5("pair_mod_depth_5", displayName = "Pair Mod Depth 5"),
+    DUO_MOD_SOURCE_LEVEL_0("duo_mod_source_level_0", displayName = "Duo Mod Source Level 0"),
+    DUO_MOD_SOURCE_LEVEL_1("duo_mod_source_level_1", displayName = "Duo Mod Source Level 1"),
+    DUO_MOD_SOURCE_LEVEL_2("duo_mod_source_level_2", displayName = "Duo Mod Source Level 2"),
+    DUO_MOD_SOURCE_LEVEL_3("duo_mod_source_level_3", displayName = "Duo Mod Source Level 3"),
+    DUO_MOD_SOURCE_LEVEL_4("duo_mod_source_level_4", displayName = "Duo Mod Source Level 4"),
+    DUO_MOD_SOURCE_LEVEL_5("duo_mod_source_level_5", displayName = "Duo Mod Source Level 5"),
 
     // Per-quad (×3)
     QUAD_PITCH_0("quad_pitch_0", displayName = "Quad Pitch 0"),
@@ -148,14 +148,14 @@ enum class VoiceSymbol(
         private val tunes = arrayOf(TUNE_0, TUNE_1, TUNE_2, TUNE_3, TUNE_4, TUNE_5, TUNE_6, TUNE_7, TUNE_8, TUNE_9, TUNE_10, TUNE_11)
         private val modDepths = arrayOf(MOD_DEPTH_0, MOD_DEPTH_1, MOD_DEPTH_2, MOD_DEPTH_3, MOD_DEPTH_4, MOD_DEPTH_5, MOD_DEPTH_6, MOD_DEPTH_7, MOD_DEPTH_8, MOD_DEPTH_9, MOD_DEPTH_10, MOD_DEPTH_11)
         private val envSpeeds = arrayOf(ENV_SPEED_0, ENV_SPEED_1, ENV_SPEED_2, ENV_SPEED_3, ENV_SPEED_4, ENV_SPEED_5, ENV_SPEED_6, ENV_SPEED_7, ENV_SPEED_8, ENV_SPEED_9, ENV_SPEED_10, ENV_SPEED_11)
-        private val pairSharpnesses = arrayOf(PAIR_SHARPNESS_0, PAIR_SHARPNESS_1, PAIR_SHARPNESS_2, PAIR_SHARPNESS_3, PAIR_SHARPNESS_4, PAIR_SHARPNESS_5)
+        private val duoSharpnesses = arrayOf(DUO_SHARPNESS_0, DUO_SHARPNESS_1, DUO_SHARPNESS_2, DUO_SHARPNESS_3, DUO_SHARPNESS_4, DUO_SHARPNESS_5)
         private val duoModSources = arrayOf(DUO_MOD_SOURCE_0, DUO_MOD_SOURCE_1, DUO_MOD_SOURCE_2, DUO_MOD_SOURCE_3, DUO_MOD_SOURCE_4, DUO_MOD_SOURCE_5)
-        private val pairEngines = arrayOf(PAIR_ENGINE_0, PAIR_ENGINE_1, PAIR_ENGINE_2, PAIR_ENGINE_3, PAIR_ENGINE_4, PAIR_ENGINE_5)
-        private val pairHarmonics = arrayOf(PAIR_HARMONICS_0, PAIR_HARMONICS_1, PAIR_HARMONICS_2, PAIR_HARMONICS_3, PAIR_HARMONICS_4, PAIR_HARMONICS_5)
-        private val pairProsodies = arrayOf(PAIR_PROSODY_0, PAIR_PROSODY_1, PAIR_PROSODY_2, PAIR_PROSODY_3, PAIR_PROSODY_4, PAIR_PROSODY_5)
-        private val pairSpeeds = arrayOf(PAIR_SPEED_0, PAIR_SPEED_1, PAIR_SPEED_2, PAIR_SPEED_3, PAIR_SPEED_4, PAIR_SPEED_5)
-        private val pairMorphs = arrayOf(PAIR_MORPH_0, PAIR_MORPH_1, PAIR_MORPH_2, PAIR_MORPH_3, PAIR_MORPH_4, PAIR_MORPH_5)
-        private val pairModDepths = arrayOf(PAIR_MOD_DEPTH_0, PAIR_MOD_DEPTH_1, PAIR_MOD_DEPTH_2, PAIR_MOD_DEPTH_3, PAIR_MOD_DEPTH_4, PAIR_MOD_DEPTH_5)
+        private val duoEngines = arrayOf(DUO_ENGINE_0, DUO_ENGINE_1, DUO_ENGINE_2, DUO_ENGINE_3, DUO_ENGINE_4, DUO_ENGINE_5)
+        private val duoHarmonics = arrayOf(DUO_HARMONICS_0, DUO_HARMONICS_1, DUO_HARMONICS_2, DUO_HARMONICS_3, DUO_HARMONICS_4, DUO_HARMONICS_5)
+        private val duoProsodies = arrayOf(DUO_PROSODY_0, DUO_PROSODY_1, DUO_PROSODY_2, DUO_PROSODY_3, DUO_PROSODY_4, DUO_PROSODY_5)
+        private val duoSpeeds = arrayOf(DUO_SPEED_0, DUO_SPEED_1, DUO_SPEED_2, DUO_SPEED_3, DUO_SPEED_4, DUO_SPEED_5)
+        private val duoMorphs = arrayOf(DUO_MORPH_0, DUO_MORPH_1, DUO_MORPH_2, DUO_MORPH_3, DUO_MORPH_4, DUO_MORPH_5)
+        private val duoModSourceLevels = arrayOf(DUO_MOD_SOURCE_LEVEL_0, DUO_MOD_SOURCE_LEVEL_1, DUO_MOD_SOURCE_LEVEL_2, DUO_MOD_SOURCE_LEVEL_3, DUO_MOD_SOURCE_LEVEL_4, DUO_MOD_SOURCE_LEVEL_5)
         private val quadPitches = arrayOf(QUAD_PITCH_0, QUAD_PITCH_1, QUAD_PITCH_2)
         private val quadHolds = arrayOf(QUAD_HOLD_0, QUAD_HOLD_1, QUAD_HOLD_2)
         private val quadVolumes = arrayOf(QUAD_VOLUME_0, QUAD_VOLUME_1, QUAD_VOLUME_2)
@@ -166,14 +166,14 @@ enum class VoiceSymbol(
         fun tune(index: Int): VoiceSymbol = tunes[index]
         fun modDepth(index: Int): VoiceSymbol = modDepths[index]
         fun envSpeed(index: Int): VoiceSymbol = envSpeeds[index]
-        fun pairSharpness(index: Int): VoiceSymbol = pairSharpnesses[index]
+        fun duoSharpness(index: Int): VoiceSymbol = duoSharpnesses[index]
         fun duoModSource(index: Int): VoiceSymbol = duoModSources[index]
-        fun pairEngine(index: Int): VoiceSymbol = pairEngines[index]
-        fun pairHarmonics(index: Int): VoiceSymbol = pairHarmonics[index]
-        fun pairProsody(index: Int): VoiceSymbol = pairProsodies[index]
-        fun pairSpeed(index: Int): VoiceSymbol = pairSpeeds[index]
-        fun pairMorph(index: Int): VoiceSymbol = pairMorphs[index]
-        fun pairModDepth(index: Int): VoiceSymbol = pairModDepths[index]
+        fun duoEngine(index: Int): VoiceSymbol = duoEngines[index]
+        fun duoHarmonics(index: Int): VoiceSymbol = duoHarmonics[index]
+        fun duoProsody(index: Int): VoiceSymbol = duoProsodies[index]
+        fun duoSpeed(index: Int): VoiceSymbol = duoSpeeds[index]
+        fun duoMorph(index: Int): VoiceSymbol = duoMorphs[index]
+        fun duoModSourceLevel(index: Int): VoiceSymbol = duoModSourceLevels[index]
         fun quadPitch(index: Int): VoiceSymbol = quadPitches[index]
         fun quadHold(index: Int): VoiceSymbol = quadHolds[index]
         fun quadVolume(index: Int): VoiceSymbol = quadVolumes[index]

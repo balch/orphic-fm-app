@@ -127,12 +127,23 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
         - **MODE**: Control voltage behavior mode (Identity, Bump, Tilt).
         - **V RANGE**: Output voltage range (Narrow, Positive, Full).
 
+        ## Activating Flux on Voice Pairs
+        Flux must be assigned as the duo modulation source on a voice duo to take effect.
+        Always set ALL THREE controls together:
+        1. Set `voice_duo_mod_source_N` to **3** (FLUX) for the desired pair(s) (0-5).
+        2. Set `voice_duo_mod_source_level_N` to **0.3-0.7** to control how much Flux modulates the duo.
+        3. Set Flux **MIX** above 0 to hear the pitch modulation.
+        Flux gates and triggers are routed automatically when FLUX is the active mod source.
+
+        To disable: set `voice_duo_mod_source_N` back to **1** (OFF), or set MIX to 0.
+
         ## Tips
         - Start with MIX at 0 and slowly increase to hear how random melodies blend with your existing tuning.
         - Use Pentatonic scale for always-pleasant random melodies.
         - Low SPREAD + high DEJA VU creates subtle, repetitive motifs.
         - High SPREAD + Chromatic scale = experimental, atonal sequences.
         - Pair with Delay and Reverb for ambient generative music.
+        - Assign FLUX to only 1-2 pairs and keep others on OFF or LFO for contrast.
     """.trimIndent()
 
             override val portControlKeys = mapOf(
@@ -140,12 +151,20 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
                 FluxSymbol.SPREAD.controlId.key to "Range / width of the random distribution",
                 FluxSymbol.BIAS.controlId.key to "Center point of the pitch distribution",
                 FluxSymbol.DEJAVU.controlId.key to "Pattern memory / repetition probability",
+                FluxSymbol.LENGTH.controlId.key to "Sequence length (integer, 2-16)",
                 FluxSymbol.RATE.controlId.key to "Internal clock speed",
                 FluxSymbol.PROBABILITY.controlId.key to "Gate firing probability per step",
                 FluxSymbol.JITTER.controlId.key to "Timing randomness for gates",
+                FluxSymbol.GATE_LENGTH.controlId.key to "Gate length as fraction of step",
                 FluxSymbol.PULSE_WIDTH.controlId.key to "Gate pulse duration",
                 FluxSymbol.PULSE_WIDTH_STD.controlId.key to "Pulse width randomization amount",
-                FluxSymbol.MIX.controlId.key to "Flux pitch modulation depth",
+                FluxSymbol.CLOCK_SOURCE.controlId.key to "Clock source (0=internal, 1=external)",
+                FluxSymbol.T_MODEL.controlId.key to "Random distribution type (0=Bernoulli, 1=Cluster, 2=Drum, 3=Independent, 4=Divider, 5=3-State, 6=Markov)",
+                FluxSymbol.T_RANGE.controlId.key to "Time range multiplier (0=1/4x, 1=1x, 2=4x)",
+                FluxSymbol.SCALE.controlId.key to "Scale quantization (0=Major, 1=Minor, 2=Pentatonic, 3=Phrygian, 4=Whole Tone, 5=Chromatic)",
+                FluxSymbol.CONTROL_MODE.controlId.key to "CV behavior mode (0=Identity, 1=Bump, 2=Tilt)",
+                FluxSymbol.VOLTAGE_RANGE.controlId.key to "Output voltage range (0=Narrow, 1=Positive, 2=Full)",
+                FluxSymbol.MIX.controlId.key to "Flux pitch modulation depth (must be > 0 for Flux to be audible)",
             )
         }
     }

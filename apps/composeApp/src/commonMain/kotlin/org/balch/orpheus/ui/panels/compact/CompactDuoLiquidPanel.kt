@@ -35,7 +35,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
  */
 @Composable
 fun CompactDuoLiquidPanel(
-    pairIndex: Int,
+    duoIndex: Int,
     voiceFeature: VoicesFeature = VoiceViewModel.feature(),
     borderColor: Color = OrpheusColors.neonMagenta,
     liquidState: LiquidState? = null,
@@ -43,7 +43,7 @@ fun CompactDuoLiquidPanel(
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(10.dp)
-    val startIndex = pairIndex * 2
+    val startIndex = duoIndex * 2
 
     Box(
         modifier = modifier
@@ -91,7 +91,7 @@ private fun CompactDuoLiquidPanelPreview() {
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         CompactDuoLiquidPanel(
-            pairIndex = 0,
+            duoIndex = 0,
             voiceFeature = VoiceViewModel.previewFeature(),
             borderColor = OrpheusColors.neonMagenta,
             liquidState = null,

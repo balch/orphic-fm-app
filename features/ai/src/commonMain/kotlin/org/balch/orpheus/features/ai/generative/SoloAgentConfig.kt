@@ -29,31 +29,40 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         The song description/mood should guide every choice below. Think about what timbres,
         effects, and textures best serve the requested atmosphere.
 
-        1. **PICK ENGINES** (voice_pair_engine_0..3) — Choose synthesis engines that fit the mood:
+        1. **PICK ENGINES** (voice_duo_engine_0..3) — Choose synthesis engines that fit the mood:
            - 0=osc (default, warm pads), 5=fm (bright, metallic), 6=noise (texture, wind),
              7=wave (rich harmonics), 8=va (classic analog), 9=additive (organ, bells),
              10=grain (granular, glitchy), 11=string (plucked, bowed), 12=modal (struck, resonant),
              13=particle (scattered, ethereal), 14=swarm (dense, buzzy), 15=chord (full chords),
              16=wavetable (evolving), 17=speech (vocal formants)
-           - Mix different engines across pairs for richer timbres (e.g., pair 0=string, pair 1=fm)
+           - Mix different engines across duos for richer timbres (e.g., duo 0=string, duo 1=fm)
            - Match to mood: cinematic→string/modal, aggressive→wave/fm, ethereal→grain/particle
 
-        2. **SET PAIR SHARPNESS** (voice_pair_sharpness_0..3) — Waveform character:
+        2. **SET DUO SHARPNESS** (voice_duo_sharpness_0..3) — Waveform character:
            - 0.0=soft/sine, 0.5=medium, 1.0=sharp/bright. Match to mood energy level.
 
-        3. **SET MODULATION** — Configure voice modulation depth and LFO:
+        3. **SET DUO MOD SOURCE** — Each duo has a modulation source. Defaults are source=FM, level=0 (silent!).
+           You MUST set level > 0 for any mod source to be audible:
+           - voice_duo_mod_source_0..5: Select source (0=FM, 1=OFF, 2=LFO, 3=FLUX)
+           - voice_duo_mod_source_level_0..5: Amount (0.0=none, 1.0=full). SET THIS > 0!
+             * FM (0): Metallic, bell-like timbres. Level 0.3-0.5 for subtle, 0.7+ for aggressive.
+             * OFF (1): Clean, unmodulated sound. Level doesn't matter.
+             * LFO (2): Rhythmic tremolo/vibrato. Level 0.2-0.4 for gentle, 0.6+ for dramatic.
+             * FLUX (3): Generative random melodies. Level 0.3-0.7. Also set flux_mix > 0 for pitch effect.
+
+        4. **SET VOICE MODULATION** — Per-voice FM depth and LFO:
            - voice_mod_depth_0..7: FM depth per voice (0=clean, 0.3=warm, 0.7=bright harmonics)
            - duolfo_freq_a / duolfo_freq_b: LFO speeds (slow=ambient, fast=rhythmic)
            - duolfo_mode: 0.0=AND (rhythmic pulse), 0.5=OFF, 1.0=OR (smooth sweep)
 
-        4. **SET EFFECTS** — Spatial and tonal processing:
+        5. **SET EFFECTS** — Spatial and tonal processing:
            - delay_time_1/delay_time_2, delay_feedback, delay_mix: Spatial echoes
            - reverb_amount, reverb_time, reverb_damping: Room/atmosphere
            - distortion_drive, distortion_mix: Warmth/grit
            - voice_vibrato: Organic movement (0.1=subtle, 0.3=expressive)
            - voice_coupling: Inter-voice FM brightness
 
-        5. **SET VOLUMES AND HOLDS** — Then start the sound:
+        6. **SET VOLUMES AND HOLDS** — Then start the sound:
            - voice_quad_volume_0/1/2 to 0.7
            - voice_quad_hold_0/1/2 starting at 0.3 (will ramp up)
            - voice_env_speed_0..7 to 0.8-1.0 for sustain
@@ -96,9 +105,9 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - voice_quad_hold_2: Sustain level. (Note: Only kicks in at high env_speed).
         - voice_quad_volume_2: Keep LOW (0.2-0.35) - foundation, not dominant!
 
-        ### PAIRS 0-3 (Voice Pair Shaping)
-        - voice_pair_sharpness_0 through voice_pair_sharpness_3: Waveform (0=soft triangle, 1=sharp square)
-        - voice_pair_engine_0 through voice_pair_engine_3: Synthesis engine selection (integer engine ID)
+        ### DUOS 0-3 (Voice Duo Shaping)
+        - voice_duo_sharpness_0 through voice_duo_sharpness_3: Waveform (0=soft triangle, 1=sharp square)
+        - voice_duo_engine_0 through voice_duo_engine_3: Synthesis engine selection (integer engine ID)
 
         ### LFO
         - duolfo_freq_a: LFO A speed (0.0-1.0)
@@ -322,8 +331,8 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - stack [note "c3", note "e3"] — simultaneous
 
         ENGINE SELECTION (from REPL):
-        - engine:1 string — set pair 1 to physical modeling strings
-        - engine:2 fm — set pair 2 to FM synthesis
+        - engine:1 string — set duo 1 to physical modeling strings
+        - engine:2 fm — set duo 2 to FM synthesis
         - Names: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech
 
         META: solo d1, mute d2, unmute d2
@@ -382,7 +391,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
             initialPrompt = "Begin with a stark, synthetic perfection. Establish a monotonous, hypnotic chord progression (e.g., I-IV loops) using bright, cold tones. Keep the rhythm rigid and mechanical.",
             evolutionPrompts = listOf(
                 "Increase the tension by slightly detuning Voices 1-4 (voice_quad_pitch_0). Keep the rhythm rigid.",
-                "Introduce a new layer of sound that feels 'too perfect', like plastic. High sharpness on voice_pair_sharpness_0.",
+                "Introduce a new layer of sound that feels 'too perfect', like plastic. High sharpness on voice_duo_sharpness_0.",
                 "Begin a slow, creeping dissonance. Let the 'heartache' bleed in via slow LFO modulation on pitch.",
                 "Sudden shift: Drop the bass (QUAD 3) to a menacing low rumble, while high leads scream.",
                 "Spiraling solo: Create a chaotic, rising REPL pattern that simulates a mental breakdown.",
@@ -398,7 +407,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
             initialPrompt = "Create a bright, baroque-pop atmosphere. Use major keys and playful, bouncy intervals. Think harpsichords and sunshine.",
             evolutionPrompts = listOf(
                 "Introduce a swirling, colorful lead line using rapid arpeggios.",
-                "Brighten the tone: Increase voice_pair_sharpness and FM depth for a bell-like quality.",
+                "Brighten the tone: Increase voice_duo_sharpness and FM depth for a bell-like quality.",
                 "Add a joyful, skipping rhythm. Use the REPL to create a 'la-la-la' melody.",
                 "Saturate the sound with heavy chorus (using short delay_time and high MOD).",
                 "Shift the key up a step to lift the energy.",

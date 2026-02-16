@@ -226,7 +226,7 @@ class SynthControlAgent(
 
     /**
      * Check if a control ID is allowed given the config's activeQuads restriction.
-     * Global/effect controls are always allowed. Voice/pair/quad controls are
+     * Global/effect controls are always allowed. Voice/duo/quad controls are
      * only allowed if they belong to one of the active quads.
      */
     private fun isControlAllowedForActiveQuads(controlId: String): Boolean {
@@ -250,9 +250,9 @@ class SynthControlAgent(
         val voiceMatch = Regex("voice_(?:tune|mod_depth|env_speed)_(\\d+)").find(id)
         if (voiceMatch != null) return voiceMatch.groupValues[1].toInt() / 4
 
-        // Pair controls (0-indexed) → quad N/2
-        val pairMatch = Regex("voice_(?:duo_mod_source|pair_sharpness|pair_engine|pair_harmonics|pair_morph|pair_mod_depth)_(\\d+)").find(id)
-        if (pairMatch != null) return pairMatch.groupValues[1].toInt() / 2
+        // Duo controls (0-indexed) → quad N/2
+        val duoMatch = Regex("voice_(?:duo_mod_source|duo_sharpness|duo_engine|duo_harmonics|duo_morph|duo_mod_source_level)_(\\d+)").find(id)
+        if (duoMatch != null) return duoMatch.groupValues[1].toInt() / 2
 
         // Global/effect controls (voice_vibrato, distortion_*, delay_*, resonator_*, warps_*, etc.)
         return null

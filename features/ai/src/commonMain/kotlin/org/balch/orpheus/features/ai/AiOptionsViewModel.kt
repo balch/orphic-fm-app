@@ -585,7 +585,7 @@ class AiOptionsViewModel(
 
                  // Sharp waveforms
                  val sharpness = List(6) { 0.5f + r.nextFloat() * 0.5f }
-                 sharpness.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_sharpness_$i", PortValue.FloatValue(v)) }
+                 sharpness.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_sharpness_$i", PortValue.FloatValue(v)) }
 
                  // Mostly FM for metallic/bell/lead tones
                  val modSources = List(6) { if (r.nextFloat() > 0.8) ModSource.LFO else ModSource.VOICE_FM }

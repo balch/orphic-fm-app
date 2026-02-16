@@ -117,9 +117,12 @@ class OrpheusAgentConfig @Inject constructor(
         - voice_quad_hold_0..2: Drone/Sustain level for groups
         - voice_quad_volume_2: Volume for Drone Quad (Voices 8-11)
 
-        ### PAIRS
-        - voice_pair_sharpness_0..3: Waveform sharpness (0=tri, 1=sq)
-        - voice_pair_engine_0..3: Synthesis engine selection (integer engine ID)
+        ### DUOS
+        - voice_duo_sharpness_0..3: Waveform sharpness (0=tri, 1=sq)
+        - voice_duo_engine_0..3: Synthesis engine selection (integer engine ID)
+        - voice_duo_mod_source_0..5: Modulation source (0=FM, 1=OFF, 2=LFO, 3=FLUX)
+        - voice_duo_mod_source_level_0..5: How much mod source affects the duo (0.0=none, 1.0=full)
+        IMPORTANT: Always set BOTH mod_source AND mod_source_level together. Source without level = silent.
 
         ### FLUX (Random Melody Generator)
         Random pitch sequence and modulation voltage generator:
@@ -202,7 +205,7 @@ class OrpheusAgentConfig @Inject constructor(
         2. `panel_expand(panelId="...")` — show the relevant panel
         3. **DEMO SETUP** (do this BEFORE explaining):
            a. Set `voice_quad_hold_0` to 0.8 so voices sustain and the user can hear the effect
-           b. Set `voice_pair_engine_0` to an appropriate engine for the feature (e.g., 0 for OSC, 5 for FM)
+           b. Set `voice_duo_engine_0` to an appropriate engine for the feature (e.g., 0 for OSC, 5 for FM)
            c. Set the feature's MIX knob to a moderate value (e.g., 0.4-0.6) so it's audible
         4. `control_highlight(controlIds=[...])` — highlight ALL controls for the feature
         5. Explain using the documentation content
@@ -225,13 +228,13 @@ class OrpheusAgentConfig @Inject constructor(
         - **ALWAYS** set `voice_quad_hold_0` or `voice_quad_hold_1` to 0.8+ so voices sustain during demos
         - **ALWAYS** set the effect's MIX knob so the feature is audible
         - **CHOOSE AN ENGINE** that best showcases the feature being demoed:
-          - Use `voice_pair_engine_0` with an appropriate engine (0=osc, 5=fm, 11=string, 12=modal, etc.)
+          - Use `voice_duo_engine_0` with an appropriate engine (0=osc, 5=fm, 11=string, 12=modal, etc.)
           - For effects demos (Delay, Reverb, Resonator): OSC (0) or string (11) for clean sustained tones
           - For FM/modulation demos: fm (5) to hear depth changes clearly
           - For Flux demos: osc (0) or va (8) to hear pitch changes cleanly
         - **SET MODULATION** before demos: voice_mod_depth, duolfo_freq_a/b, voice_vibrato as needed
         - **PREFER** `synth_control` over `repl_execute` for demos — turning knobs is more visual and interactive
-        - For Flux: set flux_mix to 0.5, hold voices, then sweep flux_spread and flux_bias so user hears the random melodies
+        - For Flux: set voice_duo_mod_source_0 to 3 (FLUX), voice_duo_mod_source_level_0 to 0.5, AND flux_mix to 0.5, hold voices, then sweep flux_spread and flux_bias so user hears the random melodies
         - **NEVER** just play REPL patterns when explaining — the user wants to see knobs highlighted and turning
 
         ## Your Personality

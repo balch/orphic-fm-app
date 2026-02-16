@@ -10,7 +10,7 @@ data class VoicePanelActions(
     val setVoiceTune: (Int, Float) -> Unit,
     val setVoiceModDepth: (Int, Float) -> Unit,
     val setDuoModDepth: (Int, Float) -> Unit,
-    val setPairSharpness: (Int, Float) -> Unit,
+    val setDuoSharpness: (Int, Float) -> Unit,
     val setVoiceEnvelopeSpeed: (Int, Float) -> Unit,
     val pulseStart: (Int) -> Unit,
     val pulseEnd: (Int) -> Unit,
@@ -34,16 +34,16 @@ data class VoicePanelActions(
     val setQuadTriggerSource: (Int, Int) -> Unit,
     val setQuadPitchSource: (Int, Int) -> Unit,
     val setQuadEnvelopeTriggerMode: (Int, Boolean) -> Unit,
-    val setPairEngine: (Int, Int) -> Unit,
-    val setPairHarmonics: (Int, Float) -> Unit,
-    val setPairMorph: (Int, Float) -> Unit,
-    val setPairModDepth: (Int, Float) -> Unit
+    val setDuoEngine: (Int, Int) -> Unit,
+    val setDuoHarmonics: (Int, Float) -> Unit,
+    val setDuoMorph: (Int, Float) -> Unit,
+    val setDuoModSourceLevel: (Int, Float) -> Unit,
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
             setMasterVolume = {}, setVibrato = {},
             setVoiceTune = {_, _ -> }, setVoiceModDepth = {_, _ -> },
-            setDuoModDepth = {_, _ -> }, setPairSharpness = {_, _ -> },
+            setDuoModDepth = {_, _ -> }, setDuoSharpness = {_, _ -> },
             setVoiceEnvelopeSpeed = {_, _ -> }, pulseStart = {}, pulseEnd = {},
             setHold = {_, _ -> }, setDuoModSource = {_, _ -> },
             setQuadPitch = {_, _ -> }, setQuadHold = {_, _ -> },
@@ -56,10 +56,10 @@ data class VoicePanelActions(
             setBpm = {}, setQuadTriggerSource = {_, _ -> },
             setQuadPitchSource = {_, _ -> },
             setQuadEnvelopeTriggerMode = {_, _ -> },
-            setPairEngine = {_, _ -> },
-            setPairHarmonics = {_, _ -> },
-            setPairMorph = {_, _ -> },
-            setPairModDepth = {_, _ -> }
+            setDuoEngine = {_, _ -> },
+            setDuoHarmonics = {_, _ -> },
+            setDuoMorph = {_, _ -> },
+            setDuoModSourceLevel = {_, _ -> },
         )
     }
 }

@@ -25,7 +25,8 @@ data class SynthControlArgs(
 
         Special cases:
         - BENDER: -1=full down, 0=center, +1=full up
-        - Engine selection (pair_engine keys): Integer engine ID (0, 5-17). NOT 0-1 range.
+        - Engine selection (duo_engine keys): Integer engine ID (0, 5-17). NOT 0-1 range.
+        - Duo mod source (duo_mod_source keys): Integer (0=FM, 1=OFF, 2=LFO, 3=FLUX). NOT 0-1 range.
         - Tune keys: 0.0-1.0 where 0.5=A3 (220Hz). tuneValue = 0.5 + (semitones from A3 / 48.0)
     """)
     val value: Float
@@ -99,15 +100,15 @@ class SynthControlTool @Inject constructor(
                 message = "Unknown control: ${args.controlId}. Use user_manual tool to find valid symbols."
             )
 
-        // Engine selection (pair_engine keys) — set immediately as integer, no ramping
-        if (targetId.symbol.startsWith("pair_engine")) {
+        // Integer controls (engine selection, duo mod source) — set immediately, no ramping
+        if (targetId.symbol.startsWith("duo_engine") || (targetId.symbol.startsWith("duo_mod_source") && !targetId.symbol.startsWith("duo_mod_source_level"))) {
             val intValue = args.value.toInt()
             synthController.setPluginControl(
                 id = targetId,
                 value = PortValue.IntValue(intValue),
                 origin = ControlEventOrigin.AI
             )
-            return SynthControlResult(success = true, message = "Set ${shortKey(targetId)} to engine $intValue")
+            return SynthControlResult(success = true, message = "Set ${shortKey(targetId)} to $intValue")
         }
 
         val normalizedValue = args.value.coerceIn(0f, 1f)

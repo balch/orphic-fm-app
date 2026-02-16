@@ -466,10 +466,10 @@ class TidalScheduler(
                  }
                  dispatchEvent(event)
              }
-             // Pair/Duo level events
-             is TidalEvent.PairSharp -> {
+             // Duo level events
+             is TidalEvent.DuoSharp -> {
                  if (event.locations.isNotEmpty()) {
-                     _triggers.tryEmit(TriggerEvent(event.pairIndex * 2, event.locations))
+                     _triggers.tryEmit(TriggerEvent(event.duoIndex * 2, event.locations))
                  }
                  dispatchEvent(event)
              }
@@ -479,9 +479,9 @@ class TidalScheduler(
                  }
                  dispatchEvent(event)
              }
-             is TidalEvent.PairEngine -> {
+             is TidalEvent.DuoEngine -> {
                  if (event.locations.isNotEmpty()) {
-                     _triggers.tryEmit(TriggerEvent(event.pairIndex * 2, event.locations))
+                     _triggers.tryEmit(TriggerEvent(event.duoIndex * 2, event.locations))
                  }
                  dispatchEvent(event)
              }
@@ -650,17 +650,17 @@ class TidalScheduler(
                 )
             }
 
-            is TidalEvent.PairSharp -> {
+            is TidalEvent.DuoSharp -> {
                 synthController.setPluginControl(
-                    VoiceSymbol.pairSharpness(event.pairIndex).controlId,
+                    VoiceSymbol.duoSharpness(event.duoIndex).controlId,
                     PortValue.FloatValue(event.sharpness),
                     ControlEventOrigin.TIDAL
                 )
             }
 
-            is TidalEvent.PairEngine -> {
+            is TidalEvent.DuoEngine -> {
                 synthController.setPluginControl(
-                    VoiceSymbol.pairEngine(event.pairIndex).controlId,
+                    VoiceSymbol.duoEngine(event.duoIndex).controlId,
                     PortValue.IntValue(event.engineId),
                     ControlEventOrigin.TIDAL
                 )

@@ -49,7 +49,7 @@ class VoicePlugin : DspPlugin {
     private val _tune = FloatArray(12) { 0.5f } // Default from SynthPreset is usually determined by patch
     private val _modDepth = FloatArray(12)
     private val _envSpeed = FloatArray(12)
-    private val _pairSharpness = FloatArray(6)
+    private val _duoSharpness = FloatArray(6)
     private val _duoModSource = IntArray(6)
     
     private var _fmStructureCrossQuad = false
@@ -63,12 +63,12 @@ class VoicePlugin : DspPlugin {
     private val _quadTriggerSource = IntArray(3)
     private val _quadPitchSource = IntArray(3)
     private val _quadEnvTriggerMode = BooleanArray(3)
-    private val _pairEngine = IntArray(6)
-    private val _pairHarmonics = FloatArray(6) { 0.0f }
-    private val _pairProsody = FloatArray(6) { 0.5f }
-    private val _pairSpeed = FloatArray(6) { 0.0f }
-    private val _pairMorph = FloatArray(6) { 0.0f }
-    private val _pairModDepth = FloatArray(6) { 0.0f }
+    private val _duoEngine = IntArray(6)
+    private val _duoHarmonics = FloatArray(6) { 0.0f }
+    private val _duoProsody = FloatArray(6) { 0.5f }
+    private val _duoSpeed = FloatArray(6) { 0.0f }
+    private val _duoMorph = FloatArray(6) { 0.0f }
+    private val _duoModSourceLevel = FloatArray(6) { 0.0f }
 
     private val portDefs = ports(startIndex = 0) {
         // Voice Params (0-11)
@@ -109,14 +109,14 @@ class VoicePlugin : DspPlugin {
             }
         }
 
-        // Pair Params (0-5)
+        // Duo Params (0-5)
         for (i in 0 until 6) {
-            controlPort(VoiceSymbol.pairSharpness(i)) {
+            controlPort(VoiceSymbol.duoSharpness(i)) {
                 floatType {
-                    get { _pairSharpness[i] }
+                    get { _duoSharpness[i] }
                     set {
-                        _pairSharpness[i] = it
-                        listener?.onVoiceParamChange(i, "sharpness", it)
+                        _duoSharpness[i] = it
+                        listener?.onVoiceParamChange(i, "duo_sharpness", it)
                     }
                 }
             }
@@ -129,64 +129,64 @@ class VoicePlugin : DspPlugin {
                     }
                 }
             }
-            controlPort(VoiceSymbol.pairEngine(i)) {
+            controlPort(VoiceSymbol.duoEngine(i)) {
                 intType {
                     default = 0
                     min = 0; max = 17
-                    get { _pairEngine[i] }
+                    get { _duoEngine[i] }
                     set {
-                        _pairEngine[i] = it
-                        listener?.onVoiceParamChange(i, "pair_engine", it)
+                        _duoEngine[i] = it
+                        listener?.onVoiceParamChange(i, "duo_engine", it)
                     }
                 }
             }
-            controlPort(VoiceSymbol.pairHarmonics(i)) {
+            controlPort(VoiceSymbol.duoHarmonics(i)) {
                 floatType {
                     default = 0.0f
-                    get { _pairHarmonics[i] }
+                    get { _duoHarmonics[i] }
                     set {
-                        _pairHarmonics[i] = it
-                        listener?.onVoiceParamChange(i, "pair_harmonics", it)
+                        _duoHarmonics[i] = it
+                        listener?.onVoiceParamChange(i, "duo_harmonics", it)
                     }
                 }
             }
-            controlPort(VoiceSymbol.pairProsody(i)) {
+            controlPort(VoiceSymbol.duoProsody(i)) {
                 floatType {
                     default = 0.5f
-                    get { _pairProsody[i] }
+                    get { _duoProsody[i] }
                     set {
-                        _pairProsody[i] = it
-                        listener?.onVoiceParamChange(i, "pair_prosody", it)
+                        _duoProsody[i] = it
+                        listener?.onVoiceParamChange(i, "duo_prosody", it)
                     }
                 }
             }
-            controlPort(VoiceSymbol.pairSpeed(i)) {
+            controlPort(VoiceSymbol.duoSpeed(i)) {
                 floatType {
                     default = 0.0f
-                    get { _pairSpeed[i] }
+                    get { _duoSpeed[i] }
                     set {
-                        _pairSpeed[i] = it
-                        listener?.onVoiceParamChange(i, "pair_speed", it)
+                        _duoSpeed[i] = it
+                        listener?.onVoiceParamChange(i, "duo_speed", it)
                     }
                 }
             }
-            controlPort(VoiceSymbol.pairMorph(i)) {
+            controlPort(VoiceSymbol.duoMorph(i)) {
                 floatType {
                     default = 0.0f
-                    get { _pairMorph[i] }
+                    get { _duoMorph[i] }
                     set {
-                        _pairMorph[i] = it
-                        listener?.onVoiceParamChange(i, "pair_morph", it)
+                        _duoMorph[i] = it
+                        listener?.onVoiceParamChange(i, "duo_morph", it)
                     }
                 }
             }
-            controlPort(VoiceSymbol.pairModDepth(i)) {
+            controlPort(VoiceSymbol.duoModSourceLevel(i)) {
                 floatType {
                     default = 0.0f
-                    get { _pairModDepth[i] }
+                    get { _duoModSourceLevel[i] }
                     set {
-                        _pairModDepth[i] = it
-                        listener?.onVoiceParamChange(i, "pair_mod_depth", it)
+                        _duoModSourceLevel[i] = it
+                        listener?.onVoiceParamChange(i, "duo_mod_source_level", it)
                     }
                 }
             }
@@ -316,14 +316,14 @@ class VoicePlugin : DspPlugin {
     fun setTune(i: Int, v: Float) { _tune[i] = v }
     fun setModDepth(i: Int, v: Float) { _modDepth[i] = v }
     fun setEnvSpeed(i: Int, v: Float) { _envSpeed[i] = v }
-    fun setPairSharpness(i: Int, v: Float) { _pairSharpness[i] = v }
+    fun setDuoSharpness(i: Int, v: Float) { _duoSharpness[i] = v }
     fun setDuoModSource(i: Int, v: Int) { _duoModSource[i] = v }
-    fun setPairEngine(i: Int, v: Int) { _pairEngine[i] = v }
-    fun setPairHarmonics(i: Int, v: Float) { _pairHarmonics[i] = v }
-    fun setPairProsody(i: Int, v: Float) { _pairProsody[i] = v }
-    fun setPairSpeed(i: Int, v: Float) { _pairSpeed[i] = v }
-    fun setPairMorph(i: Int, v: Float) { _pairMorph[i] = v }
-    fun setPairModDepth(i: Int, v: Float) { _pairModDepth[i] = v }
+    fun setDuoEngine(i: Int, v: Int) { _duoEngine[i] = v }
+    fun setDuoHarmonics(i: Int, v: Float) { _duoHarmonics[i] = v }
+    fun setDuoProsody(i: Int, v: Float) { _duoProsody[i] = v }
+    fun setDuoSpeed(i: Int, v: Float) { _duoSpeed[i] = v }
+    fun setDuoMorph(i: Int, v: Float) { _duoMorph[i] = v }
+    fun setDuoModSourceLevel(i: Int, v: Float) { _duoModSourceLevel[i] = v }
 
     fun setFmStructure(v: Boolean) { _fmStructureCrossQuad = v }
     fun setTotalFeedback(v: Float) { _totalFeedback = v }

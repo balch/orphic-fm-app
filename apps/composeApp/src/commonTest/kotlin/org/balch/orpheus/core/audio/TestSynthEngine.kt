@@ -19,7 +19,7 @@ open class TestSynthEngine : SynthEngine {
     val _voiceTunes = FloatArray(12) { 0.5f }
     val _voiceFmDepths = FloatArray(12) { 0f }
     val _voiceEnvelopeSpeeds = FloatArray(12) { 0f }
-    val _pairSharpness = FloatArray(6) { 0f }
+    val _duoSharpness = FloatArray(6) { 0f }
     val _duoModSources = Array(6) { ModSource.OFF }
     val _quadPitch = FloatArray(3) { 0.5f }
     val _quadHold = FloatArray(3) { 0f }
@@ -57,7 +57,7 @@ open class TestSynthEngine : SynthEngine {
     override fun getVoiceTune(index: Int): Float = _voiceTunes[index]
     override fun getVoiceFmDepth(index: Int): Float = _voiceFmDepths[index]
     override fun getVoiceEnvelopeSpeed(index: Int): Float = _voiceEnvelopeSpeeds[index]
-    override fun getPairSharpness(pairIndex: Int): Float = _pairSharpness[pairIndex]
+    override fun getDuoSharpness(duoIndex: Int): Float = _duoSharpness[duoIndex]
     override fun getDuoModSource(duoIndex: Int): ModSource = _duoModSources[duoIndex]
     override fun getQuadPitch(quadIndex: Int): Float = _quadPitch[quadIndex]
     override fun getQuadHold(quadIndex: Int): Float = _quadHold[quadIndex]
@@ -86,7 +86,7 @@ open class TestSynthEngine : SynthEngine {
     override fun setVoiceFeedback(index: Int, amount: Float) {}
     override fun setVoiceFmDepth(index: Int, amount: Float) { _voiceFmDepths[index] = amount }
     override fun setVoiceEnvelopeSpeed(index: Int, speed: Float) { _voiceEnvelopeSpeeds[index] = speed }
-    override fun setPairSharpness(pairIndex: Int, sharpness: Float) { _pairSharpness[pairIndex] = sharpness }
+    override fun setDuoSharpness(duoIndex: Int, sharpness: Float) { _duoSharpness[duoIndex] = sharpness }
     override fun setDuoModSource(duoIndex: Int, source: ModSource) { _duoModSources[duoIndex] = source }
     override fun setQuadPitch(quadIndex: Int, pitch: Float) { _quadPitch[quadIndex] = pitch }
     override fun setQuadHold(quadIndex: Int, amount: Float) { _quadHold[quadIndex] = amount }

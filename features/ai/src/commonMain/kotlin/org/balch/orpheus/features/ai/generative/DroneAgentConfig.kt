@@ -22,7 +22,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         ## CONTROLS
         Use CONTROL actions to shape the drone sound.
         Parameters: controlId (string), value (float 0.0-1.0)
-        IMPORTANT: In DRONE Mode you can ONLY use Quad 2 controls (voice_quad_*_2), Voices 8-11 (voice_*_8..11), and Pairs 4-5 (voice_pair_sharpness_4/5). Do NOT touch Quad 0, Quad 1, Voices 0-7, or Pairs 0-3 — those belong to the user.
+        IMPORTANT: In DRONE Mode you can ONLY use Quad 2 controls (voice_quad_*_2), Voices 8-11 (voice_*_8..11), and Duos 4-5 (voice_duo_sharpness_4/5). Do NOT touch Quad 0, Quad 1, Voices 0-7, or Duos 0-3 — those belong to the user.
 
         ESSENTIAL CONTROLS for drones:
         - voice_quad_volume_2: Volume of drone voices (IMPORTANT: keep at 0.5-0.7 to stay below main volume). Do NOT use stereo_master_vol.
@@ -37,8 +37,11 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         - voice_mod_depth_8..11: FM synthesis depth per voice (0=clean, higher=brighter harmonics).
         - voice_env_speed_8..11: Envelope speed per voice (0=fast/percussive, 1=slow/pad). Use 0.7-1.0 for sustained drones.
 
-        PER-PAIR CONTROLS (Quad 2 = Pairs 4-5):
-        - voice_pair_sharpness_4, voice_pair_sharpness_5: Waveform sharpness (0=soft/sine, 1=sharp/saw).
+        PER-DUO CONTROLS (Quad 2 = Duos 4-5):
+        - voice_duo_sharpness_4, voice_duo_sharpness_5: Waveform sharpness (0=soft/sine, 1=sharp/saw).
+        - voice_duo_mod_source_4, voice_duo_mod_source_5: Modulation source (0=FM, 1=OFF, 2=LFO, 3=FLUX).
+        - voice_duo_mod_source_level_4, voice_duo_mod_source_level_5: Mod source amount (0.0=none, 1.0=full).
+        IMPORTANT: Always set BOTH mod_source AND mod_source_level together. Source without level = silent.
         
         BENDER CONTROL (SPECIAL: uses -1.0 to +1.0 range!):
         - BENDER: Pitch bend with spring-loaded feel (-1.0=down, 0.0=center, +1.0=up)
@@ -131,7 +134,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         
         ## DRONE SOUND DESIGN TIPS
         1. Small changes to voice_quad_pitch_2 create detuned beating textures.
-        2. Adjust voice_pair_sharpness_4 or voice_pair_sharpness_5 to morph waveform textures.
+        2. Adjust voice_duo_sharpness_4 or voice_duo_sharpness_5 to morph waveform textures.
         3. Use delay_feedback for spatial depth.
         4. Keep evolving slowly - small parameter changes.
         5. Use BENDER for whale-like pitch glides in oceanic/deep themes.
@@ -143,12 +146,12 @@ data object DroneAgentConfig : SynthControlAgentConfig {
     override val initialPrompt = """
         The system has initialized a unique preset. Now activate the drone.
 
-        1. **Pick engines** for pairs 4-5 (voice_pair_engine_4/5) that match the mood prompt:
+        1. **Pick engines** for duos 4-5 (voice_duo_engine_4/5) that match the mood prompt:
            - Ethereal/cosmic → 13 (particle) or 10 (grain)
            - Warm/organic → 0 (osc) or 8 (va)
            - Metallic/bells → 12 (modal) or 9 (additive)
            - Strings/bowed → 11 (string)
-        2. **Set sharpness** (voice_pair_sharpness_4/5) to match mood energy.
+        2. **Set sharpness** (voice_duo_sharpness_4/5) to match mood energy.
         3. **Set modulation**: voice_mod_depth_8..11 for FM richness, voice_vibrato for movement.
         4. **Set effects**: reverb_amount/time, delay_feedback/mix, distortion_drive as appropriate.
         5. **Ramp up volume** (voice_quad_volume_2 to 0.6).
@@ -164,7 +167,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
     override val initialMoodPrompts = listOf(
         "Evolve the drone texture: adjust voice_vibrato depth or voice_quad_pitch_2 to shift the harmonic character.",
         "Add more space: increase delay_feedback slightly, maybe reduce distortion_drive. Keep it ethereal.",
-        "Morph the modulation: change voice_pair_sharpness_4 slightly to vary the texture.",
+        "Morph the modulation: change voice_duo_sharpness_4 slightly to vary the texture.",
         "Deepen the drone: lower voice_quad_pitch_2 slightly (around 0.2-0.4) for sub-bass weight.",
         "Create movement: shift voice_vibrato and delay_time_1 values. Make the drone breathe and pulse.",
         "Simplify: reduce voice_coupling and voice_total_feedback. Let the pure tones shine through.",

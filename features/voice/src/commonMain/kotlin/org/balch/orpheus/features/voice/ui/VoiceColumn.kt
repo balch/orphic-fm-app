@@ -25,9 +25,9 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 fun VoiceColumnMod(
     modifier: Modifier = Modifier,
     voiceIndex: Int,
-    pairIndex: Int,
+    duoIndex: Int,
     tune: Float,
-    pairMorph: Float,
+    duoMorph: Float,
     envSpeed: Float,
     voiceActions: VoiceActions,
 ) {
@@ -40,11 +40,11 @@ fun VoiceColumnMod(
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
         RotaryKnob(
-            value = pairMorph,
-            onValueChange = { voiceActions.setPairMorph(pairIndex, it) },
+            value = duoMorph,
+            onValueChange = { voiceActions.setDuoMorph(duoIndex, it) },
             label = "\u03C8",
             labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = VoiceSymbol.pairMorph(pairIndex).controlId.key,
+            controlId = VoiceSymbol.duoMorph(duoIndex).controlId.key,
             size = 28.dp,
             progressColor = OrpheusColors.neonMagenta
         )
@@ -71,7 +71,7 @@ fun VoiceColumnMod(
 fun VoiceColumnSharp(
     modifier: Modifier = Modifier,
     voiceIndex: Int,
-    pairIndex: Int,
+    duoIndex: Int,
     tune: Float,
     sharpness: Float,
     envSpeed: Float,
@@ -87,10 +87,10 @@ fun VoiceColumnSharp(
     ) {
         RotaryKnob(
             value = sharpness,
-            onValueChange = { voiceActions.setPairSharpness(pairIndex, it) },
+            onValueChange = { voiceActions.setDuoSharpness(duoIndex, it) },
             label = "\u266F", // sharp
             labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = VoiceSymbol.pairSharpness(pairIndex).controlId.key,
+            controlId = VoiceSymbol.duoSharpness(duoIndex).controlId.key,
             size = 28.dp,
             progressColor = OrpheusColors.synthGreen
         )
@@ -123,9 +123,9 @@ fun VoiceColumnModPreview() {
     LiquidPreviewContainerWithGradient {
         VoiceColumnMod(
             voiceIndex = 0,
-            pairIndex = 0,
+            duoIndex = 0,
             tune = voiceState.voiceStates[0].tune,
-            pairMorph = voiceState.pairMorphs[0],
+            duoMorph = voiceState.duoMorphs[0],
             envSpeed = voiceState.voiceEnvelopeSpeeds[0],
             voiceActions = voiceActions,
             modifier = Modifier.padding(16.dp)
@@ -143,9 +143,9 @@ fun VoiceColumnSharpPreview() {
     LiquidPreviewContainerWithGradient {
         VoiceColumnSharp(
             voiceIndex = 1,
-            pairIndex = 0,
+            duoIndex = 0,
             tune = voiceState.voiceStates[1].tune,
-            sharpness = voiceState.pairSharpness[0],
+            sharpness = voiceState.duoSharpness[0],
             envSpeed = voiceState.voiceEnvelopeSpeeds[1],
             voiceActions = voiceActions,
             modifier = Modifier.padding(16.dp)

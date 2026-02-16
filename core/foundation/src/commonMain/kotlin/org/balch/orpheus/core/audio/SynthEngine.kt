@@ -11,9 +11,9 @@ interface SynthEngine {
     fun setVoiceTune(index: Int, tune: Float)
     fun setVoiceGate(index: Int, active: Boolean)
     fun setVoiceFeedback(index: Int, amount: Float)
-    fun setVoiceFmDepth(index: Int, amount: Float) // FM modulation from pair
+    fun setVoiceFmDepth(index: Int, amount: Float) // FM modulation from duo
     fun setVoiceEnvelopeSpeed(index: Int, speed: Float) // 0=Fast, 1=Slow (continuous)
-    fun setPairSharpness(pairIndex: Int, sharpness: Float) // Waveform (0=tri, 1=sq) per pair
+    fun setDuoSharpness(duoIndex: Int, sharpness: Float) // Waveform (0=tri, 1=sq) per duo
 
     // specialized Drum Synthesis (808)
     /** Trigger a specialized 808-style drum. Parameters are normalized 0..1. */
@@ -175,7 +175,7 @@ interface SynthEngine {
     fun getVoiceTune(index: Int): Float
     fun getVoiceFmDepth(index: Int): Float
     fun getVoiceEnvelopeSpeed(index: Int): Float
-    fun getPairSharpness(pairIndex: Int): Float
+    fun getDuoSharpness(duoIndex: Int): Float
     fun getDuoModSource(duoIndex: Int): ModSource
     fun getFmStructureCrossQuad(): Boolean
     fun getTotalFeedback(): Float

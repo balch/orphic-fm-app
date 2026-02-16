@@ -657,27 +657,27 @@ class TidalRepl(
         }
 
         
-        // sharp:<pairIndex> <value> - Pair waveform sharpness (0.0 = tri, 1.0 = sq)
-        extractVoiceParam(trimmed, "sharp")?.let { (pairIndex, value) ->
-            if (pairIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Pair index must be 1-4, got: $pairIndex")
+        // sharp:<duoIndex> <value> - Duo waveform sharpness (0.0 = tri, 1.0 = sq)
+        extractVoiceParam(trimmed, "sharp")?.let { (duoIndex, value) ->
+            if (duoIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Duo index must be 1-4, got: $duoIndex")
             val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
-            return Pattern.pure(TidalEvent.PairSharp((pairIndex - 1).coerceIn(0, 3), value.coerceIn(0f, 1f), listOf(location)))
+            return Pattern.pure(TidalEvent.DuoSharp((duoIndex - 1).coerceIn(0, 3), value.coerceIn(0f, 1f), listOf(location)))
         }
 
-        // engine:<pairIndex> <engineName> - Pair synthesis engine selection
+        // engine:<duoIndex> <engineName> - Duo synthesis engine selection
         if (trimmed.startsWith("engine:") || trimmed.startsWith("engine ")) {
             val content = if (trimmed.startsWith("engine:")) trimmed.substringAfter("engine:") else trimmed.substringAfter("engine ")
             val clean = content.trim()
             val parts = clean.split(" ", limit = 2)
             if (parts.size >= 2) {
-                val pairIndex = parts[0].replace("\"", "").replace("'", "").toIntOrNull()
+                val duoIndex = parts[0].replace("\"", "").replace("'", "").toIntOrNull()
                 val engineName = parts[1].replace("\"", "").replace("'", "").lowercase()
-                if (pairIndex != null) {
-                    if (pairIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Pair index must be 1-4, got: $pairIndex")
+                if (duoIndex != null) {
+                    if (duoIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Duo index must be 1-4, got: $duoIndex")
                     val engineId = resolveEngineId(engineName)
                         ?: throw IllegalArgumentException("Line $lineNum: Unknown engine '$engineName'. Use: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech")
                     val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
-                    return Pattern.pure(TidalEvent.PairEngine((pairIndex - 1).coerceIn(0, 3), engineId, listOf(location)))
+                    return Pattern.pure(TidalEvent.DuoEngine((duoIndex - 1).coerceIn(0, 3), engineId, listOf(location)))
                 }
             }
         }
@@ -687,14 +687,14 @@ class TidalRepl(
             val content = match.groupValues[1].trim()
             val parts = content.split(Regex("\\s+"))
             if (parts.size >= 2) {
-                val pairIndex = parts[0].toIntOrNull()
+                val duoIndex = parts[0].toIntOrNull()
                 val engineName = parts[1].lowercase()
-                if (pairIndex != null) {
-                    if (pairIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Pair index must be 1-4, got: $pairIndex")
+                if (duoIndex != null) {
+                    if (duoIndex !in 1..4) throw IllegalArgumentException("Line $lineNum: Duo index must be 1-4, got: $duoIndex")
                     val engineId = resolveEngineId(engineName)
                         ?: throw IllegalArgumentException("Line $lineNum: Unknown engine '$engineName'. Use: osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech")
                     val location = SourceLocation(trimOffset, trimOffset + trimmed.length)
-                    return Pattern.pure(TidalEvent.PairEngine((pairIndex - 1).coerceIn(0, 3), engineId, listOf(location)))
+                    return Pattern.pure(TidalEvent.DuoEngine((duoIndex - 1).coerceIn(0, 3), engineId, listOf(location)))
                 }
             }
         }
@@ -1069,8 +1069,8 @@ class TidalRepl(
     }
 
     /**
-     * Resolve an engine name to a voice-pair engine port value.
-     * These are the integer values stored in the PAIR_ENGINE port.
+     * Resolve an engine name to a duo engine port value.
+     * These are the integer values stored in the DUO_ENGINE port.
      */
     private fun resolveEngineId(name: String): Int? = when (name) {
         "osc", "default", "0" -> 0

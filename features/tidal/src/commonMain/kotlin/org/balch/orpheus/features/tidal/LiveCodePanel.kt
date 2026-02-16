@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.tidal.TidalScheduler
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
@@ -76,7 +77,92 @@ interface LiveCodeFeature : SynthFeature<LiveCodeUiState, LiveCodePanelActions> 
     val triggers: Flow<TidalScheduler.TriggerEvent>
 
     override val synthControl: SynthFeature.SynthControl
-        get() = SynthFeature.SynthControl.Empty
+        get() = SynthControlDescriptor
+
+    companion object {
+        internal val SynthControlDescriptor = object : SynthFeature.SynthControl {
+            override val panelId = PanelId.CODE
+            override val title = "Live Code"
+
+            override val markdown = """
+                Tidal-style live coding REPL for creating and manipulating musical patterns in real time.
+
+                ## Pattern Types
+                - **note "c3 e3 g3"** - Melodic note patterns (c3, d#4, bb2, octaves 0-9)
+                - **s "bd sn hh"** - Drum sample patterns (bd, sn, hh, cp, oh, kick, hat, rim, lt, mt, ht, cb)
+                - **voices:1 2 3** - Trigger voice envelopes (indices 1-12)
+                - **hold "0.8 0.2"** - Sustain levels per voice (0.0-1.0)
+
+                ## Slot Assignment
+                - **d1 $ note "c3 e3"** - Assign a cycling pattern to slot d1 (up to d16)
+                - **once $ note "c3"** - Execute a pattern once immediately (no cycling)
+                - Slots run independently and can be layered
+
+                ## Mini-Notation (inside quotes)
+                - **[a b c]** - Subdivide: fit into one step
+                - **<a b c>** - Alternate: cycle through on successive beats
+                - **a*3** - Speed up: play 3x in its slot
+                - **a/2** - Slow down: play every other cycle
+                - **a!3** - Replicate: repeat as separate events
+                - **a@2** - Elongate: takes 2 time units
+                - **a?** - Degrade: 50% chance of silence
+                - **a(3,8)** - Euclidean: 3 pulses across 8 steps
+                - **a(3,8,2)** - Euclidean with rotation offset
+                - **0..4** - Range: expands to 0 1 2 3 4
+                - **~** - Silence/rest
+                - **a,b** - Stack: play simultaneously
+
+                ## # Combiner
+                Stack two patterns together (applies both simultaneously):
+                - d1 $ voices "1 2 3" # hold "0.8 0.5 0.2"
+                - d1 $ note "c3 e3" # envspeed "0.9 0.5"
+
+                ## Transformations
+                - **fast 2 $ note "c3 e3"** - Speed up by factor
+                - **slow 2 $ note "c3 e3"** - Slow down by factor
+                - **stack [p1, p2]** - Play patterns simultaneously
+                - **fastcat [p1, p2]** - Concatenate into one cycle
+                - **slowcat [p1, p2]** - Each pattern gets full cycle
+
+                ## Voice Controls (index 1-8)
+                - **tune:1 0.562** - Pitch (0.5=A3, formula: 0.5 + semitones/48)
+                - **pan:1 -0.5** - Pan position (-1.0 to 1.0)
+                - **envspeed:1 0.3** - Envelope speed (0=fast/percussive, 1=slow/drone)
+                - **hold:1 0.8** - Sustain level (0.0-1.0)
+
+                Tune reference: A3=0.500, C4=0.562, D4=0.604, E4=0.646, G4=0.708, A4=0.750
+
+                ## Duo Controls (index 1-4)
+                - **engine:1 fm** - Synthesis engine (osc, fm, noise, wave, va, additive, grain, string, modal, particle, swarm, chord, wavetable, speech)
+                - **sharp:1 0.7** - Waveform sharpness (0=triangle, 1=square)
+                - **duomod:1 fm** - Modulation source (fm, off, lfo)
+
+                ## Quad Controls (index 1-3)
+                - **quadhold:1 0.8** - Quad sustain level (0.0-1.0)
+                - **quadpitch:1 0.5** - Quad group pitch (0.5=unity)
+
+                ## Effects (set once, not cycled)
+                - **drive:0.4** - Distortion drive (0.0-1.0)
+                - **distmix:0.5** - Distortion mix (0.0-1.0)
+                - **vibrato:0.3** - LFO depth (0.0-1.0)
+                - **feedback:0.4** - Delay feedback (0.0-1.0)
+                - **delaymix:0.3** - Delay wet/dry mix (0.0-1.0)
+
+                ## Meta Commands
+                - **solo d1** - Solo a slot
+                - **mute d1** - Mute a slot
+                - **unmute d1** - Unmute a slot
+
+                ## Tips
+                - Use d1-d16 slots for different layers (drums, melody, bass, effects)
+                - Combine # to add hold/envspeed to voice patterns
+                - Use slow/fast to create polyrhythmic textures
+                - Euclidean patterns a(k,n) distribute k pulses evenly across n steps
+            """.trimIndent()
+
+            override val portControlKeys: Map<String, String> = emptyMap()
+        }
+    }
 }
 
 /**

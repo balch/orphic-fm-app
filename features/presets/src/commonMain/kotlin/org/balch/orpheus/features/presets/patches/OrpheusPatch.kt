@@ -49,7 +49,7 @@ class OrpheusPatch : SynthPatch {
             envSpeeds.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:env_speed_$i", PortValue.FloatValue(v)) }
 
             val sharpness = listOf(0.59624976f, 0.0f, 0.0f, 0.6787497f, 0.0f, 0.0f)
-            sharpness.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_sharpness_$i", PortValue.FloatValue(v)) }
+            sharpness.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_sharpness_$i", PortValue.FloatValue(v)) }
 
             val modSources = listOf(
                 ModSource.VOICE_FM, ModSource.LFO, ModSource.LFO,
@@ -60,19 +60,19 @@ class OrpheusPatch : SynthPatch {
             // Voice engines — mixed synthesis for layered warmth
             // 0=Default, 4=FM, 7=VirtualAnalog, 8=Additive, 10=String
             val engines = listOf(0, 10, 8, 7, 0, 0)
-            engines.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_engine_$i", PortValue.IntValue(v)) }
+            engines.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_engine_$i", PortValue.IntValue(v)) }
 
             val harmonics = listOf(0.15f, 0.45f, 0.6f, 0.35f, 0.0f, 0.0f)
-            harmonics.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_harmonics_$i", PortValue.FloatValue(v)) }
+            harmonics.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_harmonics_$i", PortValue.FloatValue(v)) }
 
-            // Pair morph — engine 0 gets warm detune, Plaits engines get character
+            // Duo morph — engine 0 gets warm detune, Plaits engines get character
             // engines: 0=Default, 10=String, 8=Additive, 7=VirtualAnalog, 0, 0
-            val pairMorphs = listOf(0.20f, 0.35f, 0.45f, 0.30f, 0.0f, 0.0f)
-            pairMorphs.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_morph_$i", PortValue.FloatValue(v)) }
+            val duoMorphs = listOf(0.20f, 0.35f, 0.45f, 0.30f, 0.0f, 0.0f)
+            duoMorphs.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_morph_$i", PortValue.FloatValue(v)) }
 
-            // Pair mod depth — FM depth for engine 0, timbre mod for Plaits
-            val pairModDepths = listOf(0.60f, 0.25f, 0.30f, 0.49f, 0.0f, 0.0f)
-            pairModDepths.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:pair_mod_depth_$i", PortValue.FloatValue(v)) }
+            // Duo mod depth — FM depth for engine 0, timbre mod for Plaits
+            val duoModSourceLevels = listOf(0.60f, 0.25f, 0.30f, 0.49f, 0.0f, 0.0f)
+            duoModSourceLevels.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_mod_source_level_$i", PortValue.FloatValue(v)) }
 
             val lfoUri = DuoLfoPlugin.URI
             put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.01f))

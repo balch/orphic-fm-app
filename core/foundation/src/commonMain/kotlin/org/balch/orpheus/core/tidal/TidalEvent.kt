@@ -304,12 +304,12 @@ sealed class TidalEvent {
 
     
     /**
-     * Pair waveform sharpness control.
-     * @param pairIndex Pair index (0-3, where pair 0 = voices 0-1, etc.)
+     * Duo waveform sharpness control.
+     * @param duoIndex Duo index (0-5, where duo 0 = voices 0-1, etc.)
      * @param sharpness Waveform sharpness (0.0 = triangle, 1.0 = square)
      */
-    data class PairSharp(
-        val pairIndex: Int,
+    data class DuoSharp(
+        val duoIndex: Int,
         val sharpness: Float,
         override val locations: List<SourceLocation> = emptyList()
     ) : TidalEvent() {
@@ -318,12 +318,12 @@ sealed class TidalEvent {
     }
 
     /**
-     * Pair engine selection.
-     * @param pairIndex Pair index (0-3, where pair 0 = voices 0-1, etc.)
+     * Duo engine selection.
+     * @param duoIndex Duo index (0-5, where duo 0 = voices 0-1, etc.)
      * @param engineId Engine ID: 0=osc, 5=fm, 6=noise, 7=wave, 8=va, 9=additive, 10=grain, 11=string, 12=modal
      */
-    data class PairEngine(
-        val pairIndex: Int,
+    data class DuoEngine(
+        val duoIndex: Int,
         val engineId: Int,
         override val locations: List<SourceLocation> = emptyList()
     ) : TidalEvent() {
@@ -453,10 +453,10 @@ object Orpheus {
     fun voicePan(voiceIndex: Int, pan: Float): Pattern<TidalEvent> =
         Pattern.pure(TidalEvent.VoicePan(voiceIndex, pan))
 
-    // === Pair Engine Selection ===
+    // === Duo Engine Selection ===
 
-    fun pairEngine(pairIndex: Int, engineId: Int): Pattern<TidalEvent> =
-        Pattern.pure(TidalEvent.PairEngine(pairIndex, engineId))
+    fun duoEngine(duoIndex: Int, engineId: Int): Pattern<TidalEvent> =
+        Pattern.pure(TidalEvent.DuoEngine(duoIndex, engineId))
 
     // === Generic Control ===
     

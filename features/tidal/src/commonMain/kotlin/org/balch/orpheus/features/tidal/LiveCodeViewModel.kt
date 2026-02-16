@@ -9,8 +9,10 @@ import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoMap
+import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.SynthFeature
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -109,6 +111,7 @@ sealed class LiveCodeIntent {
 @Inject
 @ViewModelKey(LiveCodeViewModel::class)
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
+@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
 class LiveCodeViewModel(
     private val scheduler: TidalScheduler,
     private val repl: TidalRepl,
