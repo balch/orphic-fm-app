@@ -57,7 +57,7 @@ class GrainsPlugin(
     private var _pitch = 0.0f
     private var _density = 0.5f
     private var _texture = 0.5f
-    private var _dryWet = 0.5f
+    private var _dryWet = 0f
     private var _freeze = false
     private var _trigger = false
     private var _mode = 0
@@ -103,6 +103,7 @@ class GrainsPlugin(
         
         controlPort(GrainsSymbol.DRY_WET) {
             floatType {
+                default = 0f
                 get { _dryWet }
                 set { _dryWet = it; grains.dryWet.set(it.toDouble()); grains.setBypass(it <= 0.001f) }
             }

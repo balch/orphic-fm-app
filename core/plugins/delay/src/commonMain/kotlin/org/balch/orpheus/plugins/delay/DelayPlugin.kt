@@ -77,7 +77,7 @@ class DelayPlugin(
 
     // Internal state
     private var _feedback = 0.5f
-    private var _mix = 0.5f
+    private var _mix = 0f
     private var _time1 = 0.3f
     private var _time2 = 0.3f
     private var _modDepth1 = 0f
@@ -103,6 +103,7 @@ class DelayPlugin(
         
         controlPort(DelaySymbol.MIX) {
             floatType {
+                default = 0f
                 get { _mix }
                 set {
                     _mix = it.coerceIn(0f, 1f)

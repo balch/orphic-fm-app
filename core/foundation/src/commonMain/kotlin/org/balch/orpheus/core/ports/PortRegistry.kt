@@ -6,6 +6,7 @@ import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.plugin.PortType
 import org.balch.orpheus.core.plugin.PortValue
 
 /**
@@ -61,8 +62,21 @@ class PortRegistry(
 
     /**
      * Restore port values from a typed map.
+     * Resets ALL ports to their plugin-defined defaults first, then applies overrides.
+     * This ensures switching presets never leaves stale values from a previous preset.
      */
     fun restoreState(values: Map<String, PortValue>) {
+        // Reset all ports to their plugin-defined defaults
+        controlPorts.forEach { (qualifiedSymbol, pair) ->
+            val (_, port) = pair
+            val defaultValue = when (port.type) {
+                PortType.FLOAT -> PortValue.FloatValue(port.default)
+                PortType.INT -> PortValue.IntValue(port.default.toInt())
+                PortType.BOOLEAN -> PortValue.BoolValue(port.default != 0f)
+            }
+            setPortValue(qualifiedSymbol, defaultValue)
+        }
+        // Apply preset overrides
         values.forEach { (symbol, value) ->
             setPortValue(symbol, value)
         }

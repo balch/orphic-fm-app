@@ -72,7 +72,7 @@ class WarpsPlugin(
     private var _timbre = 0.5f
     private var _level1 = 0.5f
     private var _level2 = 0.5f
-    private var _mix = 0.5f
+    private var _mix = 0f
     private var _carrierSource = 0 // WarpsSource.SYNTH
     private var _modulatorSource = 1 // WarpsSource.DRUMS
     
@@ -109,6 +109,7 @@ class WarpsPlugin(
         
         controlPort(WarpsSymbol.MIX) {
             floatType {
+                default = 0f
                 get { _mix }
                 set {
                     _mix = it

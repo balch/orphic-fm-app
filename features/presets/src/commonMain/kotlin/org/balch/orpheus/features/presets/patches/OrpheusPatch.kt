@@ -6,21 +6,25 @@ import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.plugin.PortValue
-import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
+import org.balch.orpheus.core.plugin.symbols.DISTORTION_URI
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
-import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
+import org.balch.orpheus.core.plugin.symbols.FLUX_URI
+import org.balch.orpheus.core.plugin.symbols.FluxSymbol
+import org.balch.orpheus.core.plugin.symbols.REVERB_URI
+import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 import org.balch.orpheus.core.presets.SynthPatch
 import org.balch.orpheus.core.presets.SynthPreset
-import org.balch.orpheus.plugins.beats.BeatsPlugin
 import org.balch.orpheus.plugins.delay.DelayPlugin
-import org.balch.orpheus.plugins.distortion.DistortionPlugin
-import org.balch.orpheus.plugins.drum.DrumPlugin
 import org.balch.orpheus.plugins.duolfo.DuoLfoPlugin
 
 /**
- * Warm Pad - Gentle, warm pad with subtle modulation.
+ * Orpheus Patch - Evolving drones with depth and atmosphere.
+ *
+ * All engine 0. Designed for the hold knobs — bring up quad holds
+ * and let the voices sustain and evolve through Flux modulation and LFO.
+ * Ideal for ambient, meditative soundscapes.
  */
 @Inject
 @ContributesIntoSet(AppScope::class)
@@ -30,95 +34,102 @@ class OrpheusPatch : SynthPatch {
     override val preset = SynthPreset(
         name = "Orpheus",
         portValues = buildMap {
+            val voiceUri = "org.balch.orpheus.plugins.voice"
+
+            // Tunes: spread across a wide range for rich drone harmonics
             val tunes = listOf(
-                0.60874975f, 0.68999964f, 0.4812498f, 0.4962499f, 0.63999975f, 0.6599998f,
-                0.49875003f, 0.55f, 0.75f, 0.82f, 0.89f, 0.96f
+                0.20f, 0.27f, 0.35f, 0.42f,
+                0.38f, 0.45f, 0.52f, 0.60f,
+                0.55f, 0.62f, 0.70f, 0.78f
             )
-            tunes.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:tune_$i", PortValue.FloatValue(v)) }
+            tunes.forEachIndexed { i, v ->
+                put("$voiceUri:tune_$i", PortValue.FloatValue(v))
+            }
 
+            // Mod depths: rich FM character across all voices
             val modDepths = listOf(
-                0.59749967f, 0.59749967f, 0.26875004f, 0.26875004f, 0.48874983f, 0.48874983f,
-                0.45749986f, 0.45749986f, 0.0f, 0.0f, 0.0f, 0.0f
+                0.25f, 0.25f, 0.30f, 0.30f,
+                0.20f, 0.20f, 0.25f, 0.25f,
+                0.15f, 0.15f, 0.20f, 0.20f
             )
-            modDepths.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:mod_depth_$i", PortValue.FloatValue(v)) }
+            modDepths.forEachIndexed { i, v ->
+                put("$voiceUri:mod_depth_$i", PortValue.FloatValue(v))
+            }
 
+            // Env speeds: slow-to-medium for evolving sustain
             val envSpeeds = listOf(
-                0.0f, 0.0f, 0.38235295f, 0.60294116f, 0.0f, 0.0f,
-                0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f
+                0.15f, 0.15f, 0.20f, 0.20f,
+                0.18f, 0.18f, 0.22f, 0.22f,
+                0.12f, 0.12f, 0.15f, 0.15f
             )
-            envSpeeds.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:env_speed_$i", PortValue.FloatValue(v)) }
+            envSpeeds.forEachIndexed { i, v ->
+                put("$voiceUri:env_speed_$i", PortValue.FloatValue(v))
+            }
 
-            val sharpness = listOf(0.59624976f, 0.0f, 0.0f, 0.6787497f, 0.0f, 0.0f)
-            sharpness.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_sharpness_$i", PortValue.FloatValue(v)) }
+            // Duo parameters: warm detuning and modulation depth
+            val duoMorphs = listOf(0.18f, 0.15f, 0.20f, 0.22f, 0.25f, 0.18f)
+            duoMorphs.forEachIndexed { i, v ->
+                put("$voiceUri:duo_morph_$i", PortValue.FloatValue(v))
+            }
 
+            val duoModSourceLevels = listOf(0.30f, 0.25f, 0.35f, 0.28f, 0.20f, 0.22f)
+            duoModSourceLevels.forEachIndexed { i, v ->
+                put("$voiceUri:duo_mod_source_level_$i", PortValue.FloatValue(v))
+            }
+
+            val duoSharpness = listOf(0.15f, 0.10f, 0.20f, 0.12f, 0.08f, 0.10f)
+            duoSharpness.forEachIndexed { i, v ->
+                put("$voiceUri:duo_sharpness_$i", PortValue.FloatValue(v))
+            }
+
+            // Mod sources: mix of LFO and Flux for evolving character
             val modSources = listOf(
-                ModSource.VOICE_FM, ModSource.LFO, ModSource.LFO,
-                ModSource.VOICE_FM, ModSource.OFF, ModSource.OFF
+                ModSource.LFO, ModSource.FLUX,
+                ModSource.LFO, ModSource.FLUX,
+                ModSource.LFO, ModSource.FLUX
             )
-            modSources.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_mod_source_$i", PortValue.IntValue(v.ordinal)) }
+            modSources.forEachIndexed { i, v ->
+                put("$voiceUri:duo_mod_source_$i", PortValue.IntValue(v.ordinal))
+            }
 
-            // Voice engines — mixed synthesis for layered warmth
-            // 0=Default, 4=FM, 7=VirtualAnalog, 8=Additive, 10=String
-            val engines = listOf(0, 10, 8, 7, 0, 0)
-            engines.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_engine_$i", PortValue.IntValue(v)) }
+            // Holds start at 0 (forced by PresetLoader) — user brings them up
 
-            val harmonics = listOf(0.15f, 0.45f, 0.6f, 0.35f, 0.0f, 0.0f)
-            harmonics.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_harmonics_$i", PortValue.FloatValue(v)) }
-
-            // Duo morph — engine 0 gets warm detune, Plaits engines get character
-            // engines: 0=Default, 10=String, 8=Additive, 7=VirtualAnalog, 0, 0
-            val duoMorphs = listOf(0.20f, 0.35f, 0.45f, 0.30f, 0.0f, 0.0f)
-            duoMorphs.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_morph_$i", PortValue.FloatValue(v)) }
-
-            // Duo mod depth — FM depth for engine 0, timbre mod for Plaits
-            val duoModSourceLevels = listOf(0.60f, 0.25f, 0.30f, 0.49f, 0.0f, 0.0f)
-            duoModSourceLevels.forEachIndexed { i, v -> put("org.balch.orpheus.plugins.voice:duo_mod_source_level_$i", PortValue.FloatValue(v)) }
-
+            // LFO: slow, linked for coherent modulation
             val lfoUri = DuoLfoPlugin.URI
-            put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.01f))
-            put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.02875f))
+            put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.02f))
+            put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.035f))
             put("$lfoUri:${DuoLfoSymbol.MODE.symbol}", PortValue.IntValue(HyperLfoMode.AND.ordinal))
             put("$lfoUri:${DuoLfoSymbol.LINK.symbol}", PortValue.BoolValue(true))
 
+            // Flux: engaged for evolving pitch sequences
+            val fluxUri = FLUX_URI
+            put("$fluxUri:${FluxSymbol.MIX.symbol}", PortValue.FloatValue(0.25f))
+            put("$fluxUri:${FluxSymbol.RATE.symbol}", PortValue.FloatValue(0.3f))
+            put("$fluxUri:${FluxSymbol.SPREAD.symbol}", PortValue.FloatValue(0.4f))
+            put("$fluxUri:${FluxSymbol.STEPS.symbol}", PortValue.FloatValue(0.6f))
+            put("$fluxUri:${FluxSymbol.DEJAVU.symbol}", PortValue.FloatValue(0.5f))
+            put("$fluxUri:${FluxSymbol.JITTER.symbol}", PortValue.FloatValue(0.1f))
+
+            // Delay: atmospheric
             val delayUri = DelayPlugin.URI
-            put("$delayUri:${DelaySymbol.TIME_1.symbol}", PortValue.FloatValue(0.1675003f))
-            put("$delayUri:${DelaySymbol.TIME_2.symbol}", PortValue.FloatValue(0.22625016f))
-            put("$delayUri:${DelaySymbol.MOD_DEPTH_1.symbol}", PortValue.FloatValue(0.05875f))
-            put("$delayUri:${DelaySymbol.MOD_DEPTH_2.symbol}", PortValue.FloatValue(0.10875f))
-            put("$delayUri:${DelaySymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.30750036f))
-            put("$delayUri:${DelaySymbol.MIX.symbol}", PortValue.FloatValue(0.51125044f))
-            
-            val distUri = DistortionPlugin.URI
-            put("$distUri:${DistortionSymbol.DRIVE.symbol}", PortValue.FloatValue(0.4f))
-            put("$distUri:${DistortionSymbol.MIX.symbol}", PortValue.FloatValue(0.6f))
+            put("$delayUri:${DelaySymbol.TIME_1.symbol}", PortValue.FloatValue(0.55f))
+            put("$delayUri:${DelaySymbol.TIME_2.symbol}", PortValue.FloatValue(0.70f))
+            put("$delayUri:${DelaySymbol.MOD_DEPTH_1.symbol}", PortValue.FloatValue(0.08f))
+            put("$delayUri:${DelaySymbol.MOD_DEPTH_2.symbol}", PortValue.FloatValue(0.12f))
+            put("$delayUri:${DelaySymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.40f))
+            put("$delayUri:${DelaySymbol.MIX.symbol}", PortValue.FloatValue(0.35f))
 
-            // Drums — bypassed, deep tuned kit to match the warm Orpheus character
-            val drumUri = DrumPlugin.URI
-            put("$drumUri:${DrumSymbol.BYPASS.symbol}", PortValue.BoolValue(true))
-            put("$drumUri:${DrumSymbol.MIX.symbol}", PortValue.FloatValue(0.75f))
-            put("$drumUri:${DrumSymbol.BD_FREQ.symbol}", PortValue.FloatValue(0.45f))
-            put("$drumUri:${DrumSymbol.BD_TONE.symbol}", PortValue.FloatValue(0.55f))
-            put("$drumUri:${DrumSymbol.BD_DECAY.symbol}", PortValue.FloatValue(0.6f))
-            put("$drumUri:${DrumSymbol.BD_P4.symbol}", PortValue.FloatValue(0.4f))
-            put("$drumUri:${DrumSymbol.BD_P5.symbol}", PortValue.FloatValue(0.6f))
-            put("$drumUri:${DrumSymbol.SD_FREQ.symbol}", PortValue.FloatValue(0.25f))
-            put("$drumUri:${DrumSymbol.SD_TONE.symbol}", PortValue.FloatValue(0.6f))
-            put("$drumUri:${DrumSymbol.SD_DECAY.symbol}", PortValue.FloatValue(0.5f))
-            put("$drumUri:${DrumSymbol.SD_P4.symbol}", PortValue.FloatValue(0.6f))
-            put("$drumUri:${DrumSymbol.HH_FREQ.symbol}", PortValue.FloatValue(0.3f))
-            put("$drumUri:${DrumSymbol.HH_TONE.symbol}", PortValue.FloatValue(0.55f))
-            put("$drumUri:${DrumSymbol.HH_DECAY.symbol}", PortValue.FloatValue(0.4f))
-            put("$drumUri:${DrumSymbol.HH_P4.symbol}", PortValue.FloatValue(0.5f))
+            // Reverb: spacious
+            val reverbUri = REVERB_URI
+            put("$reverbUri:${ReverbSymbol.AMOUNT.symbol}", PortValue.FloatValue(0.35f))
+            put("$reverbUri:${ReverbSymbol.TIME.symbol}", PortValue.FloatValue(0.6f))
+            put("$reverbUri:${ReverbSymbol.DIFFUSION.symbol}", PortValue.FloatValue(0.7f))
 
-            // Beats — laid-back groove with swing
-            val beatsUri = BeatsPlugin.URI
-            put("$beatsUri:${BeatsSymbol.X.symbol}", PortValue.FloatValue(0.6f))
-            put("$beatsUri:${BeatsSymbol.Y.symbol}", PortValue.FloatValue(0.4f))
-            put("$beatsUri:${BeatsSymbol.BPM.symbol}", PortValue.FloatValue(105f))
-            put("$beatsUri:${BeatsSymbol.MIX.symbol}", PortValue.FloatValue(0.75f))
-            put("$beatsUri:${BeatsSymbol.RANDOMNESS.symbol}", PortValue.FloatValue(0.1f))
-            put("$beatsUri:${BeatsSymbol.SWING.symbol}", PortValue.FloatValue(0.15f))
+            // Distortion: warm saturation
+            val distUri = DISTORTION_URI
+            put("$distUri:${DistortionSymbol.DRIVE.symbol}", PortValue.FloatValue(0.25f))
+            put("$distUri:${DistortionSymbol.MIX.symbol}", PortValue.FloatValue(0.4f))
         },
-        createdAt = 1767461190433L
+        createdAt = 0L
     )
 }

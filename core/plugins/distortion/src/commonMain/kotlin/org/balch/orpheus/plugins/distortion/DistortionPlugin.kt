@@ -68,7 +68,7 @@ class DistortionPlugin(
 
     // Internal state
     private var _drive = 0.0f
-    private var _mix = 0.5f
+    private var _mix = 0f
     private var _dryLevel = 1.0f
 
     // Type-safe DSL port definitions  
@@ -88,6 +88,7 @@ class DistortionPlugin(
         
         controlPort(DistortionSymbol.MIX) {
             floatType {
+                default = 0f
                 get { _mix }
                 set {
                     _mix = it
@@ -160,11 +161,11 @@ class DistortionPlugin(
         driveGainLeft.inputB.set(1.0)
         driveGainRight.inputB.set(1.0)
 
-        // Default clean/distorted mix (50/50)
-        cleanPathGainLeft.inputB.set(0.5)
-        cleanPathGainRight.inputB.set(0.5)
-        distortedPathGainLeft.inputB.set(0.5)
-        distortedPathGainRight.inputB.set(0.5)
+        // Default clean/distorted mix (all clean, no distortion)
+        cleanPathGainLeft.inputB.set(1.0)
+        cleanPathGainRight.inputB.set(1.0)
+        distortedPathGainLeft.inputB.set(0.0)
+        distortedPathGainRight.inputB.set(0.0)
 
         // Dry level defaults (full dry)
         dryGainLeft.inputB.set(1.0)

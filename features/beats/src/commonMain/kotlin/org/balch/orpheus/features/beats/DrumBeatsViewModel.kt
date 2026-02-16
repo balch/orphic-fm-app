@@ -32,6 +32,7 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
+import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.synthViewModel
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.plugins.drum.engine.DrumBeatsGenerator
@@ -108,7 +109,7 @@ interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
                 BeatsSymbol.X.controlId.key to "Pattern X coordinate (Drums mode)",
                 BeatsSymbol.Y.controlId.key to "Pattern Y coordinate (Drums mode)",
                 BeatsSymbol.BPM.controlId.key to "Tempo in beats per minute",
-                BeatsSymbol.MIX.controlId.key to "Beat generator output level",
+                DrumSymbol.MIX.controlId.key to "Drum synth output level",
                 BeatsSymbol.RANDOMNESS.controlId.key to "Random ghost note / drop probability",
                 BeatsSymbol.SWING.controlId.key to "Off-beat timing offset for groove",
                 BeatsSymbol.MODE.controlId.key to "Pattern mode (0=Drums, 1=Euclidean)",
@@ -145,7 +146,7 @@ class DrumBeatsViewModel(
     private val xFlow = synthController.controlFlow(BeatsSymbol.X.controlId)
     private val yFlow = synthController.controlFlow(BeatsSymbol.Y.controlId)
     private val bpmFlow = synthController.controlFlow(BeatsSymbol.BPM.controlId)
-    private val mixFlow = synthController.controlFlow(BeatsSymbol.MIX.controlId)
+    private val mixFlow = synthController.controlFlow(DrumSymbol.MIX.controlId)
     private val randomnessFlow = synthController.controlFlow(BeatsSymbol.RANDOMNESS.controlId)
     private val swingFlow = synthController.controlFlow(BeatsSymbol.SWING.controlId)
     private val modeFlow = synthController.controlFlow(BeatsSymbol.MODE.controlId)

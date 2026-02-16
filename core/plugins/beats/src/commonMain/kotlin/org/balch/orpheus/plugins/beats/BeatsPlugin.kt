@@ -42,7 +42,6 @@ class BeatsPlugin : DspPlugin {
     private var _x = 0.5f
     private var _y = 0.5f
     private var _bpm = 120f
-    private var _mix = 0.7f
     private var _randomness = 0f
     private var _swing = 0f
     private var _mode = 0
@@ -58,9 +57,6 @@ class BeatsPlugin : DspPlugin {
         }
         controlPort(BeatsSymbol.BPM) {
             floatType { default = 120f; min = 20f; max = 300f; get { _bpm }; set { _bpm = it } }
-        }
-        controlPort(BeatsSymbol.MIX) {
-            floatType { default = 0.7f; get { _mix }; set { _mix = it } }
         }
         controlPort(BeatsSymbol.RANDOMNESS) {
             floatType { get { _randomness }; set { _randomness = it } }

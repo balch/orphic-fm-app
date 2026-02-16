@@ -49,7 +49,7 @@ class ReverbPlugin(
     private val reverbUnit = dspFactory.createReverbUnit()
 
     // Internal state
-    private var _amount = 0.3f
+    private var _amount = 0f
     private var _time = 0.5f
     private var _damping = 0.7f
     private var _diffusion = 0.625f
@@ -58,7 +58,7 @@ class ReverbPlugin(
     private val portDefs = ports(startIndex = 4) {
         controlPort(ReverbSymbol.AMOUNT) {
             floatType {
-                default = 0.3f
+                default = 0f
                 get { _amount }
                 set { _amount = it; reverbUnit.setAmount(it); reverbUnit.setBypass(it <= 0.001f) }
             }

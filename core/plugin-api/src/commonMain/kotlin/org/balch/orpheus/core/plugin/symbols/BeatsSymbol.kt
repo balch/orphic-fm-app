@@ -13,7 +13,6 @@ enum class BeatsSymbol(
     X("x", displayName = "X"),
     Y("y", displayName = "Y"),
     BPM("bpm", displayName = "BPM"),
-    MIX("mix", displayName = "Mix"),
     RANDOMNESS("randomness", displayName = "Randomness"),
     SWING("swing", displayName = "Swing"),
     MODE("mode", displayName = "Output Mode"),

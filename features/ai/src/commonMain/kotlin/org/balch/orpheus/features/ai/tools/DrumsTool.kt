@@ -224,7 +224,7 @@ class DrumsTool @Inject constructor(
         "BEATS_EUCLIDEAN_LENGTH_3" -> BeatsSymbol.euclidean(2)
         "BEATS_RANDOMNESS" -> BeatsSymbol.RANDOMNESS
         "BEATS_SWING" -> BeatsSymbol.SWING
-        "BEATS_MIX" -> BeatsSymbol.MIX
+        "BEATS_MIX" -> DrumSymbol.MIX
 
         else -> null
     }
