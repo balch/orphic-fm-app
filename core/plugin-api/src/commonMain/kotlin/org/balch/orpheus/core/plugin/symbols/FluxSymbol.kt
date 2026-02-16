@@ -19,7 +19,6 @@ enum class FluxSymbol(
     RATE("rate", displayName = "Rate"),
     JITTER("jitter", displayName = "Jitter"),
     PROBABILITY("probability", displayName = "Probability"),
-    GATE_LENGTH("gatelength", displayName = "Gate Length"),
     CLOCK_SOURCE("clock_source", displayName = "Clock Source"),
     T_MODEL("t_model", displayName = "T Model"),
     T_RANGE("t_range", displayName = "T Range"),

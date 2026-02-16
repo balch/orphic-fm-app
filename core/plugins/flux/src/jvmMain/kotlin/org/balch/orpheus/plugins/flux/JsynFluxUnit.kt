@@ -28,7 +28,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     private val jsynRate = UnitInputPort("Rate")
     private val jsynJitter = UnitInputPort("Jitter")
     private val jsynProbability = UnitInputPort("Probability")
-    private val jsynGateLength = UnitInputPort("GateLength")
+    private val jsynPulseWidth = UnitInputPort("PulseWidth")
 
     // Output
     private val jsynOutput = UnitOutputPort("Output")
@@ -50,7 +50,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     override val rate: AudioInput = JsynAudioInput(jsynRate)
     override val jitter: AudioInput = JsynAudioInput(jsynJitter)
     override val probability: AudioInput = JsynAudioInput(jsynProbability)
-    override val gateLength: AudioInput = JsynAudioInput(jsynGateLength)
+    override val pulseWidth: AudioInput = JsynAudioInput(jsynPulseWidth)
 
     override val output: AudioOutput = JsynAudioOutput(jsynOutput)
     override val outputX1: AudioOutput = JsynAudioOutput(jsynOutputX1)
@@ -69,7 +69,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         addPort(jsynRate)
         addPort(jsynJitter)
         addPort(jsynProbability)
-        addPort(jsynGateLength)
+        addPort(jsynPulseWidth)
         addPort(jsynOutput)
         addPort(jsynOutputX1)
         addPort(jsynOutputX3)
@@ -86,7 +86,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         jsynRate.set(0.5)
         jsynJitter.set(0.0)
         jsynProbability.set(0.5)
-        jsynGateLength.set(0.5)
+        jsynPulseWidth.set(0.5)
     }
 
     @Volatile private var bypass = true
@@ -127,7 +127,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         processor.setRate(jsynRate.values[start].toFloat())
         processor.setJitter(jsynJitter.values[start].toFloat())
         processor.setGateProbability(jsynProbability.values[start].toFloat())
-        processor.setPulseWidth(jsynGateLength.values[start].toFloat())
+        processor.setPulseWidth(jsynPulseWidth.values[start].toFloat())
 
         // Delegate block processing to FluxProcessor
         processor.process(

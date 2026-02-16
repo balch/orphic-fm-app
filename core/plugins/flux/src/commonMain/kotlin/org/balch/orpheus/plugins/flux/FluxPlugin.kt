@@ -34,7 +34,7 @@ import org.balch.orpheus.core.plugin.symbols.FluxSymbol
  * 7: Output Trig T3 (Audio)
  * 
  * Controls (via DSL):
- * - spread, bias, steps, dejavu, length, scale, rate, jitter, probability, gatelength
+ * - spread, bias, steps, dejavu, length, scale, rate, jitter, probability, pulse_width
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -66,7 +66,6 @@ class FluxPlugin(
     private var _rate = 0.5f
     private var _jitter = 0.0f
     private var _probability = 0.5f
-    private var _gateLength = 0.5f
     private var _tModel = 0
     private var _tRange = 1
     private var _pulseWidth = 0.5f
@@ -146,13 +145,6 @@ class FluxPlugin(
             }
         }
         
-        controlPort(FluxSymbol.GATE_LENGTH) {
-            floatType {
-                get { _gateLength }
-                set { _gateLength = it; flux.gateLength.set(it.toDouble()) }
-            }
-        }
-
         controlPort(FluxSymbol.T_MODEL) {
             intType {
                 min = 0; max = 6
@@ -175,7 +167,7 @@ class FluxPlugin(
             floatType {
                 default = 0.5f
                 get { _pulseWidth }
-                set { _pulseWidth = it; flux.setPulseWidth(it) }
+                set { _pulseWidth = it; flux.pulseWidth.set(it.toDouble()) }
             }
         }
 
@@ -239,7 +231,7 @@ class FluxPlugin(
         "rate" to flux.rate,
         "jitter" to flux.jitter,
         "probability" to flux.probability,
-        "gateLength" to flux.gateLength
+        "pulseWidth" to flux.pulseWidth
     )
 
     override val outputs: Map<String, AudioOutput> = mapOf(
@@ -262,7 +254,6 @@ class FluxPlugin(
         setPortValue("rate", PortValue.FloatValue(0.5f))
         setPortValue("jitter", PortValue.FloatValue(0.0f))
         setPortValue("probability", PortValue.FloatValue(0.5f))
-        setPortValue("gatelength", PortValue.FloatValue(0.5f))
         setPortValue("t_model", PortValue.IntValue(0))
         setPortValue("t_range", PortValue.IntValue(1))
         setPortValue("pulse_width", PortValue.FloatValue(0.5f))

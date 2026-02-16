@@ -50,7 +50,8 @@ fun <T> ValueCycleButton(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 color = color.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 1,
             )
             Spacer(Modifier.height(4.dp))
         }

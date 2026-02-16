@@ -157,14 +157,13 @@ fun FluxPanel(
             )
 
             RotaryKnob(
-                value = state.rate,
-                onValueChange = actions.setRate,
-                label = "RATE",
-                controlId = FluxSymbol.RATE.controlId.key,
-                size = 36.dp,
+                value = state.length.toFloat(),
+                onValueChange = { actions.setLength(it.toInt()) },
+                label = "LENGTH",
+                range = 1f..16f,
+                size = 30.dp,
                 progressColor = OrpheusColors.metallicBlueLight
             )
-
         }
 
         // Row 3: Secondary knobs + MIX at bottom-right
@@ -173,10 +172,10 @@ fun FluxPanel(
             verticalAlignment = Alignment.Bottom
         ) {
             RotaryKnob(
-                value = state.length.toFloat(),
-                onValueChange = { actions.setLength(it.toInt()) },
-                label = "LENGTH",
-                range = 1f..16f,
+                value = state.rate,
+                onValueChange = actions.setRate,
+                label = "RATE",
+                controlId = FluxSymbol.RATE.controlId.key,
                 size = 30.dp,
                 progressColor = OrpheusColors.metallicBlueLight
             )

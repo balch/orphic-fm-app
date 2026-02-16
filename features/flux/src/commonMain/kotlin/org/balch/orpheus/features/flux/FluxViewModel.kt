@@ -38,7 +38,6 @@ data class FluxUiState(
     val jitter: Float = 0.0f,
     val probability: Float = 0.5f,
     val clockSource: Int = 0,
-    val gateLength: Float = 0.5f,
     val tModel: Int = 0,
     val tRange: Int = 1,
     val pulseWidth: Float = 0.5f,
@@ -60,7 +59,6 @@ data class FluxPanelActions(
     val setJitter: (Float) -> Unit,
     val setProbability: (Float) -> Unit,
     val setClockSource: (Int) -> Unit,
-    val setGateLength: (Float) -> Unit,
     val setTModel: (Int) -> Unit,
     val setTRange: (Int) -> Unit,
     val setPulseWidth: (Float) -> Unit,
@@ -70,7 +68,7 @@ data class FluxPanelActions(
     val setMix: (Float) -> Unit
 ) {
     companion object {
-        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -85,7 +83,6 @@ private sealed interface FluxIntent {
     data class Jitter(val value: Float) : FluxIntent
     data class Probability(val value: Float) : FluxIntent
     data class ClockSource(val value: Int) : FluxIntent
-    data class GateLength(val value: Float) : FluxIntent
     data class TModel(val value: Int) : FluxIntent
     data class TRange(val value: Int) : FluxIntent
     data class PulseWidth(val value: Float) : FluxIntent
@@ -115,7 +112,7 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
         - **RATE**: Internal clock speed when using the internal clock source.
         - **PROBABILITY**: Chance that a step will fire its gate. 1.0 = every step triggers; lower values create sparser rhythms.
         - **JITTER**: Timing randomness. Adds human-like timing imperfections to the gate outputs.
-        - **PULSE WIDTH**: Duration of the gate pulse as a fraction of the step length.
+        - **PULSE WIDTH**: Gate pulse duration as a fraction of the step length (0.0=short trigger, 1.0=full step gate).
         - **PW RAND**: Randomization amount for pulse width. Adds variety to gate lengths.
         - **MIX**: Controls how much the Flux pitch output affects voice tuning. 0 = off (no pitch modulation), 1 = full random melodies.
 
@@ -151,12 +148,11 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
                 FluxSymbol.SPREAD.controlId.key to "Range / width of the random distribution",
                 FluxSymbol.BIAS.controlId.key to "Center point of the pitch distribution",
                 FluxSymbol.DEJAVU.controlId.key to "Pattern memory / repetition probability",
-                FluxSymbol.LENGTH.controlId.key to "Sequence length (integer, 2-16)",
+                FluxSymbol.LENGTH.controlId.key to "Sequence length (integer, 1-16)",
                 FluxSymbol.RATE.controlId.key to "Internal clock speed",
                 FluxSymbol.PROBABILITY.controlId.key to "Gate firing probability per step",
                 FluxSymbol.JITTER.controlId.key to "Timing randomness for gates",
-                FluxSymbol.GATE_LENGTH.controlId.key to "Gate length as fraction of step",
-                FluxSymbol.PULSE_WIDTH.controlId.key to "Gate pulse duration",
+                FluxSymbol.PULSE_WIDTH.controlId.key to "Gate pulse width (0.0=short trigger, 1.0=full step)",
                 FluxSymbol.PULSE_WIDTH_STD.controlId.key to "Pulse width randomization amount",
                 FluxSymbol.CLOCK_SOURCE.controlId.key to "Clock source (0=internal, 1=external)",
                 FluxSymbol.T_MODEL.controlId.key to "Random distribution type (0=Bernoulli, 1=Cluster, 2=Drum, 3=Independent, 4=Divider, 5=3-State, 6=Markov)",
@@ -195,7 +191,6 @@ class FluxViewModel(
     private val jitterId = synthController.controlFlow(FluxSymbol.JITTER.controlId)
     private val probabilityId = synthController.controlFlow(FluxSymbol.PROBABILITY.controlId)
     private val clockSourceId = synthController.controlFlow(FluxSymbol.CLOCK_SOURCE.controlId)
-    private val gateLengthId = synthController.controlFlow(FluxSymbol.GATE_LENGTH.controlId)
     private val tModelId = synthController.controlFlow(FluxSymbol.T_MODEL.controlId)
     private val tRangeId = synthController.controlFlow(FluxSymbol.T_RANGE.controlId)
     private val pulseWidthId = synthController.controlFlow(FluxSymbol.PULSE_WIDTH.controlId)
@@ -215,7 +210,6 @@ class FluxViewModel(
         setJitter = jitterId.floatSetter(),
         setProbability = probabilityId.floatSetter(),
         setClockSource = clockSourceId.intSetter(),
-        setGateLength = gateLengthId.floatSetter(),
         setTModel = tModelId.intSetter(),
         setTRange = tRangeId.intSetter(),
         setPulseWidth = pulseWidthId.floatSetter(),
@@ -237,7 +231,6 @@ class FluxViewModel(
         jitterId.map { FluxIntent.Jitter(it.asFloat()) },
         probabilityId.map { FluxIntent.Probability(it.asFloat()) },
         clockSourceId.map { FluxIntent.ClockSource(it.asInt()) },
-        gateLengthId.map { FluxIntent.GateLength(it.asFloat()) },
         tModelId.map { FluxIntent.TModel(it.asInt()) },
         tRangeId.map { FluxIntent.TRange(it.asInt()) },
         pulseWidthId.map { FluxIntent.PulseWidth(it.asFloat()) },
@@ -270,7 +263,6 @@ class FluxViewModel(
         is FluxIntent.Jitter -> state.copy(jitter = intent.value)
         is FluxIntent.Probability -> state.copy(probability = intent.value)
         is FluxIntent.ClockSource -> state.copy(clockSource = intent.value)
-        is FluxIntent.GateLength -> state.copy(gateLength = intent.value)
         is FluxIntent.TModel -> state.copy(tModel = intent.value)
         is FluxIntent.TRange -> state.copy(tRange = intent.value)
         is FluxIntent.PulseWidth -> state.copy(pulseWidth = intent.value)

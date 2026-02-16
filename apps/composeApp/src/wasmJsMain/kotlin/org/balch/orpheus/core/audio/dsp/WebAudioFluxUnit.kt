@@ -21,7 +21,7 @@ class WebAudioFluxUnit(private val context: AudioContext) : FluxUnit {
     override val rate: AudioInput = WebAudioManualInput(context) {}
     override val jitter: AudioInput = WebAudioManualInput(context) {}
     override val probability: AudioInput = WebAudioManualInput(context) {}
-    override val gateLength: AudioInput = WebAudioManualInput(context) {}
+    override val pulseWidth: AudioInput = WebAudioManualInput(context) {}
     
     override fun setScale(index: Int) {}
 }

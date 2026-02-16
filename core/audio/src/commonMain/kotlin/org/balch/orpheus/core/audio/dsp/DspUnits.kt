@@ -558,9 +558,9 @@ interface FluxUnit : AudioUnit {
     /** Gate Probability Bias (0.0 = Favors T3, 1.0 = Favors T1) */
     val probability: AudioInput
 
-    /** Gate Length (0.0 = Trigger, 1.0 = Full step) */
-    val gateLength: AudioInput
-    
+    /** Pulse Width (0.0 = short trigger, 1.0 = full step gate) */
+    val pulseWidth: AudioInput
+
     /** Master Output (X2 - Main Melody) */
     override val output: AudioOutput
     
