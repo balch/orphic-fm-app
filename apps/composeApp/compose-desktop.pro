@@ -2,6 +2,21 @@
 -ignorewarnings
 
 -dontnote kotlin.**
+-dontnote io.ktor.**
+-dontnote io.netty.**
+-dontnote io.lettuce.**
+-dontnote io.opentelemetry.**
+-dontnote org.bytedeco.**
+-dontnote ch.qos.logback.**
+-dontnote org.apache.**
+-dontnote org.slf4j.**
+-dontnote reactor.**
+-dontnote ai.koog.**
+-dontnote aws.**
+-dontnote com.typesafe.**
+-dontnote okhttp3.**
+-dontnote okio.**
+-dontnote javax.sound.midi.**
 -dontwarn kotlin.**
 
 -optimizationpasses 2
@@ -45,10 +60,8 @@
 -keep class uk.co.xfactorylibrarians.coremidi4j.** { *; }
 -keepclassmembers class uk.co.xfactorylibrarians.coremidi4j.** { *; }
 
-# Keep javax.sound.midi SPI - required for MIDI device provider discovery
--keep class javax.sound.midi.** { *; }
--keep class javax.sound.midi.spi.** { *; }
-# Keep all MidiDeviceProvider implementations
+# Keep MidiDeviceProvider implementations for SPI discovery
+# (javax.sound.midi.** are JDK library classes — ProGuard preserves them automatically)
 -keep class * extends javax.sound.midi.spi.MidiDeviceProvider { *; }
 
 # Suppress warnings from common libraries that have optional dependencies
@@ -68,6 +81,15 @@
 # Prevent optimization of Netty's Log4J2 logger factory which references missing log4j classes
 -keep,allowshrinking class io.netty.util.internal.logging.Log4J2LoggerFactory { *; }
 -keep,allowshrinking class io.netty.util.internal.logging.Log4J2Logger { *; }
+
+# Logback optional dependencies (conditional evaluation, XZ compression)
+-dontwarn ch.qos.logback.**
+-dontwarn org.codehaus.janino.**
+-dontwarn org.codehaus.commons.**
+-dontwarn org.tukaani.xz.**
+
+# Ktor server websocket (pulled transitively, not used in client)
+-dontwarn io.ktor.server.**
 
 # Additional suppressions for transitive dependencies (Micrometer, Reactor, BouncyCastle, etc.)
 -dontwarn reactor.**
