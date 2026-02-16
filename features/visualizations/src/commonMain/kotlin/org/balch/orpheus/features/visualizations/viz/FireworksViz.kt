@@ -3,8 +3,10 @@ package org.balch.orpheus.features.visualizations.viz
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -15,16 +17,9 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
@@ -33,7 +28,6 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.DynamicVisualization
 import org.balch.orpheus.ui.viz.Visualization
-import org.balch.orpheus.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -105,11 +99,9 @@ class FireworksViz(
     }
 
     // State
-    private val _uiState = MutableStateFlow(FireworksUiState())
-    val uiState: StateFlow<FireworksUiState> = _uiState.asStateFlow()
+    private val _uiState = mutableStateOf(FireworksUiState(), neverEqualPolicy())
 
-    private var vizJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private var active = false
 
     // Simulation State (kept mutable inside the loop for performance)
     private val particles = ArrayList<Particle>()
@@ -151,30 +143,12 @@ class FireworksViz(
     override val liquidEffectsFlow: Flow<VisualizationLiquidEffects> = _liquidEffects.asStateFlow()
 
     override fun onActivate() {
-        if (vizJob?.isActive == true) return
+        active = true
         particles.clear()
-        
-        vizJob = scope.launch(dispatcherProvider.default) {
-            var lastFrameTime = currentTimeMillis()
-
-            while (isActive) {
-                val currentTime = currentTimeMillis()
-                val dt = (currentTime - lastFrameTime) / 1000f
-                lastFrameTime = currentTime
-
-                // limit dt to avoid huge jumps on frame drops
-                val deltaTime = dt.coerceAtMost(0.1f)
-
-                updateSimulation(deltaTime)
-
-                delay(16) // ~60fps target
-            }
-        }
     }
-    
+
     override fun onDeactivate() {
-        vizJob?.cancel()
-        vizJob = null
+        active = false
         particles.clear()
         _uiState.value = FireworksUiState()
     }
@@ -291,7 +265,7 @@ class FireworksViz(
 
         val flash = (masterLevel - 0.6f).coerceAtLeast(0f) * 0.4f * _colorKnob // Flash also obeys color knob
         _uiState.value = FireworksUiState(
-            particles = particles.toList(),
+            particles = ArrayList(particles),
             masterEnergy = masterLevel,
             flashIntensity = flash
         )
@@ -414,8 +388,31 @@ class FireworksViz(
 
     @Composable
     override fun Content(modifier: Modifier) {
-        val state by uiState.collectAsState()
-        
+        // Frame-synchronized animation loop
+        LaunchedEffect(Unit) {
+            var lastFrameNanos = 0L
+
+            while (true) {
+                withFrameNanos { frameNanos ->
+                    if (!active) {
+                        lastFrameNanos = frameNanos
+                        return@withFrameNanos
+                    }
+
+                    val dt = if (lastFrameNanos == 0L) {
+                        0.016f // first frame: assume 60fps
+                    } else {
+                        ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
+                    }
+                    lastFrameNanos = frameNanos
+
+                    updateSimulation(dt)
+                }
+            }
+        }
+
+        val state = _uiState.value
+
         Canvas(modifier = modifier.fillMaxSize()) {
             val scaleX = size.width / 1000f
             val scaleY = size.height / 1000f

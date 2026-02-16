@@ -1,23 +1,16 @@
 package org.balch.orpheus.features.visualizations.viz
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.features.visualizations.viz.shader.MetaballsCanvas
@@ -28,8 +21,8 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Blob
 import org.balch.orpheus.ui.viz.Visualization
-import org.balch.orpheus.util.currentTimeMillis
 import kotlin.math.cos
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -75,7 +68,7 @@ class ShaderLampViz(
     override val color = OrpheusColors.neonCyan
     override val knob1Label = "SPEED"
     override val knob2Label = "SIZE"
-    
+
     override val liquidEffects = Default
 
     private var _speedKnob = 0.5f
@@ -98,10 +91,10 @@ class ShaderLampViz(
     private val baseRadius = 0.15f  // Slightly larger base
     private val maxRadius = 0.30f   // Larger max
     private val baseSpeed = 0.0004f // Slower force-based movement
-    
+
     private val speedMultiplier: Float get() = 0.4f + (_speedKnob * 1.6f)
     private val sizeMultiplier: Float get() = 0.6f + (_sizeKnob * 1.4f)
-    
+
     private val shaderConfig: MetaballsConfig
         get() = MetaballsConfig(
             maxBalls = blobCount,
@@ -110,16 +103,13 @@ class ShaderLampViz(
             blendSoftness = 0.5f
         )
 
-    private val _uiState = MutableStateFlow(ShaderLampUiState())
-    val uiState: StateFlow<ShaderLampUiState> = _uiState.asStateFlow()
-
-    private var vizJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val _uiState = mutableStateOf(ShaderLampUiState(), neverEqualPolicy())
+    private var active = false
 
     override fun onActivate() {
-        if (vizJob?.isActive == true) return
+        active = true
         animationTime = 0f
-        
+
         blobs.clear()
         for (i in 0 until blobCount) {
             blobs.add(LavaBlob(
@@ -135,38 +125,13 @@ class ShaderLampViz(
                 targetRadius = baseRadius,
                 targetX = Random.nextFloat(),
                 targetY = Random.nextFloat(),
-                targetChangeTime = currentTimeMillis() + Random.nextLong(1000, 5000)
+                targetChangeTime = 0L
             ))
-        }
-        
-        vizJob = scope.launch(dispatcherProvider.default) {
-            var lastFrameTime = currentTimeMillis()
-            while (isActive) {
-                val currentTime = currentTimeMillis()
-                val deltaTime = (currentTime - lastFrameTime) / 1000f
-                lastFrameTime = currentTime
-                animationTime += deltaTime
-
-                val voiceLevels = engine.voiceLevelsFlow.value
-                val lfoValue = engine.lfoOutputFlow.value
-                val masterLevel = engine.masterLevelFlow.value
-
-                updateBlobs(voiceLevels, masterLevel, lfoValue, deltaTime)
-
-                _uiState.value = ShaderLampUiState(
-                    blobs = blobs.map { it.toBlob() },
-                    lfoModulation = lfoValue,
-                    masterEnergy = masterLevel,
-                    animationTime = animationTime
-                )
-                delay(30)
-            }
         }
     }
 
     override fun onDeactivate() {
-        vizJob?.cancel()
-        vizJob = null
+        active = false
         blobs.clear()
         animationTime = 0f
         _uiState.value = ShaderLampUiState()
@@ -174,7 +139,43 @@ class ShaderLampViz(
 
     @Composable
     override fun Content(modifier: Modifier) {
-        val state by uiState.collectAsState()
+        // Frame-synchronized animation loop
+        LaunchedEffect(Unit) {
+            var lastFrameNanos = 0L
+
+            while (true) {
+                withFrameNanos { frameNanos ->
+                    if (!active) {
+                        lastFrameNanos = frameNanos
+                        return@withFrameNanos
+                    }
+
+                    val dt = if (lastFrameNanos == 0L) {
+                        0.016f // first frame: assume 60fps
+                    } else {
+                        ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
+                    }
+                    lastFrameNanos = frameNanos
+                    animationTime += dt
+
+                    val voiceLevels = engine.voiceLevelsFlow.value
+                    val lfoValue = engine.lfoOutputFlow.value
+                    val masterLevel = engine.masterLevelFlow.value
+
+                    updateBlobs(voiceLevels, masterLevel, lfoValue, dt)
+
+                    _uiState.value = ShaderLampUiState(
+                        blobs = blobs.map { it.toBlob() },
+                        lfoModulation = lfoValue,
+                        masterEnergy = masterLevel,
+                        animationTime = animationTime
+                    )
+                }
+            }
+        }
+
+        val state = _uiState.value
+
         MetaballsCanvas(
             modifier = modifier,
             blobs = state.blobs,
@@ -184,7 +185,7 @@ class ShaderLampViz(
             time = state.animationTime
         )
     }
-    
+
     private fun LavaBlob.toBlob(): Blob = Blob(
         id = id,
         x = x,
@@ -200,44 +201,47 @@ class ShaderLampViz(
     )
 
     private fun updateBlobs(voiceLevels: FloatArray, masterLevel: Float, lfoValue: Float, deltaTime: Float) {
-        val currentTime = currentTimeMillis()
+        // All forces/damping were tuned at ~33fps (delay(30)). Normalize so
+        // fs = 1.0 at 33fps, allowing the same constants to work at any fps.
+        val fs = (deltaTime * 33f).coerceIn(0.1f, 3f)
         val globalSpeed = baseSpeed * speedMultiplier
-        
+
         for (blob in blobs) {
             val voiceLevel = voiceLevels.getOrElse(blob.voiceIndex) { 0f }
             val totalEnergy = voiceLevel + masterLevel * 0.4f
-            
-            // ALPHA: Steeper quadratic curve - stays silent then pops in vibrantly
+
+            // ALPHA: exponential smoothing scaled by frame step
             val audioPower = (voiceLevel * 2.5f + masterLevel * 0.5f).coerceIn(0f, 1f)
             val targetAlpha = audioPower * audioPower
-            blob.alpha = (blob.alpha * 0.85f + targetAlpha * 0.15f).coerceIn(0.0001f, 1.0f)
-            
-            // SIZE: Grows with energy
+            blob.alpha = (blob.alpha * (1f - 0.15f * fs) + targetAlpha * 0.15f * fs).coerceIn(0.0001f, 1.0f)
+
+            // SIZE: exponential smoothing scaled by frame step
             val targetRad = (baseRadius + (totalEnergy * (maxRadius - baseRadius))) * sizeMultiplier
-            blob.radius = (blob.radius * 0.93f + targetRad * 0.07f)
-            
+            blob.radius = blob.radius * (1f - 0.07f * fs) + targetRad * 0.07f * fs
+
             // TARGET WANDERING
-            if (currentTime > blob.targetChangeTime) {
+            blob.targetChangeTime -= (deltaTime * 1000f).toLong()
+            if (blob.targetChangeTime <= 0) {
                 blob.targetX = 0.1f + Random.nextFloat() * 0.8f
                 blob.targetY = 0.1f + Random.nextFloat() * 0.8f
-                blob.targetChangeTime = currentTime + 4000L + Random.nextLong(6000)
+                blob.targetChangeTime = 4000L + Random.nextLong(6000)
             }
-            
+
             val dx = blob.targetX - blob.x
             val dy = blob.targetY - blob.y
             val dist = sqrt(dx * dx + dy * dy)
-            
+
             if (dist > 0.02f) {
-                val wanderForce = globalSpeed * (1.0f + totalEnergy * 2.0f)
+                val wanderForce = globalSpeed * (1.0f + totalEnergy * 2.0f) * fs
                 blob.velocityX += (dx / dist) * wanderForce
                 blob.velocityY += (dy / dist) * wanderForce
             }
-            
+
             // LFO Swirl
-            val lfoMag = lfoValue * 0.0008f * speedMultiplier
+            val lfoMag = lfoValue * 0.0008f * speedMultiplier * fs
             blob.velocityX += lfoMag * cos(animationTime * 0.7f + blob.id)
             blob.velocityY += lfoMag * sin(animationTime * 0.7f + blob.id)
-            
+
             // LAVA LAMP ATTRACTION / REPULSION
             for (other in blobs) {
                 if (other.id == blob.id) continue
@@ -245,38 +249,37 @@ class ShaderLampViz(
                 val oy = other.y - blob.y
                 val odist = sqrt(ox * ox + oy * oy)
                 if (odist < 0.001f) continue
-                
+
                 val combinedR = (blob.radius + other.radius) * 0.5f
                 if (odist < combinedR * 1.2f) {
-                    // Repel when too close
-                    val repel = 0.0002f * (combinedR * 1.2f - odist)
+                    val repel = 0.0002f * (combinedR * 1.2f - odist) * fs
                     blob.velocityX -= (ox / odist) * repel
                     blob.velocityY -= (oy / odist) * repel
                 } else if (odist < 0.4f) {
-                    // Gentle attraction when in range
-                    val attract = 0.00005f * (totalEnergy + 0.1f)
+                    val attract = 0.00005f * (totalEnergy + 0.1f) * fs
                     blob.velocityX += (ox / odist) * attract
                     blob.velocityY += (oy / odist) * attract
                 }
             }
-            
-            // MOMENTUM & DAMPING
-            // Higher friction at rest, less friction when energetic
-            val damping = 0.96f + (totalEnergy * 0.02f).coerceAtMost(0.035f)
+
+            // MOMENTUM & DAMPING — exponentiate damping by frame step
+            val baseDamping = 0.96f + (totalEnergy * 0.02f).coerceAtMost(0.035f)
+            val damping = baseDamping.pow(fs)
             blob.velocityX *= damping
             blob.velocityY *= damping
-            
+
             // APPLY PHYSICS
             blob.x += blob.velocityX
             blob.y += blob.velocityY
-            
-            // SOFT BOUNDARIES
+
+            // SOFT BOUNDARIES (scale nudge by fs)
             val margin = 0.1f
-            if (blob.x < margin) { blob.velocityX += 0.001f; blob.targetX = 0.5f }
-            if (blob.x > 1.0f - margin) { blob.velocityX -= 0.001f; blob.targetX = 0.5f }
-            if (blob.y < margin) { blob.velocityY += 0.001f; blob.targetY = 0.5f }
-            if (blob.y > 1.0f - margin) { blob.velocityY -= 0.001f; blob.targetY = 0.5f }
-            
+            val nudge = 0.001f * fs
+            if (blob.x < margin) { blob.velocityX += nudge; blob.targetX = 0.5f }
+            if (blob.x > 1.0f - margin) { blob.velocityX -= nudge; blob.targetX = 0.5f }
+            if (blob.y < margin) { blob.velocityY += nudge; blob.targetY = 0.5f }
+            if (blob.y > 1.0f - margin) { blob.velocityY -= nudge; blob.targetY = 0.5f }
+
             blob.x = blob.x.coerceIn(0.02f, 0.98f)
             blob.y = blob.y.coerceIn(0.02f, 0.98f)
         }

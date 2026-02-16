@@ -3,8 +3,10 @@ package org.balch.orpheus.features.visualizations.viz
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -15,16 +17,9 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
@@ -33,7 +28,6 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.DynamicVisualization
 import org.balch.orpheus.ui.viz.Visualization
-import org.balch.orpheus.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.pow
@@ -81,9 +75,13 @@ data class Star(
 
 /**
  * Galaxy visualization - procedural spiral galaxy with particle stars.
- * 
+ *
  * OPTIMIZED: Pre-computes star colors, reduces allocation per frame.
  * Uses simple solid circles instead of radial gradients for performance.
+ *
+ * Uses Compose's withFrameNanos for vsync-aligned animation instead of
+ * a background coroutine with delay(). This eliminates timing jitter
+ * from thread switching and imprecise delay scheduling.
  *
  * Knob1 (SPIN): Controls rotation speed
  * Knob2 (ARMS): Controls spiral arm tightness
@@ -100,7 +98,7 @@ class GalaxyViz(
     override val color = OrpheusColors.neonCyan
     override val knob1Label = "SPIN"
     override val knob2Label = "ARMS"
-    
+
     // Low frost for crisper stars, high saturation for vibrant colors
     override val liquidEffects = Default
 
@@ -120,11 +118,10 @@ class GalaxyViz(
     private val midColor = OrpheusColors.galaxyMid       // Purple transition
     private val rimColor = OrpheusColors.galaxyRim       // Cool blue
 
-    private val _uiState = MutableStateFlow(GalaxyUiState())
-    val uiState: StateFlow<GalaxyUiState> = _uiState.asStateFlow()
+    // neverEqualPolicy: always recompose on write since state changes every frame
+    private val _uiState = mutableStateOf(GalaxyUiState(), neverEqualPolicy())
 
-    private var vizJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private var active = false
     private var rotationAngle = 0f
     private var smoothedEnergy = 0f
 
@@ -137,14 +134,14 @@ class GalaxyViz(
         return List(starCount) {
             val radiusFactor = random.nextFloat().pow(0.5f)
             val brightness = 0.3f + random.nextFloat() * 0.7f
-            
+
             // Pre-compute color based on radius
             val t = radiusFactor
             val starColor = when {
                 t < 0.3f -> lerpColor(coreColor, midColor, t / 0.3f)
                 else -> lerpColor(midColor, rimColor, (t - 0.3f) / 0.7f)
             }
-            
+
             Star(
                 radiusFactor = radiusFactor,
                 branchIndex = random.nextInt(4), // 4 spiral arms
@@ -161,63 +158,13 @@ class GalaxyViz(
     override val liquidEffectsFlow: Flow<VisualizationLiquidEffects> = _liquidEffects.asStateFlow()
 
     override fun onActivate() {
-        if (vizJob?.isActive == true) return
+        active = true
         rotationAngle = 0f
         smoothedEnergy = 0f
-
-        vizJob = scope.launch(dispatcherProvider.default) {
-            var lastFrameTime = currentTimeMillis()
-
-            while (isActive) {
-                val currentTime = currentTimeMillis()
-                val deltaTime = (currentTime - lastFrameTime) / 1000f
-                lastFrameTime = currentTime
-
-                val voiceLevels = engine.voiceLevelsFlow.value
-                val lfoValue = engine.lfoOutputFlow.value
-                val masterLevel = engine.masterLevelFlow.value
-
-                smoothedEnergy = smoothedEnergy * 0.92f + masterLevel * 0.08f
-
-                // Rotation - NEGATIVE for reverse direction
-                val baseSpeed = -(0.02f + _spinKnob * 0.08f)
-                val audioBoost = -smoothedEnergy * 0.1f
-                rotationAngle += deltaTime * (baseSpeed + audioBoost)
-
-                _uiState.value = GalaxyUiState(
-                    rotationAngle = rotationAngle,
-                    masterEnergy = smoothedEnergy,
-                    lfoModulation = lfoValue,
-                    voiceLevels = voiceLevels
-                )
-
-                // Dynamic Title Effects for Galaxy
-                // Pulse color between Rim (cool) and Core (warm) based on LFO
-                val lfoShift = (lfoValue + 1f) / 2f
-                val titleColor = lerpColor(rimColor, coreColor, lfoShift)
-                
-                // Pulse elevation with energy
-                val elevation = 6.dp + (smoothedEnergy * 10).dp
-
-                val currentEffects = Default.copy(
-                    title = Default.title.copy(
-                        titleColor = titleColor,
-                        titleElevation = elevation,
-                        // Subtle size pulse
-                        titleSize = (22 + smoothedEnergy * 4).sp,
-                        borderColor = titleColor.copy(alpha = 0.2f + smoothedEnergy * 0.3f)
-                    )
-                )
-                _liquidEffects.value = currentEffects
-
-                delay(40) // ~25fps for less CPU usage
-            }
-        }
     }
 
     override fun onDeactivate() {
-        vizJob?.cancel()
-        vizJob = null
+        active = false
         rotationAngle = 0f
         smoothedEnergy = 0f
         _uiState.value = GalaxyUiState()
@@ -225,7 +172,65 @@ class GalaxyViz(
 
     @Composable
     override fun Content(modifier: Modifier) {
-        val state by uiState.collectAsState()
+        // Frame-synchronized animation loop
+        LaunchedEffect(Unit) {
+            var lastFrameNanos = 0L
+
+            while (true) {
+                withFrameNanos { frameNanos ->
+                    if (!active) {
+                        lastFrameNanos = frameNanos
+                        return@withFrameNanos
+                    }
+
+                    val dt = if (lastFrameNanos == 0L) {
+                        0.016f // first frame: assume 60fps
+                    } else {
+                        ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
+                    }
+                    lastFrameNanos = frameNanos
+
+                    val voiceLevels = engine.voiceLevelsFlow.value
+                    val lfoValue = engine.lfoOutputFlow.value
+                    val masterLevel = engine.masterLevelFlow.value
+
+                    smoothedEnergy = smoothedEnergy * 0.92f + masterLevel * 0.08f
+
+                    // Rotation - NEGATIVE for reverse direction
+                    val baseSpeed = -(0.02f + _spinKnob * 0.08f)
+                    val audioBoost = -smoothedEnergy * 0.1f
+                    rotationAngle += dt * (baseSpeed + audioBoost)
+
+                    _uiState.value = GalaxyUiState(
+                        rotationAngle = rotationAngle,
+                        masterEnergy = smoothedEnergy,
+                        lfoModulation = lfoValue,
+                        voiceLevels = voiceLevels
+                    )
+
+                    // Dynamic Title Effects for Galaxy
+                    // Pulse color between Rim (cool) and Core (warm) based on LFO
+                    val lfoShift = (lfoValue + 1f) / 2f
+                    val titleColor = lerpColor(rimColor, coreColor, lfoShift)
+
+                    // Pulse elevation with energy
+                    val elevation = 6.dp + (smoothedEnergy * 10).dp
+
+                    val currentEffects = Default.copy(
+                        title = Default.title.copy(
+                            titleColor = titleColor,
+                            titleElevation = elevation,
+                            // Subtle size pulse
+                            titleSize = (22 + smoothedEnergy * 4).sp,
+                            borderColor = titleColor.copy(alpha = 0.2f + smoothedEnergy * 0.3f)
+                        )
+                    )
+                    _liquidEffects.value = currentEffects
+                }
+            }
+        }
+
+        val state = _uiState.value
 
         Canvas(modifier = modifier.fillMaxSize()) {
             val w = size.width
@@ -262,7 +267,7 @@ class GalaxyViz(
 
                 // More musical reactivity: voice affects alpha and size significantly
                 val alpha = (star.brightness * baseIntensity * (0.5f + voiceEnergy * 0.8f)).coerceIn(0f, 1f)
-                
+
                 // Size varies with energy, LFO, AND individual voice level
                 val sizeMultiplier = 1f + energy * 0.6f + lfo * 0.3f + voiceEnergy * 0.8f
                 val starSize = star.size * sizeMultiplier

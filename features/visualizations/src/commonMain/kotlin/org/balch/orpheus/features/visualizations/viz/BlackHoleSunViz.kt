@@ -3,8 +3,10 @@ package org.balch.orpheus.features.visualizations.viz
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.neverEqualPolicy
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -15,15 +17,6 @@ import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
@@ -31,12 +24,12 @@ import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.viz.Visualization
-import org.balch.orpheus.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -186,46 +179,29 @@ class BlackHoleSunViz(
     // Physics Constants
     private val G = 0.0006f              // Stronger gravity for faster, tighter orbits
 
-    private val _uiState = MutableStateFlow(BlackholeSunUiState())
-    val uiState: StateFlow<BlackholeSunUiState> = _uiState.asStateFlow()
+    // neverEqualPolicy: always recompose on write since particles are mutated in-place
+    private val _uiState = mutableStateOf(BlackholeSunUiState(), neverEqualPolicy())
 
-    private var vizJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private var active = false
     private var animationTime = 0f
     private var smoothedMasterEnergy = 0f
 
     override fun onActivate() {
-        if (vizJob?.isActive == true) return
+        active = true
         animationTime = 0f
         smoothedMasterEnergy = 0f
         particles.clear()
         diskGlow = 0f
         diskHeat.fill(0f)
-        
+
         // Reset emitter angles
         emitterAngles.forEachIndexed { i, _ ->
             emitterAngles[i] = (i.toFloat() / 8f) * 2f * PI.toFloat()
         }
-        
-        vizJob = scope.launch(dispatcherProvider.default) {
-            var lastFrameTime = currentTimeMillis()
-            
-            while (isActive) {
-                val currentTime = currentTimeMillis()
-                val deltaTime = ((currentTime - lastFrameTime) / 1000f).coerceAtMost(0.1f)
-                lastFrameTime = currentTime
-                animationTime += deltaTime
-
-                updateSimulation(deltaTime)
-
-                delay(16) // ~60fps for smooth particles
-            }
-        }
     }
 
     override fun onDeactivate() {
-        vizJob?.cancel()
-        vizJob = null
+        active = false
         particles.clear()
         diskGlow = 0f
         diskHeat.fill(0f)
@@ -234,8 +210,32 @@ class BlackHoleSunViz(
 
     @Composable
     override fun Content(modifier: Modifier) {
-        val state by uiState.collectAsState()
-        
+        // Frame-synchronized animation loop
+        LaunchedEffect(Unit) {
+            var lastFrameNanos = 0L
+
+            while (true) {
+                withFrameNanos { frameNanos ->
+                    if (!active) {
+                        lastFrameNanos = frameNanos
+                        return@withFrameNanos
+                    }
+
+                    val dt = if (lastFrameNanos == 0L) {
+                        0.016f // first frame: assume 60fps
+                    } else {
+                        ((frameNanos - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
+                    }
+                    lastFrameNanos = frameNanos
+
+                    animationTime += dt
+                    updateSimulation(dt)
+                }
+            }
+        }
+
+        val state = _uiState.value
+
         Canvas(modifier = modifier.fillMaxSize()) {
             drawBlackholeSun(state)
         }
@@ -245,7 +245,10 @@ class BlackHoleSunViz(
         val voiceLevels = engine.voiceLevelsFlow.value
         val masterLevel = engine.masterLevelFlow.value
         
-        smoothedMasterEnergy = smoothedMasterEnergy * 0.9f + masterLevel * 0.1f
+        // Exponential smoothing scaled by frame step (tuned at 60fps: 0.1 blend)
+        val smoothFs = (deltaTime * 60f).coerceIn(0.1f, 3f)
+        val blend = 0.1f * smoothFs
+        smoothedMasterEnergy = smoothedMasterEnergy * (1f - blend) + masterLevel * blend
 
         // Calculate orbit direction from knob (reverses at 0.25 and 0.75)
         val directionMultiplier = cos(_spinKnob * 2f * PI.toFloat())
@@ -260,7 +263,7 @@ class BlackHoleSunViz(
         }
 
         // Emit particles from active voices
-        emitParticles(voiceLevels, masterLevel, orbitDirection)
+        emitParticles(voiceLevels, masterLevel, orbitDirection, deltaTime)
 
         // Update particle physics
         updateParticles(deltaTime, orbitDirection)
@@ -287,23 +290,27 @@ class BlackHoleSunViz(
         )
     }
 
-    private fun emitParticles(voiceLevels: FloatArray, masterLevel: Float, orbitDir: Float) {
+    private fun emitParticles(voiceLevels: FloatArray, masterLevel: Float, orbitDir: Float, deltaTime: Float) {
         if (particles.size >= maxParticles) return
+
+        // Scale spawn probability so rate is independent of fps
+        // Original was tuned at ~60fps (delay(16)), so spawnScale ≈ 1.0 at 60fps
+        val spawnScale = (deltaTime * 60f).coerceAtMost(1f)
 
         for (i in 0 until 8) {
             val voiceLevel = voiceLevels.getOrElse(i) { 0f }
             val effectiveLevel = maxOf(voiceLevel, masterLevel * 0.3f)
-            
+
             // Low threshold so we see occasional particles even at quiet levels
             if (effectiveLevel < 0.03f) continue
-            
+
             // EMISSION CURVE:
             // Use quadratic curve so low volumes = sparse occasional particles
             // High volumes = full stream (same as before)
             // effectiveLevel^2 gives: 0.1 -> 0.01, 0.3 -> 0.09, 0.5 -> 0.25, 1.0 -> 1.0
             val scaledLevel = effectiveLevel * effectiveLevel
-            val emitChance = scaledLevel * (0.05f + _densityKnob * 0.95f)
-            
+            val emitChance = scaledLevel * (0.05f + _densityKnob * 0.95f) * spawnScale
+
             if (Random.nextFloat() < emitChance) {
                 emitParticle(i, effectiveLevel, orbitDir)
             }
@@ -372,38 +379,41 @@ class BlackHoleSunViz(
     }
 
     private fun updateParticles(deltaTime: Float, orbitDir: Float) {
+        // All physics were tuned at ~60fps (delay(16)). Normalize so
+        // fs = 1.0 at 60fps, allowing the same constants to work at any fps.
+        val fs = (deltaTime * 60f).coerceIn(0.1f, 3f)
         val iterator = particles.iterator()
-        
+
         while (iterator.hasNext()) {
             val p = iterator.next()
-            
+
             // Calculate distance from center
             p.distanceFromCenter = sqrt(p.x * p.x + p.y * p.y)
-            
+
             // REAL GRAVITY PHYSICS (Newtonian-ish)
             // F = G * M / r^2
             // Acceleration direction is toward center (-x, -y)
-            
+
             // Softening parameter to prevent infinity at center
             val r2 = p.distanceFromCenter * p.distanceFromCenter + 0.001f
             val force = G / r2
-            
+
             val dirX = -p.x / (p.distanceFromCenter + 0.0001f)
             val dirY = -p.y / (p.distanceFromCenter + 0.0001f)
-            
-            // Apply Gravity
-            p.vx += dirX * force
-            p.vy += dirY * force
-            
-            // Drag - Reduced significantly so they don't stop and fall in
-            val drag = 0.998f 
-            
+
+            // Apply Gravity (scale by frame step)
+            p.vx += dirX * force * fs
+            p.vy += dirY * force * fs
+
+            // Drag — exponentiate by frame step so damping is fps-independent
+            val drag = (0.998f).pow(fs)
+
             p.vx *= drag
             p.vy *= drag
-            
-            // Move particle
-            p.x += p.vx
-            p.y += p.vy
+
+            // Move particle (scale by frame step)
+            p.x += p.vx * fs
+            p.y += p.vy * fs
             
             // Transition particle types based on distance
             when {
