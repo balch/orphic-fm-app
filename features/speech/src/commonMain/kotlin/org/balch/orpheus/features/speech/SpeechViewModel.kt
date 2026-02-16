@@ -52,6 +52,8 @@ data class SpeechUiState(
     val speechText: String = "",
     val isSpeaking: Boolean = false,
     val isGenerating: Boolean = false,
+    val wordIndex: Int = 0,
+    val totalWords: Int = 0,
     val ttsAvailable: Boolean = false,
     val selectedVoice: String = "",
     val availableVoices: List<String> = emptyList(),
@@ -271,7 +273,9 @@ class SpeechViewModel(
                 is SpeechEvent.Speaking -> state.copy(
                     isSpeaking = true,
                     isGenerating = false,
-                    speechText = intent.event.text
+                    speechText = intent.event.text,
+                    wordIndex = intent.event.wordIndex,
+                    totalWords = intent.event.totalWords,
                 )
                 is SpeechEvent.Done -> state.copy(
                     isSpeaking = false,
@@ -309,12 +313,26 @@ class SpeechViewModel(
 
                 synthEngine.loadTtsAudio(result.samples, result.sampleRate)
 
-                speechEventBus.emitSpeaking(text, 0, 1)
+                val words = text.split(" ").filter { it.isNotEmpty() }
+                val totalWords = words.size
+                val durationMs = (result.samples.size.toFloat() / result.sampleRate * 1000f / stateFlow.value.rate).toLong()
+
+                // Weight per-word timing by character count
+                val totalChars = words.sumOf { it.length }.coerceAtLeast(1)
+                val wordDurations = words.map { word ->
+                    (durationMs * word.length / totalChars).coerceAtLeast(50L)
+                }
+
+                speechEventBus.emitSpeaking(text, 0, totalWords)
                 synthEngine.playTts()
 
-                // Wait for approximate playback duration
-                val durationMs = (result.samples.size.toFloat() / result.sampleRate * 1000f / stateFlow.value.rate).toLong()
-                delay(durationMs)
+                // Emit word-by-word progress events with weighted timing
+                for (i in 1 until totalWords) {
+                    delay(wordDurations[i - 1])
+                    speechEventBus.emitSpeaking(text, i, totalWords)
+                }
+                // Wait for the last word to finish
+                delay(wordDurations.last())
 
                 speechEventBus.emitDone(text)
             } catch (e: Exception) {

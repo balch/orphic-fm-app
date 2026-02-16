@@ -12,6 +12,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +40,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -167,6 +168,7 @@ fun SpeechPanel(
                 speechText = uiState.speechText,
                 isSpeaking = uiState.isSpeaking,
                 isGenerating = uiState.isGenerating,
+                wordIndex = uiState.wordIndex,
                 spacebarTrigger = uiState.spacebarTrigger,
                 onToggle = {
                     val isBusy = uiState.isSpeaking || uiState.isGenerating
@@ -254,37 +256,30 @@ private fun SpeechReadout(
     speechText: String,
     isSpeaking: Boolean,
     isGenerating: Boolean,
+    wordIndex: Int,
     spacebarTrigger: Boolean,
     onToggle: () -> Unit,
     onSpacebarToggle: () -> Unit,
     color: Color,
 ) {
     var phase by remember { mutableStateOf(ReadoutPhase.PLAY_BUTTON) }
-    var revealedWordCount by remember { mutableIntStateOf(0) }
     val words = remember(speechText) {
         speechText.split(" ").filter { it.isNotEmpty() }
     }
+    // Word reveal count driven by ViewModel word-timing events
+    val revealedWordCount = if (isSpeaking) (wordIndex + 1).coerceAtMost(words.size) else words.size
 
     // Phase state machine driven by external state changes
     LaunchedEffect(isGenerating, isSpeaking) {
         when {
             isGenerating -> {
                 phase = ReadoutPhase.GENERATING
-                revealedWordCount = 0
             }
             isSpeaking -> {
                 phase = ReadoutPhase.SPEAKING
-                revealedWordCount = 0
-                // Word-by-word reveal animation
-                for (i in 1..words.size) {
-                    delay(220L)
-                    revealedWordCount = i
-                }
-                // If we animated through all words before speech ends, just wait
             }
             // Transitioning from active → idle
             phase == ReadoutPhase.SPEAKING -> {
-                revealedWordCount = words.size
                 phase = ReadoutPhase.DONE_HOLD
                 delay(2000L)
                 phase = ReadoutPhase.PLAY_BUTTON
@@ -593,6 +588,17 @@ private fun SpeechReadout(
                 }
             }
 
+            val scrollState = rememberScrollState()
+            // Auto-scroll to keep the current word visible
+            LaunchedEffect(revealedWordCount, words.size) {
+                if (words.isNotEmpty() && scrollState.maxValue > 0) {
+                    val progress = revealedWordCount.toFloat() / words.size
+                    scrollState.animateScrollTo(
+                        (scrollState.maxValue * progress).toInt()
+                    )
+                }
+            }
+
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -603,9 +609,8 @@ private fun SpeechReadout(
                     lineHeight = 18.sp,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .verticalScroll(scrollState)
                         .alpha(textAlpha),
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }

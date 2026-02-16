@@ -14,6 +14,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.speech.SpeechEventBus
 import org.balch.orpheus.core.speech.SpeechVocabulary
@@ -107,7 +108,6 @@ class SpeechTool @Inject constructor(
         }
 
         log.info { "TTS speaking: '$text' voice=${args.voice}" }
-        speechEventBus.emitSpeaking(text, 0, 1)
 
         val speedWpm = speedToWpm(args.speed)
         val result = ttsGenerator.generate(text, args.voice, speedWpm)
@@ -117,11 +117,30 @@ class SpeechTool @Inject constructor(
         }
 
         synthEngine.loadTtsAudio(result.samples, result.sampleRate)
+
+        val words = text.split(" ").filter { it.isNotEmpty() }
+        val totalWords = words.size
+        // Account for playback rate (PTCH knob) — higher rate = faster playback = shorter duration
+        val playbackRate = (synthController.getPluginControl(TtsSymbol.RATE.controlId)?.asFloat() ?: 1f)
+            .coerceIn(0.25f, 2f)
+        val durationMs = (result.samples.size.toFloat() / result.sampleRate * 1000f / playbackRate).toLong()
+
+        // Weight per-word timing by character count
+        val totalChars = words.sumOf { it.length }.coerceAtLeast(1)
+        val wordDurations = words.map { word ->
+            (durationMs * word.length / totalChars).coerceAtLeast(50L)
+        }
+
+        speechEventBus.emitSpeaking(text, 0, totalWords)
         synthEngine.playTts()
 
-        // Wait for approximate playback duration + audio pipeline latency buffer
-        val durationMs = (result.samples.size.toFloat() / result.sampleRate * 1000f).toLong() + 200
-        delay(durationMs)
+        // Emit word-by-word progress events with weighted timing
+        for (i in 1 until totalWords) {
+            delay(wordDurations[i - 1])
+            speechEventBus.emitSpeaking(text, i, totalWords)
+        }
+        // Wait for the last word + audio pipeline latency buffer
+        delay(wordDurations.last() + 200)
 
         speechEventBus.emitDone(text)
         return Result(
