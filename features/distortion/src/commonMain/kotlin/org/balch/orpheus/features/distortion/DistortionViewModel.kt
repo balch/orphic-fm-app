@@ -33,7 +33,7 @@ import org.balch.orpheus.core.synthViewModel
 data class DistortionUiState(
     val drive: Float = 0.0f,
     val volume: Float = 0.7f,
-    val mix: Float = 0.5f,
+    val mix: Float = 0.0f,
     val peak: Float = 0.0f,
     val mode: StereoMode = StereoMode.VOICE_PAN,
     val masterPan: Float = 0f

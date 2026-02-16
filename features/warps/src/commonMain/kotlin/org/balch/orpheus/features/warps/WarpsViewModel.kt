@@ -35,7 +35,7 @@ data class WarpsUiState(
     val modulatorLevel: Float = 0.5f,
     val carrierSource: WarpsSource = WarpsSource.SYNTH,
     val modulatorSource: WarpsSource = WarpsSource.DRUMS,
-    val mix: Float = 0.5f
+    val mix: Float = 0.0f
 )
 
 @Immutable

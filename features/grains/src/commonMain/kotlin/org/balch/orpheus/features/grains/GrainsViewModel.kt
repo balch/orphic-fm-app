@@ -37,7 +37,7 @@ data class GrainsUiState(
     val pitch: Float = 0.0f,     // Pitch Shifting (semitones/ratio)
     val density: Float = 0.5f,   // Feedback / Grain Overlap
     val texture: Float = 0.5f,   // Filter (LP/HP)
-    val dryWet: Float = 0.5f,    // Mix (0=dry, 1=wet, 0.5=50/50)
+    val dryWet: Float = 0.0f,    // Mix (0=dry, 1=wet)
     val freeze: Boolean = false, // Loop/Freeze
     val trigger: Boolean = false, // Trigger
     val mode: GrainsMode = GrainsMode.GRANULAR // Processing mode

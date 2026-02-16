@@ -134,7 +134,7 @@ class DspSynthEngine @Inject constructor(
         setupAutomation()
 
         // Initial defaults
-        setDelayMix(0.5f)
+        setDelayMix(0f)
         setDrumsBypass(true)
         setDrumTriggerSource(0, 0) // Kick -> Internal (manual only)
         setDrumTriggerSource(1, 0) // Snare -> Internal (manual only)

@@ -4,6 +4,9 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
@@ -11,11 +14,11 @@ import org.balch.orpheus.core.preferences.AppPreferencesRepository
 
 /**
  * Provides the Gemini API key for AI functionality.
- * 
+ *
  * Priority:
  * 1. Build-time key from BuildKonfig (local.properties)
  * 2. User-provided key stored in preferences
- * 
+ *
  * Exposes reactive state so UI can respond to key changes.
  */
 @SingleIn(AppScope::class)
@@ -28,8 +31,19 @@ class AiKeyRepository @Inject constructor(
 
     private var lastUsedKey: Triple<AiProvider, String, Boolean>? = null
 
-    val isApiKeySet: Boolean get() = lastUsedKey != null
-    val isUserProvidedKey: Boolean get() = lastUsedKey?.third == true
+    private val _isApiKeySet = MutableStateFlow(false)
+    val isApiKeySetFlow: StateFlow<Boolean> = _isApiKeySet.asStateFlow()
+    val isApiKeySet: Boolean get() = _isApiKeySet.value
+
+    private val _isUserProvidedKey = MutableStateFlow(false)
+    val isUserProvidedKeyFlow: StateFlow<Boolean> = _isUserProvidedKey.asStateFlow()
+    val isUserProvidedKey: Boolean get() = _isUserProvidedKey.value
+
+    private fun updateKeyState(key: Triple<AiProvider, String, Boolean>?) {
+        lastUsedKey = key
+        _isApiKeySet.value = key != null
+        _isUserProvidedKey.value = key?.third == true
+    }
 
     suspend fun getKey(aiProvider: AiProvider): Pair<String, Boolean>? =
         withContext(dispatcherProvider.io) {
@@ -39,10 +53,10 @@ class AiKeyRepository @Inject constructor(
             } ?: getPreferenceKey(aiProvider)?.let { key ->
                 key to true // true = user-provided
             }
-            
+
             // Track last used key for debugging/reference
             result?.also { (key, isUserKey) ->
-                lastUsedKey = Triple(aiProvider, key, isUserKey)
+                updateKeyState(Triple(aiProvider, key, isUserKey))
             }
         }
 
@@ -67,7 +81,7 @@ class AiKeyRepository @Inject constructor(
                 log.debug { "Saved user-provided API key" }
                 true
             }
-                .onSuccess { _ -> lastUsedKey = Triple(aiProvider, key, false) }
+                .onSuccess { _ -> updateKeyState(Triple(aiProvider, key, true)) }
                 .onFailure { e ->
                     log.error(e) { "Failed to save user API key: $aiProvider" }
                 }.getOrNull() ?: false
@@ -85,11 +99,10 @@ class AiKeyRepository @Inject constructor(
                 }
                 preferencesRepository.save(prefs.copy(userApiKeys = updatedKeys))
                 log.debug { "Cleared user-provided API key" }
-            }.onSuccess { _ -> lastUsedKey = null}
+            }.onSuccess { _ -> updateKeyState(null) }
             .onFailure { e ->
                 log.e(e) { "Failed to clear user API key: $aiProvider" }
             }
         }
     }
 }
-

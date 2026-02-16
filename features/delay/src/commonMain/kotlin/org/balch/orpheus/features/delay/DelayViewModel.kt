@@ -34,7 +34,7 @@ data class DelayUiState(
     val mod1: Float = 0.0f,
     val mod2: Float = 0.0f,
     val feedback: Float = 0.5f,
-    val mix: Float = 0.5f,
+    val mix: Float = 0.0f,
     val isLfoSource: Boolean = true,
     val isTriangleWave: Boolean = true
 )

@@ -28,7 +28,7 @@ import org.balch.orpheus.core.synthViewModel
 
 @Immutable
 data class ReverbUiState(
-    val amount: Float = 0.3f,
+    val amount: Float = 0.0f,
     val time: Float = 0.5f,
     val damping: Float = 0.7f,
     val diffusion: Float = 0.625f

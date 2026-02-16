@@ -884,8 +884,11 @@ class AiOptionsViewModel(
 
     override val stateFlow: StateFlow<AiOptionsUiState> = combine(
         combine(_isDroneActive, _isSoloActive, _isReplActive, _showChatDialog, ::AiFeatureFlags),
-        combine(_sessionId, messages, _dialogPosition, _dialogSize, ::AiDialogState)
-    ) { flags, dialog ->
+        combine(_sessionId, messages, _dialogPosition, _dialogSize, ::AiDialogState),
+        aiKeyRepository.isApiKeySetFlow,
+        aiKeyRepository.isUserProvidedKeyFlow,
+        aiModelProvider.selectedModel
+    ) { flags, dialog, isKeySet, isUserKey, model ->
         AiOptionsUiState(
             isDroneActive = flags.isDroneActive,
             isSoloActive = flags.isSoloActive,
@@ -899,9 +902,9 @@ class AiOptionsViewModel(
             aiStatusMessages = aiStatusMessages,
             aiInputLog = aiInputLog,
             aiControlLog = aiControlLog,
-            isApiKeySet = aiKeyRepository.isApiKeySet,
-            isUserProvidedKey = aiKeyRepository.isUserProvidedKey,
-            selectedModel = aiModelProvider.selectedModel.value
+            isApiKeySet = isKeySet,
+            isUserProvidedKey = isUserKey,
+            selectedModel = model
         )
     }.stateIn(
         scope = viewModelScope,
