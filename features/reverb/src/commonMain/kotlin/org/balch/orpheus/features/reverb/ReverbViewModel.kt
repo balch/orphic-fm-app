@@ -2,13 +2,11 @@ package org.balch.orpheus.features.reverb
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
@@ -16,7 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-import dev.zacsweers.metro.ContributesIntoSet
+
 import kotlinx.coroutines.flow.SharingStarted
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
@@ -24,7 +22,8 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 
 @Immutable
 data class ReverbUiState(
@@ -92,13 +91,13 @@ interface ReverbFeature : SynthFeature<ReverbUiState, ReverbPanelActions> {
 }
 
 @Inject
-@ViewModelKey(ReverbViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(ReverbViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class ReverbViewModel(
     synthController: SynthController,
-    dispatcherProvider: DispatcherProvider
-) : ViewModel(), ReverbFeature {
+    dispatcherProvider: DispatcherProvider,
+    scope: FeatureCoroutineScope,
+) : ReverbFeature {
 
     private val amountFlow = synthController.controlFlow(ReverbSymbol.AMOUNT.controlId)
     private val timeFlow = synthController.controlFlow(ReverbSymbol.TIME.controlId)
@@ -126,7 +125,7 @@ class ReverbViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = ReverbUiState()
             )
@@ -148,6 +147,6 @@ class ReverbViewModel(
 
         @Composable
         fun feature(): ReverbFeature =
-            synthViewModel<ReverbViewModel, ReverbFeature>()
+            synthFeature<ReverbViewModel, ReverbFeature>()
     }
 }

@@ -3,11 +3,12 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
 import org.balch.orpheus.core.tidal.ReplResult
 import org.balch.orpheus.core.tidal.TidalRepl
@@ -62,16 +63,19 @@ data class ReplExecuteResult(
  * 
  * This tool automatically expands the CODE panel and populates it with the executed code.
  */
-@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 class ReplExecuteTool @Inject constructor(
     private val tidalRepl: TidalRepl,
     private val replCodeEventBus: ReplCodeEventBus,
     private val panelExpansionEventBus: PanelExpansionEventBus
-) : Tool<ReplExecuteArgs, ReplExecuteResult>(
-    argsSerializer = ReplExecuteArgs.serializer(),
-    resultSerializer = ReplExecuteResult.serializer(),
-    name = "repl_execute",
-    description = """
+) : ToolProvider {
+
+    override val tool by lazy {
+        object : Tool<ReplExecuteArgs, ReplExecuteResult>(
+            argsSerializer = ReplExecuteArgs.serializer(),
+            resultSerializer = ReplExecuteResult.serializer(),
+            name = "repl_execute",
+            description = """
         Execute Tidal-style REPL code for musical patterns.
 
         IMPORTANT: Pass code as an array of strings in the 'lines' parameter!
@@ -158,10 +162,16 @@ class ReplExecuteTool @Inject constructor(
         Engine selection + effects:
         { "lines": ["engine:1 string", "sharp:1 0.3", "drive:0.2", "d1 $ note \"c3 e3 g3 c4\""] }
     """.trimIndent()
-) {
+        ) {
+            override suspend fun execute(args: ReplExecuteArgs): ReplExecuteResult {
+                return executeInternal(args)
+            }
+        }
+    }
+
     private val log = logging("ReplExecuteTool")
 
-    override suspend fun execute(args: ReplExecuteArgs): ReplExecuteResult {
+    private suspend fun executeInternal(args: ReplExecuteArgs): ReplExecuteResult {
         // Join lines into a single code block
         val code = args.lines.joinToString("\n").trim()
         log.debug { "ReplExecuteTool: Executing ${args.lines.size} lines: ${code.take(80)}..." }

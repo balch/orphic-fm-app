@@ -3,12 +3,13 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
@@ -21,6 +22,41 @@ import org.balch.orpheus.core.speech.SpeechVocabulary
 import org.balch.orpheus.core.speech.TtsGenerator
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
 
+@Serializable
+data class SpeechArgs(
+    @property:LLMDescription(
+        "Speech mode: 'auto' (default, picks best available), 'tts' (text-to-speech, any text), or 'synth' (LPC engine, limited vocabulary)."
+    )
+    val mode: String = "auto",
+
+    @property:LLMDescription("Free-form text to speak using TTS. Use this for arbitrary sentences and phrases.")
+    val text: String = "",
+
+    @property:LLMDescription("List of words for synth/LPC mode, e.g. [\"hello\", \"one\", \"two\"]. Limited to built-in vocabulary.")
+    val words: List<String> = emptyList(),
+
+    @property:LLMDescription("TTS voice name (e.g. 'Samantha', 'Daniel'). Only used in TTS mode. Omit for default voice.")
+    val voice: String? = null,
+
+    @property:LLMDescription("Speech speed (0.0=fast, 1.0=slow). Defaults to 0.3.")
+    val speed: Float = 0.3f,
+
+    @property:LLMDescription("Prosody/intonation amount (0.0=flat, 1.0=expressive). Synth mode only. Defaults to 0.5.")
+    val prosody: Float = 0.5f,
+
+    @property:LLMDescription("Voice duo to use for synth mode speech (1-6). Defaults to 1.")
+    val duo: Int = 1,
+)
+
+@Serializable
+data class SpeechResult(
+    val success: Boolean,
+    val message: String,
+    val mode: String = "",
+    val wordsSpoken: Int = 0,
+    val wordsSpelled: Int = 0,
+)
+
 /**
  * AI tool for making the synthesizer speak using either TTS (text-to-speech)
  * for arbitrary text, or the Plaits LPC speech engine for its word bank vocabulary.
@@ -28,57 +64,31 @@ import org.balch.orpheus.features.ai.PanelExpansionEventBus
  * Mode is selected automatically: if `text` is provided and TTS is available, uses TTS.
  * If `words` is provided, uses the synth LPC engine. Can be overridden with `mode`.
  */
-@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 class SpeechTool @Inject constructor(
     private val synthController: SynthController,
     private val synthEngine: SynthEngine,
     private val ttsGenerator: TtsGenerator,
     private val speechEventBus: SpeechEventBus,
     private val panelExpansionEventBus: PanelExpansionEventBus,
-) : Tool<SpeechTool.Args, SpeechTool.Result>(
-    argsSerializer = Args.serializer(),
-    resultSerializer = Result.serializer(),
-    name = "speech",
-    description = buildDescription(ttsGenerator.isAvailable)
-) {
+) : ToolProvider {
+
+    override val tool by lazy {
+        object : Tool<SpeechArgs, SpeechResult>(
+            argsSerializer = SpeechArgs.serializer(),
+            resultSerializer = SpeechResult.serializer(),
+            name = "speech",
+            description = buildDescription(ttsGenerator.isAvailable)
+        ) {
+            override suspend fun execute(args: SpeechArgs): SpeechResult {
+                return executeInternal(args)
+            }
+        }
+    }
+
     private val log = logging("SpeechTool")
 
-    @Serializable
-    data class Args(
-        @property:LLMDescription(
-            "Speech mode: 'auto' (default, picks best available), 'tts' (text-to-speech, any text), or 'synth' (LPC engine, limited vocabulary)."
-        )
-        val mode: String = "auto",
-
-        @property:LLMDescription("Free-form text to speak using TTS. Use this for arbitrary sentences and phrases.")
-        val text: String = "",
-
-        @property:LLMDescription("List of words for synth/LPC mode, e.g. [\"hello\", \"one\", \"two\"]. Limited to built-in vocabulary.")
-        val words: List<String> = emptyList(),
-
-        @property:LLMDescription("TTS voice name (e.g. 'Samantha', 'Daniel'). Only used in TTS mode. Omit for default voice.")
-        val voice: String? = null,
-
-        @property:LLMDescription("Speech speed (0.0=fast, 1.0=slow). Defaults to 0.3.")
-        val speed: Float = 0.3f,
-
-        @property:LLMDescription("Prosody/intonation amount (0.0=flat, 1.0=expressive). Synth mode only. Defaults to 0.5.")
-        val prosody: Float = 0.5f,
-
-        @property:LLMDescription("Voice duo to use for synth mode speech (1-6). Defaults to 1.")
-        val duo: Int = 1,
-    )
-
-    @Serializable
-    data class Result(
-        val success: Boolean,
-        val message: String,
-        val mode: String = "",
-        val wordsSpoken: Int = 0,
-        val wordsSpelled: Int = 0,
-    )
-
-    override suspend fun execute(args: Args): Result {
+    private suspend fun executeInternal(args: SpeechArgs): SpeechResult {
         val effectiveMode = resolveMode(args)
         panelExpansionEventBus.expand(PanelId.SPEECH)
 
@@ -88,7 +98,7 @@ class SpeechTool @Inject constructor(
         }
     }
 
-    private fun resolveMode(args: Args): String = when (args.mode) {
+    private fun resolveMode(args: SpeechArgs): String = when (args.mode) {
         "tts" -> if (ttsGenerator.isAvailable) "tts" else "synth"
         "synth" -> "synth"
         else -> when { // "auto"
@@ -101,10 +111,10 @@ class SpeechTool @Inject constructor(
 
     // ── TTS mode ──────────────────────────────────────────────────────
 
-    private suspend fun executeTts(args: Args): Result {
+    private suspend fun executeTts(args: SpeechArgs): SpeechResult {
         val text = args.text.ifBlank { args.words.joinToString(" ") }
         if (text.isBlank()) {
-            return Result(success = false, message = "No text provided for TTS", mode = "tts")
+            return SpeechResult(success = false, message = "No text provided for TTS", mode = "tts")
         }
 
         log.info { "TTS speaking: '$text' voice=${args.voice}" }
@@ -113,7 +123,7 @@ class SpeechTool @Inject constructor(
         val result = ttsGenerator.generate(text, args.voice, speedWpm)
         if (result == null) {
             speechEventBus.emitFailed("TTS generation failed")
-            return Result(success = false, message = "TTS generation failed", mode = "tts")
+            return SpeechResult(success = false, message = "TTS generation failed", mode = "tts")
         }
 
         synthEngine.loadTtsAudio(result.samples, result.sampleRate)
@@ -143,7 +153,7 @@ class SpeechTool @Inject constructor(
         delay(wordDurations.last() + 200)
 
         speechEventBus.emitDone(text)
-        return Result(
+        return SpeechResult(
             success = true,
             message = "Spoke '$text' using TTS${args.voice?.let { " (voice: $it)" } ?: ""}",
             mode = "tts",
@@ -153,10 +163,10 @@ class SpeechTool @Inject constructor(
 
     // ── Synth/LPC mode ───────────────────────────────────────────────
 
-    private suspend fun executeSynth(args: Args): Result {
+    private suspend fun executeSynth(args: SpeechArgs): SpeechResult {
         val words = args.words.ifEmpty { args.text.split("\\s+".toRegex()).filter { it.isNotBlank() } }
         if (words.isEmpty()) {
-            return Result(success = false, message = "No words provided for synth speech", mode = "synth")
+            return SpeechResult(success = false, message = "No words provided for synth speech", mode = "synth")
         }
 
         val duoIndex = (args.duo - 1).coerceIn(0, 5)
@@ -242,7 +252,7 @@ class SpeechTool @Inject constructor(
 
         speechEventBus.emitDone(fullText)
 
-        return Result(
+        return SpeechResult(
             success = true,
             message = "Spoke '$fullText' on duo $duoNum using synth engine",
             mode = "synth",

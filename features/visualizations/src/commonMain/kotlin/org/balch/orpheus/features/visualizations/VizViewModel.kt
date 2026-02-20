@@ -1,13 +1,11 @@
 package org.balch.orpheus.features.visualizations
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +16,8 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 import org.balch.orpheus.features.visualizations.viz.OffViz
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.DynamicVisualization
@@ -61,14 +60,15 @@ interface VizFeature : SynthFeature<VizUiState, VizPanelActions> {
  * Injects all available Visualization implementations.
  */
 @Inject
-@ViewModelKey(VizViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
+@ClassKey(VizViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class VizViewModel(
     visualizations: Set<Visualization>,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
-) : ViewModel(), VizFeature {
+    private val scope: FeatureCoroutineScope
+) : VizFeature, AutoCloseable {
 
     override val actions = VizPanelActions(
         onSelectViz = { selectVisualization(it) },
@@ -97,12 +97,12 @@ class VizViewModel(
     init {
         // Activate initial visualization if it's not off (likely is off initially)
         if (_currentViz.value.id != "off") {
-            viewModelScope.launch(dispatcherProvider.default) {
+            scope.launch(dispatcherProvider.default) {
                 _currentViz.value.onActivate()
             }
         }
 
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             val prefs = appPreferencesRepository.load()
             prefs.lastVizId?.let { id ->
                 sortedVisualizations.find { it.id == id }?.let { viz ->
@@ -112,12 +112,12 @@ class VizViewModel(
         }
         
         // Subscribe to viz knob control flows (bidirectional with MIDI)
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             synthController.controlFlow(VizSymbol.KNOB_1.controlId).collect { value ->
                 onKnob1Change(value.asFloat())
             }
         }
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             synthController.controlFlow(VizSymbol.KNOB_2.controlId).collect { value ->
                 onKnob2Change(value.asFloat())
             }
@@ -135,7 +135,7 @@ class VizViewModel(
     fun selectVisualization(viz: Visualization, save: Boolean = true) {
         if (_currentViz.value == viz) return
 
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             // Perform activation/deactivation on background thread
             _currentViz.value.onDeactivate()
             viz.onActivate()
@@ -147,7 +147,7 @@ class VizViewModel(
 
             // Handle dynamic effects
             if (viz is DynamicVisualization) {
-                dynamicEffectsJob = viewModelScope.launch(dispatcherProvider.default) {
+                dynamicEffectsJob = scope.launch(dispatcherProvider.default) {
                     viz.liquidEffectsFlow.collect { effects ->
                          _uiState.value = _uiState.value.copy(liquidEffects = effects)
                     }
@@ -185,8 +185,7 @@ class VizViewModel(
         )
     }
     
-    override fun onCleared() {
-        super.onCleared()
+    override fun close() {
         _currentViz.value.onDeactivate()
         dynamicEffectsJob?.cancel()
     }
@@ -204,6 +203,6 @@ class VizViewModel(
 
         @Composable
         fun feature(): VizFeature =
-            synthViewModel<VizViewModel, VizFeature>()
+            synthFeature<VizViewModel, VizFeature>()
     }
 }

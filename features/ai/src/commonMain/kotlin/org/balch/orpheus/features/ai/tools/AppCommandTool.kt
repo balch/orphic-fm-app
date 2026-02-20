@@ -3,7 +3,7 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -12,6 +12,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonClassDiscriminator
+import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.currentKoogModel
@@ -48,61 +49,70 @@ sealed class AppCommand {
     data object GetModel : AppCommand()
 }
 
+@Serializable
+data class AppCommandResult(
+    val success: Boolean,
+    val message: String
+)
+
 /**
  * Tool for executing built-in commands to control the app
  */
-@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 class AppCommandTool @Inject constructor(
     private val tidalRepl: TidalRepl,
     private val aiModelProvider: AiModelProvider,
-) : Tool<AppCommand, AppCommandTool.Result>(
-    argsSerializer = AppCommand.serializer(),
-    resultSerializer = Result.serializer(),
-    name = "app_control",
-    description = """
+) : ToolProvider {
+
+    override val tool by lazy {
+        object : Tool<AppCommand, AppCommandResult>(
+            argsSerializer = AppCommand.serializer(),
+            resultSerializer = AppCommandResult.serializer(),
+            name = "app_control",
+            description = """
         Tool to allow the user to control the app or query about app specific settings (ex: llm model).
         Check the user intent to the list of commands supported and call this tool when appropriate.
     """.trimIndent()
-) {
+        ) {
+            override suspend fun execute(args: AppCommand): AppCommandResult {
+                return executeInternal(args)
+            }
+        }
+    }
+
     private val log = logging("AppCommandTool")
 
-    @Serializable
-    data class Result(
-        val success: Boolean,
-        val message: String
-    )
-
-    override suspend fun execute(args: AppCommand): Result {
+    private suspend fun executeInternal(args: AppCommand): AppCommandResult {
         log.debug { "Executing command: $args" }
 
         return when (args) {
             is AppCommand.Mute -> executeMute()
             is AppCommand.ChangeModel -> executeChangeModel(args.modelId)
-            is AppCommand.GetModel -> Result(true, aiModelProvider.currentKoogModel.id)
+            is AppCommand.GetModel -> AppCommandResult(true, aiModelProvider.currentKoogModel.id)
         }
     }
 
-    private fun executeMute(): Result =
+    private fun executeMute(): AppCommandResult =
         runCatching {
             log.debug { "Executing mute/hush" }
             tidalRepl.hush()
         }.fold(
             onSuccess = {
-                Result(
+                AppCommandResult(
                     success = true,
                     message = "All sounds muted and patterns stopped"
                 )
             },
             onFailure = { e ->
                 log.error(e) { "AppCommandTool: Failed to mute: ${e.message}" }
-                Result(
+                AppCommandResult(
                     success = false,
                     message = "Failed to mute: ${e.message}"
                 )
             }
         )
 
-    private suspend fun executeChangeModel(modelId: String): Result {
+    private suspend fun executeChangeModel(modelId: String): AppCommandResult {
         val model = AiModel.entries.find { it.id == modelId }
 
         return if (model != null) {
@@ -111,14 +121,14 @@ class AppCommandTool @Inject constructor(
                 aiModelProvider.selectModel(model)
             }.fold(
                 onSuccess = {
-                    Result(
+                    AppCommandResult(
                         success = true,
                         message = "Changed AI model to ${model.displayName}. The new model will be used for the next session."
                     )
                 },
                 onFailure = {
                     log.error(it) { "Failed to change model: ${it.message}" }
-                    Result(
+                    AppCommandResult(
                         success = false,
                         message = "Error AI model to ${model.displayName}. The new model will be used for the next session."
                     )
@@ -126,7 +136,7 @@ class AppCommandTool @Inject constructor(
             )
         } else {
             log.warn { "AppCommandTool: Unknown model ID: $modelId" }
-            Result(
+            AppCommandResult(
                 success = false,
                 message = "Unknown model ID: $modelId. Available: ${AiModel.entries.joinToString { it.id }}"
             )

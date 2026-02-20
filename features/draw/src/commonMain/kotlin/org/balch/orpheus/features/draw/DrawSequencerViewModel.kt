@@ -1,17 +1,16 @@
 package org.balch.orpheus.features.draw
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.ViewModel
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.synthFeature
 
 interface DrawSequencerFeature: SynthFeature<DrawSequencerUiState, DrawSequencerPanelActions> {
     override val synthControl: SynthFeature.SynthControl
@@ -19,9 +18,9 @@ interface DrawSequencerFeature: SynthFeature<DrawSequencerUiState, DrawSequencer
 }
 
 @Inject
-@ViewModelKey(DrawSequencerViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-class DrawSequencerViewModel : ViewModel(), DrawSequencerFeature {
+@ClassKey(DrawSequencerViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
+class DrawSequencerViewModel : DrawSequencerFeature {
     private val _state = MutableStateFlow(DrawSequencerUiState())
     override val stateFlow: StateFlow<DrawSequencerUiState> = _state.asStateFlow()
 
@@ -44,7 +43,7 @@ class DrawSequencerViewModel : ViewModel(), DrawSequencerFeature {
         onClearPath = { _ -> },
         onSetEnabled = {}
     )
-    
+
     companion object Companion {
         fun previewFeature(state: DrawSequencerUiState = DrawSequencerUiState(isExpanded = true)): DrawSequencerFeature =
             object : DrawSequencerFeature {
@@ -66,7 +65,7 @@ class DrawSequencerViewModel : ViewModel(), DrawSequencerFeature {
 
         @Composable
         fun feature(): DrawSequencerFeature =
-            synthViewModel<DrawSequencerViewModel, DrawSequencerFeature>()
+            synthFeature<DrawSequencerViewModel, DrawSequencerFeature>()
     }
 }
 
@@ -110,4 +109,3 @@ data class DrawSequencerState(
     val currentPosition: Float = 0f,
     val config: DrawSequencerConfig = DrawSequencerConfig()
 )
-

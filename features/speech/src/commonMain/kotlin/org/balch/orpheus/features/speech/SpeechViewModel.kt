@@ -2,15 +2,12 @@ package org.balch.orpheus.features.speech
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +20,7 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import androidx.compose.ui.input.key.Key
+import org.balch.orpheus.core.FeatureCoroutineScope
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.input.KeyAction
@@ -38,7 +36,7 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.speech.SpeechEvent
 import org.balch.orpheus.core.speech.SpeechEventBus
 import org.balch.orpheus.core.speech.TtsGenerator
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.synthFeature
 
 @Immutable
 data class SpeechUiState(
@@ -136,17 +134,17 @@ interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
 }
 
 @Inject
-@ViewModelKey(SpeechViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(SpeechViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class SpeechViewModel(
     synthController: SynthController,
     private val synthEngine: SynthEngine,
     private val ttsGenerator: TtsGenerator,
     private val speechEventBus: SpeechEventBus,
     private val presetLoader: PresetLoader,
-    dispatcherProvider: DispatcherProvider
-) : ViewModel(), SpeechFeature {
+    dispatcherProvider: DispatcherProvider,
+    private val scope: FeatureCoroutineScope,
+) : SpeechFeature {
 
     private val log = logging("SpeechViewModel")
 
@@ -213,13 +211,13 @@ class SpeechViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = SpeechUiState(ttsAvailable = ttsGenerator.isAvailable)
             )
 
     init {
-        viewModelScope.launch {
+        scope.launch {
             val voices = ttsGenerator.listVoices()
             voicesLoadedFlow.value = voices
             if (voices.isNotEmpty() && selectedVoiceFlow.value.isEmpty()) {
@@ -228,7 +226,7 @@ class SpeechViewModel(
         }
 
         // Restore non-plugin state from loaded presets
-        viewModelScope.launch {
+        scope.launch {
             presetLoader.presetFlow.collect { preset ->
                 preset.getString(KEY_TEXT_INPUT).takeIf { it.isNotEmpty() }
                     ?.let { textInputFlow.value = it }
@@ -239,17 +237,17 @@ class SpeechViewModel(
         }
 
         // Sync non-plugin state to PresetLoader for save
-        viewModelScope.launch {
+        scope.launch {
             textInputFlow.collect {
                 presetLoader.setFeatureValue(KEY_TEXT_INPUT, PortValue.StringValue(it))
             }
         }
-        viewModelScope.launch {
+        scope.launch {
             selectedVoiceFlow.collect {
                 presetLoader.setFeatureValue(KEY_SELECTED_VOICE, PortValue.StringValue(it))
             }
         }
-        viewModelScope.launch {
+        scope.launch {
             spacebarTriggerFlow.collect {
                 presetLoader.setFeatureValue(KEY_SPACEBAR_TRIGGER, PortValue.BoolValue(it))
             }
@@ -298,7 +296,7 @@ class SpeechViewModel(
         if (text.isEmpty()) return
 
         speakJob?.cancel()
-        speakJob = viewModelScope.launch {
+        speakJob = scope.launch {
             try {
                 generatingFlow.value = true
                 log.info { "Generating TTS for: $text" }
@@ -348,7 +346,7 @@ class SpeechViewModel(
         speakJob?.cancel()
         speakJob = null
         synthEngine.stopTts()
-        viewModelScope.launch {
+        scope.launch {
             speechEventBus.emitIdle()
         }
     }
@@ -369,6 +367,6 @@ class SpeechViewModel(
 
         @Composable
         fun feature(): SpeechFeature =
-            synthViewModel<SpeechViewModel, SpeechFeature>()
+            synthFeature<SpeechViewModel, SpeechFeature>()
     }
 }

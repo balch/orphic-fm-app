@@ -1,12 +1,12 @@
 package org.balch.orpheus.features.ai
 
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.FeatureCollection
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.input.KeyBinding
-import kotlin.jvm.JvmSuppressWildcards
 
 /**
  * Registry that indexes [SynthFeature.SynthControl] contributions for lookup and search.
@@ -14,23 +14,28 @@ import kotlin.jvm.JvmSuppressWildcards
  * Injected with the set of all registered features and provides
  * lookup-by-panel, search-by-query, and find-panel-for-control.
  */
-@SingleIn(AppScope::class)
+@SingleIn(FeatureScope::class)
 class UserManualRegistry @Inject constructor(
-    features: @JvmSuppressWildcards Set<SynthFeature<*, *>>
+    private val featureCollection: FeatureCollection
 ) {
-    private val synthControls = features.map { it.synthControl }
+    private val features get() = featureCollection.allFeatures
+    private val synthControls get() = features.map { it.synthControl }
 
-    private val byPanelId: Map<PanelId, SynthFeature.SynthControl> =
+    private val byPanelId: Map<PanelId, SynthFeature.SynthControl> by lazy {
         synthControls.associateBy { it.panelId }
+    }
 
     /** panelId → keyBindings from the owning feature. */
-    private val keyBindingsByPanel: Map<PanelId, List<KeyBinding>> =
+    private val keyBindingsByPanel: Map<PanelId, List<KeyBinding>> by lazy {
         features.associate { it.synthControl.panelId to it.keyBindings }
+    }
 
-    private val controlToPanel: Map<String, PanelId> = buildMap {
-        for (synthControl in synthControls) {
-            for (controlId in synthControl.portControlKeys.keys) {
-                put(controlId, synthControl.panelId)
+    private val controlToPanel: Map<String, PanelId> by lazy {
+        buildMap {
+            for (synthControl in synthControls) {
+                for (controlId in synthControl.portControlKeys.keys) {
+                    put(controlId, synthControl.panelId)
+                }
             }
         }
     }

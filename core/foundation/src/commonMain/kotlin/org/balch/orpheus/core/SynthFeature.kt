@@ -1,11 +1,6 @@
 package org.balch.orpheus.core
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewmodel.CreationExtras
-import dev.zacsweers.metro.Assisted
-import dev.zacsweers.metrox.viewmodel.ViewModelAssistedFactory
-import dev.zacsweers.metrox.viewmodel.metroViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.input.KeyBinding
@@ -25,7 +20,7 @@ interface SynthFeature<S, A> {
         get() = SharingStarted.WhileSubscribed(5_000)
 
     /**
-     * Key bindings for this feature, with actions wired to the ViewModel.
+     * Key bindings for this feature.
      * The keyboard handler collects these from all features to build the dispatch map,
      * and AI tools / documentation read them for shortcut descriptions (ignoring [action]).
      */
@@ -34,7 +29,6 @@ interface SynthFeature<S, A> {
 
     /**
      * Self-registering documentation descriptor for a feature panel.
-     * Feature modules implement this interface and register via @ContributesIntoSet.
      *
      * The AI tools use [portControlKeys] (raw `PluginControlId.key` strings) directly
      * to control the synth — no mapping layer. The SynthControlTool builds its description
@@ -67,27 +61,18 @@ interface SynthFeature<S, A> {
     }
 }
 
-/** Extract a typed feature from a set. Throws if not found. */
-inline fun <reified T : SynthFeature<*, *>> Set<SynthFeature<*, *>>.toFeature(): T =
-    filterIsInstance<T>().first()
-
-/** Extract a typed feature from a set, or null if not present. */
-inline fun <reified T : SynthFeature<*, *>> Set<SynthFeature<*, *>>.toFeatureOrNull(): T? =
-    filterIsInstance<T>().firstOrNull()
-
 /**
- * Retrieve a ViewModel from the Metro DI graph, returning it as a feature.
- * Works like metroViewModel() but allows casting to a specific feature interface (e.g. BossFeature).
+ * Retrieve a feature from the [SynthFeatureRegistry] via [LocalSynthFeatures].
+ * Used as default parameter values in panel composables.
  *
- * Usage: `val feature: MyFeature = synthViewModel<MyViewModel, MyFeature>()`
+ * Usage: `val feature: MyFeature = synthFeature<MyViewModel, MyFeature>()`
  */
 @Suppress("UNCHECKED_CAST")
 @Composable
-inline fun <reified VM : ViewModel, S, A> synthViewModel(): SynthFeature<S, A> =
-    metroViewModel<VM>() as SynthFeature<S, A>
-
+inline fun <reified F : Any, S, A> synthFeature(): SynthFeature<S, A> =
+    LocalSynthFeatures.current.getFeature<SynthFeature<S, A>>(F::class)
 
 @Suppress("UNCHECKED_CAST")
 @Composable
-inline fun <reified VM : ViewModel, R> synthViewModel(): R =
-    metroViewModel<VM>() as R
+inline fun <reified F : Any, R> synthFeature(): R =
+    LocalSynthFeatures.current.getFeature<R>(F::class)

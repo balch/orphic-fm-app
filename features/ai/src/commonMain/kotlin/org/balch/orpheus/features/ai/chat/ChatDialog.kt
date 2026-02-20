@@ -17,11 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import kotlinx.coroutines.flow.MutableSharedFlow
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.config.AppConfig
+import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.ai.chat.widgets.ChatInputField
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
@@ -47,8 +47,8 @@ import org.balch.orpheus.ui.widgets.dialogs.DraggableDialog
 @Composable
 fun ChatDialog(
     modifier: Modifier = Modifier,
-    viewModel: ChatViewModel = metroViewModel(),
-    aiViewModel: AiOptionsViewModel = metroViewModel(),
+    chatFeature: ChatFeature = ChatViewModel.feature(),
+    aiFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
     liquidState: LiquidState,
     position: Pair<Float, Float>,
     onPositionChange: (Float, Float) -> Unit,
@@ -56,11 +56,11 @@ fun ChatDialog(
     onSizeChange: (Float, Float) -> Unit,
     onClose: () -> Unit = {},
 ) {
-    val chatState by viewModel.stateFlow.collectAsState()
+    val chatState by chatFeature.stateFlow.collectAsState()
     val messages = chatState.messages
     val isLoading = chatState.isLoading
 
-    val aiState by aiViewModel.stateFlow.collectAsState()
+    val aiState by aiFeature.stateFlow.collectAsState()
     val isDroneActive = aiState.isDroneActive
     val isSoloActive = aiState.isSoloActive
     val isDashboardMode = isDroneActive || isSoloActive
@@ -90,7 +90,7 @@ fun ChatDialog(
                     isActive = true,
                     isSoloMode = isSoloActive,
                     sessionId = aiState.sessionId,
-                    onSendInfluence = { aiViewModel.actions.onSendInfluence(it) },
+                    onSendInfluence = { aiFeature.actions.onSendInfluence(it) },
                     // Give it full space but respect layout
                     modifier = Modifier
                         .fillMaxWidth()
@@ -107,8 +107,8 @@ fun ChatDialog(
                 messages = messages,
                 isLoading = isLoading,
                 isApiKeySet = isApiKeySet,
-                onSendMessage = viewModel.actions.onSendPrompt,
-                onSaveApiKey = aiViewModel.actions.onSaveApiKey
+                onSendMessage = chatFeature.actions.onSendPrompt,
+                onSaveApiKey = aiFeature.actions.onSaveApiKey
             )
         }
     }

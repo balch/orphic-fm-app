@@ -174,7 +174,7 @@ class SynthControlAgent(
 
                 log.debug { "Executing CONTROL: $id = $value" }
                 emitControl("Set $id: ${value.format(2)}")
-                val result = synthControlTool.execute(SynthControlArgs(id, value))
+                val result = synthControlTool.tool.execute(SynthControlArgs(id, value))
                 if (!result.success) {
                     emitControl("Failed: ${result.message}", isError = true)
                     injectUserPrompt("CONTROL action failed for $id: ${result.message}")
@@ -205,7 +205,7 @@ class SynthControlAgent(
 
                 log.debug { "Executing REPL: $code" }
                 emitControl("Pattern: $code")
-                val result = replExecuteTool.execute(ReplExecuteArgs(lines = code.lines()))
+                val result = replExecuteTool.tool.execute(ReplExecuteArgs(lines = code.lines()))
                 if (!result.success) {
                     emitControl("Failed: ${result.message}", isError = true)
                     // Provide feedback to the AI so it can correct the code immediately
@@ -460,8 +460,8 @@ class SynthControlAgent(
                 val executor = SingleLLMPromptExecutor(llmClient)
                 // Tools are manually invoked, so registry can be empty or contain them for metadata (optional)
                 val toolRegistry = ToolRegistry {
-                    tool(synthControlTool)
-                    tool(replExecuteTool)
+                    tool(synthControlTool.tool)
+                    tool(replExecuteTool.tool)
                 }
                 
                 val agent = AIAgent(
@@ -532,7 +532,7 @@ class SynthControlAgent(
                 // Wait for fade to complete
                 delay((fadeDuration * 1000).toLong())
 
-                replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
+                replExecuteTool.tool.execute(ReplExecuteArgs(lines = listOf("hush")))
 
                 // Restore volumes after hush (instant, not faded)
                 savedVolumes.forEach { (quadIndex, volume) ->
@@ -542,7 +542,7 @@ class SynthControlAgent(
                 log.debug { "Restored quad volumes" }
             }.onFailure { e ->
                 log.warn(e) { "Failed to stop gracefully: ${e.message}" }
-                replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
+                replExecuteTool.tool.execute(ReplExecuteArgs(lines = listOf("hush")))
             }
             emitStatus("Stopped")
             _state.value = SynthAgentState.Idle

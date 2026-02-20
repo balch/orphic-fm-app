@@ -13,26 +13,29 @@ import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.ext.tool.ExitTool
 import ai.koog.prompt.llm.LLModel
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.Provider
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.ai.AiModelProvider
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.ai.currentKoogModel
 import org.balch.orpheus.core.config.AppConfig
-import kotlin.jvm.JvmSuppressWildcards
+import org.balch.orpheus.core.ai.ToolProvider
 import kotlin.time.ExperimentalTime
 
 /**
  * Configuration for the Orpheus AI agent persona and behavior.
  */
-@SingleIn(AppScope::class)
+@SingleIn(FeatureScope::class)
 class OrpheusAgentConfig @Inject constructor(
-    private val toolSet: @JvmSuppressWildcards Set<Tool<*, *>>,
+    private val toolSet: Set<ToolProvider>,
     private val aiModelProvider: AiModelProvider,
 ) {
     @OptIn(ExperimentalTime::class)
-    val toolRegistry = ToolRegistry {
-        tools(toolSet.toList())
+    val toolRegistry by lazy {
+        ToolRegistry {
+            tools(toolSet.toList().map { it.tool })
+        }
     }
 
     /** Model to use for the agent - uses user's selection */

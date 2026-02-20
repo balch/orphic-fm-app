@@ -18,19 +18,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.toFeature
+import org.balch.orpheus.core.feature
+import org.balch.orpheus.core.input.KeyBinding
+import org.balch.orpheus.core.LocalSynthFeatures
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionViewModel
-import org.balch.orpheus.features.drum.DrumViewModel
-import org.balch.orpheus.features.speech.SpeechViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
@@ -38,6 +39,7 @@ import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
+import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderViewModel
 import org.balch.orpheus.ui.panels.compact.CompactAiSection
@@ -52,7 +54,26 @@ import org.balch.orpheus.ui.widgets.DraggableDivider
 import org.balch.orpheus.ui.widgets.VizBackground
 
 /**
- * Compact Portrait Layout: Mobile-optimized design for portrait orientation.
+ * Compact Portrait Screen - retrieves typed features from the registry and
+ * delegates to [CompactPortraitLayout] for the actual UI.
+ */
+@Composable
+fun CompactPortraitScreen(
+    modifier: Modifier = Modifier,
+) {
+    val registry = LocalSynthFeatures.current
+    CompactPortraitLayout(
+        headerFeature = registry.feature<HeaderViewModel, HeaderFeature>(),
+        voiceFeature = registry.feature<VoiceViewModel, VoicesFeature>(),
+        vizFeature = registry.feature<VizViewModel, VizFeature>(),
+        distortionFeature = registry.feature<DistortionViewModel, DistortionFeature>(),
+        keyActions = registry.keyActions,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Previewable compact portrait layout — accepts all features as explicit parameters.
  *
  * Layout:
  * - Top: Header panel with title, preset dropdown, volume
@@ -62,17 +83,16 @@ import org.balch.orpheus.ui.widgets.VizBackground
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CompactPortraitScreen(
+fun CompactPortraitLayout(
+    headerFeature: HeaderFeature,
+    voiceFeature: VoicesFeature,
+    vizFeature: VizFeature,
+    distortionFeature: DistortionFeature,
+    keyActions: Map<Key, List<KeyBinding>>,
     modifier: Modifier = Modifier,
-    features: Set<SynthFeature<*, *>>,
 ) {
-    val headerFeature: HeaderFeature = features.toFeature()
-    val voiceFeature: VoicesFeature = features.toFeature()
-    val vizFeature: VizFeature = features.toFeature()
-    val distortionFeature: DistortionFeature = features.toFeature()
-
-    val liquidState = LocalLiquidState.current ?: rememberLiquidState()
-    val effects = LocalLiquidEffects.current
+    val liquidState: LiquidState = LocalLiquidState.current ?: rememberLiquidState()
+    val effects: VisualizationLiquidEffects = LocalLiquidEffects.current
 
     // Focus handling for keyboard input
     val focusRequester = remember { FocusRequester() }
@@ -94,8 +114,6 @@ fun CompactPortraitScreen(
     var selectedBottomPanel by remember { mutableStateOf(CompactBottomPanelType.PADS) }
 
     val vizState by vizFeature.stateFlow.collectAsState()
-
-    val keyActions = rememberSynthKeyActions(features)
 
     Box(
         modifier = modifier
@@ -204,16 +222,13 @@ fun CompactPortraitScreen(
 @Preview(widthDp = 360, heightDp = 700)
 @Composable
 private fun CompactPortraitLayoutPreview() {
-    LiquidPreviewContainerWithGradient() {
-        CompactPortraitScreen(
-            features = setOf(
-                HeaderViewModel.previewFeature(),
-                VoiceViewModel.previewFeature(),
-                DrumViewModel.previewFeature(),
-                SpeechViewModel.previewFeature(),
-                VizViewModel.previewFeature(),
-                DistortionViewModel.previewFeature(),
-            ),
+    LiquidPreviewContainerWithGradient {
+        CompactPortraitLayout(
+            headerFeature = HeaderViewModel.previewFeature(),
+            voiceFeature = VoiceViewModel.previewFeature(),
+            vizFeature = VizViewModel.previewFeature(),
+            distortionFeature = DistortionViewModel.previewFeature(),
+            keyActions = emptyMap(),
         )
     }
 }

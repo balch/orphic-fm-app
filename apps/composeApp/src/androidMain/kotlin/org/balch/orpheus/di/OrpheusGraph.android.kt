@@ -24,7 +24,7 @@ actual interface OrpheusGraph : ViewModelGraph {
     actual val consoleLogger: ConsoleLogger
     actual val globalTempo: GlobalTempo
     actual val controlHighlightEventBus: ControlHighlightEventBus
-    
+
     /**
      * Android-specific lifecycle manager for background audio handling.
      * Accessing this property ensures it gets initialized.

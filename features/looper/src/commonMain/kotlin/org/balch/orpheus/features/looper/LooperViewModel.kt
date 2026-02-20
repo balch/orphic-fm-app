@@ -2,14 +2,12 @@ package org.balch.orpheus.features.looper
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -23,7 +21,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 
 @Immutable
 data class LooperUiState(
@@ -62,11 +61,12 @@ interface LooperFeature : SynthFeature<LooperUiState, LooperActions> {
 }
 
 @Inject
-@ViewModelKey(LooperViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
+@ClassKey(LooperViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class LooperViewModel(
-    private val synth: SynthEngine
-) : ViewModel(), LooperFeature {
+    private val synth: SynthEngine,
+    scope: FeatureCoroutineScope,
+) : LooperFeature {
 
     private val log = logging("LooperViewModel")
     private val _userIntents = MutableSharedFlow<LooperIntent>(
@@ -96,7 +96,7 @@ class LooperViewModel(
                 newState
             }
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = LooperUiState()
             )
@@ -179,6 +179,6 @@ class LooperViewModel(
 
         @Composable
         fun feature(): LooperFeature =
-            synthViewModel<LooperViewModel, LooperFeature>()
+            synthFeature<LooperViewModel, LooperFeature>()
     }
 }

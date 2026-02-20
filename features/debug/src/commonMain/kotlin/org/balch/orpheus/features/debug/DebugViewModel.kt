@@ -1,20 +1,19 @@
 package org.balch.orpheus.features.debug
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 import org.balch.orpheus.util.ConsoleLogger
 import org.balch.orpheus.util.LogEntry
 
@@ -47,12 +46,13 @@ interface DebugFeature : SynthFeature<DebugUiState, DebugPanelActions> {
  * Combines engine monitoring flows with console logs into a unified UI state.
  */
 @Inject
-@ViewModelKey(DebugViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
+@ClassKey(DebugViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DebugViewModel(
     private val engine: SynthEngine,
-    private val consoleLogger: ConsoleLogger
-) : ViewModel(), DebugFeature {
+    private val consoleLogger: ConsoleLogger,
+    scope: FeatureCoroutineScope,
+) : DebugFeature {
 
     override val actions = DebugPanelActions(
         onClearLogs = ::onClearLogs
@@ -69,7 +69,7 @@ class DebugViewModel(
             logs = logs
         )
     }.stateIn(
-        scope = viewModelScope,
+        scope = scope,
         started = this.sharingStrategy,
         initialValue = DebugUiState(0f, 0f,)
     )
@@ -89,6 +89,6 @@ class DebugViewModel(
 
         @Composable
         fun feature(): DebugFeature =
-            synthViewModel<DebugViewModel, DebugFeature>()
+            synthFeature<DebugViewModel, DebugFeature>()
     }
 }

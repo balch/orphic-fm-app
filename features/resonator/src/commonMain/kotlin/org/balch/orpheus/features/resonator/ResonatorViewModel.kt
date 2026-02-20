@@ -2,13 +2,11 @@ package org.balch.orpheus.features.resonator
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
@@ -16,7 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-import dev.zacsweers.metro.ContributesIntoSet
+
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
@@ -25,7 +23,8 @@ import org.balch.orpheus.core.controller.enumSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 
 enum class ResonatorMode(val displayName: String) {
     MODAL("Bar"),
@@ -134,13 +133,13 @@ interface ResonatorFeature : SynthFeature<ResonatorUiState, ResonatorPanelAction
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ViewModelKey(ResonatorViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(ResonatorViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class ResonatorViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
-) : ViewModel(), ResonatorFeature {
+    scope: FeatureCoroutineScope,
+) : ResonatorFeature {
 
     // Control flows for Resonator plugin ports
     private val modeId = synthController.controlFlow(ResonatorSymbol.MODE.controlId)
@@ -186,7 +185,7 @@ class ResonatorViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = ResonatorUiState()
             )
@@ -216,6 +215,6 @@ class ResonatorViewModel(
 
         @Composable
         fun feature(): ResonatorFeature =
-            synthViewModel<ResonatorViewModel, ResonatorFeature>()
+            synthFeature<ResonatorViewModel, ResonatorFeature>()
     }
 }

@@ -2,14 +2,12 @@ package org.balch.orpheus.features.presets
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +24,8 @@ import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
 import org.balch.orpheus.core.presets.SynthPreset
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 
 /** UI state for the Presets panel. */
 @Immutable
@@ -83,14 +82,15 @@ interface PresetsFeature : SynthFeature<PresetUiState, PresetPanelActions> {
  * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
  */
 @Inject
-@ViewModelKey(PresetsViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
+@ClassKey(PresetsViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class PresetsViewModel(
     private val presetsRepository: PresetsRepository,
     private val presetLoader: PresetLoader,
     private val dispatcherProvider: DispatcherProvider,
-    private val appPreferencesRepository: AppPreferencesRepository
-) : ViewModel(), PresetsFeature {
+    private val appPreferencesRepository: AppPreferencesRepository,
+    private val scope: FeatureCoroutineScope
+) : PresetsFeature {
 
     override val actions = PresetPanelActions(
         selectPreset = ::selectPreset,
@@ -110,7 +110,7 @@ class PresetsViewModel(
     )
 
     init {
-        viewModelScope.launch(dispatcherProvider.io) {
+        scope.launch(dispatcherProvider.io) {
             val initial = loadPresets()
             // Session restore: Apply last selected preset once when the ViewModel is first created.
             // This avoids re-applying presets and interrupting audio when swiping panels in compact mode.
@@ -137,7 +137,7 @@ class PresetsViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = PresetUiState.Loading
             )
@@ -212,7 +212,7 @@ class PresetsViewModel(
             is PresetIntent.ApplyPreset -> {
                 presetLoader.applyPreset(intent.preset)
                 log.info { "Applied preset: ${intent.preset.name}" }
-                viewModelScope.launch(dispatcherProvider.io) {
+                scope.launch(dispatcherProvider.io) {
                     val prefs = appPreferencesRepository.load().copy(lastPresetName = intent.preset.name)
                     appPreferencesRepository.save(prefs)
                 }
@@ -268,6 +268,6 @@ class PresetsViewModel(
 
         @Composable
         fun feature(): PresetsFeature =
-            synthViewModel<PresetsViewModel, PresetsFeature>()
+            synthFeature<PresetsViewModel, PresetsFeature>()
     }
 }

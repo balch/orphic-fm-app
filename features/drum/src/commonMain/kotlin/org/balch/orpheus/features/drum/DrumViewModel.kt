@@ -2,14 +2,11 @@ package org.balch.orpheus.features.drum
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +28,8 @@ import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.controller.intSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 
 @Immutable
@@ -209,14 +207,14 @@ interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
  * Keeps SynthEngine for triggerDrum() (imperative operation).
  */
 @Inject
-@ViewModelKey(DrumViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(DrumViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DrumViewModel(
     private val synthEngine: SynthEngine,
     synthController: SynthController,
-    dispatcherProvider: DispatcherProvider
-) : ViewModel(), DrumFeature {
+    dispatcherProvider: DispatcherProvider,
+    scope: FeatureCoroutineScope,
+) : DrumFeature {
 
     // Control flows for Drum plugin ports
     private val bdFreqId = synthController.controlFlow(DrumSymbol.BD_FREQ.controlId)
@@ -361,7 +359,7 @@ class DrumViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = DrumUiState()
             )
@@ -435,6 +433,6 @@ class DrumViewModel(
 
         @Composable
         fun feature(): DrumFeature =
-            synthViewModel<DrumViewModel, DrumFeature>()
+            synthFeature<DrumViewModel, DrumFeature>()
     }
 }

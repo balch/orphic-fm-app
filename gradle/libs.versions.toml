@@ -1,5 +1,5 @@
 [versions]
-agp = "9.0.0"
+agp = "9.0.1"
 android-compileSdk = "36"
 android-minSdk = "24"
 android-targetSdk = "36"
@@ -13,10 +13,11 @@ androidx-testExt = "1.3.0"
 composeGradlePlugin = "1.10.1"
 composeHotReload = "1.0.0"
 composeMultiplatform = "1.10.1"
-gradle = "9.0.0"
+gradle = "9.0.1"
 junit = "4.13.2"
 kotlin = "2.3.10"
-ksp = "2.3.5"
+ksp = "2.3.6"
+kotlinx-atomicfu = "0.31.0"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.10.0"
 kotlinx-datetime = "0.7.1-0.6.x-compat"
@@ -27,8 +28,8 @@ kmlogging = "2.1.0"
 material3Version = "1.9.0"
 media = "1.7.1"
 slf4jApi = "2.0.17"
-logback = "1.5.29"
-metro = "0.10.3"
+logback = "1.5.32"
+metro = "0.10.4"
 ktmidi = "0.11.2"
 coremidi4j = "1.6"
 navigation3 = "1.0.1"
@@ -63,6 +64,7 @@ compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.re
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4jApi" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "kotlinx-atomicfu" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 ktmidi = { module = "dev.atsushieno:ktmidi", version.ref = "ktmidi" }
 ktmidi-jvm-desktop = { module = "dev.atsushieno:ktmidi-jvm-desktop", version.ref = "ktmidi" }

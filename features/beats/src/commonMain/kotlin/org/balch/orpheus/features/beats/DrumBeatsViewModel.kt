@@ -2,14 +2,11 @@ package org.balch.orpheus.features.beats
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -33,7 +30,8 @@ import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.plugins.drum.engine.DrumBeatsGenerator
 
@@ -132,15 +130,15 @@ interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
  * PatternGenerator state is updated as a side effect alongside controlFlow-driven state changes.
  */
 @Inject
-@ViewModelKey(DrumBeatsViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(DrumBeatsViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DrumBeatsViewModel(
     private val synthEngine: SynthEngine,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
     private val globalTempo: GlobalTempo,
-) : ViewModel(), DrumBeatsFeature {
+    private val scope: FeatureCoroutineScope
+) : DrumBeatsFeature, AutoCloseable {
 
     // Control flows for beats ports
     private val xFlow = synthController.controlFlow(BeatsSymbol.X.controlId)
@@ -204,14 +202,14 @@ class DrumBeatsViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = BeatsUiState()
             )
 
     init {
         // Sync GlobalTempo -> BPM port
-        viewModelScope.launch(dispatcherProvider.io) {
+        scope.launch(dispatcherProvider.io) {
             globalTempo.bpm.collect { bpm ->
                 bpmFlow.value = FloatValue(bpm.toFloat())
             }
@@ -293,7 +291,7 @@ class DrumBeatsViewModel(
 
     private fun startClock() {
         clockJob?.cancel()
-        clockJob = viewModelScope.launch(dispatcherProvider.io) {
+        clockJob = scope.launch(dispatcherProvider.io) {
             var nextTickTime = synthEngine.getCurrentTime()
 
             while (isActive) {
@@ -335,8 +333,7 @@ class DrumBeatsViewModel(
         uiIntents.tryEmit(DrumBeatsIntent.TickStep(0))
     }
 
-    override fun onCleared() {
-        super.onCleared()
+    override fun close() {
         stopClock()
     }
 
@@ -349,7 +346,7 @@ class DrumBeatsViewModel(
 
         @Composable
         fun feature(): DrumBeatsFeature =
-            synthViewModel<DrumBeatsViewModel, DrumBeatsFeature>()
+            synthFeature<DrumBeatsViewModel, DrumBeatsFeature>()
     }
 }
 

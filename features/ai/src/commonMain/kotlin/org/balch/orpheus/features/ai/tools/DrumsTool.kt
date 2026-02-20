@@ -2,12 +2,13 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PluginControlId
@@ -153,14 +154,17 @@ data class DrumsControlResult(val success: Boolean, val message: String)
  * 4. SWING works best in 0.2-0.6 range
  * 5. Switch modes (BEATS_MODE) for dramatic pattern changes
  */
-@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 class DrumsTool @Inject constructor(
     private val synthController: SynthController
-) : Tool<DrumsControlArgs, DrumsControlResult>(
-    argsSerializer = DrumsControlArgs.serializer(),
-    resultSerializer = DrumsControlResult.serializer(),
-    name = "drums_control",
-    description = """
+) : ToolProvider {
+
+    override val tool by lazy {
+        object : Tool<DrumsControlArgs, DrumsControlResult>(
+            argsSerializer = DrumsControlArgs.serializer(),
+            resultSerializer = DrumsControlResult.serializer(),
+            name = "drums_control",
+            description = """
         Control drum synthesis and drum beat patterns.
 
         808 DRUMS - Manual triggering of three analog-style drum voices:
@@ -179,7 +183,12 @@ class DrumsTool @Inject constructor(
         For EUCLIDEAN_LENGTH: value is scaled 0.0-1.0 → 1-32 steps internally.
         Use BEATS_RUN=1.0 to start the sequencer, 0.0 to stop.
     """.trimIndent()
-) {
+        ) {
+            override suspend fun execute(args: DrumsControlArgs): DrumsControlResult {
+                return executeInternal(args)
+            }
+        }
+    }
     // Track current values for each control to enable smooth ramping
     private val currentValues = mutableMapOf<PluginControlId, Float>()
 
@@ -229,7 +238,7 @@ class DrumsTool @Inject constructor(
         else -> null
     }
 
-    override suspend fun execute(args: DrumsControlArgs): DrumsControlResult {
+    private suspend fun executeInternal(args: DrumsControlArgs): DrumsControlResult {
         val normalizedValue = args.value.coerceIn(0f, 1f)
         val id = args.controlId.uppercase()
 

@@ -2,14 +2,11 @@ package org.balch.orpheus.features.grains
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
@@ -27,7 +24,8 @@ import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 import org.balch.orpheus.plugins.grains.engine.GrainsMode
 
 @Immutable
@@ -122,13 +120,13 @@ interface GrainsFeature : SynthFeature<GrainsUiState, GrainsPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ViewModelKey(GrainsViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(GrainsViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class GrainsViewModel(
     synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
-) : ViewModel(), GrainsFeature {
+    private val scope: FeatureCoroutineScope
+) : GrainsFeature {
 
     // Control flows for Grains plugin ports
     private val positionId = synthController.controlFlow(GrainsSymbol.POSITION.controlId)
@@ -177,7 +175,7 @@ class GrainsViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = GrainsUiState()
             )
@@ -201,7 +199,7 @@ class GrainsViewModel(
 
     fun trigger() {
         triggerId.value = BoolValue(true)
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             kotlinx.coroutines.delay(20)
             triggerId.value = BoolValue(false)
         }
@@ -216,6 +214,6 @@ class GrainsViewModel(
 
         @Composable
         fun feature(): GrainsFeature =
-            synthViewModel<GrainsViewModel, GrainsFeature>()
+            synthFeature<GrainsViewModel, GrainsFeature>()
     }
 }

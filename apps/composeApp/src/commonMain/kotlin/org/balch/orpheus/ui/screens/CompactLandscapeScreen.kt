@@ -31,16 +31,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.toFeature
+import org.balch.orpheus.core.feature
+import org.balch.orpheus.core.LocalSynthFeatures
 import org.balch.orpheus.features.draw.DrawSequencerFeature
 import org.balch.orpheus.features.draw.DrawSequencerViewModel
 import org.balch.orpheus.features.draw.ui.CompactDrawSequencerView
 import org.balch.orpheus.features.draw.ui.ExpandedDrawSequencerScreen
-import org.balch.orpheus.features.drum.DrumViewModel
 import org.balch.orpheus.features.presets.PresetsFeature
 import org.balch.orpheus.features.presets.PresetsViewModel
-import org.balch.orpheus.features.speech.SpeechViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
@@ -69,17 +67,17 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 @Composable
 fun CompactLandscapeScreen(
     modifier: Modifier = Modifier,
-    features: Set<SynthFeature<*, *>>,
 ) {
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
 
-    val voiceFeature: VoicesFeature = features.toFeature()
-    val presetsFeature: PresetsFeature = features.toFeature()
-    val vizFeature: VizFeature = features.toFeature()
-    val sequencerFeature: DrawSequencerFeature = features.toFeature()
+    val registry = LocalSynthFeatures.current
+    val voiceFeature: VoicesFeature = registry.feature<VoiceViewModel, VoicesFeature>()
+    val presetsFeature: PresetsFeature = registry.feature<PresetsViewModel, PresetsFeature>()
+    val vizFeature: VizFeature = registry.feature<VizViewModel, VizFeature>()
+    val sequencerFeature: DrawSequencerFeature = registry.feature<DrawSequencerViewModel, DrawSequencerFeature>()
 
-    val keyActions = rememberSynthKeyActions(features)
+    val keyActions = registry.keyActions
 
     Box(modifier = modifier.fillMaxSize()) {
         CompactLandscapeLayout(

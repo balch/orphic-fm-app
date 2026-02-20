@@ -36,6 +36,7 @@ kotlin {
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.collections.immutable)
+                implementation(libs.kotlinx.atomicfu)
                 implementation(libs.kotlinx.coroutines.core)
 
                 // UI & Lifecycle (for SynthFeature and ViewModels)

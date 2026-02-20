@@ -3,13 +3,31 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
+import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
 import org.balch.orpheus.core.PanelId
+
+@Serializable
+data class PanelExpandArgs(
+    @property:LLMDescription("""
+            The panel ID string to expand or collapse, e.g. "code", "speech", "delay".
+        """)
+    val panelId: String,
+
+    @property:LLMDescription("True to expand the panel, false to collapse it. Defaults to true.")
+    val expand: Boolean = true
+)
+
+@Serializable
+data class PanelExpandResult(
+    val success: Boolean,
+    val message: String
+)
 
 /**
  * Tool for expanding or collapsing UI panels.
@@ -19,15 +37,17 @@ import org.balch.orpheus.core.PanelId
  * - Show the VIZ panel to highlight visual effects
  * - Focus on specific panels during tutorials
  */
-@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 class PanelExpandTool @Inject constructor(
     private val panelExpansionEventBus: PanelExpansionEventBus
-) : Tool<PanelExpandTool.Args, PanelExpandTool.Result>(
+) : ToolProvider {
 
-    argsSerializer = Args.serializer(),
-    resultSerializer = Result.serializer(),
-    name = "panel_expand",
-    description = """
+    override val tool by lazy {
+        object : Tool<PanelExpandArgs, PanelExpandResult>(
+            argsSerializer = PanelExpandArgs.serializer(),
+            resultSerializer = PanelExpandResult.serializer(),
+            name = "panel_expand",
+            description = """
         Expand or collapse UI panels in the synthesizer interface.
         Use this to show relevant panels before performing actions,
         like expanding the CODE panel before inserting REPL patterns.
@@ -35,27 +55,16 @@ class PanelExpandTool @Inject constructor(
         distortion, resonator, code, ai, beats, drums, grains, looper,
         warps, flux, flux_triggers, speech, tweaks.
     """.trimIndent()
-) {
+        ) {
+            override suspend fun execute(args: PanelExpandArgs): PanelExpandResult {
+                return executeInternal(args)
+            }
+        }
+    }
+
     private val log = logging("PanelExpandTool")
 
-    @Serializable
-    data class Args(
-        @property:LLMDescription("""
-            The panel ID string to expand or collapse, e.g. "code", "speech", "delay".
-        """)
-        val panelId: String,
-
-        @property:LLMDescription("True to expand the panel, false to collapse it. Defaults to true.")
-        val expand: Boolean = true
-    )
-
-    @Serializable
-    data class Result(
-        val success: Boolean,
-        val message: String
-    )
-
-    override suspend fun execute(args: Args): Result {
+    private suspend fun executeInternal(args: PanelExpandArgs): PanelExpandResult {
         val panelId = PanelId(args.panelId)
         log.debug { "PanelExpandTool: ${panelId.id} expand=${args.expand}" }
 
@@ -67,7 +76,7 @@ class PanelExpandTool @Inject constructor(
 
         val action = if (args.expand) "expanded" else "collapsed"
         log.debug { "PanelExpandTool: ${panelId.id} $action" }
-        return Result(
+        return PanelExpandResult(
             success = true,
             message = "${panelId.id} panel $action"
         )

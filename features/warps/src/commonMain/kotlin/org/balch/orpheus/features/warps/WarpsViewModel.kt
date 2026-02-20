@@ -2,14 +2,11 @@ package org.balch.orpheus.features.warps
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
@@ -25,7 +22,8 @@ import org.balch.orpheus.core.controller.enumSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 
 @Immutable
 data class WarpsUiState(
@@ -111,13 +109,13 @@ interface WarpsFeature : SynthFeature<WarpsUiState, WarpsPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ViewModelKey(WarpsViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(WarpsViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class WarpsViewModel(
     synthController: SynthController,
-    dispatcherProvider: DispatcherProvider
-) : ViewModel(), WarpsFeature {
+    dispatcherProvider: DispatcherProvider,
+    scope: FeatureCoroutineScope,
+) : WarpsFeature {
 
     // Control flows for Warps plugin ports
     private val algorithmId = synthController.controlFlow(WarpsSymbol.ALGORITHM.controlId)
@@ -164,7 +162,7 @@ class WarpsViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = WarpsUiState()
             )
@@ -194,6 +192,6 @@ class WarpsViewModel(
 
         @Composable
         fun feature(): WarpsFeature =
-            synthViewModel<WarpsViewModel, WarpsFeature>()
+            synthFeature<WarpsViewModel, WarpsFeature>()
     }
 }

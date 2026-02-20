@@ -2,14 +2,11 @@ package org.balch.orpheus.features.distortion
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +24,8 @@ import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.StereoSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 
 @Immutable
 data class DistortionUiState(
@@ -102,14 +100,14 @@ interface DistortionFeature : SynthFeature<DistortionUiState, DistortionPanelAct
  * Keeps SynthEngine dependency for peakFlow monitoring and StereoMode (non-port state).
  */
 @Inject
-@ViewModelKey(DistortionViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*,*>>())
+@ClassKey(DistortionViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DistortionViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
-    dispatcherProvider: DispatcherProvider
-) : ViewModel(), DistortionFeature {
+    dispatcherProvider: DispatcherProvider,
+    scope: FeatureCoroutineScope,
+) : DistortionFeature {
 
     // Control flows for plugin ports
     private val driveId = synthController.controlFlow(DistortionSymbol.DRIVE.controlId)
@@ -146,7 +144,7 @@ class DistortionViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = DistortionUiState()
             )
@@ -183,6 +181,6 @@ class DistortionViewModel(
 
         @Composable
         fun feature(): DistortionFeature =
-            synthViewModel<DistortionViewModel, DistortionFeature>()
+            synthFeature<DistortionViewModel, DistortionFeature>()
     }
 }

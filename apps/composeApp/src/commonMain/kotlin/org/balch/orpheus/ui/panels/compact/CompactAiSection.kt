@@ -10,11 +10,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsPanelActions
 import org.balch.orpheus.features.ai.AiOptionsUiState
 import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.ai.chat.ChatDialogContent
+import org.balch.orpheus.features.ai.chat.ChatFeature
 import org.balch.orpheus.features.ai.chat.ChatPanelActions
 import org.balch.orpheus.features.ai.chat.ChatUiState
 import org.balch.orpheus.features.ai.chat.ChatViewModel
@@ -35,19 +36,19 @@ import org.balch.orpheus.features.ai.widgets.AiModeSelector
 @Composable
 fun CompactAiSection(
     modifier: Modifier = Modifier,
-    aiViewModel: AiOptionsViewModel = metroViewModel(),
-    chatViewModel: ChatViewModel = metroViewModel(),
+    aiFeature: AiOptionsFeature = AiOptionsViewModel.feature(),
+    chatFeature: ChatFeature = ChatViewModel.feature(),
     onShowRepl: () -> Unit = {}
 ) {
-    val aiOptionsState by aiViewModel.stateFlow.collectAsState()
-    val chatState by chatViewModel.stateFlow.collectAsState()
+    val aiOptionsState by aiFeature.stateFlow.collectAsState()
+    val chatState by chatFeature.stateFlow.collectAsState()
 
     CompactAiSectionLayout(
         modifier = modifier,
         aiOptionsState = aiOptionsState,
-        aiOptionsActions = aiViewModel.actions,
+        aiOptionsActions = aiFeature.actions,
         chatState = chatState,
-        chatActions = chatViewModel.actions,
+        chatActions = chatFeature.actions,
         onShowRepl = onShowRepl
     )
 }

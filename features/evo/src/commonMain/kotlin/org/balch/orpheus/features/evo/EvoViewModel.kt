@@ -2,15 +2,12 @@ package org.balch.orpheus.features.evo
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
@@ -31,7 +28,8 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.plugin.symbols.EvoSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 
 
 @Immutable
@@ -98,16 +96,16 @@ interface EvoFeature : SynthFeature<EvoUiState, EvoPanelActions> {
 }
 
 @Inject
-@ViewModelKey(EvoViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(EvoViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class EvoViewModel(
     strategies: Set<AudioEvolutionStrategy>,
     private val synthEngine: SynthEngine,
     private val synthController: SynthController,
     private val dispatcherProvider: DispatcherProvider,
-    private val mediaSessionStateManager: MediaSessionStateManager
-) : ViewModel(), EvoFeature {
+    private val mediaSessionStateManager: MediaSessionStateManager,
+    private val scope: FeatureCoroutineScope
+) : EvoFeature, AutoCloseable {
 
     private val log = logging("EvoViewModel")
 
@@ -137,7 +135,7 @@ class EvoViewModel(
     }
     .flowOn(dispatcherProvider.io)
     .stateIn(
-        scope = viewModelScope,
+        scope = scope,
         started = this.sharingStrategy,
         initialValue = EvoUiState(
             selectedStrategy = sortedStrategies.first(),
@@ -159,12 +157,12 @@ class EvoViewModel(
         log.debug { "Initialized with ${sortedStrategies.size} strategies: ${sortedStrategies.map { it.name }}" }
 
         // Subscribe to MIDI CC changes for evo knobs
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             synthController.controlFlow(EvoSymbol.DEPTH.controlId).collect { value ->
                 _userIntents.tryEmit(EvoIntent.Knob1(value.asFloat()))
             }
         }
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             synthController.controlFlow(EvoSymbol.RATE.controlId).collect { value ->
                 _userIntents.tryEmit(EvoIntent.Knob2(value.asFloat()))
             }
@@ -240,7 +238,7 @@ class EvoViewModel(
 
         log.debug { "Starting evolution loop with ${stateFlow.value.selectedStrategy.name}" }
 
-        evoJob = viewModelScope.launch(dispatcherProvider.default) {
+        evoJob = scope.launch(dispatcherProvider.default) {
             while (isActive) {
                 val state = stateFlow.value
                 if (!state.isEnabled) break
@@ -269,8 +267,7 @@ class EvoViewModel(
         evoJob = null
     }
 
-    override fun onCleared() {
-        super.onCleared()
+    override fun close() {
         stopEvolutionLoop()
         stateFlow.value.selectedStrategy.onDeactivate()
         log.debug { "EvoViewModel cleared" }
@@ -304,7 +301,7 @@ class EvoViewModel(
 
         @Composable
         fun feature(): EvoFeature =
-            synthViewModel<EvoViewModel, EvoFeature>()
+            synthFeature<EvoViewModel, EvoFeature>()
     }
 }
 

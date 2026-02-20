@@ -1,14 +1,11 @@
 package org.balch.orpheus.features.voice
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -43,7 +40,8 @@ import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 import org.balch.orpheus.core.tempo.GlobalTempo
 
 
@@ -159,16 +157,16 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
  * Keeps SynthEngine dependency for non-port operations (gate, hold, wobble, bend, slide, peak).
  */
 @Inject
-@ViewModelKey(VoiceViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(VoiceViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class VoiceViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
     private val wobbleController: VoiceWobbleController,
     private val globalTempo: GlobalTempo,
-    dispatcherProvider: DispatcherProvider
-) : ViewModel(), VoicesFeature {
+    dispatcherProvider: DispatcherProvider,
+    private val scope: FeatureCoroutineScope
+) : VoicesFeature {
 
     // ═══════════════════════════════════════════════════════════
     // CONTROL FLOWS
@@ -313,13 +311,13 @@ class VoiceViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = VoiceUiState()
             )
 
     init {
-        viewModelScope.launch(dispatcherProvider.io) {
+        scope.launch(dispatcherProvider.io) {
             // Pulse events
             launch {
                 synthController.onPulseStart.collect { voiceIndex ->
@@ -578,6 +576,6 @@ class VoiceViewModel(
             }
 
         @Composable
-        fun feature(): VoicesFeature = synthViewModel<VoiceViewModel, VoicesFeature>()
+        fun feature(): VoicesFeature = synthFeature<VoiceViewModel, VoicesFeature>()
     }
 }

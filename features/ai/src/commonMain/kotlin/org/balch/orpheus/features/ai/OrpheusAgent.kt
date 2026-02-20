@@ -12,15 +12,12 @@ import ai.koog.prompt.executor.clients.google.GoogleLLMClient
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.llms.SingleLLMPromptExecutor
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -40,7 +37,9 @@ import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.ai.deriveAiProviderFromKey
+import org.balch.orpheus.core.FeatureCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.tidal.ReplCodeEvent
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
@@ -54,15 +53,15 @@ import kotlin.time.ExperimentalTime
  * Orpheus AI Agent - a musical guide inhabiting the Orphic-FM synthesizer.
  * Uses Gemini to provide expert advice on sounds and can control the synth.
  */
-@SingleIn(AppScope::class)
+@SingleIn(FeatureScope::class)
 class OrpheusAgent @Inject constructor(
     private val config: OrpheusAgentConfig,
     private val aiKeyRepository: AiKeyRepository,
     private val aiModelProvider: AiModelProvider,
     private val replCodeEventBus: ReplCodeEventBus,
     private val dispatcherProvider: DispatcherProvider,
+    private val scope: FeatureCoroutineScope,
 ) {
-    private val agentScope= CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val logger = logging("OrpheusAgent")
 
     private val userIntent = MutableSharedFlow<PromptIntent>(
@@ -153,7 +152,7 @@ class OrpheusAgent @Inject constructor(
     val agentFlow: StateFlow<AgentState> = _agentState.asStateFlow()
 
     init {
-        agentScope.launch(dispatcherProvider.io) {
+        scope.launch(dispatcherProvider.io) {
             replCodeEventBus.events.collect { event ->
                 when (event) {
                     is ReplCodeEvent.Generating -> emitStatus("Generating code...", isLoading = true)
@@ -170,7 +169,7 @@ class OrpheusAgent @Inject constructor(
     }
     
     private fun startAgentIfNeeded() {
-        currentAgentJob = agentScope.launch(dispatcherProvider.io) {
+        currentAgentJob = scope.launch(dispatcherProvider.io) {
             // Get API key for the current model's provider
             val aiProvider = aiModelProvider.selectedModel.value.aiProvider
             val keyResult = aiKeyRepository.getKey(aiProvider)
@@ -213,7 +212,7 @@ class OrpheusAgent @Inject constructor(
         messages.add(ChatMessage(text = "Switching to $modelName...", type = ChatMessageType.Loading))
         _agentState.value = AgentState.Loading(messages.toList())
         
-        currentAgentJob = agentScope.launch(dispatcherProvider.io) {
+        currentAgentJob = scope.launch(dispatcherProvider.io) {
             // Get API key for the current model's provider
             val aiProvider = aiModelProvider.selectedModel.value.aiProvider
             val keyResult = aiKeyRepository.getKey(aiProvider)

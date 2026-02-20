@@ -1,14 +1,11 @@
 package org.balch.orpheus.features.ai
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -24,8 +21,10 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.balch.orpheus.core.FeatureCoroutineScope
 import org.balch.orpheus.core.PanelId
 import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
@@ -47,7 +46,7 @@ import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
 import org.balch.orpheus.core.presets.SynthPreset
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.synthFeature
 import org.balch.orpheus.core.tidal.ReplCodeEvent
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
@@ -94,7 +93,9 @@ data class AiOptionsPanelActions(
     val onSendInfluence: (String) -> Unit,
     val onSaveApiKey: (AiProvider, String) -> Unit,
     val onClearApiKey: (AiProvider) -> Unit,
-    val onSelectModel: (AiModel) -> Unit
+    val onSelectModel: (AiModel) -> Unit,
+    val onDialogPositionChange: (Float, Float) -> Unit,
+    val onDialogSizeChange: (Float, Float) -> Unit,
 ) {
     companion object {
         val EMPTY = AiOptionsPanelActions(
@@ -105,7 +106,9 @@ data class AiOptionsPanelActions(
             onSendInfluence = {},
             onSaveApiKey = { _, _ -> },
             onClearApiKey = {},
-            onSelectModel = {}
+            onSelectModel = {},
+            onDialogPositionChange = { _, _ -> },
+            onDialogSizeChange = { _, _ -> },
         )
     }
 }
@@ -125,8 +128,8 @@ interface AiOptionsFeature : SynthFeature<AiOptionsUiState, AiOptionsPanelAction
  * - Chat: Open chat dialog
  */
 @Inject
-@ViewModelKey(AiOptionsViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
+@ClassKey(AiOptionsViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class AiOptionsViewModel(
     private val agent: OrpheusAgent,
     private val synthAgentFactory: SynthControlAgent.Factory,
@@ -143,7 +146,8 @@ class AiOptionsViewModel(
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val synthOrchestrator: SynthOrchestrator,
     private val mediaSessionStateManager: MediaSessionStateManager,
-) : ViewModel(), AiOptionsFeature {
+    private val scope: FeatureCoroutineScope,
+) : AiOptionsFeature, AutoCloseable {
 
     private val log = logging("AiOptionsViewModel")
 
@@ -153,7 +157,7 @@ class AiOptionsViewModel(
 
     init {
         // Observe model changes and restart the OrpheusAgent (Chat) when model changes
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             aiModelProvider.selectedModel
                 .drop(1) // Skip initial emission to avoid restart on startup
                 .collect { model ->
@@ -163,7 +167,7 @@ class AiOptionsViewModel(
         }
 
         // Subscribe to user interaction events to deactivate REPL mode
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             replCodeEventBus.events.collect { event ->
                 if (event is ReplCodeEvent.UserInteraction && _isReplActive.value) {
                     log.debug { "User interaction detected, deactivating REPL mode" }
@@ -173,7 +177,7 @@ class AiOptionsViewModel(
         }
 
         // Subscribe to playback lifecycle events (e.g., foreground service stop)
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
                     is PlaybackLifecycleEvent.StopAll -> {
@@ -186,7 +190,7 @@ class AiOptionsViewModel(
         }
 
         // Subscribe to mode change events (from OrpheusAgent tools like StartCompositionTool)
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             modeChangeEventBus.events.collect { event ->
                 when (event) {
                     is ModeChangeEvent.StartComposition -> {
@@ -227,9 +231,9 @@ class AiOptionsViewModel(
         if (_isReplActive.value) {
             log.debug { "Deactivating REPL mode (lifecycle)" }
             _isReplActive.value = false
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 runCatchingSuspend {
-                    replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
+                    replExecuteTool.tool.execute(ReplExecuteArgs(lines = listOf("hush")))
                 }.onFailure { e ->
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
@@ -254,9 +258,9 @@ class AiOptionsViewModel(
         }
         if (_isReplActive.value) {
             _isReplActive.value = false
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 runCatchingSuspend {
-                    replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
+                    replExecuteTool.tool.execute(ReplExecuteArgs(lines = listOf("hush")))
                 }
             }
         }
@@ -278,7 +282,7 @@ class AiOptionsViewModel(
         val newAgent = synthAgentFactory.create(SoloAgentConfig)
         _soloAgent.value = newAgent
         
-        viewModelScope.launch(dispatcherProvider.io) {
+        scope.launch(dispatcherProvider.io) {
 
 /*
             if (event.type != CompositionType.USER_PROMPTED) {
@@ -324,7 +328,7 @@ class AiOptionsViewModel(
      * Save a user-provided API key.
      */
     private fun saveApiKey(aiProvider: AiProvider, key: String) {
-        viewModelScope.launch(dispatcherProvider.io) {
+        scope.launch(dispatcherProvider.io) {
             val success = aiKeyRepository.setKey(aiProvider, key)
             if (success) {
                 log.debug { "API key saved successfully" }
@@ -338,7 +342,7 @@ class AiOptionsViewModel(
      * Clear the user-provided API key.
      */
     private fun clearApiKey(aiProvider: AiProvider) {
-        viewModelScope.launch(dispatcherProvider.io) {
+        scope.launch(dispatcherProvider.io) {
             aiKeyRepository.clearApiKey(aiProvider)
             log.debug { "API key cleared" }
         }
@@ -364,7 +368,7 @@ class AiOptionsViewModel(
     private val messages: StateFlow<List<ChatMessage>> = agent.agentFlow
         .map { it.messages }
         .stateIn(
-            scope = viewModelScope,
+            scope = scope,
             started = this.sharingStrategy,
             initialValue = emptyList()
         )
@@ -394,9 +398,9 @@ class AiOptionsViewModel(
         val wasReplActive = _isReplActive.value
         if (wasReplActive && !wasActive) {
             _isReplActive.value = false
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 runCatchingSuspend {
-                    replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
+                    replExecuteTool.tool.execute(ReplExecuteArgs(lines = listOf("hush")))
                 }.onFailure { e ->
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
@@ -425,7 +429,7 @@ class AiOptionsViewModel(
             
             // Drone mode only uses Quad 3 (voices 8-11) for background drones
             // Quads 1 and 2 remain untouched for user to play over
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 // If we just stopped Solo, give it a moment to clean up
                 if (wasSoloActive) {
                     delay(500)
@@ -478,9 +482,9 @@ class AiOptionsViewModel(
         val wasReplActive = _isReplActive.value
         if (wasReplActive && !wasActive) {
             _isReplActive.value = false
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 runCatchingSuspend {
-                    replExecuteTool.execute(ReplExecuteArgs(lines = listOf("hush")))
+                    replExecuteTool.tool.execute(ReplExecuteArgs(lines = listOf("hush")))
                 }.onFailure { e ->
                     log.warn { "Failed to hush REPL: ${e.message}" }
                 }
@@ -508,7 +512,7 @@ class AiOptionsViewModel(
             _soloAgent.value = newAgent
             
             // Generate and apply a specialized solo/lead preset
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 // If we just stopped Drone, give it a moment to clean up
                 if (wasDroneActive) {
                     delay(500)
@@ -693,7 +697,7 @@ class AiOptionsViewModel(
             
             // Immediately open CODE panel and close LFO/DELAY panels
             // This gives instant UI feedback before AI starts generating
-            viewModelScope.launch(dispatcherProvider.default) {
+            scope.launch(dispatcherProvider.default) {
                 panelExpansionEventBus.expand(PanelId.CODE)
                 panelExpansionEventBus.collapse(PanelId.LFO)
                 panelExpansionEventBus.collapse(PanelId.DELAY)
@@ -701,12 +705,12 @@ class AiOptionsViewModel(
             }
 
             // Emit generating event immediately so UI shows loading state
-            viewModelScope.launch(dispatcherProvider.default) {
+            scope.launch(dispatcherProvider.default) {
                 replCodeEventBus.emitGenerating()
             }
             
             // Reset to Default preset
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 val defaultPreset = presetsRepository.getDefault()
                 presetLoader.applyPreset(defaultPreset)
                 log.debug { "Reset to Default preset for REPL" }
@@ -744,12 +748,12 @@ class AiOptionsViewModel(
             log.debug { "REPL mode deactivated" }
 
             // Emit UserInteraction to clear the AI generating state
-            viewModelScope.launch(dispatcherProvider.default) {
+            scope.launch(dispatcherProvider.default) {
                 replCodeEventBus.emitUserInteraction()
             }
 
             // Stop all REPL patterns with ramp down
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 runCatchingSuspend {
                     // Get current volumes
                     val vol0 = synthEngine.getQuadVolume(0)
@@ -766,7 +770,7 @@ class AiOptionsViewModel(
                     // Wait for fade to complete
                     delay((fadeDuration * 1000).toLong())
 
-                    replExecuteTool.execute(
+                    replExecuteTool.tool.execute(
                         ReplExecuteArgs(lines = listOf("hush"))
                     )
                     log.debug { "Hushed REPL patterns" }
@@ -779,7 +783,7 @@ class AiOptionsViewModel(
                     log.warn { "Failed to hush REPL patterns gracefully: ${e.message}" }
                     // Fallback
                     runCatchingSuspend {
-                        replExecuteTool.execute(
+                        replExecuteTool.tool.execute(
                             ReplExecuteArgs(lines = listOf("hush"))
                         )
                     }
@@ -843,7 +847,7 @@ class AiOptionsViewModel(
      * Select a new AI model.
      */
     private fun selectModel(model: AiModel) {
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             aiModelProvider.selectModel(model)
             log.debug { "Model selected: ${model.displayName}" }
         }
@@ -857,16 +861,10 @@ class AiOptionsViewModel(
         onSendInfluence = ::sendInfluence,
         onSaveApiKey = ::saveApiKey,
         onClearApiKey = ::clearApiKey,
-        onSelectModel = ::selectModel
+        onSelectModel = ::selectModel,
+        onDialogPositionChange = { x, y -> _dialogPosition.value = x to y },
+        onDialogSizeChange = { w, h -> _dialogSize.value = w to h },
     )
-
-    fun updateDialogPosition(x: Float, y: Float) {
-        _dialogPosition.value = x to y
-    }
-
-    fun updateDialogSize(width: Float, height: Float) {
-        _dialogSize.value = width to height
-    }
 
     private data class AiFeatureFlags(
         val isDroneActive: Boolean,
@@ -907,7 +905,7 @@ class AiOptionsViewModel(
             selectedModel = model
         )
     }.stateIn(
-        scope = viewModelScope,
+        scope = scope,
         started = this.sharingStrategy,
         initialValue = AiOptionsUiState(
             availableModels = availableModels,
@@ -917,8 +915,7 @@ class AiOptionsViewModel(
         )
     )
 
-    override fun onCleared() {
-        super.onCleared()
+    override fun close() {
         stopAllAgents()
     }
 
@@ -931,6 +928,6 @@ class AiOptionsViewModel(
 
         @Composable
         fun feature(): AiOptionsFeature =
-            synthViewModel<AiOptionsViewModel, AiOptionsFeature>()
+            synthFeature<AiOptionsViewModel, AiOptionsFeature>()
     }
 }

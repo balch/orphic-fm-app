@@ -3,13 +3,14 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
+import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.features.ai.CompositionType
 import org.balch.orpheus.features.ai.ModeChangeEventBus
 
@@ -63,14 +64,17 @@ data class StartCompositionResult(
  * - "Play me something relaxing"
  * - "Start a drone background"
  */
-@ContributesIntoSet(AppScope::class, binding<Tool<*, *>>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
 class StartCompositionTool @Inject constructor(
     private val modeChangeEventBus: ModeChangeEventBus
-) : Tool<StartCompositionArgs, StartCompositionResult>(
-    argsSerializer = StartCompositionArgs.serializer(),
-    resultSerializer = StartCompositionResult.serializer(),
-    name = "start_composition",
-    description = """
+) : ToolProvider {
+
+    override val tool by lazy {
+        object : Tool<StartCompositionArgs, StartCompositionResult>(
+            argsSerializer = StartCompositionArgs.serializer(),
+            resultSerializer = StartCompositionResult.serializer(),
+            name = "start_composition",
+            description = """
         IMMEDIATELY use this tool when the user wants to:
         - JAM or improvise (\"let's jam\", \"jam with me\", \"start jamming\", \"improvise something\")
         - CREATE A SONG (\"create a song\", \"compose something\", \"write a song\", \"make music\")
@@ -81,10 +85,16 @@ class StartCompositionTool @Inject constructor(
         This switches to Dashboard mode and launches the Solo AI composer to create full compositions.
         DO NOT use REPL or manual synth controls when the user asks for jamming or full compositions.
     """.trimIndent()
-) {
+        ) {
+            override suspend fun execute(args: StartCompositionArgs): StartCompositionResult {
+                return executeInternal(args)
+            }
+        }
+    }
+
     private val log = logging("StartCompositionTool")
 
-    override suspend fun execute(args: StartCompositionArgs): StartCompositionResult {
+    private suspend fun executeInternal(args: StartCompositionArgs): StartCompositionResult {
         log.debug { "Starting composition: $args" }
         val songName = args.name ?: "Untitled Composition"
         val userRequest = buildString {

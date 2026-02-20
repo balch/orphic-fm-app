@@ -1,0 +1,2 @@
+*.dylib !text !filter !merge !diff
+*.task !text !filter !merge !diff

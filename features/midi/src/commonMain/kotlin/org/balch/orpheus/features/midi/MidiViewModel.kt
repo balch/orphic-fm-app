@@ -2,14 +2,12 @@ package org.balch.orpheus.features.midi
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +23,8 @@ import org.balch.orpheus.core.midi.MidiInputHandler
 import org.balch.orpheus.core.midi.MidiMappingRepository
 import org.balch.orpheus.core.midi.MidiMappingState
 import org.balch.orpheus.core.midi.MidiMappingStateHolder
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 
 /** UI state for the MIDI panel. */
 @Immutable
@@ -48,15 +47,16 @@ interface MidiFeature : SynthFeature<MidiUiState, MidiPanelActions> {
  * SynthController and all MidiViewModel instances share the same state.
  */
 @Inject
-@ViewModelKey(MidiViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
+@ClassKey(MidiViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class MidiViewModel(
     val midiController: MidiController,
     private val midiRepository: MidiMappingRepository,
     private val stateHolder: MidiMappingStateHolder,
     private val midiInputHandler: MidiInputHandler,
-    private val dispatcherProvider: DispatcherProvider
-) : ViewModel(), MidiFeature {
+    private val dispatcherProvider: DispatcherProvider,
+    private val scope: FeatureCoroutineScope
+) : MidiFeature, AutoCloseable {
 
     private val log = logging("MidiViewModel")
 
@@ -78,7 +78,7 @@ class MidiViewModel(
             mappingState = mappingState
         )
     }.stateIn(
-        scope = viewModelScope,
+        scope = scope,
         started = this.sharingStrategy,
         initialValue = MidiUiState()
     )
@@ -103,7 +103,7 @@ class MidiViewModel(
     private var lastDeviceName: String? = null
 
     init {
-        viewModelScope.launch(dispatcherProvider.io) {
+        scope.launch(dispatcherProvider.io) {
             tryConnectMidi()
             startMidiPolling()
         }
@@ -131,7 +131,7 @@ class MidiViewModel(
 
         // Persist to storage
         midiController.currentDeviceName?.let { deviceName ->
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 midiRepository.save(deviceName, stateHolder.state.value)
             }
         }
@@ -195,7 +195,7 @@ class MidiViewModel(
                 _isConnected.value = true
                 log.debug { "MIDI initialized and listening on: $deviceName" }
 
-                viewModelScope.launch(dispatcherProvider.io) {
+                scope.launch(dispatcherProvider.io) {
                     midiRepository.load(deviceName)?.let { savedMapping ->
                         stateHolder.updateState(savedMapping)
                         log.debug { "Loaded saved MIDI mappings for $deviceName" }
@@ -212,7 +212,7 @@ class MidiViewModel(
     private fun startMidiPolling() {
         midiPollingJob?.cancel()
         midiPollingJob =
-            viewModelScope.launch(dispatcherProvider.io) {
+            scope.launch(dispatcherProvider.io) {
                 while (isActive) {
                     delay(2000)
 
@@ -245,8 +245,7 @@ class MidiViewModel(
         _isConnected.value = false
     }
 
-    override fun onCleared() {
-        super.onCleared()
+    override fun close() {
         stop()
     }
     
@@ -267,7 +266,7 @@ class MidiViewModel(
 
         @Composable
         fun feature(): MidiFeature =
-            synthViewModel<MidiViewModel, MidiFeature>()
+            synthFeature<MidiViewModel, MidiFeature>()
     }
 
 }

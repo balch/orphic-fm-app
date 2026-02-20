@@ -2,14 +2,11 @@ package org.balch.orpheus.features.lfo
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,7 +25,8 @@ import org.balch.orpheus.core.controller.enumSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 
 @Immutable
 data class LfoUiState(
@@ -111,13 +109,13 @@ interface LfoFeature : SynthFeature<LfoUiState, LfoPanelActions> {
  * Uses SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ViewModelKey(LfoViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(LfoViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class LfoViewModel(
     synthController: SynthController,
-    dispatcherProvider: DispatcherProvider
-) : ViewModel(), LfoFeature {
+    dispatcherProvider: DispatcherProvider,
+    scope: FeatureCoroutineScope,
+) : LfoFeature {
 
     // Control flows for DuoLfo plugin (using plugin-api symbols)
     private val freqAId = synthController.controlFlow(DuoLfoSymbol.FREQ_A.controlId)
@@ -156,7 +154,7 @@ class LfoViewModel(
             }
             .flowOn(dispatcherProvider.io)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = this.sharingStrategy,
                 initialValue = LfoUiState()
             )
@@ -218,6 +216,6 @@ class LfoViewModel(
 
         @Composable
         fun feature(): LfoFeature =
-            synthViewModel<LfoViewModel, LfoFeature>()
+            synthFeature<LfoViewModel, LfoFeature>()
     }
 }

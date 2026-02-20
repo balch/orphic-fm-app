@@ -4,16 +4,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
+import org.balch.orpheus.core.di.FeatureScope
+import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
-import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.SynthFeature
-import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +23,8 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
-import org.balch.orpheus.core.synthViewModel
+import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.synthFeature
 import org.balch.orpheus.core.tidal.ConsoleEntry
 import org.balch.orpheus.core.tidal.EvalMode
 import org.balch.orpheus.core.tidal.Pattern
@@ -109,9 +107,8 @@ sealed class LiveCodeIntent {
  * Delegates to TidalRepl for REPL evaluation lifecycle.
  */
 @Inject
-@ViewModelKey(LiveCodeViewModel::class)
-@ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
-@ContributesIntoSet(AppScope::class, binding = binding<SynthFeature<*, *>>())
+@ClassKey(LiveCodeViewModel::class)
+@ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class LiveCodeViewModel(
     private val scheduler: TidalScheduler,
     private val repl: TidalRepl,
@@ -119,8 +116,9 @@ class LiveCodeViewModel(
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val mediaSessionStateManager: MediaSessionStateManager,
     private val synthEngine: SynthEngine,
-    private val dispatcherProvider: DispatcherProvider
-) : ViewModel(), LiveCodeFeature {
+    private val dispatcherProvider: DispatcherProvider,
+    private val scope: FeatureCoroutineScope
+) : LiveCodeFeature, AutoCloseable {
 
     override val actions = LiveCodePanelActions(
         setCode = ::updateCode,
@@ -159,7 +157,7 @@ class LiveCodeViewModel(
     }
 
     private fun observeIntents() {
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             _intents
                 .scan(_uiState.value) { state, intent ->
                     intent?.let { reduce(state, it) } ?: state
@@ -171,7 +169,7 @@ class LiveCodeViewModel(
     }
 
     private fun observeSchedulerState() {
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             scheduler.state.collect { schedState ->
                 val wasPlaying = _uiState.value.isPlaying
                 _uiState.value = _uiState.value.copy(
@@ -188,7 +186,7 @@ class LiveCodeViewModel(
     }
 
     private fun observeReplCodeEvents() {
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             replCodeEventBus.events.collect { event ->
                 logger.d { "Received ReplCodeEvent: $event" }
                 when (event) {
@@ -217,7 +215,7 @@ class LiveCodeViewModel(
     }
 
     private fun observePlaybackLifecycle() {
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
                     is PlaybackLifecycleEvent.StopAll -> {
@@ -512,21 +510,21 @@ class LiveCodeViewModel(
     }
     
     fun execute() {
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             replCodeEventBus.emitUserInteraction()
             _intents.value = LiveCodeIntent.Execute
         }
     }
 
     fun executeBlock() {
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             replCodeEventBus.emitUserInteraction()
             _intents.value = LiveCodeIntent.ExecuteBlock
         }
     }
 
     fun executeLine() {
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             replCodeEventBus.emitUserInteraction()
             _intents.value = LiveCodeIntent.ExecuteLine
         }
@@ -537,7 +535,7 @@ class LiveCodeViewModel(
     }
     
     fun stop() {
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             replCodeEventBus.emitUserInteraction()
             _intents.value = LiveCodeIntent.Stop
         }
@@ -559,8 +557,7 @@ class LiveCodeViewModel(
         _intents.value = LiveCodeIntent.DeleteLine
     }
     
-    override fun onCleared() {
-        super.onCleared()
+    override fun close() {
         scheduler.stop()
     }
     
@@ -737,6 +734,6 @@ d4 $ slow 2 $ note "<c2 g2 e2 b2>"
 
         @Composable
         fun feature(): LiveCodeFeature =
-             synthViewModel<LiveCodeViewModel, LiveCodeUiState, LiveCodePanelActions>() as LiveCodeFeature
+             synthFeature<LiveCodeViewModel, LiveCodeUiState, LiveCodePanelActions>() as LiveCodeFeature
     }
 }

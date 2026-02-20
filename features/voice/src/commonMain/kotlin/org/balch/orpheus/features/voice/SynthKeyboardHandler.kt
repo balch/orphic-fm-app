@@ -12,7 +12,7 @@ import org.balch.orpheus.core.input.KeyBinding
 /**
  * Pure keyboard dispatcher: maps key events to [KeyAction]s.
  * Has zero feature-specific knowledge — all wiring lives in the action map
- * built by `rememberSynthKeyActions()`.
+ * built by `SynthFeatureRegistry.keyActions`.
  *
  * Respects [KeyBinding.requiresShift] (shift-specific bindings take priority)
  * and [KeyBinding.eventType] (Trigger actions only fire on the matching event type).

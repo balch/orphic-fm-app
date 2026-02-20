@@ -20,3 +20,6 @@ node_modules/
 
 # build-logic kotlin-dsl generated files
 **/bin/
+
+# Python virtual environments
+tools/train-asl-model/
