@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.ui.panels.PanelSetRegistry
 import org.balch.orpheus.core.panels.panelSet
+import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
 
 @Serializable
@@ -117,10 +118,10 @@ class PanelSetTool @Inject constructor(
 
         val newSet = panelSet(name) {
             expanded.forEach { id ->
-                expand(org.balch.orpheus.core.PanelId(id))
+                expand(PanelId(id))
             }
             collapsed.forEach { id ->
-                collapse(org.balch.orpheus.core.PanelId(id))
+                collapse(PanelId(id))
             }
         }
 

@@ -25,11 +25,15 @@ kotlin {
         minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
 
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
+            jvmTarget.set(JvmTarget.JVM_21)
         }
     }
 
-    jvm()
+    jvm {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_21)
+        }
+    }
 
     sourceSets {
         commonMain.dependencies {
@@ -45,7 +49,7 @@ kotlin {
 
 
 
-// Exclude libremidi-panama from test configurations (requires JVM 22+, we use JVM 21)
+// Exclude libremidi-panama from test configurations (requires JVM 22+ with Panama FFI)
 configurations.matching { it.name.contains("test", ignoreCase = true) }.all {
     exclude(group = "dev.atsushieno", module = "libremidi-panama")
 }

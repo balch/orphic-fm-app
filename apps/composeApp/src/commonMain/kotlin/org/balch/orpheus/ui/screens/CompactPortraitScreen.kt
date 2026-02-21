@@ -26,10 +26,10 @@ import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
-import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.feature
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.core.input.KeyBinding
-import org.balch.orpheus.core.LocalSynthFeatures
+import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.features.visualizations.VizFeature

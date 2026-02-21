@@ -37,7 +37,7 @@ import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.ai.deriveAiProviderFromKey
-import org.balch.orpheus.core.FeatureCoroutineScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.tidal.ReplCodeEvent

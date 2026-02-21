@@ -13,7 +13,7 @@ import org.balch.orpheus.core.tidal.ReplCodeEventBus
 import org.balch.orpheus.core.tidal.ReplResult
 import org.balch.orpheus.core.tidal.TidalRepl
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
-import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.features.PanelId
 
 @LLMDescription("Arguments for executing REPL code. Provide an array of lines to execute together as one block.")
 @Serializable

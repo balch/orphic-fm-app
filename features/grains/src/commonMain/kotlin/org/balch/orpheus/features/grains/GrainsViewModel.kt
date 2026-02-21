@@ -15,8 +15,8 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
 import org.balch.orpheus.core.controller.enumSetter
@@ -24,8 +24,8 @@ import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
-import org.balch.orpheus.core.FeatureCoroutineScope
-import org.balch.orpheus.core.synthFeature
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.plugins.grains.engine.GrainsMode
 
 @Immutable

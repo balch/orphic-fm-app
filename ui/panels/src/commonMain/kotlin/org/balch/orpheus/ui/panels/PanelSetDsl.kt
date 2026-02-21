@@ -1,6 +1,6 @@
 package org.balch.orpheus.core.panels
 
-import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.features.PanelId
 
 @DslMarker
 annotation class PanelSetDsl

@@ -16,7 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.FeaturePanel
+import org.balch.orpheus.core.features.FeaturePanel
 
 /**
  * A container for the top header panel row that manages expansion state

@@ -6,9 +6,9 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.FeaturePanel
-import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.featurePanelPreview
+import org.balch.orpheus.core.features.FeaturePanel
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject

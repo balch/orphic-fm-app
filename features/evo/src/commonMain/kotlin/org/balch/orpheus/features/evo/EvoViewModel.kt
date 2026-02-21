@@ -21,15 +21,15 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.plugin.symbols.EvoSymbol
-import org.balch.orpheus.core.FeatureCoroutineScope
-import org.balch.orpheus.core.synthFeature
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.synthFeature
 
 
 @Immutable

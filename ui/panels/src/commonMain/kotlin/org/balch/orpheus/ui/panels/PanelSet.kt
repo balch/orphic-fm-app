@@ -1,7 +1,7 @@
 package org.balch.orpheus.core.panels
 
 import kotlinx.serialization.Serializable
-import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.features.PanelId
 
 /**
  * Configuration for a single panel within a [PanelSet].

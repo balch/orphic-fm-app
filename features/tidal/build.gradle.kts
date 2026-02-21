@@ -18,7 +18,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-             // Core deps provided by convention
+            implementation(project(":core:tidal"))
         }
     }
 }

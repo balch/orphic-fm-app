@@ -1,6 +1,6 @@
 package org.balch.orpheus.ui
 
-import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.panels.PanelSet
 import org.balch.orpheus.core.panels.factoryPanelSet
 

@@ -10,7 +10,7 @@ import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
-import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.features.PanelId
 
 @Serializable
 data class PanelExpandArgs(

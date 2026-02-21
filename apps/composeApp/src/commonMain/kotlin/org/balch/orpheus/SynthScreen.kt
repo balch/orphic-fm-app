@@ -14,9 +14,9 @@ import com.diamondedge.logging.logging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.balch.orpheus.core.audio.SynthOrchestrator
-import org.balch.orpheus.core.feature
+import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.core.midi.LearnTarget
-import org.balch.orpheus.core.LocalSynthFeatures
+import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.features.ai.ControlHighlightEventBus
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiViewModel

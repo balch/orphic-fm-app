@@ -9,8 +9,8 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.FeatureCollection
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.FeatureCollection
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PluginControlId

@@ -19,6 +19,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":core:ai"))
+            implementation(project(":core:tts"))
+            implementation(project(":core:tidal"))
             implementation(project(":features:visualizations")) // For LiquidPreview if needed
             implementation(project(":features:drum")) // For DrumsTool
             implementation(project(":features:warps")) // For SynthControlTool?

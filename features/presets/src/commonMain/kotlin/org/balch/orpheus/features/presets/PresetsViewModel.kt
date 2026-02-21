@@ -18,14 +18,14 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
 import org.balch.orpheus.core.presets.SynthPreset
-import org.balch.orpheus.core.FeatureCoroutineScope
-import org.balch.orpheus.core.synthFeature
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.synthFeature
 
 /** UI state for the Presets panel. */
 @Immutable

@@ -11,15 +11,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import org.balch.orpheus.core.FeatureCoroutineScope
-import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.di.FeatureScope
-import org.balch.orpheus.core.synthFeature
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.features.ai.AgentState
 import org.balch.orpheus.features.ai.OrpheusAgent
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessageType
-import org.balch.orpheus.features.ai.session.SessionUsage
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 data class ChatUiState(

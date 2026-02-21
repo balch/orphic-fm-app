@@ -11,9 +11,9 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.PluginInfo
-import org.balch.orpheus.core.audio.dsp.Port
-import org.balch.orpheus.core.audio.dsp.ports
+import org.balch.orpheus.core.plugin.PluginInfo
+import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.ports
 
 /**
  * DSP Plugin for Native Audio Looper.

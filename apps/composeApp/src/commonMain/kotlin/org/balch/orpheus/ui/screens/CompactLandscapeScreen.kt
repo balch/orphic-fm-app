@@ -31,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.core.feature
-import org.balch.orpheus.core.LocalSynthFeatures
+import org.balch.orpheus.core.features.feature
+import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.features.draw.DrawSequencerFeature
 import org.balch.orpheus.features.draw.DrawSequencerViewModel
 import org.balch.orpheus.features.draw.ui.CompactDrawSequencerView

@@ -17,6 +17,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.pluginApi)
+            implementation(project(":core:tts"))
         }
     }
 }

@@ -19,10 +19,10 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
-import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.FeatureCoroutineScope
-import org.balch.orpheus.core.synthFeature
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.synthFeature
 
 @Immutable
 data class LooperUiState(

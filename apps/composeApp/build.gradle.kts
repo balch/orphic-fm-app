@@ -45,7 +45,12 @@ kotlin {
         }
         commonMain.dependencies {
             api(project(":core:audio"))
+            api(project(":core:features"))
             api(project(":core:foundation"))
+            api(project(":core:midi"))
+            api(project(":core:ai"))
+            api(project(":core:tidal"))
+            api(project(":core:tts"))
             api(project(":core:plugins:beats"))
             api(project(":core:plugins:voice"))
             api(project(":core:plugins:delay"))
@@ -156,7 +161,7 @@ compose.desktop {
                 iconFile.set(project.file("src/jvmMain/resources/icon.png"))
             }
         }
-        
+
         // Forward debug flags from Gradle to the App
         jvmArgs += listOf("-Dorpheus.debug.gc=${System.getProperty("orpheus.debug.gc", "false")}")
     }

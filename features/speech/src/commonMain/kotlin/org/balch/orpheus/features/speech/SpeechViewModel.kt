@@ -20,9 +20,9 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import androidx.compose.ui.input.key.Key
-import org.balch.orpheus.core.FeatureCoroutineScope
-import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.input.KeyAction
 import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.audio.SynthEngine
@@ -33,10 +33,10 @@ import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.TTS_URI
 import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 import org.balch.orpheus.core.presets.PresetLoader
-import org.balch.orpheus.core.speech.SpeechEvent
-import org.balch.orpheus.core.speech.SpeechEventBus
-import org.balch.orpheus.core.speech.TtsGenerator
-import org.balch.orpheus.core.synthFeature
+import org.balch.orpheus.core.tts.SpeechEvent
+import org.balch.orpheus.core.tts.SpeechEventBus
+import org.balch.orpheus.core.tts.TtsGenerator
+import org.balch.orpheus.core.features.synthFeature
 
 @Immutable
 data class SpeechUiState(

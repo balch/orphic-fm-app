@@ -36,9 +36,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.FeaturePanel
-import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.featurePanelPreview
+import org.balch.orpheus.core.features.FeaturePanel
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.featurePanelPreview
 import org.balch.orpheus.ui.panels.LocalCompactMode
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme

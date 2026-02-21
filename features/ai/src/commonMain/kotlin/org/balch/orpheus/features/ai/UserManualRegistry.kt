@@ -2,9 +2,9 @@ package org.balch.orpheus.features.ai
 
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.FeatureCollection
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.FeatureCollection
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.input.KeyBinding
 

@@ -5,7 +5,11 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.plugin.PluginInfo
+import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.Symbol
+import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.core.plugin.symbols.TTS_URI
 import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 

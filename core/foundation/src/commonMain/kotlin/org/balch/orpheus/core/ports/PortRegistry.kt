@@ -3,9 +3,9 @@ package org.balch.orpheus.core.ports
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import org.balch.orpheus.core.audio.dsp.ControlPort
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.Symbol
+import org.balch.orpheus.core.plugin.ControlPort
+import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.PortType
 import org.balch.orpheus.core.plugin.PortValue
 

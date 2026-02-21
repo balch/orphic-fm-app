@@ -1,5 +1,10 @@
 package org.balch.orpheus.core.audio.dsp
 
+import org.balch.orpheus.core.plugin.PluginInfo
+import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.Symbol
+
 /**
  * Base interface for DSP plugin modules.
  * 

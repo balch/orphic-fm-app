@@ -16,8 +16,8 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import androidx.compose.ui.input.key.Key
-import org.balch.orpheus.core.PanelId
-import org.balch.orpheus.core.SynthFeature
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.input.KeyAction
 import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.audio.SynthEngine
@@ -28,8 +28,8 @@ import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.controller.intSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
-import org.balch.orpheus.core.FeatureCoroutineScope
-import org.balch.orpheus.core.synthFeature
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 
 @Immutable

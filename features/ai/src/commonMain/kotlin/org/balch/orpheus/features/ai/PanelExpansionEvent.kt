@@ -7,7 +7,7 @@ import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.panels.PanelSet
 
 /**

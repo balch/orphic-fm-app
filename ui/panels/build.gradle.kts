@@ -14,6 +14,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            api(project(":core:features"))
             api(project(":core:foundation"))
             implementation(libs.kotlinx.coroutines.core)
         }

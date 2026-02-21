@@ -1,47 +1,9 @@
-@file:Suppress("unused")
 package org.balch.orpheus.core.audio.dsp
 
 import kotlinx.serialization.Serializable
 
 /**
- * Re-export types from core:plugin-api for backward compatibility.
- * New code should import from org.balch.orpheus.core.plugin directly.
- */
-
-// Re-export all port types
-typealias Port = org.balch.orpheus.core.plugin.Port
-typealias AudioPort = org.balch.orpheus.core.plugin.AudioPort
-typealias ControlPort = org.balch.orpheus.core.plugin.ControlPort
-typealias AtomPort = org.balch.orpheus.core.plugin.AtomPort
-typealias PortValue = org.balch.orpheus.core.plugin.PortValue
-typealias FloatValue = org.balch.orpheus.core.plugin.PortValue.FloatValue
-typealias IntValue = org.balch.orpheus.core.plugin.PortValue.IntValue
-typealias BoolValue = org.balch.orpheus.core.plugin.PortValue.BoolValue
-typealias PortType = org.balch.orpheus.core.plugin.PortType
-typealias Symbol = org.balch.orpheus.core.plugin.Symbol
-
-// Re-export plugin API types
-typealias PluginInfo = org.balch.orpheus.core.plugin.PluginInfo
-typealias PortSymbol = org.balch.orpheus.core.plugin.PortSymbol
-typealias PluginControlId = org.balch.orpheus.core.plugin.PluginControlId
-
-// Re-export DSL types
-typealias PortsDsl = org.balch.orpheus.core.plugin.PortsDsl
-typealias PortDef<T> = org.balch.orpheus.core.plugin.PortDef<T>
-typealias FloatPortBuilder = org.balch.orpheus.core.plugin.FloatPortBuilder
-typealias IntPortBuilder = org.balch.orpheus.core.plugin.IntPortBuilder
-typealias BoolPortBuilder = org.balch.orpheus.core.plugin.BoolPortBuilder
-typealias AudioPortBuilder = org.balch.orpheus.core.plugin.AudioPortBuilder
-typealias ControlPortTypeBuilder = org.balch.orpheus.core.plugin.ControlPortTypeBuilder
-typealias ControlPortTypeBuilderRaw = org.balch.orpheus.core.plugin.ControlPortTypeBuilderRaw
-typealias PortsBuilder = org.balch.orpheus.core.plugin.PortsBuilder
-
-/** DSL entry point - delegates to plugin-api */
-inline fun ports(startIndex: Int = 0, init: PortsBuilder.() -> Unit): PortsBuilder =
-    org.balch.orpheus.core.plugin.ports(startIndex, init)
-
-/**
- * Audio interfaces remain in core/audio as they have platform-specific implementations.
+ * Audio interfaces that have platform-specific implementations.
  */
 
 /**

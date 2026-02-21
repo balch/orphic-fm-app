@@ -10,16 +10,16 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
-import org.balch.orpheus.core.PanelId
+import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
-import org.balch.orpheus.core.speech.SpeechEventBus
-import org.balch.orpheus.core.speech.SpeechVocabulary
-import org.balch.orpheus.core.speech.TtsGenerator
+import org.balch.orpheus.core.tts.SpeechEventBus
+import org.balch.orpheus.core.tts.SpeechVocabulary
+import org.balch.orpheus.core.tts.TtsGenerator
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
 
 @Serializable

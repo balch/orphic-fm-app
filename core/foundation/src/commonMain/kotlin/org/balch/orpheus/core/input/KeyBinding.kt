@@ -6,7 +6,7 @@ import androidx.compose.ui.input.key.KeyEventType
 /**
  * Describes a single keyboard shortcut binding for a synth feature.
  *
- * Each feature's [SynthFeature.keyBindings][org.balch.orpheus.core.SynthFeature.keyBindings]
+ * Each feature's [SynthFeature.keyBindings][org.balch.orpheus.core.features.SynthFeature.keyBindings]
  * list provides these with a non-null [action] wired to the ViewModel.
  * AI tools and documentation consumers read the same list, ignoring [action].
  */

@@ -19,9 +19,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.FeaturePanel
-import org.balch.orpheus.core.feature
-import org.balch.orpheus.core.LocalSynthFeatures
+import org.balch.orpheus.core.features.FeaturePanel
+import org.balch.orpheus.core.features.feature
+import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiViewModel

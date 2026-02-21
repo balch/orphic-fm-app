@@ -9,8 +9,8 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.balch.orpheus.core.SynthFeature
-import org.balch.orpheus.core.synthFeature
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
 
 interface DrawSequencerFeature: SynthFeature<DrawSequencerUiState, DrawSequencerPanelActions> {
     override val synthControl: SynthFeature.SynthControl

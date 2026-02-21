@@ -18,6 +18,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":core:midi"))
             implementation(project(":features:visualizations")) // For LiquidPreview
         }
     }
