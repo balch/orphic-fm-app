@@ -18,6 +18,7 @@ import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.audio.WarpsSource
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.controller.enumSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
@@ -127,7 +128,7 @@ class WarpsViewModel(
     private val mixId = synthController.controlFlow(WarpsSymbol.MIX.controlId)
 
     override val actions = WarpsPanelActions(
-        setAlgorithm = algorithmId.floatSetter(),
+        setAlgorithm = { algorithmId.value = PortValue.FloatValue(it * 8f) },
         setTimbre = timbreId.floatSetter(),
         setCarrierLevel = carrierLevelId.floatSetter(),
         setModulatorLevel = modulatorLevelId.floatSetter(),
@@ -138,7 +139,7 @@ class WarpsViewModel(
 
     // Control changes -> WarpsIntent
     private val controlIntents = merge(
-        algorithmId.map { WarpsIntent.Algorithm(it.asFloat()) },
+        algorithmId.map { WarpsIntent.Algorithm(it.asFloat() / 8f) },
         timbreId.map { WarpsIntent.Timbre(it.asFloat()) },
         carrierLevelId.map { WarpsIntent.CarrierLevel(it.asFloat()) },
         modulatorLevelId.map { WarpsIntent.ModulatorLevel(it.asFloat()) },

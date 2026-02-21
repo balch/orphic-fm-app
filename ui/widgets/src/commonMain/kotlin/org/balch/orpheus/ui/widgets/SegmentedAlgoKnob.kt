@@ -83,7 +83,7 @@ fun SegmentedAlgoKnob(
     val learnState = LocalLearnModeState.current
     val isLearning = controlId != null && learnState.isLearning(controlId)
 
-    val activeIdx = (internalValue * (algoNames.size - 1)).roundToInt()
+    val activeIdx = (internalValue * (algoNames.size - 1)).roundToInt().coerceIn(0, algoNames.size - 1)
 
     Column(
         modifier = modifier
