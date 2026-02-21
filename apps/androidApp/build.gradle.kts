@@ -36,6 +36,15 @@ android {
                 "proguard-rules.pro"
             )
         }
+        create("debugRelease") {
+            // Release-level R8 + AOT optimization with debug signing.
+            // Use this for day-to-day development on Android to avoid the ~90% CPU
+            // overhead of JIT-only mode on JSyn's DSP synthesis thread.
+            // Logcat still works; step-debugger does not (rarely needed for synth work).
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            signingConfig = signingConfigs.getByName("debug")
+        }
         create("benchmark") {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")
