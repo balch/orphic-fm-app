@@ -93,6 +93,8 @@ kotlin {
             api(project(":features:presets"))
             api(project(":features:tweaks"))
             api(project(":features:voice"))
+            api(project(":features:mediapipe"))
+            api(project(":core:mediapipe"))
             implementation(libs.compose.material.icons)
             implementation(libs.compose.ui.tooling.preview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)

@@ -22,4 +22,4 @@ node_modules/
 **/bin/
 
 # Python virtual environments
-tools/train-asl-model/
+tools/train-asl-model/.venv/

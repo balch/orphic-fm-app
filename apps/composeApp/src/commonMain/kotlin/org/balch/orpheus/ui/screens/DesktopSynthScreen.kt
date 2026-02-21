@@ -16,13 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.core.features.LocalSynthFeatures
-import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.tweaks.CenterControlSection
@@ -32,6 +29,7 @@ import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.FactoryPanelSets
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.panels.HeaderViewModel
@@ -39,8 +37,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
 
 /**
- * The desktop screen - retrieves typed features from the registry and
- * delegates to [DesktopSynthLayout] for the actual UI.
+ * The desktop screen - retrieves typed features from the registry.
  */
 @Composable
 fun DesktopSynthScreen(
@@ -50,38 +47,17 @@ fun DesktopSynthScreen(
     focusRequester: FocusRequester = remember { FocusRequester() },
 ) {
     val registry = LocalSynthFeatures.current
-    DesktopSynthLayout(
-        headerFeature = registry.feature<HeaderViewModel, HeaderFeature>(),
-        voiceFeature = registry.feature<VoiceViewModel, VoicesFeature>(),
-        midiFeature = registry.feature<MidiViewModel, MidiFeature>(),
-        keyActions = registry.keyActions,
-        effects = effects,
-        isDialogActive = isDialogActive,
-        onDialogActiveChange = onDialogActiveChange,
-        focusRequester = focusRequester,
-    )
-}
-
-/**
- * Previewable desktop layout — accepts all features as explicit parameters.
- */
-@Composable
-fun DesktopSynthLayout(
-    headerFeature: HeaderFeature,
-    voiceFeature: VoicesFeature,
-    midiFeature: MidiFeature,
-    keyActions: Map<Key, List<KeyBinding>>,
-    effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
-    isDialogActive: Boolean = false,
-    onDialogActiveChange: (Boolean) -> Unit,
-    focusRequester: FocusRequester = remember { FocusRequester() },
-) {
-    val panels: List<FeaturePanel> = headerFeature.visiblePanels
+    val headerFeature: HeaderFeature = registry.feature<HeaderViewModel, HeaderFeature>()
+    val voiceFeature: VoicesFeature = registry.feature<VoiceViewModel, VoicesFeature>()
+    val midiFeature: MidiFeature = registry.feature<MidiViewModel, MidiFeature>()
+    val panels = remember { headerFeature.resolvePanels(FactoryPanelSets.DesktopScreen) }
 
     // Request focus for keyboard input handling
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
+
+    val keyActions = registry.keyActions
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(

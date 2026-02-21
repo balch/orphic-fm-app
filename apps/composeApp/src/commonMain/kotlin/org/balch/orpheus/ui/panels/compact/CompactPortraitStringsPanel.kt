@@ -3,6 +3,7 @@ package org.balch.orpheus.ui.panels.compact
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -69,6 +70,7 @@ import kotlin.math.abs
 fun CompactStringPanel(
     voiceState: VoiceUiState,
     actions: VoicePanelActions,
+    externalStringBends: List<Float> = listOf(0f, 0f, 0f, 0f),
     modifier: Modifier = Modifier,
     liquidState: LiquidState? = LocalLiquidState.current,
     effects: VisualizationLiquidEffects = LocalLiquidEffects.current
@@ -156,6 +158,7 @@ fun CompactStringPanel(
                 colors = stringColors,
                 voiceStates = voiceState.voiceStates,
                 stringCenters = stringCenters,
+                externalStringBends = externalStringBends,
                 onStringPositionsChanged = { newPositions -> stringCenters = newPositions },
                 slideBarPosition = { slideBarAnim.value },
                 onStringStart = { stringIndex, bendAmount, voiceMix ->
@@ -262,6 +265,7 @@ private fun BenderStringsCanvas(
     colors: List<Color>,
     voiceStates: List<VoiceState>,
     stringCenters: List<Float>,
+    externalStringBends: List<Float> = listOf(0f, 0f, 0f, 0f),
     onStringPositionsChanged: (List<Float>) -> Unit,
     onStringStart: (stringIndex: Int, bendAmount: Float, voiceMix: Float) -> Unit,
     onStringBendChange: (stringIndex: Int, bendAmount: Float, voiceMix: Float) -> Unit,
@@ -282,6 +286,16 @@ private fun BenderStringsCanvas(
 
     // Track active touches per string (for visual feedback)
     var activeStrings by remember { mutableStateOf(setOf<Int>()) }
+
+    // Drive deflections from external bend values (Maestro Mode) when not touch-active
+    LaunchedEffect(externalStringBends) {
+        for (i in 0 until 4) {
+            val bend = externalStringBends.getOrElse(i) { 0f }
+            if (i !in activeStrings) {
+                stringDeflections[i].snapTo(bend)
+            }
+        }
+    }
 
     // Use rememberUpdatedState to ensure pointerInput loop always sees the latest positions
     val currentStringCenters by rememberUpdatedState(stringCenters)

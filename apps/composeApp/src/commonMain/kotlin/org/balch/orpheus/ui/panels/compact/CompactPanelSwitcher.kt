@@ -66,8 +66,8 @@ fun CompactPanelSwitcher(
         }
     }
 
-    LaunchedEffect(pagerState.currentPage) {
-        val currentPanel = panels[pagerState.currentPage]
+    LaunchedEffect(pagerState.settledPage) {
+        val currentPanel = panels[pagerState.settledPage]
         if (currentPanel.panelId != selectedPanelId) {
             onPanelSelected(currentPanel.panelId)
         }
@@ -102,20 +102,18 @@ fun CompactPanelSwitcher(
             }
         }
 
-        // Navigation header with arrows
+        // Navigation header with arrows (circular wrap)
         PanelNavigationHeader(
             panelColor = currentColor,
-            canGoLeft = currentIndex > 0,
-            canGoRight = currentIndex < panels.size - 1,
+            canGoLeft = panels.size > 1,
+            canGoRight = panels.size > 1,
             onLeftClick = {
-                if (currentIndex > 0) {
-                    onPanelSelected(panels[currentIndex - 1].panelId)
-                }
+                val prev = (currentIndex - 1 + panels.size) % panels.size
+                onPanelSelected(panels[prev].panelId)
             },
             onRightClick = {
-                if (currentIndex < panels.size - 1) {
-                    onPanelSelected(panels[currentIndex + 1].panelId)
-                }
+                val next = (currentIndex + 1) % panels.size
+                onPanelSelected(panels[next].panelId)
             }
         )
 

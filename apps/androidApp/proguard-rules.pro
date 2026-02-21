@@ -56,3 +56,11 @@
 -dontwarn org.apache.logging.log4j.spi.ExtendedLogger
 -dontwarn org.apache.logging.log4j.spi.ExtendedLoggerWrapper
 -dontwarn reactor.blockhound.integration.BlockHoundIntegration
+
+# MediaPipe hand tracking
+# Graph.<clinit> uses Flogger which walks the stack by class name;
+# R8 must preserve class names for both MediaPipe and Flogger.
+-keep class com.google.mediapipe.** { *; }
+-keep class com.google.protobuf.** { *; }
+-keep class com.google.common.flogger.** { *; }
+-dontwarn com.google.mediapipe.proto.**

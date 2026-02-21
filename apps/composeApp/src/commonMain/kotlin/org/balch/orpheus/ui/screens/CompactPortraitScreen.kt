@@ -23,13 +23,12 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.feature
-import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.features.LocalSynthFeatures
+import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.ai.chat.ChatFeature
@@ -41,9 +40,11 @@ import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
+import org.balch.orpheus.features.mediapipe.MediaPipeFeature
+import org.balch.orpheus.features.mediapipe.MediaPipeViewModel
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
-import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
+import org.balch.orpheus.ui.FactoryPanelSets
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderViewModel
 import org.balch.orpheus.ui.panels.compact.CompactAiSection
@@ -66,6 +67,7 @@ fun CompactPortraitScreen(
     modifier: Modifier = Modifier,
 ) {
     val registry = LocalSynthFeatures.current
+    val mediaPipeFeature: MediaPipeFeature = registry.feature<MediaPipeViewModel, MediaPipeFeature>()
     CompactPortraitLayout(
         headerFeature = registry.feature<HeaderViewModel, HeaderFeature>(),
         voiceFeature = registry.feature<VoiceViewModel, VoicesFeature>(),
@@ -73,6 +75,7 @@ fun CompactPortraitScreen(
         distortionFeature = registry.feature<DistortionViewModel, DistortionFeature>(),
         aiFeature = registry.feature<AiOptionsViewModel, AiOptionsFeature>(),
         chatFeature = registry.feature<ChatViewModel, ChatFeature>(),
+        mediaPipeFeature = mediaPipeFeature,
         keyActions = registry.keyActions,
         modifier = modifier,
     )
@@ -96,11 +99,13 @@ fun CompactPortraitLayout(
     distortionFeature: DistortionFeature,
     aiFeature: AiOptionsFeature,
     chatFeature: ChatFeature,
+    mediaPipeFeature: MediaPipeFeature,
     keyActions: Map<Key, List<KeyBinding>>,
     modifier: Modifier = Modifier,
 ) {
-    val liquidState: LiquidState = LocalLiquidState.current ?: rememberLiquidState()
-    val effects: VisualizationLiquidEffects = LocalLiquidEffects.current
+
+    val liquidState = LocalLiquidState.current ?: rememberLiquidState()
+    val effects = LocalLiquidEffects.current
 
     // Focus handling for keyboard input
     val focusRequester = remember { FocusRequester() }
@@ -114,12 +119,22 @@ fun CompactPortraitLayout(
     val minTopHeight = 150.dp
     val maxTopHeight = 450.dp
 
-    // Derive compact panels from active panel set
-    val compactPanels = headerFeature.visiblePanels
+    // Resolve compact panels from the Compact factory panel set
+    val compactPanels = remember { headerFeature.resolvePanels(FactoryPanelSets.Compact) }
     var selectedPanelId by remember { mutableStateOf(PanelId.EVO) }
 
     // Selected panel for bottom panel switcher
     var selectedBottomPanel by remember { mutableStateOf(CompactBottomPanelType.PADS) }
+
+    // Gesture-driven bottom panel switching: toggle between PADS and STRINGS
+    LaunchedEffect(Unit) {
+        mediaPipeFeature.panelSwipeEvents.collect {
+            selectedBottomPanel = when (selectedBottomPanel) {
+                CompactBottomPanelType.PADS -> CompactBottomPanelType.STRINGS
+                else -> CompactBottomPanelType.PADS
+            }
+        }
+    }
 
     val vizState by vizFeature.stateFlow.collectAsState()
 
@@ -210,9 +225,11 @@ fun CompactPortraitLayout(
                                 }
                                 CompactBottomPanelType.STRINGS -> {
                                     val voiceState by voiceFeature.stateFlow.collectAsState()
+                                    val externalBends by mediaPipeFeature.stringBends.collectAsState()
                                     CompactStringPanel(
                                         voiceState = voiceState,
                                         actions = voiceFeature.actions,
+                                        externalStringBends = externalBends,
                                         modifier = Modifier.fillMaxSize(),
                                         liquidState = liquidState,
                                         effects = effects
@@ -240,6 +257,7 @@ private fun CompactPortraitLayoutPreview() {
             distortionFeature = DistortionViewModel.previewFeature(),
             aiFeature = AiOptionsViewModel.previewFeature(),
             chatFeature = ChatViewModel.previewFeature(),
+            mediaPipeFeature = MediaPipeViewModel.previewFeature(),
             keyActions = emptyMap(),
         )
     }

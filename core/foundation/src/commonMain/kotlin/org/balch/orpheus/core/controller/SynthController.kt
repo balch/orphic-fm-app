@@ -24,16 +24,28 @@ enum class ControlEventOrigin {
     SEQUENCER, // Internal Automation/Sequencer
     TIDAL,     // Tidal Cycles OSC input (future)
     AI,        // AI Agent Automation
-    EVO        // Audio Evolution Strategies
+    EVO,       // Audio Evolution Strategies
+    MEDIAPIPE  // Camera-based gesture tracking
 }
 
 /**
  * Control event data for flow-based routing.
  */
 data class ControlEvent(
-    val controlId: String, 
+    val controlId: String,
     val value: Float,
     val origin: ControlEventOrigin = ControlEventOrigin.MIDI
+)
+
+/**
+ * Per-voice hold state change event.
+ * Emitted by any source (UI, MediaPipe, AI) to synchronize hold state
+ * across all consumers (VoiceViewModel, MediaPipeViewModel, etc.).
+ */
+data class HoldEvent(
+    val voiceIndex: Int,
+    val holding: Boolean,
+    val origin: ControlEventOrigin = ControlEventOrigin.UI
 )
 
 /**
@@ -74,11 +86,18 @@ class SynthController @Inject constructor() {
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
+    private val _onHoldChange = MutableSharedFlow<HoldEvent>(
+        replay = 0,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+
     // Public read-only flows for ViewModels to subscribe
     val onPulseStart: Flow<Int> = _onPulseStart.asSharedFlow()
     val onPulseEnd: Flow<Int> = _onPulseEnd.asSharedFlow()
     val onControlChange: Flow<ControlEvent> = _onControlChange.asSharedFlow()
     val onBendChange: Flow<Float> = _onBendChange.asSharedFlow()
+    val onHoldChange: Flow<HoldEvent> = _onHoldChange.asSharedFlow()
 
     // ═══════════════════════════════════════════════════════════
     // PLUGIN PORT ROUTING
@@ -310,6 +329,15 @@ class SynthController @Inject constructor() {
      */
     fun emitBendChange(amount: Float) {
         _onBendChange.tryEmit(amount.coerceIn(-1f, 1f))
+    }
+
+    /**
+     * Emit a per-voice hold state change.
+     * Called by VoiceViewModel (UI), MediaPipeViewModel (gesture), or AI agents.
+     * All consumers listen to [onHoldChange] and update their local state.
+     */
+    fun emitHoldChange(voiceIndex: Int, holding: Boolean, origin: ControlEventOrigin = ControlEventOrigin.UI) {
+        _onHoldChange.tryEmit(HoldEvent(voiceIndex, holding, origin))
     }
 }
 

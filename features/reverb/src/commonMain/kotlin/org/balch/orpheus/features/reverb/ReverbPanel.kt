@@ -47,7 +47,7 @@ fun ReverbPanel(
                     onValueChange = actions.setAmount,
                     label = "AMT",
                     controlId = ReverbSymbol.AMOUNT.controlId.key,
-                    size = 40.dp,
+                    size = 48.dp,
                     progressColor = OrpheusColors.echoLavender
                 )
                 RotaryKnob(
@@ -55,7 +55,7 @@ fun ReverbPanel(
                     onValueChange = actions.setTime,
                     label = "TIME",
                     controlId = ReverbSymbol.TIME.controlId.key,
-                    size = 40.dp,
+                    size = 48.dp,
                     progressColor = OrpheusColors.echoLavender
                 )
             }
@@ -68,7 +68,7 @@ fun ReverbPanel(
                     onValueChange = actions.setDamping,
                     label = "DAMP",
                     controlId = ReverbSymbol.DAMPING.controlId.key,
-                    size = 40.dp,
+                    size = 48.dp,
                     progressColor = OrpheusColors.echoLavender
                 )
                 RotaryKnob(
@@ -76,7 +76,7 @@ fun ReverbPanel(
                     onValueChange = actions.setDiffusion,
                     label = "DIFF",
                     controlId = ReverbSymbol.DIFFUSION.controlId.key,
-                    size = 40.dp,
+                    size = 48.dp,
                     progressColor = OrpheusColors.echoLavender
                 )
             }

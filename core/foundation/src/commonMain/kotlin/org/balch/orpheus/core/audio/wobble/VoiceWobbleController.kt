@@ -24,7 +24,7 @@ class VoiceWobbleController {
     private val _config = MutableStateFlow(VoiceWobbleConfig())
     val config: StateFlow<VoiceWobbleConfig> = _config.asStateFlow()
     
-    private val _voiceWobbleStates = MutableStateFlow(List(8) { VoiceWobbleState() })
+    private val _voiceWobbleStates = MutableStateFlow(List(12) { VoiceWobbleState() })
     val voiceWobbleStates: StateFlow<List<VoiceWobbleState>> = _voiceWobbleStates.asStateFlow()
     
     /**
@@ -39,7 +39,7 @@ class VoiceWobbleController {
      * Initializes wobble tracking for the voice.
      */
     fun onPulseStart(voiceIndex: Int, initialX: Float, initialY: Float) {
-        if (voiceIndex !in 0..7) return
+        if (voiceIndex !in 0..11) return
         
         val states = _voiceWobbleStates.value.toMutableList()
         states[voiceIndex] = VoiceWobbleState(
@@ -64,7 +64,7 @@ class VoiceWobbleController {
      * @return Wobble offset in range [-1, 1]
      */
     fun onPointerMove(voiceIndex: Int, x: Float, y: Float): Float {
-        if (voiceIndex !in 0..7) return 0f
+        if (voiceIndex !in 0..11) return 0f
         
         val config = _config.value
         if (!config.enabled) return 0f
@@ -125,7 +125,7 @@ class VoiceWobbleController {
      * @return The final wobble modulation value at release
      */
     fun onPulseEnd(voiceIndex: Int): Float {
-        if (voiceIndex !in 0..7) return 0f
+        if (voiceIndex !in 0..11) return 0f
         
         val states = _voiceWobbleStates.value.toMutableList()
         val currentState = states[voiceIndex]
@@ -160,7 +160,7 @@ class VoiceWobbleController {
      * Get the current wobble offset for a voice.
      */
     fun getWobbleOffset(voiceIndex: Int): Float {
-        if (voiceIndex !in 0..7) return 0f
+        if (voiceIndex !in 0..11) return 0f
         return _voiceWobbleStates.value[voiceIndex].smoothedWobble
     }
     
@@ -168,7 +168,7 @@ class VoiceWobbleController {
      * Check if wobble is currently active for a voice.
      */
     fun isWobbleActive(voiceIndex: Int): Boolean {
-        if (voiceIndex !in 0..7) return false
+        if (voiceIndex !in 0..11) return false
         return _voiceWobbleStates.value[voiceIndex].isActive
     }
 }

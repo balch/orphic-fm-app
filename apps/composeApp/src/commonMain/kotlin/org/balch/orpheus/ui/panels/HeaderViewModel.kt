@@ -58,6 +58,12 @@ interface HeaderFeature : SynthFeature<HeaderPanelUiState, HeaderPanelActions> {
     val sortedPanels: List<FeaturePanel>
     val visiblePanels: List<FeaturePanel>
 
+    /**
+     * Resolve a [PanelSet] against registered panels.
+     * Returns matched panels in declaration order, logging warnings for unresolved IDs.
+     */
+    fun resolvePanels(panelSet: PanelSet): List<FeaturePanel>
+
     override val synthControl: SynthFeature.SynthControl
         get() = SynthFeature.SynthControl.Empty
 
@@ -97,7 +103,7 @@ class HeaderViewModel(
     // All panels in an unordered list — ordering comes from the active panel set
     override val sortedPanels: List<FeaturePanel> = panels.toList()
 
-    private val defaultPanelSet = FactoryPanelSets.All
+    private val defaultPanelSet = FactoryPanelSets.DesktopScreen
 
     private val uiIntents = MutableSharedFlow<HeaderIntent>(extraBufferCapacity = 64)
 
@@ -158,6 +164,15 @@ class HeaderViewModel(
             return state.visiblePanelIds.mapNotNull { panelMap[it] }
         }
 
+    override fun resolvePanels(panelSet: PanelSet): List<FeaturePanel> {
+        return panelSet.visibleIds.mapNotNull { id ->
+            panelMap[id] ?: run {
+                log.warn { "PanelSet '${panelSet.name}' references unregistered panel: ${id.id}" }
+                null
+            }
+        }
+    }
+
     override val actions = HeaderPanelActions(
         setExpanded = { panelId, expanded ->
             uiIntents.tryEmit(HeaderIntent.Single(panelId, expanded))
@@ -170,10 +185,13 @@ class HeaderViewModel(
             panels: List<FeaturePanel> = emptyList()
         ): HeaderFeature =
             object : HeaderFeature {
+                private val panelMap = panels.associateBy { it.panelId }
                 override val stateFlow: StateFlow<HeaderPanelUiState> = MutableStateFlow(state)
                 override val actions: HeaderPanelActions = HeaderPanelActions.EMPTY
                 override val sortedPanels = panels
                 override val visiblePanels = panels
+                override fun resolvePanels(panelSet: PanelSet): List<FeaturePanel> =
+                    panelSet.visibleIds.mapNotNull { panelMap[it] }
             }
 
         @Composable

@@ -38,4 +38,8 @@ data class PanelSet(
     /** Weight overrides for panels (null entries omitted). */
     val weightOverrides: Map<PanelId, Float>
         get() = panels.filter { it.weight != null }.associate { PanelId(it.panelId) to it.weight!! }
+
+    /** Remove a panel by ID, returning a new PanelSet. */
+    operator fun minus(panelId: PanelId): PanelSet =
+        copy(panels = panels.filter { it.panelId != panelId.id })
 }

@@ -3,6 +3,7 @@ package org.balch.orpheus.core.features
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.GraphExtension
+import dev.zacsweers.metro.Provider
 import org.balch.orpheus.core.di.FeatureScope
 
 /**

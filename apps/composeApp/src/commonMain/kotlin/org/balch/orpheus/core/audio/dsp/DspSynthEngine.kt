@@ -22,6 +22,7 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.PortSymbol
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.BENDER_URI
 import org.balch.orpheus.core.plugin.symbols.BenderSymbol
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
@@ -591,8 +592,14 @@ class DspSynthEngine @Inject constructor(
     override fun stopTestTone() { testGain?.inputB?.set(0.0) }
 
     // Plugin Port Access
-    override fun setPluginPort(pluginUri: String, symbol: String, value: PortValue): Boolean =
-        pluginProvider.getPlugin(pluginUri)?.setPortValue(symbol, value) ?: false
+    override fun setPluginPort(pluginUri: String, symbol: String, value: PortValue): Boolean {
+        val result = pluginProvider.getPlugin(pluginUri)?.setPortValue(symbol, value) ?: false
+        // Keep bendFlow in sync when Bender BEND is set externally (gesture, MIDI, AI)
+        if (result && pluginUri == BENDER_URI && symbol == BenderSymbol.BEND.symbol) {
+            _bendFlow.value = value.asFloat()
+        }
+        return result
+    }
     override fun getPluginPort(pluginUri: String, symbol: String): PortValue? =
         pluginProvider.getPlugin(pluginUri)?.getPortValue(symbol)
 

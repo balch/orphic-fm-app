@@ -335,6 +335,12 @@ class VoiceViewModel(
                     uiIntents.tryEmit(VoiceIntent.PeakLevel(peak))
                 }
             }
+            // Hold from any source (UI, MediaPipe, AI)
+            launch {
+                synthController.onHoldChange.collect { event ->
+                    uiIntents.tryEmit(VoiceIntent.Hold(event.voiceIndex, event.holding))
+                }
+            }
             // Bend from AI
             launch {
                 synthController.onBendChange.collect { amount ->
@@ -446,7 +452,7 @@ class VoiceViewModel(
     }
 
     fun setHold(index: Int, holding: Boolean) {
-        uiIntents.tryEmit(VoiceIntent.Hold(index, holding))
+        synthController.emitHoldChange(index, holding, ControlEventOrigin.UI)
     }
 
     fun setDuoModSource(index: Int, source: ModSource) {

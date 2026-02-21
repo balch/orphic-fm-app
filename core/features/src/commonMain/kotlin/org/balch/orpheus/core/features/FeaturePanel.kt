@@ -34,6 +34,7 @@ value class PanelId(val id: String) {
         val FLUX_TRIGGERS = PanelId("flux_triggers")
         val SPEECH = PanelId("speech")
         val TWEAKS = PanelId("tweaks")
+        val ASL_MAESTRO = PanelId("mediapipe")
     }
 }
 

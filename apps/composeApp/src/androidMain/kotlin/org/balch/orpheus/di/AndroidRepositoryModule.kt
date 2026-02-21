@@ -6,6 +6,8 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
+import org.balch.orpheus.core.mediapipe.AndroidHandTracker
+import org.balch.orpheus.core.mediapipe.HandTracker
 import org.balch.orpheus.core.preferences.AndroidAppPreferencesRepository
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.AndroidSynthPresetRepository
@@ -26,12 +28,16 @@ interface AndroidRepositoryModule {
         @Provides
         @SingleIn(AppScope::class)
         fun provideAppPreferencesRepository(impl: AndroidAppPreferencesRepository): AppPreferencesRepository = impl
-        
+
         /**
          * Provide Context from Application for components that need it.
          * Application is passed to the factory, and extends Context.
          */
         @Provides
         fun provideContext(application: Application): Context = application
+
+        @Provides
+        @SingleIn(AppScope::class)
+        fun provideHandTracker(context: Context): HandTracker = AndroidHandTracker(context)
     }
 }

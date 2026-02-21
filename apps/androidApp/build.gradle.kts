@@ -56,6 +56,8 @@ android {
 dependencies {
     implementation(projects.apps.composeApp)
     implementation(project(":core:foundation"))
+    implementation(project(":core:mediapipe"))
+    implementation(project(":features:mediapipe"))
     implementation(project(":core:plugins:delay"))
     implementation(project(":core:plugins:distortion"))
     implementation(project(":core:plugins:resonator"))

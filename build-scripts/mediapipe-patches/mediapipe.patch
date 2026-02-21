@@ -1,0 +1,241 @@
+diff --git a/.bazelrc b/.bazelrc
+index 5965f963f..7070fa106 100644
+--- a/.bazelrc
++++ b/.bazelrc
+@@ -121,6 +121,10 @@ build:darwin_x86_64 --cpu=darwin_x86_64
+ build:darwin_arm64 --apple_platform_type=macos
+ build:darwin_arm64 --macos_minimum_os=10.16
+ build:darwin_arm64 --cpu=darwin_arm64
++# Disable Eigen's custom aligned allocation to prevent allocator mismatch
++# in Holder<Matrix>::~Holder() when building with -exported_symbols_list.
++# On ARM64, malloc already returns 16-byte aligned pointers so NEON still works.
++build:darwin_arm64 --copt=-DEIGEN_MAX_ALIGN_BYTES=0
+ 
+ # Turn off maximum stdout size
+ build --experimental_ui_max_stdouterr_bytes=-1
+@@ -130,3 +134,6 @@ try-import %workspace%/.configure.bazelrc
+ 
+ # This bazelrc file can be used for user-specific custom build settings.
+ try-import %workspace%/.user.bazelrc
++# Fix zlib fdopen conflict on macOS (TARGET_OS_MAC macro redefines fdopen)
++build --per_file_copt=external/zlib/.*@-UTARGET_OS_MAC
++build --host_per_file_copt=external/zlib/.*@-UTARGET_OS_MAC
+diff --git a/WORKSPACE b/WORKSPACE
+index 01ac6fb43..72610a34a 100644
+--- a/WORKSPACE
++++ b/WORKSPACE
+@@ -631,7 +631,7 @@ new_local_repository(
+     # For local MacOS builds, the path should point to an opencv@3 installation.
+     # If you edit the path here, you will also need to update the corresponding
+     # prefix in "opencv_macos.BUILD".
+-    path = "/usr/local",  # e.g. /usr/local/Cellar for HomeBrew
++    path = "/opt/homebrew/Cellar",  # Homebrew on Apple Silicon
+ )
+ 
+ new_local_repository(
+diff --git a/mediapipe/tasks/c/vision/hand_landmarker/BUILD b/mediapipe/tasks/c/vision/hand_landmarker/BUILD
+index 5060d8978..900aa539c 100644
+--- a/mediapipe/tasks/c/vision/hand_landmarker/BUILD
++++ b/mediapipe/tasks/c/vision/hand_landmarker/BUILD
+@@ -172,3 +172,36 @@ cc_binary(
+     ],
+     deps = [":hand_landmarker_lib"],
+ )
++
++# Combined JNI dylib — HandLandmarker + GestureRecognizer in one library.
++# All MediaPipe deps are statically linked; no external OpenCV/protobuf.
++# bazel build --config darwin_arm64 --define MEDIAPIPE_DISABLE_GPU=1 \
++#   //mediapipe/tasks/c/vision/hand_landmarker:libmediapipe_jni.dylib
++cc_library(
++    name = "jni_headers",
++    hdrs = glob(["jni/*.h"]),
++    includes = ["jni"],
++)
++
++cc_binary(
++    name = "libmediapipe_jni.dylib",
++    srcs = ["mediapipe_jni.cc"],
++    additional_linker_inputs = ["exported_symbols.txt"],
++    linkopts = [
++        "-Wl,-install_name,libmediapipe_jni.dylib",
++        "-fvisibility=hidden",
++        "-Wl,-exported_symbols_list,$(location exported_symbols.txt)",
++        "-framework", "Foundation",
++    ],
++    linkshared = True,
++    tags = [
++        "manual",
++        "nobuilder",
++        "notap",
++    ],
++    deps = [
++        ":hand_landmarker_lib",
++        "//mediapipe/tasks/c/vision/gesture_recognizer:gesture_recognizer_lib",
++        ":jni_headers",
++    ],
++)
+diff --git a/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/handedness_to_matrix_calculator.cc b/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/handedness_to_matrix_calculator.cc
+index 35273351a..3bb156770 100644
+--- a/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/handedness_to_matrix_calculator.cc
++++ b/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/handedness_to_matrix_calculator.cc
+@@ -14,7 +14,6 @@ limitations under the License.
+ ==============================================================================*/
+ #include "mediapipe/tasks/cc/vision/gesture_recognizer/calculators/handedness_to_matrix_calculator.h"
+ 
+-#include <memory>
+ #include <utility>
+ 
+ #include "absl/status/status.h"
+@@ -36,15 +35,15 @@ using ::mediapipe::api3::Calculator;
+ using ::mediapipe::api3::CalculatorContext;
+ using ::mediapipe::tasks::vision::gesture_recognizer::GetRightHandScore;
+ 
+-absl::StatusOr<std::unique_ptr<Matrix>> HandednessToMatrix(
++// Returns a 1x1 Matrix with the right-hand score.
++// Returns by value (not unique_ptr) so Send(Matrix&&) uses MakePacket
++// instead of Adopt — fixes Holder<Matrix> crash on macOS ARM64.
++absl::StatusOr<Matrix> HandednessToMatrix(
+     const mediapipe::ClassificationList& classification_list) {
+-  // Feature value is the probability that the hand is a right hand.
+   MP_ASSIGN_OR_RETURN(float score, GetRightHandScore(classification_list));
+-  auto matrix = Matrix(1, 1);
++  Matrix matrix(1, 1);
+   matrix(0, 0) = score;
+-  auto result = std::make_unique<Matrix>();
+-  *result = matrix;
+-  return result;
++  return matrix;
+ }
+ 
+ }  // namespace
+@@ -58,7 +57,7 @@ class HandednessToMatrixNodeImpl
+     }
+     const ClassificationList& handedness = cc.in_handedness.GetOrDie();
+ 
+-    MP_ASSIGN_OR_RETURN(auto handedness_matrix, HandednessToMatrix(handedness));
++    MP_ASSIGN_OR_RETURN(Matrix handedness_matrix, HandednessToMatrix(handedness));
+     cc.out_handedness_matrix.Send(std::move(handedness_matrix));
+     return absl::OkStatus();
+   }
+diff --git a/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/landmarks_to_matrix_calculator.cc b/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/landmarks_to_matrix_calculator.cc
+index 1f7b732cc..12a6631c8 100644
+--- a/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/landmarks_to_matrix_calculator.cc
++++ b/mediapipe/tasks/cc/vision/gesture_recognizer/calculators/landmarks_to_matrix_calculator.cc
+@@ -17,7 +17,6 @@ limitations under the License.
+ #include <algorithm>
+ #include <cmath>
+ #include <limits>
+-#include <memory>
+ #include <type_traits>
+ #include <utility>
+ 
+@@ -172,9 +171,10 @@ absl::Status ProcessLandmarks(LandmarkListT landmarks,
+                         options.object_normalization_origin_offset()));
+   }
+ 
+-  auto landmarks_matrix = std::make_unique<Matrix>();
+-  *landmarks_matrix = LandmarksToMatrix(landmarks);
+-  cc.landmarks_matrix.Send(std::move(landmarks_matrix));
++  // Use Send(Matrix&&) instead of Send(unique_ptr<Matrix>) to avoid
++  // Adopt() pointer ownership — fixes Holder<Matrix>::~Holder() crash
++  // (POINTER_BEING_FREED_WAS_NOT_ALLOCATED) on macOS ARM64.
++  cc.landmarks_matrix.Send(LandmarksToMatrix(landmarks));
+   return absl::OkStatus();
+ }
+ 
+diff --git a/third_party/opencv_macos.BUILD b/third_party/opencv_macos.BUILD
+index 4139f188e..aa0d6a288 100644
+--- a/third_party/opencv_macos.BUILD
++++ b/third_party/opencv_macos.BUILD
+@@ -7,52 +7,52 @@ licenses(["notice"])  # BSD license
+ 
+ exports_files(["LICENSE"])
+ 
+-# Example configurations:
+-#
+-# # OpenCV 3
+-# To configure OpenCV 3, obtain the path of OpenCV 3 from Homebrew. The
+-# following commands show the output of the command with version 3.4.16_10:
+-#
+-# $ brew ls opencv@3 | grep version.hpp
+-# $ /opt/homebrew/Cellar/opencv@3/3.4.16_10/include/opencv2/core/version.hpp
+-#
+-# Then set path in "macos_opencv" rule in the WORKSPACE file to
+-# "/opt/homebrew/Cellar" and the PREFIX below to "opencv/<version>" (e.g.
+-# "opencv/3.4.16_10" for the example above).
+-#
+-# # OpenCV 4
+-# To configure OpenCV 4, obtain the path of OpenCV 4 from Homebrew. The
+-# following commands show the output of the command with version 4.10.0_12:
+-#
+-# $ brew ls opencv | grep version.hpp
+-# $ /opt/homebrew/Cellar/opencv/4.10.0_12/include/opencv4/opencv2/core/version.hpp
+-# $ /opt/homebrew/Cellar/opencv/4.10.0_12/include/opencv4/opencv2/dnn/version.hpp
+-#
+-# Then set path in "macos_opencv" rule in the WORKSPACE file to
+-# "/opt/homebrew/Cellar" and the PREFIX below to "opencv/<version>" (e.g.
+-# "opencv/4.10.0_12" for the example above). For OpenCV 4, you will also need to
+-# adjust the include paths. The header search path should be
+-# "include/opencv4/opencv2/**/*.h*" and the include prefix needs to be set to
+-# "include/opencv4".
+-
+-PREFIX = "opt/opencv@3"
++PREFIX = "opencv/4.13.0_3"
++TBB_PREFIX = "tbb/2022.3.0"
+ 
+ cc_library(
+     name = "opencv",
+     srcs = glob(
+         [
+-            paths.join(PREFIX, "lib/libopencv_core.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_calib3d.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_features2d.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_highgui.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_imgcodecs.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_imgproc.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_video.dylib"),
+-            paths.join(PREFIX, "lib/libopencv_videoio.dylib"),
++            paths.join(PREFIX, "lib/libopencv_core.a"),
++            paths.join(PREFIX, "lib/libopencv_calib3d.a"),
++            paths.join(PREFIX, "lib/libopencv_features2d.a"),
++            paths.join(PREFIX, "lib/libopencv_highgui.a"),
++            paths.join(PREFIX, "lib/libopencv_imgcodecs.a"),
++            paths.join(PREFIX, "lib/libopencv_imgproc.a"),
++            paths.join(PREFIX, "lib/libopencv_video.a"),
++            paths.join(PREFIX, "lib/libopencv_videoio.a"),
++            # Additional static deps needed by OpenCV static libs
++            paths.join(PREFIX, "lib/libopencv_flann.a"),
++            paths.join(PREFIX, "lib/libopencv_dnn.a"),
++            paths.join(PREFIX, "lib/libopencv_objdetect.a"),
++            paths.join(PREFIX, "lib/libade.a"),
++            # ARM NEON HAL acceleration
++            paths.join(PREFIX, "lib/libkleidicv.a"),
++            paths.join(PREFIX, "lib/libkleidicv_hal.a"),
++            paths.join(PREFIX, "lib/libkleidicv_thread.a"),
++            paths.join(PREFIX, "lib/libtegra_hal.a"),
++            # Intel trace / profiling stubs
++            paths.join(PREFIX, "lib/libittnotify.a"),
++            # TBB (Threading Building Blocks) — used by OpenCV parallel backends
++            paths.join(TBB_PREFIX, "lib/libtbb.a"),
+         ],
+     ),
+-    hdrs = glob([paths.join(PREFIX, "include/opencv2/**/*.h*")]),
+-    includes = [paths.join(PREFIX, "include/")],
++    hdrs = glob([paths.join(PREFIX, "include/opencv4/opencv2/**/*.h*")]),
++    includes = [paths.join(PREFIX, "include/opencv4/")],
++    linkopts = [
++        "-framework", "AVFoundation",
++        "-framework", "CoreMedia",
++        "-framework", "CoreVideo",
++        "-framework", "QuartzCore",
++        "-framework", "AppKit",
++        "-framework", "OpenCL",
++        "-framework", "Accelerate",
++        "-framework", "CoreGraphics",
++        "-framework", "CoreImage",
++        "-lz",
++        "-lc++",
++    ],
+     linkstatic = 1,
+     visibility = ["//visibility:public"],
+ )
