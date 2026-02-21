@@ -123,10 +123,10 @@ fun CompactLandscapeScreen(
 @Composable
 private fun CompactLandscapeLayout(
     modifier: Modifier = Modifier,
-    presetFeature: PresetsFeature = PresetsViewModel.feature(),
-    voiceFeature: VoicesFeature = VoiceViewModel.feature(),
-    vizFeature: VizFeature = VizViewModel.feature(),
-    sequencerFeature: DrawSequencerFeature = DrawSequencerViewModel.feature(),
+    presetFeature: PresetsFeature,
+    voiceFeature: VoicesFeature,
+    vizFeature: VizFeature,
+    sequencerFeature: DrawSequencerFeature,
     liquidState: LiquidState? = null,
     effects: VisualizationLiquidEffects = LocalLiquidEffects.current,
     onKeyEvent: (KeyEvent, Boolean) -> Boolean = { _, _ -> false },

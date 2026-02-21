@@ -30,6 +30,10 @@ import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.features.LocalSynthFeatures
+import org.balch.orpheus.features.ai.AiOptionsFeature
+import org.balch.orpheus.features.ai.AiOptionsViewModel
+import org.balch.orpheus.features.ai.chat.ChatFeature
+import org.balch.orpheus.features.ai.chat.ChatViewModel
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
@@ -67,6 +71,8 @@ fun CompactPortraitScreen(
         voiceFeature = registry.feature<VoiceViewModel, VoicesFeature>(),
         vizFeature = registry.feature<VizViewModel, VizFeature>(),
         distortionFeature = registry.feature<DistortionViewModel, DistortionFeature>(),
+        aiFeature = registry.feature<AiOptionsViewModel, AiOptionsFeature>(),
+        chatFeature = registry.feature<ChatViewModel, ChatFeature>(),
         keyActions = registry.keyActions,
         modifier = modifier,
     )
@@ -88,6 +94,8 @@ fun CompactPortraitLayout(
     voiceFeature: VoicesFeature,
     vizFeature: VizFeature,
     distortionFeature: DistortionFeature,
+    aiFeature: AiOptionsFeature,
+    chatFeature: ChatFeature,
     keyActions: Map<Key, List<KeyBinding>>,
     modifier: Modifier = Modifier,
 ) {
@@ -185,6 +193,8 @@ fun CompactPortraitLayout(
                                 CompactBottomPanelType.AI -> {
                                     CompactAiSection(
                                         modifier = Modifier.fillMaxSize(),
+                                        aiFeature = aiFeature,
+                                        chatFeature = chatFeature,
                                         onShowRepl = { selectedPanelId = PanelId.CODE }
                                     )
                                 }
@@ -228,6 +238,8 @@ private fun CompactPortraitLayoutPreview() {
             voiceFeature = VoiceViewModel.previewFeature(),
             vizFeature = VizViewModel.previewFeature(),
             distortionFeature = DistortionViewModel.previewFeature(),
+            aiFeature = AiOptionsViewModel.previewFeature(),
+            chatFeature = ChatViewModel.previewFeature(),
             keyActions = emptyMap(),
         )
     }
