@@ -335,10 +335,10 @@ class ConductorInteractionEngineTest {
     }
 
     @Test
-    fun `hand openness maps to timbre`() {
+    fun `hand openness no longer emits timbre`() {
         val events = engine.update(listOf(leftHand(handOpenness = 0.9f)), 0L)
-        val timbre = events.filterIsInstance<ConductorEvent.TimbreSet>().last()
-        assertTrue(timbre.value > 0.8f)
+        val timbre = events.filterIsInstance<ConductorEvent.TimbreSet>()
+        assertTrue(timbre.isEmpty(), "TimbreSet should no longer be emitted")
     }
 
     // ── Distance invariance ──────────────────────────────

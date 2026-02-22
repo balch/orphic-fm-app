@@ -252,8 +252,8 @@ class ConductorInteractionEngine {
             val normalized = ((palmYMax - hand.palmY) / range).coerceIn(0f, 1f)
             events += ConductorEvent.DynamicsSet(quadIndex, normalized)
 
-            // -- Timbre: hand openness --
-            events += ConductorEvent.TimbreSet(hand.handOpenness.coerceIn(0f, 1f))
+            // Timbre (hand openness → sharpness) removed: noisy handOpenness values
+            // in the 0.7–1.0 range caused unmusical sounds.
         }
 
         // Gate off strings whose hand disappeared

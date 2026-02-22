@@ -130,7 +130,7 @@ interface MediaPipeFeature : SynthFeature<MediaPipeUiState, MediaPipePanelAction
 class MediaPipeViewModel(
     private val handTracker: HandTracker,
     private val synthController: SynthController,
-    private val dispatcherProvider: DispatcherProvider,
+    dispatcherProvider: DispatcherProvider,
     private val _engine: SynthEngine,
 ) : ViewModel(), MediaPipeFeature {
 
@@ -513,6 +513,7 @@ class MediaPipeViewModel(
                 )
             }
             is ConductorEvent.TimbreSet -> {
+/*
                 for (di in 0..3) {
                     synthController.setPluginControl(
                         VoiceSymbol.duoSharpness(di).controlId,
@@ -520,6 +521,8 @@ class MediaPipeViewModel(
                         ControlEventOrigin.MEDIAPIPE,
                     )
                 }
+
+ */
             }
         }
     }
