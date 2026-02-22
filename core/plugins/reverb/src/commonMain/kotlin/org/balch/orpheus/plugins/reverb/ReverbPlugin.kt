@@ -61,10 +61,20 @@ class ReverbPlugin(
                 default = 0f
                 get { _amount }
                 set {
+                    val wasDisabled = _amount <= 0.001f
                     _amount = it
+                    val shouldEnable = it > 0.001f
+                    if (wasDisabled && shouldEnable) {
+                        // Zero output before enabling to prevent blowout
+                        reverbUnit.setAmount(0f)
+                        reverbUnit.setBypass(false)
+                        setPluginEnabled(true, audioEngine)
+                    }
                     reverbUnit.setAmount(it)
-                    reverbUnit.setBypass(it <= 0.001f)
-                    setPluginEnabled(it > 0.001f, audioEngine)
+                    reverbUnit.setBypass(!shouldEnable)
+                    if (!shouldEnable) {
+                        setPluginEnabled(false, audioEngine)
+                    }
                 }
             }
         }

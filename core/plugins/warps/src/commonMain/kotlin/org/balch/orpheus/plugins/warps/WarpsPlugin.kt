@@ -112,15 +112,26 @@ class WarpsPlugin(
                 default = 0f
                 get { _mix }
                 set {
+                    val wasDisabled = _mix <= 0.001f
                     _mix = it
+                    val shouldEnable = it > 0.001f
+                    if (wasDisabled && shouldEnable) {
+                        // Zero wet gains before enabling to prevent blowout
+                        wetGainLeft.inputB.set(0.0)
+                        wetGainRight.inputB.set(0.0)
+                        warps.setBypass(false)
+                        setPluginEnabled(true, audioEngine)
+                    }
                     val wet = it.toDouble()
                     val dry = (1.0 - it).toDouble()
                     wetGainLeft.inputB.set(wet)
                     wetGainRight.inputB.set(wet)
                     dryGainLeft.inputB.set(dry)
                     dryGainRight.inputB.set(dry)
-                    warps.setBypass(it <= 0.001f)
-                    setPluginEnabled(it > 0.001f, audioEngine)
+                    warps.setBypass(!shouldEnable)
+                    if (!shouldEnable) {
+                        setPluginEnabled(false, audioEngine)
+                    }
                 }
             }
         }

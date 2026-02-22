@@ -143,14 +143,24 @@ class ResonatorPlugin(
                 default = 0.0f
                 get { _mix }
                 set {
+                    val wasDisabled = _mix <= 0.001f
                     _mix = it.coerceIn(0f, 1f)
+                    val shouldEnable = _mix > 0.001f
+                    if (wasDisabled && shouldEnable) {
+                        // Zero wet gains before enabling to prevent blowout
+                        wetGainL.inputB.set(0.0)
+                        wetGainR.inputB.set(0.0)
+                        setPluginEnabled(true, audioEngine)
+                    }
                     val wetLevel = it.toDouble()
                     val dryLevel = (1.0 - it).toDouble()
                     wetGainL.inputB.set(wetLevel)
                     wetGainR.inputB.set(wetLevel)
                     dryGainL.inputB.set(dryLevel)
                     dryGainR.inputB.set(dryLevel)
-                    setPluginEnabled(_mix > 0.001f, audioEngine)
+                    if (!shouldEnable) {
+                        setPluginEnabled(false, audioEngine)
+                    }
                 }
             }
         }

@@ -87,6 +87,7 @@ class VoicePlugin : DspPlugin {
             }
             controlPort(VoiceSymbol.modDepth(i)) {
                 floatType {
+                    default = 0f
                     get { _modDepth[i] }
                     set {
                         if (_modDepth[i] != it) {
@@ -98,6 +99,7 @@ class VoicePlugin : DspPlugin {
             }
             controlPort(VoiceSymbol.envSpeed(i)) {
                 floatType {
+                    default = 0f
                     get { _envSpeed[i] }
                     set {
                         if (_envSpeed[i] != it) {
@@ -113,6 +115,7 @@ class VoicePlugin : DspPlugin {
         for (i in 0 until 6) {
             controlPort(VoiceSymbol.duoSharpness(i)) {
                 floatType {
+                    default = 0f
                     get { _duoSharpness[i] }
                     set {
                         _duoSharpness[i] = it
@@ -206,6 +209,7 @@ class VoicePlugin : DspPlugin {
         }
         controlPort(VoiceSymbol.TOTAL_FEEDBACK) {
             floatType {
+                default = 0f
                 get { _totalFeedback }
                 set {
                     if (_totalFeedback != it) {
@@ -217,6 +221,7 @@ class VoicePlugin : DspPlugin {
         }
         controlPort(VoiceSymbol.VIBRATO) {
             floatType {
+                default = 0f
                 get { _vibrato }
                 set {
                     if (_vibrato != it) {
@@ -228,6 +233,7 @@ class VoicePlugin : DspPlugin {
         }
         controlPort(VoiceSymbol.COUPLING) {
             floatType {
+                default = 0f
                 get { _coupling }
                 set {
                     if (_coupling != it) {
@@ -252,6 +258,7 @@ class VoicePlugin : DspPlugin {
             }
             controlPort(VoiceSymbol.quadHold(i)) {
                 floatType {
+                    default = 0f
                     get { _quadHold[i] }
                     set {
                         _quadHold[i] = it

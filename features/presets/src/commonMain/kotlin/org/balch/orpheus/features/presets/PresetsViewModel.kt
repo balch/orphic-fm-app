@@ -153,7 +153,7 @@ class PresetsViewModel(
 
         // Load last selected preset from preferences, fallback to Default
         val prefs = appPreferencesRepository.load()
-        val lastPresetName = prefs.lastPresetName ?: "Default"
+        val lastPresetName = prefs.lastPresetName ?: "Orpheus"
         val presetToApply = allPresets.find { it.name == lastPresetName }
             ?: presetsRepository.getDefault()
         return PresetUiState.Loaded(allPresets, presetToApply, presetsRepository.getFactoryPresetNames())

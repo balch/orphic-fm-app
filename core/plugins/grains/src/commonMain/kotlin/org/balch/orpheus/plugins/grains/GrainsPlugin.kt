@@ -106,10 +106,20 @@ class GrainsPlugin(
                 default = 0f
                 get { _dryWet }
                 set {
+                    val wasDisabled = _dryWet <= 0.001f
                     _dryWet = it
+                    val shouldEnable = it > 0.001f
+                    if (wasDisabled && shouldEnable) {
+                        // Zero output before enabling to prevent blowout
+                        grains.dryWet.set(0.0)
+                        grains.setBypass(false)
+                        setPluginEnabled(true, audioEngine)
+                    }
                     grains.dryWet.set(it.toDouble())
-                    grains.setBypass(it <= 0.001f)
-                    setPluginEnabled(it > 0.001f, audioEngine)
+                    grains.setBypass(!shouldEnable)
+                    if (!shouldEnable) {
+                        setPluginEnabled(false, audioEngine)
+                    }
                 }
             }
         }

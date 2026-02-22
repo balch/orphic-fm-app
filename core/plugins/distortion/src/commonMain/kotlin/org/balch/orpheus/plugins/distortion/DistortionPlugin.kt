@@ -91,14 +91,24 @@ class DistortionPlugin(
                 default = 0f
                 get { _mix }
                 set {
+                    val wasDisabled = _mix <= 0.001f
                     _mix = it
+                    val shouldEnable = it > 0.001f
                     val distortedLevel = it
                     val cleanLevel = 1.0f - it
+                    if (wasDisabled && shouldEnable) {
+                        // Zero distorted path gains before enabling to prevent blowout
+                        distortedPathGainLeft.inputB.set(0.0)
+                        distortedPathGainRight.inputB.set(0.0)
+                        setPluginEnabled(true, audioEngine)
+                    }
                     cleanPathGainLeft.inputB.set(cleanLevel.toDouble())
                     cleanPathGainRight.inputB.set(cleanLevel.toDouble())
                     distortedPathGainLeft.inputB.set(distortedLevel.toDouble())
                     distortedPathGainRight.inputB.set(distortedLevel.toDouble())
-                    setPluginEnabled(it > 0.001f, audioEngine)
+                    if (!shouldEnable) {
+                        setPluginEnabled(false, audioEngine)
+                    }
                 }
             }
         }

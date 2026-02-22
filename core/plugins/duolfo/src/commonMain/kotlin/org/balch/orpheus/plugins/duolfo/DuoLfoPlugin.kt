@@ -150,6 +150,7 @@ class DuoLfoPlugin(
 
         controlPort(DuoLfoSymbol.FREQ_A) {
             floatType {
+                default = 0f
                 get { _freqA }
                 set {
                     _freqA = it
@@ -161,6 +162,7 @@ class DuoLfoPlugin(
 
         controlPort(DuoLfoSymbol.FREQ_B) {
             floatType {
+                default = 0f
                 get { _freqB }
                 set {
                     _freqB = it

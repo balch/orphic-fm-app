@@ -59,10 +59,10 @@ class BeatsPlugin : DspPlugin {
             floatType { default = 120f; min = 20f; max = 300f; get { _bpm }; set { _bpm = it } }
         }
         controlPort(BeatsSymbol.RANDOMNESS) {
-            floatType { get { _randomness }; set { _randomness = it } }
+            floatType { default = 0f; get { _randomness }; set { _randomness = it } }
         }
         controlPort(BeatsSymbol.SWING) {
-            floatType { get { _swing }; set { _swing = it } }
+            floatType { default = 0f; get { _swing }; set { _swing = it } }
         }
         controlPort(BeatsSymbol.MODE) {
             intType { get { _mode }; set { _mode = it } }

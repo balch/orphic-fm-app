@@ -202,9 +202,18 @@ class FluxPlugin(
                 default = 0.0f
                 get { _mix }
                 set {
+                    val wasDisabled = _mix <= 0.001f
                     _mix = it
+                    val shouldEnable = it > 0.001f
+                    if (wasDisabled && shouldEnable) {
+                        // Zero mix before enabling to prevent blowout
+                        flux.setMix(0f)
+                        setPluginEnabled(true, audioEngine)
+                    }
                     flux.setMix(it)
-                    setPluginEnabled(it > 0.001f, audioEngine)
+                    if (!shouldEnable) {
+                        setPluginEnabled(false, audioEngine)
+                    }
                 }
             }
         }

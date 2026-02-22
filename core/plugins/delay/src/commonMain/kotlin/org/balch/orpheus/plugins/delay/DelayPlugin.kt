@@ -108,14 +108,22 @@ class DelayPlugin(
                 set {
                     val wasDisabled = _mix <= 0.001f
                     _mix = it.coerceIn(0f, 1f)
-                    updateStereoGains()
                     val shouldEnable = _mix > 0.001f
                     if (wasDisabled && shouldEnable) {
+                        // Zero wet gains before enabling to prevent blowout
+                        delay1WetLeft.inputB.set(0.0)
+                        delay1WetRight.inputB.set(0.0)
+                        delay2WetLeft.inputB.set(0.0)
+                        delay2WetRight.inputB.set(0.0)
                         // Clear stale buffer data before re-enabling
                         delay1.clear()
                         delay2.clear()
+                        setPluginEnabled(true, audioEngine)
                     }
-                    setPluginEnabled(shouldEnable, audioEngine)
+                    updateStereoGains()
+                    if (!shouldEnable) {
+                        setPluginEnabled(false, audioEngine)
+                    }
                 }
             }
         }

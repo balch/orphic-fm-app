@@ -14,7 +14,7 @@ import kotlinx.coroutines.sync.withLock
  * 
  * This is a singleton that caches presets for efficient access throughout the app.
  * Use this instead of accessing DronePresetRepository directly when you need
- * quick access to the full preset list or specific presets like "Default".
+ * quick access to the full preset list or specific presets like "Orpheus".
  */
 @SingleIn(AppScope::class)
 @Inject
@@ -58,11 +58,11 @@ class PresetsRepository(
     }
     
     /**
-     * Get the Default preset. Never returns null since Default is a factory preset.
+     * Get the default preset (Orpheus). Never returns null since it's a factory preset.
      */
     suspend fun getDefault(): SynthPreset {
         ensureLoaded()
-        return _allPresets.value.find { it.name == "Default" } 
+        return _allPresets.value.find { it.name == "Orpheus" }
             ?: factoryPresets.first() // Fallback to first factory preset
     }
     

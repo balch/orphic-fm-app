@@ -6,9 +6,13 @@ import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.symbols.DELAY_URI
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.plugin.symbols.DISTORTION_URI
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
+import org.balch.orpheus.core.plugin.symbols.FLUX_URI
+import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 import org.balch.orpheus.core.plugin.symbols.REVERB_URI
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 import org.balch.orpheus.core.plugin.symbols.STEREO_URI
@@ -18,87 +22,87 @@ import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.plugins.duolfo.DuoLfoPlugin
 
 /**
- * Orpheus Patch - The signature sound. Multi-engine layering with stereo depth.
+ * 6-7 - Engine 17 textures with Flux sequencing and deep modulation.
  *
- * Pairs 0-1: FM-rich voices with character (engines 0, 10)
- * Pair 2: Warm modulated mid-range (engine 8)
- * Pair 3: Wild textural layer at max depth (engine 13)
+ * Pairs 0-1: Engine 0 and Engine 17 with Flux and FM modulation
+ * Pair 2: Engine 0 with LFO modulation
+ * Pair 3: Engine 0 with no modulation
  * Pairs 4-5: Clean ascending melodic voices (engine 0, no FM)
- * Reverb and distortion provide atmosphere; delay/warps/flux off by default.
+ * Flux engaged for sequencing. Delay adds motion. Reverb and distortion for atmosphere.
  */
 @Inject
 @ContributesIntoSet(AppScope::class)
-class OrpheusPatch : SynthPatch {
-    override val id = "orpheus"
-    override val name = "Orpheus"
+class SixSevenPatch : SynthPatch {
+    override val id = "six_seven"
+    override val name = "6-7"
     override val preset = SynthPreset(
-        name = "Orpheus",
+        name = "6-7",
         portValues = buildMap {
             val voiceUri = "org.balch.orpheus.plugins.voice"
 
-            // Tunes: varied across pairs for rich layering
+            // Tunes: varied across pairs
             val tunes = listOf(
-                0.61f, 0.69f, 0.48f, 0.50f,    // Pair 0-1: mid-high FM voices
-                0.64f, 0.66f, 0.50f, 0.55f,    // Pair 2-3: mid range
-                0.75f, 0.82f, 0.89f, 0.96f     // Pair 4-5: clean ascending
+                0.345f, 0.514f, 0.598f, 0.610f,    // Pair 0-1
+                0.121f, 0.186f, 0.447f, 0.514f,    // Pair 2-3
+                0.75f, 0.82f, 0.89f, 0.96f         // Pair 4-5: ascending
             )
             tunes.forEachIndexed { i, v ->
                 put("$voiceUri:tune_$i", PortValue.FloatValue(v))
             }
 
-            // Mod depths: rich FM on pairs 0-2, max on pair 3, clean on pairs 4-5
+            // Mod depths: strong FM on pairs 0-2, moderate on pair 3, clean on pairs 4-5
             val modDepths = listOf(
-                0.60f, 0.60f, 0.27f, 0.27f,
-                0.49f, 0.49f, 1.00f, 1.00f,
+                0.44f, 0.44f, 0.58f, 0.58f,
+                0.71f, 0.71f, 0.63f, 0.63f,
                 0.00f, 0.00f, 0.00f, 0.00f
             )
             modDepths.forEachIndexed { i, v ->
                 put("$voiceUri:mod_depth_$i", PortValue.FloatValue(v))
             }
 
-            // Env speeds: fast on most, gentle on pair 1, medium on pair 3
+            // Env speeds: gentle on pair 1, rest instant
             val envSpeeds = listOf(
-                0.00f, 0.00f, 0.15f, 0.10f,
-                0.00f, 0.00f, 0.53f, 0.43f,
+                0.00f, 0.00f, 0.56f, 0.66f,
+                0.00f, 0.00f, 0.00f, 0.00f,
                 0.00f, 0.00f, 0.00f, 0.00f
             )
             envSpeeds.forEachIndexed { i, v ->
                 put("$voiceUri:env_speed_$i", PortValue.FloatValue(v))
             }
 
-            // Duo engines: varied for timbral diversity
-            val duoEngines = listOf(0, 10, 8, 13, 0, 0)
+            // Duo engines: Engine 17 on pair 1, engine 0 elsewhere
+            val duoEngines = listOf(0, 17, 0, 0, 0, 0)
             duoEngines.forEachIndexed { i, v ->
                 put("$voiceUri:duo_engine_$i", PortValue.IntValue(v))
             }
 
-            // Duo sharpness: character across active pairs
-            val duoSharpness = listOf(0.60f, 0.56f, 0.47f, 0.78f, 0.00f, 0.00f)
+            // Duo sharpness
+            val duoSharpness = listOf(0.40f, 0.50f, 0.40f, 0.50f, 0.00f, 0.00f)
             duoSharpness.forEachIndexed { i, v ->
                 put("$voiceUri:duo_sharpness_$i", PortValue.FloatValue(v))
             }
 
-            // Duo harmonics: engine-specific timbral character
-            val duoHarmonics = listOf(0.15f, 0.45f, 0.60f, 0.42f, 0.00f, 0.00f)
+            // Duo harmonics: engine 17 with harmonics on pair 1
+            val duoHarmonics = listOf(0.00f, 0.60f, 0.00f, 0.00f, 0.00f, 0.00f)
             duoHarmonics.forEachIndexed { i, v ->
                 put("$voiceUri:duo_harmonics_$i", PortValue.FloatValue(v))
             }
 
-            // Duo morph: shapes timbre per engine — critical for non-default engines
-            val duoMorphs = listOf(0.30f, 0.50f, 0.45f, 0.92f, 0.15f, 0.15f)
+            // Duo morph
+            val duoMorphs = listOf(0.40f, 0.35f, 0.45f, 0.30f, 0.00f, 0.00f)
             duoMorphs.forEachIndexed { i, v ->
                 put("$voiceUri:duo_morph_$i", PortValue.FloatValue(v))
             }
 
-            // Duo mod source levels: how much the mod source affects timbre
-            val duoModSourceLevels = listOf(0.25f, 0.30f, 0.35f, 0.06f, 0.00f, 0.00f)
+            // Duo mod source levels
+            val duoModSourceLevels = listOf(0.44f, 0.50f, 0.55f, 0.50f, 0.00f, 0.00f)
             duoModSourceLevels.forEachIndexed { i, v ->
                 put("$voiceUri:duo_mod_source_level_$i", PortValue.FloatValue(v))
             }
 
-            // Mod sources: VOICE_FM on pair 0, LFO on pairs 1-2, OFF on pairs 3-5
+            // Mod sources: FLUX on pair 0, VOICE_FM on pair 1, LFO on pair 2, OFF on pairs 3-5
             val modSources = listOf(
-                ModSource.VOICE_FM, ModSource.LFO,
+                ModSource.FLUX, ModSource.VOICE_FM,
                 ModSource.LFO, ModSource.OFF,
                 ModSource.OFF, ModSource.OFF
             )
@@ -106,10 +110,10 @@ class OrpheusPatch : SynthPatch {
                 put("$voiceUri:duo_mod_source_$i", PortValue.IntValue(v.ordinal))
             }
 
-            // LFO: slow, linked, triangle for smooth modulation
+            // LFO: slow, linked, triangle, AND mode
             val lfoUri = DuoLfoPlugin.URI
-            put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.01f))
-            put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.029f))
+            put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.02f))
+            put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.02f))
             put("$lfoUri:${DuoLfoSymbol.MODE.symbol}", PortValue.IntValue(HyperLfoMode.AND.ordinal))
             put("$lfoUri:${DuoLfoSymbol.LINK.symbol}", PortValue.BoolValue(true))
             put("$lfoUri:${DuoLfoSymbol.TRIANGLE_MODE.symbol}", PortValue.BoolValue(true))
@@ -121,10 +125,32 @@ class OrpheusPatch : SynthPatch {
             put("$reverbUri:${ReverbSymbol.DAMPING.symbol}", PortValue.FloatValue(0.56f))
             put("$reverbUri:${ReverbSymbol.DIFFUSION.symbol}", PortValue.FloatValue(0.50f))
 
-            // Distortion: warm saturation (moderate to avoid blowout with many voices)
+            // Delay: rhythmic motion with subtle mix
+            val delayUri = DELAY_URI
+            put("$delayUri:${DelaySymbol.TIME_1.symbol}", PortValue.FloatValue(0.168f))
+            put("$delayUri:${DelaySymbol.TIME_2.symbol}", PortValue.FloatValue(0.614f))
+            put("$delayUri:${DelaySymbol.MOD_DEPTH_1.symbol}", PortValue.FloatValue(0.66f))
+            put("$delayUri:${DelaySymbol.MOD_DEPTH_2.symbol}", PortValue.FloatValue(0.27f))
+            put("$delayUri:${DelaySymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.60f))
+            put("$delayUri:${DelaySymbol.MIX.symbol}", PortValue.FloatValue(0.06f))
+
+            // Flux: engaged for sequencing
+            val fluxUri = FLUX_URI
+            put("$fluxUri:${FluxSymbol.SPREAD.symbol}", PortValue.FloatValue(0.30f))
+            put("$fluxUri:${FluxSymbol.BIAS.symbol}", PortValue.FloatValue(0.18f))
+            put("$fluxUri:${FluxSymbol.STEPS.symbol}", PortValue.FloatValue(0.34f))
+            put("$fluxUri:${FluxSymbol.DEJAVU.symbol}", PortValue.FloatValue(0.64f))
+            put("$fluxUri:${FluxSymbol.LENGTH.symbol}", PortValue.IntValue(5))
+            put("$fluxUri:${FluxSymbol.SCALE.symbol}", PortValue.IntValue(2))
+            put("$fluxUri:${FluxSymbol.RATE.symbol}", PortValue.FloatValue(0.20f))
+            put("$fluxUri:${FluxSymbol.JITTER.symbol}", PortValue.FloatValue(0.00f))
+            put("$fluxUri:${FluxSymbol.PROBABILITY.symbol}", PortValue.FloatValue(0.50f))
+            put("$fluxUri:${FluxSymbol.MIX.symbol}", PortValue.FloatValue(0.47f))
+
+            // Distortion: warm saturation
             val distUri = DISTORTION_URI
-            put("$distUri:${DistortionSymbol.DRIVE.symbol}", PortValue.FloatValue(0.30f))
-            put("$distUri:${DistortionSymbol.MIX.symbol}", PortValue.FloatValue(0.40f))
+            put("$distUri:${DistortionSymbol.DRIVE.symbol}", PortValue.FloatValue(0.25f))
+            put("$distUri:${DistortionSymbol.MIX.symbol}", PortValue.FloatValue(0.31f))
 
             // Stereo: wide voice placement
             val stereoUri = STEREO_URI
