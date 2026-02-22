@@ -96,6 +96,9 @@ class DspWiringGraph @Inject constructor(
         // Initialize all plugins (sets up internal wiring)
         pluginProvider.plugins.forEach { it.initialize() }
 
+        // Apply initial bypass state — plugins with mix=0 or no activity start disabled
+        pluginProvider.plugins.forEach { it.applyInitialBypassState(audioEngine) }
+
         // TOTAL FB: StereoPlugin.peak → scaled → HyperLfo.feedbackInput
         pluginProvider.stereoPlugin.outputs["peakOutput"]?.connect(totalFbGain.inputA)
         totalFbGain.output.connect(pluginProvider.hyperLfo.feedbackInput)

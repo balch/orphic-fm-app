@@ -201,7 +201,11 @@ class FluxPlugin(
             floatType {
                 default = 0.0f
                 get { _mix }
-                set { _mix = it; flux.setMix(it) }
+                set {
+                    _mix = it
+                    flux.setMix(it)
+                    setPluginEnabled(it > 0.001f, audioEngine)
+                }
             }
         }
     }
@@ -265,6 +269,10 @@ class FluxPlugin(
         audioUnits.forEach { audioEngine.addUnit(it) }
     }
     
+    override fun applyInitialBypassState(audioEngine: AudioEngine) {
+        setPluginEnabled(_mix > 0.001f, audioEngine)
+    }
+
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}

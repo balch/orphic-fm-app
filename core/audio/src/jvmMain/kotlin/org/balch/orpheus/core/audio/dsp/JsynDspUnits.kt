@@ -34,13 +34,19 @@ class JsynEnvelope : Envelope {
 
 class JsynDelayLine : DelayLine {
     internal val jsDelay = InterpolatingDelay()
+    private var bufferSize = 0
 
     override val input: AudioInput = JsynAudioInput(jsDelay.input)
     override val delay: AudioInput = JsynAudioInput(jsDelay.delay)
     override val output: AudioOutput = JsynAudioOutput(jsDelay.output)
 
     override fun allocate(maxSamples: Int) {
+        bufferSize = maxSamples
         jsDelay.allocate(maxSamples)
+    }
+
+    override fun clear() {
+        if (bufferSize > 0) jsDelay.allocate(bufferSize)
     }
 }
 

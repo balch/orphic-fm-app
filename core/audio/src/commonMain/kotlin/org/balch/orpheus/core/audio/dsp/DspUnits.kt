@@ -68,7 +68,10 @@ interface DelayLine : AudioUnit {
 
     /** Allocate buffer for maximum delay in samples */
     fun allocate(maxSamples: Int)
-    
+
+    /** Clear the delay buffer to silence (safe to call when unit is disabled) */
+    fun clear() {}
+
     interface Factory {
         fun create(): DelayLine
     }

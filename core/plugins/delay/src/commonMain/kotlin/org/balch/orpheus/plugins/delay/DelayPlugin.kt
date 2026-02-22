@@ -106,8 +106,16 @@ class DelayPlugin(
                 default = 0f
                 get { _mix }
                 set {
+                    val wasDisabled = _mix <= 0.001f
                     _mix = it.coerceIn(0f, 1f)
                     updateStereoGains()
+                    val shouldEnable = _mix > 0.001f
+                    if (wasDisabled && shouldEnable) {
+                        // Clear stale buffer data before re-enabling
+                        delay1.clear()
+                        delay2.clear()
+                    }
+                    setPluginEnabled(shouldEnable, audioEngine)
                 }
             }
         }
@@ -301,6 +309,10 @@ class DelayPlugin(
     private fun updateState() {
         // Here we would apply values from ControlPorts
         // For now let's just use the defaults from Port definition if not set
+    }
+
+    override fun applyInitialBypassState(audioEngine: AudioEngine) {
+        setPluginEnabled(_mix > 0.001f, audioEngine)
     }
 
     override fun connectPort(index: Int, data: Any) {

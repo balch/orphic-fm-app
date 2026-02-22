@@ -98,6 +98,7 @@ class DistortionPlugin(
                     cleanPathGainRight.inputB.set(cleanLevel.toDouble())
                     distortedPathGainLeft.inputB.set(distortedLevel.toDouble())
                     distortedPathGainRight.inputB.set(distortedLevel.toDouble())
+                    setPluginEnabled(it > 0.001f, audioEngine)
                 }
             }
         }
@@ -134,6 +135,20 @@ class DistortionPlugin(
         distortedPathGainLeft, distortedPathGainRight,
         postMixSummerLeft, postMixSummerRight
     )
+
+    // Only disable distortion processing path — keep dry passthrough alive
+    // since Distortion is in the series path: Resonator → Distortion → StereoSum
+    private val distortionPathUnits: List<AudioUnit> = listOf(
+        driveGainLeft, driveGainRight,
+        limiterLeft, limiterRight,
+        distortedPathGainLeft, distortedPathGainRight
+    )
+
+    override fun setPluginEnabled(enabled: Boolean, audioEngine: AudioEngine) {
+        for (unit in distortionPathUnits) {
+            audioEngine.setUnitEnabled(unit, enabled)
+        }
+    }
 
     // DspPlugin compatibility
     override val inputs: Map<String, AudioInput> = mapOf(
@@ -193,6 +208,10 @@ class DistortionPlugin(
 
         // Register with engine
         audioUnits.forEach { audioEngine.addUnit(it) }
+    }
+
+    override fun applyInitialBypassState(audioEngine: AudioEngine) {
+        setPluginEnabled(_mix > 0.001f, audioEngine)
     }
 
     override fun onStart() {

@@ -5,6 +5,12 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
@@ -41,7 +47,11 @@ class BenderPlugin(
 
     companion object {
         const val URI = BENDER_URI
+        private const val SPRING_DECAY_MS = 750L // attack(3ms) + decay(400ms) + release(300ms) + buffer
     }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var disableJob: Job? = null
 
     // Control signal path
     private val bendInputProxy = dspFactory.createPassThrough()
@@ -122,16 +132,24 @@ class BenderPlugin(
                     tensionGain.inputB.set(tensionLevel.toDouble())
                     
                     if (isActive && !wasActive) {
+                        disableJob?.cancel()
+                        setPluginEnabled(true, audioEngine)
                         tensionEnvelope.input.set(1.0)
                         _wasActive = true
                     } else if (!isActive && wasActive) {
                         tensionEnvelope.input.set(0.0)
                     }
-                    
+
                     if (!isActive && _wasActive) {
                         springEnvelope.input.set(1.0)
                         springEnvelope.input.set(0.0)
                         _wasActive = false
+                        // Defer disable so spring envelope can decay
+                        disableJob?.cancel()
+                        disableJob = scope.launch {
+                            delay(SPRING_DECAY_MS)
+                            setPluginEnabled(false, audioEngine)
+                        }
                     }
                 }
             }
@@ -273,6 +291,10 @@ class BenderPlugin(
         audioMixer.output.connect(audioOutputProxy.input)
 
         audioUnits.forEach { audioEngine.addUnit(it) }
+    }
+
+    override fun applyInitialBypassState(audioEngine: AudioEngine) {
+        setPluginEnabled(false, audioEngine)
     }
 
     override fun onStart() {}

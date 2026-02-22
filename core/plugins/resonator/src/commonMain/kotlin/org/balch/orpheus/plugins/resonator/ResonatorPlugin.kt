@@ -150,6 +150,7 @@ class ResonatorPlugin(
                     wetGainR.inputB.set(wetLevel)
                     dryGainL.inputB.set(dryLevel)
                     dryGainR.inputB.set(dryLevel)
+                    setPluginEnabled(_mix > 0.001f, audioEngine)
                 }
             }
         }
@@ -183,6 +184,16 @@ class ResonatorPlugin(
         wetGainL, wetGainR, dryGainL, dryGainR,
         resoMixL, resoMixR, finalSumL, finalSumR
     )
+
+    // Only disable expensive resonator + wet path — keep routing alive
+    // since Resonator feeds into Distortion in the series path
+    private val expensiveUnits: List<AudioUnit> = listOf(resonator, wetGainL, wetGainR)
+
+    override fun setPluginEnabled(enabled: Boolean, audioEngine: AudioEngine) {
+        for (unit in expensiveUnits) {
+            audioEngine.setUnitEnabled(unit, enabled)
+        }
+    }
 
     override val inputs: Map<String, AudioInput> = mapOf(
         "drumLeft" to drumExciteGainL.inputA,
@@ -247,6 +258,10 @@ class ResonatorPlugin(
         applyTargetMixRouting()
 
         audioUnits.forEach { audioEngine.addUnit(it) }
+    }
+
+    override fun applyInitialBypassState(audioEngine: AudioEngine) {
+        setPluginEnabled(_mix > 0.001f, audioEngine)
     }
 
     override fun onStart() {}

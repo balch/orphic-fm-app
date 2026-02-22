@@ -16,6 +16,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":core:audio"))
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.kotlinx.coroutines.core)
         }
     }
 }

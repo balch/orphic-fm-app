@@ -105,7 +105,12 @@ class GrainsPlugin(
             floatType {
                 default = 0f
                 get { _dryWet }
-                set { _dryWet = it; grains.dryWet.set(it.toDouble()); grains.setBypass(it <= 0.001f) }
+                set {
+                    _dryWet = it
+                    grains.dryWet.set(it.toDouble())
+                    grains.setBypass(it <= 0.001f)
+                    setPluginEnabled(it > 0.001f, audioEngine)
+                }
             }
         }
         
@@ -169,6 +174,10 @@ class GrainsPlugin(
         grains.position.set(0.2)
 
         audioUnits.forEach { audioEngine.addUnit(it) }
+    }
+
+    override fun applyInitialBypassState(audioEngine: AudioEngine) {
+        setPluginEnabled(_dryWet > 0.001f, audioEngine)
     }
 
     override fun onStart() {}

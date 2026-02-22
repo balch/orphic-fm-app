@@ -120,6 +120,7 @@ class WarpsPlugin(
                     dryGainLeft.inputB.set(dry)
                     dryGainRight.inputB.set(dry)
                     warps.setBypass(it <= 0.001f)
+                    setPluginEnabled(it > 0.001f, audioEngine)
                 }
             }
         }
@@ -183,6 +184,10 @@ class WarpsPlugin(
         audioUnits.forEach { audioEngine.addUnit(it) }
     }
     
+    override fun applyInitialBypassState(audioEngine: AudioEngine) {
+        setPluginEnabled(_mix > 0.001f, audioEngine)
+    }
+
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}

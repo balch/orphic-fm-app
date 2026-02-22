@@ -60,7 +60,12 @@ class ReverbPlugin(
             floatType {
                 default = 0f
                 get { _amount }
-                set { _amount = it; reverbUnit.setAmount(it); reverbUnit.setBypass(it <= 0.001f) }
+                set {
+                    _amount = it
+                    reverbUnit.setAmount(it)
+                    reverbUnit.setBypass(it <= 0.001f)
+                    setPluginEnabled(it > 0.001f, audioEngine)
+                }
             }
         }
 
@@ -119,6 +124,10 @@ class ReverbPlugin(
         reverbUnit.setInputGain(0.5f)
 
         audioUnits.forEach { audioEngine.addUnit(it) }
+    }
+
+    override fun applyInitialBypassState(audioEngine: AudioEngine) {
+        setPluginEnabled(_amount > 0.001f, audioEngine)
     }
 
     override fun onStart() {}

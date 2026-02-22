@@ -5,9 +5,15 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
@@ -94,6 +100,9 @@ class PerStringBenderPlugin(
     )
     
     private val stringStates = Array(NUM_STRINGS) { StringBenderState() }
+    private var _pluginActive = false
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var disableJob: Job? = null
 
     // Per-voice pitch bend outputs (connect to voice frequency modulation)
     private val voiceBendOutputs = Array(8) { dspFactory.createPassThrough() }
@@ -345,9 +354,33 @@ class PerStringBenderPlugin(
         audioUnits.forEach { audioEngine.addUnit(it) }
     }
 
+    override fun applyInitialBypassState(audioEngine: AudioEngine) {
+        setPluginEnabled(false, audioEngine)
+    }
+
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
+
+    private fun ensureEnabled() {
+        disableJob?.cancel()
+        if (!_pluginActive) {
+            _pluginActive = true
+            setPluginEnabled(true, audioEngine)
+        }
+    }
+
+    private fun disableIfIdle() {
+        if (_pluginActive && stringStates.none { it.isActive } && !slideBarWasActive) {
+            // Defer disable so spring/pluck envelopes can decay
+            disableJob?.cancel()
+            disableJob = scope.launch {
+                delay(SPRING_DURATION_MS.toLong())
+                _pluginActive = false
+                setPluginEnabled(false, audioEngine)
+            }
+        }
+    }
 
     private fun applyDirectionForString(stringIndex: Int, rawDeflection: Float): Float {
         return if (stringIndex < 2) {
@@ -359,7 +392,8 @@ class PerStringBenderPlugin(
 
     fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float, voiceIsPlaying: Boolean = true): Boolean {
         if (stringIndex !in 0 until NUM_STRINGS) return false
-        
+        ensureEnabled()
+
         val state = stringStates[stringIndex]
         
         // Store raw and apply direction
@@ -499,6 +533,7 @@ class PerStringBenderPlugin(
         gesture.lastX = 0f
         gesture.lastTime = currentTime
         
+        disableIfIdle()
         val springDuration = (SPRING_DURATION_MS * pullDistance.coerceIn(0.3f, 1f)).toInt()
         return Pair(springDuration, shouldReleaseVoice)
     }
@@ -569,6 +604,7 @@ class PerStringBenderPlugin(
     private var slideBarWasActive = false
     
     fun setSlideBar(yPosition: Float, xPosition: Float) {
+        ensureEnabled()
         val currentTime = Clock.System.now().toEpochMilliseconds()
         val deltaTime = (currentTime - slideBarLastTime).coerceAtLeast(1L)
         
@@ -642,6 +678,7 @@ class PerStringBenderPlugin(
                 voiceBendOutputs[voiceB].input.set(0.0)
             }
         }
+        disableIfIdle()
     }
     
     fun getSlideBarPosition(): Float = slideBarPosition

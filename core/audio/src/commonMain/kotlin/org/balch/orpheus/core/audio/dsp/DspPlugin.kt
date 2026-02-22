@@ -56,6 +56,25 @@ interface DspPlugin {
      */
     fun activate() {}
     
+    /**
+     * Enable or disable this plugin's audio units at the scheduler level.
+     * When disabled, units are skipped entirely — zero CPU cost.
+     * Override for plugins in series signal paths that need dry passthrough.
+     */
+    fun setPluginEnabled(enabled: Boolean, audioEngine: AudioEngine) {
+        for (unit in audioUnits) {
+            audioEngine.setUnitEnabled(unit, enabled)
+        }
+    }
+
+    /**
+     * Called by the orchestrator after [initialize] to set the correct
+     * enabled/disabled state based on initial parameter values.
+     * Override in plugins that manage their own bypass to avoid
+     * burning CPU at startup when mix/activity is zero.
+     */
+    fun applyInitialBypassState(audioEngine: AudioEngine) {}
+
     /** Called when audio engine starts */
     fun onStart() {}
 
