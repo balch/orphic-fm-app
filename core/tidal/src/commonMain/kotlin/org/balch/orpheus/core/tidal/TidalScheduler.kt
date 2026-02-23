@@ -108,6 +108,9 @@ class TidalScheduler(
     
     private var playbackJob: Job? = null
     private var currentPattern: Pattern<TidalEvent>? = null
+
+    // Save-on-first-write state: captures pre-REPL values so stop() can restore them
+    private val savedControlState = mutableMapOf<PluginControlId, PortValue>()
     
     // Scheduler timing parameters
     private val scheduleWindowSeconds = 0.25 // Schedule 250ms chunks at a time
@@ -205,32 +208,26 @@ class TidalScheduler(
         log.debug { "TidalScheduler: Stopping playback" }
         playbackJob?.cancel()
         playbackJob = null
-        
+
         // Clear automation and turn off all voices
         for (i in 0 until 12) {
             synthEngine.clearParameterAutomation("voice_gate_$i")
             synthEngine.clearParameterAutomation("voice_freq_$i")
             synthEngine.setVoiceGate(i, false)
         }
-        
+
         // Reset all holds to 0 for the 8 main voices
         // Per-voice hold has no PluginControlId — use engine directly
         for (i in 0 until 8) {
             synthEngine.setVoiceHold(i, 0f)
         }
 
-        // Reset quad holds
-        for (i in 0 until 3) {
-            synthController.setPluginControl(VoiceSymbol.quadHold(i).controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
+        // Restore all controls the REPL modified to their pre-REPL values
+        for ((id, value) in savedControlState) {
+            synthController.setPluginControl(id, value, ControlEventOrigin.TIDAL)
         }
+        savedControlState.clear()
 
-        // Reset global effects to prevent "static tone"
-        synthController.setPluginControl(DistortionSymbol.DRIVE.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
-        synthController.setPluginControl(DistortionSymbol.MIX.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
-        synthController.setPluginControl(VoiceSymbol.VIBRATO.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
-        synthController.setPluginControl(DelaySymbol.FEEDBACK.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
-        synthController.setPluginControl(DelaySymbol.MIX.controlId, PortValue.FloatValue(0f), ControlEventOrigin.TIDAL)
-        
         _state.value = _state.value.copy(isPlaying = false)
     }
     
@@ -512,6 +509,18 @@ class TidalScheduler(
     }
     
     /**
+     * Set a plugin control from REPL, saving the pre-REPL value on first write.
+     * On stop(), saved values are restored instead of zeroing.
+     */
+    private fun tidalSetPluginControl(id: PluginControlId, value: PortValue) {
+        if (id !in savedControlState) {
+            val current = synthController.getPluginControl(id)
+            savedControlState[id] = current ?: PortValue.FloatValue(0f)
+        }
+        synthController.setPluginControl(id, value, ControlEventOrigin.TIDAL)
+    }
+
+    /**
      * Dispatch a Tidal event to the SynthController/Engine.
      */
     private fun dispatchEvent(event: TidalEvent) {
@@ -535,10 +544,9 @@ class TidalScheduler(
             }
             
             is TidalEvent.VoiceTune -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     VoiceSymbol.tune(event.voiceIndex).controlId,
                     PortValue.FloatValue(event.tune),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
@@ -548,92 +556,81 @@ class TidalScheduler(
             }
 
             is TidalEvent.QuadPitch -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     VoiceSymbol.quadPitch(event.quadIndex).controlId,
                     PortValue.FloatValue(event.pitch),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.QuadHold -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     VoiceSymbol.quadHold(event.quadIndex).controlId,
                     PortValue.FloatValue(event.amount),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.DelayTime -> {
                 val symbol = if (event.delayIndex == 0) DelaySymbol.TIME_1 else DelaySymbol.TIME_2
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     symbol.controlId,
                     PortValue.FloatValue(event.time),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.DelayFeedback -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     DelaySymbol.FEEDBACK.controlId,
                     PortValue.FloatValue(event.amount),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.DelayMix -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     DelaySymbol.MIX.controlId,
                     PortValue.FloatValue(event.amount),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.LfoFreq -> {
                 val symbol = if (event.lfoIndex == 0) DuoLfoSymbol.FREQ_A else DuoLfoSymbol.FREQ_B
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     symbol.controlId,
                     PortValue.FloatValue(event.frequency),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.Drive -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     DistortionSymbol.DRIVE.controlId,
                     PortValue.FloatValue(event.amount),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.DistortionMix -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     DistortionSymbol.MIX.controlId,
                     PortValue.FloatValue(event.amount),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.Vibrato -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     VoiceSymbol.VIBRATO.controlId,
                     PortValue.FloatValue(event.amount),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.VoicePan -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     StereoSymbol.entries[StereoSymbol.VOICE_PAN_0.ordinal + event.voiceIndex].controlId,
                     PortValue.FloatValue(event.pan),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.VoiceEnvSpeed -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     VoiceSymbol.envSpeed(event.voiceIndex).controlId,
                     PortValue.FloatValue(event.speed),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
@@ -643,26 +640,23 @@ class TidalScheduler(
                     "lfo" -> org.balch.orpheus.core.audio.ModSource.LFO
                     else -> org.balch.orpheus.core.audio.ModSource.OFF
                 }
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     VoiceSymbol.duoModSource(event.duoIndex).controlId,
                     PortValue.IntValue(modSource.ordinal),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.DuoSharp -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     VoiceSymbol.duoSharpness(event.duoIndex).controlId,
                     PortValue.FloatValue(event.sharpness),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
             is TidalEvent.DuoEngine -> {
-                synthController.setPluginControl(
+                tidalSetPluginControl(
                     VoiceSymbol.duoEngine(event.duoIndex).controlId,
                     PortValue.IntValue(event.engineId),
-                    ControlEventOrigin.TIDAL
                 )
             }
 
@@ -670,7 +664,7 @@ class TidalScheduler(
                 // Try to parse as a PluginControlId key (e.g., "org.balch.orpheus.plugins.voice:tune_0")
                 val pluginId = PluginControlId.parse(event.controlId)
                 if (pluginId != null) {
-                    synthController.setPluginControl(pluginId, PortValue.FloatValue(event.value), ControlEventOrigin.TIDAL)
+                    tidalSetPluginControl(pluginId, PortValue.FloatValue(event.value))
                 } else {
                     // Legacy fallback for unrecognized control IDs
                     synthController.emitControlChange(event.controlId, event.value, ControlEventOrigin.TIDAL)
