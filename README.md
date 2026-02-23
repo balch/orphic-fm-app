@@ -150,6 +150,18 @@ curl -L -o core/mediapipe/src/jvmMain/resources/models/hand_landmarker.task \
 
 </details>
 
+### JDK Requirement
+
+Desktop packaging (`packageReleaseDistributionForCurrentOS`) requires a full JDK 17+ with `jpackage` — the standard `run` task works without it. Android Studio's bundled JBR does **not** include `jpackage`. If you see `'jpackage' is missing`, add this to `local.properties`:
+
+```properties
+org.gradle.java.home=/path/to/your/full/jdk
+```
+
+For example on macOS with [jenv](https://www.jenv.be/): `org.gradle.java.home=/Users/you/.jenv/versions/21`
+
+> **Note:** The `.java-version` file pins JDK 21 (current LTS). JDK 17 is the minimum supported version.
+
 ### Commands
 
 ```bash
@@ -157,9 +169,9 @@ curl -L -o core/mediapipe/src/jvmMain/resources/models/hand_landmarker.task \
 ./gradlew :apps:composeApp:run
 
 # Android
-./gradlew :apps:composeApp:installDebug
+./gradlew :apps:androidApp:installDebugRelease
 
-# Release (dmg/msi/deb depending on OS)
+# Desktop release (dmg/msi/deb depending on OS)
 ./gradlew :apps:composeApp:packageReleaseDistributionForCurrentOS
 
 # Full build
