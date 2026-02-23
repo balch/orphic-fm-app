@@ -20,6 +20,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
+import org.balch.orpheus.core.controller.ControlStateSnapshot
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
@@ -145,6 +146,9 @@ class MediaPipeViewModel(
     private val gestureInterpreter = GestureInterpreter()
     private val aslEngine = AslInteractionEngine()
     private val conductorEngine = ConductorInteractionEngine()
+
+    // Save-on-first-write: captures pre-gesture values so camera-off can restore them
+    private val controlSnapshot = ControlStateSnapshot(synthController)
     private val _gestureMode = MutableStateFlow(GestureMode.ASL)
     private var lastConductorToggleMs = 0L // cooldown prevents re-toggle bounce
     private val conductorToggleCooldownMs = 1500L
@@ -385,10 +389,9 @@ class MediaPipeViewModel(
             }
             is AslEvent.SystemParamSet -> {
                 val controlId = resolveControlId(event.sign, event.sign) ?: return
-                synthController.setPluginControl(
+                gestureSetPluginControl(
                     controlId,
                     PortValue.FloatValue(event.value.coerceIn(0f, 1f)),
-                    ControlEventOrigin.MEDIAPIPE,
                 )
             }
             is AslEvent.TargetSelected -> {
@@ -463,17 +466,15 @@ class MediaPipeViewModel(
                 synthController.emitBendChange(event.value)
             }
             is ConductorEvent.HoldSet -> {
-                synthController.setPluginControl(
+                gestureSetPluginControl(
                     VoiceSymbol.quadHold(event.quadIndex).controlId,
                     PortValue.FloatValue(event.value),
-                    ControlEventOrigin.MEDIAPIPE,
                 )
             }
             is ConductorEvent.DynamicsSet -> {
-                synthController.setPluginControl(
+                gestureSetPluginControl(
                     VoiceSymbol.quadVolume(event.quadIndex).controlId,
                     PortValue.FloatValue(event.value),
-                    ControlEventOrigin.MEDIAPIPE,
                 )
             }
             is ConductorEvent.TimbreSet -> { /* no-op, removed */ }
@@ -541,11 +542,7 @@ class MediaPipeViewModel(
         val current = synthController.getPluginControl(controlId)?.asFloat() ?: default
         val newValue = (current + delta * PARAM_ADJUST_SCALE).coerceIn(range)
         log.debug { "adjustParameter $controlId delta=$delta current=$current -> $newValue" }
-        synthController.setPluginControl(
-            controlId,
-            PortValue.FloatValue(newValue),
-            ControlEventOrigin.MEDIAPIPE,
-        )
+        gestureSetPluginControl(controlId, PortValue.FloatValue(newValue))
     }
 
     /**
@@ -560,7 +557,7 @@ class MediaPipeViewModel(
             val controlId = VoiceSymbol.envSpeed(vi).controlId
             val current = synthController.getPluginControl(controlId)?.asFloat() ?: 0.5f
             val newValue = (current + deltaZ * ENV_SPEED_Z_SCALE).coerceIn(0f, 1f)
-            synthController.setPluginControl(controlId, PortValue.FloatValue(newValue), ControlEventOrigin.MEDIAPIPE)
+            gestureSetPluginControl(controlId, PortValue.FloatValue(newValue))
         }
     }
 
@@ -633,30 +630,58 @@ class MediaPipeViewModel(
             handTracker.start()
         } else {
             handTracker.stop()
-            if (handActive) {
-                handActive = false
-                missCount = 0
-                deactivateGestureControls()
-            }
+            // Deactivation is handled by the combine flow on dispatcherProvider.default
+            // when it sees enabled=false. We must NOT call deactivateGestureControls() here
+            // because this runs on the main thread while the combine accesses the engines
+            // on the default dispatcher — concurrent access is not thread-safe.
         }
+    }
+
+    /** Set a plugin control from gesture tracking, saving the pre-gesture value on first write. */
+    private fun gestureSetPluginControl(id: PluginControlId, value: PortValue) {
+        controlSnapshot.setPluginControl(id, value, ControlEventOrigin.MEDIAPIPE)
     }
 
     /** Deactivate gesture controls and reset ASL engine state. */
     @OptIn(ExperimentalTime::class)
     private fun deactivateGestureControls() {
         log.info { "deactivateGestureControls (mode=${_gestureMode.value})" }
-        // Flush pending events (e.g., gate-off for voices still gated via pinch)
+
+        // 1. Restore all plugin controls modified during this gesture session
+        //    (hold, dynamics, parameter adjustments, etc.) to pre-gesture values.
+        //    Must happen BEFORE gate-off so hold is zeroed when envelopes release.
+        controlSnapshot.restore(ControlEventOrigin.MEDIAPIPE)
+
+        // 2. Flush pending events (e.g., gate-off for voices still gated via pinch)
         val timestampMs = Clock.System.now().toEpochMilliseconds()
         val flushEvents = aslEngine.update(emptyList(), timestampMs)
         for (event in flushEvents) {
             dispatchAslEvent(event)
         }
         aslEngine.reset()
-        // Also flush conductor engine if active
+
+        // 3. Flush conductor engine if active
         val conductorFlush = conductorEngine.reset()
         for (event in conductorFlush) {
             dispatchConductorEvent(event)
         }
+
+        // 4. Safety net: force all 8 voice gates off directly through the engine.
+        //    The SharedFlow path (emitPulseEnd → VoiceViewModel → setVoiceGate) is
+        //    indirect and async. Belt-and-suspenders: set gates off on the engine directly.
+        for (i in 0 until 8) {
+            _engine.setVoiceGate(i, false)
+        }
+
+        // 5. Reset global pitch bend (conductor uses emitBendChange, not plugin controls)
+        synthController.emitBendChange(0f)
+
+        // 6. Release any active string bends
+        for (duoIndex in 0..3) {
+            _engine.releaseStringBend(duoIndex)
+        }
+        _stringBends.value = listOf(0f, 0f, 0f, 0f)
+
         // Preserve Maestro Mode on tracking loss — only explicit fist exits conductor.
         // ASL mode resets fully since selection state depends on continuous tracking.
         if (_gestureMode.value == GestureMode.ASL) {
@@ -668,11 +693,6 @@ class MediaPipeViewModel(
             selectedQuadIndex = null
         }
         _isBending.value = false
-        synthController.setPluginControl(
-            BenderSymbol.BEND.controlId,
-            PortValue.FloatValue(0f),
-            ControlEventOrigin.MEDIAPIPE,
-        )
     }
 
     override fun onCleared() {

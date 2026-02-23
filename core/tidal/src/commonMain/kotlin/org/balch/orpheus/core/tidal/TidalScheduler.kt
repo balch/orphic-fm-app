@@ -19,6 +19,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
+import org.balch.orpheus.core.controller.ControlStateSnapshot
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
@@ -110,7 +111,7 @@ class TidalScheduler(
     private var currentPattern: Pattern<TidalEvent>? = null
 
     // Save-on-first-write state: captures pre-REPL values so stop() can restore them
-    private val savedControlState = mutableMapOf<PluginControlId, PortValue>()
+    private val controlSnapshot = ControlStateSnapshot(synthController)
     
     // Scheduler timing parameters
     private val scheduleWindowSeconds = 0.25 // Schedule 250ms chunks at a time
@@ -223,10 +224,7 @@ class TidalScheduler(
         }
 
         // Restore all controls the REPL modified to their pre-REPL values
-        for ((id, value) in savedControlState) {
-            synthController.setPluginControl(id, value, ControlEventOrigin.TIDAL)
-        }
-        savedControlState.clear()
+        controlSnapshot.restore(ControlEventOrigin.TIDAL)
 
         _state.value = _state.value.copy(isPlaying = false)
     }
@@ -508,16 +506,8 @@ class TidalScheduler(
         dispatchEvent(event)
     }
     
-    /**
-     * Set a plugin control from REPL, saving the pre-REPL value on first write.
-     * On stop(), saved values are restored instead of zeroing.
-     */
     private fun tidalSetPluginControl(id: PluginControlId, value: PortValue) {
-        if (id !in savedControlState) {
-            val current = synthController.getPluginControl(id)
-            savedControlState[id] = current ?: PortValue.FloatValue(0f)
-        }
-        synthController.setPluginControl(id, value, ControlEventOrigin.TIDAL)
+        controlSnapshot.setPluginControl(id, value, ControlEventOrigin.TIDAL)
     }
 
     /**
