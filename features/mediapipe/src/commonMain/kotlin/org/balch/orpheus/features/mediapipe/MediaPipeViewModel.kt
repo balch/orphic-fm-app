@@ -395,16 +395,21 @@ class MediaPipeViewModel(
                 )
             }
             is AslEvent.TargetSelected -> {
-                // State update handled via selectedTarget flow
+                // Voice-level target clears any D/Q sub-selection
+                selectedDuoIndex = null
+                selectedQuadIndex = null
             }
             is AslEvent.TargetDeselected -> {
-                // State update handled via selectedTarget flow
+                selectedDuoIndex = null
+                selectedQuadIndex = null
             }
             is AslEvent.DuoSelected -> {
                 selectedDuoIndex = event.duoIndex
+                selectedQuadIndex = null
             }
             is AslEvent.QuadSelected -> {
                 selectedQuadIndex = event.quadIndex
+                selectedDuoIndex = null
             }
             is AslEvent.EnvSpeedAdjust -> {
                 adjustEnvSpeed(event.deltaZ)
@@ -583,31 +588,44 @@ class MediaPipeViewModel(
     /**
      * Resolve a control port ID for a given target+param ASL sign combination.
      *
-     * Mapping:
-     * - Voice number (NUM_1-8) + param letter → per-voice parameter
-     * - D (duo prefix) + param letter → per-duo parameter (requires selectedDuoIndex)
-     * - Q (quad prefix) + param letter → per-quad parameter (requires selectedQuadIndex)
+     * Routing depends on whether D/Q sub-selection is active:
+     * - Quad selected (Q+number): H→quadHold, W→quadVolume, B→quadPitch
+     * - Duo selected (D+number): M→duoMorph, S→duoSharpness, L→duoModLevel
+     * - Voice selected (number alone): B→globalBend, params auto-derive duo/quad from voice
      * - System sign (V, C, Y) → global parameter (param is the target itself)
      */
     private fun resolveControlId(target: AslSign, param: AslSign): PluginControlId? {
         return when {
-            // Voice-level params: target is a number sign (1-8)
-            // Auto-derive duo (vi/2) and quad (vi/4) from voice index
             target.category == AslCategory.NUMBER -> {
                 val vi = target.voiceIndex() ?: return null
-                val di = selectedDuoIndex ?: (vi / 2)  // explicit D prefix overrides auto-derive
-                val qi = selectedQuadIndex ?: (vi / 4)  // explicit Q prefix overrides auto-derive
-                when (param) {
-                    // Duo-level params (auto-derived from voice)
-                    AslSign.LETTER_M -> VoiceSymbol.duoMorph(di).controlId
-                    AslSign.LETTER_S -> VoiceSymbol.duoSharpness(di).controlId
-                    AslSign.LETTER_L -> VoiceSymbol.duoModSourceLevel(di).controlId
-                    // Quad-level params (auto-derived from voice)
-                    AslSign.LETTER_H -> VoiceSymbol.quadHold(qi).controlId
-                    AslSign.LETTER_W -> VoiceSymbol.quadVolume(qi).controlId
-                    // Voice-level params
-                    AslSign.LETTER_B -> BenderSymbol.BEND.controlId
-                    else -> null
+                val qi = selectedQuadIndex
+                val di = selectedDuoIndex
+
+                when {
+                    // Quad sub-selection active: only quad-level params
+                    qi != null -> when (param) {
+                        AslSign.LETTER_H -> VoiceSymbol.quadHold(qi).controlId
+                        AslSign.LETTER_W -> VoiceSymbol.quadVolume(qi).controlId
+                        AslSign.LETTER_B -> VoiceSymbol.quadPitch(qi).controlId
+                        else -> null
+                    }
+                    // Duo sub-selection active: only duo-level params
+                    di != null -> when (param) {
+                        AslSign.LETTER_M -> VoiceSymbol.duoMorph(di).controlId
+                        AslSign.LETTER_S -> VoiceSymbol.duoSharpness(di).controlId
+                        AslSign.LETTER_L -> VoiceSymbol.duoModSourceLevel(di).controlId
+                        else -> null
+                    }
+                    // Voice-level: auto-derive duo/quad from voice index
+                    else -> when (param) {
+                        AslSign.LETTER_M -> VoiceSymbol.duoMorph(vi / 2).controlId
+                        AslSign.LETTER_S -> VoiceSymbol.duoSharpness(vi / 2).controlId
+                        AslSign.LETTER_L -> VoiceSymbol.duoModSourceLevel(vi / 2).controlId
+                        AslSign.LETTER_H -> VoiceSymbol.quadHold(vi / 4).controlId
+                        AslSign.LETTER_W -> VoiceSymbol.quadVolume(vi / 4).controlId
+                        AslSign.LETTER_B -> BenderSymbol.BEND.controlId
+                        else -> null
+                    }
                 }
             }
             // System params: the target IS the param (direct sign)
