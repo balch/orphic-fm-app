@@ -11,6 +11,8 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
+import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.Symbol
@@ -106,10 +108,9 @@ class DelayPlugin(
                 default = 0f
                 get { _mix }
                 set {
-                    val wasDisabled = _mix <= 0.001f
+                    val wasDisabled = _mix <= PLUGIN_DISABLE_THRESHOLD
                     _mix = it.coerceIn(0f, 1f)
-                    val shouldEnable = _mix > 0.001f
-                    if (wasDisabled && shouldEnable) {
+                    if (wasDisabled && _mix > PLUGIN_ENABLE_THRESHOLD) {
                         // Zero wet gains before enabling to prevent blowout
                         delay1WetLeft.inputB.set(0.0)
                         delay1WetRight.inputB.set(0.0)
@@ -121,7 +122,7 @@ class DelayPlugin(
                         setPluginEnabled(true, audioEngine)
                     }
                     updateStereoGains()
-                    if (!shouldEnable) {
+                    if (_mix <= PLUGIN_DISABLE_THRESHOLD) {
                         setPluginEnabled(false, audioEngine)
                     }
                 }
@@ -320,7 +321,7 @@ class DelayPlugin(
     }
 
     override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_mix > 0.001f, audioEngine)
+        setPluginEnabled(_mix > PLUGIN_ENABLE_THRESHOLD, audioEngine)
     }
 
     override fun connectPort(index: Int, data: Any) {

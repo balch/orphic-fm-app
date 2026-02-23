@@ -25,6 +25,7 @@ import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.plugins.resonator.ResonatorPlugin
+import kotlin.concurrent.Volatile
 import kotlin.math.absoluteValue
 import kotlin.math.pow
 
@@ -100,6 +101,7 @@ class PerStringBenderPlugin(
     )
     
     private val stringStates = Array(NUM_STRINGS) { StringBenderState() }
+    @Volatile
     private var _pluginActive = false
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var disableJob: Job? = null

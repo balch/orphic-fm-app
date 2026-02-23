@@ -11,6 +11,8 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
+import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.Symbol
@@ -106,18 +108,18 @@ class GrainsPlugin(
                 default = 0f
                 get { _dryWet }
                 set {
-                    val wasDisabled = _dryWet <= 0.001f
+                    val wasDisabled = _dryWet <= PLUGIN_DISABLE_THRESHOLD
                     _dryWet = it
-                    val shouldEnable = it > 0.001f
-                    if (wasDisabled && shouldEnable) {
+                    val shouldDisable = _dryWet <= PLUGIN_DISABLE_THRESHOLD
+                    if (wasDisabled && _dryWet > PLUGIN_ENABLE_THRESHOLD) {
                         // Zero output before enabling to prevent blowout
                         grains.dryWet.set(0.0)
                         grains.setBypass(false)
                         setPluginEnabled(true, audioEngine)
                     }
                     grains.dryWet.set(it.toDouble())
-                    grains.setBypass(!shouldEnable)
-                    if (!shouldEnable) {
+                    grains.setBypass(shouldDisable)
+                    if (shouldDisable) {
                         setPluginEnabled(false, audioEngine)
                     }
                 }
@@ -187,7 +189,7 @@ class GrainsPlugin(
     }
 
     override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_dryWet > 0.001f, audioEngine)
+        setPluginEnabled(_dryWet > PLUGIN_ENABLE_THRESHOLD, audioEngine)
     }
 
     override fun onStart() {}

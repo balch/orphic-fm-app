@@ -5,6 +5,12 @@ import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 
+/** Plugin enables when mix/amount exceeds this value (hysteresis upper bound) */
+const val PLUGIN_ENABLE_THRESHOLD = 0.005f
+
+/** Plugin disables when mix/amount drops to or below this value (hysteresis lower bound) */
+const val PLUGIN_DISABLE_THRESHOLD = 0.001f
+
 /**
  * Base interface for DSP plugin modules.
  * 

@@ -7,6 +7,7 @@ import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.AndroidAudioDeviceManager
+import java.util.Arrays
 
 /**
  * Android actual implementation of AudioEngine using JSyn.
@@ -108,7 +109,20 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
             is com.jsyn.unitgen.UnitGenerator -> unit
             else -> null
         }
-        ug?.isEnabled = enabled
+        ug?.let {
+            it.isEnabled = enabled
+            if (!enabled) {
+                // Zero all output ports to prevent DC offset from JSyn's flattenOutputs()
+                // which holds the last sample value rather than zeroing
+                for (port in it.getPorts()) {
+                    if (port is com.jsyn.ports.UnitOutputPort) {
+                        for (i in 0 until port.numParts) {
+                            Arrays.fill(port.getValues(i), 0.0)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     override val lineOutLeft: AudioInput

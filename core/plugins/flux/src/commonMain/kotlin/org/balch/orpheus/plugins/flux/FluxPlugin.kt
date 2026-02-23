@@ -11,6 +11,8 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
+import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.Symbol
@@ -202,16 +204,15 @@ class FluxPlugin(
                 default = 0.0f
                 get { _mix }
                 set {
-                    val wasDisabled = _mix <= 0.001f
+                    val wasDisabled = _mix <= PLUGIN_DISABLE_THRESHOLD
                     _mix = it
-                    val shouldEnable = it > 0.001f
-                    if (wasDisabled && shouldEnable) {
+                    if (wasDisabled && _mix > PLUGIN_ENABLE_THRESHOLD) {
                         // Zero mix before enabling to prevent blowout
                         flux.setMix(0f)
                         setPluginEnabled(true, audioEngine)
                     }
                     flux.setMix(it)
-                    if (!shouldEnable) {
+                    if (_mix <= PLUGIN_DISABLE_THRESHOLD) {
                         setPluginEnabled(false, audioEngine)
                     }
                 }
@@ -279,7 +280,7 @@ class FluxPlugin(
     }
     
     override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_mix > 0.001f, audioEngine)
+        setPluginEnabled(_mix > PLUGIN_ENABLE_THRESHOLD, audioEngine)
     }
 
     override fun onStart() {}

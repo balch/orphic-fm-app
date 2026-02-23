@@ -11,6 +11,8 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
+import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.Symbol
@@ -61,18 +63,18 @@ class ReverbPlugin(
                 default = 0f
                 get { _amount }
                 set {
-                    val wasDisabled = _amount <= 0.001f
+                    val wasDisabled = _amount <= PLUGIN_DISABLE_THRESHOLD
                     _amount = it
-                    val shouldEnable = it > 0.001f
-                    if (wasDisabled && shouldEnable) {
+                    val shouldDisable = _amount <= PLUGIN_DISABLE_THRESHOLD
+                    if (wasDisabled && _amount > PLUGIN_ENABLE_THRESHOLD) {
                         // Zero output before enabling to prevent blowout
                         reverbUnit.setAmount(0f)
                         reverbUnit.setBypass(false)
                         setPluginEnabled(true, audioEngine)
                     }
                     reverbUnit.setAmount(it)
-                    reverbUnit.setBypass(!shouldEnable)
-                    if (!shouldEnable) {
+                    reverbUnit.setBypass(shouldDisable)
+                    if (shouldDisable) {
                         setPluginEnabled(false, audioEngine)
                     }
                 }
@@ -137,7 +139,7 @@ class ReverbPlugin(
     }
 
     override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_amount > 0.001f, audioEngine)
+        setPluginEnabled(_amount > PLUGIN_ENABLE_THRESHOLD, audioEngine)
     }
 
     override fun onStart() {}

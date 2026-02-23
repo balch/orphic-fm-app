@@ -6,6 +6,7 @@ import com.jsyn.unitgen.UnitGenerator
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.FluxUnit
+import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
 import org.balch.orpheus.core.audio.dsp.JsynAudioInput
 import org.balch.orpheus.core.audio.dsp.JsynAudioOutput
 import org.balch.orpheus.plugins.flux.engine.FluxProcessor
@@ -92,7 +93,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     @Volatile private var bypass = true
     @Volatile private var mix = 0.0f
     override fun setBypass(bypass: Boolean) { this.bypass = bypass }
-    override fun setMix(mix: Float) { this.mix = mix; bypass = mix <= 0.001f; processor.setMix(mix) }
+    override fun setMix(mix: Float) { this.mix = mix; bypass = mix <= PLUGIN_DISABLE_THRESHOLD; processor.setMix(mix) }
 
     override fun setScale(index: Int) { processor.setScale(index) }
     override fun setTModel(index: Int) { processor.setTModel(index) }

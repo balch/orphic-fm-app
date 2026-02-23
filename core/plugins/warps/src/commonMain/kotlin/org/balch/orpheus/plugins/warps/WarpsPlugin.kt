@@ -11,6 +11,8 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
+import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.Symbol
@@ -112,10 +114,10 @@ class WarpsPlugin(
                 default = 0f
                 get { _mix }
                 set {
-                    val wasDisabled = _mix <= 0.001f
+                    val wasDisabled = _mix <= PLUGIN_DISABLE_THRESHOLD
                     _mix = it
-                    val shouldEnable = it > 0.001f
-                    if (wasDisabled && shouldEnable) {
+                    val shouldDisable = _mix <= PLUGIN_DISABLE_THRESHOLD
+                    if (wasDisabled && _mix > PLUGIN_ENABLE_THRESHOLD) {
                         // Zero wet gains before enabling to prevent blowout
                         wetGainLeft.inputB.set(0.0)
                         wetGainRight.inputB.set(0.0)
@@ -128,8 +130,8 @@ class WarpsPlugin(
                     wetGainRight.inputB.set(wet)
                     dryGainLeft.inputB.set(dry)
                     dryGainRight.inputB.set(dry)
-                    warps.setBypass(!shouldEnable)
-                    if (!shouldEnable) {
+                    warps.setBypass(shouldDisable)
+                    if (shouldDisable) {
                         setPluginEnabled(false, audioEngine)
                     }
                 }
@@ -196,7 +198,7 @@ class WarpsPlugin(
     }
     
     override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_mix > 0.001f, audioEngine)
+        setPluginEnabled(_mix > PLUGIN_ENABLE_THRESHOLD, audioEngine)
     }
 
     override fun onStart() {}

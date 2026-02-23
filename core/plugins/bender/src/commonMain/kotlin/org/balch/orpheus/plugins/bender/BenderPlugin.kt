@@ -24,6 +24,7 @@ import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.BENDER_URI
 import org.balch.orpheus.core.plugin.symbols.BenderSymbol
+import kotlin.concurrent.Volatile
 import kotlin.math.absoluteValue
 import kotlin.math.pow
 import kotlin.random.Random
@@ -95,6 +96,7 @@ class BenderPlugin(
     private var _timbreModulation = 0.3f
     private var _springVolume = 0.4f
     private var _tensionVolume = 0.015f
+    @Volatile
     private var _wasActive = false
 
     // Type-safe DSL port definitions
