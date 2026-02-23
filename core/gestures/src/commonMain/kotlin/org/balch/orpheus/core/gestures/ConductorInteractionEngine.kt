@@ -4,17 +4,21 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 sealed interface ConductorEvent {
-    // String duo gating (each string = 2 voices)
-    data class StringGateOn(val stringIndex: Int) : ConductorEvent
-    data class StringGateOff(val stringIndex: Int) : ConductorEvent
-    data class StringBendSet(val stringIndex: Int, val bendAmount: Float) : ConductorEvent
-    data class StringRelease(val stringIndex: Int) : ConductorEvent
+    // Individual voice gating (each finger = 1 voice)
+    data class VoiceGateOn(val voiceIndex: Int) : ConductorEvent
+    data class VoiceGateOff(val voiceIndex: Int) : ConductorEvent
+
+    // Per-voice bend (single voice gated in a duo)
+    data class VoiceBendSet(val voiceIndex: Int, val bendAmount: Float) : ConductorEvent
+    data class VoiceRelease(val voiceIndex: Int) : ConductorEvent
+
+    // Duo bend (both voices in duo gated simultaneously)
+    data class DuoBendSet(val duoIndex: Int, val bendAmount: Float) : ConductorEvent
+    data class DuoRelease(val duoIndex: Int) : ConductorEvent
 
     // Roll-routed controls
     data class BendSet(val value: Float) : ConductorEvent
     data class HoldSet(val quadIndex: Int, val value: Float) : ConductorEvent
-    data class ModSourceCycle(val quadIndex: Int) : ConductorEvent
-    data class ModSourceLevelSet(val quadIndex: Int, val value: Float) : ConductorEvent
 
     // Continuous per-hand controls
     data class DynamicsSet(val quadIndex: Int, val value: Float) : ConductorEvent
@@ -22,55 +26,48 @@ sealed interface ConductorEvent {
 }
 
 /**
- * Maestro Mode interaction engine (v2).
+ * Maestro Mode interaction engine (v3 — individual voices).
  *
- * Four fingers per hand, each with a distinct role:
- * - **Index/Middle**: gate a string duo (2 voices each). Finger tipX delta
- *   from thumb drives per-string bend. Release triggers spring-back.
- * - **Ring**: modifier for roll → duo mod source level. Double-tap cycles
- *   mod source (OFF→LFO→FM→FLUX) for both duos on the quad.
- * - **Pinky**: modifier for roll → quad hold.
+ * All four fingers per hand gate individual voices:
+ *   Left:  Index=V0, Middle=V1, Ring=V2, Pinky=V3
+ *   Right: Index=V4, Middle=V5, Ring=V6, Pinky=V7
  *
- * Roll angle routes based on which modifier is active:
- *   pinky > ring > global pitch bend (default).
+ * When both voices of a duo are gated simultaneously (index+middle or ring+pinky
+ * on the same hand), they share a duo-level string bend with spring-back animation.
+ * A single gated voice gets a solo bend.
  *
- * Palm Y → quad dynamics (auto-calibrated). Hand openness → timbre.
+ * Hold control: Thumbs Up / Thumbs Down ASL signs activate Z-velocity fling
+ * through hold detents [0, 0.4, 0.5, 0.6, 0.75] for the quad of that hand.
+ *
+ * Roll angle always routes to global pitch bend (no more ring modifier).
+ * Palm Y → quad dynamics (auto-calibrated).
  */
 class ConductorInteractionEngine {
 
-    // String gating state (4 strings)
-    private val stringGated = BooleanArray(NUM_STRINGS)
+    // Per-voice gating state (8 voices)
+    private val voiceGated = BooleanArray(NUM_VOICES)
 
-    // Per-finger modifier state (ring/pinky per hand)
-    private val ringTouching = BooleanArray(2) // [left, right]
-    private val pinkyTouching = BooleanArray(2)
+    // Per-voice thumb X at gate-on (for bend delta)
+    private val thumbXAtGate = FloatArray(NUM_VOICES)
 
-    /** True when any hand has pinky touching thumb (hold modifier active). */
-    val isAnyPinkyTouching: Boolean get() = pinkyTouching[0] || pinkyTouching[1]
-    /** True when any hand has ring touching thumb (mod-level modifier active). */
-    val isAnyRingTouching: Boolean get() = ringTouching[0] || ringTouching[1]
+    // Track which voices are addressed this frame (for hand-disappearing detection)
+    private val voicesAddressed = BooleanArray(NUM_VOICES)
+
+    /** True when any voice is gated (used externally for swipe suppression). */
+    val isAnyVoiceGated: Boolean get() = voiceGated.any { it }
 
     // Smoothed roll-derived values per hand
     private val smoothedBend = FloatArray(2)
-    private val smoothedModLevel = FloatArray(2)
 
-    // Detent hold system per hand
-    private val holdTarget = FloatArray(2)       // target detent value
-    private val holdCurrent = FloatArray(2)      // smoothed current hold output
-    private val lastEmittedHold = FloatArray(2) { -1f } // last value sent, -1 = never
-    private val holdSettled = BooleanArray(2) { true } // true when current == target (latched)
-    private val lastRawSize = FloatArray(2)      // previous frame's raw apparentSize
-    private val hasLastRawSize = BooleanArray(2) // whether lastRawSize is initialized
-    private val smoothedVelocity = FloatArray(2) // low-pass filtered Z velocity
-
-    // Ring double-tap detection per hand
-    private val lastRingTapMs = LongArray(2) { -1000L }
-
-    // Pinky double-tap detection per hand (resets hold to 0)
-    private val lastPinkyTapMs = LongArray(2) { -1000L }
-
-    // Per-string thumb X at gate-on (for bend delta)
-    private val thumbXAtGate = FloatArray(NUM_STRINGS)
+    // Detent hold system per hand (driven by thumbs up/down)
+    private val holdTarget = FloatArray(2)
+    private val holdCurrent = FloatArray(2)
+    private val lastEmittedHold = FloatArray(2) { -1f }
+    private val holdSettled = BooleanArray(2) { true }
+    private val lastRawSize = FloatArray(2)
+    private val hasLastRawSize = BooleanArray(2)
+    private val smoothedVelocity = FloatArray(2)
+    private val holdActive = BooleanArray(2) // true when thumbs up/down is being shown
 
     // Auto-calibration for palmY → dynamics
     private var palmYMin = 0.3f
@@ -81,29 +78,58 @@ class ConductorInteractionEngine {
         timestampMs: Long,
     ): List<ConductorEvent> {
         val events = mutableListOf<ConductorEvent>()
-
-        // Track which strings are addressed this frame
-        val stringsAddressed = BooleanArray(NUM_STRINGS)
+        voicesAddressed.fill(false)
 
         for (hand in gestures) {
             val isLeft = hand.handedness == Handedness.LEFT
             val handIdx = if (isLeft) 0 else 1
-            val stringOffset = if (isLeft) 0 else 2
+            val voiceOffset = if (isLeft) 0 else 4
             val quadIndex = if (isLeft) 0 else 1
 
             val thumbTip = hand.fingers.firstOrNull { it.finger == Finger.THUMB }
                 ?: continue
 
-            // Reference distance for scaling all thresholds by camera distance
             val refDist = hand.apparentSize.coerceAtLeast(MIN_APPARENT_SIZE)
 
-            // -- Index & Middle: string gating + bend --
-            for ((fingerIdx, finger) in STRING_FINGERS.withIndex()) {
+            // -- Thumbs Up/Down: hold fling --
+            val isThumbsGesture = hand.aslSign == AslSign.THUMBS_UP ||
+                hand.aslSign == AslSign.THUMBS_DOWN
+            val wasHoldActive = holdActive[handIdx]
+
+            if (isThumbsGesture && hand.aslConfidence >= THUMBS_CONFIDENCE_MIN) {
+                if (!wasHoldActive) {
+                    // Entering hold mode — gate off any voices this hand had active
+                    holdActive[handIdx] = true
+                    hasLastRawSize[handIdx] = false
+                    smoothedVelocity[handIdx] = 0f
+                    events += gateOffVoicesForHand(voiceOffset)
+                }
+                events += processHoldFling(hand, handIdx, quadIndex, refDist)
+                // Skip finger gating when showing thumbs gesture
+                continue
+            } else if (wasHoldActive) {
+                // Exiting hold mode — settle to nearest detent
+                holdActive[handIdx] = false
+                if (!holdSettled[handIdx]) {
+                    holdTarget[handIdx] = nearestDetent(holdTarget[handIdx])
+                    holdCurrent[handIdx] = holdTarget[handIdx]
+                    holdSettled[handIdx] = true
+                    if (abs(holdCurrent[handIdx] - lastEmittedHold[handIdx]) > HOLD_EMIT_EPSILON) {
+                        lastEmittedHold[handIdx] = holdCurrent[handIdx]
+                        events += ConductorEvent.HoldSet(quadIndex, holdCurrent[handIdx])
+                    }
+                }
+                hasLastRawSize[handIdx] = false
+                smoothedVelocity[handIdx] = 0f
+            }
+
+            // -- All 4 fingers: individual voice gating + bend --
+            for ((fingerIdx, finger) in VOICE_FINGERS.withIndex()) {
                 val fingerState = hand.fingers.firstOrNull { it.finger == finger }
                     ?: continue
 
-                val stringIndex = stringOffset + fingerIdx
-                stringsAddressed[stringIndex] = true
+                val voiceIndex = voiceOffset + fingerIdx
+                voicesAddressed[voiceIndex] = true
 
                 val dist = distance2D(thumbTip.tipX, thumbTip.tipY,
                     fingerState.tipX, fingerState.tipY)
@@ -111,139 +137,70 @@ class ConductorInteractionEngine {
                 val threshold = refDist * TOUCH_RATIOS[fingerIdx]
                 val offThreshold = threshold * HYSTERESIS_FACTOR
 
-                if (!stringGated[stringIndex] && dist <= threshold) {
-                    stringGated[stringIndex] = true
-                    thumbXAtGate[stringIndex] = thumbTip.tipX
-                    events += ConductorEvent.StringGateOn(stringIndex)
-                } else if (stringGated[stringIndex] && dist > offThreshold) {
-                    stringGated[stringIndex] = false
-                    events += ConductorEvent.StringRelease(stringIndex)
-                    events += ConductorEvent.StringGateOff(stringIndex)
-                }
-
-                // Per-string bend while gated
-                if (stringGated[stringIndex]) {
-                    val bendDelta = fingerState.tipX - thumbXAtGate[stringIndex]
-                    val bendRange = refDist * BEND_X_RATIO
-                    val bendNormalized = (bendDelta / bendRange).coerceIn(-1f, 1f)
-                    events += ConductorEvent.StringBendSet(stringIndex, bendNormalized)
-                }
-            }
-
-            // -- Ring: modifier + double-tap --
-            val ringState = hand.fingers.firstOrNull { it.finger == Finger.RING }
-            if (ringState != null) {
-                val dist = distance2D(thumbTip.tipX, thumbTip.tipY,
-                    ringState.tipX, ringState.tipY)
-                val wasRingTouching = ringTouching[handIdx]
-                val threshold = refDist * RING_TOUCH_RATIO
-                val offThreshold = threshold * HYSTERESIS_FACTOR
-
-                if (!wasRingTouching && dist <= threshold) {
-                    ringTouching[handIdx] = true
-                    // Double-tap detection
-                    if (timestampMs - lastRingTapMs[handIdx] <= DOUBLE_TAP_MS) {
-                        events += ConductorEvent.ModSourceCycle(quadIndex)
-                        lastRingTapMs[handIdx] = -1000L // reset to prevent triple-tap
+                if (!voiceGated[voiceIndex] && dist <= threshold) {
+                    voiceGated[voiceIndex] = true
+                    thumbXAtGate[voiceIndex] = thumbTip.tipX
+                    events += ConductorEvent.VoiceGateOn(voiceIndex)
+                } else if (voiceGated[voiceIndex] && dist > offThreshold) {
+                    voiceGated[voiceIndex] = false
+                    // Check if this was part of a duo bend
+                    val duoIndex = voiceIndex / 2
+                    val partnerVoice = if (voiceIndex % 2 == 0) voiceIndex + 1 else voiceIndex - 1
+                    if (voiceGated.getOrElse(partnerVoice) { false }) {
+                        // Partner still gated — transition from duo bend to solo bend for partner
+                        events += ConductorEvent.DuoRelease(duoIndex)
                     } else {
-                        lastRingTapMs[handIdx] = timestampMs
+                        events += ConductorEvent.VoiceRelease(voiceIndex)
                     }
-                } else if (wasRingTouching && dist > offThreshold) {
-                    ringTouching[handIdx] = false
+                    events += ConductorEvent.VoiceGateOff(voiceIndex)
                 }
             }
 
-            // -- Pinky: modifier + Z-velocity detent hold --
-            val pinkyState = hand.fingers.firstOrNull { it.finger == Finger.PINKY }
-            if (pinkyState != null) {
-                val dist = distance2D(thumbTip.tipX, thumbTip.tipY,
-                    pinkyState.tipX, pinkyState.tipY)
-                val threshold = refDist * PINKY_TOUCH_RATIO
-                val offThreshold = threshold * HYSTERESIS_FACTOR
+            // -- Bend: duo vs solo --
+            // Process bends for gated voices, grouped by duo
+            for (localDuo in 0..1) {
+                val duoIndex = (voiceOffset / 2) + localDuo
+                val v0 = voiceOffset + localDuo * 2
+                val v1 = v0 + 1
+                val v0Gated = voiceGated.getOrElse(v0) { false }
+                val v1Gated = voiceGated.getOrElse(v1) { false }
 
-                if (!pinkyTouching[handIdx] && dist <= threshold) {
-                    pinkyTouching[handIdx] = true
-                    // Double-tap detection: reset hold to 0
-                    if (timestampMs - lastPinkyTapMs[handIdx] <= DOUBLE_TAP_MS) {
-                        holdTarget[handIdx] = 0f
-                        holdCurrent[handIdx] = 0f
-                        holdSettled[handIdx] = true
-                        lastEmittedHold[handIdx] = 0f
-                        events += ConductorEvent.HoldSet(quadIndex, 0f)
-                        lastPinkyTapMs[handIdx] = -1000L // prevent triple-tap
-                    } else {
-                        lastPinkyTapMs[handIdx] = timestampMs
+                if (v0Gated && v1Gated) {
+                    // Both gated — duo bend using average of finger offsets
+                    val f0 = hand.fingers.firstOrNull { it.finger == VOICE_FINGERS[localDuo * 2] }
+                    val f1 = hand.fingers.firstOrNull { it.finger == VOICE_FINGERS[localDuo * 2 + 1] }
+                    if (f0 != null && f1 != null) {
+                        val avgX = (f0.tipX + f1.tipX) / 2f
+                        val avgAnchor = (thumbXAtGate[v0] + thumbXAtGate[v1]) / 2f
+                        val bendDelta = avgX - avgAnchor
+                        val bendRange = refDist * BEND_X_RATIO
+                        val bendNormalized = (bendDelta / bendRange).coerceIn(-1f, 1f)
+                        events += ConductorEvent.DuoBendSet(duoIndex, bendNormalized)
                     }
-                    // Anchor Z tracking on pinky gate-on
-                    hasLastRawSize[handIdx] = false
-                    smoothedVelocity[handIdx] = 0f
-                } else if (pinkyTouching[handIdx] && dist > offThreshold) {
-                    pinkyTouching[handIdx] = false
-                    hasLastRawSize[handIdx] = false
-                    smoothedVelocity[handIdx] = 0f
+                } else if (v0Gated) {
+                    val f0 = hand.fingers.firstOrNull { it.finger == VOICE_FINGERS[localDuo * 2] }
+                    if (f0 != null) {
+                        val bendDelta = f0.tipX - thumbXAtGate[v0]
+                        val bendRange = refDist * BEND_X_RATIO
+                        val bendNormalized = (bendDelta / bendRange).coerceIn(-1f, 1f)
+                        events += ConductorEvent.VoiceBendSet(v0, bendNormalized)
+                    }
+                } else if (v1Gated) {
+                    val f1 = hand.fingers.firstOrNull { it.finger == VOICE_FINGERS[localDuo * 2 + 1] }
+                    if (f1 != null) {
+                        val bendDelta = f1.tipX - thumbXAtGate[v1]
+                        val bendRange = refDist * BEND_X_RATIO
+                        val bendNormalized = (bendDelta / bendRange).coerceIn(-1f, 1f)
+                        events += ConductorEvent.VoiceBendSet(v1, bendNormalized)
+                    }
                 }
             }
 
-            // -- Pinky hold: Z velocity drives detent stepping --
-            if (pinkyTouching[handIdx]) {
-                val rawSize = hand.apparentSize
-                if (!hasLastRawSize[handIdx]) {
-                    lastRawSize[handIdx] = rawSize
-                    hasLastRawSize[handIdx] = true
-                } else {
-                    // Raw frame-to-frame velocity, normalized by hand size for distance invariance
-                    val rawVelocity = (rawSize - lastRawSize[handIdx]) / refDist
-                    lastRawSize[handIdx] = rawSize
-                    smoothedVelocity[handIdx] += (rawVelocity - smoothedVelocity[handIdx]) * VELOCITY_SMOOTHING
-
-                    val absVelocity = abs(smoothedVelocity[handIdx])
-
-                    // Require higher velocity to break out of settled state
-                    val threshold = if (holdSettled[handIdx]) Z_VELOCITY_BREAKOUT
-                                    else Z_VELOCITY_THRESHOLD
-
-                    if (absVelocity > threshold) {
-                        holdSettled[handIdx] = false
-                        val holdDelta = smoothedVelocity[handIdx] * Z_HOLD_SENSITIVITY
-                        holdTarget[handIdx] = (holdTarget[handIdx] + holdDelta)
-                            .coerceIn(0f, HOLD_DETENTS.last())
-                    } else if (!holdSettled[handIdx]) {
-                        // Velocity dropped — snap to nearest detent and latch
-                        holdTarget[handIdx] = nearestDetent(holdTarget[handIdx])
-                        holdCurrent[handIdx] = holdTarget[handIdx]
-                        holdSettled[handIdx] = true
-                    }
-                }
-
-                // Smooth holdCurrent toward target while unsettled
-                if (!holdSettled[handIdx]) {
-                    val distance = holdTarget[handIdx] - holdCurrent[handIdx]
-                    val smoothing = (abs(distance) * HOLD_SPEED_SCALE)
-                        .coerceIn(HOLD_MIN_SPEED, HOLD_MAX_SPEED)
-                    holdCurrent[handIdx] += distance * smoothing
-                }
-                // Emit on change
-                if (abs(holdCurrent[handIdx] - lastEmittedHold[handIdx]) > HOLD_EMIT_EPSILON) {
-                    lastEmittedHold[handIdx] = holdCurrent[handIdx]
-                    events += ConductorEvent.HoldSet(quadIndex, holdCurrent[handIdx])
-                }
-            }
-
-            // -- Roll angle routing (priority: ring > bend, pinky no longer uses roll) --
+            // -- Roll angle: always global pitch bend --
             val rollAngle = hand.rollAngle
-            when {
-                ringTouching[handIdx] -> {
-                    val target = ((rollAngle + ROLL_HALF_RANGE) / ROLL_FULL_RANGE)
-                        .coerceIn(0f, 1f)
-                    smoothedModLevel[handIdx] += (target - smoothedModLevel[handIdx]) * ROLL_SMOOTHING
-                    events += ConductorEvent.ModSourceLevelSet(quadIndex, smoothedModLevel[handIdx])
-                }
-                else -> {
-                    val target = (rollAngle / ROLL_HALF_RANGE).coerceIn(-1f, 1f)
-                    smoothedBend[handIdx] += (target - smoothedBend[handIdx]) * ROLL_SMOOTHING
-                    events += ConductorEvent.BendSet(smoothedBend[handIdx])
-                }
-            }
+            val target = (rollAngle / ROLL_HALF_RANGE).coerceIn(-1f, 1f)
+            smoothedBend[handIdx] += (target - smoothedBend[handIdx]) * ROLL_SMOOTHING
+            events += ConductorEvent.BendSet(smoothedBend[handIdx])
 
             // -- Dynamics: auto-calibrated palmY --
             palmYMin = minOf(palmYMin, hand.palmY)
@@ -251,110 +208,155 @@ class ConductorInteractionEngine {
             val range = (palmYMax - palmYMin).coerceAtLeast(0.05f)
             val normalized = ((palmYMax - hand.palmY) / range).coerceIn(0f, 1f)
             events += ConductorEvent.DynamicsSet(quadIndex, normalized)
-
-            // Timbre (hand openness → sharpness) removed: noisy handOpenness values
-            // in the 0.7–1.0 range caused unmusical sounds.
         }
 
-        // Gate off strings whose hand disappeared
-        for (si in 0 until NUM_STRINGS) {
-            if (stringGated[si] && !stringsAddressed[si]) {
-                val isLeft = si < 2
-                val handPresent = gestures.any {
-                    (it.handedness == Handedness.LEFT) == isLeft
-                }
-                if (!handPresent) {
-                    stringGated[si] = false
-                    events += ConductorEvent.StringRelease(si)
-                    events += ConductorEvent.StringGateOff(si)
-                }
+        // Gate off voices whose hand disappeared
+        for (handOffset in intArrayOf(0, 4)) {
+            val isLeft = handOffset == 0
+            val anyVoiceUnaddressed = (handOffset until handOffset + 4).any {
+                voiceGated[it] && !voicesAddressed[it]
+            }
+            if (!anyVoiceUnaddressed) continue
+            val handPresent = gestures.any {
+                (it.handedness == Handedness.LEFT) == isLeft
+            }
+            if (!handPresent) {
+                events += gateOffVoicesForHand(handOffset)
             }
         }
 
         return events
     }
 
+    private fun processHoldFling(
+        hand: GestureState,
+        handIdx: Int,
+        quadIndex: Int,
+        refDist: Float,
+    ): List<ConductorEvent> {
+        val events = mutableListOf<ConductorEvent>()
+        val rawSize = hand.apparentSize
+        if (!hasLastRawSize[handIdx]) {
+            lastRawSize[handIdx] = rawSize
+            hasLastRawSize[handIdx] = true
+        } else {
+            val rawVelocity = (rawSize - lastRawSize[handIdx]) / refDist
+            lastRawSize[handIdx] = rawSize
+            smoothedVelocity[handIdx] += (rawVelocity - smoothedVelocity[handIdx]) * VELOCITY_SMOOTHING
+
+            val absVelocity = abs(smoothedVelocity[handIdx])
+            val threshold = if (holdSettled[handIdx]) Z_VELOCITY_BREAKOUT
+                            else Z_VELOCITY_THRESHOLD
+
+            if (absVelocity > threshold) {
+                holdSettled[handIdx] = false
+                val holdDelta = smoothedVelocity[handIdx] * Z_HOLD_SENSITIVITY
+                holdTarget[handIdx] = (holdTarget[handIdx] + holdDelta)
+                    .coerceIn(0f, HOLD_DETENTS.last())
+            } else if (!holdSettled[handIdx]) {
+                holdTarget[handIdx] = nearestDetent(holdTarget[handIdx])
+                holdCurrent[handIdx] = holdTarget[handIdx]
+                holdSettled[handIdx] = true
+            }
+        }
+
+        if (!holdSettled[handIdx]) {
+            val distance = holdTarget[handIdx] - holdCurrent[handIdx]
+            val smoothing = (abs(distance) * HOLD_SPEED_SCALE)
+                .coerceIn(HOLD_MIN_SPEED, HOLD_MAX_SPEED)
+            holdCurrent[handIdx] += distance * smoothing
+        }
+        if (abs(holdCurrent[handIdx] - lastEmittedHold[handIdx]) > HOLD_EMIT_EPSILON) {
+            lastEmittedHold[handIdx] = holdCurrent[handIdx]
+            events += ConductorEvent.HoldSet(quadIndex, holdCurrent[handIdx])
+        }
+        return events
+    }
+
+    /**
+     * Gate off all voices belonging to one hand (4 voices starting at [voiceOffset]).
+     * Correctly emits DuoRelease when both partners are gated, avoiding duplicates.
+     */
+    private fun gateOffVoicesForHand(voiceOffset: Int): List<ConductorEvent> {
+        val events = mutableListOf<ConductorEvent>()
+        val duosReleased = mutableSetOf<Int>()
+        for (vi in voiceOffset until voiceOffset + 4) {
+            if (voiceGated[vi]) {
+                val duoIndex = vi / 2
+                val partnerVoice = if (vi % 2 == 0) vi + 1 else vi - 1
+                if (voiceGated.getOrElse(partnerVoice) { false } && duoIndex !in duosReleased) {
+                    events += ConductorEvent.DuoRelease(duoIndex)
+                    duosReleased += duoIndex
+                } else if (!voiceGated.getOrElse(partnerVoice) { false }) {
+                    events += ConductorEvent.VoiceRelease(vi)
+                }
+                events += ConductorEvent.VoiceGateOff(vi)
+                voiceGated[vi] = false
+            }
+        }
+        return events
+    }
+
     fun reset(): List<ConductorEvent> {
         val events = mutableListOf<ConductorEvent>()
-        for (si in 0 until NUM_STRINGS) {
-            if (stringGated[si]) {
-                events += ConductorEvent.StringRelease(si)
-                events += ConductorEvent.StringGateOff(si)
+        val duosReleased = mutableSetOf<Int>()
+        for (vi in 0 until NUM_VOICES) {
+            if (voiceGated[vi]) {
+                val duoIndex = vi / 2
+                val partnerVoice = if (vi % 2 == 0) vi + 1 else vi - 1
+                if (voiceGated.getOrElse(partnerVoice) { false } && duoIndex !in duosReleased) {
+                    events += ConductorEvent.DuoRelease(duoIndex)
+                    duosReleased += duoIndex
+                } else if (!voiceGated.getOrElse(partnerVoice) { false }) {
+                    events += ConductorEvent.VoiceRelease(vi)
+                }
+                events += ConductorEvent.VoiceGateOff(vi)
             }
-            stringGated[si] = false
+            voiceGated[vi] = false
         }
-        ringTouching[0] = false; ringTouching[1] = false
-        pinkyTouching[0] = false; pinkyTouching[1] = false
         smoothedBend[0] = 0f; smoothedBend[1] = 0f
-        smoothedModLevel[0] = 0f; smoothedModLevel[1] = 0f
         holdTarget[0] = 0f; holdTarget[1] = 0f
         holdCurrent[0] = 0f; holdCurrent[1] = 0f
         lastEmittedHold[0] = -1f; lastEmittedHold[1] = -1f
         holdSettled[0] = true; holdSettled[1] = true
         hasLastRawSize[0] = false; hasLastRawSize[1] = false
         smoothedVelocity[0] = 0f; smoothedVelocity[1] = 0f
-        lastRingTapMs[0] = -1000L; lastRingTapMs[1] = -1000L
-        lastPinkyTapMs[0] = -1000L; lastPinkyTapMs[1] = -1000L
+        holdActive[0] = false; holdActive[1] = false
         palmYMin = 0.3f; palmYMax = 0.7f
         return events
     }
 
     companion object {
-        const val NUM_STRINGS = 4
         const val NUM_VOICES = 8
 
-        /** String-gating fingers: index and middle. */
-        private val STRING_FINGERS = arrayOf(Finger.INDEX, Finger.MIDDLE)
+        /** All four gating fingers in order: index, middle, ring, pinky. */
+        private val VOICE_FINGERS = arrayOf(Finger.INDEX, Finger.MIDDLE, Finger.RING, Finger.PINKY)
 
-        /** Minimum apparentSize to prevent division by near-zero. */
         private const val MIN_APPARENT_SIZE = 0.05f
 
-        /** Touch threshold ratios (× apparentSize) for index and middle. */
-        private val TOUCH_RATIOS = floatArrayOf(0.36f, 0.36f)
-
-        /** Touch threshold ratios for ring and pinky modifiers.
-         *  Ring is tighter to prevent accidental engagement. */
-        private const val RING_TOUCH_RATIO = 0.30f
-        private const val PINKY_TOUCH_RATIO = 0.55f
+        /** Touch threshold ratios (x apparentSize) per finger.
+         *  Index/middle use standard threshold; ring is tighter; pinky is looser. */
+        private val TOUCH_RATIOS = floatArrayOf(0.36f, 0.36f, 0.30f, 0.55f)
 
         private const val HYSTERESIS_FACTOR = 1.5f
         private const val ROLL_SMOOTHING = 0.08f
-
-        /** Bend X range ratio (× apparentSize). */
         private const val BEND_X_RATIO = 0.68f
-
-        /** Roll angle range (radians). ±0.5 rad ≈ ±29°. */
         private const val ROLL_HALF_RANGE = 0.5f
-        private const val ROLL_FULL_RANGE = 1.0f
 
-        /** Double-tap window for ring finger mod source cycling. */
-        private const val DOUBLE_TAP_MS = 400L
+        /** Minimum ASL confidence to recognize thumbs up/down for hold control. */
+        private const val THUMBS_CONFIDENCE_MIN = 0.7f
 
         // ── Hold detent system ──
-        /** Target hold positions — dramatic stops for performance. */
         val HOLD_DETENTS = floatArrayOf(0f, 0.4f, 0.5f, 0.6f, 0.75f)
-
-        /** Only emit HoldSet when value changed by at least this much. */
         private const val HOLD_EMIT_EPSILON = 0.002f
-
-        /** Low-pass filter for Z velocity to suppress camera noise. */
         private const val VELOCITY_SMOOTHING = 0.4f
-
-        /** Normalized Z velocity below this is noise — ignored. */
         private const val Z_VELOCITY_THRESHOLD = 0.02f
-
-        /** Normalized velocity needed to break out of a settled detent. */
         private const val Z_VELOCITY_BREAKOUT = 0.05f
-
-        /** How much Z velocity translates to hold change. Lower = less sensitive. */
         private const val Z_HOLD_SENSITIVITY = 4.0f
-
-        /** Smoothing speed range for hold interpolation. */
         private const val HOLD_MIN_SPEED = 0.08f
         private const val HOLD_MAX_SPEED = 0.25f
         private const val HOLD_SPEED_SCALE = 0.5f
 
-        /** Find nearest detent position for a given hold value. */
         private fun nearestDetent(value: Float): Float {
             var best = HOLD_DETENTS[0]
             var bestDist = abs(value - best)
@@ -368,9 +370,11 @@ class ConductorInteractionEngine {
             return best
         }
 
-        /** Voices for a given string index. */
-        fun voicesForString(stringIndex: Int): Pair<Int, Int> =
-            Pair(stringIndex * 2, stringIndex * 2 + 1)
+        /** Duo index for a given voice. */
+        fun duoForVoice(voiceIndex: Int): Int = voiceIndex / 2
+
+        /** Quad index for a given voice. */
+        fun quadForVoice(voiceIndex: Int): Int = voiceIndex / 4
 
         private fun distance2D(x1: Float, y1: Float, x2: Float, y2: Float): Float {
             val dx = x1 - x2

@@ -112,30 +112,39 @@ System params are direct (no voice selection needed):
 Enter Maestro Mode by signing **ILY** (thumb + index + pinky extended, "I Love You").
 Exit with **ILY** again or fist (**A**/**S**).
 
-In Maestro Mode, each finger has a distinct role. Voices are grouped into
-four "strings" of two voices each (String 0 = V1/V2, String 1 = V3/V4, etc.).
+In Maestro Mode, each finger-to-thumb touch gates an individual voice.
+Multiple fingers can touch simultaneously to play chords.
 
-### String Gating (Index + Middle Fingers)
+### Voice Gating (All 4 Fingers)
 
-- **Index finger** touches thumb → gates strings 0-1 (voices 1-4)
-- **Middle finger** touches thumb → gates strings 2-3 (voices 5-8)
-- Horizontal fingertip offset from the thumb drives **per-string pitch bend**
+| Hand | Index | Middle | Ring | Pinky |
+|------|-------|--------|------|-------|
+| **Left** | V1 | V2 | V3 | V4 |
+| **Right** | V5 | V6 | V7 | V8 |
+
+- Touch finger to thumb → voice gates ON (sounds while touching)
+- Release from thumb → voice gates OFF
+- Multiple fingers touching simultaneously = chord
+
+### Pitch Bend (String Pull)
+
+- **Single voice touching**: horizontal fingertip offset from thumb bends that voice
+- **Both voices of a duo touching** (index+middle or ring+pinky): they share a
+  duo-level string bend with spring-back animation
 - Release triggers a spring-back to center bend
+
+### Hold Control (Thumbs Up / Thumbs Down)
+
+- **Thumbs Up** or **Thumbs Down** gesture activates hold control for that hand's quad
+  (left hand = Q1, right hand = Q2)
+- While showing thumbs gesture, **push/pull toward camera** (Z-axis velocity) steps
+  through hold detents (0, 0.4, 0.5, 0.6, 0.75)
+- Returning to open hand settles hold to the nearest detent
 
 ### Continuous Controls
 
 - **Hand height** (Y) controls dynamics — high hand = loud, low hand = quiet (auto-calibrated)
-- **Hand openness** controls timbre — open palm = soft/legato, fist = sharp/staccato
-- **Hand roll** (tilt) controls pitch bend (when no modifier is active)
+- **Hand roll** (tilt) controls global pitch bend
+- **Open palm swipe** left/right switches panels
 
-### Ring Finger — Mod Source
-
-- **Ring touches thumb**: hand roll routes to **mod source level** instead of bend
-- **Ring double-tap** (< 300ms): cycles mod source (OFF → LFO → FM → FLUX)
-
-### Pinky Finger — Hold
-
-- **Pinky touches thumb**: Z-axis velocity (push/pull) steps through hold detents (0, 0.4, 0.5, 0.6, 0.75)
-- **Pinky double-tap** (< 300ms): resets hold to 0
-
-No voice selection needed — the conductor controls the whole orchestra.
+No voice selection step needed — fingers directly control individual voices.

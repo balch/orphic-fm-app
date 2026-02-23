@@ -4,324 +4,267 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 class ConductorInteractionEngineTest {
 
     private val engine = ConductorInteractionEngine()
 
-    // ── String gating ─────────────────────────────────────
+    // ── Individual voice gating ─────────────────────────
 
     @Test
-    fun `left hand index touch gates string 0`() {
+    fun `left hand index touch gates voice 0`() {
         val events = engine.update(listOf(leftHand(indexTouching = true)), 0L)
-        val gates = events.filterIsInstance<ConductorEvent.StringGateOn>()
+        val gates = events.filterIsInstance<ConductorEvent.VoiceGateOn>()
         assertEquals(1, gates.size)
-        assertEquals(0, gates[0].stringIndex)
+        assertEquals(0, gates[0].voiceIndex)
     }
 
     @Test
-    fun `left hand middle touch gates string 1`() {
+    fun `left hand middle touch gates voice 1`() {
         val events = engine.update(listOf(leftHand(middleTouching = true)), 0L)
-        val gates = events.filterIsInstance<ConductorEvent.StringGateOn>()
+        val gates = events.filterIsInstance<ConductorEvent.VoiceGateOn>()
         assertEquals(1, gates.size)
-        assertEquals(1, gates[0].stringIndex)
+        assertEquals(1, gates[0].voiceIndex)
     }
 
     @Test
-    fun `right hand index touch gates string 2`() {
+    fun `left hand ring touch gates voice 2`() {
+        val events = engine.update(listOf(leftHand(ringTouching = true)), 0L)
+        val gates = events.filterIsInstance<ConductorEvent.VoiceGateOn>()
+        assertEquals(1, gates.size)
+        assertEquals(2, gates[0].voiceIndex)
+    }
+
+    @Test
+    fun `left hand pinky touch gates voice 3`() {
+        val events = engine.update(listOf(leftHand(pinkyTouching = true)), 0L)
+        val gates = events.filterIsInstance<ConductorEvent.VoiceGateOn>()
+        assertEquals(1, gates.size)
+        assertEquals(3, gates[0].voiceIndex)
+    }
+
+    @Test
+    fun `right hand index touch gates voice 4`() {
         val events = engine.update(listOf(rightHand(indexTouching = true)), 0L)
-        val gates = events.filterIsInstance<ConductorEvent.StringGateOn>()
+        val gates = events.filterIsInstance<ConductorEvent.VoiceGateOn>()
         assertEquals(1, gates.size)
-        assertEquals(2, gates[0].stringIndex)
+        assertEquals(4, gates[0].voiceIndex)
     }
 
     @Test
-    fun `right hand middle touch gates string 3`() {
-        val events = engine.update(listOf(rightHand(middleTouching = true)), 0L)
-        val gates = events.filterIsInstance<ConductorEvent.StringGateOn>()
+    fun `right hand ring touch gates voice 6`() {
+        val events = engine.update(listOf(rightHand(ringTouching = true)), 0L)
+        val gates = events.filterIsInstance<ConductorEvent.VoiceGateOn>()
         assertEquals(1, gates.size)
-        assertEquals(3, gates[0].stringIndex)
+        assertEquals(6, gates[0].voiceIndex)
     }
 
     @Test
-    fun `both hands gate strings on both quads`() {
+    fun `multiple fingers gate multiple voices simultaneously`() {
         val events = engine.update(
-            listOf(leftHand(indexTouching = true), rightHand(indexTouching = true)),
+            listOf(leftHand(indexTouching = true, middleTouching = true, pinkyTouching = true)),
             0L,
         )
-        val strings = events.filterIsInstance<ConductorEvent.StringGateOn>()
-            .map { it.stringIndex }.toSet()
-        assertEquals(setOf(0, 2), strings)
+        val voices = events.filterIsInstance<ConductorEvent.VoiceGateOn>()
+            .map { it.voiceIndex }.toSet()
+        assertEquals(setOf(0, 1, 3), voices)
     }
 
     @Test
-    fun `releasing finger emits StringRelease then StringGateOff`() {
+    fun `both hands gate voices on both quads`() {
+        val events = engine.update(
+            listOf(leftHand(indexTouching = true), rightHand(ringTouching = true)),
+            0L,
+        )
+        val voices = events.filterIsInstance<ConductorEvent.VoiceGateOn>()
+            .map { it.voiceIndex }.toSet()
+        assertEquals(setOf(0, 6), voices)
+    }
+
+    @Test
+    fun `releasing finger emits VoiceRelease then VoiceGateOff`() {
         engine.update(listOf(leftHand(indexTouching = true)), 0L)
         val events = engine.update(listOf(leftHand()), 33L)
-        val releases = events.filterIsInstance<ConductorEvent.StringRelease>()
-        val gateOffs = events.filterIsInstance<ConductorEvent.StringGateOff>()
+        val releases = events.filterIsInstance<ConductorEvent.VoiceRelease>()
+        val gateOffs = events.filterIsInstance<ConductorEvent.VoiceGateOff>()
         assertEquals(1, releases.size)
-        assertEquals(0, releases[0].stringIndex)
+        assertEquals(0, releases[0].voiceIndex)
         assertEquals(1, gateOffs.size)
-        assertEquals(0, gateOffs[0].stringIndex)
+        assertEquals(0, gateOffs[0].voiceIndex)
     }
 
     @Test
-    fun `hand disappearing gates off its strings`() {
-        engine.update(listOf(leftHand(indexTouching = true)), 0L)
+    fun `hand disappearing gates off its voices`() {
+        engine.update(listOf(leftHand(indexTouching = true, ringTouching = true)), 0L)
         val events = engine.update(emptyList(), 33L)
-        val gateOffs = events.filterIsInstance<ConductorEvent.StringGateOff>()
-        assertEquals(1, gateOffs.size)
-        assertEquals(0, gateOffs[0].stringIndex)
+        val gateOffs = events.filterIsInstance<ConductorEvent.VoiceGateOff>()
+            .map { it.voiceIndex }.toSet()
+        assertEquals(setOf(0, 2), gateOffs)
     }
 
-    // ── Per-string bend ──────────────────────────────────
+    // ── Solo voice bend ──────────────────────────────────
 
     @Test
-    fun `finger X movement while gated emits StringBendSet`() {
+    fun `single finger X movement emits VoiceBendSet`() {
         engine.update(listOf(leftHand(indexTouching = true, fingerXOffset = 0f)), 0L)
-        // Move finger X while still touching
         val events = engine.update(
             listOf(leftHand(indexTouching = true, fingerXOffset = 0.05f)),
             33L,
         )
-        val bends = events.filterIsInstance<ConductorEvent.StringBendSet>()
-        assertTrue(bends.isNotEmpty(), "Should emit bend while gated")
-        assertEquals(0, bends[0].stringIndex)
-        assertTrue(bends[0].bendAmount > 0f, "Positive X offset should produce positive bend")
+        val bends = events.filterIsInstance<ConductorEvent.VoiceBendSet>()
+        assertTrue(bends.isNotEmpty(), "Should emit VoiceBendSet for single gated voice")
+        assertEquals(0, bends[0].voiceIndex)
+        assertTrue(bends[0].bendAmount > 0f)
     }
 
+    // ── Duo bend ─────────────────────────────────────────
+
     @Test
-    fun `bend is normalized relative to gate-on thumb position`() {
-        // Gate on with finger at thumb X
-        engine.update(listOf(leftHand(indexTouching = true, fingerXOffset = 0f)), 0L)
-        // Move finger within touch range — offset 0.05 from gate-on position
-        // Total distance from thumb = 0.02 + 0.05 = 0.07, still within 0.08 threshold
+    fun `both duo voices gated emits DuoBendSet instead of VoiceBendSet`() {
+        engine.update(
+            listOf(leftHand(indexTouching = true, middleTouching = true, fingerXOffset = 0f)),
+            0L,
+        )
         val events = engine.update(
-            listOf(leftHand(indexTouching = true, fingerXOffset = 0.05f)),
+            listOf(leftHand(indexTouching = true, middleTouching = true, fingerXOffset = 0.05f)),
             33L,
         )
-        val bend = events.filterIsInstance<ConductorEvent.StringBendSet>().last()
-        // bendDelta=0.07 / (apparentSize*BEND_X_RATIO) = 0.07/0.136 ≈ 0.51
-        assertTrue(bend.bendAmount in 0.3f..0.7f,
-            "Expected bend ~0.5, got ${bend.bendAmount}")
-    }
-
-    // ── Roll angle routing ───────────────────────────────
-
-    @Test
-    fun `roll angle with no modifier emits BendSet`() {
-        val events = engine.update(listOf(leftHand(rollAngle = 0.3f)), 0L)
-        val bends = events.filterIsInstance<ConductorEvent.BendSet>()
-        assertTrue(bends.isNotEmpty(), "Roll without modifier should emit BendSet")
-        assertTrue(bends[0].value > 0f, "Positive roll should produce positive bend")
+        val duoBends = events.filterIsInstance<ConductorEvent.DuoBendSet>()
+        val voiceBends = events.filterIsInstance<ConductorEvent.VoiceBendSet>()
+        assertTrue(duoBends.isNotEmpty(), "Should emit DuoBendSet when both duo voices gated")
+        assertTrue(voiceBends.isEmpty(), "Should NOT emit VoiceBendSet when duo is active")
+        assertEquals(0, duoBends[0].duoIndex, "Left index+middle = duo 0")
     }
 
     @Test
-    fun `pinky with Z push forward emits HoldSet increasing`() {
-        // Frame 1: establish baseline apparentSize
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.2f)), 0L)
-        // Frames 2-4: sustained push forward (must exceed breakout threshold after smoothing)
+    fun `ring plus pinky forms duo 1 on left hand`() {
+        engine.update(
+            listOf(leftHand(ringTouching = true, pinkyTouching = true, fingerXOffset = 0f)),
+            0L,
+        )
+        val events = engine.update(
+            listOf(leftHand(ringTouching = true, pinkyTouching = true, fingerXOffset = 0.05f)),
+            33L,
+        )
+        val duoBends = events.filterIsInstance<ConductorEvent.DuoBendSet>()
+        assertTrue(duoBends.isNotEmpty())
+        assertEquals(1, duoBends[0].duoIndex, "Left ring+pinky = duo 1")
+    }
+
+    @Test
+    fun `releasing one duo partner emits DuoRelease`() {
+        engine.update(
+            listOf(leftHand(indexTouching = true, middleTouching = true)),
+            0L,
+        )
+        val events = engine.update(
+            listOf(leftHand(indexTouching = true)),
+            33L,
+        )
+        val duoReleases = events.filterIsInstance<ConductorEvent.DuoRelease>()
+        assertTrue(duoReleases.isNotEmpty(), "Releasing one duo partner should emit DuoRelease")
+        assertEquals(0, duoReleases[0].duoIndex)
+    }
+
+    // ── Thumbs Up/Down hold control ─────────────────────
+
+    @Test
+    fun `thumbs up with Z push emits HoldSet`() {
+        engine.update(listOf(leftHand(aslSign = AslSign.THUMBS_UP, apparentSize = 0.2f)), 0L)
         var holds = emptyList<ConductorEvent.HoldSet>()
         for (i in 1..3) {
-            val size = 0.2f + i * 0.04f // deliberate push
+            val size = 0.2f + i * 0.04f
             val events = engine.update(
-                listOf(leftHand(pinkyTouching = true, apparentSize = size)),
+                listOf(leftHand(aslSign = AslSign.THUMBS_UP, apparentSize = size)),
                 i * 33L,
             )
             holds = holds + events.filterIsInstance<ConductorEvent.HoldSet>()
         }
-        assertTrue(holds.isNotEmpty(), "Pinky + Z push should emit HoldSet")
-        assertEquals(0, holds[0].quadIndex, "Left hand → quad 0")
-        assertTrue(holds[0].value > 0f, "Forward push should increase hold")
+        assertTrue(holds.isNotEmpty(), "Thumbs up + Z push should emit HoldSet")
+        assertEquals(0, holds[0].quadIndex, "Left hand = quad 0")
+        assertTrue(holds[0].value > 0f)
     }
 
     @Test
-    fun `pinky with Z pull back decreases hold`() {
-        // Build up hold first with large deliberate pushes
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.2f)), 0L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.25f)), 33L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.30f)), 66L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.35f)), 99L)
-        // Now pull back sharply
+    fun `thumbs down with Z push also emits HoldSet`() {
+        engine.update(listOf(rightHand(aslSign = AslSign.THUMBS_DOWN, apparentSize = 0.2f)), 0L)
+        var holds = emptyList<ConductorEvent.HoldSet>()
+        for (i in 1..3) {
+            val size = 0.2f + i * 0.04f
+            val events = engine.update(
+                listOf(rightHand(aslSign = AslSign.THUMBS_DOWN, apparentSize = size)),
+                i * 33L,
+            )
+            holds = holds + events.filterIsInstance<ConductorEvent.HoldSet>()
+        }
+        assertTrue(holds.isNotEmpty(), "Thumbs down + Z push should emit HoldSet")
+        assertEquals(1, holds[0].quadIndex, "Right hand = quad 1")
+    }
+
+    @Test
+    fun `transitioning to thumbs gesture releases gated voices`() {
+        // Gate some voices first
+        engine.update(listOf(leftHand(indexTouching = true, middleTouching = true)), 0L)
+        assertTrue(engine.isAnyVoiceGated)
+        // Next frame shows thumbs up — should release both voices
         val events = engine.update(
-            listOf(leftHand(pinkyTouching = true, apparentSize = 0.25f)),
-            132L,
+            listOf(leftHand(aslSign = AslSign.THUMBS_UP, apparentSize = 0.2f)),
+            33L,
         )
-        val holds = events.filterIsInstance<ConductorEvent.HoldSet>()
-        assertTrue(holds.isNotEmpty(), "Pull-back should emit HoldSet")
+        val gateOffs = events.filterIsInstance<ConductorEvent.VoiceGateOff>()
+            .map { it.voiceIndex }.toSet()
+        assertEquals(setOf(0, 1), gateOffs, "Voices should be gated off when entering thumbs mode")
+        // Should get a DuoRelease since both partners were gated
+        val duoReleases = events.filterIsInstance<ConductorEvent.DuoRelease>()
+        assertEquals(1, duoReleases.size, "Should emit exactly one DuoRelease for the duo")
+        assertEquals(0, duoReleases[0].duoIndex)
     }
 
     @Test
-    fun `pinky hold settles near detent positions`() {
-        // Push forward with deliberate sustained movement
-        var lastHold = 0f
-        for (i in 0..15) {
-            val size = 0.2f + i * 0.01f // deliberate push
-            val events = engine.update(
-                listOf(leftHand(pinkyTouching = true, apparentSize = size)),
-                i * 33L,
-            )
-            val hold = events.filterIsInstance<ConductorEvent.HoldSet>().lastOrNull()
-            if (hold != null) lastHold = hold.value
-        }
-        // Then hold steady to let it settle
-        for (i in 16..25) {
-            val events = engine.update(
-                listOf(leftHand(pinkyTouching = true, apparentSize = 0.35f)),
-                i * 33L,
-            )
-            val hold = events.filterIsInstance<ConductorEvent.HoldSet>().lastOrNull()
-            if (hold != null) lastHold = hold.value
-        }
-        // Should have settled near one of the detents
-        val nearDetent = ConductorInteractionEngine.HOLD_DETENTS.any { abs(lastHold - it) < 0.15f }
-        assertTrue(nearDetent, "Hold ($lastHold) should be near a detent position")
-    }
-
-    @Test
-    fun `hold stops emitting once settled at detent`() {
-        // Push forward with deliberate movement
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.2f)), 0L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.25f)), 33L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.30f)), 66L)
-
-        // Now hold steady — same apparentSize for many frames
-        var emittedCount = 0
-        for (i in 3..30) {
-            val events = engine.update(
-                listOf(leftHand(pinkyTouching = true, apparentSize = 0.30f)),
-                i * 33L,
-            )
-            emittedCount += events.filterIsInstance<ConductorEvent.HoldSet>().size
-        }
-        // Velocity smoothing takes a few frames to decay, then snaps and stops
-        assertTrue(emittedCount < 8,
-            "Hold should stop emitting once settled, but emitted $emittedCount times in 28 frames")
-    }
-
-    @Test
-    fun `pinky does not capture roll — bend still emits`() {
-        // Pinky touching but roll should still go to bend (not hold)
+    fun `thumbs gesture does not gate any voices`() {
         val events = engine.update(
-            listOf(leftHand(pinkyTouching = true, rollAngle = 0.3f, apparentSize = 0.2f)),
+            listOf(leftHand(aslSign = AslSign.THUMBS_UP, indexTouching = true)),
+            0L,
+        )
+        val gates = events.filterIsInstance<ConductorEvent.VoiceGateOn>()
+        assertTrue(gates.isEmpty(), "Thumbs gesture should skip finger gating")
+    }
+
+    @Test
+    fun `hold settles to nearest detent when thumbs gesture ends`() {
+        engine.update(listOf(leftHand(aslSign = AslSign.THUMBS_UP, apparentSize = 0.2f)), 0L)
+        engine.update(listOf(leftHand(aslSign = AslSign.THUMBS_UP, apparentSize = 0.25f)), 33L)
+        engine.update(listOf(leftHand(aslSign = AslSign.THUMBS_UP, apparentSize = 0.30f)), 66L)
+        val events = engine.update(listOf(leftHand(apparentSize = 0.30f)), 99L)
+        val holds = events.filterIsInstance<ConductorEvent.HoldSet>()
+        if (holds.isNotEmpty()) {
+            val nearDetent = ConductorInteractionEngine.HOLD_DETENTS.any { abs(holds.last().value - it) < 0.15f }
+            assertTrue(nearDetent, "Hold should settle near a detent")
+        }
+    }
+
+    // ── Roll → global pitch bend ─────────────────────────
+
+    @Test
+    fun `roll angle always emits BendSet`() {
+        val events = engine.update(listOf(leftHand(rollAngle = 0.3f)), 0L)
+        val bends = events.filterIsInstance<ConductorEvent.BendSet>()
+        assertTrue(bends.isNotEmpty())
+        assertTrue(bends[0].value > 0f)
+    }
+
+    @Test
+    fun `roll emits BendSet even with voices gated`() {
+        val events = engine.update(
+            listOf(leftHand(indexTouching = true, ringTouching = true, rollAngle = 0.3f)),
             0L,
         )
         val bends = events.filterIsInstance<ConductorEvent.BendSet>()
-        assertTrue(bends.isNotEmpty(), "Roll should still emit BendSet even with pinky active")
+        assertTrue(bends.isNotEmpty(), "Roll should always produce BendSet, no modifier capture")
     }
 
-    @Test
-    fun `roll angle with ring touching emits ModSourceLevelSet`() {
-        val events = engine.update(
-            listOf(leftHand(ringTouching = true, rollAngle = 0.3f)),
-            0L,
-        )
-        val levels = events.filterIsInstance<ConductorEvent.ModSourceLevelSet>()
-        assertTrue(levels.isNotEmpty(), "Ring + roll should emit ModSourceLevelSet")
-        assertEquals(0, levels[0].quadIndex)
-    }
-
-    @Test
-    fun `ring takes priority over bend for roll routing`() {
-        val events = engine.update(
-            listOf(leftHand(ringTouching = true, rollAngle = 0.3f)),
-            0L,
-        )
-        val levels = events.filterIsInstance<ConductorEvent.ModSourceLevelSet>()
-        val bends = events.filterIsInstance<ConductorEvent.BendSet>()
-        assertTrue(levels.isNotEmpty(), "Ring should capture roll")
-        assertTrue(bends.isEmpty(), "Bend should be suppressed when ring active")
-    }
-
-    @Test
-    fun `roll values are smoothed over multiple frames`() {
-        var lastBend = 0f
-        for (i in 0..10) {
-            val events = engine.update(listOf(leftHand(rollAngle = 0.4f)), i * 33L)
-            val bend = events.filterIsInstance<ConductorEvent.BendSet>().lastOrNull()
-            if (bend != null) {
-                assertTrue(bend.value >= lastBend, "Bend should monotonically increase")
-                lastBend = bend.value
-            }
-        }
-        assertTrue(lastBend > 0.3f, "After 10 frames, bend should approach target")
-    }
-
-    // ── Ring double-tap ──────────────────────────────────
-
-    @Test
-    fun `ring double-tap emits ModSourceCycle`() {
-        // First tap
-        engine.update(listOf(leftHand(ringTouching = true)), 0L)
-        // Release ring
-        engine.update(listOf(leftHand()), 100L)
-        // Second tap within 400ms
-        val events = engine.update(listOf(leftHand(ringTouching = true)), 300L)
-        val cycles = events.filterIsInstance<ConductorEvent.ModSourceCycle>()
-        assertEquals(1, cycles.size, "Double-tap should emit ModSourceCycle")
-        assertEquals(0, cycles[0].quadIndex)
-    }
-
-    @Test
-    fun `ring single tap does not emit ModSourceCycle`() {
-        val events = engine.update(listOf(leftHand(ringTouching = true)), 0L)
-        val cycles = events.filterIsInstance<ConductorEvent.ModSourceCycle>()
-        assertTrue(cycles.isEmpty(), "Single tap should not cycle mod source")
-    }
-
-    @Test
-    fun `ring taps too far apart do not cycle`() {
-        // First tap
-        engine.update(listOf(leftHand(ringTouching = true)), 0L)
-        // Release
-        engine.update(listOf(leftHand()), 100L)
-        // Second tap after 400ms window
-        val events = engine.update(listOf(leftHand(ringTouching = true)), 500L)
-        val cycles = events.filterIsInstance<ConductorEvent.ModSourceCycle>()
-        assertTrue(cycles.isEmpty(), "Taps >400ms apart should not cycle")
-    }
-
-    // ── Pinky double-tap (hold reset) ───────────────────
-
-    @Test
-    fun `pinky double-tap resets hold to zero`() {
-        // Build up some hold first (first pinky touch-on at t=0 sets lastPinkyTapMs=0)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.2f)), 0L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.25f)), 33L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.30f)), 66L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.35f)), 99L)
-        // Release pinky
-        engine.update(listOf(leftHand()), 200L)
-        // First tap of the double-tap sequence
-        engine.update(listOf(leftHand(pinkyTouching = true)), 1000L)
-        // Release
-        engine.update(listOf(leftHand()), 1100L)
-        // Second tap within 400ms of first tap → double-tap
-        val events = engine.update(listOf(leftHand(pinkyTouching = true)), 1300L)
-        val holds = events.filterIsInstance<ConductorEvent.HoldSet>()
-        assertTrue(holds.isNotEmpty(), "Pinky double-tap should emit HoldSet")
-        assertEquals(0f, holds.last().value, "Pinky double-tap should reset hold to 0")
-        assertEquals(0, holds.last().quadIndex, "Left hand → quad 0")
-    }
-
-    @Test
-    fun `pinky taps too far apart do not reset hold`() {
-        // Build up hold
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.2f)), 0L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.30f)), 33L)
-        engine.update(listOf(leftHand(pinkyTouching = true, apparentSize = 0.35f)), 66L)
-        // Release pinky
-        engine.update(listOf(leftHand()), 100L)
-        // Second tap after 400ms window — should NOT reset
-        val events = engine.update(listOf(leftHand(pinkyTouching = true)), 600L)
-        val holds = events.filterIsInstance<ConductorEvent.HoldSet>()
-        // Should not have a 0.0 hold reset
-        assertTrue(holds.none { it.value == 0f },
-            "Pinky taps >400ms apart should not reset hold")
-    }
-
-    // ── Dynamics & Timbre ────────────────────────────────
+    // ── Dynamics ─────────────────────────────────────────
 
     @Test
     fun `palmY maps to dynamics with auto-calibration`() {
@@ -330,78 +273,47 @@ class ConductorInteractionEngineTest {
         val events = engine.update(listOf(leftHand(palmY = 0.5f)), 66L)
         val dynamics = events.filterIsInstance<ConductorEvent.DynamicsSet>().last()
         assertEquals(0, dynamics.quadIndex)
-        assertTrue(dynamics.value in 0.3f..0.7f,
-            "Mid palmY should produce ~0.5 dynamics, got ${dynamics.value}")
-    }
-
-    @Test
-    fun `hand openness no longer emits timbre`() {
-        val events = engine.update(listOf(leftHand(handOpenness = 0.9f)), 0L)
-        val timbre = events.filterIsInstance<ConductorEvent.TimbreSet>()
-        assertTrue(timbre.isEmpty(), "TimbreSet should no longer be emitted")
-    }
-
-    // ── Distance invariance ──────────────────────────────
-
-    @Test
-    fun `touch gating works at close distance (large apparentSize)`() {
-        val events = engine.update(
-            listOf(leftHand(indexTouching = true, apparentSize = 0.35f)),
-            0L,
-        )
-        val gates = events.filterIsInstance<ConductorEvent.StringGateOn>()
-        assertEquals(1, gates.size, "Should gate at close distance (apparentSize=0.35)")
-    }
-
-    @Test
-    fun `touch gating works at far distance (small apparentSize)`() {
-        val engine2 = ConductorInteractionEngine()
-        val events = engine2.update(
-            listOf(leftHand(indexTouching = true, apparentSize = 0.12f)),
-            0L,
-        )
-        val gates = events.filterIsInstance<ConductorEvent.StringGateOn>()
-        assertEquals(1, gates.size, "Should gate at far distance (apparentSize=0.12)")
+        assertTrue(dynamics.value in 0.3f..0.7f)
     }
 
     // ── Reset ────────────────────────────────────────────
 
     @Test
-    fun `reset gates off all active strings`() {
+    fun `reset gates off all active voices`() {
         engine.update(
-            listOf(leftHand(indexTouching = true, middleTouching = true),
-                rightHand(indexTouching = true)),
+            listOf(leftHand(indexTouching = true, ringTouching = true),
+                rightHand(pinkyTouching = true)),
             0L,
         )
         val events = engine.reset()
-        val gateOffs = events.filterIsInstance<ConductorEvent.StringGateOff>()
-            .map { it.stringIndex }.toSet()
-        assertEquals(setOf(0, 1, 2), gateOffs)
-        val releases = events.filterIsInstance<ConductorEvent.StringRelease>()
-        assertEquals(3, releases.size)
+        val gateOffs = events.filterIsInstance<ConductorEvent.VoiceGateOff>()
+            .map { it.voiceIndex }.toSet()
+        assertEquals(setOf(0, 2, 7), gateOffs)
     }
 
     @Test
-    fun `no hands produces no gate events`() {
-        val events = engine.update(emptyList(), 0L)
-        assertTrue(events.filterIsInstance<ConductorEvent.StringGateOn>().isEmpty())
+    fun `isAnyVoiceGated reflects gating state`() {
+        assertFalse(engine.isAnyVoiceGated)
+        engine.update(listOf(leftHand(pinkyTouching = true)), 0L)
+        assertTrue(engine.isAnyVoiceGated)
     }
 
-    // ── Voice mapping helper ─────────────────────────────
+    // ── Helpers ──────────────────────────────────────────
 
     @Test
-    fun `voicesForString returns correct duo`() {
-        assertEquals(Pair(0, 1), ConductorInteractionEngine.voicesForString(0))
-        assertEquals(Pair(2, 3), ConductorInteractionEngine.voicesForString(1))
-        assertEquals(Pair(4, 5), ConductorInteractionEngine.voicesForString(2))
-        assertEquals(Pair(6, 7), ConductorInteractionEngine.voicesForString(3))
+    fun `duoForVoice returns correct duo`() {
+        assertEquals(0, ConductorInteractionEngine.duoForVoice(0))
+        assertEquals(0, ConductorInteractionEngine.duoForVoice(1))
+        assertEquals(1, ConductorInteractionEngine.duoForVoice(2))
+        assertEquals(1, ConductorInteractionEngine.duoForVoice(3))
+        assertEquals(2, ConductorInteractionEngine.duoForVoice(4))
+        assertEquals(3, ConductorInteractionEngine.duoForVoice(7))
     }
 
     // ── Test helpers ─────────────────────────────────────
 
     private fun leftHand(
         palmY: Float = 0.5f,
-        handOpenness: Float = 0.5f,
         rollAngle: Float = 0f,
         apparentSize: Float = 0.2f,
         indexTouching: Boolean = false,
@@ -409,10 +321,10 @@ class ConductorInteractionEngineTest {
         ringTouching: Boolean = false,
         pinkyTouching: Boolean = false,
         fingerXOffset: Float = 0f,
+        aslSign: AslSign? = null,
     ) = handWith(
         handedness = Handedness.LEFT,
         palmY = palmY,
-        handOpenness = handOpenness,
         rollAngle = rollAngle,
         apparentSize = apparentSize,
         indexTouching = indexTouching,
@@ -420,11 +332,11 @@ class ConductorInteractionEngineTest {
         ringTouching = ringTouching,
         pinkyTouching = pinkyTouching,
         fingerXOffset = fingerXOffset,
+        aslSign = aslSign,
     )
 
     private fun rightHand(
         palmY: Float = 0.5f,
-        handOpenness: Float = 0.5f,
         rollAngle: Float = 0f,
         apparentSize: Float = 0.2f,
         indexTouching: Boolean = false,
@@ -432,10 +344,10 @@ class ConductorInteractionEngineTest {
         ringTouching: Boolean = false,
         pinkyTouching: Boolean = false,
         fingerXOffset: Float = 0f,
+        aslSign: AslSign? = null,
     ) = handWith(
         handedness = Handedness.RIGHT,
         palmY = palmY,
-        handOpenness = handOpenness,
         rollAngle = rollAngle,
         apparentSize = apparentSize,
         indexTouching = indexTouching,
@@ -443,17 +355,12 @@ class ConductorInteractionEngineTest {
         ringTouching = ringTouching,
         pinkyTouching = pinkyTouching,
         fingerXOffset = fingerXOffset,
+        aslSign = aslSign,
     )
 
-    /**
-     * Build GestureState with finger positions relative to thumb.
-     * Touching = 0.02 from thumb, not touching = 0.25 from thumb.
-     * fingerXOffset shifts string-gating fingers (index/middle) X for bend testing.
-     */
     private fun handWith(
         handedness: Handedness,
         palmY: Float,
-        handOpenness: Float,
         rollAngle: Float,
         apparentSize: Float = 0.2f,
         indexTouching: Boolean,
@@ -461,15 +368,13 @@ class ConductorInteractionEngineTest {
         ringTouching: Boolean,
         pinkyTouching: Boolean,
         fingerXOffset: Float,
+        aslSign: AslSign? = null,
     ): GestureState {
         val thumbX = 0.5f
         val thumbY = 0.5f
 
         fun fingerTip(finger: Finger, touching: Boolean): FingerState {
-            val xOffset = if (touching && (finger == Finger.INDEX || finger == Finger.MIDDLE))
-                fingerXOffset else 0f
-            // When touching with X offset, keep total distance within threshold
-            // by positioning along X axis only (Y stays at thumbY)
+            val xOffset = if (touching) fingerXOffset else 0f
             val tipX = if (touching) thumbX + 0.02f + xOffset else thumbX + 0.25f
             val tipY = thumbY
             return FingerState(
@@ -500,9 +405,9 @@ class ConductorInteractionEngineTest {
             rollAngle = rollAngle,
             ringFingerDirection = 0f,
             handedness = handedness,
-            handOpenness = handOpenness,
-            aslSign = null,
-            aslConfidence = 0f,
+            handOpenness = 0.5f,
+            aslSign = aslSign,
+            aslConfidence = if (aslSign != null) 0.9f else 0f,
             fingers = fingers,
         )
     }

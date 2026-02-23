@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
@@ -275,7 +274,7 @@ class MediaPipeViewModel(
                         }
                         // Swipe detection runs in Maestro Mode too, but suppressed
                         // when modifier fingers are active to prevent accidental triggers.
-                        if (!conductorEngine.isAnyPinkyTouching && !conductorEngine.isAnyRingTouching) {
+                        if (!conductorEngine.isAnyVoiceGated) {
                             val swipeEvents = aslEngine.checkSwipe(gestures, timestampMs)
                             for (event in swipeEvents) {
                                 dispatchAslEvent(event)
@@ -422,52 +421,43 @@ class MediaPipeViewModel(
         }
     }
 
-    /** Cycle order for duo mod source: OFF → LFO → FM → FLUX → OFF. */
-    private val modSourceCycleOrder = listOf(
-        ModSource.OFF, ModSource.LFO, ModSource.VOICE_FM, ModSource.FLUX,
-    )
-
-    /** Track current mod source per quad for cycling. */
-    private val currentModSource = arrayOf(ModSource.OFF, ModSource.OFF)
-
     private fun dispatchConductorEvent(event: ConductorEvent) {
         when (event) {
-            is ConductorEvent.StringGateOn -> {
-                val (v0, v1) = ConductorInteractionEngine.voicesForString(event.stringIndex)
-                synthController.emitPulseStart(v0)
-                synthController.emitPulseStart(v1)
+            is ConductorEvent.VoiceGateOn -> {
+                synthController.emitPulseStart(event.voiceIndex)
             }
-            is ConductorEvent.StringGateOff -> {
-                val (v0, v1) = ConductorInteractionEngine.voicesForString(event.stringIndex)
-                synthController.emitPulseEnd(v0)
-                synthController.emitPulseEnd(v1)
+            is ConductorEvent.VoiceGateOff -> {
+                synthController.emitPulseEnd(event.voiceIndex)
             }
-            is ConductorEvent.StringBendSet -> {
-                _engine.setStringBend(event.stringIndex, event.bendAmount, 0.5f)
-                // Update per-string bend state for UI deflection
+            is ConductorEvent.VoiceBendSet -> {
+                val duoIndex = ConductorInteractionEngine.duoForVoice(event.voiceIndex)
+                _engine.setStringBend(duoIndex, event.bendAmount, 0.5f)
                 _stringBends.value = _stringBends.value.toMutableList().apply {
-                    set(event.stringIndex, event.bendAmount)
+                    set(duoIndex, event.bendAmount)
                 }
-                // Update viz knobs so string UI animates
-                val vizValue = (event.bendAmount + 1f) / 2f
-                if (event.stringIndex == 0) {
-                    synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, vizValue, ControlEventOrigin.MEDIAPIPE)
-                } else if (event.stringIndex == 3) {
-                    synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, vizValue, ControlEventOrigin.MEDIAPIPE)
-                }
+                updateVizKnobsForBend(duoIndex, event.bendAmount)
             }
-            is ConductorEvent.StringRelease -> {
-                _engine.releaseStringBend(event.stringIndex)
-                // Reset per-string bend state for UI spring-back
+            is ConductorEvent.VoiceRelease -> {
+                val duoIndex = ConductorInteractionEngine.duoForVoice(event.voiceIndex)
+                _engine.releaseStringBend(duoIndex)
                 _stringBends.value = _stringBends.value.toMutableList().apply {
-                    set(event.stringIndex, 0f)
+                    set(duoIndex, 0f)
                 }
-
-                if (event.stringIndex == 0) {
-                    synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, 0.5f, ControlEventOrigin.MEDIAPIPE)
-                } else if (event.stringIndex == 3) {
-                    synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, 0.5f, ControlEventOrigin.MEDIAPIPE)
+                resetVizKnobsForBend(duoIndex)
+            }
+            is ConductorEvent.DuoBendSet -> {
+                _engine.setStringBend(event.duoIndex, event.bendAmount, 0.5f)
+                _stringBends.value = _stringBends.value.toMutableList().apply {
+                    set(event.duoIndex, event.bendAmount)
                 }
+                updateVizKnobsForBend(event.duoIndex, event.bendAmount)
+            }
+            is ConductorEvent.DuoRelease -> {
+                _engine.releaseStringBend(event.duoIndex)
+                _stringBends.value = _stringBends.value.toMutableList().apply {
+                    set(event.duoIndex, 0f)
+                }
+                resetVizKnobsForBend(event.duoIndex)
             }
             is ConductorEvent.BendSet -> {
                 synthController.emitBendChange(event.value)
@@ -479,32 +469,6 @@ class MediaPipeViewModel(
                     ControlEventOrigin.MEDIAPIPE,
                 )
             }
-            is ConductorEvent.ModSourceCycle -> {
-                val qi = event.quadIndex
-                val current = currentModSource[qi]
-                val currentIdx = modSourceCycleOrder.indexOf(current)
-                val next = modSourceCycleOrder[(currentIdx + 1) % modSourceCycleOrder.size]
-                currentModSource[qi] = next
-                // Apply to both duos on this quad (qi*2 and qi*2+1, but capped at duo count)
-                val duoStart = qi * 2
-                for (di in duoStart..(duoStart + 1).coerceAtMost(3)) {
-                    synthController.setPluginControl(
-                        VoiceSymbol.duoModSource(di).controlId,
-                        PortValue.IntValue(next.ordinal),
-                        ControlEventOrigin.MEDIAPIPE,
-                    )
-                }
-            }
-            is ConductorEvent.ModSourceLevelSet -> {
-                val duoStart = event.quadIndex * 2
-                for (di in duoStart..(duoStart + 1).coerceAtMost(3)) {
-                    synthController.setPluginControl(
-                        VoiceSymbol.duoModSourceLevel(di).controlId,
-                        PortValue.FloatValue(event.value),
-                        ControlEventOrigin.MEDIAPIPE,
-                    )
-                }
-            }
             is ConductorEvent.DynamicsSet -> {
                 synthController.setPluginControl(
                     VoiceSymbol.quadVolume(event.quadIndex).controlId,
@@ -512,18 +476,24 @@ class MediaPipeViewModel(
                     ControlEventOrigin.MEDIAPIPE,
                 )
             }
-            is ConductorEvent.TimbreSet -> {
-/*
-                for (di in 0..3) {
-                    synthController.setPluginControl(
-                        VoiceSymbol.duoSharpness(di).controlId,
-                        PortValue.FloatValue(event.value),
-                        ControlEventOrigin.MEDIAPIPE,
-                    )
-                }
+            is ConductorEvent.TimbreSet -> { /* no-op, removed */ }
+        }
+    }
 
- */
-            }
+    private fun updateVizKnobsForBend(duoIndex: Int, bendAmount: Float) {
+        val vizValue = (bendAmount + 1f) / 2f
+        if (duoIndex == 0) {
+            synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, vizValue, ControlEventOrigin.MEDIAPIPE)
+        } else if (duoIndex == 3) {
+            synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, vizValue, ControlEventOrigin.MEDIAPIPE)
+        }
+    }
+
+    private fun resetVizKnobsForBend(duoIndex: Int) {
+        if (duoIndex == 0) {
+            synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, 0.5f, ControlEventOrigin.MEDIAPIPE)
+        } else if (duoIndex == 3) {
+            synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, 0.5f, ControlEventOrigin.MEDIAPIPE)
         }
     }
 
