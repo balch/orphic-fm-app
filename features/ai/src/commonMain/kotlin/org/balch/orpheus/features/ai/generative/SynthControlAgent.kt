@@ -319,6 +319,9 @@ class SynthControlAgent(
                                 // Check if we've completed all prompts and should finish
                                 if (evolutionIndex >= selectedMood.evolutionPrompts.size) {
                                     if (config.finishOnLastEvolution) {
+                                        // Send a final fade-out instruction before completing
+                                        emit("Final fadeout: The song is ending. Set voice_quad_hold_0, voice_quad_hold_1, and voice_quad_hold_2 to 0.0 to release all notes. Also reduce beats_mix to 0.0. Let the sound fade to silence.")
+                                        delay(config.evolutionIntervalMs)
                                         // Signal completion and stop the flow
                                         log.debug { "All evolution prompts completed - signaling completion" }
                                         _completed.tryEmit(Unit)
