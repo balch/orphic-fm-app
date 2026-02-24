@@ -64,9 +64,12 @@ class GranularProcessor {
     private val modeFadeDuration = 512
     private var modeFadeSamplesRemaining = 0
     
-    // Temporary buffers
+    // Temporary buffers (pre-allocated to avoid audio-thread allocations)
     private var tempOutputL = FloatArray(maxBlockSize)
     private var tempOutputR = FloatArray(maxBlockSize)
+    private var mixedInputL = FloatArray(maxBlockSize)
+    private var mixedInputR = FloatArray(maxBlockSize)
+    private var tempInterleaved = FloatArray(maxBlockSize * 2)
     
     // Parameters (exposed for external access)
     val parameters = GrainsParameters()
@@ -119,6 +122,9 @@ class GranularProcessor {
         if (tempOutputL.size < size) {
             tempOutputL = FloatArray(size)
             tempOutputR = FloatArray(size)
+            mixedInputL = FloatArray(size)
+            mixedInputR = FloatArray(size)
+            tempInterleaved = FloatArray(size * 2)
         }
         
         // --- 0. Mode Change Detection ---
@@ -140,9 +146,9 @@ class GranularProcessor {
         
         val fbGain = feedback * (1.0f - freezeLp)
         
-        // Prepare mixed input with feedback
-        val mixedInputL = FloatArray(size)
-        val mixedInputR = if (numChannels == 2) FloatArray(size) else mixedInputL
+        // Prepare mixed input with feedback (using pre-allocated buffers)
+        val mixedInputL = this.mixedInputL
+        val mixedInputR = if (numChannels == 2) this.mixedInputR else mixedInputL
         
         for (i in 0 until size) {
             var inL = inputLeft[i]
@@ -175,7 +181,7 @@ class GranularProcessor {
         }
         
         // --- 2. Mode-Specific Playback ---
-        val tempOutput = FloatArray(size * 2) // Interleaved stereo
+        val tempOutput = tempInterleaved // Pre-allocated interleaved stereo buffer
         
         when (currentMode) {
             GrainsMode.GRANULAR -> {

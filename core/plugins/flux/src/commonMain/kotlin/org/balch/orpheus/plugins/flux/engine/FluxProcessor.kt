@@ -78,6 +78,15 @@ class FluxProcessor(private val sampleRate: Float) {
     // Correlated sequence hashes (from x_y_generator.cc)
     private val xHashes = intArrayOf(0, 0xbeca55e5.toInt(), 0xf0cacc1a.toInt())
 
+    // Pre-allocated scratch buffers for tick()/tickClockOff() compat API
+    private val tickClock = DoubleArray(1)
+    private val tickOx1 = DoubleArray(1)
+    private val tickOx2 = DoubleArray(1)
+    private val tickOx3 = DoubleArray(1)
+    private val tickOt1 = DoubleArray(1)
+    private val tickOt2 = DoubleArray(1)
+    private val tickOt3 = DoubleArray(1)
+
     init {
         for (i in 0 until NUM_X_CHANNELS) {
             randomSequences[i].init(randomStream)
@@ -253,50 +262,25 @@ class FluxProcessor(private val sampleRate: Float) {
     /** Generate the next voltage(s) when triggered by a gate/clock.
      *  Kept for non-JSyn platforms. For JSyn, use [process] instead. */
     fun tick() {
-        val clock = doubleArrayOf(1.0)
-        val ox1 = doubleArrayOf(0.0)
-        val ox2 = doubleArrayOf(0.0)
-        val ox3 = doubleArrayOf(0.0)
-        val ot1 = doubleArrayOf(0.0)
-        val ot2 = doubleArrayOf(0.0)
-        val ot3 = doubleArrayOf(0.0)
-        process(clock, ox1, ox2, ox3, ot1, ot2, ot3, 0, 1)
-        outX1 = ox1[0].toFloat()
-        outX2 = ox2[0].toFloat()
-        outX3 = ox3[0].toFloat()
-        outT1 = ot1[0].toFloat()
-        outT2 = ot2[0].toFloat()
-        outT3 = ot3[0].toFloat()
+        tickClock[0] = 1.0
+        tickOx1[0] = 0.0; tickOx2[0] = 0.0; tickOx3[0] = 0.0
+        tickOt1[0] = 0.0; tickOt2[0] = 0.0; tickOt3[0] = 0.0
+        process(tickClock, tickOx1, tickOx2, tickOx3, tickOt1, tickOt2, tickOt3, 0, 1)
+        outX1 = tickOx1[0].toFloat()
+        outX2 = tickOx2[0].toFloat()
+        outX3 = tickOx3[0].toFloat()
+        outT1 = tickOt1[0].toFloat()
+        outT2 = tickOt2[0].toFloat()
+        outT3 = tickOt3[0].toFloat()
     }
 
     /** Called when clock is low/off to reset gates. */
     fun tickClockOff() {
-        val clock = doubleArrayOf(0.0)
-        val ox1 = doubleArrayOf(0.0)
-        val ox2 = doubleArrayOf(0.0)
-        val ox3 = doubleArrayOf(0.0)
-        val ot1 = doubleArrayOf(0.0)
-        val ot2 = doubleArrayOf(0.0)
-        val ot3 = doubleArrayOf(0.0)
-        process(clock, ox1, ox2, ox3, ot1, ot2, ot3, 0, 1)
+        tickClock[0] = 0.0
+        tickOx1[0] = 0.0; tickOx2[0] = 0.0; tickOx3[0] = 0.0
+        tickOt1[0] = 0.0; tickOt2[0] = 0.0; tickOt3[0] = 0.0
+        process(tickClock, tickOx1, tickOx2, tickOx3, tickOt1, tickOt2, tickOt3, 0, 1)
     }
-
-    // --- Getters ---
-    fun getT1() = outT1
-    fun getT2() = outT2
-    fun getT3() = outT3
-    fun getCurrentVoltage(): Float = outX2
-    fun getX1(): Float = outX1
-    fun getX2(): Float = outX2
-    fun getX3(): Float = outX3
-    fun getSpread(): Float = spread
-    fun getBias(): Float = bias
-    fun getSteps(): Float = steps
-    fun getDejaVu(): Float = dejaVu
-    fun getLength(): Int = length
-    fun getScaleIndex(): Int = scaleIndex
-    fun getJitter(): Float = jitter
-    fun getGateProbability(): Float = probability
 
     // --- Parameter setters ---
 

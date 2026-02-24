@@ -86,7 +86,9 @@ object SynthDsp {
         }
 
         /**
-         * Process a single sample and return LP/BP/HP/NP
+         * Process a single sample and return LP/BP/HP.
+         * Note: allocates a FilterOutputs per call. For hot paths, use
+         * [processInto] with a pre-allocated [MutableFilterOutputs] instead.
          */
         fun process(input: Float): FilterOutputs {
             val hp = (input - r * state1 - g * state1 - state2) * h
@@ -94,8 +96,23 @@ object SynthDsp {
             state1 = g * hp + bp
             val lp = g * bp + state2
             state2 = g * bp + lp
-            
+
             return FilterOutputs(lp, bp, hp)
+        }
+
+        /**
+         * Process a single sample, writing LP/BP/HP into a pre-allocated holder.
+         * Zero-allocation alternative to [process] for audio-rate hot paths.
+         */
+        fun processInto(input: Float, out: MutableFilterOutputs) {
+            val hp = (input - r * state1 - g * state1 - state2) * h
+            val bp = g * hp + state1
+            state1 = g * hp + bp
+            val lp = g * bp + state2
+            state2 = g * bp + lp
+            out.lp = lp
+            out.bp = bp
+            out.hp = hp
         }
 
         /**
@@ -145,6 +162,13 @@ object SynthDsp {
         }
 
         data class FilterOutputs(val lp: Float, val bp: Float, val hp: Float)
+
+        /** Pre-allocatable mutable holder for filter outputs. */
+        class MutableFilterOutputs {
+            var lp: Float = 0f
+            var bp: Float = 0f
+            var hp: Float = 0f
+        }
     }
 
     /**

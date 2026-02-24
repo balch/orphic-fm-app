@@ -9,6 +9,7 @@ import kotlin.math.min
  */
 class AnalogBassDrum {
     private val resonator = SynthDsp.StateVariableFilter()
+    private val resonatorOut = SynthDsp.StateVariableFilter.MutableFilterOutputs()
     private var pulseRemainingSamples = 0
     private var fmPulseRemainingSamples = 0
     private var pulse = 0f
@@ -123,12 +124,12 @@ class AnalogBassDrum {
         // Resonator
         resonator.setFq(f, 1.0f + q * f)
         val excitation = (currentPulse - retrigPulse * 0.2f) * scale
-        val outputs = resonator.process(excitation)
-        val resonatorOut = outputs.bp
-        lpOut = outputs.lp
+        resonator.processInto(excitation, resonatorOut)
+        val resonatorBp = resonatorOut.bp
+        lpOut = resonatorOut.lp
 
         // Output Tone Filter
-        toneLp += toneF * (currentPulse * exciterLeak + resonatorOut - toneLp)
+        toneLp += toneF * (currentPulse * exciterLeak + resonatorBp - toneLp)
 
         // Normalize output to reasonable range (bass drum can get very hot)
         return toneLp * 0.3f

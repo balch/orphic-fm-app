@@ -79,6 +79,12 @@ class TGenerator {
     private val randomStream = RandomStream()
     private val randomVectorArray = FloatArray(2 * NUM_T_CHANNELS + 2)
 
+    // Pre-allocated scratch objects to avoid audio-thread allocations
+    private val scratchRV = RandomVector()
+    private val scratchRatio = Ratio(1, 1)
+    private val scratchDividerRatios = arrayOf(Ratio(1, 1), Ratio(1, 1))
+    private val scratchDividerPattern = DividerPattern(scratchDividerRatios, 1)
+
     fun init(sampleRate: Float) {
         oneHertz = 1f / sampleRate
         model = Model.COMPLEMENTARY_BERNOULLI
@@ -259,14 +265,16 @@ class TGenerator {
                         u *= strength
                         val patIdx = (u * NUM_DIVIDER_PATTERNS).toInt()
                             .coerceIn(0, NUM_DIVIDER_PATTERNS - 1)
-                        pattern = dividerPatterns[patIdx].let { p ->
-                            if (bias < 0.5f) {
-                                DividerPattern(
-                                    ratios = arrayOf(p.ratios[1].copy(), p.ratios[0].copy()),
-                                    length = p.length
-                                )
-                            } else p
-                        }
+                        val p = dividerPatterns[patIdx]
+                        pattern = if (bias < 0.5f) {
+                            // Reuse scratch pattern with swapped ratios (no allocation)
+                            scratchDividerRatios[0].p = p.ratios[1].p
+                            scratchDividerRatios[0].q = p.ratios[1].q
+                            scratchDividerRatios[1].p = p.ratios[0].p
+                            scratchDividerRatios[1].q = p.ratios[0].q
+                            scratchDividerPattern.length = p.length
+                            scratchDividerPattern
+                        } else p
                     }
                     for (i in 0 until NUM_T_CHANNELS) {
                         slaveRamp[i].init(
@@ -312,10 +320,11 @@ class TGenerator {
             if (!this.useExternalClock) {
                 rampExtractor.reset()
             }
-            val ratio = rateQuantizer.let { rq ->
-                val idx = rq.process((1.05f * rate / 96f + 0.5f).coerceIn(0f, 1f))
-                inputDividerRatios[idx].copy()
-            }
+            val ratio = scratchRatio
+            val idx = rateQuantizer.process((1.05f * rate / 96f + 0.5f).coerceIn(0f, 1f))
+            val src = inputDividerRatios[idx]
+            ratio.p = src.p
+            ratio.q = src.q
             when (range) {
                 Range.RANGE_0_25X -> ratio.q *= 4
                 Range.RANGE_4X -> ratio.p *= 4
@@ -343,10 +352,9 @@ class TGenerator {
             dividerPatternLength = 0
             drumPatternStep = DRUM_PATTERN_SIZE
             if (model != Model.DIVIDER) {
-                val rv = RandomVector()
                 sequence.nextVector(randomVectorArray, randomVectorArray.size)
-                rv.fromArray(randomVectorArray)
-                configureSlaveRamps(rv)
+                scratchRV.fromArray(randomVectorArray)
+                configureSlaveRamps(scratchRV)
             }
         }
 
@@ -366,9 +374,9 @@ class TGenerator {
 
             if (masterPhase > 1f) {
                 masterPhase -= 1f
-                val rv = RandomVector()
                 sequence.nextVector(randomVectorArray, randomVectorArray.size)
-                rv.fromArray(randomVectorArray)
+                scratchRV.fromArray(randomVectorArray)
+                val rv = scratchRV
 
                 val jitterAmount = jitter * jitter * jitter * jitter * 36f
                 val x = Distributions.fastBetaDistributionSample(rv.jitter)
@@ -408,9 +416,9 @@ class TGenerator {
     }
 
     /** Divider pattern: ratios for each T channel + pattern length. */
-    data class DividerPattern(
+    class DividerPattern(
         val ratios: Array<Ratio>,
-        val length: Int
+        var length: Int
     )
 
     companion object {
