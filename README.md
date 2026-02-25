@@ -3,7 +3,7 @@
 > FM stands for Frequency Modulation, which describes a technique to enhance sound by creating rich harmonics involving changing the pitch of waveforms produced by Oscillators.
 
 # Orphic-FM
-An 8-oscillator synthesizer built with Kotlin Multiplatform, targeting Desktop and Android.
+An 8-oscillator synthesizer built with Kotlin Multiplatform
 
 ## Overview
 Orphic-FM is an 8-oscillator Synthesizer Emulator combining sounds and harmonics with semi-random math and AI. Oscillators are hierarchically grouped and cross-modulated until the sound takes on a life of its own. Eight voices pair into four duos, which group into two quads, with modulation layered at every level. Add a dual delay system that can self-oscillate, a plate reverb, stereo distortion, plus AI agent control, and things get interesting fast.
