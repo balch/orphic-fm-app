@@ -29,19 +29,21 @@ class FloatPortBuilder(override val symbol: Symbol) : PortDef<Float>() {
     var max: Float = 1f
     var logarithmic: Boolean = false
     var units: String? = null
-    
+    var excludeFromPresets: Boolean = false
+
     private var _getter: (() -> Float)? = null
     private var _setter: ((Float) -> Unit)? = null
-    
+
     /** Define how to read the current value */
     fun get(block: () -> Float) { _getter = block }
-    
+
     /** Define how to apply a new value */
     fun set(block: (Float) -> Unit) { _setter = block }
-    
+
     override fun toControlPort(index: Int) = ControlPort(
         index, symbol, name, PortType.FLOAT, default, min, max,
-        isLogarithmic = logarithmic, units = units
+        isLogarithmic = logarithmic, units = units,
+        excludeFromPresets = excludeFromPresets
     )
     
     override fun getValue() = PortValue.FloatValue(_getter?.invoke() ?: default)
@@ -58,17 +60,19 @@ class IntPortBuilder(override val symbol: Symbol) : PortDef<Int>() {
     var min: Int = 0
     var max: Int = 100
     var options: List<String>? = null  // Enum labels
-    
+    var excludeFromPresets: Boolean = false
+
     private var _getter: (() -> Int)? = null
     private var _setter: ((Int) -> Unit)? = null
-    
+
     fun get(block: () -> Int) { _getter = block }
     fun set(block: (Int) -> Unit) { _setter = block }
-    
+
     override fun toControlPort(index: Int) = ControlPort(
-        index, symbol, name, PortType.INT, 
+        index, symbol, name, PortType.INT,
         default.toFloat(), min.toFloat(), max.toFloat(),
-        enumLabels = options
+        enumLabels = options,
+        excludeFromPresets = excludeFromPresets
     )
     
     override fun getValue() = PortValue.IntValue(_getter?.invoke() ?: default)
@@ -82,16 +86,18 @@ class IntPortBuilder(override val symbol: Symbol) : PortDef<Int>() {
 class BoolPortBuilder(override val symbol: Symbol) : PortDef<Boolean>() {
     override var name: String = symbol.replaceFirstChar { it.uppercase() }
     var default: Boolean = false
-    
+    var excludeFromPresets: Boolean = false
+
     private var _getter: (() -> Boolean)? = null
     private var _setter: ((Boolean) -> Unit)? = null
-    
+
     fun get(block: () -> Boolean) { _getter = block }
     fun set(block: (Boolean) -> Unit) { _setter = block }
-    
+
     override fun toControlPort(index: Int) = ControlPort(
         index, symbol, name, PortType.BOOLEAN,
-        if (default) 1f else 0f, 0f, 1f
+        if (default) 1f else 0f, 0f, 1f,
+        excludeFromPresets = excludeFromPresets
     )
     
     override fun getValue() = PortValue.BoolValue(_getter?.invoke() ?: default)

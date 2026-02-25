@@ -12,7 +12,6 @@ import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.plugin.symbols.REVERB_URI
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 import org.balch.orpheus.core.plugin.symbols.STEREO_URI
-import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import org.balch.orpheus.core.presets.SynthPatch
 import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.plugins.duolfo.DuoLfoPlugin
@@ -128,7 +127,6 @@ class OrpheusPatch : SynthPatch {
 
             // Stereo: wide voice placement
             val stereoUri = STEREO_URI
-            put("$stereoUri:${StereoSymbol.MASTER_VOL.symbol}", PortValue.FloatValue(0.45f))
             val pans = listOf(0.0f, 0.0f, -0.3f, -0.3f, 0.3f, 0.3f, -0.7f, 0.7f, 0.0f, 0.0f, 0.0f, 0.0f)
             pans.forEachIndexed { i, v ->
                 put("$stereoUri:voice_pan_$i", PortValue.FloatValue(v))

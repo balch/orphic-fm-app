@@ -101,7 +101,8 @@ data class ControlPort(
     val isInput: Boolean = true,
     val isLogarithmic: Boolean = false,
     val units: String? = null,
-    val enumLabels: List<String>? = null  // For IntPort with discrete choices
+    val enumLabels: List<String>? = null,  // For IntPort with discrete choices
+    val excludeFromPresets: Boolean = false  // User-only control, not saved/loaded by presets
 ) : Port() {
     fun qualifiedSymbol(pluginUri: String): String = "$pluginUri:$symbol"
 }

@@ -85,6 +85,7 @@ class StereoPlugin(
         controlPort(StereoSymbol.MASTER_VOL) {
             floatType {
                 default = 0.7f
+                excludeFromPresets = true
                 get { _masterVolume }
                 set {
                     _masterVolume = it

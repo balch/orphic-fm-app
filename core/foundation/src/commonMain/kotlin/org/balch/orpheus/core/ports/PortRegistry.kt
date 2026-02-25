@@ -53,22 +53,27 @@ class PortRegistry(
 
     /**
      * Capture all current port values as a typed map.
+     * Ports marked [ControlPort.excludeFromPresets] are skipped.
      */
     fun captureState(): Map<String, PortValue> {
-        return controlPorts.mapNotNull { (symbol, _) ->
-            getPortValue(symbol)?.let { symbol to it }
-        }.toMap()
+        return controlPorts
+            .filter { (_, pair) -> !pair.second.excludeFromPresets }
+            .mapNotNull { (symbol, _) ->
+                getPortValue(symbol)?.let { symbol to it }
+            }.toMap()
     }
 
     /**
      * Restore port values from a typed map.
      * Resets ALL ports to their plugin-defined defaults first, then applies overrides.
+     * Ports marked [ControlPort.excludeFromPresets] are left untouched.
      * This ensures switching presets never leaves stale values from a previous preset.
      */
     fun restoreState(values: Map<String, PortValue>) {
-        // Reset all ports to their plugin-defined defaults
+        // Reset all ports to their plugin-defined defaults (skip user-only ports)
         controlPorts.forEach { (qualifiedSymbol, pair) ->
             val (_, port) = pair
+            if (port.excludeFromPresets) return@forEach
             val defaultValue = when (port.type) {
                 PortType.FLOAT -> PortValue.FloatValue(port.default)
                 PortType.INT -> PortValue.IntValue(port.default.toInt())
@@ -76,9 +81,15 @@ class PortRegistry(
             }
             setPortValue(qualifiedSymbol, defaultValue)
         }
-        // Apply preset overrides
+        // Apply preset overrides (excluded ports are filtered out of saved presets,
+        // but guard here too in case of legacy/hand-edited preset files)
+        val excludedSymbols = controlPorts
+            .filter { (_, pair) -> pair.second.excludeFromPresets }
+            .keys
         values.forEach { (symbol, value) ->
-            setPortValue(symbol, value)
+            if (symbol !in excludedSymbols) {
+                setPortValue(symbol, value)
+            }
         }
     }
 
