@@ -84,6 +84,17 @@ Every DSP module implements `DspPlugin` and declares its ports through a type-sa
 
 `SynthController` is the central bus. Every control event carries an `origin` (`MIDI`, `UI`, `SEQUENCER`, `TIDAL`, `AI`, `EVO`) so the system knows who's driving a parameter and avoids conflicts. ViewModels observe `StateFlow` and update UI state based on events that happen throughout the system.
 
+### Hand Tracking & Gesture Control
+
+Camera-based gesture control lets you play the synth with ASL (American Sign Language) hand signs. The system uses [MediaPipe Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/guide) to detect 21 hand landmarks per hand at 30fps, then a pure-Kotlin rule-based classifier recognizes 23 ASL signs (numbers 1-8, letters A/B/C/D/H/L/M/Q/R/S/V/W/Y, plus Thumbs Up/Down and ILY).
+
+Two interaction modes are available:
+
+- **ASL Mode** -- Sign a number to select a voice, sign a letter to select a parameter, then pinch to gate the voice and drag to adjust the value. A breadcrumb bar shows selection progress.
+- **Maestro Mode** -- Sign ILY to enter. Each finger has a role: index/middle touch thumb to gate strings, ring modifier controls mod source level via hand roll, pinky modifier steps through hold detents. Hand height drives dynamics, hand openness drives timbre.
+
+The classifier fuses rule-based geometric analysis with MediaPipe's native gesture recognizer for robust sign detection. The ASL classifier was developed with reference to the [Synthetic ASL Alphabet](https://www.kaggle.com/datasets/lexset/synthetic-asl-alphabet) and [Synthetic ASL Numbers](https://www.kaggle.com/datasets/lexset/synthetic-asl-numbers) datasets. See [GESTURES.md](GESTURES.md) for the full gesture reference.
+
 ### Platforms
 
 | Platform | Audio | Status |
@@ -202,18 +213,5 @@ For example on macOS with [jenv](https://www.jenv.be/): `org.gradle.java.home=/U
 | [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/guide)                  | Hand landmark detection and gesture recognition ([Tasks SDK](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker) on Android, C API via JNI on Desktop) |
 | [AndroidX CameraX](https://developer.android.com/jetpack/androidx/releases/camera) | Camera capture and lifecycle management on Android                                                               |
 | [JavaCV](https://github.com/bytedeco/javacv)                                       | Camera capture on Desktop (FFmpeg/avfoundation)                                                                  |
-
----
-
-## Hand Tracking & Gesture Control
-
-Camera-based gesture control lets you play the synth with ASL (American Sign Language) hand signs. The system uses [MediaPipe Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/guide) to detect 21 hand landmarks per hand at 30fps, then a pure-Kotlin rule-based classifier recognizes 23 ASL signs (numbers 1-8, letters A/B/C/D/H/L/M/Q/R/S/V/W/Y, plus Thumbs Up/Down and ILY).
-
-Two interaction modes are available:
-
-- **ASL Mode** -- Sign a number to select a voice, sign a letter to select a parameter, then pinch to gate the voice and drag to adjust the value. A breadcrumb bar shows selection progress.
-- **Maestro Mode** -- Sign ILY to enter. Each finger has a role: index/middle touch thumb to gate strings, ring modifier controls mod source level via hand roll, pinky modifier steps through hold detents. Hand height drives dynamics, hand openness drives timbre.
-
-The classifier fuses rule-based geometric analysis with MediaPipe's native gesture recognizer for robust sign detection. The ASL classifier was developed with reference to the [Synthetic ASL Alphabet](https://www.kaggle.com/datasets/lexset/synthetic-asl-alphabet) and [Synthetic ASL Numbers](https://www.kaggle.com/datasets/lexset/synthetic-asl-numbers) datasets. See [GESTURES.md](GESTURES.md) for the full gesture reference.
 
 **License:** [GNU GPLv3](LICENSE)
