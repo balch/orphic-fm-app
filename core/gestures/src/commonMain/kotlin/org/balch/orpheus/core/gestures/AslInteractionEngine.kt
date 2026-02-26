@@ -20,6 +20,7 @@ sealed interface AslEvent {
     data class DuoSelected(val duoIndex: Int) : AslEvent
     data class QuadSelected(val quadIndex: Int) : AslEvent
     data object ToggleConductorMode : AslEvent
+    data object ToggleKeyboardMode : AslEvent
 }
 
 class AslInteractionEngine(
@@ -217,6 +218,9 @@ class AslInteractionEngine(
                     }
                     AslSign.ILY -> {
                         events += AslEvent.ToggleConductorMode
+                    }
+                    AslSign.LETTER_E -> {
+                        events += AslEvent.ToggleKeyboardMode
                     }
                     else -> {}
                 }

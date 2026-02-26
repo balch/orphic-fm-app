@@ -93,6 +93,15 @@ fun AslMaestroPanel(
                         modifier = Modifier.fillMaxSize(),
                     )
 
+                    // Keyboard overlay drawn before hands so fingers appear on top of keys
+                    if (state.gestureMode == GestureMode.KEYBOARD) {
+                        KeyboardOverlay(
+                            pressedKeys = state.pressedKeys,
+                            engineName = state.keyboardEngineName,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+
                     // Skeleton overlay per hand — same size as the image, so coordinates align
                     for ((index, hand) in state.hands.withIndex()) {
                         HandSkeletonOverlay(

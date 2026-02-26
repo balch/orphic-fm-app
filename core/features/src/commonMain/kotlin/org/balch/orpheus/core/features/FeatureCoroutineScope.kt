@@ -18,4 +18,9 @@ class FeatureCoroutineScope @Inject constructor() : CoroutineScope {
     private val job = SupervisorJob()
     override val coroutineContext = job + Dispatchers.Main.immediate
     fun cancel() { job.cancel() }
+
+    /** Register a teardown callback that runs when the scope is cancelled. */
+    fun onCleared(block: () -> Unit) {
+        job.invokeOnCompletion { block() }
+    }
 }

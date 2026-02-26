@@ -14,6 +14,8 @@ enum class AslSign(
     NUM_6("6", AslCategory.NUMBER),
     NUM_7("7", AslCategory.NUMBER),
     NUM_8("8", AslCategory.NUMBER),
+    NUM_9("9", AslCategory.NUMBER),
+    NUM_10("10", AslCategory.NUMBER),
 
     // Letters — mode/parameter selection
     LETTER_A("A", AslCategory.COMMAND),    // Neutral / deselect
@@ -21,23 +23,37 @@ enum class AslSign(
     THUMBS_DOWN("-", AslCategory.COMMAND), // Hold voice off
     ILY("ILY", AslCategory.COMMAND),  // I Love You — toggle Maestro Mode
     LETTER_B("B", AslCategory.PARAMETER),  // Pitch bend mode
-    LETTER_H("H", AslCategory.PARAMETER),  // Parameter: Hold level (quad)
     LETTER_C("C", AslCategory.SYSTEM),     // System: Coupling
     LETTER_D("D", AslCategory.MODE),       // Duo mode prefix
+    LETTER_E("E", AslCategory.COMMAND),    // Toggle AR Keyboard Mode
+    LETTER_F("F", AslCategory.PARAMETER),  // Reserved
+    LETTER_G("G", AslCategory.PARAMETER),  // Reserved
+    LETTER_H("H", AslCategory.PARAMETER),  // Parameter: Hold level (quad)
+    LETTER_I("I", AslCategory.PARAMETER),  // Reserved
+    LETTER_J("J", AslCategory.PARAMETER),  // Reserved (motion sign)
+    LETTER_K("K", AslCategory.PARAMETER),  // Reserved
     LETTER_L("L", AslCategory.PARAMETER),  // Reserved
     LETTER_M("M", AslCategory.PARAMETER),  // Parameter: Morph
+    LETTER_N("N", AslCategory.PARAMETER),  // Reserved
+    LETTER_O("O", AslCategory.PARAMETER),  // Reserved
+    LETTER_P("P", AslCategory.PARAMETER),  // Reserved
     LETTER_Q("Q", AslCategory.MODE),       // Quad mode prefix
     LETTER_R("R", AslCategory.COMMAND),    // Remote adjust (no-gate pinch)
     LETTER_S("S", AslCategory.PARAMETER),  // Parameter: Sharpness
+    LETTER_T("T", AslCategory.PARAMETER),  // Reserved
+    LETTER_U("U", AslCategory.PARAMETER),  // Reserved
     LETTER_V("V", AslCategory.SYSTEM),     // System: Vibrato
     LETTER_W("W", AslCategory.PARAMETER),  // Parameter: Volume (quad)
+    LETTER_X("X", AslCategory.PARAMETER),  // Reserved
     LETTER_Y("Y", AslCategory.SYSTEM),     // System: Chaos
+    LETTER_Z("Z", AslCategory.PARAMETER),  // Reserved (motion sign)
     ;
 
     /** Voice index (0-based) for number signs, null for non-numbers. */
     fun voiceIndex(): Int? = when (this) {
         NUM_1 -> 0; NUM_2 -> 1; NUM_3 -> 2; NUM_4 -> 3
         NUM_5 -> 4; NUM_6 -> 5; NUM_7 -> 6; NUM_8 -> 7
+        NUM_9 -> 8; NUM_10 -> 9
         else -> null
     }
 
@@ -64,6 +80,7 @@ val AslSign.targetDisplayLabel: String
     get() = when (this) {
         AslSign.NUM_1 -> "V1"; AslSign.NUM_2 -> "V2"; AslSign.NUM_3 -> "V3"; AslSign.NUM_4 -> "V4"
         AslSign.NUM_5 -> "V5"; AslSign.NUM_6 -> "V6"; AslSign.NUM_7 -> "V7"; AslSign.NUM_8 -> "V8"
+        AslSign.NUM_9 -> "V9"; AslSign.NUM_10 -> "V10"
         AslSign.LETTER_V -> "Vibrato"
         AslSign.LETTER_C -> "Coupling"
         AslSign.LETTER_Y -> "Chaos"
@@ -89,7 +106,7 @@ fun AslSign.Companion.duoDisplayLabel(duoIndex: Int): String = "D${duoIndex + 1}
 fun AslSign.Companion.quadDisplayLabel(quadIndex: Int): String = "Q${quadIndex + 1}"
 
 enum class AslCategory {
-    NUMBER,     // Voice selection (1-8)
+    NUMBER,     // Voice selection (1-10)
     MODE,       // Layer prefix (D=duo, Q=quad)
     PARAMETER,  // Parameter selection (M=morph, S=sharpness, etc.)
     SYSTEM,     // System params (V=vibrato, C=coupling, Y=chaos)

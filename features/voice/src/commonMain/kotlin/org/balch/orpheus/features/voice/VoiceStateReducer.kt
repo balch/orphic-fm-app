@@ -85,6 +85,9 @@ internal fun reduceVoiceState(state: VoiceUiState, intent: VoiceIntent): VoiceUi
 
         is VoiceIntent.SetBpm ->
             state.copy(bpm = intent.value)
+
+        is VoiceIntent.ToggleRightQuad ->
+            state.copy(selectedRightQuad = if (state.selectedRightQuad == 1) 2 else 1)
     }
 
 // Helper extensions for cleaner state transformations

@@ -140,6 +140,8 @@ class GestureInterpreter(
             AslSign.LETTER_H,  // hand horizontal
             AslSign.LETTER_D,  // thumb touching middle
             AslSign.LETTER_Q,  // pointing down
+            AslSign.LETTER_K,  // thumb between index and middle
+            AslSign.LETTER_F,  // thumb-index circle with other fingers extended
         )
 
         /** Signs the native GR was never trained on — rule-based always wins. */

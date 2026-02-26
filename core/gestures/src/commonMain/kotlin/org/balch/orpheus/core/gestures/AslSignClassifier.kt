@@ -9,10 +9,12 @@ import kotlin.math.sqrt
  *
  * Classifies static ASL finger-spelling signs from finger extension patterns,
  * thumb position, and inter-finger distances. Designed for the subset of signs
- * used by Orpheus gesture control (numbers 1-8, letters A/B/C/D/H/L/M/Q/S/V/W/Y).
+ * used by Orpheus gesture control (numbers 1-8, all 26 ASL letters,
+ * plus Thumbs Up/Down and ILY). Works alongside the ML gesture recognizer
+ * in a fusion architecture — see GestureInterpreter.kt.
  *
- * This replaces the native MediaPipe GestureRecognizer (whose C API crashes in
- * LIVE_STREAM mode) with a lightweight pure-Kotlin alternative.
+ * Provides a lightweight pure-Kotlin geometric classifier that runs alongside
+ * the MediaPipe GestureRecognizer ML model. Results are fused in GestureInterpreter.
  */
 class AslSignClassifier(
     private val confidenceHigh: Float = 0.90f,
@@ -166,6 +168,19 @@ class AslSignClassifier(
                 abs(indexTip.y - wrist.y) < refDist * 0.55f ->
                 AslSign.LETTER_H to confidenceMedium
 
+            // === K: Index + middle extended, spread, thumb between and elevated ===
+            // Differs from 3 by thumb POSITION: in K the thumb tip is
+            // horizontally between index and middle fingertips.
+            // Differs from V by thumb ELEVATION: in K the thumb points up
+            // between the fingers (above MCP joints); in V it's curled down.
+            // Must precede V and 3.
+            index.isExtended && middle.isExtended &&
+                !ring.isExtended && !pinky.isExtended &&
+                indexMiddleSpread > refDist * 0.15f &&
+                isThumbBetweenFingers(thumbTip, indexTip, middleTip) &&
+                thumbTip.y < middleMcp.y ->
+                AslSign.LETTER_K to confidenceMedium
+
             // === V / 2: Index + middle extended ===
             // V has fingers spread, 2 has them together (we treat as same for now)
             index.isExtended && middle.isExtended &&
@@ -185,6 +200,13 @@ class AslSignClassifier(
             !thumb.isExtended && index.isExtended && middle.isExtended &&
                 ring.isExtended && !pinky.isExtended ->
                 AslSign.LETTER_W to confidenceHigh
+
+            // === F: Thumb + index touching, middle + ring + pinky extended ===
+            // Must precede 4 — F has 3 upper fingers up like 4/5, but thumb
+            // and index are pinched together. The touch is the key discriminator.
+            middle.isExtended && ring.isExtended && pinky.isExtended &&
+                thumbIndexDist < touchThreshold ->
+                AslSign.LETTER_F to confidenceMedium
 
             // === 4: All four fingers extended, thumb curled ===
             !thumb.isExtended && index.isExtended && middle.isExtended &&
@@ -301,6 +323,20 @@ class AslSignClassifier(
         } else {
             thumbTip.x < indexMcp.x && thumbTip.x > pinkyMcp.x
         }
+    }
+
+    /**
+     * Check if thumb tip X is between index tip X and middle tip X.
+     * Works regardless of handedness (uses min/max of the two fingertips).
+     */
+    private fun isThumbBetweenFingers(
+        thumbTip: HandLandmark,
+        indexTip: HandLandmark,
+        middleTip: HandLandmark,
+    ): Boolean {
+        val minX = minOf(indexTip.x, middleTip.x)
+        val maxX = maxOf(indexTip.x, middleTip.x)
+        return thumbTip.x in minX..maxX
     }
 
     private fun dist(a: HandLandmark, b: HandLandmark): Float {

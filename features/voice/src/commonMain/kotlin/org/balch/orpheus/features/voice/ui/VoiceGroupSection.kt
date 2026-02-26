@@ -8,8 +8,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +51,7 @@ fun VoiceGroupSection(
     quadLabel: String,
     quadColor: Color,
     voiceStartIndex: Int,
+    showQuadToggle: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val voiceState by voiceFeature.stateFlow.collectAsState()
@@ -60,6 +66,7 @@ fun VoiceGroupSection(
         quadLabel = quadLabel,
         quadColor = quadColor,
         voiceStartIndex = voiceStartIndex,
+        showQuadToggle = showQuadToggle,
         voiceState = voiceState,
         midiState = midiState,
         voiceActions = voiceActions,
@@ -93,6 +100,7 @@ fun VoiceGroupSectionLayout(
     quadLabel: String,
     quadColor: Color,
     voiceStartIndex: Int,
+    showQuadToggle: Boolean = false,
     voiceState: VoiceUiState,
     midiState: MidiUiState,
     voiceActions: VoiceActions,
@@ -128,8 +136,26 @@ fun VoiceGroupSectionLayout(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
-        // Centered Quad Header
-        Text(quadLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = quadColor)
+        // Centered Quad Header with optional toggle
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(quadLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = quadColor)
+            if (showQuadToggle) {
+                IconButton(
+                    onClick = { voiceActions.toggleRightQuad() },
+                    modifier = Modifier.padding(start = 4.dp).size(24.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = "Toggle quad",
+                        tint = quadColor,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
 
         // PITCH and HOLD centered below
         Row(

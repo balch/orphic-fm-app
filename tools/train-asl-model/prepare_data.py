@@ -18,9 +18,12 @@ import random
 import shutil
 import struct
 
-# Our 21 ASL classes
-LETTER_CLASSES = ["A", "B", "C", "D", "H", "L", "M", "Q", "R", "S", "V", "W", "Y"]
-NUMBER_CLASSES = ["1", "2", "3", "4", "5", "6", "7", "8"]
+# Our 37 ASL classes (26 letters + 10 numbers + None)
+LETTER_CLASSES = [
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+    "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+]
+NUMBER_CLASSES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 NONE_CLASS = "None"
 
 

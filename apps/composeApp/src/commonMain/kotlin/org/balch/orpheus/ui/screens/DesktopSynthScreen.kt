@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +53,8 @@ fun DesktopSynthScreen(
     val voiceFeature: VoicesFeature = registry.feature<VoiceViewModel, VoicesFeature>()
     val midiFeature: MidiFeature = registry.feature<MidiViewModel, MidiFeature>()
     val panels = remember { headerFeature.resolvePanels(FactoryPanelSets.DesktopScreen) }
+    val voiceState by voiceFeature.stateFlow.collectAsState()
+    val rightQuad = voiceState.selectedRightQuad
 
     // Request focus for keyboard input handling
     LaunchedEffect(Unit) {
@@ -113,9 +117,10 @@ fun DesktopSynthScreen(
                     VoiceGroupSection(
                         voiceFeature = voiceFeature,
                         midiFeature = midiFeature,
-                        quadLabel = "5-8",
-                        quadColor = OrpheusColors.synthGreen,
-                        voiceStartIndex = 4,
+                        quadLabel = if (rightQuad == 1) "5-8" else "9-12",
+                        quadColor = if (rightQuad == 1) OrpheusColors.synthGreen else OrpheusColors.neonCyan,
+                        voiceStartIndex = if (rightQuad == 1) 4 else 8,
+                        showQuadToggle = true,
                         modifier = Modifier.weight(1f),
                     )
                 }

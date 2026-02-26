@@ -5,14 +5,15 @@ Enable gesture control from the Gesture Control panel.
 
 ## How It Works
 
-The camera tracks your hands using MediaPipe HandLandmarker. A pure-Kotlin
-classifier recognizes ASL (American Sign Language) hand signs from the
-21-point landmark data. One hand selects targets and parameters, then
-pinch gestures control values.
+The camera tracks your hands using MediaPipe HandLandmarker. A hybrid
+classifier combines a custom ML model (trained via MediaPipe Model Maker
+on all 26 ASL letters) with geometric rule-based analysis for robust sign
+recognition from the 21-point landmark data. One hand selects targets and
+parameters, then pinch gestures control values.
 
 ## One-Hand Selection Flow
 
-1. **Sign a number** (1-8) to select a voice target
+1. **Sign a number** (1-10) to select a voice target
 2. **Sign a parameter letter** (M, S, B, L, W) to select what to control
 3. **Pinch + drag up/down** to adjust the selected parameter
 4. **Push hand toward/away from camera** (Z-axis) simultaneously adjusts envelope speed
@@ -34,24 +35,49 @@ The breadcrumb bar at the bottom of the camera view shows your progress:
 | **6** | Pinky + thumb touching, 3 middle up | Select voice 6 |
 | **7** | Ring + thumb touching, others up | Select voice 7 |
 | **8** | Middle + thumb touching, others up | Select voice 8 |
+| **9** | Index curled, thumb touches index, others up | Select voice 9 |
+| **10** | Fist with thumb flicking up (like thumbs up) | Select voice 10 |
 
-### Letters — Parameter & Mode Selection
+### Letters — Full ASL Alphabet
+
+All 26 ASL letters are recognized by the hybrid ML + rule-based classifier.
+Letters with assigned functions are listed first, followed by reserved letters.
+
+#### Active Letters
 
 | Sign | Hand Shape | Action |
 |------|-----------|--------|
-| **A** | Fist (thumb alongside) | Deselect / clear all |
-| **B** | Flat hand, fingers together, thumb across | Pitch bend mode |
-| **C** | Curved open hand | System: Coupling |
-| **D** | Index up, thumb touches middle finger | Duo prefix — sign D then a number to target a specific duo |
-| **H** | Index + middle horizontal, thumb across | Parameter: Hold level (quad) |
-| **L** | Index + thumb in L-shape | Parameter: Mod source level |
-| **M** | Fist, thumb under 3 fingers | Parameter: Morph |
-| **Q** | Thumb + index pointing down | Quad prefix — sign Q then a number to target a specific quad |
-| **R** | Index + middle crossed | Remote adjust (other hand pinch adjusts without gating) |
+| **A** | Fist, thumb alongside index finger | Deselect / clear all |
+| **B** | Four fingers up together, thumb across palm | Pitch bend mode |
+| **C** | Curved open hand forming C shape | System: Coupling |
+| **D** | Index up, thumb touches middle finger | Duo prefix — sign D then a number |
+| **E** | Fingertips curled down to touch thumb | Toggle AR Keyboard Mode |
+| **H** | Index + middle horizontal together | Parameter: Hold level (quad) |
+| **L** | Index + thumb at 90 degrees (L shape) | Parameter: Mod source level |
+| **M** | Fist, thumb tucked under 3 fingers | Parameter: Morph |
+| **Q** | Thumb + index pointing down | Quad prefix — sign Q then a number |
+| **R** | Index + middle crossed | Remote adjust (no-gate pinch) |
 | **S** | Fist, thumb over fingers | Parameter: Sharpness |
-| **V** | Index + middle spread (peace) | System: Vibrato |
+| **V** | Index + middle spread (peace sign) | System: Vibrato |
 | **W** | Index + middle + ring spread | Parameter: Volume (quad) |
 | **Y** | Thumb + pinky out (hang loose) | System: Chaos/Feedback |
+
+#### Reserved Letters (recognized but not yet assigned)
+
+| Sign | Hand Shape |
+|------|-----------|
+| **F** | Thumb + index tips touching (circle), middle + ring + pinky up |
+| **G** | Index + thumb extended parallel horizontally, others curled |
+| **I** | Pinky only extended, others curled |
+| **K** | Index + middle spread, thumb up between them |
+| **J** | Like I but pinky traces a J curve (motion sign) |
+| **N** | Fist, thumb between index and middle fingers |
+| **O** | Thumb + index tips meet forming O, others partially bent |
+| **P** | Like K but hand points down |
+| **T** | Fist, thumb between index and middle (thumb tip visible) |
+| **U** | Index + middle extended together pointing up |
+| **X** | Index finger hooked/bent, others curled |
+| **Z** | Index extended, hand traces Z pattern (motion sign) |
 
 ### Control Gestures
 

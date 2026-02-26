@@ -2,8 +2,6 @@ package org.balch.orpheus.features.mediapipe
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -24,6 +22,7 @@ import org.balch.orpheus.core.controller.ControlStateSnapshot
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
@@ -38,6 +37,8 @@ import org.balch.orpheus.core.gestures.GestureInterpreter
 import org.balch.orpheus.core.gestures.GestureMode
 import org.balch.orpheus.core.gestures.GestureState
 import org.balch.orpheus.core.gestures.InteractionPhase
+import org.balch.orpheus.core.gestures.KeyboardEvent
+import org.balch.orpheus.core.gestures.KeyboardInteractionEngine
 import org.balch.orpheus.core.mediapipe.CameraFrame
 import org.balch.orpheus.core.mediapipe.HandTracker
 import org.balch.orpheus.core.mediapipe.TrackedHand
@@ -65,6 +66,8 @@ data class MediaPipeUiState(
     val remoteAdjustArmed: Boolean = false,
     val selectedDuoIndex: Int? = null,
     val selectedQuadIndex: Int? = null,
+    val pressedKeys: Set<Int> = emptySet(),
+    val keyboardEngineName: String? = null,
 )
 
 @Immutable
@@ -132,7 +135,8 @@ class MediaPipeViewModel(
     private val synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
     private val _engine: SynthEngine,
-) : ViewModel(), MediaPipeFeature {
+    private val scope: FeatureCoroutineScope,
+) : MediaPipeFeature {
 
     override val engine: SynthEngine get() = _engine
 
@@ -146,12 +150,21 @@ class MediaPipeViewModel(
     private val gestureInterpreter = GestureInterpreter()
     private val aslEngine = AslInteractionEngine()
     private val conductorEngine = ConductorInteractionEngine()
+    private val keyboardEngine = KeyboardInteractionEngine()
+    private var savedVoiceTuning: SavedVoiceTuning? = null
+    private val _pressedKeys = MutableStateFlow<Set<Int>>(emptySet())
+    private val _keyboardEngineName = MutableStateFlow<String?>(null)
+
+    private class SavedVoiceTuning(
+        val voiceTunes: FloatArray,
+        val quadPitches: FloatArray,
+    )
 
     // Save-on-first-write: captures pre-gesture values so camera-off can restore them
     private val controlSnapshot = ControlStateSnapshot(synthController)
     private val _gestureMode = MutableStateFlow(GestureMode.ASL)
-    private var lastConductorToggleMs = 0L // cooldown prevents re-toggle bounce
-    private val conductorToggleCooldownMs = 1500L
+    private var lastModeToggleMs = 0L // cooldown prevents re-toggle bounce
+    private val modeToggleCooldownMs = 1500L
 
     private val _isEnabled = MutableStateFlow(false)
     private val _heldVoiceIndices = MutableStateFlow<Set<Int>>(emptySet())
@@ -174,8 +187,11 @@ class MediaPipeViewModel(
     private var missCount = 0
 
     init {
+        // Stop hand tracker when the feature scope is cancelled
+        scope.onCleared { handTracker.stop() }
+
         // Track hold state from any source (UI, MediaPipe, AI) for display and toggle logic
-        viewModelScope.launch {
+        scope.launch {
             synthController.onHoldChange.collect { event ->
                 _heldVoiceIndices.value = if (event.holding) {
                     _heldVoiceIndices.value + event.voiceIndex
@@ -199,7 +215,7 @@ class MediaPipeViewModel(
         // that runs for the ViewModel's entire lifetime, independent of UI subscription
         // state. This ensures events (voice gates, parameter adjustments) are never
         // lost during brief UI unsubscriptions (e.g., configuration changes).
-        viewModelScope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.default) {
             combine(
                 _isEnabled,
                 handTracker.results,
@@ -265,8 +281,8 @@ class MediaPipeViewModel(
                         }
                         val exitSign = signerHand?.aslSign
                         if (exitSign == AslSign.LETTER_A || exitSign == AslSign.LETTER_S) {
-                            if (timestampMs - lastConductorToggleMs > conductorToggleCooldownMs) {
-                                lastConductorToggleMs = timestampMs
+                            if (timestampMs - lastModeToggleMs > modeToggleCooldownMs) {
+                                lastModeToggleMs = timestampMs
                                 log.info { "CONDUCTOR exit via $exitSign" }
                                 toggleGestureMode()
                                 return@combine
@@ -286,6 +302,24 @@ class MediaPipeViewModel(
                         } else {
                             // Reset swipe state so stale palmX doesn't cause false trigger on release
                             aslEngine.checkSwipe(emptyList(), timestampMs)
+                        }
+                    }
+                    GestureMode.KEYBOARD -> {
+                        // Exit: fist sign (A/S) returns to ASL mode
+                        val signerHand = gestures.firstOrNull {
+                            it.aslSign != null && it.aslConfidence >= 0.7f
+                        }
+                        val exitSign = signerHand?.aslSign
+                        if (exitSign == AslSign.LETTER_A || exitSign == AslSign.LETTER_S) {
+                            if (timestampMs - lastModeToggleMs > modeToggleCooldownMs) {
+                                lastModeToggleMs = timestampMs
+                                exitKeyboardMode()
+                                return@combine
+                            }
+                        }
+                        val events = keyboardEngine.update(gestures, timestampMs)
+                        for (event in events) {
+                            dispatchKeyboardEvent(event)
                         }
                     }
                 }
@@ -308,46 +342,52 @@ class MediaPipeViewModel(
             ) { held, target, param, (prefix, phase, mode) ->
                 AslUiExtras(held, target, param, prefix, phase, mode)
             },
-            combine(_isBending, _cachedGestures) { b, g -> b to g },
-        ) { enabled, result, frame, extras, (bending, cachedGestures) ->
+            combine(_isBending, _cachedGestures, _pressedKeys, _keyboardEngineName) { b, g, pk, en ->
+                GestureUiExtras(b, g, pk, en)
+            },
+        ) { enabled, result, frame, aslExtras, gestureExtras ->
             if (!enabled || result == null || result.hands.isEmpty()) {
                 MediaPipeUiState(
                     isEnabled = enabled,
                     isTracking = false,
                     cameraFrame = if (enabled) frame else null,
-                    heldVoiceIndices = extras.heldIndices,
-                    selectedTarget = extras.selectedTarget,
-                    selectedParam = extras.selectedParam,
-                    modePrefix = extras.modePrefix,
-                    interactionPhase = extras.interactionPhase,
-                    gestureMode = extras.gestureMode,
+                    heldVoiceIndices = aslExtras.heldIndices,
+                    selectedTarget = aslExtras.selectedTarget,
+                    selectedParam = aslExtras.selectedParam,
+                    modePrefix = aslExtras.modePrefix,
+                    interactionPhase = aslExtras.interactionPhase,
+                    gestureMode = aslExtras.gestureMode,
                     remoteAdjustArmed = aslEngine.remoteAdjustArmed,
                     selectedDuoIndex = selectedDuoIndex,
                     selectedQuadIndex = selectedQuadIndex,
+                    pressedKeys = gestureExtras.pressedKeys,
+                    keyboardEngineName = gestureExtras.keyboardEngineName,
                 )
             } else {
                 MediaPipeUiState(
                     isEnabled = enabled,
                     isTracking = true,
                     hands = result.hands,
-                    gestureStates = cachedGestures,
+                    gestureStates = gestureExtras.cachedGestures,
                     cameraFrame = frame,
-                    isBending = bending,
-                    heldVoiceIndices = extras.heldIndices,
-                    selectedTarget = extras.selectedTarget,
-                    selectedParam = extras.selectedParam,
-                    modePrefix = extras.modePrefix,
-                    interactionPhase = extras.interactionPhase,
-                    gestureMode = extras.gestureMode,
+                    isBending = gestureExtras.bending,
+                    heldVoiceIndices = aslExtras.heldIndices,
+                    selectedTarget = aslExtras.selectedTarget,
+                    selectedParam = aslExtras.selectedParam,
+                    modePrefix = aslExtras.modePrefix,
+                    interactionPhase = aslExtras.interactionPhase,
+                    gestureMode = aslExtras.gestureMode,
                     remoteAdjustArmed = aslEngine.remoteAdjustArmed,
                     selectedDuoIndex = selectedDuoIndex,
                     selectedQuadIndex = selectedQuadIndex,
+                    pressedKeys = gestureExtras.pressedKeys,
+                    keyboardEngineName = gestureExtras.keyboardEngineName,
                 )
             }
         }
             .flowOn(dispatcherProvider.default)
             .stateIn(
-                scope = viewModelScope,
+                scope = scope,
                 started = sharingStrategy,
                 initialValue = MediaPipeUiState(),
             )
@@ -359,6 +399,13 @@ class MediaPipeViewModel(
         val modePrefix: AslSign?,
         val interactionPhase: InteractionPhase,
         val gestureMode: GestureMode,
+    )
+
+    private data class GestureUiExtras(
+        val bending: Boolean,
+        val cachedGestures: List<GestureState>,
+        val pressedKeys: Set<Int>,
+        val keyboardEngineName: String?,
     )
 
     /** Map AslEvent to synth controller calls. */
@@ -420,10 +467,19 @@ class MediaPipeViewModel(
             is AslEvent.ToggleConductorMode -> {
                 @OptIn(ExperimentalTime::class)
                 val now = Clock.System.now().toEpochMilliseconds()
-                if (now - lastConductorToggleMs > conductorToggleCooldownMs) {
-                    lastConductorToggleMs = now
+                if (now - lastModeToggleMs > modeToggleCooldownMs) {
+                    lastModeToggleMs = now
                     log.info { "CONDUCTOR enter via ILY" }
                     toggleGestureMode()
+                }
+            }
+            is AslEvent.ToggleKeyboardMode -> {
+                @OptIn(ExperimentalTime::class)
+                val now = Clock.System.now().toEpochMilliseconds()
+                if (now - lastModeToggleMs > modeToggleCooldownMs) {
+                    lastModeToggleMs = now
+                    log.info { "KEYBOARD enter via E" }
+                    enterKeyboardMode()
                 }
             }
         }
@@ -486,6 +542,58 @@ class MediaPipeViewModel(
         }
     }
 
+    private fun dispatchKeyboardEvent(event: KeyboardEvent) {
+        when (event) {
+            is KeyboardEvent.NoteOn -> {
+                _pressedKeys.value = _pressedKeys.value + event.keyIndex
+                synthController.emitPulseStart(event.keyIndex)
+            }
+            is KeyboardEvent.NoteOff -> {
+                _pressedKeys.value = _pressedKeys.value - event.keyIndex
+                synthController.emitPulseEnd(event.keyIndex)
+            }
+            is KeyboardEvent.CycleEngine -> {
+                // TODO: cycle voice engine model for all 12 voices
+            }
+        }
+    }
+
+    private fun enterKeyboardMode() {
+        // Snapshot current tunings so we can restore on exit
+        savedVoiceTuning = SavedVoiceTuning(
+            voiceTunes = FloatArray(KeyboardInteractionEngine.NUM_KEYS) { _engine.getVoiceTune(it) },
+            quadPitches = FloatArray(NUM_QUADS) { _engine.getQuadPitch(it) },
+        )
+        // Set quad pitches to unity (0.5) so keyboard tuning is absolute
+        for (q in 0 until NUM_QUADS) _engine.setQuadPitch(q, 0.5f)
+        // Tune each voice to a chromatic note starting at middle C (MIDI 60)
+        // Formula: freq = 55.0 * 2^(tune * 4.0), so tune = (midiNote - MIDI_TUNE_OFFSET) / MIDI_TUNE_DIVISOR
+        for (i in 0 until KeyboardInteractionEngine.NUM_KEYS) {
+            val tune = (MIDI_BASE_NOTE + i - MIDI_TUNE_OFFSET).toFloat() / MIDI_TUNE_DIVISOR
+            _engine.setVoiceTune(i, tune)
+        }
+        _gestureMode.value = GestureMode.KEYBOARD
+    }
+
+    private fun exitKeyboardMode() {
+        // Flush any active notes
+        val flush = keyboardEngine.reset()
+        for (e in flush) dispatchKeyboardEvent(e)
+        _pressedKeys.value = emptySet()
+        // Restore saved tunings
+        savedVoiceTuning?.let { saved ->
+            for (i in saved.voiceTunes.indices) _engine.setVoiceTune(i, saved.voiceTunes[i])
+            for (q in saved.quadPitches.indices) _engine.setQuadPitch(q, saved.quadPitches[q])
+        }
+        savedVoiceTuning = null
+        _gestureMode.value = GestureMode.ASL
+        _selectedTarget.value = null
+        _selectedParam.value = null
+        _modePrefix.value = null
+        _interactionPhase.value = InteractionPhase.IDLE
+        _isBending.value = false
+    }
+
     private fun updateVizKnobsForBend(duoIndex: Int, bendAmount: Float) {
         val vizValue = (bendAmount + 1f) / 2f
         if (duoIndex == 0) {
@@ -517,11 +625,16 @@ class MediaPipeViewModel(
                 val flush = conductorEngine.reset()
                 for (e in flush) dispatchConductorEvent(e)
             }
+            GestureMode.KEYBOARD -> {
+                exitKeyboardMode()
+                return // exitKeyboardMode already switches mode and resets state
+            }
         }
         // Switch mode
         _gestureMode.value = when (_gestureMode.value) {
             GestureMode.ASL -> GestureMode.CONDUCTOR
             GestureMode.CONDUCTOR -> GestureMode.ASL
+            GestureMode.KEYBOARD -> GestureMode.ASL
         }
         // Reset UI state
         _selectedTarget.value = null
@@ -684,10 +797,18 @@ class MediaPipeViewModel(
             dispatchConductorEvent(event)
         }
 
-        // 4. Safety net: force all 8 voice gates off directly through the engine.
+        // 3b. Flush keyboard engine and restore tunings if in keyboard mode
+        if (_gestureMode.value == GestureMode.KEYBOARD) {
+            exitKeyboardMode()
+        } else {
+            val kbFlush = keyboardEngine.reset()
+            for (event in kbFlush) dispatchKeyboardEvent(event)
+        }
+
+        // 4. Safety net: force all voice gates off directly through the engine.
         //    The SharedFlow path (emitPulseEnd → VoiceViewModel → setVoiceGate) is
         //    indirect and async. Belt-and-suspenders: set gates off on the engine directly.
-        for (i in 0 until 8) {
+        for (i in 0 until KeyboardInteractionEngine.NUM_KEYS) {
             _engine.setVoiceGate(i, false)
         }
 
@@ -713,17 +834,19 @@ class MediaPipeViewModel(
         _isBending.value = false
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        handTracker.stop()
-    }
-
     companion object {
         private const val MISS_THRESHOLD = 5
         /** Scale factor for pinch-drag Y delta → 0-1 parameter range. ~20% screen = full range. */
         private const val PARAM_ADJUST_SCALE = 5f
         /** Scale factor for Z-depth delta → envelope speed. Z values are smaller, so scale more aggressively. */
         private const val ENV_SPEED_Z_SCALE = 10f
+        private const val NUM_QUADS = 3
+        /** MIDI note number for middle C — the lowest key in keyboard mode. */
+        private const val MIDI_BASE_NOTE = 60
+        /** Offset in the engine's tune formula: tune = (midiNote - offset) / divisor. */
+        private const val MIDI_TUNE_OFFSET = 33
+        /** Divisor in the engine's tune formula: freq = 55.0 * 2^(tune * 4.0). */
+        private const val MIDI_TUNE_DIVISOR = 48f
 
         fun previewFeature(
             state: MediaPipeUiState = MediaPipeUiState(),

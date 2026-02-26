@@ -64,6 +64,12 @@ fun AslSelectionBar(
         return
     }
 
+    // Keyboard Mode: show a single full-width indicator instead of breadcrumbs
+    if (gestureMode == GestureMode.KEYBOARD) {
+        KeyboardModeBar(modifier)
+        return
+    }
+
     // Derive slot states
     val hasTarget = selectedTarget != null
     val isSystemTarget = selectedTarget?.category == AslCategory.SYSTEM
@@ -267,6 +273,46 @@ private fun AslSelectionBarModePrefixPreview() {
         interactionPhase = InteractionPhase.IDLE,
         isTracking = true,
     )
+}
+
+@Composable
+private fun KeyboardModeBar(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "keyboardPulse")
+    val pulseAlpha by transition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(tween(1200), RepeatMode.Reverse),
+        label = "keyboardAlpha",
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                ),
+            )
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(28.dp)
+                .alpha(pulseAlpha)
+                .border(1.dp, OrpheusColors.synthGreen, RoundedCornerShape(6.dp))
+                .background(OrpheusColors.synthGreen.copy(alpha = 0.2f), RoundedCornerShape(6.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "KEYS",
+                color = OrpheusColors.synthGreen,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 2.sp,
+            )
+        }
+    }
 }
 
 @Composable

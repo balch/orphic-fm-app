@@ -274,7 +274,8 @@ class VoiceViewModel(
         setDuoEngine = ::setDuoEngine,
         setDuoHarmonics = ::setDuoHarmonics,
         setDuoMorph = ::setDuoMorph,
-        setDuoModSourceLevel = ::setDuoModSourceLevel
+        setDuoModSourceLevel = ::setDuoModSourceLevel,
+        toggleRightQuad = ::toggleRightQuad
     )
 
     override val keyBindings: List<KeyBinding> = buildList {
@@ -493,6 +494,10 @@ class VoiceViewModel(
 
     fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) {
         quadEnvTriggerModeFlows[quadIndex].value = BoolValue(enabled)
+    }
+
+    fun toggleRightQuad() {
+        uiIntents.tryEmit(VoiceIntent.ToggleRightQuad)
     }
 
     // ═══════════════════════════════════════════════════════════
