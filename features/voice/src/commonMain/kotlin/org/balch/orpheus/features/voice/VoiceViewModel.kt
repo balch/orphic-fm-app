@@ -1,7 +1,7 @@
 package org.balch.orpheus.features.voice
 
 import androidx.compose.runtime.Composable
-import org.balch.orpheus.core.di.FeatureScope
+import androidx.compose.ui.input.key.Key
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -19,12 +19,6 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
-import org.balch.orpheus.core.input.KeyAction
-import org.balch.orpheus.core.input.KeyBinding
-import org.balch.orpheus.core.input.KeyboardInputHandler
-import androidx.compose.ui.input.key.Key
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.wobble.VoiceWobbleController
@@ -33,15 +27,21 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.plugin.symbols.VizSymbol
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.input.KeyAction
+import org.balch.orpheus.core.input.KeyBinding
+import org.balch.orpheus.core.input.KeyboardInputHandler
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
+import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.tempo.GlobalTempo
 
 
@@ -275,7 +275,8 @@ class VoiceViewModel(
         setDuoHarmonics = ::setDuoHarmonics,
         setDuoMorph = ::setDuoMorph,
         setDuoModSourceLevel = ::setDuoModSourceLevel,
-        toggleRightQuad = ::toggleRightQuad
+        toggleRightQuad = ::toggleRightQuad,
+        toggleLeftPanel = ::toggleLeftPanel
     )
 
     override val keyBindings: List<KeyBinding> = buildList {
@@ -498,6 +499,10 @@ class VoiceViewModel(
 
     fun toggleRightQuad() {
         uiIntents.tryEmit(VoiceIntent.ToggleRightQuad)
+    }
+
+    fun toggleLeftPanel() {
+        uiIntents.tryEmit(VoiceIntent.ToggleLeftPanel)
     }
 
     // ═══════════════════════════════════════════════════════════

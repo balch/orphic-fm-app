@@ -37,9 +37,9 @@ import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModelProvider
 import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.ai.deriveAiProviderFromKey
-import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.tidal.ReplCodeEvent
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
@@ -256,9 +256,15 @@ class OrpheusAgent @Inject constructor(
         )
 
         createAgent(strategy, apiKey) {
+            // Lifecycle logging handler
             handleEvents {
                 onAgentStarting { _ -> logger.d { "Agent starting" } }
                 onAgentCompleted { _ -> logger.d { "Agent completed" } }
+                onToolCallStarting { context -> logger.d { "Tool call starting: ${context.toolName}" } }
+                onToolCallCompleted { context -> logger.d { "Tool call completed: ${context.toolName}" } }
+            }
+            // Error handling handler
+            handleEvents {
                 onAgentExecutionFailed { ctx ->
                     if (ctx.throwable is CancellationException) {
                         logger.debug { "Agent execution cancelled" }
@@ -268,11 +274,10 @@ class OrpheusAgent @Inject constructor(
                     }
                 }
                 onToolCallFailed { context -> logger.e { "Tool call failed: ${context.toolName} : ${context.message}" } }
-                onToolCallStarting { context -> logger.d { "Tool call starting: ${context.toolName}" } }
-                onToolCallCompleted { context ->
-                    logger.d { "Tool call completed: ${context.toolName}" }
-                    trackToolCall()
-                }
+            }
+            // Usage tracking handler
+            handleEvents {
+                onToolCallCompleted { _ -> trackToolCall() }
             }
         }.run(prompt)
     }.onEach {

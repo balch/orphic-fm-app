@@ -3,7 +3,6 @@ package org.balch.orpheus.ui.panels.compact
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -243,7 +243,7 @@ fun CompactStringPanel(
  * Tracks state for a pointer touching strings.
  * A single pointer can grab multiple strings when dragging across them.
  */
-private data class StringTouchState(
+internal data class StringTouchState(
     val pointerId: PointerId,
     val startY: Float,             // Y at initial touch (for voice mix calculation)
     var currentX: Float,           // Current X position
@@ -261,7 +261,7 @@ private data class StringTouchState(
  * - Vertical position at touch = voice mix (A vs B in duo)
  */
 @Composable
-private fun BenderStringsCanvas(
+internal fun BenderStringsCanvas(
     colors: List<Color>,
     voiceStates: List<VoiceState>,
     stringCenters: List<Float>,
@@ -768,7 +768,7 @@ private fun BenderStringsCanvas(
     }
 }
 
-private sealed interface StringInteraction {
+internal sealed interface StringInteraction {
     data class Pluck(val initialStringIndex: Int) : StringInteraction
     data class MoveHeader(val stringIndex: Int) : StringInteraction
     object SlideBar : StringInteraction

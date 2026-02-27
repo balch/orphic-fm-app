@@ -39,6 +39,7 @@ data class VoicePanelActions(
     val setDuoMorph: (Int, Float) -> Unit,
     val setDuoModSourceLevel: (Int, Float) -> Unit,
     val toggleRightQuad: () -> Unit,
+    val toggleLeftPanel: () -> Unit,
 ) {
     companion object {
         val EMPTY = VoicePanelActions(
@@ -62,6 +63,7 @@ data class VoicePanelActions(
             setDuoMorph = {_, _ -> },
             setDuoModSourceLevel = {_, _ -> },
             toggleRightQuad = {},
+            toggleLeftPanel = {},
         )
     }
 }

@@ -2,15 +2,13 @@ package org.balch.orpheus.features.ai.generative
 
 import ai.koog.prompt.markdown.markdown
 import ai.koog.prompt.streaming.StreamFrame
-import ai.koog.prompt.streaming.filterTextOnly
 import ai.koog.prompt.structure.markdown.MarkdownStructureDefinition
 import ai.koog.prompt.structure.markdown.markdownStreamingParser
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.float
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -24,7 +22,7 @@ data class AgentAction(
 )
 
 enum class ActionType {
-    CONTROL, REPL, STATUS, UNKNOWN
+    CONTROL, REPL, STATUS, REASONING, UNKNOWN
 }
 
 /**
@@ -65,11 +63,10 @@ fun synthActionDefinition(): MarkdownStructureDefinition {
  */
 fun parseSynthActions(stream: Flow<StreamFrame>): Flow<AgentAction> {
     return channelFlow {
-        val json = Json { ignoreUnknownKeys = true }
-        // Channel to feed text parts to the markdown parser
-        val textChannel = kotlinx.coroutines.channels.Channel<StreamFrame>(kotlinx.coroutines.channels.Channel.UNLIMITED)
-        
-        // Launch markdown parser
+        // Channel to feed text chunks to the markdown parser
+        val textChannel = Channel<String>(Channel.UNLIMITED)
+
+        // Launch markdown parser on the text-only stream
         launch {
             markdownStreamingParser {
                 var currentType = ActionType.UNKNOWN
@@ -95,7 +92,7 @@ fun parseSynthActions(stream: Flow<StreamFrame>): Flow<AgentAction> {
                     if (currentType == ActionType.STATUS && details.size == 1) {
                          send(AgentAction(ActionType.STATUS, currentHeader, details.toList()))
                          details.clear()
-                         currentType = ActionType.UNKNOWN 
+                         currentType = ActionType.UNKNOWN
                     }
                     else if (currentType == ActionType.REPL && details.size == 1) {
                          send(AgentAction(ActionType.REPL, currentHeader, details.toList()))
@@ -114,41 +111,66 @@ fun parseSynthActions(stream: Flow<StreamFrame>): Flow<AgentAction> {
                         send(AgentAction(currentType, currentHeader, details.toList()))
                     }
                 }
-            }.parseStream(textChannel.receiveAsFlow().filterTextOnly())
+            }.parseStream(textChannel.receiveAsFlow())
         }
 
-        // Process incoming stream
+        // Accumulate reasoning deltas into sentence-sized chunks
+        val reasoningBuffer = StringBuilder()
+
+        // Process incoming stream: route text deltas to parser, handle tool calls directly
         stream.collect { frame ->
             when (frame) {
-                is StreamFrame.Append -> textChannel.send(frame)
-                is StreamFrame.ToolCall -> {
+                is StreamFrame.TextDelta -> textChannel.send(frame.text)
+                is StreamFrame.ReasoningDelta -> {
+                    val text = frame.text ?: frame.summary
+                    if (text != null) {
+                        reasoningBuffer.append(text)
+                        // Emit when we hit sentence boundaries for readable chunks
+                        val content = reasoningBuffer.toString()
+                        val lastSentenceEnd = content.lastIndexOfAny(charArrayOf('.', '!', '?', '\n'))
+                        if (lastSentenceEnd > 0 && content.length > 40) {
+                            val sentence = content.substring(0, lastSentenceEnd + 1).trim()
+                            if (sentence.isNotEmpty()) {
+                                send(AgentAction(ActionType.REASONING, details = listOf(sentence)))
+                            }
+                            reasoningBuffer.clear()
+                            reasoningBuffer.append(content.substring(lastSentenceEnd + 1))
+                        }
+                    }
+                }
+                is StreamFrame.ReasoningComplete -> {
+                    // Flush any remaining reasoning buffer
+                    val remaining = reasoningBuffer.toString().trim()
+                    if (remaining.isNotEmpty()) {
+                        send(AgentAction(ActionType.REASONING, details = listOf(remaining)))
+                        reasoningBuffer.clear()
+                    }
+                }
+                is StreamFrame.ToolCallComplete -> {
                     try {
+                        val args = frame.contentJson
                         when (frame.name.lowercase()) {
                             "synth_control", "synthcontrol" -> {
-                                val args = json.decodeFromString<JsonObject>(frame.content)
                                 val id = args["controlId"]?.jsonPrimitive?.content
                                 val value = args["value"]?.jsonPrimitive?.float
-                                
+
                                 if (id != null && value != null) {
                                     send(AgentAction(ActionType.CONTROL, details = listOf(id, value.toString())))
                                 }
                             }
                             "repl_execute", "replexecute" -> {
-                                val args = json.decodeFromString<JsonObject>(frame.content)
                                 val code = args["code"]?.jsonPrimitive?.content
                                 if (code != null) {
                                     send(AgentAction(ActionType.REPL, details = listOf(code)))
                                 }
                             }
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // Ignore parse errors from tools
                     }
                 }
-                else -> {} 
-            }
-            if (frame is StreamFrame.End) {
-                textChannel.close()
+                is StreamFrame.End -> {} // channel closed after collect completes
+                else -> {}
             }
         }
         textChannel.close()

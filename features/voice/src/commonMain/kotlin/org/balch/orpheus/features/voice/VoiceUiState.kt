@@ -32,6 +32,7 @@ data class VoiceUiState(
     val quadEnvelopeTriggerModes: List<Boolean> = listOf(false, false, false),
     val aiVoiceEngineHighlights: List<Boolean> = List(6) { false },
     val selectedRightQuad: Int = 1, // 1 = quad 1 (voices 5-8), 2 = quad 2 (voices 9-12)
+    val selectedLeftPanel: LeftPanelMode = LeftPanelMode.VOICES,
 ) {
     companion object {
         val DEFAULT_TUNINGS = listOf(0.20f, 0.27f, 0.34f, 0.40f, 0.47f, 0.54f, 0.61f, 0.68f, 0.75f, 0.82f, 0.89f, 0.96f)
@@ -77,6 +78,12 @@ internal sealed interface VoiceIntent {
     data class BendPosition(val value: Float) : VoiceIntent
     data class SetBpm(val value: Double) : VoiceIntent
 
-    // UI-only toggle
+    // UI-only toggles
     data object ToggleRightQuad : VoiceIntent
+    data object ToggleLeftPanel : VoiceIntent
+}
+
+enum class LeftPanelMode {
+    VOICES,
+    BENDER_STRINGS,
 }

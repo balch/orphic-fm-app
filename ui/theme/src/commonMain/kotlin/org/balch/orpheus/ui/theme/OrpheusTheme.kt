@@ -265,4 +265,18 @@ object OrpheusColors {
     val engineGreen = Color(0xFF81C784)          // Grain
     val engineYellow = Color(0xFFFFD54F)         // String
     val engineOrange = Color(0xFFFF8A65)         // Modal
+
+    // Aquarium colors
+    val aquariumDeep = Color(0xFF0A1628)       // Deep ocean background
+    val aquariumTeal = Color(0xFF0E4D64)       // Teal mid-water
+    val aquariumLight = Color(0xFF1A7A8A)      // Light shaft color
+    val aquariumBubble = Color(0x40FFFFFF)     // Translucent bubble
+    val fishOrange = Color(0xFFFF8C42)         // Clownfish orange
+    val fishBlue = Color(0xFF4A90D9)           // Blue tang
+    val fishSilver = Color(0xFFC0C8D0)        // Silver minnow
+    val fishRed = Color(0xFFE04040)            // Red snapper
+    val fishGold = Color(0xFFFFD700)           // Goldfish
+    val fishTeal = Color(0xFF40C4AA)           // Teal angel
+    val fishPurple = Color(0xFF9B6DFF)         // Purple reef fish
+    val fishPink = Color(0xFFFF6B9D)           // Pink chromis
 }

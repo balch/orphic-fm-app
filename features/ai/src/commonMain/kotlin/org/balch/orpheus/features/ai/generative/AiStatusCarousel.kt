@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,13 +25,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.Flow
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 
 /**
  * A rolling carousel for displaying Drone Agent status messages.
@@ -65,14 +69,13 @@ fun AiStatusCarousel(
         }
     }
     
-    // Auto-navigate to newest when new message arrives
-    val currentMessage = messages.getOrNull(currentIndex)
-    
-    
+    // Snapshot the batch outside AnimatedContent so we don't read mutableStateListOf inside the transition
+    val batch = messages.asSequence().drop(currentIndex).take(4).toList()
+
     if (messages.isEmpty()) {
         return
     }
-    
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -93,39 +96,33 @@ fun AiStatusCarousel(
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Drone icon removed 
             // Message text with rolling animation
             AnimatedContent(
-                targetState = currentMessage,
+                targetState = batch,
                 transitionSpec = {
                     slideInVertically { height -> height } togetherWith
                             slideOutVertically { height -> -height }
                 },
                 modifier = Modifier.weight(1f),
                 label = "drone_message"
-            ) { topMessage ->
-                // Show batch of 4 messages
-                val startIdx = currentIndex
-                val batch = messages.asSequence().drop(startIdx).take(4).toList()
-                
+            ) { animatedBatch ->
                 Column(
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    if (batch.isEmpty() && topMessage != null) {
-                         Text(topMessage.text, color = OrpheusColors.metallicBlue)
-                    } else if (batch.isEmpty()) {
+                    if (animatedBatch.isEmpty()) {
                          Text("AI ready", color = OrpheusColors.sterlingSilver.copy(alpha=0.5f), fontSize=12.sp)
                     } else {
-                        batch.forEachIndexed { i, msg ->
+                        animatedBatch.forEachIndexed { i, msg ->
                             val isPrimary = i == 0
                             Text(
-                                text = msg.text,
+                                text = if (msg.isReasoning) "\u2728 ${msg.text}" else msg.text,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontSize = if (isPrimary) 13.sp else 12.sp,
                                 lineHeight = if (isPrimary) 18.sp else 14.sp,
                                 fontStyle = FontStyle.Italic,
                                 color = when {
                                     msg.isError -> MaterialTheme.colorScheme.error
+                                    msg.isReasoning -> OrpheusColors.softPurple.copy(alpha = if (isPrimary) 0.85f else 0.5f)
                                     msg.isLoading -> OrpheusColors.sterlingSilver.copy(alpha = 0.9f)
                                     else -> if (isPrimary) OrpheusColors.metallicBlue else OrpheusColors.sterlingSilver.copy(alpha = 0.5f)
                                 },
@@ -174,6 +171,73 @@ fun AiStatusCarousel(
                     )
                 }
             }
+        }
+    }
+}
+
+private fun previewFlow(vararg messages: AiStatusMessage) = previewStatusFlow(*messages)
+
+// === Previews ===
+
+@Preview(widthDp = 400, heightDp = 120)
+@Composable
+private fun CarouselStatusPreview() {
+    OrpheusTheme {
+        Surface(color = OrpheusColors.darkVoid) {
+            AiStatusCarousel(
+                statusMessages = previewFlow(
+                    AiStatusMessage("Weaving a tapestry of overtones across the harmonic series"),
+                    AiStatusMessage("Shifting to Dorian mode with subtle detuning"),
+                    AiStatusMessage("Introducing shimmer delay at 40% wet"),
+                    AiStatusMessage("Initializing...", isLoading = true),
+                ),
+                isActive = true,
+                sessionId = 1,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+            )
+        }
+    }
+}
+
+@Preview(widthDp = 400, heightDp = 120)
+@Composable
+private fun CarouselReasoningPreview() {
+    OrpheusTheme {
+        Surface(color = OrpheusColors.darkVoid) {
+            AiStatusCarousel(
+                statusMessages = previewFlow(
+                    AiStatusMessage("Considering whether Lydian mode would complement the current drone texture.", isReasoning = true),
+                    AiStatusMessage("The user wants more movement, so I should increase flux spread.", isReasoning = true),
+                    AiStatusMessage("Building tension with rising fifths"),
+                ),
+                isActive = true,
+                sessionId = 1,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+            )
+        }
+    }
+}
+
+@Preview(widthDp = 400, heightDp = 120)
+@Composable
+private fun CarouselErrorPreview() {
+    OrpheusTheme {
+        Surface(color = OrpheusColors.darkVoid) {
+            AiStatusCarousel(
+                statusMessages = previewFlow(
+                    AiStatusMessage("Stream Error", isError = true),
+                    AiStatusMessage("Attempting drone in C minor"),
+                ),
+                isActive = true,
+                sessionId = 1,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.medium)
+            )
         }
     }
 }

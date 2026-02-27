@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,6 +102,8 @@ fun RotaryKnob(
     ) {
         // Track current value internally for smooth updates, syncing with external value when it changes
         var internalValue by remember(value) { mutableStateOf(value) }
+        // Keep onValueChange fresh for pointerInput closures (avoids stale capture when keys don't change)
+        val currentOnValueChange by rememberUpdatedState(onValueChange)
 
         Box(
             modifier = Modifier.size(size)
@@ -128,7 +131,7 @@ fun RotaryKnob(
                                     val newValue = (internalValue + delta).coerceIn(range)
                                     if (newValue != internalValue) {
                                         internalValue = newValue
-                                        onValueChange(newValue)
+                                        currentOnValueChange(newValue)
                                     }
                                 }
                             }

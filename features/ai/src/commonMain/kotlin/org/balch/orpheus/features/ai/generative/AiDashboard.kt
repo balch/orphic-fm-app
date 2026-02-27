@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,11 +26,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.Flow
 import org.balch.orpheus.features.ai.chat.widgets.ChatInputField
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 
 @Composable
 fun AiDashboard(
@@ -88,7 +92,7 @@ fun AiDashboard(
 }
 
 @Composable
-fun LogPanel(
+internal fun LogPanel(
     title: String,
     flow: Flow<AiStatusMessage>,
     sessionId: Int, // Key to clear logs
@@ -146,7 +150,7 @@ fun LogPanel(
                 .padding(horizontal = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            items(messages) { msg ->
+            items(messages, key = { it.id }) { msg ->
                 if (showVisuals && msg.text.startsWith("Set ")) {
                     ControlItem(msg.text)
                 } else {
@@ -170,7 +174,7 @@ fun LogPanel(
  * parses "Set NAME: 0.XX"
  */
 @Composable
-fun ControlItem(text: String) {
+private fun ControlItem(text: String) {
     val parts = text.substringAfter("Set ").split(": ")
     if (parts.size < 2) {
         Text(text, fontSize = 11.sp, color = OrpheusColors.sterlingSilver)
@@ -236,6 +240,93 @@ fun ControlItem(text: String) {
                     )
                 }
             }
+        }
+    }
+}
+
+// === Previews ===
+
+private fun previewFlow(vararg messages: AiStatusMessage) = previewStatusFlow(*messages)
+
+@Preview(widthDp = 400, heightDp = 500)
+@Composable
+private fun DashboardDronePreview() {
+    OrpheusTheme {
+        Surface(color = OrpheusColors.darkVoid) {
+            AiDashboard(
+                inputLog = previewFlow(
+                    AiStatusMessage("Initializing Drone..."),
+                    AiStatusMessage("User adjusted: Drive: 0.45"),
+                    AiStatusMessage("Mood: Ethereal Drift"),
+                ),
+                controlLog = previewFlow(
+                    AiStatusMessage("Set voice_tune_0: 0.56"),
+                    AiStatusMessage("Set distortion_drive: 0.45"),
+                    AiStatusMessage("Set delay_feedback: 0.70"),
+                    AiStatusMessage("Pattern: d1 $ slow 2 note \"c3 e3 g3\""),
+                    AiStatusMessage("Failed: Unknown sound: glitch", isError = true),
+                ),
+                statusMessages = previewFlow(
+                    AiStatusMessage("Weaving harmonic textures in C Dorian"),
+                    AiStatusMessage("Considering a shift to minor pentatonic.", isReasoning = true),
+                    AiStatusMessage("Adding shimmer delay at 40% wet"),
+                ),
+                isActive = true,
+                sessionId = 1,
+                modifier = Modifier.height(500.dp)
+            )
+        }
+    }
+}
+
+@Preview(widthDp = 400, heightDp = 500)
+@Composable
+private fun DashboardSoloPreview() {
+    OrpheusTheme {
+        Surface(color = OrpheusColors.darkVoid) {
+            AiDashboard(
+                inputLog = previewFlow(
+                    AiStatusMessage("User direction: Play something jazzy"),
+                    AiStatusMessage("Mood: Midnight Jazz"),
+                ),
+                controlLog = previewFlow(
+                    AiStatusMessage("Set voice_duo_engine_0: 5"),
+                    AiStatusMessage("Set beats_bpm: 95"),
+                    AiStatusMessage("Set beats_run: 1.0"),
+                    AiStatusMessage("Pattern: d1 $ note \"c3 eb3 g3 bb3\""),
+                ),
+                statusMessages = previewFlow(
+                    AiStatusMessage("Laying down a walking bass line"),
+                    AiStatusMessage("The jazz voicings need more tension — adding a b9.", isReasoning = true),
+                ),
+                isActive = true,
+                sessionId = 1,
+                isSoloMode = true,
+                modifier = Modifier.height(500.dp)
+            )
+        }
+    }
+}
+
+@Preview(widthDp = 400, heightDp = 160)
+@Composable
+private fun LogPanelControlsPreview() {
+    OrpheusTheme {
+        Surface(color = OrpheusColors.darkVoid) {
+            LogPanel(
+                title = "SYNTH CONTROLS",
+                flow = previewFlow(
+                    AiStatusMessage("Set distortion_drive: 0.45"),
+                    AiStatusMessage("Set delay_feedback: 0.70"),
+                    AiStatusMessage("Set voice_tune_0: 0.56"),
+                    AiStatusMessage("Set resonator_mix: 0.35"),
+                    AiStatusMessage("Pattern: d2 $ s \"bd sn hh\""),
+                    AiStatusMessage("Failed: Unknown control", isError = true),
+                ),
+                sessionId = 1,
+                showVisuals = true,
+                modifier = Modifier.fillMaxWidth().height(160.dp)
+            )
         }
     }
 }

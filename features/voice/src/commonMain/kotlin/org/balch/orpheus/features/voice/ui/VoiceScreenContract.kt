@@ -32,6 +32,7 @@ interface VoiceActions {
     fun setDuoMorph(duoIndex: Int, value: Float)
     fun setDuoModSourceLevel(duoIndex: Int, value: Float)
     fun toggleRightQuad()
+    fun toggleLeftPanel()
 }
 
 interface MidiActions {
@@ -68,6 +69,7 @@ fun VoicePanelActions.toVoiceActions(): VoiceActions = object : VoiceActions {
     override fun setDuoMorph(duoIndex: Int, value: Float) = this@toVoiceActions.setDuoMorph(duoIndex, value)
     override fun setDuoModSourceLevel(duoIndex: Int, value: Float) = this@toVoiceActions.setDuoModSourceLevel(duoIndex, value)
     override fun toggleRightQuad() = this@toVoiceActions.toggleRightQuad()
+    override fun toggleLeftPanel() = this@toVoiceActions.toggleLeftPanel()
 }
 
 /**

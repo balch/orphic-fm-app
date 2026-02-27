@@ -44,6 +44,11 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.ValueCycleButton
 
+/**
+ * @param onToggle Optional override for the quad toggle button action.
+ *   When null (default), the toggle button performs [VoiceActions.toggleRightQuad].
+ *   When provided, replaces that default behavior entirely.
+ */
 @Composable
 fun VoiceGroupSection(
     voiceFeature: VoicesFeature = VoiceViewModel.feature(),
@@ -52,6 +57,7 @@ fun VoiceGroupSection(
     quadColor: Color,
     voiceStartIndex: Int,
     showQuadToggle: Boolean = false,
+    onToggle: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val voiceState by voiceFeature.stateFlow.collectAsState()
@@ -67,6 +73,7 @@ fun VoiceGroupSection(
         quadColor = quadColor,
         voiceStartIndex = voiceStartIndex,
         showQuadToggle = showQuadToggle,
+        onToggle = onToggle,
         voiceState = voiceState,
         midiState = midiState,
         voiceActions = voiceActions,
@@ -101,6 +108,7 @@ fun VoiceGroupSectionLayout(
     quadColor: Color,
     voiceStartIndex: Int,
     showQuadToggle: Boolean = false,
+    onToggle: (() -> Unit)? = null,
     voiceState: VoiceUiState,
     midiState: MidiUiState,
     voiceActions: VoiceActions,
@@ -144,7 +152,7 @@ fun VoiceGroupSectionLayout(
             Text(quadLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = quadColor)
             if (showQuadToggle) {
                 IconButton(
-                    onClick = { voiceActions.toggleRightQuad() },
+                    onClick = { (onToggle ?: { voiceActions.toggleRightQuad() })() },
                     modifier = Modifier.padding(start = 4.dp).size(24.dp),
                 ) {
                     Icon(

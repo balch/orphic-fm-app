@@ -3,12 +3,12 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.ai.UserManualRegistry
 
 @Serializable
@@ -38,8 +38,9 @@ data class UserManualResult(
  * - controlId: Look up what a specific control does and which panel it belongs to
  * - query: Search across all manuals for matching content
  */
+@Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
-class UserManualTool @Inject constructor(
+class UserManualTool(
     private val userManualRegistry: UserManualRegistry
 ) : ToolProvider {
 

@@ -21,10 +21,6 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
-import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.ai.AiKeyRepository
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
@@ -35,6 +31,11 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
@@ -46,7 +47,6 @@ import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
 import org.balch.orpheus.core.presets.SynthPreset
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.tidal.ReplCodeEvent
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
 import org.balch.orpheus.features.ai.chat.widgets.ChatMessage
@@ -283,22 +283,6 @@ class AiOptionsViewModel(
         _soloAgent.value = newAgent
         
         scope.launch(dispatcherProvider.io) {
-
-/*
-            if (event.type != CompositionType.USER_PROMPTED) {
-                val soloPreset = generateRandomSoloPreset()
-
-                // Fade in: Apply preset with Quad Volumes = 0, then ramp up
-                val presetWithZeroQuadVol = soloPreset.copy(
-                    quadGroupVolumes = listOf(0f, 0f, 0f)
-                )
-
-                presetLoader.applyPreset(presetWithZeroQuadVol)
-                log.debug { "Applied solo preset: ${soloPreset.name} (fading in)" }
-            }
-
- */
-
             // Fade in using JSyn's LinearRamp
             val fadeDuration = 2.0f
             synthEngine.fadeQuadVolume(0, 1f, fadeDuration)
@@ -806,7 +790,9 @@ class AiOptionsViewModel(
     private val aiStatusMessages: Flow<AiStatusMessage> = merge(
         agent.statusMessages,
         _droneAgent.flatMapLatest { it?.statusMessages ?: flow {} },
-        _soloAgent.flatMapLatest { it?.statusMessages ?: flow {} }
+        _soloAgent.flatMapLatest { it?.statusMessages ?: flow {} },
+        _droneAgent.flatMapLatest { it?.reasoningLog ?: flow {} },
+        _soloAgent.flatMapLatest { it?.reasoningLog ?: flow {} }
     )
 
     /**

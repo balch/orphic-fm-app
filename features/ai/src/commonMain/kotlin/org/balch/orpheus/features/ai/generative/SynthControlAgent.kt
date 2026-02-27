@@ -4,6 +4,7 @@ import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.agent.config.AIAgentConfig
 import ai.koog.agents.core.dsl.builder.forwardTo
 import ai.koog.agents.core.dsl.builder.strategy
+import ai.koog.agents.core.dsl.extension.leaveLastNMessages
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
@@ -116,6 +117,11 @@ class SynthControlAgent(
         MutableSharedFlow<AiStatusMessage>(replay = 50, extraBufferCapacity = 50)
     val controlLog: SharedFlow<AiStatusMessage> = _controlLog.asSharedFlow()
 
+    // Log of model reasoning/thinking (from ReasoningDelta frames)
+    private val _reasoningLog =
+        MutableSharedFlow<AiStatusMessage>(replay = 5, extraBufferCapacity = 10)
+    val reasoningLog: SharedFlow<AiStatusMessage> = _reasoningLog.asSharedFlow()
+
     private var agentJob: Job? = null
 
     // Status tracking
@@ -217,6 +223,11 @@ class SynthControlAgent(
                 log.debug { "STATUS: $msg" }
                 _state.value = SynthAgentState.Playing(msg)
                 emitStatus(msg)
+            }
+            ActionType.REASONING -> {
+                val msg = action.details.getOrNull(0) ?: return
+                log.debug { "REASONING: $msg" }
+                _reasoningLog.tryEmit(AiStatusMessage(msg, isReasoning = true))
             }
             ActionType.UNKNOWN -> {
                 // Ignore
@@ -389,7 +400,7 @@ class SynthControlAgent(
                                 isBusy = true
                                 runCatchingSuspend {
                                     val monitoredStream = stream.onEach {
-                                        if (it is StreamFrame.Append) log.debug { "RAW APPEND: ${it.text}" }
+                                        if (it is StreamFrame.TextDelta) log.debug { "RAW DELTA: ${it.text}" }
                                     }
 
                                     parseSynthActions(monitoredStream).collect { action ->
@@ -439,10 +450,14 @@ class SynthControlAgent(
                                      log.debug { "Event received: $inputPrompt" }
                                      _state.value = SynthAgentState.Processing
                                      emitInput(inputPrompt)
-                                     
+
                                      appendPrompt { user(inputPrompt) }
                                      processStructuredResponse(requestLLMStreaming(mdDefinition))
-                                     
+
+                                     // Sliding window: keep last 6 messages (3 user/assistant pairs)
+                                     // plus system prompt to prevent unbounded context growth
+                                     session.leaveLastNMessages(6, preserveSystemMessages = true)
+
                                      lastActionTime = Clock.System.now()
                                 }
                             }

@@ -20,18 +20,21 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
-import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.core.features.LocalSynthFeatures
+import org.balch.orpheus.core.features.feature
+import org.balch.orpheus.features.mediapipe.MediaPipeFeature
+import org.balch.orpheus.features.mediapipe.MediaPipeViewModel
 import org.balch.orpheus.features.midi.MidiFeature
 import org.balch.orpheus.features.midi.MidiViewModel
 import org.balch.orpheus.features.tweaks.CenterControlSection
+import org.balch.orpheus.features.voice.LeftPanelMode
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
 import org.balch.orpheus.features.voice.ui.VoiceGroupSection
+import org.balch.orpheus.ui.FactoryPanelSets
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
-import org.balch.orpheus.ui.FactoryPanelSets
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderPanel
 import org.balch.orpheus.ui.panels.HeaderViewModel
@@ -52,9 +55,11 @@ fun DesktopSynthScreen(
     val headerFeature: HeaderFeature = registry.feature<HeaderViewModel, HeaderFeature>()
     val voiceFeature: VoicesFeature = registry.feature<VoiceViewModel, VoicesFeature>()
     val midiFeature: MidiFeature = registry.feature<MidiViewModel, MidiFeature>()
+    val mediaPipeFeature: MediaPipeFeature = registry.feature<MediaPipeViewModel, MediaPipeFeature>()
     val panels = remember { headerFeature.resolvePanels(FactoryPanelSets.DesktopScreen) }
     val voiceState by voiceFeature.stateFlow.collectAsState()
     val rightQuad = voiceState.selectedRightQuad
+    val leftPanel = voiceState.selectedLeftPanel
 
     // Request focus for keyboard input handling
     LaunchedEffect(Unit) {
@@ -98,14 +103,28 @@ fun DesktopSynthScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    VoiceGroupSection(
-                        voiceFeature = voiceFeature,
-                        midiFeature = midiFeature,
-                        quadLabel = "1-4",
-                        quadColor = OrpheusColors.neonMagenta,
-                        voiceStartIndex = 0,
-                        modifier = Modifier.weight(1f),
-                    )
+                    when (leftPanel) {
+                        LeftPanelMode.VOICES -> VoiceGroupSection(
+                            voiceFeature = voiceFeature,
+                            midiFeature = midiFeature,
+                            quadLabel = "1-4",
+                            quadColor = OrpheusColors.neonMagenta,
+                            voiceStartIndex = 0,
+                            showQuadToggle = true,
+                            onToggle = { voiceFeature.actions.toggleLeftPanel() },
+                            modifier = Modifier.weight(1f),
+                        )
+                        LeftPanelMode.BENDER_STRINGS -> {
+                            val externalBends by mediaPipeFeature.stringBends.collectAsState()
+                            DesktopBenderStringsSection(
+                                voiceState = voiceState,
+                                actions = voiceFeature.actions,
+                                externalStringBends = externalBends,
+                                onToggle = { voiceFeature.actions.toggleLeftPanel() },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
 
                     CenterControlSection(
                         voiceFeature = voiceFeature,

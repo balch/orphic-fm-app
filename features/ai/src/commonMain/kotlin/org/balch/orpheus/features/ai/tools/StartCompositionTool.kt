@@ -3,14 +3,13 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import org.balch.orpheus.core.ai.ToolProvider
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.ai.CompositionType
 import org.balch.orpheus.features.ai.ModeChangeEventBus
 
@@ -64,8 +63,9 @@ data class StartCompositionResult(
  * - "Play me something relaxing"
  * - "Start a drone background"
  */
+@Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
-class StartCompositionTool @Inject constructor(
+class StartCompositionTool(
     private val modeChangeEventBus: ModeChangeEventBus
 ) : ToolProvider {
 
