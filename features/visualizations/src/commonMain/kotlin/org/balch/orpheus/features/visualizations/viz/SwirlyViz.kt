@@ -102,6 +102,19 @@ class SwirlyViz(
         OrpheusColors.swirlyPinkPurple
     )
 
+    // Pre-allocated static gradient color lists to avoid per-frame allocations
+    private val bgGradientColors = listOf(
+        Color.Black,
+        OrpheusColors.fireworksBackground,
+        OrpheusColors.blackHoleDeep,
+        OrpheusColors.darkVoid
+    )
+    private val centerMaskColors = listOf(
+        Color.Black,
+        Color.Black.copy(alpha = 0.8f),
+        Color.Transparent
+    )
+
     private val _uiState = mutableStateOf(SwirlyUiState(), neverEqualPolicy())
 
     private var animationTime = 0f
@@ -192,12 +205,7 @@ class SwirlyViz(
             // Background gradient - lighter at edges, DARK at center
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color.Black,
-                        OrpheusColors.fireworksBackground,
-                        OrpheusColors.blackHoleDeep,
-                        OrpheusColors.darkVoid
-                    ),
+                    colors = bgGradientColors,
                     center = Offset(cx, cy),
                     radius = maxRadius * 1.2f
                 ),
@@ -257,11 +265,7 @@ class SwirlyViz(
 
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color.Black,
-                        Color.Black.copy(alpha = 0.8f),
-                        Color.Transparent
-                    ),
+                    colors = centerMaskColors,
                     center = Offset(cx, cy),
                     radius = maxRadius * 0.15f
                 ),

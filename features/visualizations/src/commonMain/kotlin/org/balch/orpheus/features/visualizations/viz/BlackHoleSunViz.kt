@@ -179,6 +179,23 @@ class BlackHoleSunViz(
     // Physics Constants
     private val G = 0.0006f              // Stronger gravity for faster, tighter orbits
 
+    // Pre-allocated static colorStop arrays to avoid per-frame allocations
+    private val bgColorStops = arrayOf(
+        0f to OrpheusColors.blackHoleDeep,
+        0.5f to OrpheusColors.blackHoleVoid,
+        1f to OrpheusColors.blackHoleEdge
+    )
+    private val bhCenterColorStops = arrayOf(
+        0f to Color.Black,
+        0.85f to Color.Black,
+        1f to OrpheusColors.blackHoleEdge
+    )
+    private val vignetteColorStops = arrayOf(
+        0f to Color.Transparent,
+        0.7f to Color.Transparent,
+        1f to Color.Black.copy(alpha = 0.3f)
+    )
+
     // neverEqualPolicy: always recompose on write since particles are mutated in-place
     private val _uiState = mutableStateOf(BlackholeSunUiState(), neverEqualPolicy())
 
@@ -461,11 +478,7 @@ class BlackHoleSunViz(
         // Dark background with subtle gradient
         drawRect(
             brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0f to OrpheusColors.blackHoleDeep,
-                    0.5f to OrpheusColors.blackHoleVoid,
-                    1f to OrpheusColors.blackHoleEdge
-                ),
+                colorStops = bgColorStops,
                 center = Offset(cx, cy),
                 radius = scale * 1.5f
             )
@@ -525,11 +538,7 @@ class BlackHoleSunViz(
         // Black hole center (true black with sharp edge)
         drawCircle(
             brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0f to Color.Black,
-                    0.85f to Color.Black,
-                    1f to OrpheusColors.blackHoleEdge
-                ),
+                colorStops = bhCenterColorStops,
                 center = Offset(cx, cy),
                 radius = scale * blackHoleRadius
             ),
@@ -636,11 +645,7 @@ class BlackHoleSunViz(
         // Subtle vignette
         drawRect(
             brush = Brush.radialGradient(
-                colorStops = arrayOf(
-                    0f to Color.Transparent,
-                    0.7f to Color.Transparent,
-                    1f to Color.Black.copy(alpha = 0.3f)
-                ),
+                colorStops = vignetteColorStops,
                 center = Offset(cx, cy),
                 radius = scale * 1.4f
             )

@@ -47,13 +47,13 @@ enum class ParticleType {
 }
 
 data class Particle(
-    val x: Float,
-    val y: Float,
-    val vx: Float,
-    val vy: Float,
+    var x: Float,
+    var y: Float,
+    var vx: Float,
+    var vy: Float,
     val color: Color,
-    val size: Float,
-    val life: Float,        // 1.0 -> 0.0
+    var size: Float,
+    var life: Float,        // 1.0 -> 0.0
     val decay: Float,       // How fast life decreases
     val type: ParticleType,
     val phase: Float = 0f,  // For twinkling/animation
@@ -238,13 +238,11 @@ class FireworksViz(
             if (newLife <= 0f) {
                 particles.removeAt(i)
             } else {
-                 particles[i] = p.copy(
-                     x = p.x + newVx * dt,
-                     y = p.y + newVy * dt,
-                     vx = newVx,
-                     vy = newVy,
-                     life = newLife
-                 )
+                p.x += newVx * dt
+                p.y += newVy * dt
+                p.vx = newVx
+                p.vy = newVy
+                p.life = newLife
             }
         }
 

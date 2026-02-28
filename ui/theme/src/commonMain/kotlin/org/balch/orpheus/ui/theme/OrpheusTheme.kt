@@ -279,4 +279,21 @@ object OrpheusColors {
     val fishTeal = Color(0xFF40C4AA)           // Teal angel
     val fishPurple = Color(0xFF9B6DFF)         // Purple reef fish
     val fishPink = Color(0xFFFF6B9D)           // Pink chromis
+
+    // Mt. Hood Viz Colors (from photo reference)
+    val hoodSkyTop = Color(0xFF4A5566)           // Darker steel gray-blue upper sky
+    val hoodSkyMid = Color(0xFFB07848)           // Darker peach/amber mid sky
+    val hoodHorizon = Color(0xFFA05028)          // Deeper orange at horizon
+    val hoodTwilightTop = Color(0xFF1A1040)      // Indigo twilight upper
+    val hoodTwilightMid = Color(0xFF8B2252)      // Magenta twilight mid
+    val hoodTwilightHorizon = Color(0xFF8B1A1A)  // Deep crimson twilight horizon
+    val hoodMountain = Color(0xFF1A1A1A)         // Near-black mountain silhouette
+    val hoodForeground = Color(0xFF0A0A0A)       // Pure dark foreground ridge
+    val hoodBackRidge = Color(0xFF252525)        // Slightly lighter back ridge
+    val hoodLavaOrange = Color(0xFFFF6B00)       // Hot lava orange
+    val hoodLavaRed = Color(0xFFFF2200)          // Lava red glow
+    val hoodLavaYellow = Color(0xFFFFCC00)       // Lava bright yellow center
+    val hoodRimGlow = Color(0xFFFF8844)          // Orange rim glow on silhouette edge
+    val hoodSmoke = Color(0xFF888888)            // Smoke/ash gray
+    val hoodBackground = Color(0xFF1A1520)       // Default background
 }

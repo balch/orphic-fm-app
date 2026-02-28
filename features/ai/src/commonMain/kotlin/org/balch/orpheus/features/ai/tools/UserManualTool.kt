@@ -64,7 +64,7 @@ class UserManualTool(
 
     private val log = logging("UserManualTool")
 
-    private suspend fun executeInternal(args: UserManualArgs): UserManualResult {
+    private fun executeInternal(args: UserManualArgs): UserManualResult {
         log.debug { "UserManualTool: panelId=${args.panelId} controlId=${args.controlId} query=${args.query}" }
 
         val available = userManualRegistry.availablePanels

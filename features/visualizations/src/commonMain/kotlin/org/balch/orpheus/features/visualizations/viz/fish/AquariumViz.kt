@@ -94,6 +94,17 @@ class AquariumViz(
 
     private val _uiState = mutableStateOf(AquariumUiState(), neverEqualPolicy())
 
+    // Pre-allocated paths to avoid per-frame heap allocations
+    private val shaftPaths = Array(3) { Path() }
+    private val bodyPath = Path()
+    private val tailPath = Path()
+
+    // Pre-allocated static gradient colors
+    private val bgGradientColors = listOf(
+        OrpheusColors.aquariumTeal.copy(alpha = 0.4f),
+        OrpheusColors.aquariumDeep,
+    )
+
     // Max fish from knob; actual count scales with music energy
     private val maxFishFromKnob: Int
         get() = (3 + (_fishKnob * 17f)).toInt().coerceIn(3, 20)
@@ -391,12 +402,7 @@ class AquariumViz(
             val h = size.height
 
             drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        OrpheusColors.aquariumTeal.copy(alpha = 0.4f),
-                        OrpheusColors.aquariumDeep,
-                    )
-                )
+                brush = Brush.verticalGradient(colors = bgGradientColors)
             )
 
             drawLightShafts(w, h, state.masterEnergy)
@@ -423,13 +429,13 @@ class AquariumViz(
         for (i in 0 until 3) {
             val startX = w * (0.3f + i * 0.25f)
             val shaftWidth = w * 0.08f
-            val path = Path().apply {
-                moveTo(startX, 0f)
-                lineTo(startX + shaftWidth, 0f)
-                lineTo(startX - w * 0.1f + shaftWidth, h)
-                lineTo(startX - w * 0.1f, h)
-                close()
-            }
+            val path = shaftPaths[i]
+            path.reset()
+            path.moveTo(startX, 0f)
+            path.lineTo(startX + shaftWidth, 0f)
+            path.lineTo(startX - w * 0.1f + shaftWidth, h)
+            path.lineTo(startX - w * 0.1f, h)
+            path.close()
             drawPath(path, shaftColor)
         }
     }
@@ -456,33 +462,28 @@ class AquariumViz(
             degrees = f.smoothHeading * 180f / PI.toFloat(),
             pivot = Offset(cx, cy)
         ) {
-            val bodyPath = Path().apply {
-                moveTo(cx + fishLen * 0.5f, cy)
-                cubicTo(
-                    cx + fishLen * 0.3f, cy - fishHeight * 0.5f,
-                    cx - fishLen * 0.1f, cy - fishHeight * 0.5f,
-                    cx - fishLen * 0.3f, cy
-                )
-                cubicTo(
-                    cx - fishLen * 0.1f, cy + fishHeight * 0.5f,
-                    cx + fishLen * 0.3f, cy + fishHeight * 0.5f,
-                    cx + fishLen * 0.5f, cy
-                )
-                close()
-            }
+            bodyPath.reset()
+            bodyPath.moveTo(cx + fishLen * 0.5f, cy)
+            bodyPath.cubicTo(
+                cx + fishLen * 0.3f, cy - fishHeight * 0.5f,
+                cx - fishLen * 0.1f, cy - fishHeight * 0.5f,
+                cx - fishLen * 0.3f, cy
+            )
+            bodyPath.cubicTo(
+                cx - fishLen * 0.1f, cy + fishHeight * 0.5f,
+                cx + fishLen * 0.3f, cy + fishHeight * 0.5f,
+                cx + fishLen * 0.5f, cy
+            )
+            bodyPath.close()
             drawPath(bodyPath, fishColor)
 
             // Forked tail fin
-            val tailPath = Path().apply {
-                moveTo(cx - fishLen * 0.3f, cy)
-                // Upper fork
-                lineTo(cx - fishLen * 0.55f, cy - fishHeight * 0.5f + tailSwing)
-                // Notch back toward body
-                lineTo(cx - fishLen * 0.4f, cy + tailSwing * 0.3f)
-                // Lower fork
-                lineTo(cx - fishLen * 0.55f, cy + fishHeight * 0.5f + tailSwing)
-                close()
-            }
+            tailPath.reset()
+            tailPath.moveTo(cx - fishLen * 0.3f, cy)
+            tailPath.lineTo(cx - fishLen * 0.55f, cy - fishHeight * 0.5f + tailSwing)
+            tailPath.lineTo(cx - fishLen * 0.4f, cy + tailSwing * 0.3f)
+            tailPath.lineTo(cx - fishLen * 0.55f, cy + fishHeight * 0.5f + tailSwing)
+            tailPath.close()
             drawPath(tailPath, fishColor.copy(alpha = fishColor.alpha * 0.8f))
 
             val eyeX = cx + fishLen * 0.25f
