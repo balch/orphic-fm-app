@@ -553,17 +553,17 @@ class VoiceViewModel(
         engine.setStringBend(stringIndex, bendAmount, voiceMix)
         val vizValue = (bendAmount + 1f) / 2f
         if (stringIndex == 0) {
-            synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, vizValue, ControlEventOrigin.UI)
+            synthController.setPluginControl(VizSymbol.KNOB_1.controlId, FloatValue(vizValue), ControlEventOrigin.UI)
         } else if (stringIndex == 3) {
-            synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, vizValue, ControlEventOrigin.UI)
+            synthController.setPluginControl(VizSymbol.KNOB_2.controlId, FloatValue(vizValue), ControlEventOrigin.UI)
         }
     }
 
     fun releaseStringBend(stringIndex: Int): Int {
         if (stringIndex == 0) {
-            synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, 0.5f, ControlEventOrigin.UI)
+            synthController.setPluginControl(VizSymbol.KNOB_1.controlId, FloatValue(0.5f), ControlEventOrigin.UI)
         } else if (stringIndex == 3) {
-            synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, 0.5f, ControlEventOrigin.UI)
+            synthController.setPluginControl(VizSymbol.KNOB_2.controlId, FloatValue(0.5f), ControlEventOrigin.UI)
         }
         return engine.releaseStringBend(stringIndex)
     }

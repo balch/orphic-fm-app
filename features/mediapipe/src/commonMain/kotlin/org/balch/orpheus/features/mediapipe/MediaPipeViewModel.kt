@@ -2,6 +2,7 @@ package org.balch.orpheus.features.mediapipe
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -14,8 +15,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.ControlStateSnapshot
@@ -28,7 +27,6 @@ import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.gestures.AslCategory
 import org.balch.orpheus.core.gestures.AslEvent
-import org.balch.orpheus.core.gestures.SwipeDirection
 import org.balch.orpheus.core.gestures.AslInteractionEngine
 import org.balch.orpheus.core.gestures.AslSign
 import org.balch.orpheus.core.gestures.ConductorEvent
@@ -39,15 +37,17 @@ import org.balch.orpheus.core.gestures.GestureState
 import org.balch.orpheus.core.gestures.InteractionPhase
 import org.balch.orpheus.core.gestures.KeyboardEvent
 import org.balch.orpheus.core.gestures.KeyboardInteractionEngine
+import org.balch.orpheus.core.gestures.SwipeDirection
 import org.balch.orpheus.core.mediapipe.CameraFrame
 import org.balch.orpheus.core.mediapipe.HandTracker
 import org.balch.orpheus.core.mediapipe.TrackedHand
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
-import com.diamondedge.logging.logging
 import org.balch.orpheus.core.plugin.symbols.BenderSymbol
 import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 @Immutable
 data class MediaPipeUiState(
@@ -597,17 +597,17 @@ class MediaPipeViewModel(
     private fun updateVizKnobsForBend(duoIndex: Int, bendAmount: Float) {
         val vizValue = (bendAmount + 1f) / 2f
         if (duoIndex == 0) {
-            synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, vizValue, ControlEventOrigin.MEDIAPIPE)
+            synthController.setPluginControl(VizSymbol.KNOB_1.controlId, PortValue.FloatValue(vizValue), ControlEventOrigin.MEDIAPIPE)
         } else if (duoIndex == 3) {
-            synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, vizValue, ControlEventOrigin.MEDIAPIPE)
+            synthController.setPluginControl(VizSymbol.KNOB_2.controlId, PortValue.FloatValue(vizValue), ControlEventOrigin.MEDIAPIPE)
         }
     }
 
     private fun resetVizKnobsForBend(duoIndex: Int) {
         if (duoIndex == 0) {
-            synthController.emitControlChange(VizSymbol.KNOB_1.controlId.key, 0.5f, ControlEventOrigin.MEDIAPIPE)
+            synthController.setPluginControl(VizSymbol.KNOB_1.controlId, PortValue.FloatValue(0.5f), ControlEventOrigin.MEDIAPIPE)
         } else if (duoIndex == 3) {
-            synthController.emitControlChange(VizSymbol.KNOB_2.controlId.key, 0.5f, ControlEventOrigin.MEDIAPIPE)
+            synthController.setPluginControl(VizSymbol.KNOB_2.controlId, PortValue.FloatValue(0.5f), ControlEventOrigin.MEDIAPIPE)
         }
     }
 

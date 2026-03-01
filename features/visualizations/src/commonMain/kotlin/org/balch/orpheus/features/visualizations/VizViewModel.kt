@@ -1,7 +1,6 @@
 package org.balch.orpheus.features.visualizations
 
 import androidx.compose.runtime.Composable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -10,14 +9,16 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.features.visualizations.viz.OffViz
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.DynamicVisualization
@@ -112,12 +113,13 @@ class VizViewModel(
         }
         
         // Subscribe to viz knob control flows (bidirectional with MIDI)
-        scope.launch(dispatcherProvider.default) {
+        // Collect on Main to serialize updates and prevent out-of-order processing
+        scope.launch(dispatcherProvider.main) {
             synthController.controlFlow(VizSymbol.KNOB_1.controlId).collect { value ->
                 onKnob1Change(value.asFloat())
             }
         }
-        scope.launch(dispatcherProvider.default) {
+        scope.launch(dispatcherProvider.main) {
             synthController.controlFlow(VizSymbol.KNOB_2.controlId).collect { value ->
                 onKnob2Change(value.asFloat())
             }
@@ -149,7 +151,7 @@ class VizViewModel(
             if (viz is DynamicVisualization) {
                 dynamicEffectsJob = scope.launch(dispatcherProvider.default) {
                     viz.liquidEffectsFlow.collect { effects ->
-                         _uiState.value = _uiState.value.copy(liquidEffects = effects)
+                         _uiState.update { it.copy(liquidEffects = effects) }
                     }
                 }
             }
@@ -169,20 +171,22 @@ class VizViewModel(
 
     fun onKnob1Change(value: Float) {
         _currentViz.value.setKnob1(value)
-        _uiState.value = _uiState.value.copy(knob1Value = value)
+        _uiState.update { it.copy(knob1Value = value) }
     }
 
     fun onKnob2Change(value: Float) {
         _currentViz.value.setKnob2(value)
-        _uiState.value = _uiState.value.copy(knob2Value = value)
+        _uiState.update { it.copy(knob2Value = value) }
     }
 
     private fun updateState() {
-        _uiState.value = _uiState.value.copy(
-            selectedViz = _currentViz.value,
-            showKnobs = _currentViz.value.id != "off",
-            liquidEffects = _currentViz.value.liquidEffects
-        )
+        _uiState.update {
+            it.copy(
+                selectedViz = _currentViz.value,
+                showKnobs = _currentViz.value.id != "off",
+                liquidEffects = _currentViz.value.liquidEffects
+            )
+        }
     }
     
     override fun close() {
