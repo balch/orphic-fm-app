@@ -688,23 +688,20 @@ class MtHoodViz(
         lerp(a, b, t.coerceIn(0f, 1f))
 
     companion object {
-        // Very see-through and shiny glass panels — high refraction, low tint, high saturation
         val Default = VisualizationLiquidEffects(
-            frostSmall = 2f,     // Minimal frost for clarity
-            frostMedium = 3f,
-            frostLarge = 4f,
-            tintAlpha = 0.05f,   // Very transparent panels
+            frostSmall = 1f,
+            frostMedium = 2f,
+            frostLarge = 3f,
+            tintAlpha = 0.1f,
             top = VisualizationLiquidScope(
-                saturation = 1.2f,
-                dispersion = 1.0f,
-                curve = .2f,
-                refraction = 0.9f,   // High refraction for shiny glass look
+                saturation = 2.0f,
+                dispersion = .4f,
+                curve = .01f,
+                refraction = 0.4f,
             ),
             bottom = VisualizationLiquidScope(
-                saturation = 1.0f,
-                dispersion = .8f,
-                curve = .2f,
-                refraction = 0.8f,   // High refraction
+                saturation = 1.5f,
+                dispersion = .1f,
             ),
             title = CenterPanelStyle(
                 scope = VisualizationLiquidScope(

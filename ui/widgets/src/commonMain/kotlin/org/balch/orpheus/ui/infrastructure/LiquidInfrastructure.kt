@@ -18,6 +18,19 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 /**
  * Settings for a liquid effect scope (saturation, contrast, etc.)
+ * @param refraction Controls how much the background distorts through the lens. Setting this to 0 removes the liquid
+ * effect altogether, nullifying any [curve] value.
+ ** @param curve  Adjusts how strongly the lens curves at its center vs. edges. Setting this to 0 removes the liquid
+ * effect altogether, nullifying any [refraction] value.
+ * @param edge Width of the rim lighting around the effect's edge. Higher values create a wider, softer edge and expand the region where rim lighting is applied.
+ * Set to `0f` to disable this effect.
+ * @param saturation Adjusts the color saturation of the content behind the liquid effect. Values greater than 1f create more vivid colors, while values less than 1f
+ * decrease create more muted colors. A value of 0f results in grayscale.
+ * @param dispersion Controls the chromatic aberration effect, which separates RGB channels to simulate
+ * light dispersion through a lens. Higher values create more pronounced color separation, similar to light passing through
+ * a prism. Set to 0f to disable chromatic aberration.
+ * @param contrast Adjusts the contrast of the content behind the liquid effect. Values greater than 1f increase the difference between light and dark areas,
+ * while values less than 1f reduce this difference.
  */
 data class VisualizationLiquidScope(
     val refraction: Float = 0f,

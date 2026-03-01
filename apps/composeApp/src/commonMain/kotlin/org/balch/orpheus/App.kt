@@ -13,15 +13,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import org.balch.orpheus.core.features.LocalSynthFeatures
-import org.balch.orpheus.core.features.SynthFeatureRegistry
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
+import org.balch.orpheus.core.features.LocalSynthFeatures
+import org.balch.orpheus.core.features.SynthFeatureRegistry
+import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.di.OrpheusGraph
 import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsViewModel
 import org.balch.orpheus.features.ai.chat.ChatDialog
-import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.features.debug.DebugBottomBar
 import org.balch.orpheus.features.debug.DebugFeature
 import org.balch.orpheus.features.debug.DebugViewModel
@@ -30,7 +30,6 @@ import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
-import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.widgets.VizBackground
 
@@ -50,8 +49,8 @@ fun App(
             val vizState by vizFeature.stateFlow.collectAsState()
             val liquidState = rememberLiquidState()
 
-            // Create shared liquid effects
-            val liquidEffects = androidx.compose.runtime.remember { VisualizationLiquidEffects() }
+            // Use the selected visualization's liquid effects
+            val liquidEffects = vizState.liquidEffects
 
             // Double liquid state: one for the viz effects, one for the dialog glass effect
             val dialogLiquidState = rememberLiquidState()
