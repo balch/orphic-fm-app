@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +56,8 @@ fun CompactSecondsSlider(
     val density = LocalDensity.current
     var trackWidthPx by remember { mutableFloatStateOf(0f) }
     val thumbSizePx = with(density) { thumbSize.dp.toPx() }
+
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
 
     // Calculate normalized value (0..1)
     val normalizedValue = (valueSeconds - valueRange.start) / (valueRange.endInclusive - valueRange.start)
@@ -110,7 +113,7 @@ fun CompactSecondsSlider(
                                         val newOffset = (position.x - thumbSizePx / 2).coerceIn(0f, usableWidth)
                                         val newNormalized = newOffset / usableWidth
                                         val newValue = valueRange.start + (newNormalized * (valueRange.endInclusive - valueRange.start))
-                                        onValueChange(newValue)
+                                        currentOnValueChange(newValue)
                                         event.changes.forEach { it.consume() }
                                     }
                                 }

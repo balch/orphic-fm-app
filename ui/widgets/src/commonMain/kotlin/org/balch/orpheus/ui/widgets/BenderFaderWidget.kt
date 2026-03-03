@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,7 +79,9 @@ fun BenderFaderWidget(
     val usableRange = (trackHeightPx - thumbHeightPx) / 2f // Half range from center
     
     val coroutineScope = rememberCoroutineScope()
-    
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
+    val currentOnRelease by rememberUpdatedState(onRelease)
+
     // Animation state for spring-back
     val animatedOffset = remember { Animatable(0f) }
     
@@ -144,7 +147,7 @@ fun BenderFaderWidget(
                             }
                             // Convert to value: negate because up = positive
                             val newValue = -(newOffset / usableRange)
-                            onValueChange(newValue.coerceIn(-1f, 1f))
+                            currentOnValueChange(newValue.coerceIn(-1f, 1f))
                         },
                         onDragEnd = {
                             // Keep isLocallyAnimating = 1f during the spring-back animation
@@ -172,7 +175,7 @@ fun BenderFaderWidget(
                                 )
                                 // Update value during overshoot
                                 val overshootValue = -(animatedOffset.value / usableRange)
-                                onValueChange(overshootValue.coerceIn(-1f, 1f))
+                                currentOnValueChange(overshootValue.coerceIn(-1f, 1f))
                                 
                                 // Second: bounce back past center again (smaller)
                                 animatedOffset.animateTo(
@@ -182,7 +185,7 @@ fun BenderFaderWidget(
                                         easing = { t -> t * (2 - t) }
                                     )
                                 )
-                                onValueChange(-(animatedOffset.value / usableRange).coerceIn(-1f, 1f))
+                                currentOnValueChange(-(animatedOffset.value / usableRange).coerceIn(-1f, 1f))
                                 
                                 // Third: settle to center
                                 animatedOffset.animateTo(
@@ -193,8 +196,8 @@ fun BenderFaderWidget(
                                     )
                                 )
                                 
-                                onRelease()
-                                onValueChange(0f) // Ensure final value is zero
+                                currentOnRelease()
+                                currentOnValueChange(0f) // Ensure final value is zero
                                 
                                 // NOW we're done with local animation, allow external sync again
                                 isLocallyAnimating = 0f
@@ -203,8 +206,8 @@ fun BenderFaderWidget(
                         onDragCancel = {
                             coroutineScope.launch {
                                 animatedOffset.animateTo(0f, tween(300))
-                                onRelease()
-                                onValueChange(0f)
+                                currentOnRelease()
+                                currentOnValueChange(0f)
                                 isLocallyAnimating = 0f
                             }
                         }

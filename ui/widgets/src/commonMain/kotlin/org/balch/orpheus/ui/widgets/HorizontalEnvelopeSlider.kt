@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,7 @@ fun HorizontalEnvelopeSlider(
     val usableRange = trackWidthPx - thumbSizePx
 
     var offsetX by remember(value) { mutableFloatStateOf(value * usableRange) }
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
 
     // Apply learnable if controlId is provided
     val finalModifier = if (controlId != null) {
@@ -121,7 +123,7 @@ fun HorizontalEnvelopeSlider(
                                         val newOffset =
                                             (position.x - thumbSizePx / 2).coerceIn(0f, usableRange)
                                         offsetX = newOffset
-                                        onValueChange(newOffset / usableRange)
+                                        currentOnValueChange(newOffset / usableRange)
                                         event.changes.forEach { it.consume() }
                                     }
                                 }

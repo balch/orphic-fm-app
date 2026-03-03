@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +56,7 @@ fun SegmentedAlgoKnob(
 ) {
     val sensitivity = 150f
     var internalValue by remember(value) { mutableStateOf(value) }
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
 
     val algoColors = listOf(
         Color(0xFF69BE28), // Green - Xfade
@@ -115,7 +117,7 @@ fun SegmentedAlgoKnob(
                             val newValue = (internalValue + delta).coerceIn(0f, 1f)
                             if (newValue != internalValue) {
                                 internalValue = newValue
-                                onValueChange(newValue)
+                                currentOnValueChange(newValue)
                             }
                         }
                     }
@@ -140,18 +142,18 @@ fun SegmentedAlgoKnob(
                                     val totalSweep = 270f
                                     val nextValue = (relAngle / totalSweep).coerceIn(0f, 1f)
                                     internalValue = nextValue
-                                    onValueChange(nextValue)
+                                    currentOnValueChange(nextValue)
                                     return@detectTapGestures
                                 }
                             }
-                            
+
                             // Otherwise step to next (original center tap behavior)
                             val segmentCount = 9
                             val currentIdx = (internalValue * (segmentCount - 1)).roundToInt()
                             val nextIdx = (currentIdx + 1) % segmentCount
                             val nextValue = nextIdx.toFloat() / (segmentCount - 1)
                             internalValue = nextValue
-                            onValueChange(nextValue)
+                            currentOnValueChange(nextValue)
                         }
                     }
             ) {

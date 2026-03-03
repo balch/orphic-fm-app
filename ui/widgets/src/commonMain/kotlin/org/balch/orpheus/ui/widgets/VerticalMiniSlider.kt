@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +66,7 @@ fun VerticalMiniSlider(
 
     // Invert value for visual: top = 1, bottom = 0
     var offsetY by remember(value) { mutableFloatStateOf((1f - value) * usableRange) }
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
 
     val finalModifier = if (controlId != null) {
         modifier.learnable(controlId, LocalLearnModeState.current)
@@ -127,7 +129,7 @@ fun VerticalMiniSlider(
                                             (position.y - thumbSizePx / 2).coerceIn(0f, usableRange)
                                         offsetY = newOffset
                                         // Invert for value: top = 1, bottom = 0
-                                        onValueChange(1f - (newOffset / usableRange))
+                                        currentOnValueChange(1f - (newOffset / usableRange))
                                         event.changes.forEach { it.consume() }
                                     }
                                 }

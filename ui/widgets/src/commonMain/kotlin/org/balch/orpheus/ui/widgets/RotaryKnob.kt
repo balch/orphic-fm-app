@@ -308,7 +308,7 @@ fun RotaryKnob(
                             val newValue = (internalValue + delta).coerceIn(range)
                             if (newValue != internalValue) {
                                 internalValue = newValue
-                                onValueChange(newValue)
+                                currentOnValueChange(newValue)
                             }
                         }
                     }

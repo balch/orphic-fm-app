@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +64,7 @@ fun HorizontalMiniSlider(
 
     // visual: left = 0, right = 1
     var offsetX by remember(value) { mutableFloatStateOf(value * usableRange) }
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
 
     // AI tutorial highlight
     val highlightMod = if (controlId != null) Modifier.highlightable(controlId) else Modifier
@@ -126,7 +128,7 @@ fun HorizontalMiniSlider(
                                 if (event.changes.any { it.pressed }) {
                                     val newOffset = (position.x - thumbSizePx / 2).coerceIn(0f, usableRange)
                                     offsetX = newOffset
-                                    onValueChange(newOffset / usableRange)
+                                    currentOnValueChange(newOffset / usableRange)
                                     event.changes.forEach { it.consume() }
                                 }
                             }
@@ -139,7 +141,7 @@ fun HorizontalMiniSlider(
                             // Single tap: Jump to position
                             val newOffset = (offset.x - thumbSizePx / 2).coerceIn(0f, usableRange)
                             offsetX = newOffset
-                            onValueChange(newOffset / usableRange)
+                            currentOnValueChange(newOffset / usableRange)
                         }
                     )
                 }

@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ fun DraggableDivider(
     color: Color = OrpheusColors.neonCyan
 ) {
     var isDragging by remember { mutableStateOf(false) }
+    val currentOnDrag by rememberUpdatedState(onDrag)
 
     Box(
         modifier = modifier
@@ -57,7 +59,7 @@ fun DraggableDivider(
                     onDragEnd = { isDragging = false },
                     onDragCancel = { isDragging = false },
                     onVerticalDrag = { _, dragAmount ->
-                        onDrag(dragAmount)
+                        currentOnDrag(dragAmount)
                     }
                 )
             },
