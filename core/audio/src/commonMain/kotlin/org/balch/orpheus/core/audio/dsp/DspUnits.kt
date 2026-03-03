@@ -127,6 +127,10 @@ interface MultiplyAdd : AudioUnit {
 
 interface PassThrough : AudioUnit {
     val input: AudioInput
+
+    /** Read the current instantaneous value passing through this unit. */
+    fun getInstantaneousValue(): Double
+
     interface Factory { fun create(): PassThrough }
 }
 

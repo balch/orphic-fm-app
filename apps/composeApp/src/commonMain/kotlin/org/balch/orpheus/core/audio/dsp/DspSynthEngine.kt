@@ -89,6 +89,10 @@ class DspSynthEngine @Inject constructor(
 
     private val _lfoOutputFlow = MutableStateFlow(0f)
     override val lfoOutputFlow: StateFlow<Float> = _lfoOutputFlow.asStateFlow()
+    private val _lfoAOutputFlow = MutableStateFlow(0f)
+    override val lfoAOutputFlow: StateFlow<Float> = _lfoAOutputFlow.asStateFlow()
+    private val _lfoBOutputFlow = MutableStateFlow(0f)
+    override val lfoBOutputFlow: StateFlow<Float> = _lfoBOutputFlow.asStateFlow()
 
     private val _masterLevelFlow = MutableStateFlow(0f)
     override val masterLevelFlow: StateFlow<Float> = _masterLevelFlow.asStateFlow()
@@ -344,6 +348,8 @@ class DspSynthEngine @Inject constructor(
                 }
                 _voiceLevelsFlow.value = voiceLevels.copyOf()
                 _lfoOutputFlow.value = pluginProvider.hyperLfo.getCurrentValue()
+                _lfoAOutputFlow.value = pluginProvider.hyperLfo.getCurrentValueA()
+                _lfoBOutputFlow.value = pluginProvider.hyperLfo.getCurrentValueB()
 
                 val computedMaster = (voiceSum / 12f).coerceIn(0f, 1f)
                 _masterLevelFlow.value = maxOf(currentPeak.coerceIn(0f, 1f), computedMaster)

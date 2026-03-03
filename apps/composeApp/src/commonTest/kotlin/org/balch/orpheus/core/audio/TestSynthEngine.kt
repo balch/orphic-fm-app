@@ -44,6 +44,8 @@ open class TestSynthEngine : SynthEngine {
     private val _cpuLoadFlow = MutableStateFlow(0f)
     private val _voiceLevelsFlow = MutableStateFlow(FloatArray(12))
     private val _lfoOutputFlow = MutableStateFlow(0f)
+    private val _lfoAOutputFlow = MutableStateFlow(0f)
+    private val _lfoBOutputFlow = MutableStateFlow(0f)
     private val _masterLevelFlow = MutableStateFlow(0f)
 
     // Lifecycle
@@ -127,6 +129,8 @@ open class TestSynthEngine : SynthEngine {
     override val cpuLoadFlow: StateFlow<Float> = _cpuLoadFlow.asStateFlow()
     override val voiceLevelsFlow: StateFlow<FloatArray> = _voiceLevelsFlow.asStateFlow()
     override val lfoOutputFlow: StateFlow<Float> = _lfoOutputFlow.asStateFlow()
+    override val lfoAOutputFlow: StateFlow<Float> = _lfoAOutputFlow.asStateFlow()
+    override val lfoBOutputFlow: StateFlow<Float> = _lfoBOutputFlow.asStateFlow()
     override val masterLevelFlow: StateFlow<Float> = _masterLevelFlow.asStateFlow()
 
     // Test helpers to emit flow values

@@ -26,12 +26,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.preview.LiquidPreviewContainerWithGradient
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.core.plugin.symbols.VizSymbol
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
 @Composable
@@ -134,7 +134,8 @@ fun VizPanel(
                 progressColor = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray.copy(
                     alpha = 0.3f
                 ),
-                enabled = uiState.showKnobs
+                enabled = uiState.showKnobs,
+                valueFormatter = uiState.selectedViz.knob2ValueFormatter,
             )
         }
     }

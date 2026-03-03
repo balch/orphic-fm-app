@@ -52,6 +52,7 @@ class JsynPassThroughWrapper : PassThrough {
 
     override val input: AudioInput = JsynAudioInput(jsUnit.input)
     override val output: AudioOutput = JsynAudioOutput(jsUnit.output)
+    override fun getInstantaneousValue(): Double = jsUnit.output.getValue()
 }
 
 

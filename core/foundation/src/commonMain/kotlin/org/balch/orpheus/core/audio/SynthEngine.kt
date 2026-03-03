@@ -141,7 +141,9 @@ interface SynthEngine {
 
     // Visualization flows (emit at ~30fps for plasma background)
     val voiceLevelsFlow: StateFlow<FloatArray>  // 8 voice levels, 0-1 range
-    val lfoOutputFlow: StateFlow<Float>         // -1 to 1 range
+    val lfoOutputFlow: StateFlow<Float>         // -1 to 1 range (combined)
+    val lfoAOutputFlow: StateFlow<Float>        // -1 to 1 range (oscillator A)
+    val lfoBOutputFlow: StateFlow<Float>        // -1 to 1 range (oscillator B)
     val masterLevelFlow: StateFlow<Float>       // 0-1 range, overall output including delay
 
     // Bender position flow (monitoring, not a port)

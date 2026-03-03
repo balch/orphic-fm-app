@@ -13,9 +13,9 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
-import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
+import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.core.plugin.symbols.DUO_LFO_URI
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 
@@ -87,9 +87,6 @@ class DuoLfoPlugin(
     private val triangleMin = dspFactory.createMinimum() // AND = MIN(A, B)
     private val triangleMax = dspFactory.createMaximum() // OR = MAX(A, B)
     private val fmGain = dspFactory.createMultiply()
-
-    // LFO Output Monitoring for visualization
-    private val lfoMonitor = dspFactory.createPeakFollower()
 
     // Internal State
     private var _mode = 1
@@ -203,7 +200,7 @@ class DuoLfoPlugin(
         toUnipolarA, toUnipolarB, logicAnd,
         orProduct, orSum, orResult,
         toBipolarAnd, toBipolarOr,
-        triangleMin, triangleMax, fmGain, lfoMonitor
+        triangleMin, triangleMax, fmGain
     )
     
     // Compatibility Accessors
@@ -225,10 +222,6 @@ class DuoLfoPlugin(
     )
 
     override fun initialize() {
-        // Monitor the LFO output for visualization
-        outputProxy.output.connect(lfoMonitor.input)
-        lfoMonitor.setHalfLife(0.016) // ~60fps response
-
         // WIRING
         // Base Frequencies -> Mixers (inputA of each)
         inputA.output.connect(freqAModMixer.inputA)
@@ -337,5 +330,7 @@ class DuoLfoPlugin(
 
 
     
-    fun getCurrentValue(): Float = lfoMonitor.getCurrent().toFloat().coerceIn(-1f, 1f)
+    fun getCurrentValue(): Float = outputProxy.getInstantaneousValue().toFloat().coerceIn(-1f, 1f)
+    fun getCurrentValueA(): Float = outputAProxy.getInstantaneousValue().toFloat().coerceIn(-1f, 1f)
+    fun getCurrentValueB(): Float = outputBProxy.getInstantaneousValue().toFloat().coerceIn(-1f, 1f)
 }

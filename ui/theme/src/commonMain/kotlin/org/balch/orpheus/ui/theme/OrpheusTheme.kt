@@ -296,4 +296,22 @@ object OrpheusColors {
     val hoodRimGlow = Color(0xFFFF8844)          // Orange rim glow on silhouette edge
     val hoodSmoke = Color(0xFF888888)            // Smoke/ash gray
     val hoodBackground = Color(0xFF1A1520)       // Default background
+
+    // Ant Colony Viz Colors
+    val antColonyBackground = Color(0xFF0A0515)       // Deep purple-black
+    val antColonyGround = Color(0xFF1A0A2E)           // Dark purple ground
+    val antColonyGridLine = Color(0xFF2A1A3E)         // Faint purple grid lines
+    val antNeonCyan = Color(0xFF00F5FF)               // Ant trail cyan
+    val antNeonMagenta = Color(0xFFFF00FF)            // Ant trail magenta
+    val antNeonGreen = Color(0xFF39FF14)              // Ant trail green
+    val antNeonOrange = Color(0xFFFF9F00)             // Block edge orange
+    val antNeonPink = Color(0xFFFF69B4)               // Block edge pink
+    val antNeonBlue = Color(0xFF4488FF)               // Duo 5 blue
+    val antNeonYellow = Color(0xFFFFE033)             // Duo 6 yellow
+    val antFireRed = Color(0xFFFF2200)                // Fire ant red
+    val antFireGlow = Color(0xFFFF4400)               // Fire ant glow
+    val antMagGlassWhite = Color(0xFFFFFFEE)          // Magnifying glass focal point
+    val antMagGlassBurn = Color(0xFFFF6600)           // Burn orange
+    val antBootNeon = Color(0xFF00E5FF)               // Neon boot outline
+    val antEmberYellow = Color(0xFFFFCC00)            // Ember particles
 }
