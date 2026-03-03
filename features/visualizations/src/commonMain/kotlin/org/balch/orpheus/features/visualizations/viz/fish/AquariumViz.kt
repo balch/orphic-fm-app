@@ -501,21 +501,21 @@ class AquariumViz(
         private const val COHESION_STRENGTH = 0.5f
 
         val Default = VisualizationLiquidEffects(
-            frostSmall = 3f,
-            frostMedium = 5f,
-            frostLarge = 7f,
-            tintAlpha = 0.10f,
+            frostSmall = 2f,
+            frostMedium = 4f,
+            frostLarge = 6f,
+            tintAlpha = 0.05f,
             top = VisualizationLiquidScope(
                 saturation = 0.5f,
                 dispersion = 0.6f,
-                curve = 0.2f,
-                refraction = 0.5f,
+                curve = 0.02f,
+                refraction = 0.3f,
             ),
             bottom = VisualizationLiquidScope(
                 saturation = 0.8f,
                 dispersion = 0.3f,
-                curve = 0.2f,
-                refraction = 0.6f,
+                curve = 0.02f,
+                refraction = 0.4f,
             ),
             title = CenterPanelStyle(
                 scope = VisualizationLiquidScope(
