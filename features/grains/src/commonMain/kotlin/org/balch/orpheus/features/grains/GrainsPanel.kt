@@ -167,13 +167,7 @@ fun GrainsPanel(
                         GrainsButton(
                             label = "TRIG",
                             active = false,
-                            onClick = { 
-                                try {
-                                    actions.trigger()
-                                } catch (e: Exception) {
-                                    println("TRIG error: ${e.message}")
-                                }
-                            },
+                            onClick = { actions.trigger() },
                             accentColor = OrpheusColors.fadedCyan,
                             controlId = "clouds_trigger"
                         )

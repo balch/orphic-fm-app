@@ -19,9 +19,9 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.BENDER_URI
 import org.balch.orpheus.core.plugin.symbols.BenderSymbol
 import kotlin.concurrent.Volatile
@@ -109,7 +109,11 @@ class BenderPlugin(
                     val wasActive = _bendAmount.absoluteValue > 0.05f
                     _bendAmount = it.coerceIn(-1f, 1f)
                     val isActive = _bendAmount.absoluteValue > 0.05f
-                    
+
+                    // Enable/disable all units based on bend activity
+                    if (isActive && !wasActive) setPluginEnabled(true, audioEngine)
+                    else if (!isActive && wasActive) setPluginEnabled(false, audioEngine)
+
                     val normalizedBend = _bendAmount
                     val tensionCurve = normalizedBend * (1.0 + normalizedBend.absoluteValue * 0.5)
                     val semitones = tensionCurve * _maxBendSemitones
@@ -293,6 +297,9 @@ class BenderPlugin(
         audioMixer.output.connect(audioOutputProxy.input)
 
         audioUnits.forEach { audioEngine.addUnit(it) }
+
+        // Start disabled — no bend active at init
+        setPluginEnabled(false, audioEngine)
     }
 
     override fun applyInitialBypassState(audioEngine: AudioEngine) {

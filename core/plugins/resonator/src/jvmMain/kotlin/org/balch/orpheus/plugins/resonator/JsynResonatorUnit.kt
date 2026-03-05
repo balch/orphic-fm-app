@@ -50,7 +50,7 @@ class JsynResonatorUnit : UnitGenerator(), ResonatorUnit {
         addPort(jsynAuxOutput)
     }
     
-    override fun setEnabled(enabled: Boolean) {
+    override fun setResonatorEnabled(enabled: Boolean) {
         this.enabled = enabled
     }
     

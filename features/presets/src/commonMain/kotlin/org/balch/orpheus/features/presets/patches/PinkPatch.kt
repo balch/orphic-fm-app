@@ -121,7 +121,7 @@ class PinkPatch : SynthPatch {
             put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.27f))
             put("$lfoUri:${DuoLfoSymbol.MODE.symbol}", PortValue.IntValue(HyperLfoMode.OR.ordinal))
             put("$lfoUri:${DuoLfoSymbol.LINK.symbol}", PortValue.BoolValue(false))
-            put("$lfoUri:${DuoLfoSymbol.TRIANGLE_MODE.symbol}", PortValue.BoolValue(true))
+            put("$lfoUri:${DuoLfoSymbol.SHAPE.symbol}", PortValue.FloatValue(1f))
 
             // Reverb: lush and spacious
             val reverbUri = REVERB_URI

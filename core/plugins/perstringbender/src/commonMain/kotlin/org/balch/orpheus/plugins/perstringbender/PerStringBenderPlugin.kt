@@ -354,6 +354,9 @@ class PerStringBenderPlugin(
         voiceBendOutputs.forEach { it.input.set(0.0) }
 
         audioUnits.forEach { audioEngine.addUnit(it) }
+
+        // Start disabled — no strings being touched at init
+        setPluginEnabled(false, audioEngine)
     }
 
     override fun applyInitialBypassState(audioEngine: AudioEngine) {
@@ -537,6 +540,7 @@ class PerStringBenderPlugin(
         
         disableIfIdle()
         val springDuration = (SPRING_DURATION_MS * pullDistance.coerceIn(0.3f, 1f)).toInt()
+        disableIfIdle()
         return Pair(springDuration, shouldReleaseVoice)
     }
 
@@ -664,14 +668,14 @@ class PerStringBenderPlugin(
         slideBarPosition = 0f
         slideBarVibratoDepth = 0f
         slideBarWasActive = false
-        
+
         if (wasActive) {
             tensionEnvelopes[0].input.set(0.0)
             tensionRamps[0].input.set(0.0)
             springEnvelopes[0].input.set(1.0)
             springEnvelopes[0].input.set(0.0)
         }
-        
+
         for (i in 0 until NUM_STRINGS) {
             if (!stringStates[i].isActive) {
                 val voiceA = i * 2

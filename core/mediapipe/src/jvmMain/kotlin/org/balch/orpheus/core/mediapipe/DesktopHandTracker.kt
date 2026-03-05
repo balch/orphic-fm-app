@@ -5,14 +5,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -74,7 +73,7 @@ class DesktopHandTracker(
             grabber.release()
             true
         } catch (e: Exception) {
-            System.err.println("[Orpheus] Camera availability check failed: ${e.message}")
+            log.warn(e) { "Camera availability check failed" }
             false
         }
     }
@@ -204,7 +203,7 @@ class DesktopHandTracker(
                     }
                 }
             } catch (e: Exception) {
-                System.err.println("[Orpheus] DesktopHandTracker capture error: ${e.message}")
+                log.error(e) { "Capture error" }
             } finally {
                 try {
                     grabber?.stop()

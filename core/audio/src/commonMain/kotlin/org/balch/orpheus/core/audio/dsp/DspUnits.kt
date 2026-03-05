@@ -106,6 +106,16 @@ interface Limiter : AudioUnit {
     interface Factory { fun create(): Limiter }
 }
 
+/**
+ * Hard clipper that clamps output to ±1.0.
+ * 100% transparent for signals in range; prevents digital clipping on peaks.
+ */
+interface HardClip : AudioUnit {
+    val input: AudioInput
+
+    interface Factory { fun create(): HardClip }
+}
+
 interface Multiply : AudioUnit {
     val inputA: AudioInput
     val inputB: AudioInput
@@ -315,7 +325,7 @@ interface ResonatorUnit : AudioUnit {
     val auxOutput: AudioOutput
     
     /** Enable/disable resonator processing */
-    fun setEnabled(enabled: Boolean)
+    fun setResonatorEnabled(enabled: Boolean) {}
     
     /** Set mode: 0=Modal, 1=String, 2=Sympathetic */
     fun setMode(mode: Int)

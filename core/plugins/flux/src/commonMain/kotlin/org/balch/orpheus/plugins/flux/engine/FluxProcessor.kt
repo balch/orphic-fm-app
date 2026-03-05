@@ -12,6 +12,8 @@ import kotlin.math.pow
  *  (voltage generation with beta distribution, quantization, lag processing),
  *  and ramp infrastructure for per-sample phase tracking.
  *
+ *  All buffer parameters are Float-native for zero-copy on Android (Oboe).
+ *
  *  Call [process] for block-based audio-rate processing (preferred),
  *  or [tick]/[tickClockOff] for backwards-compatible event-driven usage. */
 class FluxProcessor(private val sampleRate: Float) {
@@ -79,13 +81,13 @@ class FluxProcessor(private val sampleRate: Float) {
     private val xHashes = intArrayOf(0, 0xbeca55e5.toInt(), 0xf0cacc1a.toInt())
 
     // Pre-allocated scratch buffers for tick()/tickClockOff() compat API
-    private val tickClock = DoubleArray(1)
-    private val tickOx1 = DoubleArray(1)
-    private val tickOx2 = DoubleArray(1)
-    private val tickOx3 = DoubleArray(1)
-    private val tickOt1 = DoubleArray(1)
-    private val tickOt2 = DoubleArray(1)
-    private val tickOt3 = DoubleArray(1)
+    private val tickClock = FloatArray(1)
+    private val tickOx1 = FloatArray(1)
+    private val tickOx2 = FloatArray(1)
+    private val tickOx3 = FloatArray(1)
+    private val tickOt1 = FloatArray(1)
+    private val tickOt2 = FloatArray(1)
+    private val tickOt3 = FloatArray(1)
 
     init {
         for (i in 0 until NUM_X_CHANNELS) {
@@ -124,13 +126,13 @@ class FluxProcessor(private val sampleRate: Float) {
      *  @param start start index in buffers
      *  @param size number of samples to process */
     fun process(
-        clockIn: DoubleArray,
-        outputX1: DoubleArray,
-        outputX2: DoubleArray,
-        outputX3: DoubleArray,
-        outputT1: DoubleArray,
-        outputT2: DoubleArray,
-        outputT3: DoubleArray,
+        clockIn: FloatArray,
+        outputX1: FloatArray,
+        outputX2: FloatArray,
+        outputX3: FloatArray,
+        outputT1: FloatArray,
+        outputT2: FloatArray,
+        outputT3: FloatArray,
         start: Int,
         size: Int
     ) {
@@ -144,7 +146,7 @@ class FluxProcessor(private val sampleRate: Float) {
 
         // 1. Convert analog clock to GateFlags per sample
         for (i in 0 until size) {
-            val high = clockIn[start + i] > 0.1
+            val high = clockIn[start + i] > 0.1f
             previousGateFlags = GateFlags.extract(previousGateFlags, high)
             flags[i] = previousGateFlags
         }
@@ -216,28 +218,28 @@ class FluxProcessor(private val sampleRate: Float) {
             )
         }
 
-        // 5. Copy outputs to JSyn-format buffers
+        // 5. Copy outputs to buffers
         // X outputs: convert V/octave to frequency ratio for multiplicative CV path.
         // Voice computes: baseFreq + baseFreq * cvInput = baseFreq * (1 + cvInput)
         // So cvInput = 2^(voltage) - 1 gives: baseFreq * 2^(voltage) = correct exponential pitch
         // Mix scales the raw voltage before exp conversion for perceptually linear control:
         //   2^(V * mix) - 1  →  at mix=0.5, a 3-octave range becomes 1.5 octaves
         // Clamp voltage to [-1, 4] octaves before exp to prevent blowout (2^4 = 16x max)
-        val m = mix.toDouble()
+        val m = mix
         for (i in 0 until size) {
             val idx = start + i
-            val v1 = (xOut[i * NUM_X_CHANNELS].toDouble() * m).coerceIn(-1.0, MAX_OCTAVES)
-            val v2 = (xOut[i * NUM_X_CHANNELS + 1].toDouble() * m).coerceIn(-1.0, MAX_OCTAVES)
-            val v3 = (xOut[i * NUM_X_CHANNELS + 2].toDouble() * m).coerceIn(-1.0, MAX_OCTAVES)
-            outputX1[idx] = 2.0.pow(v1) - 1.0
-            outputX2[idx] = 2.0.pow(v2) - 1.0
-            outputX3[idx] = 2.0.pow(v3) - 1.0
+            val v1 = (xOut[i * NUM_X_CHANNELS] * m).coerceIn(-1f, MAX_OCTAVES)
+            val v2 = (xOut[i * NUM_X_CHANNELS + 1] * m).coerceIn(-1f, MAX_OCTAVES)
+            val v3 = (xOut[i * NUM_X_CHANNELS + 2] * m).coerceIn(-1f, MAX_OCTAVES)
+            outputX1[idx] = 2f.pow(v1) - 1f
+            outputX2[idx] = 2f.pow(v2) - 1f
+            outputX3[idx] = 2f.pow(v3) - 1f
 
             // T gates from slave ramps
             val gateBase = i * TGenerator.NUM_T_CHANNELS
-            outputT1[idx] = if (tG[gateBase]) 1.0 else 0.0
-            outputT2[idx] = if (tR.master[i] < pulseWidth) 1.0 else 0.0
-            outputT3[idx] = if (tG[gateBase + 1]) 1.0 else 0.0
+            outputT1[idx] = if (tG[gateBase]) 1f else 0f
+            outputT2[idx] = if (tR.master[i] < pulseWidth) 1f else 0f
+            outputT3[idx] = if (tG[gateBase + 1]) 1f else 0f
         }
 
         // Update cached output state for getters (raw V/octave for internal use)
@@ -262,23 +264,23 @@ class FluxProcessor(private val sampleRate: Float) {
     /** Generate the next voltage(s) when triggered by a gate/clock.
      *  Kept for non-JSyn platforms. For JSyn, use [process] instead. */
     fun tick() {
-        tickClock[0] = 1.0
-        tickOx1[0] = 0.0; tickOx2[0] = 0.0; tickOx3[0] = 0.0
-        tickOt1[0] = 0.0; tickOt2[0] = 0.0; tickOt3[0] = 0.0
+        tickClock[0] = 1f
+        tickOx1[0] = 0f; tickOx2[0] = 0f; tickOx3[0] = 0f
+        tickOt1[0] = 0f; tickOt2[0] = 0f; tickOt3[0] = 0f
         process(tickClock, tickOx1, tickOx2, tickOx3, tickOt1, tickOt2, tickOt3, 0, 1)
-        outX1 = tickOx1[0].toFloat()
-        outX2 = tickOx2[0].toFloat()
-        outX3 = tickOx3[0].toFloat()
-        outT1 = tickOt1[0].toFloat()
-        outT2 = tickOt2[0].toFloat()
-        outT3 = tickOt3[0].toFloat()
+        outX1 = tickOx1[0]
+        outX2 = tickOx2[0]
+        outX3 = tickOx3[0]
+        outT1 = tickOt1[0]
+        outT2 = tickOt2[0]
+        outT3 = tickOt3[0]
     }
 
     /** Called when clock is low/off to reset gates. */
     fun tickClockOff() {
-        tickClock[0] = 0.0
-        tickOx1[0] = 0.0; tickOx2[0] = 0.0; tickOx3[0] = 0.0
-        tickOt1[0] = 0.0; tickOt2[0] = 0.0; tickOt3[0] = 0.0
+        tickClock[0] = 0f
+        tickOx1[0] = 0f; tickOx2[0] = 0f; tickOx3[0] = 0f
+        tickOt1[0] = 0f; tickOt2[0] = 0f; tickOt3[0] = 0f
         process(tickClock, tickOx1, tickOx2, tickOx3, tickOt1, tickOt2, tickOt3, 0, 1)
     }
 
@@ -322,7 +324,7 @@ class FluxProcessor(private val sampleRate: Float) {
 
     companion object {
         const val NUM_X_CHANNELS = 3
-        private const val MAX_OCTAVES = 4.0 // Safety clamp: max 4 octaves above base (16x freq)
+        private const val MAX_OCTAVES = 4f // Safety clamp: max 4 octaves above base (16x freq)
     }
 }
 

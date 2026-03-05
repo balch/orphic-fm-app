@@ -13,6 +13,7 @@ interface DspFactory {
     fun createDelayLine(): DelayLine
     fun createPeakFollower(): PeakFollower
     fun createLimiter(): Limiter
+    fun createHardClip(): HardClip
     fun createMultiply(): Multiply
     fun createAdd(): Add
     fun createMultiplyAdd(): MultiplyAdd

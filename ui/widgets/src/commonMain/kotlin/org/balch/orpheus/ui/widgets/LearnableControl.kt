@@ -106,7 +106,6 @@ fun Learnable(
                         .pointerInput(controlId, learnState.isActive, learnState.selectedControlId) {
                             detectTapGestures(
                                 onTap = {
-                                    println("[Learnable] Tap detected on: $controlId, calling onSelectControl")
                                     learnState.onSelectControl(controlId)
                                 }
                             )
@@ -149,7 +148,6 @@ fun Modifier.learnable(
         .pointerInput(controlId, learnState.isActive, learnState.selectedControlId) {
             detectTapGestures(
                 onTap = {
-                    println("[LearnableControl] Tap detected on: $controlId, calling onSelectControl")
                     learnState.onSelectControl(controlId)
                 }
             )

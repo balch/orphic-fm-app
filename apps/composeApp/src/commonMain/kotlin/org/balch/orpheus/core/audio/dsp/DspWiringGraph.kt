@@ -36,6 +36,10 @@ class DspWiringGraph @Inject constructor(
     val drumDirectGainL = dspFactory.createMultiply()
     val drumDirectGainR = dspFactory.createMultiply()
 
+    // Master output hard clippers (transparent below ±1.0, prevents digital clipping)
+    val masterClipL = dspFactory.createHardClip()
+    val masterClipR = dspFactory.createHardClip()
+
     // Drum Direct Distortion (Parallel Limiter)
     val drumDirectLimiterL = dspFactory.createLimiter()
     val drumDirectLimiterR = dspFactory.createLimiter()
@@ -51,38 +55,34 @@ class DspWiringGraph @Inject constructor(
 
     fun initialize(voiceManager: DspVoiceManager) {
         log.debug { "Initializing DspWiringGraph" }
-        
-        registerUnits()
+
+        // Plugins self-register their audioUnits in initialize()
         wirePlugins()
+        // Local routing units registered AFTER plugins so they appear later in the scheduler
+        registerLocalUnits()
         wireDrums()
         wireVoices(voiceManager)
-        
+
         // Defaults
-        totalFbGain.inputB.set(0.0) 
+        totalFbGain.inputB.set(0.0)
         initDrumDirectResonator()
     }
-    
-    private fun registerUnits() {
-        // Register all plugin audio units
-        pluginProvider.plugins.forEach { plugin ->
-            plugin.audioUnits.forEach { unit ->
-                audioEngine.addUnit(unit)
-            }
-        }
-        
-        // Register local units
+
+    private fun registerLocalUnits() {
         audioEngine.addUnit(totalFbGain)
         audioEngine.addUnit(voiceSumLeft)
         audioEngine.addUnit(voiceSumRight)
         audioEngine.addUnit(replSumLeft)
         audioEngine.addUnit(replSumRight)
+        audioEngine.addUnit(masterClipL)
+        audioEngine.addUnit(masterClipR)
         audioEngine.addUnit(drumChainGainL)
         audioEngine.addUnit(drumChainGainR)
         audioEngine.addUnit(drumDirectGainL)
         audioEngine.addUnit(drumDirectGainR)
         audioEngine.addUnit(drumDirectLimiterL)
         audioEngine.addUnit(drumDirectLimiterR)
-        
+
         audioEngine.addUnit(drumDirectResonator)
         audioEngine.addUnit(drumDirectResoWetGainL)
         audioEngine.addUnit(drumDirectResoWetGainR)
@@ -185,9 +185,11 @@ class DspWiringGraph @Inject constructor(
         // Flux Clock Wiring (quarter-note beat clock, not 24 PPQN)
         globalTempo.getBeatClockOutput().connect(pluginProvider.fluxPlugin.inputs["clock"]!!)
 
-        // Stereo outputs → LineOut
-        pluginProvider.stereoPlugin.outputs["lineOutLeft"]?.connect(audioEngine.lineOutLeft)
-        pluginProvider.stereoPlugin.outputs["lineOutRight"]?.connect(audioEngine.lineOutRight)
+        // Stereo outputs → Hard Clip → LineOut
+        pluginProvider.stereoPlugin.outputs["lineOutLeft"]?.connect(masterClipL.input)
+        pluginProvider.stereoPlugin.outputs["lineOutRight"]?.connect(masterClipR.input)
+        masterClipL.output.connect(audioEngine.lineOutLeft)
+        masterClipR.output.connect(audioEngine.lineOutRight)
         
         // Resonator output goes to Distortion input (resonator path continues)
         pluginProvider.resonatorPlugin.outputs["outputLeft"]!!.connect(pluginProvider.distortionPlugin.inputs["inputLeft"]!!)
@@ -286,11 +288,14 @@ class DspWiringGraph @Inject constructor(
     }
     
     private fun initDrumDirectResonator() {
-        drumDirectResonator.setEnabled(true)
-        drumDirectResonator.setMode(0) 
+        drumDirectResonator.setResonatorEnabled(true)
+        drumDirectResonator.setMode(0)
         drumDirectResoDryGainL.inputB.set(1.0)
         drumDirectResoDryGainR.inputB.set(1.0)
         drumDirectResoWetGainL.inputB.set(0.0)
         drumDirectResoWetGainR.inputB.set(0.0)
+        // Limiter drive defaults to 0 on Oboe (JSyn defaults to 1.0) — set explicitly
+        drumDirectLimiterL.drive.set(1.0)
+        drumDirectLimiterR.drive.set(1.0)
     }
 }

@@ -125,11 +125,23 @@ class DspVoice(
     val plaitsMorphModInput: AudioInput get() = morphModDepth.inputA
     val plaitsMorphModAmount: AudioInput get() = morphModDepth.inputB
 
+    /** All units in this voice, for bulk enable/disable. */
+    private val allUnits: List<AudioUnit> = listOf(
+        triangleOsc, squareOsc, sharpnessProxy, triangleGain, squareGain,
+        oscMixer, sharpnessInverter, ampEnv, vca, wobbleRamp, wobbleGain,
+        volumeRamp, volumeGain, envelopeFollower, couplingScaler, couplingMixer,
+        fmDepthControl, fmFreqMixer, pitchScaler, feedbackScaler, feedbackRamp,
+        fmSignalMixer, cvPitchScaler, cvPitchMixer, directFreqMixer,
+        vibratoScaler, vibratoMixer, benderScaler, benderMixer,
+        holdRamp, vcaControlMixer, plaitsUnit, timbreModDepth, morphModDepth,
+        oscGain, plaitsGain, sourceSelector, gateFanout
+    )
+
     fun setIdle(idle: Boolean, audioEngine: AudioEngine) {
-        // No-op: Disabling JSyn UnitGenerators via isEnabled=false does NOT zero their
-        // outputs — it leaves stale values that corrupt the coupling path and cause audio
-        // blowout. The units disabled (volumeGain, envelopeFollower) are trivially cheap,
-        // so the CPU savings were negligible anyway.
+        val enabled = !idle
+        for (unit in allUnits) {
+            audioEngine.setUnitEnabled(unit, enabled)
+        }
     }
 
     /**

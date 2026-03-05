@@ -8,6 +8,6 @@ import org.balch.orpheus.core.audio.dsp.ReverbUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class JsynReverbUnitFactory @Inject constructor() : ReverbUnit.Factory {
-    override fun create(): ReverbUnit = JsynReverbUnit()
+class OboeReverbUnitFactory @Inject constructor() : ReverbUnit.Factory {
+    override fun create(): ReverbUnit = OboeReverbUnit()
 }

@@ -17,9 +17,6 @@ kotlin {
             api(project(":core:audio"))
             implementation(libs.kotlinx.serialization.json)
         }
-        androidMain.dependencies {
-            implementation(libs.jsyn)
-        }
         jvmMain.dependencies {
             implementation(libs.jsyn)
         }

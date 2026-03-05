@@ -57,6 +57,11 @@
 -dontwarn org.apache.logging.log4j.spi.ExtendedLoggerWrapper
 -dontwarn reactor.blockhound.integration.BlockHoundIntegration
 
+# Oboe JNI bridge — C++ looks up renderAudio() by name via GetMethodID
+-keep class org.balch.orpheus.core.audio.dsp.OboeAudioBridge {
+    void renderAudio(float[], int);
+}
+
 # MediaPipe hand tracking
 # Graph.<clinit> uses Flogger which walks the stack by class name;
 # R8 must preserve class names for both MediaPipe and Flogger.

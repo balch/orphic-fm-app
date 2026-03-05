@@ -7,8 +7,8 @@ import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.DELAY_URI
-import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.plugin.symbols.DISTORTION_URI
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.plugin.symbols.FLUX_URI
@@ -115,7 +115,7 @@ class SixSevenPatch : SynthPatch {
             put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.02f))
             put("$lfoUri:${DuoLfoSymbol.MODE.symbol}", PortValue.IntValue(HyperLfoMode.AND.ordinal))
             put("$lfoUri:${DuoLfoSymbol.LINK.symbol}", PortValue.BoolValue(true))
-            put("$lfoUri:${DuoLfoSymbol.TRIANGLE_MODE.symbol}", PortValue.BoolValue(true))
+            put("$lfoUri:${DuoLfoSymbol.SHAPE.symbol}", PortValue.FloatValue(1f))
 
             // Reverb: warm and present
             val reverbUri = REVERB_URI

@@ -92,15 +92,6 @@ fun DuoLfoPanel(
                         if (isActive) OrpheusColors.neonCyan
                         else OrpheusColors.neonCyan.copy(alpha = 0.4f)
                 )
-
-                HorizontalMiniSlider(
-                    value = uiState.lfoAMultiplier,
-                    onValueChange = actions.setLfoAMultiplier,
-                    leftLabel = "🐇", // Fast
-                    rightLabel = "🐢", // Slow
-                    color = OrpheusColors.neonCyan,
-                    trackWidth = 48
-                )
             }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -125,17 +116,20 @@ fun DuoLfoPanel(
                         if (isActive) OrpheusColors.neonCyan
                         else OrpheusColors.neonCyan.copy(alpha = 0.4f)
                 )
-
-                HorizontalMiniSlider(
-                    value = uiState.lfoBMultiplier,
-                    onValueChange = actions.setLfoBMultiplier,
-                    leftLabel = "🐇", // Fast
-                    rightLabel = "🐢", // Slow
-                    color = OrpheusColors.neonCyan,
-                    trackWidth = 48
-                )
             }
         }
+
+        // Shape blend slider (square ↔ triangle)
+        HorizontalMiniSlider(
+            modifier = Modifier.learnable(DuoLfoSymbol.SHAPE.controlId.key, learnState),
+            value = uiState.shape,
+            onValueChange = actions.setShape,
+            leftLabel = "□",
+            rightLabel = "△",
+            color = if (isActive) OrpheusColors.neonCyan
+                else OrpheusColors.neonCyan.copy(alpha = 0.4f),
+            trackWidth = 80
+        )
     }
 }
 

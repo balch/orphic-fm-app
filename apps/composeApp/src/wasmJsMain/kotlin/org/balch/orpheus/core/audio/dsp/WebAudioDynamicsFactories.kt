@@ -22,3 +22,9 @@ class WebAudioPeakFollowerFactory @Inject constructor(private val engine: Orpheu
 class WebAudioLimiterFactory @Inject constructor(private val engine: OrpheusAudioEngine) : Limiter.Factory {
     override fun create(): Limiter = WebAudioLimiter(engine.webAudioContext)
 }
+
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
+class WebAudioHardClipFactory @Inject constructor(private val engine: OrpheusAudioEngine) : HardClip.Factory {
+    override fun create(): HardClip = WebAudioHardClip(engine.webAudioContext)
+}

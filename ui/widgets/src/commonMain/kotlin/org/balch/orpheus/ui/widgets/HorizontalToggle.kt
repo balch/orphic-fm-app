@@ -47,7 +47,6 @@ fun HorizontalToggle(
             .background(OrpheusColors.panelBackground)
             .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
             .clickable {
-                println("[HorizontalToggle] Clicked! Current isLeft=$isStart -> New: ${!isStart}")
                 onToggle(!isStart)
             }
             .padding(horizontal = 6.dp, vertical = 6.dp), // Padding inside container

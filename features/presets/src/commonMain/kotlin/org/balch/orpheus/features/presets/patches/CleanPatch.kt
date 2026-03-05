@@ -76,7 +76,7 @@ class CleanPatch : SynthPatch {
             val lfoUri = DuoLfoPlugin.URI
             put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.02f))
             put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.035f))
-            put("$lfoUri:${DuoLfoSymbol.TRIANGLE_MODE.symbol}", PortValue.BoolValue(true))
+            put("$lfoUri:${DuoLfoSymbol.SHAPE.symbol}", PortValue.FloatValue(1f))
 
             // Light reverb for space
             val reverbUri = REVERB_URI

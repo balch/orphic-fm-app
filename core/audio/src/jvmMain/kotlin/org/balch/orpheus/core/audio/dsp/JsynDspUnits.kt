@@ -2,6 +2,7 @@ package org.balch.orpheus.core.audio.dsp
 
 import com.jsyn.unitgen.EnvelopeDAHDSR
 import com.jsyn.unitgen.InterpolatingDelay
+import org.balch.orpheus.core.audio.HardClipGenerator
 import org.balch.orpheus.core.audio.TanhLimiter
 import com.jsyn.unitgen.PeakFollower as JsynPeakFollower
 
@@ -71,6 +72,13 @@ class JsynLimiter : Limiter {
     override val input: AudioInput = JsynAudioInput(jsLimiter.input)
     override val drive: AudioInput = JsynAudioInput(jsLimiter.drive)
     override val output: AudioOutput = JsynAudioOutput(jsLimiter.output)
+}
+
+class JsynHardClip : HardClip {
+    internal val jsClip = HardClipGenerator()
+
+    override val input: AudioInput = JsynAudioInput(jsClip.input)
+    override val output: AudioOutput = JsynAudioOutput(jsClip.output)
 }
 
 class JsynLinearRampWrapper : LinearRamp {

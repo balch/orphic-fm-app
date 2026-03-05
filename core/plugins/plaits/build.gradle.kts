@@ -16,9 +16,6 @@ kotlin {
         commonMain.dependencies {
             api(project(":core:audio"))
         }
-        androidMain.dependencies {
-            implementation(libs.jsyn)
-        }
         jvmMain.dependencies {
             implementation(libs.jsyn)
         }

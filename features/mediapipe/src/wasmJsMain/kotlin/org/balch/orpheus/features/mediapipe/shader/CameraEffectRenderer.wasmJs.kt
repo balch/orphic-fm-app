@@ -22,7 +22,7 @@ actual class CameraEffectRenderer {
             runtimeEffect = RuntimeEffect.makeForShader(CameraEffectShader.SKSL_SOURCE)
             shaderBuilder = runtimeEffect?.let { RuntimeShaderBuilder(it) }
         } catch (e: Exception) {
-            println("[Orpheus] WARNING: Camera effect shader compilation failed: ${e.message}")
+            // Shader compilation failed — will fall back to basic rendering
         }
     }
 

@@ -30,7 +30,7 @@ actual class MetaballsRenderer {
                 // AGSL is nearly identical to SKSL
                 runtimeShader = RuntimeShader(MetaballsShaderSource.SKSL_SOURCE)
             } catch (e: Exception) {
-                println("[Orpheus] WARNING: AGSL shader compilation failed: ${e.message}")
+                // AGSL shader compilation failed — will fall back to Canvas rendering
             }
         }
     }

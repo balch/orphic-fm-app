@@ -82,7 +82,9 @@ class DspVoiceManager @Inject constructor(
             voiceB.envelopeOutput.connect(voiceA.couplingInput)
         }
 
-        // REPL voices (8-11) start idle — wake-on-gate handles re-enable
+        // Main voices (0-7) start enabled; REPL voices (8-11) start idle.
+        // Wake-on-gate handles re-enable for idle voices.
+        for (i in 0 until 8) { setVoiceIdle(i, false) }
         for (i in 8 until 12) { setVoiceIdle(i, true) }
     }
 

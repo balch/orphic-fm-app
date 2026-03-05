@@ -42,6 +42,7 @@ class TestDspFactory : DspFactory {
     override fun createDelayLine(): DelayLine = throw NotImplementedError()
     override fun createPeakFollower(): PeakFollower = throw NotImplementedError()
     override fun createLimiter(): Limiter = throw NotImplementedError()
+    override fun createHardClip(): HardClip = throw NotImplementedError()
     override fun createMultiply(): Multiply = throw NotImplementedError()
     override fun createAdd(): Add = throw NotImplementedError()
     override fun createMultiplyAdd(): MultiplyAdd = throw NotImplementedError()

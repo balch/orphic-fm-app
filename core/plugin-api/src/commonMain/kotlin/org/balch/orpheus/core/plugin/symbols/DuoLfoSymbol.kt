@@ -21,7 +21,7 @@ enum class DuoLfoSymbol(
 ) : PortSymbol {
     MODE("mode", displayName = "Mode"),
     LINK("link", displayName = "Link"),
-    TRIANGLE_MODE("triangle_mode", displayName = "Triangle Mode"),
+    SHAPE("shape", displayName = "Shape"),
     FREQ_A("freq_a", displayName = "Frequency A"),
     FREQ_B("freq_b", displayName = "Frequency B")
 }

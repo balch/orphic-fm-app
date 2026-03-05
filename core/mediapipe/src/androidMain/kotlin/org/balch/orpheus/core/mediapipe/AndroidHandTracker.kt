@@ -15,6 +15,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import com.diamondedge.logging.logging
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
@@ -49,6 +50,7 @@ class AndroidHandTracker(
     private val gestureModelAssetPath: String = "models/gesture_recognizer.task",
     private val landmarkerModelAssetPath: String = "models/hand_landmarker.task",
 ) : HandTracker {
+    private val log = logging("AndroidHandTracker")
 
     private val _results = MutableSharedFlow<HandTrackingResult?>(extraBufferCapacity = 1)
     override val results: Flow<HandTrackingResult?> = _results.asSharedFlow()
@@ -64,6 +66,7 @@ class AndroidHandTracker(
     private var useGestureRecognizer: Boolean = false
     private var lifecycleOwner: TrackerLifecycleOwner? = null
     private var analysisExecutor = Executors.newSingleThreadExecutor()
+    @Volatile private var isStopping = false
 
     // Pre-allocated buffers to reduce GC pressure at 30fps
     private var reusableMirrorBitmap: Bitmap? = null
@@ -71,6 +74,7 @@ class AndroidHandTracker(
 
     override fun start() {
         if (gestureRecognizer != null || handLandmarker != null) return
+        isStopping = false
 
         // Recreate executor if it was shut down by a previous stop() call
         if (analysisExecutor.isShutdown) {
@@ -99,10 +103,10 @@ class AndroidHandTracker(
 
             gestureRecognizer = GestureRecognizer.createFromOptions(context, options)
             useGestureRecognizer = true
-            android.util.Log.i("AndroidHandTracker", "Using GestureRecognizer")
+            log.info { "Using GestureRecognizer" }
             true
         } catch (e: Throwable) {
-            android.util.Log.w("AndroidHandTracker", "GestureRecognizer unavailable, falling back to HandLandmarker", e)
+            log.warn(e) { "GestureRecognizer unavailable, falling back to HandLandmarker" }
             false
         }
 
@@ -127,9 +131,9 @@ class AndroidHandTracker(
 
                 handLandmarker = HandLandmarker.createFromOptions(context, options)
                 useGestureRecognizer = false
-                android.util.Log.i("AndroidHandTracker", "Using HandLandmarker (fallback)")
+                log.info { "Using HandLandmarker (fallback)" }
             } catch (e: Throwable) {
-                android.util.Log.e("AndroidHandTracker", "Failed to create HandLandmarker", e)
+                log.error(e) { "Failed to create HandLandmarker" }
                 _results.tryEmit(null)
                 return
             }
@@ -164,7 +168,7 @@ class AndroidHandTracker(
 
             imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
                 // Guard against stop() called while analysis is in flight
-                if (lifecycleOwner == null) {
+                if (isStopping || lifecycleOwner == null) {
                     imageProxy.close()
                     return@setAnalyzer
                 }
@@ -181,6 +185,7 @@ class AndroidHandTracker(
     }
 
     override fun stop() {
+        isStopping = true // Signal before close — prevents in-flight frames from calling recognizeAsync
         lifecycleOwner?.stop()
         lifecycleOwner = null
         gestureRecognizer?.close()
@@ -257,6 +262,8 @@ class AndroidHandTracker(
      * @param timestampMs frame timestamp in milliseconds (must be monotonically increasing).
      */
     internal fun processFrame(bitmap: Bitmap, timestampMs: Long) {
+        if (isStopping) return
+
         // Mirror horizontally so the preview feels like a natural mirror
         // and MediaPipe landmarks are in mirrored coordinates
         val mirrored = mirrorHorizontal(bitmap)

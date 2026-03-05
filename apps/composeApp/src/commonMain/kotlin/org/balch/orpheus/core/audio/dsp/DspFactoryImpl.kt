@@ -16,6 +16,7 @@ class DspFactoryImpl @Inject constructor(
     private val delayLineFactory: DelayLine.Factory,
     private val peakFollowerFactory: PeakFollower.Factory,
     private val limiterFactory: Limiter.Factory,
+    private val hardClipFactory: HardClip.Factory,
     private val multiplyFactory: Multiply.Factory,
     private val addFactory: Add.Factory,
     private val multiplyAddFactory: MultiplyAdd.Factory,
@@ -44,6 +45,7 @@ class DspFactoryImpl @Inject constructor(
     override fun createDelayLine() = delayLineFactory.create()
     override fun createPeakFollower() = peakFollowerFactory.create()
     override fun createLimiter() = limiterFactory.create()
+    override fun createHardClip() = hardClipFactory.create()
     override fun createMultiply() = multiplyFactory.create()
     override fun createAdd() = addFactory.create()
     override fun createMultiplyAdd() = multiplyAddFactory.create()

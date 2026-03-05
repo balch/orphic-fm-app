@@ -20,7 +20,7 @@ actual class CameraEffectRenderer {
             try {
                 runtimeShader = RuntimeShader(CameraEffectShader.SKSL_SOURCE)
             } catch (e: Exception) {
-                println("[Orpheus] WARNING: Camera effect AGSL shader compilation failed: ${e.message}")
+                // AGSL shader compilation failed — will fall back to basic rendering
             }
         }
     }

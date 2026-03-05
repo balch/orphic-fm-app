@@ -178,6 +178,23 @@ class WebAudioLimiter(private val context: AudioContext) : Limiter {
     override val output: AudioOutput = WebAudioNodeOutput(postGain)
 }
 
+class WebAudioHardClip(private val context: AudioContext) : HardClip {
+    private val shaper = context.createWaveShaper()
+
+    init {
+        val samples = 1024
+        val curve = Float32Array(samples)
+        for (i in 0 until samples) {
+            val x = (i.toFloat() / (samples - 1)) * 2 - 1
+            curve[i] = x.coerceIn(-1f, 1f)
+        }
+        shaper.curve = curve
+    }
+
+    override val input: AudioInput = WebAudioNodeInput(shaper, 0, context)
+    override val output: AudioOutput = WebAudioNodeOutput(shaper)
+}
+
 class WebAudioLinearRamp(private val context: AudioContext) : LinearRamp {
     private val source = context.createConstantSource().also {
         it.offset.value = 0f
@@ -431,7 +448,7 @@ class WebAudioResonatorUnit(private val context: AudioContext) : ResonatorUnit {
     override val output: AudioOutput = WebAudioNodeOutput(outputGain)
     override val auxOutput: AudioOutput = WebAudioNodeOutput(auxGain)
     
-    override fun setEnabled(enabled: Boolean) {
+    override fun setResonatorEnabled(enabled: Boolean) {
         this.enabled = enabled
         outputGain.gain.value = if (enabled) 1f else 0f
     }

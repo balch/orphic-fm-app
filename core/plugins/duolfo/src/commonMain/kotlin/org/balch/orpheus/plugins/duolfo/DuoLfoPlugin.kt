@@ -22,12 +22,13 @@ import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 /**
  * Shared DuoLFO implementation.
  * Two Oscillators (A & B) with logical AND/OR combination.
- * 
+ * Shape parameter (0=square, 1=triangle) crossfades between waveforms.
+ *
  * Port Map:
  * 0-5: Audio ports (freq inputs, feedback, outputs)
- * 
+ *
  * Controls (via DSL):
- * - mode (0=AND, 1=OFF, 2=OR), link, triangle_mode, freq_a, freq_b
+ * - mode (0=AND, 1=OFF, 2=OR), link, shape, freq_a, freq_b
  */
 @Inject
 @SingleIn(AppScope::class)
@@ -88,14 +89,31 @@ class DuoLfoPlugin(
     private val triangleMax = dspFactory.createMaximum() // OR = MAX(A, B)
     private val fmGain = dspFactory.createMultiply()
 
+    // Shape crossfade using single-parameter lerp: out = sq + (tri - sq) * shape
+    // This avoids complementary gain tracking issues (independent smoothing of
+    // (1-shape) and shape can briefly sum != 1.0, causing amplitude artifacts).
+    // Each path: diffUnit computes (tri - sq), blendUnit computes sq + diff * shape.
+    //
+    // Individual output A
+    private val diffA = dspFactory.createMultiplyAdd()     // sq*(-1) + tri = tri - sq
+    private val blendA = dspFactory.createMultiplyAdd()    // diff*shape + sq
+    // Individual output B
+    private val diffB = dspFactory.createMultiplyAdd()     // sq*(-1) + tri = tri - sq
+    private val blendB = dspFactory.createMultiplyAdd()    // diff*shape + sq
+    // Combined AND path
+    private val diffAnd = dspFactory.createMultiplyAdd()   // sqAnd*(-1) + triAnd
+    private val blendAnd = dspFactory.createMultiplyAdd()  // diff*shape + sqAnd
+    // Combined OR path
+    private val diffOr = dspFactory.createMultiplyAdd()    // sqOr*(-1) + triOr
+    private val blendOr = dspFactory.createMultiplyAdd()   // diff*shape + sqOr
+
     // Internal State
     private var _mode = 1
     private var _link = false
-    private var _triangleMode = true
+    private var _shape = 1.0f
     private var _freqA = 0.0f
     private var _freqB = 0.0f
     private var isAndMode = true
-    private var isTriangleMode = true
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 6) {
@@ -131,16 +149,13 @@ class DuoLfoPlugin(
             }
         }
 
-        controlPort(DuoLfoSymbol.TRIANGLE_MODE) {
-            boolType {
-                default = true
-                get { _triangleMode }
+        controlPort(DuoLfoSymbol.SHAPE) {
+            floatType {
+                default = 1f; min = 0f; max = 1f
+                get { _shape }
                 set {
-                    if (isTriangleMode != it) {
-                        isTriangleMode = it
-                        _triangleMode = it
-                        updateOutput()
-                    }
+                    _shape = it
+                    updateBlend(it)
                 }
             }
         }
@@ -151,7 +166,7 @@ class DuoLfoPlugin(
                 get { _freqA }
                 set {
                     _freqA = it
-                    val freqHz = 0.01 + it
+                    val freqHz = it.toDouble()
                     inputA.input.set(freqHz)
                 }
             }
@@ -163,7 +178,7 @@ class DuoLfoPlugin(
                 get { _freqB }
                 set {
                     _freqB = it
-                    val freqHz = 0.01 + it
+                    val freqHz = it.toDouble()
                     inputB.input.set(freqHz)
                 }
             }
@@ -200,9 +215,11 @@ class DuoLfoPlugin(
         toUnipolarA, toUnipolarB, logicAnd,
         orProduct, orSum, orResult,
         toBipolarAnd, toBipolarOr,
-        triangleMin, triangleMax, fmGain
+        triangleMin, triangleMax, fmGain,
+        diffA, blendA, diffB, blendB,
+        diffAnd, blendAnd, diffOr, blendOr
     )
-    
+
     // Compatibility Accessors
     val frequencyA: AudioInput get() = inputA.input
     val frequencyB: AudioInput get() = inputB.input
@@ -222,6 +239,12 @@ class DuoLfoPlugin(
     )
 
     override fun initialize() {
+        // Set oscillator amplitudes (default is 0)
+        lfoASquare.amplitude.set(1.0)
+        lfoBSquare.amplitude.set(1.0)
+        lfoATriangle.amplitude.set(1.0)
+        lfoBTriangle.amplitude.set(1.0)
+
         // WIRING
         // Base Frequencies -> Mixers (inputA of each)
         inputA.output.connect(freqAModMixer.inputA)
@@ -280,16 +303,51 @@ class DuoLfoPlugin(
         lfoATriangle.output.connect(triangleMax.inputA)
         lfoBTriangle.output.connect(triangleMax.inputB)
 
-        // Initial Output: Triangle AND (MIN)
-        triangleMin.output.connect(outputProxy.input)
-        
-        // Initial Separate Outputs
-        lfoATriangle.output.connect(outputAProxy.input)
-        lfoBTriangle.output.connect(outputBProxy.input)
+        // --- Shape crossfade wiring (permanent) ---
+        // Lerp formula: out = sq + (tri - sq) * shape
+        // diff = MultiplyAdd: sq * (-1) + tri   → (tri - sq)
+        // blend = MultiplyAdd: diff * shape + sq → sq + (tri-sq)*shape
+
+        // Individual output A
+        lfoASquare.output.connect(diffA.inputA)
+        diffA.inputB.set(-1.0)
+        lfoATriangle.output.connect(diffA.inputC)
+        diffA.output.connect(blendA.inputA)
+        // blendA.inputB = shape (set via updateBlend)
+        lfoASquare.output.connect(blendA.inputC)
+        blendA.output.connect(outputAProxy.input)
+
+        // Individual output B
+        lfoBSquare.output.connect(diffB.inputA)
+        diffB.inputB.set(-1.0)
+        lfoBTriangle.output.connect(diffB.inputC)
+        diffB.output.connect(blendB.inputA)
+        lfoBSquare.output.connect(blendB.inputC)
+        blendB.output.connect(outputBProxy.input)
+
+        // Combined AND: sq=toBipolarAnd, tri=triangleMin
+        toBipolarAnd.output.connect(diffAnd.inputA)
+        diffAnd.inputB.set(-1.0)
+        triangleMin.output.connect(diffAnd.inputC)
+        diffAnd.output.connect(blendAnd.inputA)
+        toBipolarAnd.output.connect(blendAnd.inputC)
+
+        // Combined OR: sq=toBipolarOr, tri=triangleMax
+        toBipolarOr.output.connect(diffOr.inputA)
+        diffOr.inputB.set(-1.0)
+        triangleMax.output.connect(diffOr.inputC)
+        diffOr.output.connect(blendOr.inputA)
+        toBipolarOr.output.connect(blendOr.inputC)
+
+        // Set initial shape (1.0 → full triangle)
+        updateBlend(_shape)
+
+        // Initial combined output: AND mode
+        blendAnd.output.connect(outputProxy.input)
 
         audioUnits.forEach { audioEngine.addUnit(it) }
     }
-    
+
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
@@ -298,38 +356,25 @@ class DuoLfoPlugin(
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
+    /** Set shape on all 4 blend MultiplyAdd units (inputB = shape). */
+    private fun updateBlend(shape: Float) {
+        val s = shape.toDouble()
+        blendA.inputB.set(s)
+        blendB.inputB.set(s)
+        blendAnd.inputB.set(s)
+        blendOr.inputB.set(s)
+    }
+
+    /** Switch combined output between AND and OR blended paths. */
     private fun updateOutput() {
         outputProxy.input.disconnectAll()
-        outputAProxy.input.disconnectAll()
-        outputBProxy.input.disconnectAll()
-
-        if (isTriangleMode) {
-            // Raw outputs
-            lfoATriangle.output.connect(outputAProxy.input)
-            lfoBTriangle.output.connect(outputBProxy.input)
-
-            // Triangle mode
-            if (isAndMode) {
-                triangleMin.output.connect(outputProxy.input)
-            } else {
-                triangleMax.output.connect(outputProxy.input)
-            }
+        if (isAndMode) {
+            blendAnd.output.connect(outputProxy.input)
         } else {
-            // Raw outputs (Square)
-            lfoASquare.output.connect(outputAProxy.input)
-            lfoBSquare.output.connect(outputBProxy.input)
-
-            // Square mode
-            if (isAndMode) {
-                toBipolarAnd.output.connect(outputProxy.input)
-            } else {
-                toBipolarOr.output.connect(outputProxy.input)
-            }
+            blendOr.output.connect(outputProxy.input)
         }
     }
 
-
-    
     fun getCurrentValue(): Float = outputProxy.getInstantaneousValue().toFloat().coerceIn(-1f, 1f)
     fun getCurrentValueA(): Float = outputAProxy.getInstantaneousValue().toFloat().coerceIn(-1f, 1f)
     fun getCurrentValueB(): Float = outputBProxy.getInstantaneousValue().toFloat().coerceIn(-1f, 1f)

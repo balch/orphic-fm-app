@@ -28,7 +28,7 @@ actual class MetaballsRenderer {
             shaderBuilder = runtimeEffect?.let { RuntimeShaderBuilder(it) }
         } catch (e: Exception) {
             // Shader compilation failed - will fall back to Canvas
-            println("[Orpheus] WARNING: Metaballs shader compilation failed: ${e.message}")
+            // Shader compilation failed — will fall back to Canvas rendering
         }
     }
     

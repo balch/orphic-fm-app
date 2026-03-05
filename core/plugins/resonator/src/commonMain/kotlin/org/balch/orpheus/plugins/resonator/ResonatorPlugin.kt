@@ -15,9 +15,9 @@ import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
 import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.RESONATOR_URI
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 
@@ -259,7 +259,7 @@ class ResonatorPlugin(
         bypassSumR.output.connect(finalSumR.inputB)
         
         // Apply initial settings
-        resonator.setEnabled(true)
+        resonator.setResonatorEnabled(true)
         resonator.setMode(_mode)
         resonator.setStructure(_structure)
         resonator.setBrightness(_brightness)

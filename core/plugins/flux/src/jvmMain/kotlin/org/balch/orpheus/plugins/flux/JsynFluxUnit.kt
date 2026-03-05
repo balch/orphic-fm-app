@@ -6,9 +6,9 @@ import com.jsyn.unitgen.UnitGenerator
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.FluxUnit
-import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
 import org.balch.orpheus.core.audio.dsp.JsynAudioInput
 import org.balch.orpheus.core.audio.dsp.JsynAudioOutput
+import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
 import org.balch.orpheus.plugins.flux.engine.FluxProcessor
 
 /**
@@ -90,6 +90,15 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         jsynPulseWidth.set(0.5)
     }
 
+    // Float conversion buffers (FluxProcessor uses FloatArray, JSyn ports use DoubleArray)
+    private var clockFloat = FloatArray(0)
+    private var outX1Float = FloatArray(0)
+    private var outX2Float = FloatArray(0)
+    private var outX3Float = FloatArray(0)
+    private var outT1Float = FloatArray(0)
+    private var outT2Float = FloatArray(0)
+    private var outT3Float = FloatArray(0)
+
     @Volatile private var bypass = true
     @Volatile private var mix = 0.0f
     override fun setBypass(bypass: Boolean) { this.bypass = bypass }
@@ -106,6 +115,18 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     override fun generate(start: Int, end: Int) {
         val count = end - start
         if (count <= 0) return
+
+        // Ensure Float conversion buffers are large enough
+        if (clockFloat.size < end) {
+            val sz = end
+            clockFloat = FloatArray(sz)
+            outX1Float = FloatArray(sz)
+            outX2Float = FloatArray(sz)
+            outX3Float = FloatArray(sz)
+            outT1Float = FloatArray(sz)
+            outT2Float = FloatArray(sz)
+            outT3Float = FloatArray(sz)
+        }
 
         if (bypass) {
             for (i in start until end) {
@@ -130,18 +151,32 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
         processor.setGateProbability(jsynProbability.values[start].toFloat())
         processor.setPulseWidth(jsynPulseWidth.values[start].toFloat())
 
-        // Delegate block processing to FluxProcessor
+        // Convert JSyn Double clock -> Float
+        for (i in start until end) {
+            clockFloat[i] = jsynClock.values[i].toFloat()
+        }
+
+        // Process with Float-native buffers
         processor.process(
-            clockIn = jsynClock.values,
-            outputX1 = jsynOutputX1.values,
-            outputX2 = jsynOutput.values,
-            outputX3 = jsynOutputX3.values,
-            outputT1 = jsynOutputT1.values,
-            outputT2 = jsynOutputT2.values,
-            outputT3 = jsynOutputT3.values,
+            clockIn = clockFloat,
+            outputX1 = outX1Float,
+            outputX2 = outX2Float,
+            outputX3 = outX3Float,
+            outputT1 = outT1Float,
+            outputT2 = outT2Float,
+            outputT3 = outT3Float,
             start = start,
             size = count
         )
 
+        // Convert Float outputs -> JSyn Double ports
+        for (i in start until end) {
+            jsynOutputX1.values[i] = outX1Float[i].toDouble()
+            jsynOutput.values[i] = outX2Float[i].toDouble()
+            jsynOutputX3.values[i] = outX3Float[i].toDouble()
+            jsynOutputT1.values[i] = outT1Float[i].toDouble()
+            jsynOutputT2.values[i] = outT2Float[i].toDouble()
+            jsynOutputT3.values[i] = outT3Float[i].toDouble()
+        }
     }
 }

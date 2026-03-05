@@ -22,3 +22,9 @@ class JsynPeakFollowerFactory @Inject constructor() : PeakFollower.Factory {
 class JsynLimiterFactory @Inject constructor() : Limiter.Factory {
     override fun create(): Limiter = JsynLimiter()
 }
+
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
+class JsynHardClipFactory @Inject constructor() : HardClip.Factory {
+    override fun create(): HardClip = JsynHardClip()
+}

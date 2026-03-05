@@ -27,7 +27,6 @@ kotlin {
         }
         val androidMain by getting {
             dependencies {
-                implementation(libs.jsyn)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }

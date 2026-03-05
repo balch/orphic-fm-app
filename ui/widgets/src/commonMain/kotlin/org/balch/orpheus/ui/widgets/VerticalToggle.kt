@@ -58,7 +58,6 @@ fun VerticalToggle(
             .let {
                 if (enabled && !isActive) {
                     it.clickable {
-                        println("[VerticalToggle] Clicked! Current isTop=$isTop -> New: ${!isTop}")
                         onToggle(!isTop)
                     }
                 } else {

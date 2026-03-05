@@ -10,9 +10,7 @@ Orphic-FM is an 8-oscillator Synthesizer Emulator combining sounds and harmonics
 
 This instrument is inspired by the [Lyra-8 Orgasmic Synthesizer](https://somasynths.com/lyra-organismic-synthesizer/) and adds additional synthesis engines ported from the awesome OSS [Mutable Instruments' Eurorack firmware](https://github.com/pichenettes/eurorack) repository – FM, virtual analog, granular, physical modeling strings, modal resonators, additive, waveshaping, speech synthesis, and four drum voices.
 
-Under the hood [JSyn](http://www.softsynth.com/jsyn/) does the heavy audio lifting by providing a high-performance audio engine for real-time audio synthesis, wrapped in a Java API which works well from a Kotlin Multiplatform JVM perspective. I mainly run the app on **desktop** for it's form and **CPU** capabilities, but I also needed an Android Mobile version to play around with on my phone 
-
-**(headache-saver: Android only runs smoothly on release builds)**. 
+Under the hood, **Desktop** uses [JSyn](http://www.softsynth.com/jsyn/) for real-time audio synthesis -- a high-performance engine wrapped in a Java API that works for Kotlin JVM. I mainly run the app on **desktop** for its form and **CPU** capabilities, but I also needed an Android Mobile version to play around with on my phone. **Android** uses [Oboe](https://github.com/google/oboe) (Google's C++ low-latency audio library) with a fully Kotlin-native DSP graph running at 48kHz.
 
 I had multiple motivations for building this project, but I mainly did it because I've always wanted to build some kind of instrument, and now AI agents make that possible. AI played a big part in the development, and it will be interesting to see what happens as Orpheus learns to master the synth. 
 
@@ -101,7 +99,7 @@ The fusion algorithm boosts confidence when both classifiers agree and penalizes
 | Platform | Audio | Status |
 |----------|-------|--------|
 | Desktop (JVM) | JSyn | Primary target |
-| Android | JSyn | Full support |
+| Android | Oboe (C++ / JNI) + Kotlin DSP | Full support |
 | wasmJs | -- | Disabled (pending Kotlin 2.3.20+ for Metro cross-module aggregation) |
 | iOS | -- | Skeleton |
 
@@ -199,7 +197,8 @@ For example on macOS with [jenv](https://www.jenv.be/): `org.gradle.java.home=/U
 | [Material3](https://developer.android.com/jetpack/compose/designsystems/material3) | Material Design 3 components and adaptive layouts                                                                |
 | [Liquid](https://github.com/FletchMcKee/liquid)                                    | Glassmorphism blur effects for Compose                                                                           |
 | [Metro](https://github.com/ZacSweers/metro)                                        | Compile-time dependency injection for Kotlin by Zac Sweers                                                       |
-| [JSyn](http://www.softsynth.com/jsyn/)                                             | Real-time audio synthesis library by Phil Burk                                                                   |
+| [JSyn](http://www.softsynth.com/jsyn/)                                             | Real-time audio synthesis library by Phil Burk (Desktop)                                                         |
+| [Oboe](https://github.com/google/oboe)                                            | Google's C++ low-latency audio library for Android                                                               |
 | [Tidal Cycles](https://tidalcycles.org/)                                           | A REPL (Read-Eval-Print Loop) language for Live Coding Musical patterns                                          |
 | [Strudel](https://strudel.cc/)                                                     | JS Live Coding Music Editor used for inspiration                                                                 |
 | [ktmidi](https://github.com/atsushieno/ktmidi)                                     | Kotlin Multiplatform MIDI I/O                                                                                    |
