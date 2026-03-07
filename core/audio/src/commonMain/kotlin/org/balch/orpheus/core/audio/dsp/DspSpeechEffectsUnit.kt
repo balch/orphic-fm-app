@@ -32,11 +32,12 @@ class DspSpeechEffectsUnit : SpeechEffectsUnit, DspProcessable {
     private val phaserBuf = FloatArray(PHASER_STAGES)
     private var phaserLfoPhase = 0.0
 
-    // --- Feedback delay state (~250ms circular buffer, allocated at runtime) ---
+    // --- Feedback delay state (~250ms circular buffer, recomputed in allocateBuffers) ---
     private var delaySamples = (dspSampleRate * 0.25f).toInt()
     private var delayBuffer = FloatArray(delaySamples)
     private var delayWritePos = 0
     private var delayFeedbackSample = 0f
+    private val DELAY_SECONDS = 0.25f
 
     // --- Schroeder reverb state ---
     private val COMB_LENGTHS = intArrayOf(1116, 1188, 1277, 1356)
@@ -171,6 +172,11 @@ class DspSpeechEffectsUnit : SpeechEffectsUnit, DspProcessable {
         dspInputR.allocate(maxFrames)
         dspOutputL.allocate(maxFrames)
         dspOutputR.allocate(maxFrames)
+
+        // Recompute delay buffer using actual sample rate (set by platform before allocate)
+        delaySamples = (dspSampleRate * DELAY_SECONDS).toInt()
+        delayBuffer = FloatArray(delaySamples)
+        delayWritePos = 0
     }
 
     private val inputPorts = listOf(dspInputL, dspInputR)
