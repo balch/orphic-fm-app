@@ -2,6 +2,18 @@
 
 package org.balch.orpheus.worker
 
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_INIT
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_BEND
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DELAY_MIX
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DRIVE
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_MASTER_VOLUME
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_PORT
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_VIBRATO
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_START
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_STOP
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_TRIGGER_DRUM
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_VOICE_GATE
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_VOICE_TUNE
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.dsp.dspSampleRate
 import org.balch.orpheus.core.plugin.PortValue
@@ -75,18 +87,5 @@ class CommandDispatcher(private val engine: SynthEngine) {
         setter(value)
     }
 
-    companion object {
-        const val CMD_INIT = 0
-        const val CMD_START = 1
-        const val CMD_STOP = 2
-        const val CMD_SET_PORT = 10
-        const val CMD_VOICE_GATE = 11
-        const val CMD_VOICE_TUNE = 12
-        const val CMD_TRIGGER_DRUM = 13
-        const val CMD_SET_MASTER_VOLUME = 20
-        const val CMD_SET_DRIVE = 21
-        const val CMD_SET_DELAY_MIX = 22
-        const val CMD_SET_VIBRATO = 23
-        const val CMD_SET_BEND = 24
-    }
+    // Command IDs sourced from DspWorkerProtocol in core:foundation
 }
