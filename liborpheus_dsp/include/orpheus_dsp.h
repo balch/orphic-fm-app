@@ -48,6 +48,8 @@ void orpheus_engine_set_voice_decay(OrpheusEngine* engine,
                                     int index, float value);
 void orpheus_engine_set_voice_active(OrpheusEngine* engine,
                                       int index, int active);
+void orpheus_engine_set_voice_hold(OrpheusEngine* engine,
+                                    int index, float level);
 void orpheus_engine_trigger_drum(OrpheusEngine* engine,
                                  int drum_index, float accent);
 

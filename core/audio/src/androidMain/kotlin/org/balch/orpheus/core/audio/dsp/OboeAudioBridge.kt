@@ -36,6 +36,7 @@ class OboeAudioBridge {
     external fun nativeSetVoiceMorph(index: Int, value: Float)
     external fun nativeSetVoiceDecay(index: Int, value: Float)
     external fun nativeSetVoiceActive(index: Int, active: Boolean)
+    external fun nativeSetVoiceHold(index: Int, level: Float)
     external fun nativeTriggerDrum(drumIndex: Int, accent: Float)
     external fun nativeSetMasterVolume(value: Float)
     external fun nativeSetDrive(value: Float)

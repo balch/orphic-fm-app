@@ -15,6 +15,7 @@ interface NativeDspBridge {
     fun nativeSetVoiceMorph(index: Int, value: Float)
     fun nativeSetVoiceDecay(index: Int, value: Float)
     fun nativeSetVoiceActive(index: Int, active: Boolean)
+    fun nativeSetVoiceHold(index: Int, level: Float)
     fun nativeSetMasterVolume(value: Float)
     fun nativeSetDrive(value: Float)
     fun nativeSetDelayMix(value: Float)

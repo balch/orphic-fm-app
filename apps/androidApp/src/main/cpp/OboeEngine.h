@@ -37,6 +37,7 @@ public:
     void setVoiceMorph(int index, float value);
     void setVoiceDecay(int index, float value);
     void setVoiceActive(int index, int active);
+    void setVoiceHold(int index, float level);
     void triggerDrum(int drumIndex, float accent);
     void setMasterVolume(float v);
     void setDrive(float v);

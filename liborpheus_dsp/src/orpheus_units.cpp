@@ -268,6 +268,33 @@ void unit_init(GraphUnit* u, float sr) {
 
 // -- MI Module Wrappers ------------------------------------
 
+// -- ADSR + Hold helpers for per-voice amplitude envelope --
+
+// Compute ADSR parameters from envSpeed (0.0=fast, 1.0=slow/drone)
+// Matches Kotlin: eased = speed², then interpolate ADSR ranges
+static void compute_adsr_from_speed(float speed, float sr,
+                                     float& attack_rate, float& decay_coeff,
+                                     float& sustain_level, float& release_coeff) {
+    float eased = speed * speed;
+    float attack_s  = 0.005f + eased * 2.995f;   // 5ms – 3s
+    float decay_s   = 0.05f  + eased * 2.95f;    // 50ms – 3s
+    sustain_level    = 0.8f   + eased * 0.2f;     // 0.8 – 1.0
+    float release_s = 0.1f   + eased * 3.9f;     // 100ms – 4s
+
+    attack_rate   = 1.0f / (attack_s * sr);
+    decay_coeff   = std::exp(-1.0f / (decay_s * sr));
+    release_coeff = std::exp(-1.0f / (release_s * sr));
+}
+
+// Compute scaled hold matching Kotlin: (hold^(4-speed*3)) × (0.5+speed*1.5)
+static float compute_scaled_hold(float hold, float speed) {
+    if (hold < 0.001f) return 0.0f;
+    float exponent = 4.0f - speed * 3.0f;        // 4.0 at speed=0, 1.0 at speed=1
+    float scale_factor = 0.5f + speed * 1.5f;    // 0.5 at speed=0, 2.0 at speed=1
+    float eased_hold = std::pow(hold, exponent);
+    return std::min(1.0f, eased_hold * scale_factor);
+}
+
 void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
     int idx = u->state.module.index;
     if (idx < 0 || idx >= kNumVoices) return;
@@ -276,60 +303,161 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     if (!vp.active.load(std::memory_order_relaxed)) return;
     if (!vp.ever_triggered.load(std::memory_order_relaxed)) return;
 
-    auto& voice = engine->voices_dsp[idx];
     float* out = u->output_buffers[OPORT_OUT];
+    int engine_index = vp.engine_index.load(std::memory_order_relaxed);
+    int actual_gate = vp.gate.load(std::memory_order_relaxed);
+    float env_speed = vp.decay.load(std::memory_order_relaxed); // envSpeed stored in decay
+    float raw_hold = engine->voice_hold_level[idx].load(std::memory_order_relaxed);
+    float scaled_hold = compute_scaled_hold(raw_hold, env_speed);
 
-    plaits::Patch patch;
-    patch.engine = vp.engine_index.load(std::memory_order_relaxed);
-    patch.note = vp.tune.load(std::memory_order_relaxed);
-    patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
-    patch.timbre = vp.timbre.load(std::memory_order_relaxed);
-    patch.morph = vp.morph.load(std::memory_order_relaxed);
-    patch.frequency_modulation_amount = 0.0f;
-    patch.timbre_modulation_amount = 0.0f;
-    patch.morph_modulation_amount = 0.0f;
-    patch.decay = vp.decay.load(std::memory_order_relaxed);
-    patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
+    // Smooth hold ramp (~20ms) to avoid clicks
+    auto& osc = engine->voice_osc_state[idx];
+    float hold_coeff = 1.0f - std::exp(-1.0f / (0.02f * sr));
 
-    plaits::Modulations mod;
-    std::memset(&mod, 0, sizeof(mod));
-    int current_gate = vp.gate.load(std::memory_order_relaxed);
-    mod.trigger = current_gate ? 1.0f : 0.0f;
-    mod.trigger_patched = true;
+    // Compute ADSR parameters from envSpeed
+    float attack_rate, decay_coeff, sustain_level, release_coeff;
+    compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
+                             sustain_level, release_coeff);
 
-    bool is_speech = (patch.engine == 15);
-    if (is_speech) {
-        mod.level_patched = true;
-        mod.level = current_gate ? 1.0f : 0.0f;
-    } else {
-        mod.level_patched = false;
-    }
+    if (engine_index < 0) {
+        // ═══ ENGINE 0 (OSC MODE): Triangle + Square with ADSR + Hold ═══
+        float note = vp.tune.load(std::memory_order_relaxed);
+        float freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
+        float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
 
-    const float inv_32768 = 1.0f / 32768.0f;
-    int frames_done = 0;
-    float voice_peak = 0.0f;
-    while (frames_done < num_frames) {
-        int block = std::min(static_cast<int>(plaits::kBlockSize),
-                             num_frames - frames_done);
+        float voice_peak = 0.0f;
+        for (int i = 0; i < num_frames; i++) {
+            // Triangle oscillator: 4×|phase-0.5| - 1
+            float tri = 4.0f * std::fabs(osc.tri_phase - 0.5f) - 1.0f;
+            // Square oscillator
+            float sq = (osc.sq_phase < 0.5f) ? 1.0f : -1.0f;
 
-        plaits::Voice::Frame frames[plaits::kMaxBlockSize];
-        voice.Render(patch, mod, frames, block);
+            // Crossfade: (tri × (1-sharp)) + (sq × sharp)
+            float audio = tri * (1.0f - sharpness) + sq * sharpness;
 
-        for (int i = 0; i < block; i++) {
-            float sample = (frames[i].out + frames[i].aux) * 0.5f * inv_32768;
-            out[frames_done + i] = sample;
+            // Advance phases
+            float phase_inc = freq / sr;
+            osc.tri_phase += phase_inc;
+            osc.tri_phase -= std::floor(osc.tri_phase);
+            osc.sq_phase += phase_inc;
+            osc.sq_phase -= std::floor(osc.sq_phase);
+
+            // ADSR envelope
+            bool gate_on = actual_gate != 0;
+            if (gate_on && !osc.env_gate_was_on) osc.env_stage = 1;
+            if (!gate_on && osc.env_gate_was_on) osc.env_stage = 4;
+            osc.env_gate_was_on = gate_on;
+
+            switch (osc.env_stage) {
+                case 1: // ATTACK
+                    osc.env_level += attack_rate;
+                    if (osc.env_level >= 1.0f) { osc.env_level = 1.0f; osc.env_stage = 2; }
+                    break;
+                case 2: // DECAY
+                    osc.env_level = sustain_level +
+                                    (osc.env_level - sustain_level) * decay_coeff;
+                    if (osc.env_level - sustain_level < 0.0001f) {
+                        osc.env_level = sustain_level; osc.env_stage = 3;
+                    }
+                    break;
+                case 3: // SUSTAIN
+                    osc.env_level = sustain_level;
+                    break;
+                case 4: // RELEASE
+                    osc.env_level *= release_coeff;
+                    if (osc.env_level < 0.0001f) { osc.env_level = 0.0f; osc.env_stage = 0; }
+                    break;
+                default: // IDLE
+                    osc.env_level = 0.0f;
+                    break;
+            }
+
+            // Hold ramp (smoothed to avoid clicks)
+            osc.hold_smoothed += hold_coeff * (scaled_hold - osc.hold_smoothed);
+
+            // VCA = audio × (envelope + hold)
+            float vca = osc.env_level + osc.hold_smoothed;
+            float sample = audio * vca;
+            out[i] = sample;
+
             float abs_s = std::fabs(sample);
             if (abs_s > voice_peak) voice_peak = abs_s;
         }
 
-        frames_done += block;
-    }
+        engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);
 
-    engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);
+    } else {
+        // ═══ PLAITS ENGINES (1+): Render Plaits then apply Hold VCA ═══
+        auto& voice = engine->voices_dsp[idx];
 
-    // Clear gate for drum voices (one-shot triggers) so next trigger sees rising edge
-    if (idx >= kNumMainVoices && current_gate) {
-        vp.gate.store(0, std::memory_order_relaxed);
+        // If hold is active, force gate on for Plaits so its internal LPG stays open
+        int plaits_gate = actual_gate;
+        if (scaled_hold > 0.01f) plaits_gate = 1;
+
+        plaits::Patch patch;
+        patch.engine = engine_index;
+        patch.note = vp.tune.load(std::memory_order_relaxed);
+        patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
+        patch.timbre = vp.timbre.load(std::memory_order_relaxed);
+        patch.morph = vp.morph.load(std::memory_order_relaxed);
+        patch.frequency_modulation_amount = 0.0f;
+        patch.timbre_modulation_amount = 0.0f;
+        patch.morph_modulation_amount = 0.0f;
+        patch.decay = env_speed;
+        patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
+
+        plaits::Modulations mod;
+        std::memset(&mod, 0, sizeof(mod));
+        mod.trigger = plaits_gate ? 1.0f : 0.0f;
+        mod.trigger_patched = true;
+
+        bool is_speech = (engine_index == 15);
+        if (is_speech) {
+            mod.level_patched = true;
+            mod.level = plaits_gate ? 1.0f : 0.0f;
+        } else {
+            mod.level_patched = false;
+        }
+
+        const float inv_32768 = 1.0f / 32768.0f;
+        int frames_done = 0;
+        float voice_peak = 0.0f;
+
+        while (frames_done < num_frames) {
+            int block = std::min(static_cast<int>(plaits::kBlockSize),
+                                 num_frames - frames_done);
+
+            plaits::Voice::Frame frames[plaits::kMaxBlockSize];
+            voice.Render(patch, mod, frames, block);
+
+            for (int i = 0; i < block; i++) {
+                float sample = (frames[i].out + frames[i].aux) * 0.5f * inv_32768;
+
+                // Apply hold VCA for Plaits: when hold active, scale by hold level
+                // Hold ramp smoothed to avoid clicks
+                osc.hold_smoothed += hold_coeff * (scaled_hold - osc.hold_smoothed);
+
+                // For Plaits: if no hold, pass through at unity.
+                // If hold active but gate was off, the forced gate keeps Plaits
+                // producing; scale by hold level for volume control.
+                if (raw_hold > 0.001f && actual_gate == 0) {
+                    sample *= osc.hold_smoothed;
+                }
+
+                out[frames_done + i] = sample;
+                float abs_s = std::fabs(sample);
+                if (abs_s > voice_peak) voice_peak = abs_s;
+            }
+
+            frames_done += block;
+        }
+
+        engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);
+
+        // Clear gate for drum voices (one-shot triggers)
+        if (idx >= kNumMainVoices && actual_gate) {
+            vp.gate.store(0, std::memory_order_relaxed);
+        }
     }
 }
 

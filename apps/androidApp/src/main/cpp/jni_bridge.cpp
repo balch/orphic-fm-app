@@ -132,6 +132,12 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceActive(
 }
 
 JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceHold(
+        JNIEnv *env, jobject thiz, jint index, jfloat level) {
+    sEngine.setVoiceHold(index, level);
+}
+
+JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeTriggerDrum(
         JNIEnv *env, jobject thiz, jint drumIndex, jfloat accent) {
     sEngine.triggerDrum(drumIndex, accent);

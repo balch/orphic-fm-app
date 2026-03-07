@@ -110,6 +110,23 @@ struct OrpheusEngine {
     std::atomic<float> warps_level2{0.5f};
     std::atomic<int>   warps_bypass{1};         // bypassed by default
 
+    // ── Per-voice Engine 0 (OSC mode) state ─────────
+    // Used when engine_index == -1 (OSC mode): triangle+square with ADSR + hold
+    struct VoiceOscState {
+        float tri_phase = 0.0f;
+        float sq_phase = 0.0f;
+        // ADSR envelope
+        float env_level = 0.0f;
+        int   env_stage = 0;  // 0=idle, 1=attack, 2=decay, 3=sustain, 4=release
+        bool  env_gate_was_on = false;
+        // Smoothed hold ramp (20ms)
+        float hold_smoothed = 0.0f;
+    };
+    VoiceOscState voice_osc_state[kNumVoices];
+
+    // Per-voice hold level (0.0-1.0, raw from UI before scaling)
+    std::atomic<float> voice_hold_level[kNumVoices] = {};
+
     // Marbles random sequence generator (minimal stub for future integration)
     // Full integration requires clock system and modulation routing (Phase 4+)
     std::atomic<float> marbles_rate{0.5f};

@@ -726,6 +726,17 @@ void orpheus_engine_set_voice_active(OrpheusEngine* engine,
     }
 }
 
+void orpheus_engine_set_voice_hold(OrpheusEngine* engine,
+                                    int index, float level) {
+    if (index >= 0 && index < kNumVoices) {
+        engine->voice_hold_level[index].store(level, std::memory_order_relaxed);
+        // Ensure voice is activated when hold engages (even if never gated)
+        if (level > 0.001f) {
+            engine->voice_params[index].ever_triggered.store(1, std::memory_order_relaxed);
+        }
+    }
+}
+
 void orpheus_engine_set_voice_harmonics(OrpheusEngine* engine,
                                         int index, float value) {
     if (index >= 0 && index < kNumVoices) {

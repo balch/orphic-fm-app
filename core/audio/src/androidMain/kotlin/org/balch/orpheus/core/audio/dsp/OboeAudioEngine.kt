@@ -83,6 +83,7 @@ class OboeAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
     override fun nativeSetVoiceMorph(index: Int, value: Float) = bridge.nativeSetVoiceMorph(index, value)
     override fun nativeSetVoiceDecay(index: Int, value: Float) = bridge.nativeSetVoiceDecay(index, value)
     override fun nativeSetVoiceActive(index: Int, active: Boolean) = bridge.nativeSetVoiceActive(index, active)
+    override fun nativeSetVoiceHold(index: Int, level: Float) = bridge.nativeSetVoiceHold(index, level)
     override fun nativeSetMasterVolume(value: Float) = bridge.nativeSetMasterVolume(value)
     override fun nativeSetDrive(value: Float) = bridge.nativeSetDrive(value)
     override fun nativeSetDelayMix(value: Float) = bridge.nativeSetDelayMix(value)

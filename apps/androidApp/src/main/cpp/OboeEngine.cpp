@@ -145,6 +145,9 @@ void OboeEngine::setVoiceDecay(int index, float value) {
 void OboeEngine::setVoiceActive(int index, int active) {
     if (dsp_engine_) orpheus_engine_set_voice_active(dsp_engine_, index, active);
 }
+void OboeEngine::setVoiceHold(int index, float level) {
+    if (dsp_engine_) orpheus_engine_set_voice_hold(dsp_engine_, index, level);
+}
 void OboeEngine::triggerDrum(int drumIndex, float accent) {
     if (dsp_engine_) orpheus_engine_trigger_drum(dsp_engine_, drumIndex, accent);
 }

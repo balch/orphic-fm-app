@@ -77,11 +77,6 @@ class DspSynthEngine @Inject constructor(
     private var _drumsBypass = true
     private var _stereoMode = StereoMode.VOICE_PAN
 
-    // Hold tracking for C++ gate management:
-    // When hold > 0, gate stays on in C++ even when keyboard releases
-    private val holdActive = BooleanArray(12) { false }
-    private val gateState = BooleanArray(12) { false }
-
     // Drum Sources
     private val drumTriggerSources = IntArray(3) { 0 }
     private val drumPitchSources = IntArray(3) { 0 }
@@ -250,7 +245,15 @@ class DspSynthEngine @Inject constructor(
                     }
                     "duo_mod_source_level" -> voiceManager.setDuoModSourceLevel(index, value as Float)
                     "quad_pitch" -> voiceManager.setQuadPitch(index, value as Float)
-                    "quad_hold" -> voiceManager.setQuadHold(index, value as Float)
+                    "quad_hold" -> {
+                        voiceManager.setQuadHold(index, value as Float)
+                        // Forward raw hold to C++ for all voices in the quad
+                        val startVoice = index * 4
+                        val holdAmount = value as Float
+                        for (i in startVoice until (startVoice + 4).coerceAtMost(12)) {
+                            nativeBridge?.nativeSetVoiceHold(i, holdAmount)
+                        }
+                    }
                     "quad_volume" -> voiceManager.setQuadVolume(index, value as Float)
                     "quad_trigger_source" -> voiceManager.setQuadTriggerSource(index, value as Int)
                     "quad_pitch_source" -> voiceManager.setQuadPitchSource(index, value as Int)
@@ -669,14 +672,8 @@ class DspSynthEngine @Inject constructor(
         voiceManager.setVoiceTune(index, tune)
     }
     override fun setVoiceGate(index: Int, active: Boolean) {
-        if (index in 0 until 12) {
-            gateState[index] = active
-            // If hold is active and gate is going off, keep C++ gate on
-            val cppGate = active || holdActive[index]
-            nativeBridge?.nativeSetVoiceGate(index, cppGate)
-        } else {
-            nativeBridge?.nativeSetVoiceGate(index, active)
-        }
+        // Send actual gate state — C++ handles hold-based gate override internally
+        nativeBridge?.nativeSetVoiceGate(index, active)
         voiceManager.setVoiceGate(index, active)
     }
     override fun setVoiceFeedback(index: Int, amount: Float) { /* Not implemented yet */ }
@@ -686,33 +683,18 @@ class DspSynthEngine @Inject constructor(
     override fun setQuadPitch(quadIndex: Int, pitch: Float) = voiceManager.setQuadPitch(quadIndex, pitch)
     override fun setQuadHold(quadIndex: Int, amount: Float) {
         voiceManager.setQuadHold(quadIndex, amount)
-        // Forward hold to C++ as sustained gate
-        val isHeld = amount > 0.001f
+        // Forward raw hold level to C++ — it computes scaled hold using envSpeed internally
         val startVoice = quadIndex * 4
         for (i in startVoice until (startVoice + 4).coerceAtMost(12)) {
-            holdActive[i] = isHeld
-            if (isHeld) {
-                // Hold on: keep gate on in C++ regardless of keyboard state
-                nativeBridge?.nativeSetVoiceGate(i, true)
-            } else {
-                // Hold off: restore actual gate state
-                nativeBridge?.nativeSetVoiceGate(i, gateState[i])
-            }
+            nativeBridge?.nativeSetVoiceHold(i, amount)
         }
     }
     override fun setQuadVolume(quadIndex: Int, volume: Float) = voiceManager.setQuadVolume(quadIndex, volume)
     override fun fadeQuadVolume(quadIndex: Int, targetVolume: Float, durationSeconds: Float) = voiceManager.fadeQuadVolume(quadIndex, targetVolume, durationSeconds)
     override fun setVoiceHold(index: Int, amount: Float) {
         voiceManager.setVoiceHold(index, amount)
-        if (index in 0 until 12) {
-            val isHeld = amount > 0.001f
-            holdActive[index] = isHeld
-            if (isHeld) {
-                nativeBridge?.nativeSetVoiceGate(index, true)
-            } else {
-                nativeBridge?.nativeSetVoiceGate(index, gateState[index])
-            }
-        }
+        // Forward raw hold level to C++
+        nativeBridge?.nativeSetVoiceHold(index, amount)
     }
     override fun setVoiceWobble(index: Int, wobbleOffset: Float, range: Float) = voiceManager.setVoiceWobble(index, wobbleOffset, range)
     override fun setDuoModSource(duoIndex: Int, source: ModSource) = voiceManager.setDuoModSource(duoIndex, source)
@@ -968,7 +950,7 @@ class DspSynthEngine @Inject constructor(
      * 18: Particle, 19: String, 20: Modal, 21: BassDrum, 22: SnareDrum, 23: HiHat
      */
     private fun plaitsEngineOrdinalToCpp(engineOrdinal: Int): Int {
-        if (engineOrdinal <= 0) return 0 // off → default engine 0
+        if (engineOrdinal <= 0) return -1 // Engine 0 (OSC mode): triangle+square with ADSR+hold
         val idx = engineOrdinal - 1
         return if (idx < CPP_ENGINE_MAP.size) CPP_ENGINE_MAP[idx] else 0
     }
