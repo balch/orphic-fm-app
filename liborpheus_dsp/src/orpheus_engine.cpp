@@ -49,12 +49,24 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
 }
 
 void orpheus_engine_destroy(OrpheusEngine* engine) {
-    delete engine;
+    if (engine) {
+        delete engine->graph;
+        delete engine;
+    }
 }
 
 int orpheus_engine_load_patch(OrpheusEngine* engine,
                               const uint8_t* descriptor, size_t length) {
-    // TODO: parse descriptor, build graph
+    auto* new_graph = new OrpheusGraph();
+    int result = orpheus_graph_load(new_graph, descriptor, length,
+                                    engine->sample_rate);
+    if (result != 0) {
+        delete new_graph;
+        return result;
+    }
+    auto* old = engine->graph;
+    engine->graph = new_graph;
+    delete old;
     return 0;
 }
 
@@ -62,443 +74,448 @@ void orpheus_engine_process(OrpheusEngine* engine,
                             float* output_buffer, int num_frames) {
     if (!engine || !output_buffer || num_frames <= 0) return;
 
-    // Zero the output
     std::memset(output_buffer, 0, num_frames * 2 * sizeof(float));
 
-    const float volume = engine->master_volume.load(std::memory_order_relaxed);
-    const float inv_32768 = 1.0f / 32768.0f;
-
-    // Constant-power pan helper: pan in -1..+1 → L/R gains
-    auto compute_pan = [](float pan, float& gain_l, float& gain_r) {
-        float angle = ((pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
-        gain_l = std::cos(angle);
-        gain_r = std::sin(angle);
-    };
-
-    // Process each main voice
-    for (int v = 0; v < kNumMainVoices; v++) {
-        auto& vp = engine->voice_params[v];
-        if (!vp.active.load(std::memory_order_relaxed)) continue;
-        if (!vp.ever_triggered.load(std::memory_order_relaxed)) continue;
-        auto& voice = engine->voices_dsp[v];
-
-        // Precompute per-voice pan gains
-        float pan_l, pan_r;
-        compute_pan(engine->voice_pan[v].load(std::memory_order_relaxed), pan_l, pan_r);
-
-        // Build Plaits Patch from atomic params
-        plaits::Patch patch;
-        patch.engine = vp.engine_index.load(std::memory_order_relaxed);
-        patch.note = vp.tune.load(std::memory_order_relaxed);
-        patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
-        patch.timbre = vp.timbre.load(std::memory_order_relaxed);
-        patch.morph = vp.morph.load(std::memory_order_relaxed);
-        patch.frequency_modulation_amount = 0.0f;
-        patch.timbre_modulation_amount = 0.0f;
-        patch.morph_modulation_amount = 0.0f;
-        patch.decay = vp.decay.load(std::memory_order_relaxed);
-        patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
-
-        // Build Modulations — trigger is a FLOAT value, not an enum.
-        // Voice does its own Schmitt-trigger edge detection internally.
-        plaits::Modulations mod;
-        std::memset(&mod, 0, sizeof(mod));
-        int current_gate = vp.gate.load(std::memory_order_relaxed);
-        mod.trigger = current_gate ? 1.0f : 0.0f;
-        mod.trigger_patched = true;
-
-        // Speech engine (index 15) has already_enveloped=true, bypassing the LPG.
-        // Use level_patched to gate amplitude directly so voices are silent when gate=0.
-        // TODO: This causes hard cut-off mid-word. Add amplitude smoothing (short
-        //       fade-out envelope, ~50-100ms) so speech words complete before silence.
-        bool is_speech = (patch.engine == 15);
-        if (is_speech) {
-            mod.level_patched = true;
-            mod.level = current_gate ? 1.0f : 0.0f;
-        } else {
-            mod.level_patched = false;
-        }
-
-        // Render in kBlockSize (12) chunks
-        int frames_done = 0;
-        float voice_peak = 0.0f;
-
-        while (frames_done < num_frames) {
-            int block = std::min(static_cast<int>(plaits::kBlockSize),
-                                 num_frames - frames_done);
-
-            plaits::Voice::Frame frames[plaits::kMaxBlockSize];
-            voice.Render(patch, mod, frames, block);
-
-            // Mix into interleaved stereo with per-voice pan and volume
-            for (int i = 0; i < block; i++) {
-                // Combine out + aux as mono, then pan
-                float mono = (frames[i].out + frames[i].aux) * 0.5f * inv_32768 * volume;
-
-                int idx = (frames_done + i) * 2;
-                output_buffer[idx]     += mono * pan_l;
-                output_buffer[idx + 1] += mono * pan_r;
-
-                float abs_out = std::fabs(mono);
-                if (abs_out > voice_peak) voice_peak = abs_out;
-            }
-
-            frames_done += block;
-        }
-
-        engine->voice_levels[v].store(voice_peak, std::memory_order_relaxed);
-    }
-
-    // Process drum voices (voices 8-11, using Plaits drum engines)
-    for (int v = kNumMainVoices; v < kNumVoices; v++) {
-        auto& vp = engine->voice_params[v];
-        auto& voice = engine->voices_dsp[v];
-
-        // Precompute per-voice pan gains for drum voices
-        float pan_l, pan_r;
-        compute_pan(engine->voice_pan[v].load(std::memory_order_relaxed), pan_l, pan_r);
-
-        // Build Plaits Patch from atomic params
-        plaits::Patch patch;
-        patch.engine = vp.engine_index.load(std::memory_order_relaxed);
-        patch.note = vp.tune.load(std::memory_order_relaxed);
-        patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
-        patch.timbre = vp.timbre.load(std::memory_order_relaxed);
-        patch.morph = vp.morph.load(std::memory_order_relaxed);
-        patch.frequency_modulation_amount = 0.0f;
-        patch.timbre_modulation_amount = 0.0f;
-        patch.morph_modulation_amount = 0.0f;
-        patch.decay = vp.decay.load(std::memory_order_relaxed);
-        patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
-
-        // Build Modulations — trigger for one-shot drum hits
-        plaits::Modulations mod;
-        std::memset(&mod, 0, sizeof(mod));
-        int current_gate = vp.gate.load(std::memory_order_relaxed);
-        mod.trigger = current_gate ? 1.0f : 0.0f;
-        mod.trigger_patched = true;
-        mod.level_patched = false;
-
-        // Render in kBlockSize (12) chunks
-        int frames_done = 0;
-        float voice_peak = 0.0f;
-
-        while (frames_done < num_frames) {
-            int block = std::min(static_cast<int>(plaits::kBlockSize),
-                                 num_frames - frames_done);
-
-            plaits::Voice::Frame frames[plaits::kMaxBlockSize];
-            voice.Render(patch, mod, frames, block);
-
-            // Mix into interleaved stereo with per-voice pan and volume
-            for (int i = 0; i < block; i++) {
-                float mono = (frames[i].out + frames[i].aux) * 0.5f * inv_32768 * volume;
-
-                int idx = (frames_done + i) * 2;
-                output_buffer[idx]     += mono * pan_l;
-                output_buffer[idx + 1] += mono * pan_r;
-
-                float abs_out = std::fabs(mono);
-                if (abs_out > voice_peak) voice_peak = abs_out;
-            }
-
-            frames_done += block;
-        }
-
-        // Clear gate after rendering so drums are one-shot triggers
-        if (current_gate) {
-            vp.gate.store(0, std::memory_order_relaxed);
-        }
-
-        engine->voice_levels[v].store(voice_peak, std::memory_order_relaxed);
-    }
-
-    // Process through Clouds granular effect (if not bypassed)
-    if (!engine->clouds_bypass.load(std::memory_order_relaxed)) {
-        // Copy atomic parameters into the processor
-        auto* p = engine->clouds_processor.mutable_parameters();
-        p->position = engine->clouds_position.load(std::memory_order_relaxed);
-        p->size = engine->clouds_size.load(std::memory_order_relaxed);
-        p->pitch = engine->clouds_pitch.load(std::memory_order_relaxed);
-        p->density = engine->clouds_density.load(std::memory_order_relaxed);
-        p->texture = engine->clouds_texture.load(std::memory_order_relaxed);
-        p->dry_wet = engine->clouds_dry_wet.load(std::memory_order_relaxed);
-        p->feedback = engine->clouds_feedback.load(std::memory_order_relaxed);
-        p->reverb = engine->clouds_reverb.load(std::memory_order_relaxed);
-        p->freeze = engine->clouds_freeze.load(std::memory_order_relaxed) != 0;
-
-        engine->clouds_processor.set_playback_mode(
-            static_cast<clouds::PlaybackMode>(
-                engine->clouds_mode.load(std::memory_order_relaxed)));
-
-        // Prepare once per callback (not per block) — handles mode transitions
-        // and background computation. In firmware, Prepare() runs in idle loop.
-        engine->clouds_processor.Prepare();
-
-        // Process in kMaxBlockSize (32) chunks — Clouds uses ShortFrame I/O
-        int frames_done = 0;
-        while (frames_done < num_frames) {
-            int block = std::min(static_cast<int>(clouds::kMaxBlockSize),
-                                 num_frames - frames_done);
-
-            clouds::ShortFrame in_frames[clouds::kMaxBlockSize];
-            clouds::ShortFrame out_frames[clouds::kMaxBlockSize];
-
-            // Float interleaved → int16 stereo frames
-            for (int i = 0; i < block; i++) {
-                int idx = (frames_done + i) * 2;
-                float l = std::max(-1.0f, std::min(1.0f, output_buffer[idx]));
-                float r = std::max(-1.0f, std::min(1.0f, output_buffer[idx + 1]));
-                in_frames[i].l = static_cast<short>(l * 32767.0f);
-                in_frames[i].r = static_cast<short>(r * 32767.0f);
-            }
-
-            engine->clouds_processor.Process(in_frames, out_frames, block);
-
-            // int16 stereo frames → float interleaved
-            const float inv = 1.0f / 32768.0f;
-            for (int i = 0; i < block; i++) {
-                int idx = (frames_done + i) * 2;
-                output_buffer[idx]     = out_frames[i].l * inv;
-                output_buffer[idx + 1] = out_frames[i].r * inv;
-            }
-
-            frames_done += block;
-        }
-    }
-
-    // Process through Rings resonator (if not bypassed)
-    if (!engine->rings_bypass.load(std::memory_order_relaxed)) {
-        rings::Patch rings_patch;
-        rings_patch.structure = engine->rings_structure.load(std::memory_order_relaxed);
-        rings_patch.brightness = engine->rings_brightness.load(std::memory_order_relaxed);
-        rings_patch.damping = engine->rings_damping.load(std::memory_order_relaxed);
-        rings_patch.position = engine->rings_position.load(std::memory_order_relaxed);
-
-        rings::PerformanceState perf;
-        std::memset(&perf, 0, sizeof(perf));
-        perf.tonic = engine->rings_frequency.load(std::memory_order_relaxed);
-        perf.note = 0.0f;
-        perf.internal_exciter = engine->rings_internal_exciter.load(std::memory_order_relaxed) != 0;
-        perf.internal_strum = false;
-        perf.internal_note = false;
-
-        // Handle strum trigger (set from UI, cleared by audio thread)
-        int strum = engine->rings_strum.load(std::memory_order_relaxed);
-        perf.strum = strum != 0;
-        if (strum) {
-            engine->rings_strum.store(0, std::memory_order_relaxed);
-        }
-
-        engine->rings_part.set_model(
-            static_cast<rings::ResonatorModel>(
-                engine->rings_model.load(std::memory_order_relaxed)));
-        engine->rings_part.set_polyphony(
-            engine->rings_polyphony.load(std::memory_order_relaxed));
-
-        // Rings processes mono float in, stereo float out+aux
-        // De-interleave to mono, process in rings::kMaxBlockSize (24) chunks
-        int frames_done = 0;
-        while (frames_done < num_frames) {
-            int block = std::min(static_cast<int>(rings::kMaxBlockSize),
-                                 num_frames - frames_done);
-
-            float mono_in[rings::kMaxBlockSize];
-            float out_buf[rings::kMaxBlockSize];
-            float aux_buf[rings::kMaxBlockSize];
-
-            // Mix stereo to mono for Rings input
-            for (int i = 0; i < block; i++) {
-                int idx = (frames_done + i) * 2;
-                mono_in[i] = (output_buffer[idx] + output_buffer[idx + 1]) * 0.5f;
-            }
-
-            engine->rings_part.Process(perf, rings_patch, mono_in, out_buf, aux_buf, block);
-
-            // Clear strum after first block so it doesn't retrigger
-            perf.strum = false;
-
-            // Write stereo output (out=left, aux=right)
-            for (int i = 0; i < block; i++) {
-                int idx = (frames_done + i) * 2;
-                output_buffer[idx]     = out_buf[i];
-                output_buffer[idx + 1] = aux_buf[i];
-            }
-
-            frames_done += block;
-        }
-    }
-
-    // Process through Warps modulator (if not bypassed)
-    if (!engine->warps_bypass.load(std::memory_order_relaxed)) {
-        auto* wp = engine->warps_modulator.mutable_parameters();
-        wp->modulation_algorithm = engine->warps_algorithm.load(std::memory_order_relaxed);
-        wp->modulation_parameter = engine->warps_timbre.load(std::memory_order_relaxed);
-        wp->channel_drive[0] = engine->warps_level1.load(std::memory_order_relaxed);
-        wp->channel_drive[1] = engine->warps_level2.load(std::memory_order_relaxed);
-        wp->carrier_shape = 0;  // external carrier
-
-        // Process in warps::kMaxBlockSize (96) chunks — Warps uses ShortFrame I/O
-        int frames_done = 0;
-        while (frames_done < num_frames) {
-            int block = std::min(static_cast<int>(warps::kMaxBlockSize),
-                                 num_frames - frames_done);
-
-            warps::ShortFrame in_frames[warps::kMaxBlockSize];
-            warps::ShortFrame out_frames[warps::kMaxBlockSize];
-
-            // Float interleaved → int16 stereo frames
-            for (int i = 0; i < block; i++) {
-                int idx = (frames_done + i) * 2;
-                float l = std::max(-1.0f, std::min(1.0f, output_buffer[idx]));
-                float r = std::max(-1.0f, std::min(1.0f, output_buffer[idx + 1]));
-                in_frames[i].l = static_cast<short>(l * 32767.0f);
-                in_frames[i].r = static_cast<short>(r * 32767.0f);
-            }
-
-            engine->warps_modulator.Process(in_frames, out_frames, block);
-
-            // int16 stereo frames → float interleaved
-            const float inv = 1.0f / 32768.0f;
-            for (int i = 0; i < block; i++) {
-                int idx = (frames_done + i) * 2;
-                output_buffer[idx]     = out_frames[i].l * inv;
-                output_buffer[idx + 1] = out_frames[i].r * inv;
-            }
-
-            frames_done += block;
-        }
-    }
-
-    // ── Drive (tanh saturation) with dry/wet mix ─────
-    {
-        float drive = engine->drive_amount.load(std::memory_order_relaxed);
-        float dmix = engine->drive_mix.load(std::memory_order_relaxed);
-        if (dmix > 0.001f) {
-            float dry_amt = 1.0f - dmix;
-            for (int i = 0; i < num_frames; i++) {
-                int idx = i * 2;
-                float dry_l = output_buffer[idx];
-                float dry_r = output_buffer[idx + 1];
-                float wet_l = std::tanh(dry_l * drive);
-                float wet_r = std::tanh(dry_r * drive);
-                output_buffer[idx]     = dry_l * dry_amt + wet_l * dmix;
-                output_buffer[idx + 1] = dry_r * dry_amt + wet_r * dmix;
-            }
-        }
-    }
-
-    // ── Dual Delay ───────────────────────────────────
-    if (!engine->delay_bypass.load(std::memory_order_relaxed)) {
-        const float mix = engine->delay_mix.load(std::memory_order_relaxed);
-        const float fb = std::min(engine->delay_feedback.load(std::memory_order_relaxed), 0.95f);
-        const float sr = engine->sample_rate;
-
-        // Target delay times in samples (0..1 knob → 0.01..2.0s)
-        float target_1 = (0.01f + engine->delay_time_1.load(std::memory_order_relaxed) * 1.99f) * sr;
-        float target_2 = (0.01f + engine->delay_time_2.load(std::memory_order_relaxed) * 1.99f) * sr;
-
-        // Smooth delay times (~20ms ramp)
-        const float smooth_coeff = 1.0f - std::exp(-1.0f / (0.02f * sr));
-        engine->delay_time_1_smooth += (target_1 - engine->delay_time_1_smooth) * smooth_coeff;
-        engine->delay_time_2_smooth += (target_2 - engine->delay_time_2_smooth) * smooth_coeff;
-
-        int delay_samples_1 = std::max(1, std::min(static_cast<int>(engine->delay_time_1_smooth),
-                                                     OrpheusEngine::kMaxDelaySamples - 1));
-        int delay_samples_2 = std::max(1, std::min(static_cast<int>(engine->delay_time_2_smooth),
-                                                     OrpheusEngine::kMaxDelaySamples - 1));
-
-        const float dry = 1.0f - mix;
-        const int max_d = OrpheusEngine::kMaxDelaySamples;
-
-        for (int i = 0; i < num_frames; i++) {
-            int idx = i * 2;
-            float in_l = output_buffer[idx];
-            float in_r = output_buffer[idx + 1];
-
-            int wp = engine->delay_write_pos;
-
-            // Read from delay lines
-            int rp1 = (wp - delay_samples_1 + max_d) % max_d;
-            int rp2 = (wp - delay_samples_2 + max_d) % max_d;
-
-            float d1l = engine->delay_buffer_1l[rp1];
-            float d1r = engine->delay_buffer_1r[rp1];
-            float d2l = engine->delay_buffer_2l[rp2];
-            float d2r = engine->delay_buffer_2r[rp2];
-
-            // Write to delay lines (input + feedback)
-            engine->delay_buffer_1l[wp] = in_l + d1l * fb;
-            engine->delay_buffer_1r[wp] = in_r + d1r * fb;
-            engine->delay_buffer_2l[wp] = in_l + d2l * fb;
-            engine->delay_buffer_2r[wp] = in_r + d2r * fb;
-
-            // Mix: dry signal + wet (both delays summed)
-            float wet_l = (d1l + d2l) * 0.5f;
-            float wet_r = (d1r + d2r) * 0.5f;
-            output_buffer[idx]     = in_l * dry + wet_l * mix;
-            output_buffer[idx + 1] = in_r * dry + wet_r * mix;
-
-            engine->delay_write_pos = (wp + 1) % max_d;
-        }
-    }
-
-    // ── HyperLFO ─────────────────────────────────────
-    {
-        float freq_a = engine->lfo_freq_a.load(std::memory_order_relaxed);
-        float freq_b = engine->lfo_freq_b.load(std::memory_order_relaxed);
-        float shape = engine->lfo_shape.load(std::memory_order_relaxed);
-        int mode = engine->lfo_mode.load(std::memory_order_relaxed);
-        float sr = engine->sample_rate;
-
-        // Advance phases (compute once per callback for efficiency)
-        float inc_a = freq_a / sr * static_cast<float>(num_frames);
-        float inc_b = freq_b / sr * static_cast<float>(num_frames);
-        engine->lfo_phase_a += inc_a;
-        engine->lfo_phase_b += inc_b;
-        if (engine->lfo_phase_a >= 1.0f) engine->lfo_phase_a -= std::floor(engine->lfo_phase_a);
-        if (engine->lfo_phase_b >= 1.0f) engine->lfo_phase_b -= std::floor(engine->lfo_phase_b);
-
-        // Generate waveforms (bipolar -1..1)
-        auto gen_wave = [&](float phase) -> float {
-            float sq = phase < 0.5f ? 1.0f : -1.0f;
-            float tri = 4.0f * std::fabs(phase - 0.5f) - 1.0f;
-            return sq + (tri - sq) * shape; // lerp square→triangle
+    if (engine->graph) {
+        // Graph-based rendering
+        orpheus_graph_process(engine->graph, engine, output_buffer, num_frames);
+    } else {
+        // Fallback: existing procedural rendering (unchanged)
+        const float volume = engine->master_volume.load(std::memory_order_relaxed);
+        const float inv_32768 = 1.0f / 32768.0f;
+
+        // Constant-power pan helper: pan in -1..+1 → L/R gains
+        auto compute_pan = [](float pan, float& gain_l, float& gain_r) {
+            float angle = ((pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
+            gain_l = std::cos(angle);
+            gain_r = std::sin(angle);
         };
 
-        float a = gen_wave(engine->lfo_phase_a);
-        float b = gen_wave(engine->lfo_phase_b);
+        // Process each main voice
+        for (int v = 0; v < kNumMainVoices; v++) {
+            auto& vp = engine->voice_params[v];
+            if (!vp.active.load(std::memory_order_relaxed)) continue;
+            if (!vp.ever_triggered.load(std::memory_order_relaxed)) continue;
+            auto& voice = engine->voices_dsp[v];
 
-        // Logic combination
-        float output;
-        if (mode == 0) { // AND
-            float ua = a * 0.5f + 0.5f;
-            float ub = b * 0.5f + 0.5f;
-            output = (ua * ub) * 2.0f - 1.0f;
-        } else if (mode == 2) { // OR
-            float ua = a * 0.5f + 0.5f;
-            float ub = b * 0.5f + 0.5f;
-            output = (ua + ub - ua * ub) * 2.0f - 1.0f;
-        } else { // OFF (mode=1) — use A only
-            output = a;
+            // Precompute per-voice pan gains
+            float pan_l, pan_r;
+            compute_pan(engine->voice_pan[v].load(std::memory_order_relaxed), pan_l, pan_r);
+
+            // Build Plaits Patch from atomic params
+            plaits::Patch patch;
+            patch.engine = vp.engine_index.load(std::memory_order_relaxed);
+            patch.note = vp.tune.load(std::memory_order_relaxed);
+            patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
+            patch.timbre = vp.timbre.load(std::memory_order_relaxed);
+            patch.morph = vp.morph.load(std::memory_order_relaxed);
+            patch.frequency_modulation_amount = 0.0f;
+            patch.timbre_modulation_amount = 0.0f;
+            patch.morph_modulation_amount = 0.0f;
+            patch.decay = vp.decay.load(std::memory_order_relaxed);
+            patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
+
+            // Build Modulations — trigger is a FLOAT value, not an enum.
+            // Voice does its own Schmitt-trigger edge detection internally.
+            plaits::Modulations mod;
+            std::memset(&mod, 0, sizeof(mod));
+            int current_gate = vp.gate.load(std::memory_order_relaxed);
+            mod.trigger = current_gate ? 1.0f : 0.0f;
+            mod.trigger_patched = true;
+
+            // Speech engine (index 15) has already_enveloped=true, bypassing the LPG.
+            // Use level_patched to gate amplitude directly so voices are silent when gate=0.
+            // TODO: This causes hard cut-off mid-word. Add amplitude smoothing (short
+            //       fade-out envelope, ~50-100ms) so speech words complete before silence.
+            bool is_speech = (patch.engine == 15);
+            if (is_speech) {
+                mod.level_patched = true;
+                mod.level = current_gate ? 1.0f : 0.0f;
+            } else {
+                mod.level_patched = false;
+            }
+
+            // Render in kBlockSize (12) chunks
+            int frames_done = 0;
+            float voice_peak = 0.0f;
+
+            while (frames_done < num_frames) {
+                int block = std::min(static_cast<int>(plaits::kBlockSize),
+                                     num_frames - frames_done);
+
+                plaits::Voice::Frame frames[plaits::kMaxBlockSize];
+                voice.Render(patch, mod, frames, block);
+
+                // Mix into interleaved stereo with per-voice pan and volume
+                for (int i = 0; i < block; i++) {
+                    // Combine out + aux as mono, then pan
+                    float mono = (frames[i].out + frames[i].aux) * 0.5f * inv_32768 * volume;
+
+                    int idx = (frames_done + i) * 2;
+                    output_buffer[idx]     += mono * pan_l;
+                    output_buffer[idx + 1] += mono * pan_r;
+
+                    float abs_out = std::fabs(mono);
+                    if (abs_out > voice_peak) voice_peak = abs_out;
+                }
+
+                frames_done += block;
+            }
+
+            engine->voice_levels[v].store(voice_peak, std::memory_order_relaxed);
         }
 
-        engine->lfo_output_value = output;
-    }
+        // Process drum voices (voices 8-11, using Plaits drum engines)
+        for (int v = kNumMainVoices; v < kNumVoices; v++) {
+            auto& vp = engine->voice_params[v];
+            auto& voice = engine->voices_dsp[v];
 
-    // ── Master pan + soft-clip ─────────────────────────
-    {
-        float mp_l, mp_r;
-        compute_pan(engine->master_pan.load(std::memory_order_relaxed), mp_l, mp_r);
-        const float master_gain = 0.5f; // ~6dB headroom
-        for (int i = 0; i < num_frames; i++) {
-            int idx = i * 2;
-            output_buffer[idx]     = std::tanh(output_buffer[idx]     * mp_l * master_gain);
-            output_buffer[idx + 1] = std::tanh(output_buffer[idx + 1] * mp_r * master_gain);
+            // Precompute per-voice pan gains for drum voices
+            float pan_l, pan_r;
+            compute_pan(engine->voice_pan[v].load(std::memory_order_relaxed), pan_l, pan_r);
+
+            // Build Plaits Patch from atomic params
+            plaits::Patch patch;
+            patch.engine = vp.engine_index.load(std::memory_order_relaxed);
+            patch.note = vp.tune.load(std::memory_order_relaxed);
+            patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
+            patch.timbre = vp.timbre.load(std::memory_order_relaxed);
+            patch.morph = vp.morph.load(std::memory_order_relaxed);
+            patch.frequency_modulation_amount = 0.0f;
+            patch.timbre_modulation_amount = 0.0f;
+            patch.morph_modulation_amount = 0.0f;
+            patch.decay = vp.decay.load(std::memory_order_relaxed);
+            patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
+
+            // Build Modulations — trigger for one-shot drum hits
+            plaits::Modulations mod;
+            std::memset(&mod, 0, sizeof(mod));
+            int current_gate = vp.gate.load(std::memory_order_relaxed);
+            mod.trigger = current_gate ? 1.0f : 0.0f;
+            mod.trigger_patched = true;
+            mod.level_patched = false;
+
+            // Render in kBlockSize (12) chunks
+            int frames_done = 0;
+            float voice_peak = 0.0f;
+
+            while (frames_done < num_frames) {
+                int block = std::min(static_cast<int>(plaits::kBlockSize),
+                                     num_frames - frames_done);
+
+                plaits::Voice::Frame frames[plaits::kMaxBlockSize];
+                voice.Render(patch, mod, frames, block);
+
+                // Mix into interleaved stereo with per-voice pan and volume
+                for (int i = 0; i < block; i++) {
+                    float mono = (frames[i].out + frames[i].aux) * 0.5f * inv_32768 * volume;
+
+                    int idx = (frames_done + i) * 2;
+                    output_buffer[idx]     += mono * pan_l;
+                    output_buffer[idx + 1] += mono * pan_r;
+
+                    float abs_out = std::fabs(mono);
+                    if (abs_out > voice_peak) voice_peak = abs_out;
+                }
+
+                frames_done += block;
+            }
+
+            // Clear gate after rendering so drums are one-shot triggers
+            if (current_gate) {
+                vp.gate.store(0, std::memory_order_relaxed);
+            }
+
+            engine->voice_levels[v].store(voice_peak, std::memory_order_relaxed);
+        }
+
+        // Process through Clouds granular effect (if not bypassed)
+        if (!engine->clouds_bypass.load(std::memory_order_relaxed)) {
+            // Copy atomic parameters into the processor
+            auto* p = engine->clouds_processor.mutable_parameters();
+            p->position = engine->clouds_position.load(std::memory_order_relaxed);
+            p->size = engine->clouds_size.load(std::memory_order_relaxed);
+            p->pitch = engine->clouds_pitch.load(std::memory_order_relaxed);
+            p->density = engine->clouds_density.load(std::memory_order_relaxed);
+            p->texture = engine->clouds_texture.load(std::memory_order_relaxed);
+            p->dry_wet = engine->clouds_dry_wet.load(std::memory_order_relaxed);
+            p->feedback = engine->clouds_feedback.load(std::memory_order_relaxed);
+            p->reverb = engine->clouds_reverb.load(std::memory_order_relaxed);
+            p->freeze = engine->clouds_freeze.load(std::memory_order_relaxed) != 0;
+
+            engine->clouds_processor.set_playback_mode(
+                static_cast<clouds::PlaybackMode>(
+                    engine->clouds_mode.load(std::memory_order_relaxed)));
+
+            // Prepare once per callback (not per block) — handles mode transitions
+            // and background computation. In firmware, Prepare() runs in idle loop.
+            engine->clouds_processor.Prepare();
+
+            // Process in kMaxBlockSize (32) chunks — Clouds uses ShortFrame I/O
+            int frames_done = 0;
+            while (frames_done < num_frames) {
+                int block = std::min(static_cast<int>(clouds::kMaxBlockSize),
+                                     num_frames - frames_done);
+
+                clouds::ShortFrame in_frames[clouds::kMaxBlockSize];
+                clouds::ShortFrame out_frames[clouds::kMaxBlockSize];
+
+                // Float interleaved → int16 stereo frames
+                for (int i = 0; i < block; i++) {
+                    int idx = (frames_done + i) * 2;
+                    float l = std::max(-1.0f, std::min(1.0f, output_buffer[idx]));
+                    float r = std::max(-1.0f, std::min(1.0f, output_buffer[idx + 1]));
+                    in_frames[i].l = static_cast<short>(l * 32767.0f);
+                    in_frames[i].r = static_cast<short>(r * 32767.0f);
+                }
+
+                engine->clouds_processor.Process(in_frames, out_frames, block);
+
+                // int16 stereo frames → float interleaved
+                const float inv = 1.0f / 32768.0f;
+                for (int i = 0; i < block; i++) {
+                    int idx = (frames_done + i) * 2;
+                    output_buffer[idx]     = out_frames[i].l * inv;
+                    output_buffer[idx + 1] = out_frames[i].r * inv;
+                }
+
+                frames_done += block;
+            }
+        }
+
+        // Process through Rings resonator (if not bypassed)
+        if (!engine->rings_bypass.load(std::memory_order_relaxed)) {
+            rings::Patch rings_patch;
+            rings_patch.structure = engine->rings_structure.load(std::memory_order_relaxed);
+            rings_patch.brightness = engine->rings_brightness.load(std::memory_order_relaxed);
+            rings_patch.damping = engine->rings_damping.load(std::memory_order_relaxed);
+            rings_patch.position = engine->rings_position.load(std::memory_order_relaxed);
+
+            rings::PerformanceState perf;
+            std::memset(&perf, 0, sizeof(perf));
+            perf.tonic = engine->rings_frequency.load(std::memory_order_relaxed);
+            perf.note = 0.0f;
+            perf.internal_exciter = engine->rings_internal_exciter.load(std::memory_order_relaxed) != 0;
+            perf.internal_strum = false;
+            perf.internal_note = false;
+
+            // Handle strum trigger (set from UI, cleared by audio thread)
+            int strum = engine->rings_strum.load(std::memory_order_relaxed);
+            perf.strum = strum != 0;
+            if (strum) {
+                engine->rings_strum.store(0, std::memory_order_relaxed);
+            }
+
+            engine->rings_part.set_model(
+                static_cast<rings::ResonatorModel>(
+                    engine->rings_model.load(std::memory_order_relaxed)));
+            engine->rings_part.set_polyphony(
+                engine->rings_polyphony.load(std::memory_order_relaxed));
+
+            // Rings processes mono float in, stereo float out+aux
+            // De-interleave to mono, process in rings::kMaxBlockSize (24) chunks
+            int frames_done = 0;
+            while (frames_done < num_frames) {
+                int block = std::min(static_cast<int>(rings::kMaxBlockSize),
+                                     num_frames - frames_done);
+
+                float mono_in[rings::kMaxBlockSize];
+                float out_buf[rings::kMaxBlockSize];
+                float aux_buf[rings::kMaxBlockSize];
+
+                // Mix stereo to mono for Rings input
+                for (int i = 0; i < block; i++) {
+                    int idx = (frames_done + i) * 2;
+                    mono_in[i] = (output_buffer[idx] + output_buffer[idx + 1]) * 0.5f;
+                }
+
+                engine->rings_part.Process(perf, rings_patch, mono_in, out_buf, aux_buf, block);
+
+                // Clear strum after first block so it doesn't retrigger
+                perf.strum = false;
+
+                // Write stereo output (out=left, aux=right)
+                for (int i = 0; i < block; i++) {
+                    int idx = (frames_done + i) * 2;
+                    output_buffer[idx]     = out_buf[i];
+                    output_buffer[idx + 1] = aux_buf[i];
+                }
+
+                frames_done += block;
+            }
+        }
+
+        // Process through Warps modulator (if not bypassed)
+        if (!engine->warps_bypass.load(std::memory_order_relaxed)) {
+            auto* wp = engine->warps_modulator.mutable_parameters();
+            wp->modulation_algorithm = engine->warps_algorithm.load(std::memory_order_relaxed);
+            wp->modulation_parameter = engine->warps_timbre.load(std::memory_order_relaxed);
+            wp->channel_drive[0] = engine->warps_level1.load(std::memory_order_relaxed);
+            wp->channel_drive[1] = engine->warps_level2.load(std::memory_order_relaxed);
+            wp->carrier_shape = 0;  // external carrier
+
+            // Process in warps::kMaxBlockSize (96) chunks — Warps uses ShortFrame I/O
+            int frames_done = 0;
+            while (frames_done < num_frames) {
+                int block = std::min(static_cast<int>(warps::kMaxBlockSize),
+                                     num_frames - frames_done);
+
+                warps::ShortFrame in_frames[warps::kMaxBlockSize];
+                warps::ShortFrame out_frames[warps::kMaxBlockSize];
+
+                // Float interleaved → int16 stereo frames
+                for (int i = 0; i < block; i++) {
+                    int idx = (frames_done + i) * 2;
+                    float l = std::max(-1.0f, std::min(1.0f, output_buffer[idx]));
+                    float r = std::max(-1.0f, std::min(1.0f, output_buffer[idx + 1]));
+                    in_frames[i].l = static_cast<short>(l * 32767.0f);
+                    in_frames[i].r = static_cast<short>(r * 32767.0f);
+                }
+
+                engine->warps_modulator.Process(in_frames, out_frames, block);
+
+                // int16 stereo frames → float interleaved
+                const float inv = 1.0f / 32768.0f;
+                for (int i = 0; i < block; i++) {
+                    int idx = (frames_done + i) * 2;
+                    output_buffer[idx]     = out_frames[i].l * inv;
+                    output_buffer[idx + 1] = out_frames[i].r * inv;
+                }
+
+                frames_done += block;
+            }
+        }
+
+        // ── Drive (tanh saturation) with dry/wet mix ─────
+        {
+            float drive = engine->drive_amount.load(std::memory_order_relaxed);
+            float dmix = engine->drive_mix.load(std::memory_order_relaxed);
+            if (dmix > 0.001f) {
+                float dry_amt = 1.0f - dmix;
+                for (int i = 0; i < num_frames; i++) {
+                    int idx = i * 2;
+                    float dry_l = output_buffer[idx];
+                    float dry_r = output_buffer[idx + 1];
+                    float wet_l = std::tanh(dry_l * drive);
+                    float wet_r = std::tanh(dry_r * drive);
+                    output_buffer[idx]     = dry_l * dry_amt + wet_l * dmix;
+                    output_buffer[idx + 1] = dry_r * dry_amt + wet_r * dmix;
+                }
+            }
+        }
+
+        // ── Dual Delay ───────────────────────────────────
+        if (!engine->delay_bypass.load(std::memory_order_relaxed)) {
+            const float mix = engine->delay_mix.load(std::memory_order_relaxed);
+            const float fb = std::min(engine->delay_feedback.load(std::memory_order_relaxed), 0.95f);
+            const float sr = engine->sample_rate;
+
+            // Target delay times in samples (0..1 knob → 0.01..2.0s)
+            float target_1 = (0.01f + engine->delay_time_1.load(std::memory_order_relaxed) * 1.99f) * sr;
+            float target_2 = (0.01f + engine->delay_time_2.load(std::memory_order_relaxed) * 1.99f) * sr;
+
+            // Smooth delay times (~20ms ramp)
+            const float smooth_coeff = 1.0f - std::exp(-1.0f / (0.02f * sr));
+            engine->delay_time_1_smooth += (target_1 - engine->delay_time_1_smooth) * smooth_coeff;
+            engine->delay_time_2_smooth += (target_2 - engine->delay_time_2_smooth) * smooth_coeff;
+
+            int delay_samples_1 = std::max(1, std::min(static_cast<int>(engine->delay_time_1_smooth),
+                                                         OrpheusEngine::kMaxDelaySamples - 1));
+            int delay_samples_2 = std::max(1, std::min(static_cast<int>(engine->delay_time_2_smooth),
+                                                         OrpheusEngine::kMaxDelaySamples - 1));
+
+            const float dry = 1.0f - mix;
+            const int max_d = OrpheusEngine::kMaxDelaySamples;
+
+            for (int i = 0; i < num_frames; i++) {
+                int idx = i * 2;
+                float in_l = output_buffer[idx];
+                float in_r = output_buffer[idx + 1];
+
+                int wp = engine->delay_write_pos;
+
+                // Read from delay lines
+                int rp1 = (wp - delay_samples_1 + max_d) % max_d;
+                int rp2 = (wp - delay_samples_2 + max_d) % max_d;
+
+                float d1l = engine->delay_buffer_1l[rp1];
+                float d1r = engine->delay_buffer_1r[rp1];
+                float d2l = engine->delay_buffer_2l[rp2];
+                float d2r = engine->delay_buffer_2r[rp2];
+
+                // Write to delay lines (input + feedback)
+                engine->delay_buffer_1l[wp] = in_l + d1l * fb;
+                engine->delay_buffer_1r[wp] = in_r + d1r * fb;
+                engine->delay_buffer_2l[wp] = in_l + d2l * fb;
+                engine->delay_buffer_2r[wp] = in_r + d2r * fb;
+
+                // Mix: dry signal + wet (both delays summed)
+                float wet_l = (d1l + d2l) * 0.5f;
+                float wet_r = (d1r + d2r) * 0.5f;
+                output_buffer[idx]     = in_l * dry + wet_l * mix;
+                output_buffer[idx + 1] = in_r * dry + wet_r * mix;
+
+                engine->delay_write_pos = (wp + 1) % max_d;
+            }
+        }
+
+        // ── HyperLFO ─────────────────────────────────────
+        {
+            float freq_a = engine->lfo_freq_a.load(std::memory_order_relaxed);
+            float freq_b = engine->lfo_freq_b.load(std::memory_order_relaxed);
+            float shape = engine->lfo_shape.load(std::memory_order_relaxed);
+            int mode = engine->lfo_mode.load(std::memory_order_relaxed);
+            float sr = engine->sample_rate;
+
+            // Advance phases (compute once per callback for efficiency)
+            float inc_a = freq_a / sr * static_cast<float>(num_frames);
+            float inc_b = freq_b / sr * static_cast<float>(num_frames);
+            engine->lfo_phase_a += inc_a;
+            engine->lfo_phase_b += inc_b;
+            if (engine->lfo_phase_a >= 1.0f) engine->lfo_phase_a -= std::floor(engine->lfo_phase_a);
+            if (engine->lfo_phase_b >= 1.0f) engine->lfo_phase_b -= std::floor(engine->lfo_phase_b);
+
+            // Generate waveforms (bipolar -1..1)
+            auto gen_wave = [&](float phase) -> float {
+                float sq = phase < 0.5f ? 1.0f : -1.0f;
+                float tri = 4.0f * std::fabs(phase - 0.5f) - 1.0f;
+                return sq + (tri - sq) * shape; // lerp square→triangle
+            };
+
+            float a = gen_wave(engine->lfo_phase_a);
+            float b = gen_wave(engine->lfo_phase_b);
+
+            // Logic combination
+            float output;
+            if (mode == 0) { // AND
+                float ua = a * 0.5f + 0.5f;
+                float ub = b * 0.5f + 0.5f;
+                output = (ua * ub) * 2.0f - 1.0f;
+            } else if (mode == 2) { // OR
+                float ua = a * 0.5f + 0.5f;
+                float ub = b * 0.5f + 0.5f;
+                output = (ua + ub - ua * ub) * 2.0f - 1.0f;
+            } else { // OFF (mode=1) — use A only
+                output = a;
+            }
+
+            engine->lfo_output_value = output;
+        }
+
+        // ── Master pan + soft-clip ─────────────────────────
+        {
+            float mp_l, mp_r;
+            compute_pan(engine->master_pan.load(std::memory_order_relaxed), mp_l, mp_r);
+            const float master_gain = 0.5f; // ~6dB headroom
+            for (int i = 0; i < num_frames; i++) {
+                int idx = i * 2;
+                output_buffer[idx]     = std::tanh(output_buffer[idx]     * mp_l * master_gain);
+                output_buffer[idx + 1] = std::tanh(output_buffer[idx + 1] * mp_r * master_gain);
+            }
         }
     }
 
-    // Compute peak for monitoring
+    // Peak monitoring (always runs, regardless of graph/procedural path)
     float pk_l = 0.0f, pk_r = 0.0f;
     for (int i = 0; i < num_frames; i++) {
         float l = std::fabs(output_buffer[i * 2]);
@@ -514,6 +531,24 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                              const char* plugin_uri,
                              const char* symbol,
                              float value) {
+    // Route through graph if available
+    if (engine->graph) {
+        // Compute hash (must match Kotlin's hash16 function)
+        auto hash16 = [](const char* str) -> uint16_t {
+            uint16_t h = 0;
+            while (*str) {
+                h = h * 31 + static_cast<uint16_t>(*str);
+                str++;
+            }
+            return h;
+        };
+        uint16_t uh = hash16(plugin_uri);
+        uint16_t sh = hash16(symbol);
+        orpheus_graph_set_port(engine->graph, uh, sh, value);
+    }
+
+    // Also set engine atomics (for MI wrappers that read from atomics)
+    // Keep ALL existing strcmp chains below
     if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.grains") == 0) {
         if (std::strcmp(symbol, "position") == 0)
             engine->clouds_position.store(value, std::memory_order_relaxed);

@@ -2,6 +2,7 @@
 
 #include "orpheus_dsp.h"
 #include "orpheus_compat.h"
+#include "orpheus_graph.h"
 
 // Include MI Plaits voice
 #include "plaits/dsp/voice.h"
@@ -27,6 +28,9 @@ static constexpr int kVoiceAllocBytes = 32768;  // 32KB per voice (generous)
 
 struct OrpheusEngine {
     float sample_rate;
+
+    // Graph scheduler (null until nativeLoadGraph called)
+    OrpheusGraph* graph = nullptr;
 
     // Plaits voices
     plaits::Voice voices_dsp[kNumVoices];
