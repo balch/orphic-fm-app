@@ -25,6 +25,10 @@ enum OrpheusUnitType : uint16_t {
     UNIT_MASTER_OUT = 17,
     UNIT_DUAL_DELAY = 18,
     UNIT_HYPER_LFO = 19,
+    UNIT_CLOCK = 20,
+    UNIT_GRIDS = 21,
+    UNIT_MARBLES = 22,
+    UNIT_LOOPER = 23,
     UNIT_TYPE_COUNT
 };
 

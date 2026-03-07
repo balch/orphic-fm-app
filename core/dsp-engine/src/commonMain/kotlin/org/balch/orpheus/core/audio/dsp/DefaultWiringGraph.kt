@@ -109,6 +109,9 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val lfo = hyperLfo("lfo")
     lfo.out to delay.inputC
 
+    // Master clock (sample-accurate tempo generator)
+    val clock = clock("clock")
+
     // Reverb (Dattorro plate) — parallel send from drive output
     // Wet-only output sums into clip inputs alongside delay output
     val reverb = reverb("reverb")
@@ -136,6 +139,9 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
         for (v in 0..3) map("org.balch.orpheus.plugins.stereo", "quad_vol_0", "v${v}_vol", IPORT_INPUT_B)
         for (v in 4..7) map("org.balch.orpheus.plugins.stereo", "quad_vol_1", "v${v}_vol", IPORT_INPUT_B)
         for (v in 8..11) map("org.balch.orpheus.plugins.stereo", "quad_vol_2", "v${v}_vol", IPORT_INPUT_B)
+        // Tempo clock
+        map("org.balch.orpheus.plugins.tempo", "bpm", "clock", IPORT_INPUT_A)
+        map("org.balch.orpheus.plugins.tempo", "run", "clock", IPORT_INPUT_B)
         // Per-voice pan gains (constant-power, computed in Kotlin)
         for (v in 0 until 12) {
             map("org.balch.orpheus.plugins.stereo", "voice_pan_L_$v", "v${v}_pL", IPORT_INPUT_B)

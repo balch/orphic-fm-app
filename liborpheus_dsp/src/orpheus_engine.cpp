@@ -689,6 +689,12 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "diffusion") == 0)
             engine->reverb_diffusion.store(value, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.tempo") == 0) {
+        if (std::strcmp(symbol, "bpm") == 0)
+            engine->clock_bpm.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "run") == 0)
+            engine->clock_running.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.distortion") == 0) {
         if (std::strcmp(symbol, "drive") == 0) {
             float scaled = 1.0f + value * 14.0f;

@@ -22,6 +22,10 @@ const val UNIT_REVERB = 16
 const val UNIT_MASTER_OUT = 17
 const val UNIT_DUAL_DELAY = 18
 const val UNIT_HYPER_LFO = 19
+const val UNIT_CLOCK = 20
+const val UNIT_GRIDS = 21
+const val UNIT_MARBLES = 22
+const val UNIT_LOOPER = 23
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -283,6 +287,15 @@ class WiringGraphBuilder {
 
     fun hyperLfo(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_HYPER_LFO, name, init)
+
+    fun clock(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_CLOCK, name, init)
+    fun grids(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_GRIDS, name, init)
+    fun marbles(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_MARBLES, name, init)
+    fun looper(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_LOOPER, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

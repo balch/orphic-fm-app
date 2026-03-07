@@ -133,4 +133,9 @@ option(BUILD_TESTS "Build test executable" OFF)
 if(BUILD_TESTS)
     add_executable(orpheus_dsp_test test/test_main.cpp)
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
+    target_include_directories(orpheus_dsp_test PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${EURORACK_DIR}"
+    )
+    target_compile_definitions(orpheus_dsp_test PRIVATE TEST)
 endif()

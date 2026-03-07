@@ -1,9 +1,12 @@
 #include "orpheus_dsp.h"
+#include "orpheus_units.h"
+#include "orpheus_engine.h"
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 // Minimal WAV writer
 void write_wav(const char* path, const float* data, int num_frames, int sample_rate) {
@@ -43,7 +46,41 @@ void write_wav(const char* path, const float* data, int num_frames, int sample_r
     printf("Wrote %s (%d frames, %d Hz)\n", path, num_frames, sample_rate);
 }
 
+bool test_clock() {
+    printf("\n=== Test: Clock pulse accuracy ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    engine->clock_bpm.store(120.0f);
+    engine->clock_running.store(1);
+
+    GraphUnit clock_unit = {};
+    clock_unit.type = UNIT_CLOCK;
+    clock_unit.enabled = true;
+    unit_init(&clock_unit, 48000.0f);
+
+    int total_ticks = 0, total_beats = 0;
+    const int total_frames = 48000; // 1 second
+
+    for (int offset = 0; offset < total_frames; offset += 128) {
+        int chunk = std::min(128, total_frames - offset);
+        unit_process_clock(&clock_unit, engine, chunk, 48000.0f);
+
+        for (int i = 0; i < chunk; i++) {
+            if (clock_unit.output_buffers[0][i] > 0.5f) total_ticks++;
+            if (clock_unit.output_buffers[1][i] > 0.5f) total_beats++;
+        }
+    }
+
+    printf("Ticks in 1 second: %d (expected 48)\n", total_ticks);
+    printf("Beats in 1 second: %d (expected 2)\n", total_beats);
+    bool pass = (total_ticks == 48 && total_beats == 2);
+    printf("Clock test: %s\n", pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 int main() {
+    if (!test_clock()) return 1;
+
     printf("Creating OrpheusEngine at 48kHz...\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
 

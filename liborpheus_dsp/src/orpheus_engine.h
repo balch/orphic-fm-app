@@ -196,4 +196,11 @@ struct OrpheusEngine {
     std::atomic<float> reverb_damping{0.7f};    // 0-1, LP coefficient
     std::atomic<float> reverb_diffusion{0.625f};// 0-1, allpass coefficient
     std::atomic<int>   reverb_bypass{1};        // self-bypass when amount<=0.001
+
+    // ── Master Clock ──────────────────────────────────
+    double clock_phase{0.0};          // fractional accumulator (double to avoid drift)
+    int    clock_tick_count{0};       // 0..23 within each beat (24 PPQN)
+    int    clock_beat_count{0};       // beats within bar (0..3 for 4/4)
+    std::atomic<float> clock_bpm{120.0f};
+    std::atomic<int>   clock_running{1};  // 1 = running, 0 = stopped
 };
