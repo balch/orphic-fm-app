@@ -27,6 +27,7 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
 
     // Pre-allocated buffer for interleaved L/R output from DspGraphScheduler
     private var interleavedBuffer = FloatArray(0)
+    private lateinit var stagingBuffer: Float32Array
     private val framesPerBuffer = 128 // Web Audio render quantum
 
     // Render-ahead buffering: target 16 buffers (~43ms at 48kHz).
@@ -59,6 +60,7 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
         scheduler.sortTopologically()
         scheduler.allocate(framesPerBuffer)
         interleavedBuffer = FloatArray(framesPerBuffer * 2)
+        stagingBuffer = jsNewFloat32Array(framesPerBuffer * 2)
 
         // Load AudioWorklet module, then start the render loop
         loadWorklet(ctx)
@@ -121,17 +123,14 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
         // Run DSP graph — fills interleavedBuffer with [L0,R0,L1,R1,...]
         scheduler.process(interleavedBuffer, framesPerBuffer)
 
-        // De-interleave into separate L/R Float32Arrays
-        // New arrays each call because postMessage transfers ownership
-        val left = jsNewFloat32Array(framesPerBuffer)
-        val right = jsNewFloat32Array(framesPerBuffer)
-        for (i in 0 until framesPerBuffer) {
-            left[i] = interleavedBuffer[i * 2]
-            right[i] = interleavedBuffer[i * 2 + 1]
+        // Copy interleaved data to persistent JS staging buffer, then
+        // let JS do the de-interleave + Transferable post in one call.
+        // This avoids creating 2 Float32Arrays per render in WASM and
+        // moves the split loop to pure JS (no per-element interop).
+        for (i in 0 until framesPerBuffer * 2) {
+            stagingBuffer[i] = interleavedBuffer[i]
         }
-
-        // Send to worklet via MessagePort with Transferable (zero-copy)
-        jsPostBufferToWorklet(node, left, right)
+        jsSplitAndPostToWorklet(node, stagingBuffer, framesPerBuffer)
     }
 
     override fun stop() {

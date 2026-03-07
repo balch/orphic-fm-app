@@ -205,11 +205,12 @@ fun jsNewFloat32Array(length: Int): Float32Array =
     js("new Float32Array(length)")
 
 /**
- * Post a stereo buffer to a worklet node's port with Transferable arrays.
- * Uses a single js() expression for Kotlin/WASM compatibility.
+ * De-interleave a staging Float32Array [L0,R0,L1,R1,...] into separate
+ * L/R buffers and post to a worklet node's port with Transferable (zero-copy).
+ * The split loop runs in pure JS — no per-element WASM↔JS interop.
  */
-fun jsPostBufferToWorklet(node: AudioWorkletNode, left: Float32Array, right: Float32Array): Unit =
-    js("node.port.postMessage({ type: 'buffer', left: left, right: right }, [left.buffer, right.buffer])")
+fun jsSplitAndPostToWorklet(node: AudioWorkletNode, interleaved: Float32Array, frames: Int): Unit =
+    js("(function(){var l=new Float32Array(frames),r=new Float32Array(frames);for(var i=0;i<frames;i++){l[i]=interleaved[i*2];r[i]=interleaved[i*2+1]}node.port.postMessage({type:'buffer',left:l,right:r},[l.buffer,r.buffer])})()")
 
 /**
  * Attach a then-handler to a JS Promise.
