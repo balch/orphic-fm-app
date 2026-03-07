@@ -8,7 +8,7 @@ import kotlin.math.exp
  * Set by the platform AudioEngine before [DspGraphScheduler.allocate] is called.
  * Default is 48kHz; overwritten at runtime with the actual hardware rate.
  */
-var dspSampleRate = 48000f
+@Volatile var dspSampleRate = 48000f
 
 /**
  * Float-native audio input port for the DSP backend.
