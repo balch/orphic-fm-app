@@ -306,6 +306,23 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     auto& vp = engine->voice_params[idx];
     if (!vp.active.load(std::memory_order_relaxed)) return;
+
+    // ── Graph gate input: detect rising/falling edges from IPORT_GATE ──
+    // When connected (e.g. from Grids triggers), overrides voice_params gate.
+    GraphPort* gate_port = &u->inputs[IPORT_GATE];
+    if (gate_port->num_sources > 0) {
+        for (int i = 0; i < num_frames; i++) {
+            bool gate_on = gate_port->buffer[i] > 0.5f;
+            bool was_on = vp.gate.load(std::memory_order_relaxed) != 0;
+            if (gate_on && !was_on) {
+                vp.gate.store(1, std::memory_order_relaxed);
+                vp.ever_triggered.store(1, std::memory_order_relaxed);
+            } else if (!gate_on && was_on) {
+                vp.gate.store(0, std::memory_order_relaxed);
+            }
+        }
+    }
+
     if (!vp.ever_triggered.load(std::memory_order_relaxed)) return;
 
     float* out = u->output_buffers[OPORT_OUT];
