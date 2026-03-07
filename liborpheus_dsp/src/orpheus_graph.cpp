@@ -1,5 +1,6 @@
 #include "orpheus_graph.h"
 #include "orpheus_units.h"
+#include "orpheus_engine.h"
 #include <cstring>
 #include <cmath>
 #include <algorithm>
@@ -336,7 +337,14 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_delay_line(u, num_frames, sr); break;
             case UNIT_MASTER_OUT:
                 unit_process_master_out(u, output_buffer, num_frames); break;
-            // Plaits, Clouds, Rings, Warps handled in Task 6
+            case UNIT_PLAITS:
+                unit_process_plaits(u, engine, num_frames, sr); break;
+            case UNIT_CLOUDS:
+                unit_process_clouds(u, engine, num_frames, sr); break;
+            case UNIT_RINGS:
+                unit_process_rings(u, engine, num_frames, sr); break;
+            case UNIT_WARPS:
+                unit_process_warps(u, engine, num_frames, sr); break;
             default: break;
         }
     }

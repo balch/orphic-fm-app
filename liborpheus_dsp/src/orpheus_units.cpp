@@ -1,4 +1,5 @@
 #include "orpheus_units.h"
+#include "orpheus_engine.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -262,5 +263,207 @@ void unit_init(GraphUnit* u, float sr) {
             break;
         default:
             break;
+    }
+}
+
+// -- MI Module Wrappers ------------------------------------
+
+void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
+    int idx = u->state.module.index;
+    if (idx < 0 || idx >= kNumVoices) return;
+
+    auto& vp = engine->voice_params[idx];
+    if (!vp.active.load(std::memory_order_relaxed)) return;
+    if (!vp.ever_triggered.load(std::memory_order_relaxed)) return;
+
+    auto& voice = engine->voices_dsp[idx];
+    float* out = u->output_buffers[OPORT_OUT];
+
+    plaits::Patch patch;
+    patch.engine = vp.engine_index.load(std::memory_order_relaxed);
+    patch.note = vp.tune.load(std::memory_order_relaxed);
+    patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
+    patch.timbre = vp.timbre.load(std::memory_order_relaxed);
+    patch.morph = vp.morph.load(std::memory_order_relaxed);
+    patch.frequency_modulation_amount = 0.0f;
+    patch.timbre_modulation_amount = 0.0f;
+    patch.morph_modulation_amount = 0.0f;
+    patch.decay = vp.decay.load(std::memory_order_relaxed);
+    patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
+
+    plaits::Modulations mod;
+    std::memset(&mod, 0, sizeof(mod));
+    int current_gate = vp.gate.load(std::memory_order_relaxed);
+    mod.trigger = current_gate ? 1.0f : 0.0f;
+    mod.trigger_patched = true;
+
+    bool is_speech = (patch.engine == 15);
+    if (is_speech) {
+        mod.level_patched = true;
+        mod.level = current_gate ? 1.0f : 0.0f;
+    } else {
+        mod.level_patched = false;
+    }
+
+    const float inv_32768 = 1.0f / 32768.0f;
+    int frames_done = 0;
+    while (frames_done < num_frames) {
+        int block = std::min(static_cast<int>(plaits::kBlockSize),
+                             num_frames - frames_done);
+
+        plaits::Voice::Frame frames[plaits::kMaxBlockSize];
+        voice.Render(patch, mod, frames, block);
+
+        for (int i = 0; i < block; i++) {
+            out[frames_done + i] = (frames[i].out + frames[i].aux) * 0.5f * inv_32768;
+        }
+
+        frames_done += block;
+    }
+}
+
+void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
+    if (engine->clouds_bypass.load(std::memory_order_relaxed)) return;
+
+    float* in_l = u->inputs[IPORT_INPUT_A].buffer;
+    float* in_r = u->inputs[IPORT_INPUT_B].buffer;
+    float* out_l = u->output_buffers[OPORT_OUT];
+    float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
+
+    auto* p = engine->clouds_processor.mutable_parameters();
+    p->position = engine->clouds_position.load(std::memory_order_relaxed);
+    p->size = engine->clouds_size.load(std::memory_order_relaxed);
+    p->pitch = engine->clouds_pitch.load(std::memory_order_relaxed);
+    p->density = engine->clouds_density.load(std::memory_order_relaxed);
+    p->texture = engine->clouds_texture.load(std::memory_order_relaxed);
+    p->dry_wet = engine->clouds_dry_wet.load(std::memory_order_relaxed);
+    p->feedback = engine->clouds_feedback.load(std::memory_order_relaxed);
+    p->reverb = engine->clouds_reverb.load(std::memory_order_relaxed);
+    p->freeze = engine->clouds_freeze.load(std::memory_order_relaxed) != 0;
+
+    engine->clouds_processor.set_playback_mode(
+        static_cast<clouds::PlaybackMode>(
+            engine->clouds_mode.load(std::memory_order_relaxed)));
+    engine->clouds_processor.Prepare();
+
+    int frames_done = 0;
+    while (frames_done < num_frames) {
+        int block = std::min(static_cast<int>(clouds::kMaxBlockSize),
+                             num_frames - frames_done);
+
+        clouds::ShortFrame in_frames[clouds::kMaxBlockSize];
+        clouds::ShortFrame out_frames[clouds::kMaxBlockSize];
+
+        for (int i = 0; i < block; i++) {
+            float l = std::max(-1.0f, std::min(1.0f, in_l[frames_done + i]));
+            float r = std::max(-1.0f, std::min(1.0f, in_r[frames_done + i]));
+            in_frames[i].l = static_cast<short>(l * 32767.0f);
+            in_frames[i].r = static_cast<short>(r * 32767.0f);
+        }
+
+        engine->clouds_processor.Process(in_frames, out_frames, block);
+
+        const float inv = 1.0f / 32768.0f;
+        for (int i = 0; i < block; i++) {
+            out_l[frames_done + i] = out_frames[i].l * inv;
+            out_r[frames_done + i] = out_frames[i].r * inv;
+        }
+
+        frames_done += block;
+    }
+}
+
+void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
+    if (engine->rings_bypass.load(std::memory_order_relaxed)) return;
+
+    float* in = u->inputs[IPORT_INPUT].buffer;
+    float* out_l = u->output_buffers[OPORT_OUT];
+    float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
+
+    rings::Patch rings_patch;
+    rings_patch.structure = engine->rings_structure.load(std::memory_order_relaxed);
+    rings_patch.brightness = engine->rings_brightness.load(std::memory_order_relaxed);
+    rings_patch.damping = engine->rings_damping.load(std::memory_order_relaxed);
+    rings_patch.position = engine->rings_position.load(std::memory_order_relaxed);
+
+    rings::PerformanceState perf;
+    std::memset(&perf, 0, sizeof(perf));
+    perf.tonic = engine->rings_frequency.load(std::memory_order_relaxed);
+    perf.note = 0.0f;
+    perf.internal_exciter = engine->rings_internal_exciter.load(std::memory_order_relaxed) != 0;
+    perf.internal_strum = false;
+    perf.internal_note = false;
+
+    int strum = engine->rings_strum.load(std::memory_order_relaxed);
+    perf.strum = strum != 0;
+    if (strum) engine->rings_strum.store(0, std::memory_order_relaxed);
+
+    engine->rings_part.set_model(
+        static_cast<rings::ResonatorModel>(
+            engine->rings_model.load(std::memory_order_relaxed)));
+    engine->rings_part.set_polyphony(
+        engine->rings_polyphony.load(std::memory_order_relaxed));
+
+    int frames_done = 0;
+    while (frames_done < num_frames) {
+        int block = std::min(static_cast<int>(rings::kMaxBlockSize),
+                             num_frames - frames_done);
+
+        float out_buf[rings::kMaxBlockSize];
+        float aux_buf[rings::kMaxBlockSize];
+
+        engine->rings_part.Process(perf, rings_patch,
+                                    in + frames_done, out_buf, aux_buf, block);
+
+        perf.strum = false; // Only trigger on first block
+
+        for (int i = 0; i < block; i++) {
+            out_l[frames_done + i] = out_buf[i];
+            out_r[frames_done + i] = aux_buf[i];
+        }
+
+        frames_done += block;
+    }
+}
+
+void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
+    if (engine->warps_bypass.load(std::memory_order_relaxed)) return;
+
+    float* in_l = u->inputs[IPORT_INPUT_A].buffer;
+    float* in_r = u->inputs[IPORT_INPUT_B].buffer;
+    float* out_l = u->output_buffers[OPORT_OUT];
+    float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
+
+    auto* wp = engine->warps_modulator.mutable_parameters();
+    wp->modulation_algorithm = engine->warps_algorithm.load(std::memory_order_relaxed);
+    wp->modulation_parameter = engine->warps_timbre.load(std::memory_order_relaxed);
+    wp->channel_drive[0] = engine->warps_level1.load(std::memory_order_relaxed);
+    wp->channel_drive[1] = engine->warps_level2.load(std::memory_order_relaxed);
+    wp->carrier_shape = 0;
+
+    int frames_done = 0;
+    while (frames_done < num_frames) {
+        int block = std::min(static_cast<int>(warps::kMaxBlockSize),
+                             num_frames - frames_done);
+
+        warps::ShortFrame in_frames[warps::kMaxBlockSize];
+        warps::ShortFrame out_frames[warps::kMaxBlockSize];
+
+        for (int i = 0; i < block; i++) {
+            float l = std::max(-1.0f, std::min(1.0f, in_l[frames_done + i]));
+            float r = std::max(-1.0f, std::min(1.0f, in_r[frames_done + i]));
+            in_frames[i].l = static_cast<short>(l * 32767.0f);
+            in_frames[i].r = static_cast<short>(r * 32767.0f);
+        }
+
+        engine->warps_modulator.Process(in_frames, out_frames, block);
+
+        const float inv = 1.0f / 32768.0f;
+        for (int i = 0; i < block; i++) {
+            out_l[frames_done + i] = out_frames[i].l * inv;
+            out_r[frames_done + i] = out_frames[i].r * inv;
+        }
+
+        frames_done += block;
     }
 }
