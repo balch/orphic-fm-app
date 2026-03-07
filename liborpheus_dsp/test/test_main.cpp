@@ -135,9 +135,95 @@ bool test_grids() {
     return pass;
 }
 
+bool test_marbles() {
+    printf("\n=== Test: Marbles random sequencer ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    engine->clock_bpm.store(120.0f);
+    engine->clock_running.store(1);
+    engine->marbles_bypass.store(0);
+
+    // Configure Marbles parameters
+    engine->marbles_t_rate.store(0.0f);       // default rate
+    engine->marbles_t_bias.store(0.5f);       // balanced probability
+    engine->marbles_t_jitter.store(0.0f);     // no jitter
+    engine->marbles_t_model.store(0);         // complementary Bernoulli
+    engine->marbles_t_range.store(1);         // 1x range
+    engine->marbles_x_spread.store(0.5f);     // medium spread
+    engine->marbles_x_bias.store(0.5f);       // centered
+    engine->marbles_x_steps.store(0.5f);      // medium quantization
+    engine->marbles_deja_vu.store(0.0f);      // no looping
+    engine->marbles_deja_vu_length.store(8);
+
+    GraphUnit clock_unit = {};
+    clock_unit.type = UNIT_CLOCK;
+    clock_unit.enabled = true;
+    unit_init(&clock_unit, 48000.0f);
+
+    GraphUnit marbles_unit = {};
+    marbles_unit.type = UNIT_MARBLES;
+    marbles_unit.enabled = true;
+    unit_init(&marbles_unit, 48000.0f);
+
+    // Wire clock→marbles: clock OPORT_OUT (tick) → marbles IPORT_INPUT_A
+    marbles_unit.inputs[IPORT_INPUT_A].sources[0] = clock_unit.output_buffers[OPORT_OUT];
+    marbles_unit.inputs[IPORT_INPUT_A].num_sources = 1;
+
+    int gate_transitions = 0;
+    float cv1_min = 1e9f, cv1_max = -1e9f;
+    float cv2_min = 1e9f, cv2_max = -1e9f;
+    bool prev_gate = false;
+    const int total_frames = 48000 * 2; // 2 seconds
+
+    for (int offset = 0; offset < total_frames; offset += 128) {
+        int chunk = std::min(128, total_frames - offset);
+
+        // Process clock first
+        unit_process_clock(&clock_unit, engine, chunk, 48000.0f);
+
+        // Prepare marbles input from clock output
+        port_prepare(&marbles_unit.inputs[IPORT_INPUT_A], chunk, 48000.0f);
+
+        // Process marbles
+        unit_process_marbles(&marbles_unit, engine, chunk, 48000.0f);
+
+        // Count gate rising edges and track CV ranges
+        for (int i = 0; i < chunk; i++) {
+            bool gate = marbles_unit.output_buffers[OPORT_OUT][i] > 0.5f;
+            if (gate && !prev_gate) gate_transitions++;
+            prev_gate = gate;
+
+            float cv1 = marbles_unit.output_buffers[OPORT_OUT_RIGHT][i];
+            float cv2 = marbles_unit.output_buffers[OPORT_AUX][i];
+            if (cv1 < cv1_min) cv1_min = cv1;
+            if (cv1 > cv1_max) cv1_max = cv1;
+            if (cv2 < cv2_min) cv2_min = cv2;
+            if (cv2 > cv2_max) cv2_max = cv2;
+        }
+    }
+
+    printf("Gate transitions: %d\n", gate_transitions);
+    printf("CV1 range: [%.4f, %.4f]\n", cv1_min, cv1_max);
+    printf("CV2 range: [%.4f, %.4f]\n", cv2_min, cv2_max);
+
+    // Verify: should have gate transitions from TGenerator
+    bool gate_pass = gate_transitions > 0;
+    // Verify: CV output should have some range (not stuck at zero)
+    float cv1_range = cv1_max - cv1_min;
+    bool cv_pass = cv1_range > 0.01f;
+
+    printf("Gate test: %s (%d transitions)\n", gate_pass ? "PASS" : "FAIL", gate_transitions);
+    printf("CV range test: %s (range=%.4f)\n", cv_pass ? "PASS" : "FAIL", cv1_range);
+
+    bool pass = gate_pass && cv_pass;
+    printf("Marbles test: %s\n", pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 int main() {
     if (!test_clock()) return 1;
     if (!test_grids()) return 1;
+    if (!test_marbles()) return 1;
 
     printf("Creating OrpheusEngine at 48kHz...\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);

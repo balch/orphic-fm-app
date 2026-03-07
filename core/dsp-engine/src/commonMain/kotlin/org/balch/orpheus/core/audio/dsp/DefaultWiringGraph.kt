@@ -119,6 +119,10 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     clock.out to gridsUnit.inputA          // 24 PPQN clock ticks
     clock.outRight to gridsUnit.inputB     // beat pulse (unused but available)
 
+    // Marbles random sequencer (Flux) — clocked from master clock
+    val marblesUnit = marbles("marbles")
+    clock.out to marblesUnit.inputA        // 24 PPQN clock input
+
     // Wire Grids triggers to drum voices (voices 8, 9, 10)
     gridsUnit.out to plaitsUnits[8].gate        // kick → voice 8
     gridsUnit.outRight to plaitsUnits[9].gate   // snare → voice 9

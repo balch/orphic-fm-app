@@ -1251,3 +1251,142 @@ void unit_process_clock(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         out_beat[i] = beat ? 1.0f : 0.0f;
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Marbles Random Sequencer (MI Marbles TGenerator + XYGenerator)
+// ═══════════════════════════════════════════════════════════════════════
+//
+// Input: IPORT_INPUT_A = 24 PPQN clock pulses (from UNIT_CLOCK)
+// Output: OPORT_OUT       = t1 gate (rhythmic trigger from TGenerator)
+//         OPORT_OUT_RIGHT = x1 CV (random pitch voltage from XYGenerator)
+//         OPORT_AUX       = x2 CV (second random voltage)
+
+void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate) {
+    float* out_gate = u->output_buffers[OPORT_OUT];
+    float* out_cv1  = u->output_buffers[OPORT_OUT_RIGHT];
+    float* out_cv2  = u->output_buffers[OPORT_AUX];
+
+    // Self-bypass: output silence when disabled
+    if (engine->marbles_bypass.load(std::memory_order_relaxed)) {
+        std::memset(out_gate, 0, num_frames * sizeof(float));
+        std::memset(out_cv1,  0, num_frames * sizeof(float));
+        std::memset(out_cv2,  0, num_frames * sizeof(float));
+        return;
+    }
+
+    float* clock_in = u->inputs[IPORT_INPUT_A].buffer;
+
+    // ── Step 1: Convert float clock pulses (0/1) to stmlib::GateFlags ──
+    stmlib::GateFlags* gate_flags = engine->marbles_gate_flags;
+    stmlib::GateFlags prev_flag = engine->marbles_prev_gate_flag;
+    for (int i = 0; i < num_frames; i++) {
+        bool high = clock_in[i] > 0.5f;
+        gate_flags[i] = stmlib::ExtractGateFlags(prev_flag, high);
+        prev_flag = gate_flags[i];
+    }
+    engine->marbles_prev_gate_flag = prev_flag;
+
+    // ── Step 2: Read TGenerator parameters from engine atomics ──
+    float t_rate = engine->marbles_t_rate.load(std::memory_order_relaxed);
+    float t_bias = engine->marbles_t_bias.load(std::memory_order_relaxed);
+    float t_jitter = engine->marbles_t_jitter.load(std::memory_order_relaxed);
+    int t_model_i = engine->marbles_t_model.load(std::memory_order_relaxed);
+    int t_range_i = engine->marbles_t_range.load(std::memory_order_relaxed);
+    float deja_vu = engine->marbles_deja_vu.load(std::memory_order_relaxed);
+    int deja_vu_length = engine->marbles_deja_vu_length.load(std::memory_order_relaxed);
+
+    // Clamp enums to valid ranges
+    if (t_model_i < 0) t_model_i = 0;
+    if (t_model_i > 6) t_model_i = 6;
+    if (t_range_i < 0) t_range_i = 0;
+    if (t_range_i > 2) t_range_i = 2;
+    if (deja_vu_length < 1) deja_vu_length = 1;
+    if (deja_vu_length > 16) deja_vu_length = 16;
+
+    engine->marbles_t_generator.set_model(
+        static_cast<marbles::TGeneratorModel>(t_model_i));
+    engine->marbles_t_generator.set_range(
+        static_cast<marbles::TGeneratorRange>(t_range_i));
+    engine->marbles_t_generator.set_rate(t_rate);
+    engine->marbles_t_generator.set_bias(t_bias);
+    engine->marbles_t_generator.set_jitter(t_jitter);
+    engine->marbles_t_generator.set_deja_vu(deja_vu);
+    engine->marbles_t_generator.set_length(deja_vu_length);
+    engine->marbles_t_generator.set_pulse_width_mean(0.5f);
+    engine->marbles_t_generator.set_pulse_width_std(0.0f);
+
+    // ── Step 3: Set up Ramps struct with working buffer pointers ──
+    marbles::Ramps ramps;
+    ramps.external = engine->marbles_ramp_external;
+    ramps.master   = engine->marbles_ramp_master;
+    ramps.slave[0] = engine->marbles_ramp_slave0;
+    ramps.slave[1] = engine->marbles_ramp_slave1;
+
+    // ── Step 4: Process TGenerator (rhythmic gate generation) ──
+    // use_external_clock=true: we feed the 24 PPQN clock from UNIT_CLOCK
+    bool* gate_out = engine->marbles_gate_out;
+    engine->marbles_t_generator.Process(
+        true,                   // use_external_clock
+        gate_flags,             // external clock gate flags
+        ramps,                  // ramp working buffers (filled by TGenerator)
+        gate_out,               // output: bool gate[size * kNumTChannels]
+        static_cast<size_t>(num_frames));
+
+    // ── Step 5: Read XYGenerator parameters ──
+    float x_spread = engine->marbles_x_spread.load(std::memory_order_relaxed);
+    float x_bias = engine->marbles_x_bias.load(std::memory_order_relaxed);
+    float x_steps = engine->marbles_x_steps.load(std::memory_order_relaxed);
+    int x_control_mode_i = engine->marbles_x_control_mode.load(std::memory_order_relaxed);
+    int x_range_i = engine->marbles_x_range.load(std::memory_order_relaxed);
+    int x_scale_i = engine->marbles_x_scale.load(std::memory_order_relaxed);
+
+    if (x_control_mode_i < 0) x_control_mode_i = 0;
+    if (x_control_mode_i > 2) x_control_mode_i = 2;
+    if (x_range_i < 0) x_range_i = 0;
+    if (x_range_i > 2) x_range_i = 2;
+    if (x_scale_i < 0) x_scale_i = 0;
+    if (x_scale_i > 5) x_scale_i = 5;
+
+    // Build GroupSettings for X and Y outputs
+    marbles::GroupSettings x_settings;
+    x_settings.control_mode = static_cast<marbles::ControlMode>(x_control_mode_i);
+    x_settings.voltage_range = static_cast<marbles::VoltageRange>(x_range_i);
+    x_settings.register_mode = false;
+    x_settings.register_value = 0.0f;
+    x_settings.spread = x_spread;
+    x_settings.bias = x_bias;
+    x_settings.steps = x_steps;
+    x_settings.deja_vu = deja_vu;
+    x_settings.scale_index = x_scale_i;
+    x_settings.length = deja_vu_length;
+    x_settings.ratio = { 1, 1 };
+
+    marbles::GroupSettings y_settings = x_settings;
+    y_settings.ratio = { 1, 1 };
+
+    // ── Step 6: Process XYGenerator (random CV generation) ──
+    // CLOCK_SOURCE_INTERNAL_T1_T2_T3: X channels use the T ramps as clock
+    float* xy_output = engine->marbles_xy_output;
+    engine->marbles_xy_generator.Process(
+        marbles::CLOCK_SOURCE_INTERNAL_T1_T2_T3,
+        x_settings,
+        y_settings,
+        gate_flags,
+        ramps,
+        xy_output,
+        static_cast<size_t>(num_frames));
+
+    // ── Step 7: Deinterleave outputs to graph buffers ──
+    // TGenerator gate output: interleaved [t1_0, t2_0, t1_1, t2_1, ...]
+    // We take t1 (channel 0) as the primary gate output
+    for (int i = 0; i < num_frames; i++) {
+        out_gate[i] = gate_out[i * 2] ? 1.0f : 0.0f;  // t1 gate
+    }
+
+    // XYGenerator output: interleaved [x1, x2, x3, y] per sample (stride = kNumChannels = 4)
+    // We take x1 and x2 as the two CV outputs
+    for (int i = 0; i < num_frames; i++) {
+        out_cv1[i] = xy_output[i * 4 + 0];  // x1 CV
+        out_cv2[i] = xy_output[i * 4 + 1];  // x2 CV
+    }
+}

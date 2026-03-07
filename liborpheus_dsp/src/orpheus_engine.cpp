@@ -44,6 +44,22 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     // Initialize Warps modulator
     engine->warps_modulator.Init(engine->sample_rate);
 
+    // Initialize Marbles random sequencer
+    engine->marbles_rng.Init(0xDEADBEEF);
+    engine->marbles_random_stream.Init(&engine->marbles_rng);
+    engine->marbles_t_generator.Init(&engine->marbles_random_stream, sample_rate);
+    engine->marbles_xy_generator.Init(&engine->marbles_random_stream, sample_rate);
+    // Load a default major scale for quantization
+    {
+        marbles::Scale major_scale;
+        major_scale.InitMajor();
+        engine->marbles_xy_generator.LoadScale(0, major_scale);
+        // Also load a chromatic scale (all equal, no quantization) as scale 1
+        marbles::Scale chromatic;
+        chromatic.Init();
+        engine->marbles_xy_generator.LoadScale(1, chromatic);
+    }
+
     // Default per-voice pans (matches Kotlin StereoPlugin defaults)
     engine->voice_pan[0].store(0.0f);
     engine->voice_pan[1].store(0.0f);
@@ -652,19 +668,34 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "mode") == 0)
             engine->lfo_mode.store(static_cast<int>(value), std::memory_order_relaxed);
     }
-    else if (std::strcmp(plugin_uri, "marbles") == 0) {
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.flux") == 0
+          || std::strcmp(plugin_uri, "marbles") == 0) {
         if (std::strcmp(symbol, "rate") == 0)
-            engine->marbles_rate.store(value, std::memory_order_relaxed);
+            engine->marbles_t_rate.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "spread") == 0)
-            engine->marbles_spread.store(value, std::memory_order_relaxed);
+            engine->marbles_x_spread.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "bias") == 0)
-            engine->marbles_bias.store(value, std::memory_order_relaxed);
+            engine->marbles_t_bias.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "x_bias") == 0)
+            engine->marbles_x_bias.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "steps") == 0)
-            engine->marbles_steps.store(value, std::memory_order_relaxed);
+            engine->marbles_x_steps.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "jitter") == 0)
-            engine->marbles_jitter.store(value, std::memory_order_relaxed);
+            engine->marbles_t_jitter.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "deja_vu") == 0)
             engine->marbles_deja_vu.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "deja_vu_length") == 0)
+            engine->marbles_deja_vu_length.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "t_model") == 0)
+            engine->marbles_t_model.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "t_range") == 0)
+            engine->marbles_t_range.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "x_control_mode") == 0)
+            engine->marbles_x_control_mode.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "x_range") == 0)
+            engine->marbles_x_range.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "x_scale") == 0)
+            engine->marbles_x_scale.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->marbles_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }

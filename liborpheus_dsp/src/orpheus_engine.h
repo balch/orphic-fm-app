@@ -18,6 +18,13 @@
 // Include MI Warps modulator
 #include "warps/dsp/modulator.h"
 
+// Include MI Marbles random sequencer
+#include "marbles/random/t_generator.h"
+#include "marbles/random/x_y_generator.h"
+#include "marbles/random/random_stream.h"
+#include "marbles/random/random_generator.h"
+#include "stmlib/utils/gate_flags.h"
+
 #include <atomic>
 #include <cstring>
 
@@ -127,15 +134,38 @@ struct OrpheusEngine {
     // Per-voice hold level (0.0-1.0, raw from UI before scaling)
     std::atomic<float> voice_hold_level[kNumVoices] = {};
 
-    // Marbles random sequence generator (minimal stub for future integration)
-    // Full integration requires clock system and modulation routing (Phase 4+)
-    std::atomic<float> marbles_rate{0.5f};
-    std::atomic<float> marbles_spread{0.5f};
-    std::atomic<float> marbles_bias{0.5f};
-    std::atomic<float> marbles_steps{0.5f};
-    std::atomic<float> marbles_jitter{0.0f};
-    std::atomic<float> marbles_deja_vu{0.0f};
-    std::atomic<int>   marbles_bypass{1};       // bypassed by default
+    // ── Marbles Random Sequencer ─────────────────────
+    // MI Marbles: TGenerator (rhythmic gates) + XYGenerator (random CV)
+    marbles::RandomGenerator marbles_rng;
+    marbles::RandomStream    marbles_random_stream;
+    marbles::TGenerator      marbles_t_generator;
+    marbles::XYGenerator     marbles_xy_generator;
+
+    // Working buffers for Marbles processing (sized to kMaxFrames=512)
+    stmlib::GateFlags marbles_gate_flags[kMaxFrames] = {};
+    float marbles_ramp_external[kMaxFrames] = {};
+    float marbles_ramp_master[kMaxFrames] = {};
+    float marbles_ramp_slave0[kMaxFrames] = {};
+    float marbles_ramp_slave1[kMaxFrames] = {};
+    bool  marbles_gate_out[kMaxFrames * 2] = {};   // 2 channels interleaved (t1, t2)
+    float marbles_xy_output[kMaxFrames * 4] = {};  // 4 channels interleaved (x1, x2, x3, y)
+    stmlib::GateFlags marbles_prev_gate_flag{stmlib::GATE_FLAG_LOW};  // for edge detection
+
+    // Parameter atomics (written from UI, read from audio thread)
+    std::atomic<float> marbles_t_rate{0.0f};        // -48..+48 semitone rate offset
+    std::atomic<float> marbles_t_bias{0.5f};        // 0..1 gate probability bias
+    std::atomic<float> marbles_t_jitter{0.0f};      // 0..1 jitter amount
+    std::atomic<int>   marbles_t_model{0};           // TGeneratorModel enum (0-6)
+    std::atomic<int>   marbles_t_range{1};           // TGeneratorRange enum (0-2, default 1x)
+    std::atomic<float> marbles_x_spread{0.5f};       // 0..1 CV spread
+    std::atomic<float> marbles_x_bias{0.5f};         // 0..1 CV bias
+    std::atomic<float> marbles_x_steps{0.5f};        // 0..1 quantization steps
+    std::atomic<int>   marbles_x_control_mode{0};    // ControlMode enum (0-2)
+    std::atomic<int>   marbles_x_range{1};           // VoltageRange enum (0-2)
+    std::atomic<int>   marbles_x_scale{0};           // scale index
+    std::atomic<float> marbles_deja_vu{0.0f};        // 0..1 deja vu amount
+    std::atomic<int>   marbles_deja_vu_length{8};    // loop length (1-16)
+    std::atomic<int>   marbles_bypass{1};            // bypassed by default
 
     // ── Drive (tanh saturation) ──────────────────────
     std::atomic<float> drive_amount{1.0f};       // 1.0 = clean, higher = more saturation

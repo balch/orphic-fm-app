@@ -358,6 +358,8 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_clock(u, engine, num_frames, sr); break;
             case UNIT_GRIDS:
                 unit_process_grids(u, engine, num_frames, sr); break;
+            case UNIT_MARBLES:
+                unit_process_marbles(u, engine, num_frames, sr); break;
             default: break;
         }
     }

@@ -27,6 +27,7 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
 void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_clock(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_grids(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 
 // Initialize unit state from descriptor params
 void unit_init(GraphUnit* u, float sample_rate);
