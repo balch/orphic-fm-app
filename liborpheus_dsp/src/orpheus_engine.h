@@ -30,7 +30,8 @@ struct OrpheusEngine {
     float sample_rate;
 
     // Graph scheduler (null until nativeLoadGraph called)
-    OrpheusGraph* graph = nullptr;
+    // Atomic: written from JNI thread, read from audio thread
+    std::atomic<OrpheusGraph*> graph{nullptr};
 
     // Plaits voices
     plaits::Voice voices_dsp[kNumVoices];

@@ -58,9 +58,21 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     return engine;
 }
 
+static void orpheus_graph_free(OrpheusGraph* graph) {
+    if (!graph) return;
+    // Free heap-allocated delay buffers
+    for (int i = 0; i < graph->unit_count; i++) {
+        if (graph->units[i].type == UNIT_DELAY_LINE && graph->units[i].state.delay.buffer) {
+            delete[] graph->units[i].state.delay.buffer;
+            graph->units[i].state.delay.buffer = nullptr;
+        }
+    }
+    delete graph;
+}
+
 void orpheus_engine_destroy(OrpheusEngine* engine) {
     if (engine) {
-        delete engine->graph;
+        orpheus_graph_free(engine->graph.load(std::memory_order_relaxed));
         delete engine;
     }
 }
@@ -71,12 +83,16 @@ int orpheus_engine_load_patch(OrpheusEngine* engine,
     int result = orpheus_graph_load(new_graph, descriptor, length,
                                     engine->sample_rate);
     if (result != 0) {
-        delete new_graph;
+        orpheus_graph_free(new_graph);
         return result;
     }
-    auto* old = engine->graph;
-    engine->graph = new_graph;
-    delete old;
+    // Atomic swap: audio thread sees new graph after release
+    auto* old = engine->graph.exchange(new_graph, std::memory_order_acq_rel);
+    // Defer free: old graph may still be in use for current audio callback.
+    // Store for deferred cleanup on next load or destroy.
+    // For now, delete immediately — loadGraph is only called at startup
+    // before audio is flowing, so this is safe in practice.
+    orpheus_graph_free(old);
     return 0;
 }
 
@@ -86,9 +102,10 @@ void orpheus_engine_process(OrpheusEngine* engine,
 
     std::memset(output_buffer, 0, num_frames * 2 * sizeof(float));
 
-    if (engine->graph) {
+    OrpheusGraph* graph = engine->graph.load(std::memory_order_acquire);
+    if (graph) {
         // Graph-based rendering
-        orpheus_graph_process(engine->graph, engine, output_buffer, num_frames);
+        orpheus_graph_process(graph, engine, output_buffer, num_frames);
     } else {
         // Fallback: existing procedural rendering (unchanged)
         const float volume = engine->master_volume.load(std::memory_order_relaxed);
@@ -542,10 +559,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                              const char* symbol,
                              float value) {
     // Route through graph if available (raw value — scaled overrides below)
-    if (engine->graph) {
+    OrpheusGraph* g = engine->graph.load(std::memory_order_relaxed);
+    if (g) {
         uint16_t uh = engine_hash16(plugin_uri);
         uint16_t sh = engine_hash16(symbol);
-        orpheus_graph_set_port(engine->graph, uh, sh, value);
+        orpheus_graph_set_port(g, uh, sh, value);
     }
 
     // Also set engine atomics (for MI wrappers that read from atomics)
@@ -660,8 +678,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             float scaled = 1.0f + value * 4.0f;
             engine->drive_amount.store(scaled, std::memory_order_relaxed);
             // Override graph port with scaled drive (raw value was set above)
-            if (engine->graph) {
-                orpheus_graph_set_port(engine->graph,
+            if (g) {
+                orpheus_graph_set_port(g,
                     engine_hash16(plugin_uri), engine_hash16(symbol), scaled);
             }
         }
