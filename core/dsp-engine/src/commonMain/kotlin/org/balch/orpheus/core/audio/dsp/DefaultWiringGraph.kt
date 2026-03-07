@@ -28,9 +28,11 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
 
     val voiceOutsL = mutableListOf<UnitRef>()
     val voiceOutsR = mutableListOf<UnitRef>()
+    val plaitsUnits = mutableListOf<UnitRef>()
 
     for (v in 0 until 12) {
         val p = plaits("v${v}_p") { moduleIndex = v.toFloat() }
+        plaitsUnits.add(p)
         val vol = multiply("v${v}_vol") { inputB = 1.0f }
         val (gl, gr) = panGains(defaultPans[v])
         val pL = multiply("v${v}_pL") { inputB = gl }
@@ -111,6 +113,16 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
 
     // Master clock (sample-accurate tempo generator)
     val clock = clock("clock")
+
+    // Grids drum pattern generator — clocked from master clock
+    val gridsUnit = grids("grids")
+    clock.out to gridsUnit.inputA          // 24 PPQN clock ticks
+    clock.outRight to gridsUnit.inputB     // beat pulse (unused but available)
+
+    // Wire Grids triggers to drum voices (voices 8, 9, 10)
+    gridsUnit.out to plaitsUnits[8].gate        // kick → voice 8
+    gridsUnit.outRight to plaitsUnits[9].gate   // snare → voice 9
+    gridsUnit.aux to plaitsUnits[10].gate       // hat → voice 10
 
     // Reverb (Dattorro plate) — parallel send from drive output
     // Wet-only output sums into clip inputs alongside delay output

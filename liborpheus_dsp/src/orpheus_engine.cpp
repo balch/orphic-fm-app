@@ -668,6 +668,22 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->marbles_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.drums") == 0) {
+        if (std::strcmp(symbol, "x") == 0)
+            engine->grids_x.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "y") == 0)
+            engine->grids_y.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "density_kick") == 0)
+            engine->grids_density_kick.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "density_snare") == 0)
+            engine->grids_density_snare.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "density_hat") == 0)
+            engine->grids_density_hat.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "randomness") == 0)
+            engine->grids_randomness.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bypass") == 0)
+            engine->grids_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.stereo") == 0) {
         if (std::strcmp(symbol, "master_pan") == 0)
             engine->master_pan.store(value, std::memory_order_relaxed);
