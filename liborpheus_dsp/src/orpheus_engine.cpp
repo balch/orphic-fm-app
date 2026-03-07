@@ -31,7 +31,7 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     engine->rings_part.set_polyphony(1);
 
     // Initialize Warps modulator
-    engine->warps_modulator.Init(48000.0f);
+    engine->warps_modulator.Init(engine->sample_rate);
 
     return engine;
 }
@@ -276,6 +276,9 @@ void orpheus_engine_process(OrpheusEngine* engine,
 
             engine->rings_part.Process(perf, rings_patch, mono_in, out_buf, aux_buf, block);
 
+            // Clear strum after first block so it doesn't retrigger
+            perf.strum = false;
+
             // Write stereo output (out=left, aux=right)
             for (int i = 0; i < block; i++) {
                 int idx = (frames_done + i) * 2;
@@ -453,6 +456,7 @@ void orpheus_engine_trigger_drum(OrpheusEngine* engine,
         int voice_index = kNumMainVoices + drum_index;
         engine->voice_params[voice_index].engine_index.store(kDrumEngineIndices[drum_index]);
         engine->voice_params[voice_index].tune.store(60.0f);  // default pitch
+        engine->voice_params[voice_index].morph.store(accent, std::memory_order_relaxed);
         engine->voice_params[voice_index].gate.store(1);       // trigger on
     }
 }
