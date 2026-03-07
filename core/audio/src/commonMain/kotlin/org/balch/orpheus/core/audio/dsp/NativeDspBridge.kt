@@ -24,4 +24,5 @@ interface NativeDspBridge {
     fun nativeGetPort(uri: String, symbol: String): Float
     fun nativeGetMonitor(out: FloatArray)
     fun nativeTriggerDrum(drumIndex: Int, accent: Float)
+    fun nativeLoadGraph(data: ByteArray): Int
 }

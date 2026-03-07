@@ -43,4 +43,5 @@ class OboeAudioBridge {
     external fun nativeSetVibrato(value: Float)
     external fun nativeSetBend(value: Float)
     external fun nativeGetMonitor(out: FloatArray)
+    external fun nativeLoadGraph(serialized: ByteArray): Int
 }

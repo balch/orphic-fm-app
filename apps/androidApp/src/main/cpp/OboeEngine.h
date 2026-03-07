@@ -14,6 +14,7 @@ public:
 
     oboe::Result openStream();
     oboe::Result open();
+    int loadGraph(const uint8_t* data, size_t length);
     oboe::Result requestStart();
     oboe::Result stop();
 

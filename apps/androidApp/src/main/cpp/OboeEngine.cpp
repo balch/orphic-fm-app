@@ -42,6 +42,11 @@ oboe::Result OboeEngine::open() {
     return oboe::Result::OK;
 }
 
+int OboeEngine::loadGraph(const uint8_t* data, size_t length) {
+    if (!dsp_engine_) return -100;
+    return orpheus_engine_load_patch(dsp_engine_, data, length);
+}
+
 oboe::Result OboeEngine::requestStart() {
     mIsRunning.store(true);
     oboe::Result result = mStream->requestStart();

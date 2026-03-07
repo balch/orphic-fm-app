@@ -42,6 +42,18 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetFramesPerBuffer(
     return sEngine.getFramesPerBuffer();
 }
 
+JNIEXPORT jint JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeLoadGraph(
+        JNIEnv *env, jobject thiz, jbyteArray serialized) {
+    jbyte* data = env->GetByteArrayElements(serialized, nullptr);
+    jsize len = env->GetArrayLength(serialized);
+    jint result = sEngine.loadGraph(
+        reinterpret_cast<const uint8_t*>(data),
+        static_cast<size_t>(len));
+    env->ReleaseByteArrayElements(serialized, data, JNI_ABORT);
+    return result;
+}
+
 JNIEXPORT jdouble JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetCpuLoad(
         JNIEnv *env, jobject thiz) {

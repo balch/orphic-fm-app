@@ -92,6 +92,7 @@ class OboeAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
     override fun nativeGetPort(uri: String, symbol: String): Float = bridge.nativeGetPort(uri, symbol)
     override fun nativeGetMonitor(out: FloatArray) = bridge.nativeGetMonitor(out)
     override fun nativeTriggerDrum(drumIndex: Int, accent: Float) = bridge.nativeTriggerDrum(drumIndex, accent)
+    override fun nativeLoadGraph(data: ByteArray): Int = bridge.nativeLoadGraph(data)
 
     companion object {
         private val log = logging("OboeAudioEngine")
