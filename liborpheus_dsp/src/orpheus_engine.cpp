@@ -675,7 +675,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.distortion") == 0) {
         if (std::strcmp(symbol, "drive") == 0) {
-            float scaled = 1.0f + value * 4.0f;
+            float scaled = 1.0f + value * 14.0f;
             engine->drive_amount.store(scaled, std::memory_order_relaxed);
             // Override graph port with scaled drive (raw value was set above)
             if (g) {
@@ -788,8 +788,8 @@ void orpheus_engine_set_master_volume(OrpheusEngine* engine, float v) {
 }
 
 void orpheus_engine_set_drive(OrpheusEngine* engine, float v) {
-    // v is 0..1 from UI; map to drive multiplier 1.0..5.0
-    engine->drive_amount.store(1.0f + v * 4.0f, std::memory_order_relaxed);
+    // v is 0..1 from UI; map to drive multiplier 1.0..15.0 (matching JSyn)
+    engine->drive_amount.store(1.0f + v * 14.0f, std::memory_order_relaxed);
 }
 void orpheus_engine_set_delay_mix(OrpheusEngine* engine, float v) {
     engine->delay_mix.store(v, std::memory_order_relaxed);

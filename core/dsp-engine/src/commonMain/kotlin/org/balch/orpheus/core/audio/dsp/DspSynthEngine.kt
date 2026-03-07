@@ -179,6 +179,9 @@ class DspSynthEngine @Inject constructor(
             }
             bridge.nativeSetVoiceDecay(voiceA, vp.getEnvSpeed(voiceA))
             bridge.nativeSetVoiceDecay(voiceA + 1, vp.getEnvSpeed(voiceA + 1))
+            // Sync tune with correct MIDI note conversion
+            bridge.nativeSetVoiceTune(voiceA, tuneToMidiNote(voiceA, voiceManager.getVoiceTune(voiceA)))
+            bridge.nativeSetVoiceTune(voiceA + 1, tuneToMidiNote(voiceA + 1, voiceManager.getVoiceTune(voiceA + 1)))
             log.info { "syncNative: duo=$duo engine=$engineOrdinal→cpp=$cppIndex active=true" }
         }
     }
@@ -667,8 +670,21 @@ class DspSynthEngine @Inject constructor(
     override fun resetStringBenders() = pluginProvider.perStringBenderPlugin.resetAll()
 
     // Voice Delegation
+
+    /**
+     * Convert JSyn tune (0..1) to MIDI note for C++ engine.
+     * JSyn: freq = 55 * 2^(tune*4) * pitchMult * 2^((quadPitch-0.5)*2)
+     * MIDI: freq = 440 * 2^((note-69)/12)
+     * Solving: note = 33 + 48*tune + pitchMultSemitones + 24*(quadPitch-0.5)
+     */
+    private fun tuneToMidiNote(index: Int, tune: Float): Float {
+        val quadIndex = index / 4
+        val quadPitch = voiceManager.getQuadPitch(quadIndex)
+        return 33f + tune * 48f + VOICE_PITCH_MULT_SEMITONES[index] + 24f * (quadPitch - 0.5f)
+    }
+
     override fun setVoiceTune(index: Int, tune: Float) {
-        nativeBridge?.nativeSetVoiceTune(index, tune)
+        nativeBridge?.nativeSetVoiceTune(index, tuneToMidiNote(index, tune))
         voiceManager.setVoiceTune(index, tune)
     }
     override fun setVoiceGate(index: Int, active: Boolean) {
@@ -680,7 +696,14 @@ class DspSynthEngine @Inject constructor(
     override fun setVoiceFmDepth(index: Int, amount: Float) = voiceManager.setVoiceFmDepth(index, amount)
     override fun setVoiceEnvelopeSpeed(index: Int, speed: Float) = voiceManager.setVoiceEnvelopeSpeed(index, speed)
     override fun setDuoSharpness(duoIndex: Int, sharpness: Float) = voiceManager.setDuoSharpness(duoIndex, sharpness)
-    override fun setQuadPitch(quadIndex: Int, pitch: Float) = voiceManager.setQuadPitch(quadIndex, pitch)
+    override fun setQuadPitch(quadIndex: Int, pitch: Float) {
+        voiceManager.setQuadPitch(quadIndex, pitch)
+        // Re-sync MIDI notes for all voices in this quad since pitch offset changed
+        val startVoice = quadIndex * 4
+        for (i in startVoice until (startVoice + 4).coerceAtMost(12)) {
+            nativeBridge?.nativeSetVoiceTune(i, tuneToMidiNote(i, voiceManager.getVoiceTune(i)))
+        }
+    }
     override fun setQuadHold(quadIndex: Int, amount: Float) {
         voiceManager.setQuadHold(quadIndex, amount)
         // Forward raw hold level to C++ — it computes scaled hold using envSpeed internally
@@ -959,6 +982,12 @@ class DspSynthEngine @Inject constructor(
         private const val MONITOR_POLL_INTERVAL_MS = 200L
         /** VoicePlugin engineOrdinal for SPEECH (PlaitsEngineId.SPEECH.ordinal + 1). */
         private const val SPEECH_ENGINE_ORDINAL = 17
+
+        // Per-voice pitch multiplier in semitones (matches DspVoiceManager voice list):
+        // 0,1=bass(0.5x→-12), 2-5=mid(1.0x→0), 6,7=high(2.0x→+12), 8-11=repl(1.0x→0)
+        private val VOICE_PITCH_MULT_SEMITONES = floatArrayOf(
+            -12f, -12f, 0f, 0f, 0f, 0f, 12f, 12f, 0f, 0f, 0f, 0f
+        )
 
         // PlaitsEngineId ordinals (0-based) → C++ engine indices
         private val CPP_ENGINE_MAP = intArrayOf(

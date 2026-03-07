@@ -67,18 +67,12 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     sumL.out to mvL.inputA
     sumR.out to mvR.inputA
 
-    // Drive / limiter (stereo)
-    val driveL = limiter("driveL") { driveAmount = 1.0f }
-    val driveR = limiter("driveR") { driveAmount = 1.0f }
-    mvL.out to driveL.input
-    mvR.out to driveR.input
-
-    // Clouds (stereo in/out) - bypassed by default via engine atomics
+    // Clouds/Grains (stereo in/out) - bypassed by default via engine atomics
     val grains = clouds("grains")
-    driveL.out to grains.inputA
-    driveR.out to grains.inputB
+    mvL.out to grains.inputA
+    mvR.out to grains.inputB
 
-    // Rings (mono in -> stereo out) - bypassed by default
+    // Rings/Resonator (mono in -> stereo out) - bypassed by default
     // Mix L+R to mono for rings input
     val ringsMix = add("ringsMix")
     val ringsHalf = multiply("ringsHalf") { inputB = 0.5f }
@@ -88,10 +82,16 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     ringsMix.out to ringsHalf.inputA
     ringsHalf.out to reso.input
 
+    // Drive / limiter (stereo) - after resonator, matching JSyn chain order
+    val driveL = limiter("driveL") { driveAmount = 1.0f }
+    val driveR = limiter("driveR") { driveAmount = 1.0f }
+    reso.out to driveL.input
+    reso.outRight to driveR.input
+
     // Warps (stereo in/out) - bypassed by default
     val warp = warps("warps")
-    reso.out to warp.inputA
-    reso.outRight to warp.inputB
+    driveL.out to warp.inputA
+    driveR.out to warp.inputB
 
     // Dual Delay (stereo in/out) - bypassed by default via engine atomics
     val delay = dualDelay("delay")
