@@ -203,4 +203,17 @@ struct OrpheusEngine {
     int    clock_beat_count{0};       // beats within bar (0..3 for 4/4)
     std::atomic<float> clock_bpm{120.0f};
     std::atomic<int>   clock_running{1};  // 1 = running, 0 = stopped
+
+    // ── Grids Drum Pattern Generator ──────────────────
+    int grids_step{0};                    // current step (0..31) in the pattern
+    int grids_pulse_count{0};             // sub-step counter (0..5 for 24PPQN→4PPQN)
+    float grids_trigger_duration{0.001f}; // trigger pulse width in seconds
+    int grids_trigger_countdown[3] = {};  // countdown samples for each channel trigger
+    std::atomic<float> grids_x{0.5f};
+    std::atomic<float> grids_y{0.5f};
+    std::atomic<float> grids_density_kick{0.5f};
+    std::atomic<float> grids_density_snare{0.5f};
+    std::atomic<float> grids_density_hat{0.5f};
+    std::atomic<float> grids_randomness{0.0f};
+    std::atomic<int>   grids_bypass{1};
 };
