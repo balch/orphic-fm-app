@@ -653,6 +653,7 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
 void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
+    float* lfo_in = u->inputs[IPORT_INPUT_C].buffer;  // LFO modulation input
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
 
@@ -664,25 +665,34 @@ void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames
 
     const float mix = engine->delay_mix.load(std::memory_order_relaxed);
     const float fb = std::min(engine->delay_feedback.load(std::memory_order_relaxed), 0.95f);
+    const float mod_depth_1 = engine->delay_mod_depth_1.load(std::memory_order_relaxed);
+    const float mod_depth_2 = engine->delay_mod_depth_2.load(std::memory_order_relaxed);
 
-    // Target delay times in samples (0..1 knob → 0.01..2.0s)
-    float target_1 = (0.01f + engine->delay_time_1.load(std::memory_order_relaxed) * 1.99f) * sr;
-    float target_2 = (0.01f + engine->delay_time_2.load(std::memory_order_relaxed) * 1.99f) * sr;
-
-    // Smooth delay times (~20ms ramp)
-    const float smooth = 1.0f - std::exp(-1.0f / (0.02f * sr));
-    engine->delay_time_1_smooth += (target_1 - engine->delay_time_1_smooth) * smooth;
-    engine->delay_time_2_smooth += (target_2 - engine->delay_time_2_smooth) * smooth;
-
-    int ds1 = std::max(1, std::min(static_cast<int>(engine->delay_time_1_smooth),
-                                    OrpheusEngine::kMaxDelaySamples - 1));
-    int ds2 = std::max(1, std::min(static_cast<int>(engine->delay_time_2_smooth),
-                                    OrpheusEngine::kMaxDelaySamples - 1));
+    // Base delay times in seconds (0..1 knob → 0.01..2.0s)
+    float base_time_1 = 0.01f + engine->delay_time_1.load(std::memory_order_relaxed) * 1.99f;
+    float base_time_2 = 0.01f + engine->delay_time_2.load(std::memory_order_relaxed) * 1.99f;
 
     const float dry = 1.0f - mix;
     const int max_d = OrpheusEngine::kMaxDelaySamples;
 
+    // Smooth delay times (~20ms ramp)
+    const float smooth = 1.0f - std::exp(-1.0f / (0.02f * sr));
+
     for (int i = 0; i < num_frames; i++) {
+        // LFO modulation: convert -1..1 to 0..1 unipolar, scale by mod depth
+        float lfo_uni = (lfo_in[i] + 1.0f) * 0.5f;
+        float mod_time_1 = (base_time_1 + lfo_uni * mod_depth_1) * sr;
+        float mod_time_2 = (base_time_2 + lfo_uni * mod_depth_2) * sr;
+
+        // Per-sample smoothing for modulated delay time
+        engine->delay_time_1_smooth += (mod_time_1 - engine->delay_time_1_smooth) * smooth;
+        engine->delay_time_2_smooth += (mod_time_2 - engine->delay_time_2_smooth) * smooth;
+
+        int ds1 = std::max(1, std::min(static_cast<int>(engine->delay_time_1_smooth),
+                                        max_d - 1));
+        int ds2 = std::max(1, std::min(static_cast<int>(engine->delay_time_2_smooth),
+                                        max_d - 1));
+
         int wp = engine->delay_write_pos;
 
         int rp1 = (wp - ds1 + max_d) % max_d;

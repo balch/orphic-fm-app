@@ -637,6 +637,10 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->delay_mix.store(value, std::memory_order_relaxed);
             engine->delay_bypass.store(value < 0.001f ? 1 : 0, std::memory_order_relaxed);
         }
+        else if (std::strcmp(symbol, "mod_depth_1") == 0)
+            engine->delay_mod_depth_1.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mod_depth_2") == 0)
+            engine->delay_mod_depth_2.store(value, std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.duolfo") == 0) {
         if (std::strcmp(symbol, "freq_a") == 0)

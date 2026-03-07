@@ -10,7 +10,8 @@ import kotlin.math.sin
  *
  * Graph structure:
  *   12x Plaits voices -> per-voice volume + pan -> summing tree ->
- *   master volume -> drive (limiter) -> clouds -> rings -> warps ->
+ *   master volume -> clouds -> rings -> drive -> warps ->
+ *   delay (sends: grains+drive+warps, LFO mod) ->
  *   hard clip -> master out (interleaved stereo)
  */
 fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
@@ -94,12 +95,18 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     driveR.out to warp.inputB
 
     // Dual Delay (stereo in/out) - bypassed by default via engine atomics
+    // JSyn sends grains+distortion+warps all to delay (summed at input)
     val delay = dualDelay("delay")
+    grains.out to delay.inputA
+    grains.outRight to delay.inputB
+    driveL.out to delay.inputA
+    driveR.out to delay.inputB
     warp.out to delay.inputA
     warp.outRight to delay.inputB
 
-    // HyperLFO (standalone modulation source, no audio connections)
-    hyperLfo("lfo")
+    // HyperLFO → Delay modulation (LFO output modulates delay time)
+    val lfo = hyperLfo("lfo")
+    lfo.out to delay.inputC
 
     // Master clip + output
     val clipL = hardClip("clipL")
@@ -116,5 +123,9 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
         map("org.balch.orpheus.plugins.stereo", "master_vol", "mvR", IPORT_INPUT_B)
         map("org.balch.orpheus.plugins.distortion", "drive", "driveL", IPORT_DRIVE)
         map("org.balch.orpheus.plugins.distortion", "drive", "driveR", IPORT_DRIVE)
+        // Per-quad volume: sets inputB on all voice volume multiply nodes in each quad
+        for (v in 0..3) map("org.balch.orpheus.plugins.stereo", "quad_vol_0", "v${v}_vol", IPORT_INPUT_B)
+        for (v in 4..7) map("org.balch.orpheus.plugins.stereo", "quad_vol_1", "v${v}_vol", IPORT_INPUT_B)
+        for (v in 8..11) map("org.balch.orpheus.plugins.stereo", "quad_vol_2", "v${v}_vol", IPORT_INPUT_B)
     }
 }

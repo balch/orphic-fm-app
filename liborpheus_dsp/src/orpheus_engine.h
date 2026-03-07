@@ -153,6 +153,8 @@ struct OrpheusEngine {
     std::atomic<float> delay_time_2{0.375f};
     std::atomic<float> delay_feedback{0.3f};    // 0..0.95
     std::atomic<float> delay_mix{0.0f};         // 0..1 dry/wet
+    std::atomic<float> delay_mod_depth_1{0.0f}; // LFO mod depth for delay 1
+    std::atomic<float> delay_mod_depth_2{0.0f}; // LFO mod depth for delay 2
     std::atomic<int>   delay_bypass{1};         // bypassed by default
 
     // Smoothed delay times (to prevent zipper noise)

@@ -184,6 +184,10 @@ class DspSynthEngine @Inject constructor(
             bridge.nativeSetVoiceTune(voiceA + 1, tuneToMidiNote(voiceA + 1, voiceManager.getVoiceTune(voiceA + 1)))
             log.info { "syncNative: duo=$duo engine=$engineOrdinal→cpp=$cppIndex active=true" }
         }
+        // Sync per-quad volume
+        for (quad in 0..2) {
+            bridge.nativeSetPort("org.balch.orpheus.plugins.stereo", "quad_vol_$quad", voiceManager.getQuadVolume(quad))
+        }
     }
 
     private fun setupListeners() {
@@ -191,7 +195,7 @@ class DspSynthEngine @Inject constructor(
         pluginProvider.voicePlugin.setListener(object : VoicePlugin.Listener {
             override fun onVoiceParamChange(index: Int, param: String, value: Any) {
                 when (param) {
-                    "tune" -> voiceManager.setVoiceTune(index, value as Float)
+                    "tune" -> setVoiceTune(index, value as Float)
                     "mod_depth" -> voiceManager.setVoiceFmDepth(index, value as Float)
                     "env_speed" -> {
                         voiceManager.setVoiceEnvelopeSpeed(index, value as Float)
@@ -247,7 +251,7 @@ class DspSynthEngine @Inject constructor(
                         }
                     }
                     "duo_mod_source_level" -> voiceManager.setDuoModSourceLevel(index, value as Float)
-                    "quad_pitch" -> voiceManager.setQuadPitch(index, value as Float)
+                    "quad_pitch" -> setQuadPitch(index, value as Float)
                     "quad_hold" -> {
                         voiceManager.setQuadHold(index, value as Float)
                         // Forward raw hold to C++ for all voices in the quad
@@ -257,7 +261,7 @@ class DspSynthEngine @Inject constructor(
                             nativeBridge?.nativeSetVoiceHold(i, holdAmount)
                         }
                     }
-                    "quad_volume" -> voiceManager.setQuadVolume(index, value as Float)
+                    "quad_volume" -> setQuadVolume(index, value as Float)
                     "quad_trigger_source" -> voiceManager.setQuadTriggerSource(index, value as Int)
                     "quad_pitch_source" -> voiceManager.setQuadPitchSource(index, value as Int)
                     "quad_env_trigger_mode" -> voiceManager.setQuadEnvelopeTriggerMode(index, value as Boolean)
@@ -512,7 +516,7 @@ class DspSynthEngine @Inject constructor(
 
     override fun setDelayModDepth(index: Int, amount: Float) {
         val ps = if (index == 0) DelaySymbol.MOD_DEPTH_1 else DelaySymbol.MOD_DEPTH_2
-        setPort(ps, PortValue.FloatValue(amount))
+        setPort(ps, PortValue.FloatValue(amount))  // forwards to C++ via nativeSetPort
     }
 
     override fun getDelayTime(index: Int): Float {
@@ -712,7 +716,10 @@ class DspSynthEngine @Inject constructor(
             nativeBridge?.nativeSetVoiceHold(i, amount)
         }
     }
-    override fun setQuadVolume(quadIndex: Int, volume: Float) = voiceManager.setQuadVolume(quadIndex, volume)
+    override fun setQuadVolume(quadIndex: Int, volume: Float) {
+        voiceManager.setQuadVolume(quadIndex, volume)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.stereo", "quad_vol_$quadIndex", volume)
+    }
     override fun fadeQuadVolume(quadIndex: Int, targetVolume: Float, durationSeconds: Float) = voiceManager.fadeQuadVolume(quadIndex, targetVolume, durationSeconds)
     override fun setVoiceHold(index: Int, amount: Float) {
         voiceManager.setVoiceHold(index, amount)
