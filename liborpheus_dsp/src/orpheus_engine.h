@@ -99,4 +99,14 @@ struct OrpheusEngine {
     std::atomic<float> warps_level1{0.5f};
     std::atomic<float> warps_level2{0.5f};
     std::atomic<int>   warps_bypass{1};         // bypassed by default
+
+    // Marbles random sequence generator (minimal stub for future integration)
+    // Full integration requires clock system and modulation routing (Phase 4+)
+    std::atomic<float> marbles_rate{0.5f};
+    std::atomic<float> marbles_spread{0.5f};
+    std::atomic<float> marbles_bias{0.5f};
+    std::atomic<float> marbles_steps{0.5f};
+    std::atomic<float> marbles_jitter{0.0f};
+    std::atomic<float> marbles_deja_vu{0.0f};
+    std::atomic<int>   marbles_bypass{1};       // bypassed by default
 };

@@ -111,6 +111,67 @@ void orpheus_engine_process(OrpheusEngine* engine,
         engine->voice_levels[v] = voice_peak;
     }
 
+    // Process drum voices (voices 8-11, using Plaits drum engines)
+    for (int v = kNumMainVoices; v < kNumVoices; v++) {
+        auto& vp = engine->voice_params[v];
+        auto& voice = engine->voices_dsp[v];
+
+        // Build Plaits Patch from atomic params
+        plaits::Patch patch;
+        patch.engine = vp.engine_index.load();
+        patch.note = vp.tune.load();
+        patch.harmonics = vp.harmonics.load();
+        patch.timbre = vp.timbre.load();
+        patch.morph = vp.morph.load();
+        patch.frequency_modulation_amount = 0.0f;
+        patch.timbre_modulation_amount = 0.0f;
+        patch.morph_modulation_amount = 0.0f;
+        patch.decay = 0.5f;
+        patch.lpg_colour = 0.5f;
+
+        // Build Modulations — trigger for one-shot drum hits
+        plaits::Modulations mod;
+        std::memset(&mod, 0, sizeof(mod));
+        int current_gate = vp.gate.load();
+        mod.trigger = current_gate ? 1.0f : 0.0f;
+        mod.trigger_patched = true;
+        mod.level_patched = false;
+
+        // Render in kBlockSize (12) chunks
+        int frames_done = 0;
+        float voice_peak = 0.0f;
+
+        while (frames_done < num_frames) {
+            int block = std::min(static_cast<int>(plaits::kBlockSize),
+                                 num_frames - frames_done);
+
+            plaits::Voice::Frame frames[plaits::kMaxBlockSize];
+            voice.Render(patch, mod, frames, block);
+
+            // Mix into interleaved stereo output with int16->float conversion
+            for (int i = 0; i < block; i++) {
+                float sample_out = frames[i].out * inv_32768 * volume;
+                float sample_aux = frames[i].aux * inv_32768 * volume;
+
+                int idx = (frames_done + i) * 2;
+                output_buffer[idx]     += sample_out;  // Left
+                output_buffer[idx + 1] += sample_aux;  // Right
+
+                float abs_out = std::fabs(sample_out);
+                if (abs_out > voice_peak) voice_peak = abs_out;
+            }
+
+            frames_done += block;
+        }
+
+        // Clear gate after rendering so drums are one-shot triggers
+        if (current_gate) {
+            vp.gate.store(0);
+        }
+
+        engine->voice_levels[v] = voice_peak;
+    }
+
     // Process through Clouds granular effect (if not bypassed)
     if (!engine->clouds_bypass.load(std::memory_order_relaxed)) {
         // Copy atomic parameters into the processor
@@ -339,6 +400,22 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->warps_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "marbles") == 0) {
+        if (std::strcmp(symbol, "rate") == 0)
+            engine->marbles_rate.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "spread") == 0)
+            engine->marbles_spread.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bias") == 0)
+            engine->marbles_bias.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "steps") == 0)
+            engine->marbles_steps.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "jitter") == 0)
+            engine->marbles_jitter.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "deja_vu") == 0)
+            engine->marbles_deja_vu.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bypass") == 0)
+            engine->marbles_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
 }
 
 float orpheus_engine_get_port(OrpheusEngine* engine,
@@ -363,7 +440,19 @@ void orpheus_engine_set_voice_tune(OrpheusEngine* engine,
 
 void orpheus_engine_trigger_drum(OrpheusEngine* engine,
                                  int drum_index, float accent) {
-    // TODO
+    // Map drum indices to repl voices (8-11) with drum engine indices:
+    // 0 = bass drum  (voice 8,  engine 21)
+    // 1 = snare drum (voice 9,  engine 22)
+    // 2 = hi-hat     (voice 10, engine 23)
+    // 3 = bass drum alt (voice 11, engine 21)
+    static const int kDrumEngineIndices[] = {21, 22, 23, 21};
+
+    if (drum_index >= 0 && drum_index < kNumReplVoices) {
+        int voice_index = kNumMainVoices + drum_index;
+        engine->voice_params[voice_index].engine_index.store(kDrumEngineIndices[drum_index]);
+        engine->voice_params[voice_index].tune.store(60.0f);  // default pitch
+        engine->voice_params[voice_index].gate.store(1);       // trigger on
+    }
 }
 
 void orpheus_engine_set_master_volume(OrpheusEngine* engine, float v) {
