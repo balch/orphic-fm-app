@@ -3,6 +3,16 @@
 #include <cmath>
 #include <cstring>
 
+// Hash function matching Kotlin's hash16() and orpheus_graph.cpp's hash16()
+static uint16_t engine_hash16(const char* str) {
+    uint16_t h = 0;
+    while (*str) {
+        h = h * 31 + static_cast<uint16_t>(*str);
+        str++;
+    }
+    return h;
+}
+
 extern "C" {
 
 OrpheusEngine* orpheus_engine_create(float sample_rate) {
@@ -531,19 +541,10 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                              const char* plugin_uri,
                              const char* symbol,
                              float value) {
-    // Route through graph if available
+    // Route through graph if available (raw value — scaled overrides below)
     if (engine->graph) {
-        // Compute hash (must match Kotlin's hash16 function)
-        auto hash16 = [](const char* str) -> uint16_t {
-            uint16_t h = 0;
-            while (*str) {
-                h = h * 31 + static_cast<uint16_t>(*str);
-                str++;
-            }
-            return h;
-        };
-        uint16_t uh = hash16(plugin_uri);
-        uint16_t sh = hash16(symbol);
+        uint16_t uh = engine_hash16(plugin_uri);
+        uint16_t sh = engine_hash16(symbol);
         orpheus_graph_set_port(engine->graph, uh, sh, value);
     }
 
@@ -655,8 +656,15 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.distortion") == 0) {
-        if (std::strcmp(symbol, "drive") == 0)
-            engine->drive_amount.store(1.0f + value * 4.0f, std::memory_order_relaxed);
+        if (std::strcmp(symbol, "drive") == 0) {
+            float scaled = 1.0f + value * 4.0f;
+            engine->drive_amount.store(scaled, std::memory_order_relaxed);
+            // Override graph port with scaled drive (raw value was set above)
+            if (engine->graph) {
+                orpheus_graph_set_port(engine->graph,
+                    engine_hash16(plugin_uri), engine_hash16(symbol), scaled);
+            }
+        }
         else if (std::strcmp(symbol, "mix") == 0)
             engine->drive_mix.store(value, std::memory_order_relaxed);
     }

@@ -307,6 +307,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     const float inv_32768 = 1.0f / 32768.0f;
     int frames_done = 0;
+    float voice_peak = 0.0f;
     while (frames_done < num_frames) {
         int block = std::min(static_cast<int>(plaits::kBlockSize),
                              num_frames - frames_done);
@@ -315,20 +316,34 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         voice.Render(patch, mod, frames, block);
 
         for (int i = 0; i < block; i++) {
-            out[frames_done + i] = (frames[i].out + frames[i].aux) * 0.5f * inv_32768;
+            float sample = (frames[i].out + frames[i].aux) * 0.5f * inv_32768;
+            out[frames_done + i] = sample;
+            float abs_s = std::fabs(sample);
+            if (abs_s > voice_peak) voice_peak = abs_s;
         }
 
         frames_done += block;
     }
+
+    engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);
+
+    // Clear gate for drum voices (one-shot triggers) so next trigger sees rising edge
+    if (idx >= kNumMainVoices && current_gate) {
+        vp.gate.store(0, std::memory_order_relaxed);
+    }
 }
 
 void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
-    if (engine->clouds_bypass.load(std::memory_order_relaxed)) return;
-
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
+
+    if (engine->clouds_bypass.load(std::memory_order_relaxed)) {
+        std::memcpy(out_l, in_l, num_frames * sizeof(float));
+        std::memcpy(out_r, in_r, num_frames * sizeof(float));
+        return;
+    }
 
     auto* p = engine->clouds_processor.mutable_parameters();
     p->position = engine->clouds_position.load(std::memory_order_relaxed);
@@ -374,11 +389,15 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 }
 
 void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
-    if (engine->rings_bypass.load(std::memory_order_relaxed)) return;
-
     float* in = u->inputs[IPORT_INPUT].buffer;
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
+
+    if (engine->rings_bypass.load(std::memory_order_relaxed)) {
+        std::memcpy(out_l, in, num_frames * sizeof(float));
+        std::memcpy(out_r, in, num_frames * sizeof(float));
+        return;
+    }
 
     rings::Patch rings_patch;
     rings_patch.structure = engine->rings_structure.load(std::memory_order_relaxed);
@@ -427,12 +446,16 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
 }
 
 void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
-    if (engine->warps_bypass.load(std::memory_order_relaxed)) return;
-
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
+
+    if (engine->warps_bypass.load(std::memory_order_relaxed)) {
+        std::memcpy(out_l, in_l, num_frames * sizeof(float));
+        std::memcpy(out_r, in_r, num_frames * sizeof(float));
+        return;
+    }
 
     auto* wp = engine->warps_modulator.mutable_parameters();
     wp->modulation_algorithm = engine->warps_algorithm.load(std::memory_order_relaxed);

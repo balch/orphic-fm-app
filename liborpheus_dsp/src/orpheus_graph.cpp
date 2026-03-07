@@ -373,7 +373,6 @@ void orpheus_graph_set_port(OrpheusGraph* graph,
             if (e.unit_id < graph->unit_count && e.port < kMaxInputPorts) {
                 graph->units[e.unit_id].inputs[e.port].constant = value;
             }
-            return;
         }
     }
 }

@@ -104,6 +104,8 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // Port map for nativeSetPort routing
     portMap {
         map("org.balch.orpheus.plugins.stereo", "master_vol", "mvL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.stereo", "master_vol", "mvR", IPORT_INPUT_B)
         map("org.balch.orpheus.plugins.distortion", "drive", "driveL", IPORT_DRIVE)
+        map("org.balch.orpheus.plugins.distortion", "drive", "driveR", IPORT_DRIVE)
     }
 }
