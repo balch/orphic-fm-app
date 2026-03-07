@@ -79,14 +79,6 @@ class DspGrainsUnit : GrainsUnit, DspProcessable {
             return
         }
 
-        // Ensure conversion buffers are large enough
-        if (leftInBuffer.size < numFrames) {
-            leftInBuffer = FloatArray(numFrames)
-            rightInBuffer = FloatArray(numFrames)
-            leftOutBuffer = FloatArray(numFrames)
-            rightOutBuffer = FloatArray(numFrames)
-        }
-
         // Copy input port buffers into processor input arrays
         inL.copyInto(leftInBuffer, 0, 0, numFrames)
         inR.copyInto(rightInBuffer, 0, 0, numFrames)

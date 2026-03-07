@@ -58,14 +58,6 @@ class DspWarpsUnit : WarpsUnit, DspProcessable {
             return
         }
 
-        // Ensure conversion buffers are large enough
-        if (leftInBuffer.size < numFrames) {
-            leftInBuffer = FloatArray(numFrames)
-            rightInBuffer = FloatArray(numFrames)
-            leftOutBuffer = FloatArray(numFrames)
-            rightOutBuffer = FloatArray(numFrames)
-        }
-
         // Copy input port buffers into processor input arrays
         val inL = dspInputL.getBuffer()
         val inR = dspInputR.getBuffer()
