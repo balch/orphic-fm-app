@@ -20,6 +20,8 @@ const val UNIT_WARPS = 14
 const val UNIT_DELAY_LINE = 15
 const val UNIT_REVERB = 16
 const val UNIT_MASTER_OUT = 17
+const val UNIT_DUAL_DELAY = 18
+const val UNIT_HYPER_LFO = 19
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -275,6 +277,12 @@ class WiringGraphBuilder {
 
     fun masterOut(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_MASTER_OUT, name, init)
+
+    fun dualDelay(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_DUAL_DELAY, name, init)
+
+    fun hyperLfo(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_HYPER_LFO, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

@@ -23,6 +23,8 @@ enum OrpheusUnitType : uint16_t {
     UNIT_DELAY_LINE = 15,
     UNIT_REVERB = 16,
     UNIT_MASTER_OUT = 17,
+    UNIT_DUAL_DELAY = 18,
+    UNIT_HYPER_LFO = 19,
     UNIT_TYPE_COUNT
 };
 

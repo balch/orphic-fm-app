@@ -93,12 +93,20 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     reso.out to warp.inputA
     reso.outRight to warp.inputB
 
+    // Dual Delay (stereo in/out) - bypassed by default via engine atomics
+    val delay = dualDelay("delay")
+    warp.out to delay.inputA
+    warp.outRight to delay.inputB
+
+    // HyperLFO (standalone modulation source, no audio connections)
+    hyperLfo("lfo")
+
     // Master clip + output
     val clipL = hardClip("clipL")
     val clipR = hardClip("clipR")
     val master = masterOut("master")
-    warp.out to clipL.input
-    warp.outRight to clipR.input
+    delay.out to clipL.input
+    delay.outRight to clipR.input
     clipL.out to master.inputA
     clipR.out to master.inputB
 

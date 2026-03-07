@@ -434,7 +434,7 @@ void orpheus_engine_process(OrpheusEngine* engine,
             }
         }
 
-        // ── Master pan + soft-clip (procedural path only) ──
+        // ── Master pan + soft-clip ─────────────────────────
         {
             float mp_l, mp_r;
             compute_pan(engine->master_pan.load(std::memory_order_relaxed), mp_l, mp_r);
@@ -445,108 +445,95 @@ void orpheus_engine_process(OrpheusEngine* engine,
                 output_buffer[idx + 1] = std::tanh(output_buffer[idx + 1] * mp_r * master_gain);
             }
         }
-    }
 
-    // ═══════════════════════════════════════════════════════
-    // Shared post-processing (runs for both graph and procedural paths)
-    // ═══════════════════════════════════════════════════════
+        // ── Dual Delay ───────────────────────────────────
+        if (!engine->delay_bypass.load(std::memory_order_relaxed)) {
+            const float mix = engine->delay_mix.load(std::memory_order_relaxed);
+            const float fb = std::min(engine->delay_feedback.load(std::memory_order_relaxed), 0.95f);
+            const float sr = engine->sample_rate;
 
-    // ── Dual Delay ───────────────────────────────────
-    if (!engine->delay_bypass.load(std::memory_order_relaxed)) {
-        const float mix = engine->delay_mix.load(std::memory_order_relaxed);
-        const float fb = std::min(engine->delay_feedback.load(std::memory_order_relaxed), 0.95f);
-        const float sr = engine->sample_rate;
+            float target_1 = (0.01f + engine->delay_time_1.load(std::memory_order_relaxed) * 1.99f) * sr;
+            float target_2 = (0.01f + engine->delay_time_2.load(std::memory_order_relaxed) * 1.99f) * sr;
 
-        // Target delay times in samples (0..1 knob → 0.01..2.0s)
-        float target_1 = (0.01f + engine->delay_time_1.load(std::memory_order_relaxed) * 1.99f) * sr;
-        float target_2 = (0.01f + engine->delay_time_2.load(std::memory_order_relaxed) * 1.99f) * sr;
+            const float smooth_coeff = 1.0f - std::exp(-1.0f / (0.02f * sr));
+            engine->delay_time_1_smooth += (target_1 - engine->delay_time_1_smooth) * smooth_coeff;
+            engine->delay_time_2_smooth += (target_2 - engine->delay_time_2_smooth) * smooth_coeff;
 
-        // Smooth delay times (~20ms ramp)
-        const float smooth_coeff = 1.0f - std::exp(-1.0f / (0.02f * sr));
-        engine->delay_time_1_smooth += (target_1 - engine->delay_time_1_smooth) * smooth_coeff;
-        engine->delay_time_2_smooth += (target_2 - engine->delay_time_2_smooth) * smooth_coeff;
+            int delay_samples_1 = std::max(1, std::min(static_cast<int>(engine->delay_time_1_smooth),
+                                                         OrpheusEngine::kMaxDelaySamples - 1));
+            int delay_samples_2 = std::max(1, std::min(static_cast<int>(engine->delay_time_2_smooth),
+                                                         OrpheusEngine::kMaxDelaySamples - 1));
 
-        int delay_samples_1 = std::max(1, std::min(static_cast<int>(engine->delay_time_1_smooth),
-                                                     OrpheusEngine::kMaxDelaySamples - 1));
-        int delay_samples_2 = std::max(1, std::min(static_cast<int>(engine->delay_time_2_smooth),
-                                                     OrpheusEngine::kMaxDelaySamples - 1));
+            const float dry = 1.0f - mix;
+            const int max_d = OrpheusEngine::kMaxDelaySamples;
 
-        const float dry = 1.0f - mix;
-        const int max_d = OrpheusEngine::kMaxDelaySamples;
+            for (int i = 0; i < num_frames; i++) {
+                int idx = i * 2;
+                float in_l = output_buffer[idx];
+                float in_r = output_buffer[idx + 1];
 
-        for (int i = 0; i < num_frames; i++) {
-            int idx = i * 2;
-            float in_l = output_buffer[idx];
-            float in_r = output_buffer[idx + 1];
+                int wp = engine->delay_write_pos;
+                int rp1 = (wp - delay_samples_1 + max_d) % max_d;
+                int rp2 = (wp - delay_samples_2 + max_d) % max_d;
 
-            int wp = engine->delay_write_pos;
+                float d1l = engine->delay_buffer_1l[rp1];
+                float d1r = engine->delay_buffer_1r[rp1];
+                float d2l = engine->delay_buffer_2l[rp2];
+                float d2r = engine->delay_buffer_2r[rp2];
 
-            // Read from delay lines
-            int rp1 = (wp - delay_samples_1 + max_d) % max_d;
-            int rp2 = (wp - delay_samples_2 + max_d) % max_d;
+                engine->delay_buffer_1l[wp] = in_l + d1l * fb;
+                engine->delay_buffer_1r[wp] = in_r + d1r * fb;
+                engine->delay_buffer_2l[wp] = in_l + d2l * fb;
+                engine->delay_buffer_2r[wp] = in_r + d2r * fb;
 
-            float d1l = engine->delay_buffer_1l[rp1];
-            float d1r = engine->delay_buffer_1r[rp1];
-            float d2l = engine->delay_buffer_2l[rp2];
-            float d2r = engine->delay_buffer_2r[rp2];
+                float wet_l = (d1l + d2l) * 0.5f;
+                float wet_r = (d1r + d2r) * 0.5f;
+                output_buffer[idx]     = in_l * dry + wet_l * mix;
+                output_buffer[idx + 1] = in_r * dry + wet_r * mix;
 
-            // Write to delay lines (input + feedback)
-            engine->delay_buffer_1l[wp] = in_l + d1l * fb;
-            engine->delay_buffer_1r[wp] = in_r + d1r * fb;
-            engine->delay_buffer_2l[wp] = in_l + d2l * fb;
-            engine->delay_buffer_2r[wp] = in_r + d2r * fb;
-
-            // Mix: dry signal + wet (both delays summed)
-            float wet_l = (d1l + d2l) * 0.5f;
-            float wet_r = (d1r + d2r) * 0.5f;
-            output_buffer[idx]     = in_l * dry + wet_l * mix;
-            output_buffer[idx + 1] = in_r * dry + wet_r * mix;
-
-            engine->delay_write_pos = (wp + 1) % max_d;
-        }
-    }
-
-    // ── HyperLFO (modulation value, not audio) ───────
-    {
-        float freq_a = engine->lfo_freq_a.load(std::memory_order_relaxed);
-        float freq_b = engine->lfo_freq_b.load(std::memory_order_relaxed);
-        float shape = engine->lfo_shape.load(std::memory_order_relaxed);
-        int mode = engine->lfo_mode.load(std::memory_order_relaxed);
-        float sr = engine->sample_rate;
-
-        // Advance phases (compute once per callback for efficiency)
-        float inc_a = freq_a / sr * static_cast<float>(num_frames);
-        float inc_b = freq_b / sr * static_cast<float>(num_frames);
-        engine->lfo_phase_a += inc_a;
-        engine->lfo_phase_b += inc_b;
-        if (engine->lfo_phase_a >= 1.0f) engine->lfo_phase_a -= std::floor(engine->lfo_phase_a);
-        if (engine->lfo_phase_b >= 1.0f) engine->lfo_phase_b -= std::floor(engine->lfo_phase_b);
-
-        // Generate waveforms (bipolar -1..1)
-        auto gen_wave = [&](float phase) -> float {
-            float sq = phase < 0.5f ? 1.0f : -1.0f;
-            float tri = 4.0f * std::fabs(phase - 0.5f) - 1.0f;
-            return sq + (tri - sq) * shape; // lerp square→triangle
-        };
-
-        float a = gen_wave(engine->lfo_phase_a);
-        float b = gen_wave(engine->lfo_phase_b);
-
-        // Logic combination
-        float output;
-        if (mode == 0) { // AND
-            float ua = a * 0.5f + 0.5f;
-            float ub = b * 0.5f + 0.5f;
-            output = (ua * ub) * 2.0f - 1.0f;
-        } else if (mode == 2) { // OR
-            float ua = a * 0.5f + 0.5f;
-            float ub = b * 0.5f + 0.5f;
-            output = (ua + ub - ua * ub) * 2.0f - 1.0f;
-        } else { // OFF (mode=1) — use A only
-            output = a;
+                engine->delay_write_pos = (wp + 1) % max_d;
+            }
         }
 
-        engine->lfo_output_value = output;
+        // ── HyperLFO ─────────────────────────────────────
+        {
+            float freq_a = engine->lfo_freq_a.load(std::memory_order_relaxed);
+            float freq_b = engine->lfo_freq_b.load(std::memory_order_relaxed);
+            float shape = engine->lfo_shape.load(std::memory_order_relaxed);
+            int mode = engine->lfo_mode.load(std::memory_order_relaxed);
+            float sr = engine->sample_rate;
+
+            float inc_a = freq_a / sr * static_cast<float>(num_frames);
+            float inc_b = freq_b / sr * static_cast<float>(num_frames);
+            engine->lfo_phase_a += inc_a;
+            engine->lfo_phase_b += inc_b;
+            if (engine->lfo_phase_a >= 1.0f) engine->lfo_phase_a -= std::floor(engine->lfo_phase_a);
+            if (engine->lfo_phase_b >= 1.0f) engine->lfo_phase_b -= std::floor(engine->lfo_phase_b);
+
+            auto gen_wave = [&](float phase) -> float {
+                float sq = phase < 0.5f ? 1.0f : -1.0f;
+                float tri = 4.0f * std::fabs(phase - 0.5f) - 1.0f;
+                return sq + (tri - sq) * shape;
+            };
+
+            float a = gen_wave(engine->lfo_phase_a);
+            float b = gen_wave(engine->lfo_phase_b);
+
+            float output;
+            if (mode == 0) { // AND
+                float ua = a * 0.5f + 0.5f;
+                float ub = b * 0.5f + 0.5f;
+                output = (ua * ub) * 2.0f - 1.0f;
+            } else if (mode == 2) { // OR
+                float ua = a * 0.5f + 0.5f;
+                float ub = b * 0.5f + 0.5f;
+                output = (ua + ub - ua * ub) * 2.0f - 1.0f;
+            } else { // OFF (mode=1) — use A only
+                output = a;
+            }
+
+            engine->lfo_output_value = output;
+        }
     }
 
     // Peak monitoring (always runs, regardless of graph/procedural path)

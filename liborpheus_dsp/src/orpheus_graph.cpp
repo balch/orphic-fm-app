@@ -348,6 +348,10 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_rings(u, engine, num_frames, sr); break;
             case UNIT_WARPS:
                 unit_process_warps(u, engine, num_frames, sr); break;
+            case UNIT_DUAL_DELAY:
+                unit_process_dual_delay(u, engine, num_frames, sr); break;
+            case UNIT_HYPER_LFO:
+                unit_process_hyper_lfo(u, engine, num_frames, sr); break;
             default: break;
         }
     }

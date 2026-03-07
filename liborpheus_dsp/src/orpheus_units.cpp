@@ -490,3 +490,110 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         frames_done += block;
     }
 }
+
+// -- Dual Delay graph unit --------------------------------
+// Stereo in/out, reads delay params from engine atomics,
+// uses engine's delay buffers for state.
+void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
+    float* in_l = u->inputs[IPORT_INPUT_A].buffer;
+    float* in_r = u->inputs[IPORT_INPUT_B].buffer;
+    float* out_l = u->output_buffers[OPORT_OUT];
+    float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
+
+    if (engine->delay_bypass.load(std::memory_order_relaxed)) {
+        std::memcpy(out_l, in_l, num_frames * sizeof(float));
+        std::memcpy(out_r, in_r, num_frames * sizeof(float));
+        return;
+    }
+
+    const float mix = engine->delay_mix.load(std::memory_order_relaxed);
+    const float fb = std::min(engine->delay_feedback.load(std::memory_order_relaxed), 0.95f);
+
+    // Target delay times in samples (0..1 knob → 0.01..2.0s)
+    float target_1 = (0.01f + engine->delay_time_1.load(std::memory_order_relaxed) * 1.99f) * sr;
+    float target_2 = (0.01f + engine->delay_time_2.load(std::memory_order_relaxed) * 1.99f) * sr;
+
+    // Smooth delay times (~20ms ramp)
+    const float smooth = 1.0f - std::exp(-1.0f / (0.02f * sr));
+    engine->delay_time_1_smooth += (target_1 - engine->delay_time_1_smooth) * smooth;
+    engine->delay_time_2_smooth += (target_2 - engine->delay_time_2_smooth) * smooth;
+
+    int ds1 = std::max(1, std::min(static_cast<int>(engine->delay_time_1_smooth),
+                                    OrpheusEngine::kMaxDelaySamples - 1));
+    int ds2 = std::max(1, std::min(static_cast<int>(engine->delay_time_2_smooth),
+                                    OrpheusEngine::kMaxDelaySamples - 1));
+
+    const float dry = 1.0f - mix;
+    const int max_d = OrpheusEngine::kMaxDelaySamples;
+
+    for (int i = 0; i < num_frames; i++) {
+        int wp = engine->delay_write_pos;
+
+        int rp1 = (wp - ds1 + max_d) % max_d;
+        int rp2 = (wp - ds2 + max_d) % max_d;
+
+        float d1l = engine->delay_buffer_1l[rp1];
+        float d1r = engine->delay_buffer_1r[rp1];
+        float d2l = engine->delay_buffer_2l[rp2];
+        float d2r = engine->delay_buffer_2r[rp2];
+
+        engine->delay_buffer_1l[wp] = in_l[i] + d1l * fb;
+        engine->delay_buffer_1r[wp] = in_r[i] + d1r * fb;
+        engine->delay_buffer_2l[wp] = in_l[i] + d2l * fb;
+        engine->delay_buffer_2r[wp] = in_r[i] + d2r * fb;
+
+        float wet_l = (d1l + d2l) * 0.5f;
+        float wet_r = (d1r + d2r) * 0.5f;
+        out_l[i] = in_l[i] * dry + wet_l * mix;
+        out_r[i] = in_r[i] * dry + wet_r * mix;
+
+        engine->delay_write_pos = (wp + 1) % max_d;
+    }
+}
+
+// -- HyperLFO graph unit ----------------------------------
+// No audio input. Computes dual LFO with logic combination.
+// Writes to engine->lfo_output_value and output buffer.
+void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
+    float* out = u->output_buffers[OPORT_OUT];
+
+    float freq_a = engine->lfo_freq_a.load(std::memory_order_relaxed);
+    float freq_b = engine->lfo_freq_b.load(std::memory_order_relaxed);
+    float shape = engine->lfo_shape.load(std::memory_order_relaxed);
+    int mode = engine->lfo_mode.load(std::memory_order_relaxed);
+
+    float inc_a = freq_a / sr * static_cast<float>(num_frames);
+    float inc_b = freq_b / sr * static_cast<float>(num_frames);
+    engine->lfo_phase_a += inc_a;
+    engine->lfo_phase_b += inc_b;
+    if (engine->lfo_phase_a >= 1.0f) engine->lfo_phase_a -= std::floor(engine->lfo_phase_a);
+    if (engine->lfo_phase_b >= 1.0f) engine->lfo_phase_b -= std::floor(engine->lfo_phase_b);
+
+    auto gen_wave = [&](float phase) -> float {
+        float sq = phase < 0.5f ? 1.0f : -1.0f;
+        float tri = 4.0f * std::fabs(phase - 0.5f) - 1.0f;
+        return sq + (tri - sq) * shape;
+    };
+
+    float a = gen_wave(engine->lfo_phase_a);
+    float b = gen_wave(engine->lfo_phase_b);
+
+    float output;
+    if (mode == 0) { // AND
+        float ua = a * 0.5f + 0.5f;
+        float ub = b * 0.5f + 0.5f;
+        output = (ua * ub) * 2.0f - 1.0f;
+    } else if (mode == 2) { // OR
+        float ua = a * 0.5f + 0.5f;
+        float ub = b * 0.5f + 0.5f;
+        output = (ua + ub - ua * ub) * 2.0f - 1.0f;
+    } else { // OFF (mode=1) — use A only
+        output = a;
+    }
+
+    engine->lfo_output_value = output;
+
+    // Fill output buffer with constant value (for potential future modulation routing)
+    for (int i = 0; i < num_frames; i++)
+        out[i] = output;
+}
