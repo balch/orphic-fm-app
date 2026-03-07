@@ -1,5 +1,6 @@
 #include <jni.h>
 #include "OboeEngine.h"
+#include <cstring>
 
 static OboeEngine sEngine;
 
@@ -8,7 +9,7 @@ extern "C" {
 JNIEXPORT jint JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeOpen(
         JNIEnv *env, jobject thiz) {
-    return static_cast<jint>(sEngine.open(env, thiz));
+    return static_cast<jint>(sEngine.open());
 }
 
 JNIEXPORT jint JNICALL
@@ -45,6 +46,87 @@ JNIEXPORT jdouble JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetCpuLoad(
         JNIEnv *env, jobject thiz) {
     return sEngine.getCpuLoad();
+}
+
+// ── Parameter control ──────────────────────────
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetPort(
+        JNIEnv *env, jobject thiz, jstring uri, jstring sym, jfloat value) {
+    const char* c_uri = env->GetStringUTFChars(uri, nullptr);
+    const char* c_sym = env->GetStringUTFChars(sym, nullptr);
+    sEngine.setPort(c_uri, c_sym, value);
+    env->ReleaseStringUTFChars(uri, c_uri);
+    env->ReleaseStringUTFChars(sym, c_sym);
+}
+
+JNIEXPORT jfloat JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPort(
+        JNIEnv *env, jobject thiz, jstring uri, jstring sym) {
+    const char* c_uri = env->GetStringUTFChars(uri, nullptr);
+    const char* c_sym = env->GetStringUTFChars(sym, nullptr);
+    float result = sEngine.getPort(c_uri, c_sym);
+    env->ReleaseStringUTFChars(uri, c_uri);
+    env->ReleaseStringUTFChars(sym, c_sym);
+    return result;
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceGate(
+        JNIEnv *env, jobject thiz, jint index, jboolean active) {
+    sEngine.setVoiceGate(index, active ? 1 : 0);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceTune(
+        JNIEnv *env, jobject thiz, jint index, jfloat tune) {
+    sEngine.setVoiceTune(index, tune);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeTriggerDrum(
+        JNIEnv *env, jobject thiz, jint drumIndex, jfloat accent) {
+    sEngine.triggerDrum(drumIndex, accent);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetMasterVolume(
+        JNIEnv *env, jobject thiz, jfloat value) {
+    sEngine.setMasterVolume(value);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetDrive(
+        JNIEnv *env, jobject thiz, jfloat value) {
+    sEngine.setDrive(value);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetDelayMix(
+        JNIEnv *env, jobject thiz, jfloat value) {
+    sEngine.setDelayMix(value);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVibrato(
+        JNIEnv *env, jobject thiz, jfloat value) {
+    sEngine.setVibrato(value);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetBend(
+        JNIEnv *env, jobject thiz, jfloat value) {
+    sEngine.setBend(value);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetMonitor(
+        JNIEnv *env, jobject thiz, jfloatArray out) {
+    OrpheusMonitorData mon;
+    sEngine.getMonitor(&mon);
+    // Copy struct as flat float array (all fields are float)
+    env->SetFloatArrayRegion(out, 0, sizeof(mon) / sizeof(float),
+                             reinterpret_cast<float*>(&mon));
 }
 
 } // extern "C"

@@ -2,8 +2,9 @@
 #define ORPHEUS_OBOE_ENGINE_H
 
 #include <oboe/Oboe.h>
-#include <jni.h>
+#include "orpheus_dsp.h"
 #include <atomic>
+#include <chrono>
 
 class OboeEngine : public oboe::AudioStreamDataCallback,
                    public oboe::AudioStreamErrorCallback {
@@ -11,35 +12,42 @@ public:
     OboeEngine();
     ~OboeEngine();
 
-    /** Open the stream and set up JNI. Does NOT start audio. */
-    oboe::Result open(JNIEnv *env, jobject kotlinCallback);
-    /** Begin audio playback. Call after Kotlin has allocated buffers. */
+    oboe::Result openStream();
+    oboe::Result open();
     oboe::Result requestStart();
     oboe::Result stop();
+
     bool isRunning() const;
     int32_t getSampleRate() const;
     int32_t getFramesPerBuffer() const;
     double getCpuLoad() const;
 
+    // Direct C++ DSP engine access
+    OrpheusEngine* getDspEngine() { return dsp_engine_; }
+
+    // C API pass-through (called from JNI bridge for parameter control)
+    void setPort(const char* uri, const char* sym, float value);
+    float getPort(const char* uri, const char* sym);
+    void setVoiceGate(int index, int active);
+    void setVoiceTune(int index, float tune);
+    void triggerDrum(int drumIndex, float accent);
+    void setMasterVolume(float v);
+    void setDrive(float v);
+    void setDelayMix(float v);
+    void setVibrato(float v);
+    void setBend(float v);
+    void getMonitor(OrpheusMonitorData* out);
+
+    // Oboe callbacks
     oboe::DataCallbackResult onAudioReady(
-        oboe::AudioStream *stream, void *audioData, int32_t numFrames) override;
-    void onErrorAfterClose(oboe::AudioStream *stream, oboe::Result error) override;
+        oboe::AudioStream* stream, void* audioData, int32_t numFrames) override;
+    void onErrorAfterClose(
+        oboe::AudioStream* stream, oboe::Result error) override;
 
 private:
-    oboe::Result openStream();
-
     std::shared_ptr<oboe::AudioStream> mStream;
-    JavaVM *mJvm = nullptr;
-    // Written once from audio thread on first callback; read only from audio thread thereafter.
-    JNIEnv *mAudioThreadEnv = nullptr;
-    // Written once during open() before audio starts; read from audio thread.
-    // Safe due to happens-before from stream start, but documented for clarity.
-    jobject mKotlinCallback = nullptr;
-    jmethodID mRenderMethod = nullptr;
-    jfloatArray mJniOutputBuffer = nullptr;
-
+    OrpheusEngine* dsp_engine_ = nullptr;
     std::atomic<bool> mIsRunning{false};
-    std::atomic<bool> mAudioThreadAttached{false};
     std::atomic<double> mCpuLoad{0.0};
 };
 
