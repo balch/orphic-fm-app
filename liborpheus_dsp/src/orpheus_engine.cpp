@@ -23,6 +23,14 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     engine->clouds_processor.set_playback_mode(clouds::PLAYBACK_MODE_GRANULAR);
     engine->clouds_processor.set_quality(0);  // stereo hi-fi
 
+    // Initialize Rings resonator
+    engine->rings_part.Init(engine->rings_reverb_buffer);
+    engine->rings_part.set_model(rings::RESONATOR_MODEL_MODAL);
+    engine->rings_part.set_polyphony(1);
+
+    // Initialize Warps modulator
+    engine->warps_modulator.Init(48000.0f);
+
     return engine;
 }
 
@@ -152,6 +160,106 @@ void orpheus_engine_process(OrpheusEngine* engine,
         }
     }
 
+    // Process through Rings resonator (if not bypassed)
+    if (!engine->rings_bypass.load(std::memory_order_relaxed)) {
+        rings::Patch rings_patch;
+        rings_patch.structure = engine->rings_structure.load(std::memory_order_relaxed);
+        rings_patch.brightness = engine->rings_brightness.load(std::memory_order_relaxed);
+        rings_patch.damping = engine->rings_damping.load(std::memory_order_relaxed);
+        rings_patch.position = engine->rings_position.load(std::memory_order_relaxed);
+
+        rings::PerformanceState perf;
+        std::memset(&perf, 0, sizeof(perf));
+        perf.tonic = engine->rings_frequency.load(std::memory_order_relaxed);
+        perf.note = 0.0f;
+        perf.internal_exciter = engine->rings_internal_exciter.load(std::memory_order_relaxed) != 0;
+        perf.internal_strum = false;
+        perf.internal_note = false;
+
+        // Handle strum trigger (set from UI, cleared by audio thread)
+        int strum = engine->rings_strum.load(std::memory_order_relaxed);
+        perf.strum = strum != 0;
+        if (strum) {
+            engine->rings_strum.store(0, std::memory_order_relaxed);
+        }
+
+        engine->rings_part.set_model(
+            static_cast<rings::ResonatorModel>(
+                engine->rings_model.load(std::memory_order_relaxed)));
+        engine->rings_part.set_polyphony(
+            engine->rings_polyphony.load(std::memory_order_relaxed));
+
+        // Rings processes mono float in, stereo float out+aux
+        // De-interleave to mono, process in rings::kMaxBlockSize (24) chunks
+        int frames_done = 0;
+        while (frames_done < num_frames) {
+            int block = std::min(static_cast<int>(rings::kMaxBlockSize),
+                                 num_frames - frames_done);
+
+            float mono_in[rings::kMaxBlockSize];
+            float out_buf[rings::kMaxBlockSize];
+            float aux_buf[rings::kMaxBlockSize];
+
+            // Mix stereo to mono for Rings input
+            for (int i = 0; i < block; i++) {
+                int idx = (frames_done + i) * 2;
+                mono_in[i] = (output_buffer[idx] + output_buffer[idx + 1]) * 0.5f;
+            }
+
+            engine->rings_part.Process(perf, rings_patch, mono_in, out_buf, aux_buf, block);
+
+            // Write stereo output (out=left, aux=right)
+            for (int i = 0; i < block; i++) {
+                int idx = (frames_done + i) * 2;
+                output_buffer[idx]     = out_buf[i];
+                output_buffer[idx + 1] = aux_buf[i];
+            }
+
+            frames_done += block;
+        }
+    }
+
+    // Process through Warps modulator (if not bypassed)
+    if (!engine->warps_bypass.load(std::memory_order_relaxed)) {
+        auto* wp = engine->warps_modulator.mutable_parameters();
+        wp->modulation_algorithm = engine->warps_algorithm.load(std::memory_order_relaxed);
+        wp->modulation_parameter = engine->warps_timbre.load(std::memory_order_relaxed);
+        wp->channel_drive[0] = engine->warps_level1.load(std::memory_order_relaxed);
+        wp->channel_drive[1] = engine->warps_level2.load(std::memory_order_relaxed);
+        wp->carrier_shape = 0;  // external carrier
+
+        // Process in warps::kMaxBlockSize (96) chunks — Warps uses ShortFrame I/O
+        int frames_done = 0;
+        while (frames_done < num_frames) {
+            int block = std::min(static_cast<int>(warps::kMaxBlockSize),
+                                 num_frames - frames_done);
+
+            warps::ShortFrame in_frames[warps::kMaxBlockSize];
+            warps::ShortFrame out_frames[warps::kMaxBlockSize];
+
+            // Float interleaved → int16 stereo frames
+            for (int i = 0; i < block; i++) {
+                int idx = (frames_done + i) * 2;
+                float l = std::max(-1.0f, std::min(1.0f, output_buffer[idx]));
+                float r = std::max(-1.0f, std::min(1.0f, output_buffer[idx + 1]));
+                in_frames[i].l = static_cast<short>(l * 32767.0f);
+                in_frames[i].r = static_cast<short>(r * 32767.0f);
+            }
+
+            engine->warps_modulator.Process(in_frames, out_frames, block);
+
+            // int16 stereo frames → float interleaved
+            const float inv = 1.0f / 32768.0f;
+            for (int i = 0; i < block; i++) {
+                int idx = (frames_done + i) * 2;
+                output_buffer[idx]     = out_frames[i].l * inv;
+                output_buffer[idx + 1] = out_frames[i].r * inv;
+            }
+
+            frames_done += block;
+        }
+    }
+
     // Compute peak for monitoring
     float pk_l = 0.0f, pk_r = 0.0f;
     for (int i = 0; i < num_frames; i++) {
@@ -191,6 +299,40 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->clouds_mode.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->clouds_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
+    else if (std::strcmp(plugin_uri, "rings") == 0) {
+        if (std::strcmp(symbol, "structure") == 0)
+            engine->rings_structure.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "brightness") == 0)
+            engine->rings_brightness.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "damping") == 0)
+            engine->rings_damping.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "position") == 0)
+            engine->rings_position.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "frequency") == 0)
+            engine->rings_frequency.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "model") == 0)
+            engine->rings_model.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "polyphony") == 0)
+            engine->rings_polyphony.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "strum") == 0)
+            engine->rings_strum.store(1, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bypass") == 0)
+            engine->rings_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "internal_exciter") == 0)
+            engine->rings_internal_exciter.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
+    else if (std::strcmp(plugin_uri, "warps") == 0) {
+        if (std::strcmp(symbol, "algorithm") == 0)
+            engine->warps_algorithm.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "timbre") == 0)
+            engine->warps_timbre.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "level1") == 0)
+            engine->warps_level1.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "level2") == 0)
+            engine->warps_level2.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bypass") == 0)
+            engine->warps_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
 }
 

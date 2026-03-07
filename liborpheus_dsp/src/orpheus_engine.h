@@ -9,6 +9,14 @@
 // Include MI Clouds granular processor
 #include "clouds/dsp/granular_processor.h"
 
+// Include MI Rings resonator
+#include "rings/dsp/part.h"
+#include "rings/dsp/patch.h"
+#include "rings/dsp/performance_state.h"
+
+// Include MI Warps modulator
+#include "warps/dsp/modulator.h"
+
 #include <atomic>
 #include <cmath>
 #include <cstring>
@@ -65,4 +73,30 @@ struct OrpheusEngine {
     std::atomic<int>   clouds_freeze{0};
     std::atomic<int>   clouds_mode{0};       // PlaybackMode enum
     std::atomic<int>   clouds_bypass{1};     // bypassed by default
+
+    // Rings resonator
+    rings::Part rings_part;
+    uint16_t rings_reverb_buffer[32768];  // 64KB reverb buffer for Rings
+
+    // Rings parameter atomics (written from UI, read from audio thread)
+    std::atomic<float> rings_structure{0.5f};
+    std::atomic<float> rings_brightness{0.5f};
+    std::atomic<float> rings_damping{0.5f};
+    std::atomic<float> rings_position{0.5f};
+    std::atomic<float> rings_frequency{60.0f};  // MIDI note
+    std::atomic<int>   rings_model{0};          // ResonatorModel enum
+    std::atomic<int>   rings_polyphony{1};
+    std::atomic<int>   rings_strum{0};          // trigger: set to 1, audio thread clears
+    std::atomic<int>   rings_bypass{1};         // bypassed by default
+    std::atomic<int>   rings_internal_exciter{1}; // use internal noise exciter
+
+    // Warps modulator
+    warps::Modulator warps_modulator;
+
+    // Warps parameter atomics (written from UI, read from audio thread)
+    std::atomic<float> warps_algorithm{0.0f};
+    std::atomic<float> warps_timbre{0.5f};
+    std::atomic<float> warps_level1{0.5f};
+    std::atomic<float> warps_level2{0.5f};
+    std::atomic<int>   warps_bypass{1};         // bypassed by default
 };

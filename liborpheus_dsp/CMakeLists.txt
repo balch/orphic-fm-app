@@ -68,6 +68,7 @@ set(RINGS_SRC
 # ── Warps sources ─────────────────────────────────
 set(WARPS_SRC
     "${EURORACK_DIR}/warps/dsp/modulator.cc"
+    "${EURORACK_DIR}/warps/dsp/oscillator.cc"
     "${EURORACK_DIR}/warps/dsp/vocoder.cc"
     "${EURORACK_DIR}/warps/dsp/filter_bank.cc"
     "${EURORACK_DIR}/warps/resources.cc"
