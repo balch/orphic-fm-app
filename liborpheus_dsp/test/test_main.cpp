@@ -78,8 +78,66 @@ bool test_clock() {
     return pass;
 }
 
+bool test_grids() {
+    printf("\n=== Test: Grids drum triggers ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    engine->clock_bpm.store(120.0f);
+    engine->clock_running.store(1);
+    engine->grids_bypass.store(0);
+    engine->grids_x.store(0.5f);
+    engine->grids_y.store(0.5f);
+    engine->grids_density_kick.store(0.8f);
+    engine->grids_density_snare.store(0.8f);
+    engine->grids_density_hat.store(0.8f);
+
+    GraphUnit clock_unit = {};
+    clock_unit.type = UNIT_CLOCK;
+    clock_unit.enabled = true;
+    unit_init(&clock_unit, 48000.0f);
+
+    GraphUnit grids_unit = {};
+    grids_unit.type = UNIT_GRIDS;
+    grids_unit.enabled = true;
+    unit_init(&grids_unit, 48000.0f);
+
+    // Wire clock→grids: clock OPORT_OUT (tick) → grids IPORT_INPUT_A
+    grids_unit.inputs[IPORT_INPUT_A].sources[0] = clock_unit.output_buffers[OPORT_OUT];
+    grids_unit.inputs[IPORT_INPUT_A].num_sources = 1;
+    grids_unit.inputs[IPORT_INPUT_B].sources[0] = clock_unit.output_buffers[OPORT_OUT_RIGHT];
+    grids_unit.inputs[IPORT_INPUT_B].num_sources = 1;
+
+    int kick = 0, snare = 0, hat = 0;
+    const int total_frames = 48000 * 2; // 2 seconds
+    bool prev_k = false, prev_s = false, prev_h = false;
+
+    for (int offset = 0; offset < total_frames; offset += 128) {
+        int chunk = std::min(128, total_frames - offset);
+        unit_process_clock(&clock_unit, engine, chunk, 48000.0f);
+        port_prepare(&grids_unit.inputs[IPORT_INPUT_A], chunk, 48000.0f);
+        port_prepare(&grids_unit.inputs[IPORT_INPUT_B], chunk, 48000.0f);
+        unit_process_grids(&grids_unit, engine, chunk, 48000.0f);
+
+        for (int i = 0; i < chunk; i++) {
+            bool k = grids_unit.output_buffers[OPORT_OUT][i] > 0.5f;
+            bool s = grids_unit.output_buffers[OPORT_OUT_RIGHT][i] > 0.5f;
+            bool h = grids_unit.output_buffers[OPORT_AUX][i] > 0.5f;
+            if (k && !prev_k) kick++;
+            if (s && !prev_s) snare++;
+            if (h && !prev_h) hat++;
+            prev_k = k; prev_s = s; prev_h = h;
+        }
+    }
+
+    printf("Kick: %d  Snare: %d  Hat: %d\n", kick, snare, hat);
+    bool pass = kick > 0 && snare > 0 && hat > 0;
+    printf("Grids test: %s\n", pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 int main() {
     if (!test_clock()) return 1;
+    if (!test_grids()) return 1;
 
     printf("Creating OrpheusEngine at 48kHz...\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
