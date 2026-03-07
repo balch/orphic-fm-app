@@ -13,50 +13,61 @@ package org.balch.orpheus.plugins.reverb
  * Uses float buffer directly (no 16-bit compression) for better quality
  * on desktop/mobile targets.
  *
- * Original delay line lengths are for 48kHz; scaled by RATE_RATIO for 44100Hz.
+ * Original delay line lengths are for 48kHz; scaled by [sampleRate] ratio.
+ *
+ * @param sampleRate the target sample rate (default 44100Hz for JVM/Android;
+ *        pass the runtime rate on platforms where it varies, e.g. WASM WebAudio).
  */
-class DattorroReverb {
+class DattorroReverb(sampleRate: Float = 44100f) {
 
     companion object {
-        private const val BUFFER_SIZE = 32768 // Power of 2 — must be >= total delay memory (~19866 at 44.1kHz)
+        private const val BUFFER_SIZE = 32768 // Power of 2 — must be >= total delay memory
         private const val MASK = BUFFER_SIZE - 1
+        private const val REF_RATE = 48000f
 
-        // Scale factor from 48kHz → 44100Hz
-        private const val RATE_RATIO = 44100f / 48000f
-
-        // Input allpass diffuser lengths (scaled)
-        private val AP1_LEN = (150 * RATE_RATIO).toInt()
-        private val AP2_LEN = (214 * RATE_RATIO).toInt()
-        private val AP3_LEN = (319 * RATE_RATIO).toInt()
-        private val AP4_LEN = (527 * RATE_RATIO).toInt()
-
-        // Loop delay/allpass lengths (scaled)
-        private val DAP1A_LEN = (2182 * RATE_RATIO).toInt()
-        private val DAP1B_LEN = (2690 * RATE_RATIO).toInt()
-        private val DEL1_LEN  = (4501 * RATE_RATIO).toInt()
-        private val DAP2A_LEN = (2525 * RATE_RATIO).toInt()
-        private val DAP2B_LEN = (2197 * RATE_RATIO).toInt()
-        private val DEL2_LEN  = (6312 * RATE_RATIO).toInt()
-
-        // Bases (cumulative offsets in buffer)
-        private val AP1_BASE  = 0
-        private val AP2_BASE  = AP1_BASE  + AP1_LEN + 1
-        private val AP3_BASE  = AP2_BASE  + AP2_LEN + 1
-        private val AP4_BASE  = AP3_BASE  + AP3_LEN + 1
-        private val DAP1A_BASE = AP4_BASE + AP4_LEN + 1
-        private val DAP1B_BASE = DAP1A_BASE + DAP1A_LEN + 1
-        private val DEL1_BASE  = DAP1B_BASE + DAP1B_LEN + 1
-        private val DAP2A_BASE = DEL1_BASE + DEL1_LEN + 1
-        private val DAP2B_BASE = DAP2A_BASE + DAP2A_LEN + 1
-        private val DEL2_BASE  = DAP2B_BASE + DAP2B_LEN + 1
-        private val TOTAL_MEMORY = DEL2_BASE + DEL2_LEN + 1
-
-        // LFO tap offsets (scaled)
-        private val DEL2_TAP = (6261 * RATE_RATIO)
-        private val DEL2_LFO_AMP = (50 * RATE_RATIO)
-        private val DEL1_TAP = (4460 * RATE_RATIO)
-        private val DEL1_LFO_AMP = (40 * RATE_RATIO)
+        // Reference delay lengths at 48kHz
+        private const val AP1_REF = 150; private const val AP2_REF = 214
+        private const val AP3_REF = 319; private const val AP4_REF = 527
+        private const val DAP1A_REF = 2182; private const val DAP1B_REF = 2690; private const val DEL1_REF = 4501
+        private const val DAP2A_REF = 2525; private const val DAP2B_REF = 2197; private const val DEL2_REF = 6312
+        private const val DEL2_TAP_REF = 6261f; private const val DEL2_LFO_AMP_REF = 50f
+        private const val DEL1_TAP_REF = 4460f; private const val DEL1_LFO_AMP_REF = 40f
     }
+
+    // Scale factor from 48kHz reference to target sample rate
+    private val rateRatio = sampleRate / REF_RATE
+
+    // Input allpass diffuser lengths (scaled)
+    private val ap1Len = (AP1_REF * rateRatio).toInt()
+    private val ap2Len = (AP2_REF * rateRatio).toInt()
+    private val ap3Len = (AP3_REF * rateRatio).toInt()
+    private val ap4Len = (AP4_REF * rateRatio).toInt()
+
+    // Loop delay/allpass lengths (scaled)
+    private val dap1aLen = (DAP1A_REF * rateRatio).toInt()
+    private val dap1bLen = (DAP1B_REF * rateRatio).toInt()
+    private val del1Len  = (DEL1_REF * rateRatio).toInt()
+    private val dap2aLen = (DAP2A_REF * rateRatio).toInt()
+    private val dap2bLen = (DAP2B_REF * rateRatio).toInt()
+    private val del2Len  = (DEL2_REF * rateRatio).toInt()
+
+    // Bases (cumulative offsets in buffer)
+    private val ap1Base  = 0
+    private val ap2Base  = ap1Base  + ap1Len + 1
+    private val ap3Base  = ap2Base  + ap2Len + 1
+    private val ap4Base  = ap3Base  + ap3Len + 1
+    private val dap1aBase = ap4Base + ap4Len + 1
+    private val dap1bBase = dap1aBase + dap1aLen + 1
+    private val del1Base  = dap1bBase + dap1bLen + 1
+    private val dap2aBase = del1Base + del1Len + 1
+    private val dap2bBase = dap2aBase + dap2aLen + 1
+    private val del2Base  = dap2bBase + dap2bLen + 1
+
+    // LFO tap offsets (scaled)
+    private val del2Tap = DEL2_TAP_REF * rateRatio
+    private val del2LfoAmp = DEL2_LFO_AMP_REF * rateRatio
+    private val del1Tap = DEL1_TAP_REF * rateRatio
+    private val del1LfoAmp = DEL1_LFO_AMP_REF * rateRatio
 
     private val buffer = FloatArray(BUFFER_SIZE)
     private var writePtr = 0
@@ -85,9 +96,9 @@ class DattorroReverb {
         private set
 
     init {
-        // LFO frequencies scaled for 44100Hz
-        lfo1.initApproximate(0.5f / 44100f * 32f)
-        lfo2.initApproximate(0.3f / 44100f * 32f)
+        // LFO frequencies scaled for the target sample rate
+        lfo1.initApproximate(0.5f / sampleRate * 32f)
+        lfo2.initApproximate(0.3f / sampleRate * 32f)
     }
 
     fun clear() {
@@ -124,93 +135,44 @@ class DattorroReverb {
         acc = (leftIn + rightIn) * gain
 
         // ---- 4 input allpass diffusers ----
-        // AP1
-        val ap1Tail = readBuffer(AP1_BASE + AP1_LEN - 1)
-        prevRead = ap1Tail
-        acc += ap1Tail * kap
-        writeBuffer(AP1_BASE, acc)
-        acc *= -kap
-        acc += prevRead
-
-        // AP2
-        val ap2Tail = readBuffer(AP2_BASE + AP2_LEN - 1)
-        prevRead = ap2Tail
-        acc += ap2Tail * kap
-        writeBuffer(AP2_BASE, acc)
-        acc *= -kap
-        acc += prevRead
-
-        // AP3
-        val ap3Tail = readBuffer(AP3_BASE + AP3_LEN - 1)
-        prevRead = ap3Tail
-        acc += ap3Tail * kap
-        writeBuffer(AP3_BASE, acc)
-        acc *= -kap
-        acc += prevRead
-
-        // AP4
-        val ap4Tail = readBuffer(AP4_BASE + AP4_LEN - 1)
-        prevRead = ap4Tail
-        acc += ap4Tail * kap
-        writeBuffer(AP4_BASE, acc)
-        acc *= -kap
-        acc += prevRead
+        acc = allpass(ap1Base, ap1Len, acc, kap)
+        acc = allpass(ap2Base, ap2Len, acc, kap)
+        acc = allpass(ap3Base, ap3Len, acc, kap)
+        acc = allpass(ap4Base, ap4Len, acc, kap)
 
         val apout = acc
 
         // ---- Main reverb loop: Path 1 (left output) ----
         acc = apout
-        // Interpolate del2 with LFO modulation
-        acc += interpolate(DEL2_BASE, DEL2_TAP, lfoValue1, DEL2_LFO_AMP) * krt
-        // LP filter
+        acc += interpolate(del2Base, del2Tap, lfoValue1, del2LfoAmp) * krt
         lpDecay1 += klp * (acc - lpDecay1)
         acc = lpDecay1
-        // DAP1A
-        val dap1aTail = readBuffer(DAP1A_BASE + DAP1A_LEN - 1)
-        prevRead = dap1aTail
-        acc += dap1aTail * (-kap)
-        writeBuffer(DAP1A_BASE, acc)
-        acc *= kap
-        acc += prevRead
-        // DAP1B
-        val dap1bTail = readBuffer(DAP1B_BASE + DAP1B_LEN - 1)
-        prevRead = dap1bTail
-        acc += dap1bTail * kap
-        writeBuffer(DAP1B_BASE, acc)
-        acc *= (-kap)
-        acc += prevRead
-        // Write to DEL1, then scale for wet output (matches MI: c.Write(del1, 2.0f))
-        writeBuffer(DEL1_BASE, acc)
+        acc = allpass(dap1aBase, dap1aLen, acc, -kap)
+        acc = allpass(dap1bBase, dap1bLen, acc, kap)
+        writeBuffer(del1Base, acc)
         val wetLeft = acc * 2f
 
         // ---- Main reverb loop: Path 2 (right output) ----
         acc = apout
-        // Interpolate del1 with LFO modulation
-        acc += interpolate(DEL1_BASE, DEL1_TAP, lfoValue0, DEL1_LFO_AMP) * krt
-        // LP filter
+        acc += interpolate(del1Base, del1Tap, lfoValue0, del1LfoAmp) * krt
         lpDecay2 += klp * (acc - lpDecay2)
         acc = lpDecay2
-        // DAP2A
-        val dap2aTail = readBuffer(DAP2A_BASE + DAP2A_LEN - 1)
-        prevRead = dap2aTail
-        acc += dap2aTail * kap
-        writeBuffer(DAP2A_BASE, acc)
-        acc *= (-kap)
-        acc += prevRead
-        // DAP2B
-        val dap2bTail = readBuffer(DAP2B_BASE + DAP2B_LEN - 1)
-        prevRead = dap2bTail
-        acc += dap2bTail * (-kap)
-        writeBuffer(DAP2B_BASE, acc)
-        acc *= kap
-        acc += prevRead
-        // Write to DEL2, then scale for wet output (matches MI: c.Write(del2, 2.0f))
-        writeBuffer(DEL2_BASE, acc)
+        acc = allpass(dap2aBase, dap2aLen, acc, kap)
+        acc = allpass(dap2bBase, dap2bLen, acc, -kap)
+        writeBuffer(del2Base, acc)
         val wetRight = acc * 2f
 
         // ---- Output wet-only (parallel send — dry signal handled externally) ----
         outLeft = wetLeft * amount
         outRight = wetRight * amount
+    }
+
+    /** Single allpass section: read tail, feedforward/feedback, write head. */
+    private inline fun allpass(base: Int, len: Int, input: Float, coeff: Float): Float {
+        val tail = readBuffer(base + len - 1)
+        val v = input + tail * coeff
+        writeBuffer(base, v)
+        return v * (-coeff) + tail
     }
 
     private fun readBuffer(offset: Int): Float {

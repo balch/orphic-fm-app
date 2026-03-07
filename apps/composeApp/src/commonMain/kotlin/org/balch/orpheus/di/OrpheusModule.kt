@@ -4,8 +4,6 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
-import org.balch.orpheus.core.coroutines.DefaultDispatcherProvider
-import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.midi.MidiController
 import org.balch.orpheus.core.midi.MidiMappingRepository
 import org.balch.orpheus.core.midi.createMidiAccess
@@ -20,10 +18,6 @@ import org.balch.orpheus.core.midi.createMidiAccess
 @ContributesTo(AppScope::class)
 interface OrpheusModule {
     companion object Companion {
-        @Provides
-        @SingleIn(AppScope::class)
-        fun provideDispatcherProvider(): DispatcherProvider = DefaultDispatcherProvider()
-
         @Provides
         @SingleIn(AppScope::class)
         fun provideMidiController(): MidiController = MidiController { createMidiAccess() }

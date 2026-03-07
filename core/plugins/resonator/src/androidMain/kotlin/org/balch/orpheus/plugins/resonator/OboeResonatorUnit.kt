@@ -2,23 +2,24 @@ package org.balch.orpheus.plugins.resonator
 
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeAudioInput
-import org.balch.orpheus.core.audio.dsp.OboeAudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeProcessable
+import org.balch.orpheus.core.audio.dsp.DspAudioInput
+import org.balch.orpheus.core.audio.dsp.DspAudioOutput
+import org.balch.orpheus.core.audio.dsp.DspProcessable
 import org.balch.orpheus.core.audio.dsp.ResonatorUnit
 import org.balch.orpheus.plugins.resonator.engine.ModalResonator
 import org.balch.orpheus.plugins.resonator.engine.ResonatorString
+import kotlin.concurrent.Volatile
 
-class OboeResonatorUnit : ResonatorUnit, OboeProcessable {
+class OboeResonatorUnit : ResonatorUnit, DspProcessable {
     @Volatile override var enabled = true
 
     private val modalResonator = ModalResonator(maxModes = 24)
     private val stringResonator = ResonatorString()
 
     // Ports
-    private val oboeInput = OboeAudioInput("Input")
-    private val oboeOutput = OboeAudioOutput("Output")
-    private val oboeAuxOutput = OboeAudioOutput("AuxOutput")
+    private val oboeInput = DspAudioInput("Input")
+    private val oboeOutput = DspAudioOutput("Output")
+    private val oboeAuxOutput = DspAudioOutput("AuxOutput")
 
     override val input: AudioInput = oboeInput
     override val output: AudioOutput = oboeOutput
@@ -84,7 +85,7 @@ class OboeResonatorUnit : ResonatorUnit, OboeProcessable {
             // Handle strum trigger
             val excitation = if (i == 0 && strumPending) {
                 strumPending = false
-                val normalizedFreq = strumFrequency / org.balch.orpheus.core.audio.dsp.DSP_SAMPLE_RATE
+                val normalizedFreq = strumFrequency / org.balch.orpheus.core.audio.dsp.dspSampleRate
                 modalResonator.frequency = normalizedFreq
                 stringResonator.frequency = normalizedFreq
                 1.0f

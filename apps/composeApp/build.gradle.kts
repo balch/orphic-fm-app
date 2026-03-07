@@ -44,6 +44,7 @@ kotlin {
         }
         commonMain.dependencies {
             api(project(":core:audio"))
+            api(project(":core:dsp-engine"))
             api(project(":core:features"))
             api(project(":core:foundation"))
             api(project(":core:midi"))
@@ -166,6 +167,20 @@ compose.desktop {
         // Forward debug flags from Gradle to the App
         jvmArgs += listOf("-Dorpheus.debug.gc=${System.getProperty("orpheus.debug.gc", "false")}")
     }
+}
+
+// Copy dspWorker WASM output to composeApp resources for serving alongside the app.
+// The worker entry script (dsp-worker-entry.js) loads dsp-worker.js and the .wasm file.
+val copyDspWorker by tasks.registering(Copy::class) {
+    from(project(":apps:dspWorker").layout.buildDirectory.dir(
+        "dist/wasmJs/developmentExecutable"
+    ))
+    into(layout.buildDirectory.dir("processedResources/wasmJs/main"))
+    dependsOn(":apps:dspWorker:wasmJsBrowserDevelopmentExecutableDistribution")
+}
+
+tasks.named("wasmJsProcessResources") {
+    dependsOn(copyDspWorker)
 }
 
 // BuildKonfig configuration for cross-platform BuildConfig

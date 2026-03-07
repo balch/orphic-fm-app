@@ -25,9 +25,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
+import kotlinx.coroutines.delay
+import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.feature
-import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.features.ai.AiOptionsFeature
 import org.balch.orpheus.features.ai.AiOptionsViewModel
@@ -35,16 +36,16 @@ import org.balch.orpheus.features.ai.chat.ChatFeature
 import org.balch.orpheus.features.ai.chat.ChatViewModel
 import org.balch.orpheus.features.distortion.DistortionFeature
 import org.balch.orpheus.features.distortion.DistortionViewModel
+import org.balch.orpheus.features.mediapipe.MediaPipeFeature
+import org.balch.orpheus.features.mediapipe.MediaPipeViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.features.voice.SynthKeyboardHandler
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.features.voice.VoicesFeature
-import org.balch.orpheus.features.mediapipe.MediaPipeFeature
-import org.balch.orpheus.features.mediapipe.MediaPipeViewModel
+import org.balch.orpheus.ui.FactoryPanelSets
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
-import org.balch.orpheus.ui.FactoryPanelSets
 import org.balch.orpheus.ui.panels.HeaderFeature
 import org.balch.orpheus.ui.panels.HeaderViewModel
 import org.balch.orpheus.ui.panels.compact.CompactAiSection
@@ -110,6 +111,7 @@ fun CompactPortraitLayout(
     // Focus handling for keyboard input
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
+        delay(100)
         focusRequester.requestFocus()
     }
 

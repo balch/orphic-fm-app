@@ -31,8 +31,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.fletchmckee.liquid.LiquidState
-import org.balch.orpheus.core.features.feature
+import kotlinx.coroutines.delay
 import org.balch.orpheus.core.features.LocalSynthFeatures
+import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.features.draw.DrawSequencerFeature
 import org.balch.orpheus.features.draw.DrawSequencerViewModel
 import org.balch.orpheus.features.draw.ui.CompactDrawSequencerView
@@ -134,6 +135,10 @@ private fun CompactLandscapeLayout(
     // Focus handling for keyboard input
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
+        // Delay ensures composition and layout complete before requesting focus.
+        // Without this, requestFocus() can silently fail ~10% of the time when
+        // the focus tree isn't fully attached yet.
+        delay(100)
         focusRequester.requestFocus()
     }
 

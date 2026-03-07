@@ -1,5 +1,9 @@
 package org.balch.orpheus.core.coroutines
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
@@ -13,9 +17,12 @@ import kotlinx.coroutines.Dispatchers
  * - [Dispatchers.Default]: A coroutine dispatcher optimized for CPU-intensive work.
  * - [Dispatchers.Unconfined]: A coroutine dispatcher that is not confined to any specific thread.
  */
+@Inject
+@SingleIn(AppScope::class)
+@ContributesBinding(AppScope::class)
 class DefaultDispatcherProvider : DispatcherProvider {
     override val main: CoroutineDispatcher = Dispatchers.Main
-    override val io: CoroutineDispatcher = Dispatchers.Default  // IO not available in WASM
+    override val io: CoroutineDispatcher = Dispatchers.Default
     override val default: CoroutineDispatcher = Dispatchers.Default
     override val unconfined: CoroutineDispatcher = Dispatchers.Unconfined
 }

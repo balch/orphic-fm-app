@@ -55,6 +55,7 @@ An in-app chat agent (built on [Koog](https://github.com/koog-ai/koog-agents) wi
 ### Module Layout
 ```
 core/audio/          DSP engine interfaces, plugin system, type-safe port DSL
+core/dsp-engine/     Shared DSP graph: voice manager, wiring, automation
 core/foundation/     MIDI, presets, SynthController event bus, speech
 core/gestures/       ASL sign classifier, gesture interpretation engines
 core/mediapipe/      MediaPipe hand tracking abstraction (Android + Desktop)
@@ -63,6 +64,7 @@ core/plugins/        14 self-contained DSP plugin modules
 features/            20+ UI feature modules (Compose + ViewModel, MVI)
 ui/theme, ui/widgets Dark synth theme, knobs, sliders, collapsible panels
 apps/composeApp/     App wiring: signal routing, voice management, DI
+apps/dspWorker/      WASM Web Worker for off-main-thread DSP processing
 build-logic/         Convention plugins for consistent KMP module config
 ```
 
@@ -100,8 +102,10 @@ The fusion algorithm boosts confidence when both classifiers agree and penalizes
 |----------|-------|--------|
 | Desktop (JVM) | JSyn | Primary target |
 | Android | Oboe (C++ / JNI) + Kotlin DSP | Full support |
-| wasmJs | -- | Disabled (pending Kotlin 2.3.20+ for Metro cross-module aggregation) |
+| wasmJs | Kotlin DSP → AudioWorklet | Functional ([orphic.fm](https://orphic.fm/)) |
 | iOS | -- | Skeleton |
+
+The **WASM** target runs the full Kotlin DSP engine compiled to WebAssembly. Audio is rendered via `setInterval` into ring buffers that feed an `AudioWorkletNode` for gapless playback. An optional **Web Worker** mode (`?worker` URL flag) moves DSP processing off the main thread so Compose UI recomposition doesn't starve the audio render timer. The main thread keeps a local shadow of engine state for UI reads while forwarding parameter changes to the Worker via `postMessage`.
 
 ## Build & Run
 
@@ -180,6 +184,9 @@ For example on macOS with [jenv](https://www.jenv.be/): `org.gradle.java.home=/U
 
 # Android
 ./gradlew :apps:androidApp:installDebugRelease
+
+# WASM (opens browser at localhost:8080)
+./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun
 
 # Desktop release (dmg/msi/deb depending on OS)
 ./gradlew :apps:composeApp:packageReleaseDistributionForCurrentOS

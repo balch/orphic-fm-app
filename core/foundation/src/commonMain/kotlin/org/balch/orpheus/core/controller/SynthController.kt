@@ -130,6 +130,19 @@ class SynthController @Inject constructor() {
     }
 
     /**
+     * Replace the engine delegates after initial setup.
+     * Used by the Web Worker architecture to intercept parameter changes
+     * and forward them to the Worker instead of the local DspSynthEngine.
+     */
+    fun overrideDelegates(
+        setter: (PluginControlId, PortValue) -> Boolean,
+        getter: (PluginControlId) -> PortValue?
+    ) {
+        pluginPortSetter = setter
+        pluginPortGetter = getter
+    }
+
+    /**
      * Lazy StateFlow map for plugin control values.
      * Created on first access, seeded from engine.
      */

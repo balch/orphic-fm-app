@@ -2,22 +2,23 @@ package org.balch.orpheus.plugins.reverb
 
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeAudioInput
-import org.balch.orpheus.core.audio.dsp.OboeAudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeProcessable
+import org.balch.orpheus.core.audio.dsp.DspAudioInput
+import org.balch.orpheus.core.audio.dsp.DspAudioOutput
+import org.balch.orpheus.core.audio.dsp.DspProcessable
 import org.balch.orpheus.core.audio.dsp.ReverbUnit
+import kotlin.concurrent.Volatile
 
-class OboeReverbUnit : ReverbUnit, OboeProcessable {
+class OboeReverbUnit : ReverbUnit, DspProcessable {
     @Volatile override var enabled = true
 
     private val reverb = DattorroReverb()
     @Volatile private var bypass = false
 
     // Ports
-    private val oboeInputL = OboeAudioInput("InputLeft")
-    private val oboeInputR = OboeAudioInput("InputRight")
-    private val oboeOutputL = OboeAudioOutput("OutputLeft")
-    private val oboeOutputR = OboeAudioOutput("OutputRight")
+    private val oboeInputL = DspAudioInput("InputLeft")
+    private val oboeInputR = DspAudioInput("InputRight")
+    private val oboeOutputL = DspAudioOutput("OutputLeft")
+    private val oboeOutputR = DspAudioOutput("OutputRight")
 
     override val inputLeft: AudioInput = oboeInputL
     override val inputRight: AudioInput = oboeInputR

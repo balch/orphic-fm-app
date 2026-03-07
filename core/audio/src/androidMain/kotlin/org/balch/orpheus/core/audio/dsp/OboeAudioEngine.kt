@@ -20,6 +20,7 @@ class OboeAudioEngine @Inject constructor() : AudioEngine {
     }
 
     override fun start() {
+        if (isRunning) return // Already started
         log.info { "start() called, ${scheduler.unitCount} units registered" }
 
         // Sort the graph using Tarjan's SCC algorithm (handles feedback cycles)
@@ -37,9 +38,7 @@ class OboeAudioEngine @Inject constructor() : AudioEngine {
         val framesPerBuffer = bridge.nativeGetFramesPerBuffer()
         val sampleRate = bridge.nativeGetSampleRate()
         log.info { "Stream opened: sampleRate=$sampleRate, framesPerBuffer=$framesPerBuffer" }
-        if (sampleRate != DSP_SAMPLE_RATE.toInt()) {
-            log.warn { "Oboe stream rate ($sampleRate) != DSP_SAMPLE_RATE (${DSP_SAMPLE_RATE.toInt()})" }
-        }
+        dspSampleRate = sampleRate.toFloat()
         scheduler.allocate(framesPerBuffer.coerceAtLeast(256))
 
         // 3. Now start — callback can fire immediately, buffers are ready

@@ -5,9 +5,9 @@ import dev.zacsweers.metro.Inject
 import kotlinx.browser.localStorage
 import kotlinx.serialization.json.Json
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
+import org.balch.orpheus.features.presets.BundledPresets
 import org.w3c.dom.get
 import org.w3c.dom.set
-import orpheus.apps.composeapp.generated.resources.Res
 
 /**
  * WASM implementation of SynthPresetRepository using browser localStorage.
@@ -25,33 +25,22 @@ class WasmSynthPresetRepository : SynthPresetRepository {
     private val keyPrefix = "orpheus_preset_"
     private var initialized = false
 
-    private suspend fun ensurePresetsInitialized() {
+    private fun ensurePresetsInitialized() {
         if (initialized) return
         initialized = true
         copyBundledPresets()
     }
 
-    private suspend fun copyBundledPresets() {
-        val bundledPresets = listOf(
-            "F__Minor_Drift.json",
-            "Warm_Pad.json",
-            "Dark_Ambient.json",
-            "Swirly_Dreams.json"
-        )
-        bundledPresets.forEach { filename ->
-            runCatchingSuspend {
-                val presetName = filename.removeSuffix(".json")
-                val key = keyForPreset(presetName)
-
+    private fun copyBundledPresets() {
+        BundledPresets.presets.forEach { (name, jsonString) ->
+            runCatching {
+                val key = keyForPreset(name)
                 if (localStorage[key] == null) {
-                    val path = "files/presets/$filename"
-                    val bytes = Res.readBytes(path)
-                    val jsonString = bytes.decodeToString()
                     localStorage[key] = jsonString
-                    log.debug { "Copied bundled preset: $filename" }
+                    log.debug { "Copied bundled preset: $name" }
                 }
             }.onFailure { e ->
-                log.error { "Failed to copy bundled preset $filename: ${e.message}" }
+                log.error { "Failed to copy bundled preset $name: ${e.message}" }
             }
         }
     }

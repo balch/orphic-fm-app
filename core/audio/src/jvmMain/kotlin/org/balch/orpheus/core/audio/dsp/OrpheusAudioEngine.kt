@@ -31,6 +31,7 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
     }
 
     override fun start() {
+        if (synth.isRunning) return // Already started
         synth.add(lineOut)
         synth.start()
         lineOut.start()

@@ -2,40 +2,41 @@ package org.balch.orpheus.plugins.flux
 
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
+import org.balch.orpheus.core.audio.dsp.DspAudioInput
+import org.balch.orpheus.core.audio.dsp.DspAudioOutput
+import org.balch.orpheus.core.audio.dsp.DspProcessable
 import org.balch.orpheus.core.audio.dsp.FluxUnit
-import org.balch.orpheus.core.audio.dsp.OboeAudioInput
-import org.balch.orpheus.core.audio.dsp.OboeAudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeProcessable
 import org.balch.orpheus.plugins.flux.engine.FluxProcessor
+import kotlin.concurrent.Volatile
 
 /**
  * Oboe implementation of FluxUnit.
  * Delegates to FluxProcessor.process() with Float-native buffers.
  */
-class OboeFluxUnit : FluxUnit, OboeProcessable {
+class OboeFluxUnit : FluxUnit, DspProcessable {
     @Volatile override var enabled = true
 
-    private val processor = FluxProcessor(org.balch.orpheus.core.audio.dsp.DSP_SAMPLE_RATE)
+    private val processor = FluxProcessor(org.balch.orpheus.core.audio.dsp.dspSampleRate)
 
     // Input ports
-    private val oboeClock = OboeAudioInput("Clock")
-    private val oboeSpread = OboeAudioInput("Spread", smoothed = true)
-    private val oboeBias = OboeAudioInput("Bias", smoothed = true)
-    private val oboeSteps = OboeAudioInput("Steps", smoothed = true)
-    private val oboeDejaVu = OboeAudioInput("DejaVu", smoothed = true)
-    private val oboeLength = OboeAudioInput("Length", smoothed = true)
-    private val oboeRate = OboeAudioInput("Rate", smoothed = true)
-    private val oboeJitter = OboeAudioInput("Jitter", smoothed = true)
-    private val oboeProbability = OboeAudioInput("Probability", smoothed = true)
-    private val oboePulseWidth = OboeAudioInput("PulseWidth", smoothed = true)
+    private val oboeClock = DspAudioInput("Clock")
+    private val oboeSpread = DspAudioInput("Spread", smoothed = true)
+    private val oboeBias = DspAudioInput("Bias", smoothed = true)
+    private val oboeSteps = DspAudioInput("Steps", smoothed = true)
+    private val oboeDejaVu = DspAudioInput("DejaVu", smoothed = true)
+    private val oboeLength = DspAudioInput("Length", smoothed = true)
+    private val oboeRate = DspAudioInput("Rate", smoothed = true)
+    private val oboeJitter = DspAudioInput("Jitter", smoothed = true)
+    private val oboeProbability = DspAudioInput("Probability", smoothed = true)
+    private val oboePulseWidth = DspAudioInput("PulseWidth", smoothed = true)
 
     // Output ports
-    private val oboeOutput = OboeAudioOutput("Output")
-    private val oboeOutputX1 = OboeAudioOutput("OutputX1")
-    private val oboeOutputX3 = OboeAudioOutput("OutputX3")
-    private val oboeOutputT1 = OboeAudioOutput("OutputT1")
-    private val oboeOutputT2 = OboeAudioOutput("OutputT2")
-    private val oboeOutputT3 = OboeAudioOutput("OutputT3")
+    private val oboeOutput = DspAudioOutput("Output")
+    private val oboeOutputX1 = DspAudioOutput("OutputX1")
+    private val oboeOutputX3 = DspAudioOutput("OutputX3")
+    private val oboeOutputT1 = DspAudioOutput("OutputT1")
+    private val oboeOutputT2 = DspAudioOutput("OutputT2")
+    private val oboeOutputT3 = DspAudioOutput("OutputT3")
 
     // Interface implementation
     override val clock: AudioInput = oboeClock

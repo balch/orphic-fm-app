@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -65,7 +66,15 @@ fun PulseButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val scope = rememberCoroutineScope()
-    
+
+    // rememberUpdatedState ensures pointerInput always calls the latest callbacks
+    // without restarting the gesture handler (which would drop active presses).
+    val currentOnPulseStart by rememberUpdatedState(onPulseStart)
+    val currentOnPulseEnd by rememberUpdatedState(onPulseEnd)
+    val currentOnLearnSelect by rememberUpdatedState(onLearnSelect)
+    val currentOnPulseStartWithPosition by rememberUpdatedState(onPulseStartWithPosition)
+    val currentOnWobbleMove by rememberUpdatedState(onWobbleMove)
+
     // Track pressed state manually for wobble support
     val isPressedState = remember { mutableStateOf(false) }
     val isPressed = isPressedState.value
@@ -90,22 +99,22 @@ fun PulseButton(
                         // Wait for initial press
                         val down = awaitFirstDown()
                         val startPosition = down.position
-                        
+
                         if (isLearnMode) {
                             // In learn mode, just select for learning
-                            onLearnSelect()
+                            currentOnLearnSelect()
                         } else {
                             // Normal pulse operation with wobble tracking
                             isPressedState.value = true
-                            
+
                             // Emit press interaction for visual feedback
                             val press = PressInteraction.Press(startPosition)
                             scope.launch { interactionSource.emit(press) }
-                            
+
                             // Call start callbacks
-                            onPulseStart()
-                            onPulseStartWithPosition?.invoke(startPosition.x, startPosition.y)
-                            
+                            currentOnPulseStart()
+                            currentOnPulseStartWithPosition?.invoke(startPosition.x, startPosition.y)
+
                             // Track movement while pressed (for wobble)
                             try {
                                 while (true) {
@@ -113,10 +122,10 @@ fun PulseButton(
                                     if (event.type == PointerEventType.Move) {
                                         // Report movement for wobble calculation
                                         event.changes.firstOrNull()?.let { change ->
-                                            onWobbleMove?.invoke(change.position.x, change.position.y)
+                                            currentOnWobbleMove?.invoke(change.position.x, change.position.y)
                                         }
                                     }
-                                    
+
                                     // Check if all pointers are up
                                     if (event.changes.all { !it.pressed }) {
                                         break
@@ -126,7 +135,7 @@ fun PulseButton(
                                 // Release
                                 isPressedState.value = false
                                 scope.launch { interactionSource.emit(PressInteraction.Release(press)) }
-                                onPulseEnd()
+                                currentOnPulseEnd()
                             }
                         }
                     }

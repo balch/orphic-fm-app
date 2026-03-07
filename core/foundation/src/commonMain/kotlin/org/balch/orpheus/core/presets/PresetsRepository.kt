@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.presets
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -22,6 +23,12 @@ class PresetsRepository(
     private val synthPresetRepository: SynthPresetRepository,
     factoryPatches: Set<SynthPatch>
 ) {
+    private val log = logging("PresetsRepository")
+
+    init {
+        log.info { "PresetsRepository created with ${factoryPatches.size} factory patches: ${factoryPatches.map { it.name }}" }
+    }
+
     // Factory presets sorted by name
     private val factoryPresets: List<SynthPreset> by lazy {
         factoryPatches
@@ -97,7 +104,11 @@ class PresetsRepository(
      */
     suspend fun refreshCache() {
         mutex.withLock {
+            // Filter out user presets that duplicate factory preset names
+            // (BundledPresets seeds localStorage with copies of factory presets)
             val userPresets = synthPresetRepository.list()
+                .filter { it.name !in _factoryPresetNames }
+            log.info { "refreshCache: ${factoryPresets.size} factory + ${userPresets.size} user = ${factoryPresets.size + userPresets.size} total" }
             _allPresets.value = factoryPresets + userPresets
             isLoaded = true
         }
