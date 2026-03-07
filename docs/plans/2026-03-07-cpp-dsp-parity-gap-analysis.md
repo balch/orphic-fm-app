@@ -30,28 +30,28 @@ Note: quadPitch is NOT forwarded to C++ yet (see Gap #2).
 
 ## Gap Summary
 
-| # | Gap | JSyn Handles | C++ Handles | Impact | Fix Complexity |
-|---|-----|-------------|-------------|--------|----------------|
-| 1 | **Tune format** | 0..1 range | MIDI note | Wrong pitch on all voices | Convert in bridge call |
-| 2 | **Quad pitch** | Per-quad pitch offset | Not forwarded | Quad pitch offsets ignored | Forward converted note |
-| 3 | **Pitch multiplier** | Per-voice (0.5x bass, 1x mid) | Not applied | Bass voices at wrong octave | Apply in conversion or C++ |
-| 4 | **Per-voice volume** | Per-quad volume scaling | Graph `v*_vol` inputB=1.0 | All voices same volume | Add port map entries |
-| 5 | **Reverb** | ReverbPlugin in chain | UNIT_REVERB not implemented | No reverb in C++ | Implement or skip |
-| 6 | **Resonator routing** | Complex 4-input routing | Rings gets mono mix post-grains | Different excitation | Match routing |
-| 7 | **Distortion chain** | Distortion after resonator | Drive before clouds | Different effect order | Reorder graph |
-| 8 | **Delay routing** | Multiple sends (grains+dist+bender+warps) | Only warps→delay | Missing delay sends | Add connections |
-| 9 | **Looper** | LooperPlugin in chain | Not in graph | No looper | Add or skip |
-| 10 | **Bender/PerStringBender** | Audio synthesis + pitch bend | Bend is stub (no-op) | No pitch bend | Implement |
-| 11 | **Voice coupling** | Partner envelope → pitch mod | Not implemented | Missing coupling effect | Low priority |
-| 12 | **FM modulation** | Voice-to-voice cross-mod, LFO→FM | Not routed in graph | No FM between voices | Major feature gap |
-| 13 | **Mod source routing** | LFO/FM/Flux → timbre/morph mod | Not implemented | Missing modulation | Major feature gap |
-| 14 | **Flux CV** | Pitch CV + trigger to quads | Not forwarded | No Flux integration | Forward ports |
-| 15 | **Warps source routing** | 7 carrier/modulator options | Fixed: resonator→warps | Static routing only | Add source switching |
-| 16 | **Drum routing** | Bypass/chain mode, direct resonator | Not in graph | Drums go through full chain | Add bypass path |
-| 17 | **Drive scaling** | 1.0 + amount*14 (1..15x) | 1.0 + v*4 (1..5x) | Drive range mismatch | Align scaling |
-| 18 | **Master volume** | port map sets mvL/mvR inputB | Graph default 0.4 | Correct (0.8 * 0.5) | Verify values match |
-| 19 | **Per-voice pan** | Dynamic via setPort | Baked into graph at build time | Can't change pan live | Add port map entries |
-| 20 | **LFO→delay mod** | HyperLfo.output→Delay.lfoInput | No audio connection | No delay modulation | Wire in graph |
+| # | Gap | JSyn Handles | C++ Handles | Impact | Status |
+|---|-----|-------------|-------------|--------|--------|
+| 1 | ~~Tune format~~ | 0..1 range | MIDI note | Wrong pitch on all voices | **FIXED** — `tuneToMidiNote()` |
+| 2 | ~~Quad pitch~~ | Per-quad pitch offset | Not forwarded | Quad pitch offsets ignored | **FIXED** — listener calls override |
+| 3 | ~~Pitch multiplier~~ | Per-voice (0.5x bass, 1x mid) | Not applied | Bass voices at wrong octave | **FIXED** — `VOICE_PITCH_MULT_SEMITONES` |
+| 4 | ~~Per-voice volume~~ | Per-quad volume scaling | Graph `v*_vol` inputB=1.0 | All voices same volume | **FIXED** — port map + forwarding |
+| 5 | **Reverb** | ReverbPlugin in chain | UNIT_REVERB not implemented | No reverb in C++ | Open |
+| 6 | **Resonator routing** | Complex 4-input routing | Rings gets mono mix post-grains | Different excitation | Open |
+| 7 | ~~Distortion chain~~ | Distortion after resonator | Drive before clouds | Different effect order | **FIXED** — reordered graph |
+| 8 | ~~Delay routing~~ | Multiple sends (grains+dist+bender+warps) | Only warps→delay | Missing delay sends | **FIXED** — grains+drive+warps→delay |
+| 9 | **Looper** | LooperPlugin in chain | Not in graph | No looper | Open (Phase 4) |
+| 10 | **Bender/PerStringBender** | Audio synthesis + pitch bend | Bend is stub (no-op) | No pitch bend | Open (Phase 4) |
+| 11 | **Voice coupling** | Partner envelope → pitch mod | Not implemented | Missing coupling effect | Open (Phase 3) |
+| 12 | **FM modulation** | Voice-to-voice cross-mod, LFO→FM | Not routed in graph | No FM between voices | Open (Phase 3) |
+| 13 | **Mod source routing** | LFO/FM/Flux → timbre/morph mod | Not implemented | Missing modulation | Open (Phase 3) |
+| 14 | **Flux CV** | Pitch CV + trigger to quads | Not forwarded | No Flux integration | Open (Phase 4) |
+| 15 | **Warps source routing** | 7 carrier/modulator options | Fixed: resonator→warps | Static routing only | Open (Phase 4) |
+| 16 | **Drum routing** | Bypass/chain mode, direct resonator | Not in graph | Drums go through full chain | Open (Phase 4) |
+| 17 | ~~Drive scaling~~ | 1.0 + amount*14 (1..15x) | 1.0 + v*4 (1..5x) | Drive range mismatch | **FIXED** — `1 + v*14` |
+| 18 | ~~Master volume~~ | port map sets mvL/mvR inputB | Graph default 0.4 | Correct (0.8 * 0.5) | **FIXED** — verified |
+| 19 | **Per-voice pan** | Dynamic via setPort | Baked into graph at build time | Can't change pan live | Open (Phase 2) |
+| 20 | ~~LFO→delay mod~~ | HyperLfo.output→Delay.lfoInput | No audio connection | No delay modulation | **FIXED** — LFO→IPORT_INPUT_C |
 
 ---
 
