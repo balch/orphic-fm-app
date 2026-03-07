@@ -12,7 +12,7 @@ import dev.zacsweers.metro.SingleIn
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class OboeAudioEngine @Inject constructor() : AudioEngine {
+class OboeAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
     private val bridge = OboeAudioBridge()
 
     init {
@@ -71,7 +71,20 @@ class OboeAudioEngine @Inject constructor() : AudioEngine {
     override fun getCurrentTime(): Double = System.nanoTime() / 1_000_000_000.0
 
     /** Access the bridge for parameter control from SynthController delegates. */
-    val nativeBridge: OboeAudioBridge get() = bridge
+    val nativeBridgeImpl: OboeAudioBridge get() = bridge
+
+    // ── NativeDspBridge implementation ──────────────────────
+    override fun nativeSetVoiceGate(index: Int, active: Boolean) = bridge.nativeSetVoiceGate(index, active)
+    override fun nativeSetVoiceTune(index: Int, tune: Float) = bridge.nativeSetVoiceTune(index, tune)
+    override fun nativeSetMasterVolume(value: Float) = bridge.nativeSetMasterVolume(value)
+    override fun nativeSetDrive(value: Float) = bridge.nativeSetDrive(value)
+    override fun nativeSetDelayMix(value: Float) = bridge.nativeSetDelayMix(value)
+    override fun nativeSetVibrato(value: Float) = bridge.nativeSetVibrato(value)
+    override fun nativeSetBend(value: Float) = bridge.nativeSetBend(value)
+    override fun nativeSetPort(uri: String, symbol: String, value: Float) = bridge.nativeSetPort(uri, symbol, value)
+    override fun nativeGetPort(uri: String, symbol: String): Float = bridge.nativeGetPort(uri, symbol)
+    override fun nativeGetMonitor(out: FloatArray) = bridge.nativeGetMonitor(out)
+    override fun nativeTriggerDrum(drumIndex: Int, accent: Float) = bridge.nativeTriggerDrum(drumIndex, accent)
 
     companion object {
         private val log = logging("OboeAudioEngine")

@@ -1,0 +1,21 @@
+package org.balch.orpheus.core.audio.dsp
+
+/**
+ * Interface for forwarding DSP control calls to a native C++ engine.
+ * Implemented by platform-specific AudioEngine implementations (e.g., OboeAudioEngine).
+ * When present, DspSynthEngine forwards voice/parameter control through this bridge
+ * in addition to (or instead of) the Kotlin DSP graph.
+ */
+interface NativeDspBridge {
+    fun nativeSetVoiceGate(index: Int, active: Boolean)
+    fun nativeSetVoiceTune(index: Int, tune: Float)
+    fun nativeSetMasterVolume(value: Float)
+    fun nativeSetDrive(value: Float)
+    fun nativeSetDelayMix(value: Float)
+    fun nativeSetVibrato(value: Float)
+    fun nativeSetBend(value: Float)
+    fun nativeSetPort(uri: String, symbol: String, value: Float)
+    fun nativeGetPort(uri: String, symbol: String): Float
+    fun nativeGetMonitor(out: FloatArray)
+    fun nativeTriggerDrum(drumIndex: Int, accent: Float)
+}

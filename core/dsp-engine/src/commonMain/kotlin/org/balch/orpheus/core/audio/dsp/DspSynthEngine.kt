@@ -62,6 +62,9 @@ class DspSynthEngine @Inject constructor(
 
     private val log = logging("DspSynthEngine")
 
+    /** Native bridge for C++ DSP engine (Android). Null on JVM/WASM. */
+    private val nativeBridge = audioEngine as? NativeDspBridge
+
     private fun setPort(ps: PortSymbol, value: PortValue): Boolean =
         setPluginPort(ps.uri, ps.symbol, value)
     private fun getPort(ps: PortSymbol): PortValue? =
@@ -334,28 +337,48 @@ class DspSynthEngine @Inject constructor(
         log.debug { "Starting Shared Audio Engine..." }
         audioEngine.start()
 
-        monitoringJob = monitoringScope.launch(dispatcherProvider.io) {
-            val voiceLevels = FloatArray(12)
-            while (isActive) {
-                val currentPeak = pluginProvider.stereoPlugin.getPeak()
-                _peakFlow.value = currentPeak
-                _cpuLoadFlow.value = audioEngine.getCpuLoad()
-
-                var voiceSum = 0f
-                for (i in 0 until 12) {
-                    val level = voiceManager.voices[i].getCurrentLevel()
-                    voiceLevels[i] = level
-                    voiceSum += level
+        monitoringJob = if (nativeBridge != null) {
+            // Native C++ engine: poll monitor data from C++ via JNI
+            monitoringScope.launch(dispatcherProvider.io) {
+                val monitorBuf = FloatArray(18) // OrpheusMonitorData: peak_l, peak_r, cpu, voice_levels[12], lfo, master, bend
+                while (isActive) {
+                    nativeBridge.nativeGetMonitor(monitorBuf)
+                    _peakFlow.value = maxOf(monitorBuf[0], monitorBuf[1])
+                    _cpuLoadFlow.value = monitorBuf[2] * 100f
+                    // voice_levels[0..11] at indices 3..14
+                    val levels = FloatArray(12) { monitorBuf[3 + it] }
+                    _voiceLevelsFlow.value = levels
+                    _lfoOutputFlow.value = monitorBuf[15]
+                    _masterLevelFlow.value = monitorBuf[16]
+                    _bendFlow.value = monitorBuf[17]
+                    delay(MONITOR_POLL_INTERVAL_MS)
                 }
-                _voiceLevelsFlow.value = voiceLevels.copyOf()
-                _lfoOutputFlow.value = pluginProvider.hyperLfo.getCurrentValue()
-                _lfoAOutputFlow.value = pluginProvider.hyperLfo.getCurrentValueA()
-                _lfoBOutputFlow.value = pluginProvider.hyperLfo.getCurrentValueB()
+            }
+        } else {
+            // Kotlin DSP graph: poll from plugin units directly
+            monitoringScope.launch(dispatcherProvider.io) {
+                val voiceLevels = FloatArray(12)
+                while (isActive) {
+                    val currentPeak = pluginProvider.stereoPlugin.getPeak()
+                    _peakFlow.value = currentPeak
+                    _cpuLoadFlow.value = audioEngine.getCpuLoad()
 
-                val computedMaster = (voiceSum / 12f).coerceIn(0f, 1f)
-                _masterLevelFlow.value = maxOf(currentPeak.coerceIn(0f, 1f), computedMaster)
+                    var voiceSum = 0f
+                    for (i in 0 until 12) {
+                        val level = voiceManager.voices[i].getCurrentLevel()
+                        voiceLevels[i] = level
+                        voiceSum += level
+                    }
+                    _voiceLevelsFlow.value = voiceLevels.copyOf()
+                    _lfoOutputFlow.value = pluginProvider.hyperLfo.getCurrentValue()
+                    _lfoAOutputFlow.value = pluginProvider.hyperLfo.getCurrentValueA()
+                    _lfoBOutputFlow.value = pluginProvider.hyperLfo.getCurrentValueB()
 
-                delay(MONITOR_POLL_INTERVAL_MS)
+                    val computedMaster = (voiceSum / 12f).coerceIn(0f, 1f)
+                    _masterLevelFlow.value = maxOf(currentPeak.coerceIn(0f, 1f), computedMaster)
+
+                    delay(MONITOR_POLL_INTERVAL_MS)
+                }
             }
         }
         log.debug { "Audio Engine Started" }
@@ -385,6 +408,7 @@ class DspSynthEngine @Inject constructor(
     }
 
     override fun setDelayMix(amount: Float) {
+        nativeBridge?.nativeSetDelayMix(amount)
         setPort(DelaySymbol.MIX, PortValue.FloatValue(amount))
         setPort(DistortionSymbol.DRY_LEVEL, PortValue.FloatValue(1.0f - amount))
     }
@@ -460,6 +484,7 @@ class DspSynthEngine @Inject constructor(
 
     // Distortion delegations
     override fun setDrive(amount: Float) {
+        nativeBridge?.nativeSetDrive(amount)
         setPort(DistortionSymbol.DRIVE, PortValue.FloatValue(amount))
         // Also update direct drum limiters
         val driveVal = 1.0 + (amount * 14.0)
@@ -475,8 +500,10 @@ class DspSynthEngine @Inject constructor(
         getPort(DistortionSymbol.MIX)?.asFloat() ?: 0.5f
 
     // Stereo delegations
-    override fun setMasterVolume(amount: Float) =
-        setPort(StereoSymbol.MASTER_VOL, PortValue.FloatValue(amount)).let {}
+    override fun setMasterVolume(amount: Float) {
+        nativeBridge?.nativeSetMasterVolume(amount)
+        setPort(StereoSymbol.MASTER_VOL, PortValue.FloatValue(amount))
+    }
     override fun getMasterVolume(): Float =
         getPort(StereoSymbol.MASTER_VOL)?.asFloat() ?: 0.7f
 
@@ -503,6 +530,7 @@ class DspSynthEngine @Inject constructor(
 
     // Vibrato delegation (side effect: also updates voicePlugin)
     override fun setVibrato(amount: Float) {
+        nativeBridge?.nativeSetVibrato(amount)
         setPort(VibratoSymbol.DEPTH, PortValue.FloatValue(amount))
         pluginProvider.voicePlugin.setVibrato(amount)
     }
@@ -511,6 +539,7 @@ class DspSynthEngine @Inject constructor(
 
     // Bender delegation
     override fun setBend(amount: Float) {
+        nativeBridge?.nativeSetBend(amount)
         setPort(BenderSymbol.BEND, PortValue.FloatValue(amount))
         _bendFlow.value = amount
     }
@@ -544,8 +573,14 @@ class DspSynthEngine @Inject constructor(
     override fun resetStringBenders() = pluginProvider.perStringBenderPlugin.resetAll()
 
     // Voice Delegation
-    override fun setVoiceTune(index: Int, tune: Float) = voiceManager.setVoiceTune(index, tune)
-    override fun setVoiceGate(index: Int, active: Boolean) = voiceManager.setVoiceGate(index, active)
+    override fun setVoiceTune(index: Int, tune: Float) {
+        nativeBridge?.nativeSetVoiceTune(index, tune)
+        voiceManager.setVoiceTune(index, tune)
+    }
+    override fun setVoiceGate(index: Int, active: Boolean) {
+        nativeBridge?.nativeSetVoiceGate(index, active)
+        voiceManager.setVoiceGate(index, active)
+    }
     override fun setVoiceFeedback(index: Int, amount: Float) { /* Not implemented yet */ }
     override fun setVoiceFmDepth(index: Int, amount: Float) = voiceManager.setVoiceFmDepth(index, amount)
     override fun setVoiceEnvelopeSpeed(index: Int, speed: Float) = voiceManager.setVoiceEnvelopeSpeed(index, speed)
@@ -573,6 +608,7 @@ class DspSynthEngine @Inject constructor(
         pluginProvider.drumPlugin.setParameters(type, frequency, tone, decay, p4, p5)
     }
     override fun triggerDrum(type: Int, accent: Float) {
+        nativeBridge?.nativeTriggerDrum(type, accent)
         pluginProvider.drumPlugin.trigger(type, accent)
     }
 
@@ -600,6 +636,7 @@ class DspSynthEngine @Inject constructor(
 
     // Plugin Port Access
     override fun setPluginPort(pluginUri: String, symbol: String, value: PortValue): Boolean {
+        nativeBridge?.nativeSetPort(pluginUri, symbol, value.asFloat())
         val result = pluginProvider.getPlugin(pluginUri)?.setPortValue(symbol, value) ?: false
         // Keep bendFlow in sync when Bender BEND is set externally (gesture, MIDI, AI)
         if (result && pluginUri == BENDER_URI && symbol == BenderSymbol.BEND.symbol) {
