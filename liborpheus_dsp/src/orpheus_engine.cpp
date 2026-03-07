@@ -22,6 +22,8 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->clouds_small_buffer, sizeof(engine->clouds_small_buffer));
     engine->clouds_processor.set_playback_mode(clouds::PLAYBACK_MODE_GRANULAR);
     engine->clouds_processor.set_quality(0);  // stereo hi-fi
+    // Zero-init parameters to avoid undefined fields (stereo_spread, trigger, gate)
+    std::memset(engine->clouds_processor.mutable_parameters(), 0, sizeof(clouds::Parameters));
 
     // Initialize Rings resonator
     engine->rings_part.Init(engine->rings_reverb_buffer);
@@ -127,6 +129,10 @@ void orpheus_engine_process(OrpheusEngine* engine,
             static_cast<clouds::PlaybackMode>(
                 engine->clouds_mode.load(std::memory_order_relaxed)));
 
+        // Prepare once per callback (not per block) — handles mode transitions
+        // and background computation. In firmware, Prepare() runs in idle loop.
+        engine->clouds_processor.Prepare();
+
         // Process in kMaxBlockSize (32) chunks — Clouds uses ShortFrame I/O
         int frames_done = 0;
         while (frames_done < num_frames) {
@@ -145,7 +151,6 @@ void orpheus_engine_process(OrpheusEngine* engine,
                 in_frames[i].r = static_cast<short>(r * 32767.0f);
             }
 
-            engine->clouds_processor.Prepare();
             engine->clouds_processor.Process(in_frames, out_frames, block);
 
             // int16 stereo frames → float interleaved
