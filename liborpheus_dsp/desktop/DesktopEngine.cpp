@@ -1,0 +1,115 @@
+#include "DesktopEngine.h"
+#include <cstring>
+#include <chrono>
+
+DesktopEngine::DesktopEngine() = default;
+
+DesktopEngine::~DesktopEngine() {
+    close();
+}
+
+void DesktopEngine::open(float sampleRate) {
+    // Close any existing engine first
+    close();
+
+    sample_rate_ = sampleRate;
+    dsp_engine_ = orpheus_engine_create(sampleRate);
+    is_running_.store(dsp_engine_ != nullptr);
+}
+
+int DesktopEngine::loadGraph(const uint8_t* data, size_t length) {
+    if (!dsp_engine_) return -100;
+    return orpheus_engine_load_patch(dsp_engine_, data, length);
+}
+
+void DesktopEngine::process(float* outputBuffer, int numFrames) {
+    if (!is_running_.load() || !dsp_engine_) {
+        memset(outputBuffer, 0, numFrames * 2 * sizeof(float));
+        return;
+    }
+
+    auto start = std::chrono::steady_clock::now();
+
+    orpheus_engine_process(dsp_engine_, outputBuffer, numFrames);
+
+    auto end = std::chrono::steady_clock::now();
+    double us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    double budget = static_cast<double>(numFrames) / sample_rate_ * 1e6;
+    cpu_load_.store(us / budget);
+}
+
+void DesktopEngine::close() {
+    is_running_.store(false);
+
+    if (dsp_engine_) {
+        orpheus_engine_destroy(dsp_engine_);
+        dsp_engine_ = nullptr;
+    }
+
+    sample_rate_ = 0.0f;
+}
+
+bool DesktopEngine::isRunning() const { return is_running_.load(); }
+float DesktopEngine::getSampleRate() const { return sample_rate_; }
+double DesktopEngine::getCpuLoad() const { return cpu_load_.load(); }
+
+// -- C API pass-throughs ------------------------------------------------
+
+void DesktopEngine::setPort(const char* uri, const char* sym, float value) {
+    if (dsp_engine_) orpheus_engine_set_port(dsp_engine_, uri, sym, value);
+}
+float DesktopEngine::getPort(const char* uri, const char* sym) {
+    return dsp_engine_ ? orpheus_engine_get_port(dsp_engine_, uri, sym) : 0.0f;
+}
+void DesktopEngine::setVoiceGate(int index, int active) {
+    if (dsp_engine_) orpheus_engine_set_voice_gate(dsp_engine_, index, active);
+}
+void DesktopEngine::setVoiceTune(int index, float tune) {
+    if (dsp_engine_) orpheus_engine_set_voice_tune(dsp_engine_, index, tune);
+}
+void DesktopEngine::setVoiceEngine(int index, int engineIndex) {
+    if (dsp_engine_) orpheus_engine_set_voice_engine(dsp_engine_, index, engineIndex);
+}
+void DesktopEngine::setVoiceHarmonics(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_harmonics(dsp_engine_, index, value);
+}
+void DesktopEngine::setVoiceTimbre(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_timbre(dsp_engine_, index, value);
+}
+void DesktopEngine::setVoiceMorph(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_morph(dsp_engine_, index, value);
+}
+void DesktopEngine::setVoiceDecay(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_decay(dsp_engine_, index, value);
+}
+void DesktopEngine::setVoiceActive(int index, int active) {
+    if (dsp_engine_) orpheus_engine_set_voice_active(dsp_engine_, index, active);
+}
+void DesktopEngine::setVoiceHold(int index, float level) {
+    if (dsp_engine_) orpheus_engine_set_voice_hold(dsp_engine_, index, level);
+}
+void DesktopEngine::triggerDrum(int drumIndex, float accent) {
+    if (dsp_engine_) orpheus_engine_trigger_drum(dsp_engine_, drumIndex, accent);
+}
+void DesktopEngine::setMasterVolume(float v) {
+    if (dsp_engine_) orpheus_engine_set_master_volume(dsp_engine_, v);
+}
+void DesktopEngine::setDrive(float v) {
+    if (dsp_engine_) orpheus_engine_set_drive(dsp_engine_, v);
+}
+void DesktopEngine::setDelayMix(float v) {
+    if (dsp_engine_) orpheus_engine_set_delay_mix(dsp_engine_, v);
+}
+void DesktopEngine::setVibrato(float v) {
+    if (dsp_engine_) orpheus_engine_set_vibrato(dsp_engine_, v);
+}
+void DesktopEngine::setBend(float v) {
+    if (dsp_engine_) orpheus_engine_set_bend(dsp_engine_, v);
+}
+void DesktopEngine::getMonitor(OrpheusMonitorData* out) {
+    if (dsp_engine_) {
+        orpheus_engine_get_monitor(dsp_engine_, out);
+    } else {
+        memset(out, 0, sizeof(OrpheusMonitorData));
+    }
+}
