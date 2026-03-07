@@ -30,6 +30,7 @@ import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
+import org.balch.orpheus.core.plugin.symbols.STEREO_URI
 import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import org.balch.orpheus.core.plugin.symbols.VibratoSymbol
 import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
@@ -187,6 +188,13 @@ class DspSynthEngine @Inject constructor(
         // Sync per-quad volume
         for (quad in 0..2) {
             bridge.nativeSetPort("org.balch.orpheus.plugins.stereo", "quad_vol_$quad", voiceManager.getQuadVolume(quad))
+        }
+        // Sync per-voice pan (default pans match graph build-time values)
+        val defaultPans = floatArrayOf(0f, 0f, -0.3f, -0.3f, 0.3f, 0.3f, -0.7f, 0.7f, 0f, 0f, 0f, 0f)
+        for (v in 0 until 12) {
+            val pan = pluginProvider.getPlugin(STEREO_URI)
+                ?.getPortValue("voice_pan_$v")?.asFloat() ?: defaultPans[v]
+            forwardPanToNative(v, pan)
         }
     }
 
@@ -772,13 +780,31 @@ class DspSynthEngine @Inject constructor(
 
     // Plugin Port Access
     override fun setPluginPort(pluginUri: String, symbol: String, value: PortValue): Boolean {
-        nativeBridge?.nativeSetPort(pluginUri, symbol, value.asFloat())
+        // Intercept voice pan to compute constant-power L/R gains for C++ graph
+        if (pluginUri == STEREO_URI && symbol.startsWith("voice_pan_")) {
+            val pan = value.asFloat()  // -1..+1
+            val voiceIndex = symbol.removePrefix("voice_pan_").toIntOrNull()
+            if (voiceIndex != null) {
+                forwardPanToNative(voiceIndex, pan)
+            }
+        } else {
+            nativeBridge?.nativeSetPort(pluginUri, symbol, value.asFloat())
+        }
         val result = pluginProvider.getPlugin(pluginUri)?.setPortValue(symbol, value) ?: false
         // Keep bendFlow in sync when Bender BEND is set externally (gesture, MIDI, AI)
         if (result && pluginUri == BENDER_URI && symbol == BenderSymbol.BEND.symbol) {
             _bendFlow.value = value.asFloat()
         }
         return result
+    }
+
+    /** Compute constant-power pan gains and forward to C++ graph. */
+    private fun forwardPanToNative(voiceIndex: Int, pan: Float) {
+        val angle = ((pan + 1f) * 0.5f) * (kotlin.math.PI.toFloat() * 0.5f)
+        val leftGain = kotlin.math.cos(angle)
+        val rightGain = kotlin.math.sin(angle)
+        nativeBridge?.nativeSetPort(STEREO_URI, "voice_pan_L_$voiceIndex", leftGain)
+        nativeBridge?.nativeSetPort(STEREO_URI, "voice_pan_R_$voiceIndex", rightGain)
     }
     override fun getPluginPort(pluginUri: String, symbol: String): PortValue? =
         pluginProvider.getPlugin(pluginUri)?.getPortValue(symbol)

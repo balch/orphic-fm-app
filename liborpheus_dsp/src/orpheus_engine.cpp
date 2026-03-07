@@ -677,6 +677,18 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->voice_pan[idx].store(value, std::memory_order_relaxed);
         }
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.reverb") == 0) {
+        if (std::strcmp(symbol, "amount") == 0) {
+            engine->reverb_amount.store(value, std::memory_order_relaxed);
+            engine->reverb_bypass.store(value <= 0.001f ? 1 : 0, std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "time") == 0)
+            engine->reverb_time.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "damping") == 0)
+            engine->reverb_damping.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "diffusion") == 0)
+            engine->reverb_diffusion.store(value, std::memory_order_relaxed);
+    }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.distortion") == 0) {
         if (std::strcmp(symbol, "drive") == 0) {
             float scaled = 1.0f + value * 14.0f;

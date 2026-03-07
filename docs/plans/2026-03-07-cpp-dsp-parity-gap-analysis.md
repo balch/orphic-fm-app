@@ -36,7 +36,7 @@ Note: quadPitch is NOT forwarded to C++ yet (see Gap #2).
 | 2 | ~~Quad pitch~~ | Per-quad pitch offset | Not forwarded | Quad pitch offsets ignored | **FIXED** — listener calls override |
 | 3 | ~~Pitch multiplier~~ | Per-voice (0.5x bass, 1x mid) | Not applied | Bass voices at wrong octave | **FIXED** — `VOICE_PITCH_MULT_SEMITONES` |
 | 4 | ~~Per-voice volume~~ | Per-quad volume scaling | Graph `v*_vol` inputB=1.0 | All voices same volume | **FIXED** — port map + forwarding |
-| 5 | **Reverb** | ReverbPlugin in chain | UNIT_REVERB not implemented | No reverb in C++ | Open |
+| 5 | ~~Reverb~~ | ReverbPlugin in chain | UNIT_REVERB Dattorro plate | Reverb in C++ | **FIXED** — Dattorro plate reverb |
 | 6 | **Resonator routing** | Complex 4-input routing | Rings gets mono mix post-grains | Different excitation | Open |
 | 7 | ~~Distortion chain~~ | Distortion after resonator | Drive before clouds | Different effect order | **FIXED** — reordered graph |
 | 8 | ~~Delay routing~~ | Multiple sends (grains+dist+bender+warps) | Only warps→delay | Missing delay sends | **FIXED** — grains+drive+warps→delay |
@@ -50,7 +50,7 @@ Note: quadPitch is NOT forwarded to C++ yet (see Gap #2).
 | 16 | **Drum routing** | Bypass/chain mode, direct resonator | Not in graph | Drums go through full chain | Open (Phase 4) |
 | 17 | ~~Drive scaling~~ | 1.0 + amount*14 (1..15x) | 1.0 + v*4 (1..5x) | Drive range mismatch | **FIXED** — `1 + v*14` |
 | 18 | ~~Master volume~~ | port map sets mvL/mvR inputB | Graph default 0.4 | Correct (0.8 * 0.5) | **FIXED** — verified |
-| 19 | **Per-voice pan** | Dynamic via setPort | Baked into graph at build time | Can't change pan live | Open (Phase 2) |
+| 19 | ~~Per-voice pan~~ | Dynamic via setPort | Port map + cos/sin forwarding | Dynamic pan via graph | **FIXED** — constant-power L/R gains |
 | 20 | ~~LFO→delay mod~~ | HyperLfo.output→Delay.lfoInput | No audio connection | No delay modulation | **FIXED** — LFO→IPORT_INPUT_C |
 
 ---

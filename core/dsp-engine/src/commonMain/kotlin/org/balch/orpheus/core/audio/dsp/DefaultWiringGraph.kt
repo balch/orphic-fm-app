@@ -12,6 +12,7 @@ import kotlin.math.sin
  *   12x Plaits voices -> per-voice volume + pan -> summing tree ->
  *   master volume -> clouds -> rings -> drive -> warps ->
  *   delay (sends: grains+drive+warps, LFO mod) ->
+ *   reverb (parallel send from drive) ->
  *   hard clip -> master out (interleaved stereo)
  */
 fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
@@ -108,12 +109,20 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val lfo = hyperLfo("lfo")
     lfo.out to delay.inputC
 
+    // Reverb (Dattorro plate) — parallel send from drive output
+    // Wet-only output sums into clip inputs alongside delay output
+    val reverb = reverb("reverb")
+    driveL.out to reverb.inputA
+    driveR.out to reverb.inputB
+
     // Master clip + output
     val clipL = hardClip("clipL")
     val clipR = hardClip("clipR")
     val master = masterOut("master")
     delay.out to clipL.input
     delay.outRight to clipR.input
+    reverb.out to clipL.input
+    reverb.outRight to clipR.input
     clipL.out to master.inputA
     clipR.out to master.inputB
 
@@ -127,5 +136,10 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
         for (v in 0..3) map("org.balch.orpheus.plugins.stereo", "quad_vol_0", "v${v}_vol", IPORT_INPUT_B)
         for (v in 4..7) map("org.balch.orpheus.plugins.stereo", "quad_vol_1", "v${v}_vol", IPORT_INPUT_B)
         for (v in 8..11) map("org.balch.orpheus.plugins.stereo", "quad_vol_2", "v${v}_vol", IPORT_INPUT_B)
+        // Per-voice pan gains (constant-power, computed in Kotlin)
+        for (v in 0 until 12) {
+            map("org.balch.orpheus.plugins.stereo", "voice_pan_L_$v", "v${v}_pL", IPORT_INPUT_B)
+            map("org.balch.orpheus.plugins.stereo", "voice_pan_R_$v", "v${v}_pR", IPORT_INPUT_B)
+        }
     }
 }

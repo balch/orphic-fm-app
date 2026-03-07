@@ -173,4 +173,27 @@ struct OrpheusEngine {
     std::atomic<float> lfo_freq_b{1.0f};       // Hz
     std::atomic<float> lfo_shape{0.5f};        // 0=square, 1=triangle
     std::atomic<int>   lfo_mode{1};            // 0=AND, 1=OFF (independent), 2=OR
+
+    // ── Dattorro Plate Reverb ─────────────────────────
+    static constexpr int kReverbBufferSize = 32768;
+    static constexpr int kReverbMask = kReverbBufferSize - 1;
+    float reverb_buffer[kReverbBufferSize] = {};
+    int   reverb_write_pos{0};
+
+    // LFO state (two cosine oscillators for modulated delay reads)
+    float reverb_lfo1_phase{0.0f};
+    float reverb_lfo2_phase{0.0f};
+    float reverb_lfo1_value{0.0f};
+    float reverb_lfo2_value{0.0f};
+
+    // LP filter state
+    float reverb_lp_decay1{0.0f};
+    float reverb_lp_decay2{0.0f};
+
+    // Parameters (atomics, written from UI)
+    std::atomic<float> reverb_amount{0.0f};     // 0-1, wet level
+    std::atomic<float> reverb_time{0.5f};       // 0-1, feedback/decay
+    std::atomic<float> reverb_damping{0.7f};    // 0-1, LP coefficient
+    std::atomic<float> reverb_diffusion{0.625f};// 0-1, allpass coefficient
+    std::atomic<int>   reverb_bypass{1};        // self-bypass when amount<=0.001
 };

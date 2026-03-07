@@ -352,6 +352,8 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_dual_delay(u, engine, num_frames, sr); break;
             case UNIT_HYPER_LFO:
                 unit_process_hyper_lfo(u, engine, num_frames, sr); break;
+            case UNIT_REVERB:
+                unit_process_reverb(u, engine, num_frames, sr); break;
             default: break;
         }
     }
