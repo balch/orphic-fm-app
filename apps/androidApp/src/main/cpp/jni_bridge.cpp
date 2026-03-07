@@ -84,6 +84,42 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceTune(
 }
 
 JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceEngine(
+        JNIEnv *env, jobject thiz, jint index, jint engineIndex) {
+    sEngine.setVoiceEngine(index, engineIndex);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceHarmonics(
+        JNIEnv *env, jobject thiz, jint index, jfloat value) {
+    sEngine.setVoiceHarmonics(index, value);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceTimbre(
+        JNIEnv *env, jobject thiz, jint index, jfloat value) {
+    sEngine.setVoiceTimbre(index, value);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceMorph(
+        JNIEnv *env, jobject thiz, jint index, jfloat value) {
+    sEngine.setVoiceMorph(index, value);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceDecay(
+        JNIEnv *env, jobject thiz, jint index, jfloat value) {
+    sEngine.setVoiceDecay(index, value);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVoiceActive(
+        JNIEnv *env, jobject thiz, jint index, jboolean active) {
+    sEngine.setVoiceActive(index, active ? 1 : 0);
+}
+
+JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeTriggerDrum(
         JNIEnv *env, jobject thiz, jint drumIndex, jfloat accent) {
     sEngine.triggerDrum(drumIndex, accent);

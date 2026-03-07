@@ -122,6 +122,24 @@ void OboeEngine::setVoiceGate(int index, int active) {
 void OboeEngine::setVoiceTune(int index, float tune) {
     if (dsp_engine_) orpheus_engine_set_voice_tune(dsp_engine_, index, tune);
 }
+void OboeEngine::setVoiceEngine(int index, int engineIndex) {
+    if (dsp_engine_) orpheus_engine_set_voice_engine(dsp_engine_, index, engineIndex);
+}
+void OboeEngine::setVoiceHarmonics(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_harmonics(dsp_engine_, index, value);
+}
+void OboeEngine::setVoiceTimbre(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_timbre(dsp_engine_, index, value);
+}
+void OboeEngine::setVoiceMorph(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_morph(dsp_engine_, index, value);
+}
+void OboeEngine::setVoiceDecay(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_decay(dsp_engine_, index, value);
+}
+void OboeEngine::setVoiceActive(int index, int active) {
+    if (dsp_engine_) orpheus_engine_set_voice_active(dsp_engine_, index, active);
+}
 void OboeEngine::triggerDrum(int drumIndex, float accent) {
     if (dsp_engine_) orpheus_engine_trigger_drum(dsp_engine_, drumIndex, accent);
 }

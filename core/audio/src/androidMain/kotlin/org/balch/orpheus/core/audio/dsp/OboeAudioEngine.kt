@@ -4,6 +4,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metro.SingleIn
 
 /**
@@ -11,7 +12,7 @@ import dev.zacsweers.metro.SingleIn
  * Audio rendering happens entirely in C++ — no JNI in the audio callback.
  */
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
+@ContributesBinding(AppScope::class, binding = binding<AudioEngine>())
 class OboeAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
     private val bridge = OboeAudioBridge()
 
@@ -76,6 +77,12 @@ class OboeAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
     // ── NativeDspBridge implementation ──────────────────────
     override fun nativeSetVoiceGate(index: Int, active: Boolean) = bridge.nativeSetVoiceGate(index, active)
     override fun nativeSetVoiceTune(index: Int, tune: Float) = bridge.nativeSetVoiceTune(index, tune)
+    override fun nativeSetVoiceEngine(index: Int, engineIndex: Int) = bridge.nativeSetVoiceEngine(index, engineIndex)
+    override fun nativeSetVoiceHarmonics(index: Int, value: Float) = bridge.nativeSetVoiceHarmonics(index, value)
+    override fun nativeSetVoiceTimbre(index: Int, value: Float) = bridge.nativeSetVoiceTimbre(index, value)
+    override fun nativeSetVoiceMorph(index: Int, value: Float) = bridge.nativeSetVoiceMorph(index, value)
+    override fun nativeSetVoiceDecay(index: Int, value: Float) = bridge.nativeSetVoiceDecay(index, value)
+    override fun nativeSetVoiceActive(index: Int, active: Boolean) = bridge.nativeSetVoiceActive(index, active)
     override fun nativeSetMasterVolume(value: Float) = bridge.nativeSetMasterVolume(value)
     override fun nativeSetDrive(value: Float) = bridge.nativeSetDrive(value)
     override fun nativeSetDelayMix(value: Float) = bridge.nativeSetDelayMix(value)

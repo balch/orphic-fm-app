@@ -36,6 +36,18 @@ void orpheus_engine_set_voice_gate(OrpheusEngine* engine,
                                    int index, int active);
 void orpheus_engine_set_voice_tune(OrpheusEngine* engine,
                                    int index, float tune);
+void orpheus_engine_set_voice_engine(OrpheusEngine* engine,
+                                     int index, int engine_index);
+void orpheus_engine_set_voice_harmonics(OrpheusEngine* engine,
+                                        int index, float value);
+void orpheus_engine_set_voice_timbre(OrpheusEngine* engine,
+                                     int index, float value);
+void orpheus_engine_set_voice_morph(OrpheusEngine* engine,
+                                    int index, float value);
+void orpheus_engine_set_voice_decay(OrpheusEngine* engine,
+                                    int index, float value);
+void orpheus_engine_set_voice_active(OrpheusEngine* engine,
+                                      int index, int active);
 void orpheus_engine_trigger_drum(OrpheusEngine* engine,
                                  int drum_index, float accent);
 

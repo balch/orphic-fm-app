@@ -9,6 +9,12 @@ package org.balch.orpheus.core.audio.dsp
 interface NativeDspBridge {
     fun nativeSetVoiceGate(index: Int, active: Boolean)
     fun nativeSetVoiceTune(index: Int, tune: Float)
+    fun nativeSetVoiceEngine(index: Int, engineIndex: Int)
+    fun nativeSetVoiceHarmonics(index: Int, value: Float)
+    fun nativeSetVoiceTimbre(index: Int, value: Float)
+    fun nativeSetVoiceMorph(index: Int, value: Float)
+    fun nativeSetVoiceDecay(index: Int, value: Float)
+    fun nativeSetVoiceActive(index: Int, active: Boolean)
     fun nativeSetMasterVolume(value: Float)
     fun nativeSetDrive(value: Float)
     fun nativeSetDelayMix(value: Float)

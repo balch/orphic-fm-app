@@ -30,6 +30,12 @@ public:
     float getPort(const char* uri, const char* sym);
     void setVoiceGate(int index, int active);
     void setVoiceTune(int index, float tune);
+    void setVoiceEngine(int index, int engineIndex);
+    void setVoiceHarmonics(int index, float value);
+    void setVoiceTimbre(int index, float value);
+    void setVoiceMorph(int index, float value);
+    void setVoiceDecay(int index, float value);
+    void setVoiceActive(int index, int active);
     void triggerDrum(int drumIndex, float accent);
     void setMasterVolume(float v);
     void setDrive(float v);

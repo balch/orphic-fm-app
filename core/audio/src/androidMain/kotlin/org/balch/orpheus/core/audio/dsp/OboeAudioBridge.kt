@@ -30,6 +30,12 @@ class OboeAudioBridge {
     external fun nativeGetPort(uri: String, symbol: String): Float
     external fun nativeSetVoiceGate(index: Int, active: Boolean)
     external fun nativeSetVoiceTune(index: Int, tune: Float)
+    external fun nativeSetVoiceEngine(index: Int, engineIndex: Int)
+    external fun nativeSetVoiceHarmonics(index: Int, value: Float)
+    external fun nativeSetVoiceTimbre(index: Int, value: Float)
+    external fun nativeSetVoiceMorph(index: Int, value: Float)
+    external fun nativeSetVoiceDecay(index: Int, value: Float)
+    external fun nativeSetVoiceActive(index: Int, active: Boolean)
     external fun nativeTriggerDrum(drumIndex: Int, accent: Float)
     external fun nativeSetMasterVolume(value: Float)
     external fun nativeSetDrive(value: Float)

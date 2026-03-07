@@ -39,7 +39,11 @@ struct OrpheusEngine {
         std::atomic<float> harmonics{0.5f};
         std::atomic<float> timbre{0.5f};
         std::atomic<float> morph{0.5f};
+        std::atomic<float> decay{0.5f};     // LPG decay (maps to Plaits patch.decay)
+        std::atomic<float> lpg_colour{0.5f}; // LPG colour (filter character)
         std::atomic<int> engine_index{0};
+        std::atomic<int> active{0};          // 0 = voice disabled (no Plaits rendering)
+        std::atomic<int> ever_triggered{0};  // 0 = never gated on; skip render until first gate
     };
     VoiceParams voice_params[kNumVoices];
 

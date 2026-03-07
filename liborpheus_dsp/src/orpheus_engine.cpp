@@ -59,6 +59,8 @@ void orpheus_engine_process(OrpheusEngine* engine,
     // Process each main voice
     for (int v = 0; v < kNumMainVoices; v++) {
         auto& vp = engine->voice_params[v];
+        if (!vp.active.load(std::memory_order_relaxed)) continue;
+        if (!vp.ever_triggered.load(std::memory_order_relaxed)) continue;
         auto& voice = engine->voices_dsp[v];
 
         // Build Plaits Patch from atomic params
@@ -71,8 +73,8 @@ void orpheus_engine_process(OrpheusEngine* engine,
         patch.frequency_modulation_amount = 0.0f;
         patch.timbre_modulation_amount = 0.0f;
         patch.morph_modulation_amount = 0.0f;
-        patch.decay = 0.5f;
-        patch.lpg_colour = 0.5f;
+        patch.decay = vp.decay.load(std::memory_order_relaxed);
+        patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
 
         // Build Modulations — trigger is a FLOAT value, not an enum.
         // Voice does its own Schmitt-trigger edge detection internally.
@@ -81,7 +83,18 @@ void orpheus_engine_process(OrpheusEngine* engine,
         int current_gate = vp.gate.load(std::memory_order_relaxed);
         mod.trigger = current_gate ? 1.0f : 0.0f;
         mod.trigger_patched = true;
-        mod.level_patched = false;
+
+        // Speech engine (index 15) has already_enveloped=true, bypassing the LPG.
+        // Use level_patched to gate amplitude directly so voices are silent when gate=0.
+        // TODO: This causes hard cut-off mid-word. Add amplitude smoothing (short
+        //       fade-out envelope, ~50-100ms) so speech words complete before silence.
+        bool is_speech = (patch.engine == 15);
+        if (is_speech) {
+            mod.level_patched = true;
+            mod.level = current_gate ? 1.0f : 0.0f;
+        } else {
+            mod.level_patched = false;
+        }
 
         // Render in kBlockSize (12) chunks
         int frames_done = 0;
@@ -128,8 +141,8 @@ void orpheus_engine_process(OrpheusEngine* engine,
         patch.frequency_modulation_amount = 0.0f;
         patch.timbre_modulation_amount = 0.0f;
         patch.morph_modulation_amount = 0.0f;
-        patch.decay = 0.5f;
-        patch.lpg_colour = 0.5f;
+        patch.decay = vp.decay.load(std::memory_order_relaxed);
+        patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
 
         // Build Modulations — trigger for one-shot drum hits
         plaits::Modulations mod;
@@ -433,6 +446,9 @@ void orpheus_engine_set_voice_gate(OrpheusEngine* engine,
                                    int index, int active) {
     if (index >= 0 && index < kNumVoices) {
         engine->voice_params[index].gate.store(active);
+        if (active) {
+            engine->voice_params[index].ever_triggered.store(1, std::memory_order_relaxed);
+        }
     }
 }
 
@@ -440,6 +456,49 @@ void orpheus_engine_set_voice_tune(OrpheusEngine* engine,
                                    int index, float tune) {
     if (index >= 0 && index < kNumVoices) {
         engine->voice_params[index].tune.store(tune);
+    }
+}
+
+void orpheus_engine_set_voice_engine(OrpheusEngine* engine,
+                                     int index, int engine_index) {
+    if (index >= 0 && index < kNumVoices) {
+        engine->voice_params[index].engine_index.store(engine_index, std::memory_order_relaxed);
+        engine->voice_params[index].ever_triggered.store(0, std::memory_order_relaxed);
+    }
+}
+
+void orpheus_engine_set_voice_active(OrpheusEngine* engine,
+                                      int index, int active) {
+    if (index >= 0 && index < kNumVoices) {
+        engine->voice_params[index].active.store(active, std::memory_order_relaxed);
+    }
+}
+
+void orpheus_engine_set_voice_harmonics(OrpheusEngine* engine,
+                                        int index, float value) {
+    if (index >= 0 && index < kNumVoices) {
+        engine->voice_params[index].harmonics.store(value, std::memory_order_relaxed);
+    }
+}
+
+void orpheus_engine_set_voice_timbre(OrpheusEngine* engine,
+                                     int index, float value) {
+    if (index >= 0 && index < kNumVoices) {
+        engine->voice_params[index].timbre.store(value, std::memory_order_relaxed);
+    }
+}
+
+void orpheus_engine_set_voice_morph(OrpheusEngine* engine,
+                                    int index, float value) {
+    if (index >= 0 && index < kNumVoices) {
+        engine->voice_params[index].morph.store(value, std::memory_order_relaxed);
+    }
+}
+
+void orpheus_engine_set_voice_decay(OrpheusEngine* engine,
+                                    int index, float value) {
+    if (index >= 0 && index < kNumVoices) {
+        engine->voice_params[index].decay.store(value, std::memory_order_relaxed);
     }
 }
 

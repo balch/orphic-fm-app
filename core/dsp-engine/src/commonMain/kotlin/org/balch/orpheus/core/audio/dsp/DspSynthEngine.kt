@@ -63,7 +63,9 @@ class DspSynthEngine @Inject constructor(
     private val log = logging("DspSynthEngine")
 
     /** Native bridge for C++ DSP engine (Android). Null on JVM/WASM. */
-    private val nativeBridge = audioEngine as? NativeDspBridge
+    private val nativeBridge = (audioEngine as? NativeDspBridge).also {
+        log.info { "NativeDspBridge: ${if (it != null) "AVAILABLE" else "null"} (audioEngine=${audioEngine::class.simpleName})" }
+    }
 
     private fun setPort(ps: PortSymbol, value: PortValue): Boolean =
         setPluginPort(ps.uri, ps.symbol, value)
@@ -139,6 +141,7 @@ class DspSynthEngine @Inject constructor(
 
         setupListeners()
         setupAutomation()
+        syncNativeBridgeState()
 
         // Initial defaults
         setDelayMix(0f)
@@ -148,6 +151,37 @@ class DspSynthEngine @Inject constructor(
         setDrumTriggerSource(2, 0) // HiHat -> Internal (manual only)
     }
 
+    /** Push current voice state to C++ engine so it matches Kotlin on startup. */
+    private fun syncNativeBridgeState() {
+        val bridge = nativeBridge ?: return
+        val vp = pluginProvider.voicePlugin
+        for (duo in 0..5) {
+            val engineOrdinal = vp.getDuoEngine(duo)
+            val voiceA = duo * 2
+            val isActive = engineOrdinal > 0
+            val cppIndex = plaitsEngineOrdinalToCpp(engineOrdinal)
+            bridge.nativeSetVoiceActive(voiceA, isActive)
+            bridge.nativeSetVoiceActive(voiceA + 1, isActive)
+            bridge.nativeSetVoiceEngine(voiceA, cppIndex)
+            bridge.nativeSetVoiceEngine(voiceA + 1, cppIndex)
+            bridge.nativeSetVoiceHarmonics(voiceA, vp.getDuoHarmonics(duo))
+            bridge.nativeSetVoiceHarmonics(voiceA + 1, vp.getDuoHarmonics(duo))
+            bridge.nativeSetVoiceTimbre(voiceA, vp.getDuoSharpness(duo))
+            bridge.nativeSetVoiceTimbre(voiceA + 1, vp.getDuoSharpness(duo))
+            // Speech engine: morph is per-voice envSpeed (word selection); otherwise duo morph
+            if (engineOrdinal == SPEECH_ENGINE_ORDINAL) {
+                bridge.nativeSetVoiceMorph(voiceA, vp.getEnvSpeed(voiceA))
+                bridge.nativeSetVoiceMorph(voiceA + 1, vp.getEnvSpeed(voiceA + 1))
+            } else {
+                bridge.nativeSetVoiceMorph(voiceA, vp.getDuoMorph(duo))
+                bridge.nativeSetVoiceMorph(voiceA + 1, vp.getDuoMorph(duo))
+            }
+            bridge.nativeSetVoiceDecay(voiceA, vp.getEnvSpeed(voiceA))
+            bridge.nativeSetVoiceDecay(voiceA + 1, vp.getEnvSpeed(voiceA + 1))
+            log.info { "syncNative: duo=$duo engine=$engineOrdinal→cpp=$cppIndex active=$isActive" }
+        }
+    }
+
     private fun setupListeners() {
         // Register Voice Plugin Listener
         pluginProvider.voicePlugin.setListener(object : VoicePlugin.Listener {
@@ -155,14 +189,59 @@ class DspSynthEngine @Inject constructor(
                 when (param) {
                     "tune" -> voiceManager.setVoiceTune(index, value as Float)
                     "mod_depth" -> voiceManager.setVoiceFmDepth(index, value as Float)
-                    "env_speed" -> voiceManager.setVoiceEnvelopeSpeed(index, value as Float)
-                    "duo_sharpness" -> voiceManager.setDuoSharpness(index, value as Float)
+                    "env_speed" -> {
+                        voiceManager.setVoiceEnvelopeSpeed(index, value as Float)
+                        // Forward as LPG decay to C++ engine
+                        nativeBridge?.nativeSetVoiceDecay(index, value)
+                        // Speech engine: envSpeed overrides morph for word selection
+                        val duoIndex = index / 2
+                        if (pluginProvider.voicePlugin.getDuoEngine(duoIndex) == SPEECH_ENGINE_ORDINAL) {
+                            nativeBridge?.nativeSetVoiceMorph(index, value)
+                        }
+                    }
+                    "duo_sharpness" -> {
+                        voiceManager.setDuoSharpness(index, value as Float)
+                        // Forward timbre to C++ for both voices in the duo
+                        val voiceA = index * 2
+                        nativeBridge?.nativeSetVoiceTimbre(voiceA, value)
+                        nativeBridge?.nativeSetVoiceTimbre(voiceA + 1, value)
+                    }
                     "duo_mod_source" -> voiceManager.setDuoModSource(index, ModSource.entries[value as Int])
-                    "duo_engine" -> voiceManager.setDuoEngine(index, value as Int)
-                    "duo_harmonics" -> voiceManager.setDuoHarmonics(index, value as Float)
+                    "duo_engine" -> {
+                        val engineOrdinal = value as Int
+                        voiceManager.setDuoEngine(index, engineOrdinal)
+                        // Forward engine index + active state to C++ for both voices in the duo
+                        val voiceA = index * 2
+                        val isActive = engineOrdinal > 0
+                        val cppIndex = plaitsEngineOrdinalToCpp(engineOrdinal)
+                        nativeBridge?.nativeSetVoiceActive(voiceA, isActive)
+                        nativeBridge?.nativeSetVoiceActive(voiceA + 1, isActive)
+                        nativeBridge?.nativeSetVoiceEngine(voiceA, cppIndex)
+                        nativeBridge?.nativeSetVoiceEngine(voiceA + 1, cppIndex)
+                        // Speech engine: override C++ morph with per-voice envSpeed for word selection
+                        if (engineOrdinal == SPEECH_ENGINE_ORDINAL) {
+                            val vp = pluginProvider.voicePlugin
+                            nativeBridge?.nativeSetVoiceMorph(voiceA, vp.getEnvSpeed(voiceA))
+                            nativeBridge?.nativeSetVoiceMorph(voiceA + 1, vp.getEnvSpeed(voiceA + 1))
+                        }
+                    }
+                    "duo_harmonics" -> {
+                        voiceManager.setDuoHarmonics(index, value as Float)
+                        val voiceA = index * 2
+                        nativeBridge?.nativeSetVoiceHarmonics(voiceA, value)
+                        nativeBridge?.nativeSetVoiceHarmonics(voiceA + 1, value)
+                    }
                     "duo_prosody" -> voiceManager.setDuoProsody(index, value as Float)
                     "duo_speed" -> voiceManager.setDuoSpeed(index, value as Float)
-                    "duo_morph" -> voiceManager.setDuoMorph(index, value as Float)
+                    "duo_morph" -> {
+                        voiceManager.setDuoMorph(index, value as Float)
+                        // Speech engine: morph is controlled by envSpeed, not duo_morph
+                        if (pluginProvider.voicePlugin.getDuoEngine(index) != SPEECH_ENGINE_ORDINAL) {
+                            val voiceA = index * 2
+                            nativeBridge?.nativeSetVoiceMorph(voiceA, value)
+                            nativeBridge?.nativeSetVoiceMorph(voiceA + 1, value)
+                        }
+                    }
                     "duo_mod_source_level" -> voiceManager.setDuoModSourceLevel(index, value as Float)
                     "quad_pitch" -> voiceManager.setQuadPitch(index, value as Float)
                     "quad_hold" -> voiceManager.setQuadHold(index, value as Float)
@@ -336,6 +415,7 @@ class DspSynthEngine @Inject constructor(
         startRequested = true
         log.debug { "Starting Shared Audio Engine..." }
         audioEngine.start()
+        syncNativeBridgeState() // Re-sync after C++ engine is created
 
         monitoringJob = if (nativeBridge != null) {
             // Native C++ engine: poll monitor data from C++ via JNI
@@ -833,7 +913,46 @@ class DspSynthEngine @Inject constructor(
         }
     }
 
+    /**
+     * Maps Kotlin PlaitsEngineId ordinal+1 (1-based engineOrdinal) to
+     * C++ Plaits engine registration index. 0 = engine off (no Plaits rendering).
+     *
+     * C++ registration order (from plaits/dsp/voice.cc Init()):
+     * 0-7: engine2 (VA VCF, Phase Dist, 6-Op×3, Wave Terrain, String Machine, Chiptune)
+     * 8: VirtualAnalog, 9: Waveshaping, 10: FM, 11: Grain, 12: Additive,
+     * 13: Wavetable, 14: Chord, 15: Speech, 16: Swarm, 17: Noise,
+     * 18: Particle, 19: String, 20: Modal, 21: BassDrum, 22: SnareDrum, 23: HiHat
+     */
+    private fun plaitsEngineOrdinalToCpp(engineOrdinal: Int): Int {
+        if (engineOrdinal <= 0) return 0 // off → default engine 0
+        val idx = engineOrdinal - 1
+        return if (idx < CPP_ENGINE_MAP.size) CPP_ENGINE_MAP[idx] else 0
+    }
+
     companion object {
         private const val MONITOR_POLL_INTERVAL_MS = 200L
+        /** VoicePlugin engineOrdinal for SPEECH (PlaitsEngineId.SPEECH.ordinal + 1). */
+        private const val SPEECH_ENGINE_ORDINAL = 17
+
+        // PlaitsEngineId ordinals (0-based) → C++ engine indices
+        private val CPP_ENGINE_MAP = intArrayOf(
+            21, // ANALOG_BASS_DRUM
+            22, // ANALOG_SNARE_DRUM
+            23, // METALLIC_HI_HAT
+            21, // FM_DRUM (mapped to bass drum — custom engine not in MI source)
+            10, // FM
+            17, // NOISE
+            9,  // WAVESHAPING
+            8,  // VIRTUAL_ANALOG
+            12, // ADDITIVE
+            11, // GRAIN
+            19, // STRING
+            20, // MODAL
+            18, // PARTICLE
+            16, // SWARM
+            14, // CHORD
+            13, // WAVETABLE
+            15, // SPEECH
+        )
     }
 }
