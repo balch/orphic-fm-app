@@ -33,6 +33,18 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     // Initialize Warps modulator
     engine->warps_modulator.Init(engine->sample_rate);
 
+    // Default per-voice pans (matches Kotlin StereoPlugin defaults)
+    engine->voice_pan[0].store(0.0f);
+    engine->voice_pan[1].store(0.0f);
+    engine->voice_pan[2].store(-0.3f);
+    engine->voice_pan[3].store(-0.3f);
+    engine->voice_pan[4].store(0.3f);
+    engine->voice_pan[5].store(0.3f);
+    engine->voice_pan[6].store(-0.7f);
+    engine->voice_pan[7].store(0.7f);
+    for (int i = 8; i < kNumVoices; i++)
+        engine->voice_pan[i].store(0.0f);
+
     return engine;
 }
 
@@ -56,12 +68,23 @@ void orpheus_engine_process(OrpheusEngine* engine,
     const float volume = engine->master_volume.load(std::memory_order_relaxed);
     const float inv_32768 = 1.0f / 32768.0f;
 
+    // Constant-power pan helper: pan in -1..+1 → L/R gains
+    auto compute_pan = [](float pan, float& gain_l, float& gain_r) {
+        float angle = ((pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
+        gain_l = std::cos(angle);
+        gain_r = std::sin(angle);
+    };
+
     // Process each main voice
     for (int v = 0; v < kNumMainVoices; v++) {
         auto& vp = engine->voice_params[v];
         if (!vp.active.load(std::memory_order_relaxed)) continue;
         if (!vp.ever_triggered.load(std::memory_order_relaxed)) continue;
         auto& voice = engine->voices_dsp[v];
+
+        // Precompute per-voice pan gains
+        float pan_l, pan_r;
+        compute_pan(engine->voice_pan[v].load(std::memory_order_relaxed), pan_l, pan_r);
 
         // Build Plaits Patch from atomic params
         plaits::Patch patch;
@@ -107,16 +130,16 @@ void orpheus_engine_process(OrpheusEngine* engine,
             plaits::Voice::Frame frames[plaits::kMaxBlockSize];
             voice.Render(patch, mod, frames, block);
 
-            // Mix into interleaved stereo output with int16->float conversion
+            // Mix into interleaved stereo with per-voice pan and volume
             for (int i = 0; i < block; i++) {
-                float sample_out = frames[i].out * inv_32768 * volume;
-                float sample_aux = frames[i].aux * inv_32768 * volume;
+                // Combine out + aux as mono, then pan
+                float mono = (frames[i].out + frames[i].aux) * 0.5f * inv_32768 * volume;
 
                 int idx = (frames_done + i) * 2;
-                output_buffer[idx]     += sample_out;  // Left
-                output_buffer[idx + 1] += sample_aux;  // Right
+                output_buffer[idx]     += mono * pan_l;
+                output_buffer[idx + 1] += mono * pan_r;
 
-                float abs_out = std::fabs(sample_out);
+                float abs_out = std::fabs(mono);
                 if (abs_out > voice_peak) voice_peak = abs_out;
             }
 
@@ -130,6 +153,10 @@ void orpheus_engine_process(OrpheusEngine* engine,
     for (int v = kNumMainVoices; v < kNumVoices; v++) {
         auto& vp = engine->voice_params[v];
         auto& voice = engine->voices_dsp[v];
+
+        // Precompute per-voice pan gains for drum voices
+        float pan_l, pan_r;
+        compute_pan(engine->voice_pan[v].load(std::memory_order_relaxed), pan_l, pan_r);
 
         // Build Plaits Patch from atomic params
         plaits::Patch patch;
@@ -163,16 +190,15 @@ void orpheus_engine_process(OrpheusEngine* engine,
             plaits::Voice::Frame frames[plaits::kMaxBlockSize];
             voice.Render(patch, mod, frames, block);
 
-            // Mix into interleaved stereo output with int16->float conversion
+            // Mix into interleaved stereo with per-voice pan and volume
             for (int i = 0; i < block; i++) {
-                float sample_out = frames[i].out * inv_32768 * volume;
-                float sample_aux = frames[i].aux * inv_32768 * volume;
+                float mono = (frames[i].out + frames[i].aux) * 0.5f * inv_32768 * volume;
 
                 int idx = (frames_done + i) * 2;
-                output_buffer[idx]     += sample_out;  // Left
-                output_buffer[idx + 1] += sample_aux;  // Right
+                output_buffer[idx]     += mono * pan_l;
+                output_buffer[idx + 1] += mono * pan_r;
 
-                float abs_out = std::fabs(sample_out);
+                float abs_out = std::fabs(mono);
                 if (abs_out > voice_peak) voice_peak = abs_out;
             }
 
@@ -344,6 +370,134 @@ void orpheus_engine_process(OrpheusEngine* engine,
         }
     }
 
+    // ── Drive (tanh saturation) with dry/wet mix ─────
+    {
+        float drive = engine->drive_amount.load(std::memory_order_relaxed);
+        float dmix = engine->drive_mix.load(std::memory_order_relaxed);
+        if (dmix > 0.001f) {
+            float dry_amt = 1.0f - dmix;
+            for (int i = 0; i < num_frames; i++) {
+                int idx = i * 2;
+                float dry_l = output_buffer[idx];
+                float dry_r = output_buffer[idx + 1];
+                float wet_l = std::tanh(dry_l * drive);
+                float wet_r = std::tanh(dry_r * drive);
+                output_buffer[idx]     = dry_l * dry_amt + wet_l * dmix;
+                output_buffer[idx + 1] = dry_r * dry_amt + wet_r * dmix;
+            }
+        }
+    }
+
+    // ── Dual Delay ───────────────────────────────────
+    if (!engine->delay_bypass.load(std::memory_order_relaxed)) {
+        const float mix = engine->delay_mix.load(std::memory_order_relaxed);
+        const float fb = std::min(engine->delay_feedback.load(std::memory_order_relaxed), 0.95f);
+        const float sr = engine->sample_rate;
+
+        // Target delay times in samples (0..1 knob → 0.01..2.0s)
+        float target_1 = (0.01f + engine->delay_time_1.load(std::memory_order_relaxed) * 1.99f) * sr;
+        float target_2 = (0.01f + engine->delay_time_2.load(std::memory_order_relaxed) * 1.99f) * sr;
+
+        // Smooth delay times (~20ms ramp)
+        const float smooth_coeff = 1.0f - std::exp(-1.0f / (0.02f * sr));
+        engine->delay_time_1_smooth += (target_1 - engine->delay_time_1_smooth) * smooth_coeff;
+        engine->delay_time_2_smooth += (target_2 - engine->delay_time_2_smooth) * smooth_coeff;
+
+        int delay_samples_1 = std::max(1, std::min(static_cast<int>(engine->delay_time_1_smooth),
+                                                     OrpheusEngine::kMaxDelaySamples - 1));
+        int delay_samples_2 = std::max(1, std::min(static_cast<int>(engine->delay_time_2_smooth),
+                                                     OrpheusEngine::kMaxDelaySamples - 1));
+
+        const float dry = 1.0f - mix;
+        const int max_d = OrpheusEngine::kMaxDelaySamples;
+
+        for (int i = 0; i < num_frames; i++) {
+            int idx = i * 2;
+            float in_l = output_buffer[idx];
+            float in_r = output_buffer[idx + 1];
+
+            int wp = engine->delay_write_pos;
+
+            // Read from delay lines
+            int rp1 = (wp - delay_samples_1 + max_d) % max_d;
+            int rp2 = (wp - delay_samples_2 + max_d) % max_d;
+
+            float d1l = engine->delay_buffer_1l[rp1];
+            float d1r = engine->delay_buffer_1r[rp1];
+            float d2l = engine->delay_buffer_2l[rp2];
+            float d2r = engine->delay_buffer_2r[rp2];
+
+            // Write to delay lines (input + feedback)
+            engine->delay_buffer_1l[wp] = in_l + d1l * fb;
+            engine->delay_buffer_1r[wp] = in_r + d1r * fb;
+            engine->delay_buffer_2l[wp] = in_l + d2l * fb;
+            engine->delay_buffer_2r[wp] = in_r + d2r * fb;
+
+            // Mix: dry signal + wet (both delays summed)
+            float wet_l = (d1l + d2l) * 0.5f;
+            float wet_r = (d1r + d2r) * 0.5f;
+            output_buffer[idx]     = in_l * dry + wet_l * mix;
+            output_buffer[idx + 1] = in_r * dry + wet_r * mix;
+
+            engine->delay_write_pos = (wp + 1) % max_d;
+        }
+    }
+
+    // ── HyperLFO ─────────────────────────────────────
+    {
+        float freq_a = engine->lfo_freq_a.load(std::memory_order_relaxed);
+        float freq_b = engine->lfo_freq_b.load(std::memory_order_relaxed);
+        float shape = engine->lfo_shape.load(std::memory_order_relaxed);
+        int mode = engine->lfo_mode.load(std::memory_order_relaxed);
+        float sr = engine->sample_rate;
+
+        // Advance phases (compute once per callback for efficiency)
+        float inc_a = freq_a / sr * static_cast<float>(num_frames);
+        float inc_b = freq_b / sr * static_cast<float>(num_frames);
+        engine->lfo_phase_a += inc_a;
+        engine->lfo_phase_b += inc_b;
+        if (engine->lfo_phase_a >= 1.0f) engine->lfo_phase_a -= std::floor(engine->lfo_phase_a);
+        if (engine->lfo_phase_b >= 1.0f) engine->lfo_phase_b -= std::floor(engine->lfo_phase_b);
+
+        // Generate waveforms (bipolar -1..1)
+        auto gen_wave = [&](float phase) -> float {
+            float sq = phase < 0.5f ? 1.0f : -1.0f;
+            float tri = 4.0f * std::fabs(phase - 0.5f) - 1.0f;
+            return sq + (tri - sq) * shape; // lerp square→triangle
+        };
+
+        float a = gen_wave(engine->lfo_phase_a);
+        float b = gen_wave(engine->lfo_phase_b);
+
+        // Logic combination
+        float output;
+        if (mode == 0) { // AND
+            float ua = a * 0.5f + 0.5f;
+            float ub = b * 0.5f + 0.5f;
+            output = (ua * ub) * 2.0f - 1.0f;
+        } else if (mode == 2) { // OR
+            float ua = a * 0.5f + 0.5f;
+            float ub = b * 0.5f + 0.5f;
+            output = (ua + ub - ua * ub) * 2.0f - 1.0f;
+        } else { // OFF (mode=1) — use A only
+            output = a;
+        }
+
+        engine->lfo_output_value = output;
+    }
+
+    // ── Master pan + soft-clip ─────────────────────────
+    {
+        float mp_l, mp_r;
+        compute_pan(engine->master_pan.load(std::memory_order_relaxed), mp_l, mp_r);
+        const float master_gain = 0.5f; // ~6dB headroom
+        for (int i = 0; i < num_frames; i++) {
+            int idx = i * 2;
+            output_buffer[idx]     = std::tanh(output_buffer[idx]     * mp_l * master_gain);
+            output_buffer[idx + 1] = std::tanh(output_buffer[idx + 1] * mp_r * master_gain);
+        }
+    }
+
     // Compute peak for monitoring
     float pk_l = 0.0f, pk_r = 0.0f;
     for (int i = 0; i < num_frames; i++) {
@@ -360,7 +514,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                              const char* plugin_uri,
                              const char* symbol,
                              float value) {
-    if (std::strcmp(plugin_uri, "clouds") == 0) {
+    if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.grains") == 0) {
         if (std::strcmp(symbol, "position") == 0)
             engine->clouds_position.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "size") == 0)
@@ -384,7 +538,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->clouds_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
-    else if (std::strcmp(plugin_uri, "rings") == 0) {
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.resonator") == 0) {
         if (std::strcmp(symbol, "structure") == 0)
             engine->rings_structure.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "brightness") == 0)
@@ -406,7 +560,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "internal_exciter") == 0)
             engine->rings_internal_exciter.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
-    else if (std::strcmp(plugin_uri, "warps") == 0) {
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.warps") == 0) {
         if (std::strcmp(symbol, "algorithm") == 0)
             engine->warps_algorithm.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "timbre") == 0)
@@ -417,6 +571,28 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->warps_level2.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->warps_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.delay") == 0) {
+        if (std::strcmp(symbol, "time_1") == 0)
+            engine->delay_time_1.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "time_2") == 0)
+            engine->delay_time_2.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "feedback") == 0)
+            engine->delay_feedback.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mix") == 0) {
+            engine->delay_mix.store(value, std::memory_order_relaxed);
+            engine->delay_bypass.store(value < 0.001f ? 1 : 0, std::memory_order_relaxed);
+        }
+    }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.duolfo") == 0) {
+        if (std::strcmp(symbol, "freq_a") == 0)
+            engine->lfo_freq_a.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "freq_b") == 0)
+            engine->lfo_freq_b.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "shape") == 0)
+            engine->lfo_shape.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mode") == 0)
+            engine->lfo_mode.store(static_cast<int>(value), std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "marbles") == 0) {
         if (std::strcmp(symbol, "rate") == 0)
@@ -433,6 +609,21 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->marbles_deja_vu.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->marbles_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.stereo") == 0) {
+        if (std::strcmp(symbol, "master_pan") == 0)
+            engine->master_pan.store(value, std::memory_order_relaxed);
+        else if (std::strncmp(symbol, "voice_pan_", 10) == 0) {
+            int idx = std::atoi(symbol + 10);
+            if (idx >= 0 && idx < kNumVoices)
+                engine->voice_pan[idx].store(value, std::memory_order_relaxed);
+        }
+    }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.distortion") == 0) {
+        if (std::strcmp(symbol, "drive") == 0)
+            engine->drive_amount.store(1.0f + value * 4.0f, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mix") == 0)
+            engine->drive_mix.store(value, std::memory_order_relaxed);
     }
 }
 
@@ -524,8 +715,14 @@ void orpheus_engine_set_master_volume(OrpheusEngine* engine, float v) {
     engine->master_volume.store(v);
 }
 
-void orpheus_engine_set_drive(OrpheusEngine* engine, float v) { }
-void orpheus_engine_set_delay_mix(OrpheusEngine* engine, float v) { }
+void orpheus_engine_set_drive(OrpheusEngine* engine, float v) {
+    // v is 0..1 from UI; map to drive multiplier 1.0..5.0
+    engine->drive_amount.store(1.0f + v * 4.0f, std::memory_order_relaxed);
+}
+void orpheus_engine_set_delay_mix(OrpheusEngine* engine, float v) {
+    engine->delay_mix.store(v, std::memory_order_relaxed);
+    engine->delay_bypass.store(v < 0.001f ? 1 : 0, std::memory_order_relaxed);
+}
 void orpheus_engine_set_vibrato(OrpheusEngine* engine, float v) { }
 void orpheus_engine_set_bend(OrpheusEngine* engine, float v) { }
 
@@ -538,6 +735,7 @@ void orpheus_engine_get_monitor(OrpheusEngine* engine,
     for (int i = 0; i < kNumVoices && i < 12; i++) {
         out->voice_levels[i] = engine->voice_levels[i].load(std::memory_order_relaxed);
     }
+    out->lfo_output = engine->lfo_output_value;
 }
 
 void orpheus_engine_get_waveform(OrpheusEngine* engine,

@@ -49,6 +49,11 @@ struct OrpheusEngine {
 
     // Master controls
     std::atomic<float> master_volume{0.8f};
+    std::atomic<float> master_pan{0.0f};       // -1..+1, 0 = center
+
+    // Per-voice stereo pan (-1..+1, constant-power)
+    // Defaults match Kotlin: 0-1 center, 2-3 left(-0.3), 4-5 right(0.3), 6 left(-0.7), 7 right(0.7), 8-11 center
+    std::atomic<float> voice_pan[kNumVoices] = {};  // initialized in create()
 
     // Monitor
     std::atomic<float> peak_left{0.0f};
@@ -109,4 +114,36 @@ struct OrpheusEngine {
     std::atomic<float> marbles_jitter{0.0f};
     std::atomic<float> marbles_deja_vu{0.0f};
     std::atomic<int>   marbles_bypass{1};       // bypassed by default
+
+    // ── Drive (tanh saturation) ──────────────────────
+    std::atomic<float> drive_amount{1.0f};       // 1.0 = clean, higher = more saturation
+    std::atomic<float> drive_mix{0.0f};          // 0 = fully dry, 1 = fully wet (distorted)
+
+    // ── Dual Delay ───────────────────────────────────
+    static constexpr int kMaxDelaySamples = 110250; // ~2.3s at 48kHz
+    float delay_buffer_1l[kMaxDelaySamples] = {};
+    float delay_buffer_1r[kMaxDelaySamples] = {};
+    float delay_buffer_2l[kMaxDelaySamples] = {};
+    float delay_buffer_2r[kMaxDelaySamples] = {};
+    int delay_write_pos{0};
+
+    std::atomic<float> delay_time_1{0.25f};     // 0..1 → 0.01..2.0s
+    std::atomic<float> delay_time_2{0.375f};
+    std::atomic<float> delay_feedback{0.3f};    // 0..0.95
+    std::atomic<float> delay_mix{0.0f};         // 0..1 dry/wet
+    std::atomic<int>   delay_bypass{1};         // bypassed by default
+
+    // Smoothed delay times (to prevent zipper noise)
+    float delay_time_1_smooth{0.0f};
+    float delay_time_2_smooth{0.0f};
+
+    // ── HyperLFO (dual oscillator with logic combination) ─
+    float lfo_phase_a{0.0f};
+    float lfo_phase_b{0.0f};
+    float lfo_output_value{0.0f};              // latest output for monitoring
+
+    std::atomic<float> lfo_freq_a{1.0f};       // Hz
+    std::atomic<float> lfo_freq_b{1.0f};       // Hz
+    std::atomic<float> lfo_shape{0.5f};        // 0=square, 1=triangle
+    std::atomic<int>   lfo_mode{1};            // 0=AND, 1=OFF (independent), 2=OR
 };

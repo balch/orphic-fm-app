@@ -117,6 +117,7 @@ class DspSynthEngine @Inject constructor(
         synthController.setDelegates(
             setter = { id, value ->
                 when (id) {
+                    StereoSymbol.MASTER_VOL.controlId -> { setMasterVolume(value.asFloat()); true }
                     DistortionSymbol.DRIVE.controlId -> { setDrive(value.asFloat()); true }
                     DelaySymbol.MIX.controlId -> { setDelayMix(value.asFloat()); true }
                     VibratoSymbol.DEPTH.controlId -> { setVibrato(value.asFloat()); true }
