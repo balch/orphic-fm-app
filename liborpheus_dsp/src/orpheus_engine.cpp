@@ -16,6 +16,13 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->voices_dsp[i].Init(&allocator);
     }
 
+    // Initialize Clouds granular processor
+    engine->clouds_processor.Init(
+        engine->clouds_large_buffer, sizeof(engine->clouds_large_buffer),
+        engine->clouds_small_buffer, sizeof(engine->clouds_small_buffer));
+    engine->clouds_processor.set_playback_mode(clouds::PLAYBACK_MODE_GRANULAR);
+    engine->clouds_processor.set_quality(0);  // stereo hi-fi
+
     return engine;
 }
 
@@ -94,6 +101,57 @@ void orpheus_engine_process(OrpheusEngine* engine,
         engine->voice_levels[v] = voice_peak;
     }
 
+    // Process through Clouds granular effect (if not bypassed)
+    if (!engine->clouds_bypass.load(std::memory_order_relaxed)) {
+        // Copy atomic parameters into the processor
+        auto* p = engine->clouds_processor.mutable_parameters();
+        p->position = engine->clouds_position.load(std::memory_order_relaxed);
+        p->size = engine->clouds_size.load(std::memory_order_relaxed);
+        p->pitch = engine->clouds_pitch.load(std::memory_order_relaxed);
+        p->density = engine->clouds_density.load(std::memory_order_relaxed);
+        p->texture = engine->clouds_texture.load(std::memory_order_relaxed);
+        p->dry_wet = engine->clouds_dry_wet.load(std::memory_order_relaxed);
+        p->feedback = engine->clouds_feedback.load(std::memory_order_relaxed);
+        p->reverb = engine->clouds_reverb.load(std::memory_order_relaxed);
+        p->freeze = engine->clouds_freeze.load(std::memory_order_relaxed) != 0;
+
+        engine->clouds_processor.set_playback_mode(
+            static_cast<clouds::PlaybackMode>(
+                engine->clouds_mode.load(std::memory_order_relaxed)));
+
+        // Process in kMaxBlockSize (32) chunks — Clouds uses ShortFrame I/O
+        int frames_done = 0;
+        while (frames_done < num_frames) {
+            int block = std::min(static_cast<int>(clouds::kMaxBlockSize),
+                                 num_frames - frames_done);
+
+            clouds::ShortFrame in_frames[clouds::kMaxBlockSize];
+            clouds::ShortFrame out_frames[clouds::kMaxBlockSize];
+
+            // Float interleaved → int16 stereo frames
+            for (int i = 0; i < block; i++) {
+                int idx = (frames_done + i) * 2;
+                float l = std::max(-1.0f, std::min(1.0f, output_buffer[idx]));
+                float r = std::max(-1.0f, std::min(1.0f, output_buffer[idx + 1]));
+                in_frames[i].l = static_cast<short>(l * 32767.0f);
+                in_frames[i].r = static_cast<short>(r * 32767.0f);
+            }
+
+            engine->clouds_processor.Prepare();
+            engine->clouds_processor.Process(in_frames, out_frames, block);
+
+            // int16 stereo frames → float interleaved
+            const float inv = 1.0f / 32768.0f;
+            for (int i = 0; i < block; i++) {
+                int idx = (frames_done + i) * 2;
+                output_buffer[idx]     = out_frames[i].l * inv;
+                output_buffer[idx + 1] = out_frames[i].r * inv;
+            }
+
+            frames_done += block;
+        }
+    }
+
     // Compute peak for monitoring
     float pk_l = 0.0f, pk_r = 0.0f;
     for (int i = 0; i < num_frames; i++) {
@@ -110,7 +168,30 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                              const char* plugin_uri,
                              const char* symbol,
                              float value) {
-    // TODO: route to plugin
+    if (std::strcmp(plugin_uri, "clouds") == 0) {
+        if (std::strcmp(symbol, "position") == 0)
+            engine->clouds_position.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "size") == 0)
+            engine->clouds_size.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "pitch") == 0)
+            engine->clouds_pitch.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "density") == 0)
+            engine->clouds_density.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "texture") == 0)
+            engine->clouds_texture.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "dry_wet") == 0)
+            engine->clouds_dry_wet.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "feedback") == 0)
+            engine->clouds_feedback.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "reverb") == 0)
+            engine->clouds_reverb.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "freeze") == 0)
+            engine->clouds_freeze.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mode") == 0)
+            engine->clouds_mode.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bypass") == 0)
+            engine->clouds_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
 }
 
 float orpheus_engine_get_port(OrpheusEngine* engine,

@@ -6,6 +6,9 @@
 // Include MI Plaits voice
 #include "plaits/dsp/voice.h"
 
+// Include MI Clouds granular processor
+#include "clouds/dsp/granular_processor.h"
+
 #include <atomic>
 #include <cmath>
 #include <cstring>
@@ -44,4 +47,22 @@ struct OrpheusEngine {
     std::atomic<float> peak_right{0.0f};
     std::atomic<float> cpu_load{0.0f};
     float voice_levels[kNumVoices] = {};
+
+    // Clouds granular processor
+    clouds::GranularProcessor clouds_processor;
+    uint8_t clouds_large_buffer[118784];
+    uint8_t clouds_small_buffer[65408];
+
+    // Clouds parameter atomics (written from UI, read from audio thread)
+    std::atomic<float> clouds_position{0.5f};
+    std::atomic<float> clouds_size{0.5f};
+    std::atomic<float> clouds_pitch{0.0f};
+    std::atomic<float> clouds_density{0.5f};
+    std::atomic<float> clouds_texture{0.5f};
+    std::atomic<float> clouds_dry_wet{0.5f};
+    std::atomic<float> clouds_feedback{0.0f};
+    std::atomic<float> clouds_reverb{0.0f};
+    std::atomic<int>   clouds_freeze{0};
+    std::atomic<int>   clouds_mode{0};       // PlaybackMode enum
+    std::atomic<int>   clouds_bypass{1};     // bypassed by default
 };
