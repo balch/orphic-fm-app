@@ -138,6 +138,7 @@ class SynthController @Inject constructor() {
         setter: (PluginControlId, PortValue) -> Boolean,
         getter: (PluginControlId) -> PortValue?
     ) {
+        check(pluginPortSetter != null) { "setDelegates() must be called before overrideDelegates()" }
         pluginPortSetter = setter
         pluginPortGetter = getter
     }
