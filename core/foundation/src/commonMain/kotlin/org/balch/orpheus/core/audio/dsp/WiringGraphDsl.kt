@@ -55,6 +55,7 @@ const val PARAM_DRIVE = 9
 const val PARAM_INPUT_A = 10
 const val PARAM_INPUT_B = 11
 const val PARAM_INPUT_C = 12
+const val PARAM_MODULE_INDEX = 13
 
 // ── DSL types ───────────────────────────────────────────────────────────────
 
@@ -142,6 +143,9 @@ class UnitParamBuilder internal constructor() {
     var inputC: Float
         get() = error("Write-only")
         set(v) { params.add(PARAM_INPUT_C to v) }
+    var moduleIndex: Float
+        get() = error("Write-only")
+        set(v) { params.add(PARAM_MODULE_INDEX to v) }
 }
 
 /**

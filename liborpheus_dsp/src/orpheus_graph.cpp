@@ -112,6 +112,9 @@ int orpheus_graph_load(OrpheusGraph* graph, const uint8_t* data,
                     u->inputs[IPORT_INPUT_C].constant = val;
                     u->inputs[IPORT_INPUT_C].smoothed = val;
                     break;
+                case PARAM_MODULE_INDEX:
+                    u->state.module.index = static_cast<int>(val);
+                    break;
             }
         }
 

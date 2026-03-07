@@ -418,6 +418,11 @@ class DspSynthEngine @Inject constructor(
         audioEngine.start()
         syncNativeBridgeState() // Re-sync after C++ engine is created
 
+        // Load the default wiring graph into the C++ engine
+        nativeBridge?.nativeLoadGraph(buildDefaultWiringGraph())?.also { result ->
+            log.info { "nativeLoadGraph result: $result" }
+        }
+
         monitoringJob = if (nativeBridge != null) {
             // Native C++ engine: poll monitor data from C++ via JNI
             monitoringScope.launch(dispatcherProvider.io) {

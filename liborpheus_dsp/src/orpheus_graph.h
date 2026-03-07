@@ -64,6 +64,7 @@ enum OrpheusParamKey : uint16_t {
     PARAM_INPUT_A = 10,
     PARAM_INPUT_B = 11,
     PARAM_INPUT_C = 12,
+    PARAM_MODULE_INDEX = 13,
 };
 
 // ── Port map entry (URI+symbol hash → unit+port) ─
