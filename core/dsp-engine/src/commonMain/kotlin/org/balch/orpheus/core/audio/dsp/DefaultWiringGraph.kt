@@ -61,8 +61,9 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val sumR = buildSumTree("sumR", voiceOutsR)
 
     // Master volume (stereo)
-    val mvL = multiply("mvL") { inputB = 0.8f }
-    val mvR = multiply("mvR") { inputB = 0.8f }
+    // 0.4 = 0.8 volume × 0.5 headroom (matching procedural path's master_gain)
+    val mvL = multiply("mvL") { inputB = 0.4f }
+    val mvR = multiply("mvR") { inputB = 0.4f }
     sumL.out to mvL.inputA
     sumR.out to mvR.inputA
 

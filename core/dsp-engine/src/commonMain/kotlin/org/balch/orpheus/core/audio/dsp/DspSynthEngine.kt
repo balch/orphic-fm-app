@@ -77,6 +77,11 @@ class DspSynthEngine @Inject constructor(
     private var _drumsBypass = true
     private var _stereoMode = StereoMode.VOICE_PAN
 
+    // Hold tracking for C++ gate management:
+    // When hold > 0, gate stays on in C++ even when keyboard releases
+    private val holdActive = BooleanArray(12) { false }
+    private val gateState = BooleanArray(12) { false }
+
     // Drum Sources
     private val drumTriggerSources = IntArray(3) { 0 }
     private val drumPitchSources = IntArray(3) { 0 }
@@ -159,10 +164,10 @@ class DspSynthEngine @Inject constructor(
         for (duo in 0..5) {
             val engineOrdinal = vp.getDuoEngine(duo)
             val voiceA = duo * 2
-            val isActive = engineOrdinal > 0
             val cppIndex = plaitsEngineOrdinalToCpp(engineOrdinal)
-            bridge.nativeSetVoiceActive(voiceA, isActive)
-            bridge.nativeSetVoiceActive(voiceA + 1, isActive)
+            // Always keep voices active in C++ — it's the only audio path on Android
+            bridge.nativeSetVoiceActive(voiceA, true)
+            bridge.nativeSetVoiceActive(voiceA + 1, true)
             bridge.nativeSetVoiceEngine(voiceA, cppIndex)
             bridge.nativeSetVoiceEngine(voiceA + 1, cppIndex)
             bridge.nativeSetVoiceHarmonics(voiceA, vp.getDuoHarmonics(duo))
@@ -179,7 +184,7 @@ class DspSynthEngine @Inject constructor(
             }
             bridge.nativeSetVoiceDecay(voiceA, vp.getEnvSpeed(voiceA))
             bridge.nativeSetVoiceDecay(voiceA + 1, vp.getEnvSpeed(voiceA + 1))
-            log.info { "syncNative: duo=$duo engine=$engineOrdinal→cpp=$cppIndex active=$isActive" }
+            log.info { "syncNative: duo=$duo engine=$engineOrdinal→cpp=$cppIndex active=true" }
         }
     }
 
@@ -211,12 +216,12 @@ class DspSynthEngine @Inject constructor(
                     "duo_engine" -> {
                         val engineOrdinal = value as Int
                         voiceManager.setDuoEngine(index, engineOrdinal)
-                        // Forward engine index + active state to C++ for both voices in the duo
+                        // Forward engine index to C++ for both voices in the duo
+                        // Always keep active — C++ is the only audio path on Android
                         val voiceA = index * 2
-                        val isActive = engineOrdinal > 0
                         val cppIndex = plaitsEngineOrdinalToCpp(engineOrdinal)
-                        nativeBridge?.nativeSetVoiceActive(voiceA, isActive)
-                        nativeBridge?.nativeSetVoiceActive(voiceA + 1, isActive)
+                        nativeBridge?.nativeSetVoiceActive(voiceA, true)
+                        nativeBridge?.nativeSetVoiceActive(voiceA + 1, true)
                         nativeBridge?.nativeSetVoiceEngine(voiceA, cppIndex)
                         nativeBridge?.nativeSetVoiceEngine(voiceA + 1, cppIndex)
                         // Speech engine: override C++ morph with per-voice envSpeed for word selection
@@ -664,7 +669,14 @@ class DspSynthEngine @Inject constructor(
         voiceManager.setVoiceTune(index, tune)
     }
     override fun setVoiceGate(index: Int, active: Boolean) {
-        nativeBridge?.nativeSetVoiceGate(index, active)
+        if (index in 0 until 12) {
+            gateState[index] = active
+            // If hold is active and gate is going off, keep C++ gate on
+            val cppGate = active || holdActive[index]
+            nativeBridge?.nativeSetVoiceGate(index, cppGate)
+        } else {
+            nativeBridge?.nativeSetVoiceGate(index, active)
+        }
         voiceManager.setVoiceGate(index, active)
     }
     override fun setVoiceFeedback(index: Int, amount: Float) { /* Not implemented yet */ }
@@ -672,10 +684,36 @@ class DspSynthEngine @Inject constructor(
     override fun setVoiceEnvelopeSpeed(index: Int, speed: Float) = voiceManager.setVoiceEnvelopeSpeed(index, speed)
     override fun setDuoSharpness(duoIndex: Int, sharpness: Float) = voiceManager.setDuoSharpness(duoIndex, sharpness)
     override fun setQuadPitch(quadIndex: Int, pitch: Float) = voiceManager.setQuadPitch(quadIndex, pitch)
-    override fun setQuadHold(quadIndex: Int, amount: Float) = voiceManager.setQuadHold(quadIndex, amount)
+    override fun setQuadHold(quadIndex: Int, amount: Float) {
+        voiceManager.setQuadHold(quadIndex, amount)
+        // Forward hold to C++ as sustained gate
+        val isHeld = amount > 0.001f
+        val startVoice = quadIndex * 4
+        for (i in startVoice until (startVoice + 4).coerceAtMost(12)) {
+            holdActive[i] = isHeld
+            if (isHeld) {
+                // Hold on: keep gate on in C++ regardless of keyboard state
+                nativeBridge?.nativeSetVoiceGate(i, true)
+            } else {
+                // Hold off: restore actual gate state
+                nativeBridge?.nativeSetVoiceGate(i, gateState[i])
+            }
+        }
+    }
     override fun setQuadVolume(quadIndex: Int, volume: Float) = voiceManager.setQuadVolume(quadIndex, volume)
     override fun fadeQuadVolume(quadIndex: Int, targetVolume: Float, durationSeconds: Float) = voiceManager.fadeQuadVolume(quadIndex, targetVolume, durationSeconds)
-    override fun setVoiceHold(index: Int, amount: Float) = voiceManager.setVoiceHold(index, amount)
+    override fun setVoiceHold(index: Int, amount: Float) {
+        voiceManager.setVoiceHold(index, amount)
+        if (index in 0 until 12) {
+            val isHeld = amount > 0.001f
+            holdActive[index] = isHeld
+            if (isHeld) {
+                nativeBridge?.nativeSetVoiceGate(index, true)
+            } else {
+                nativeBridge?.nativeSetVoiceGate(index, gateState[index])
+            }
+        }
+    }
     override fun setVoiceWobble(index: Int, wobbleOffset: Float, range: Float) = voiceManager.setVoiceWobble(index, wobbleOffset, range)
     override fun setDuoModSource(duoIndex: Int, source: ModSource) = voiceManager.setDuoModSource(duoIndex, source)
     override fun setFmStructure(crossQuad: Boolean) = voiceManager.setFmStructure(crossQuad)
