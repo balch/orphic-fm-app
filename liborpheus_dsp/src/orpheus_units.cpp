@@ -310,20 +310,48 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     float raw_hold = engine->voice_hold_level[idx].load(std::memory_order_relaxed);
     float scaled_hold = compute_scaled_hold(raw_hold, env_speed);
 
-    // Smooth hold ramp (~20ms) to avoid clicks
     auto& osc = engine->voice_osc_state[idx];
-    float hold_coeff = 1.0f - std::exp(-1.0f / (0.02f * sr));
 
-    // Compute ADSR parameters from envSpeed
-    float attack_rate, decay_coeff, sustain_level, release_coeff;
-    compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
-                             sustain_level, release_coeff);
+    // ── Idle voice early exit ────────────────────────────────
+    // Skip all computation for silent voices to save CPU
+    if (engine_index < 0) {
+        // Engine 0: idle if envelope finished, no hold, no gate
+        if (osc.env_stage == 0 && scaled_hold < 0.001f && actual_gate == 0) {
+            std::memset(out, 0, num_frames * sizeof(float));
+            engine->voice_levels[idx].store(0.0f, std::memory_order_relaxed);
+            return;
+        }
+    } else {
+        // Plaits: idle if gate off, no hold, and previous peak was near zero
+        // (internal LPG has fully decayed)
+        float prev_peak = engine->voice_levels[idx].load(std::memory_order_relaxed);
+        if (actual_gate == 0 && scaled_hold < 0.001f && prev_peak < 0.0001f) {
+            std::memset(out, 0, num_frames * sizeof(float));
+            engine->voice_levels[idx].store(0.0f, std::memory_order_relaxed);
+            return;
+        }
+    }
+
+    // ── LFO vibrato modulation ───────────────────────────────
+    float vibrato_depth = engine->vibrato_depth.load(std::memory_order_relaxed);
+    float lfo_value = engine->lfo_output_value;
+    // depth 0..1 → 0..2 semitones of pitch modulation
+    float vibrato_semitones = lfo_value * vibrato_depth * 2.0f;
+
+    // Smooth hold ramp coefficient (~20ms) — constant for given sr
+    // Using fast approximation: 1 - e^(-50/sr)
+    float hold_coeff = 50.0f / sr;  // first-order Taylor approx, good enough for smoothing
 
     if (engine_index < 0) {
         // ═══ ENGINE 0 (OSC MODE): Triangle + Square with ADSR + Hold ═══
-        float note = vp.tune.load(std::memory_order_relaxed);
+        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones;
         float freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
+
+        // Compute ADSR parameters from envSpeed
+        float attack_rate, decay_coeff, sustain_level, release_coeff;
+        compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
+                                 sustain_level, release_coeff);
 
         float voice_peak = 0.0f;
         for (int i = 0; i < num_frames; i++) {
@@ -396,7 +424,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         plaits::Patch patch;
         patch.engine = engine_index;
-        patch.note = vp.tune.load(std::memory_order_relaxed);
+        patch.note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones;
         patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
         patch.timbre = vp.timbre.load(std::memory_order_relaxed);
         patch.morph = vp.morph.load(std::memory_order_relaxed);
@@ -681,7 +709,8 @@ void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames
 
 // -- HyperLFO graph unit ----------------------------------
 // No audio input. Computes dual LFO with logic combination.
-// Writes to engine->lfo_output_value and output buffer.
+// Per-sample computation for correct waveform at all rates.
+// Writes to engine->lfo_output_value (monitoring) and output buffer.
 void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
     float* out = u->output_buffers[OPORT_OUT];
 
@@ -690,38 +719,42 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     float shape = engine->lfo_shape.load(std::memory_order_relaxed);
     int mode = engine->lfo_mode.load(std::memory_order_relaxed);
 
-    float inc_a = freq_a / sr * static_cast<float>(num_frames);
-    float inc_b = freq_b / sr * static_cast<float>(num_frames);
-    engine->lfo_phase_a += inc_a;
-    engine->lfo_phase_b += inc_b;
-    if (engine->lfo_phase_a >= 1.0f) engine->lfo_phase_a -= std::floor(engine->lfo_phase_a);
-    if (engine->lfo_phase_b >= 1.0f) engine->lfo_phase_b -= std::floor(engine->lfo_phase_b);
+    float inc_a = freq_a / sr;
+    float inc_b = freq_b / sr;
+    float phase_a = engine->lfo_phase_a;
+    float phase_b = engine->lfo_phase_b;
 
-    auto gen_wave = [&](float phase) -> float {
+    auto gen_wave = [](float phase, float shp) -> float {
         float sq = phase < 0.5f ? 1.0f : -1.0f;
         float tri = 4.0f * std::fabs(phase - 0.5f) - 1.0f;
-        return sq + (tri - sq) * shape;
+        return sq + (tri - sq) * shp;
     };
 
-    float a = gen_wave(engine->lfo_phase_a);
-    float b = gen_wave(engine->lfo_phase_b);
+    float output = 0.0f;
+    for (int i = 0; i < num_frames; i++) {
+        float a = gen_wave(phase_a, shape);
+        float b = gen_wave(phase_b, shape);
 
-    float output;
-    if (mode == 0) { // AND
-        float ua = a * 0.5f + 0.5f;
-        float ub = b * 0.5f + 0.5f;
-        output = (ua * ub) * 2.0f - 1.0f;
-    } else if (mode == 2) { // OR
-        float ua = a * 0.5f + 0.5f;
-        float ub = b * 0.5f + 0.5f;
-        output = (ua + ub - ua * ub) * 2.0f - 1.0f;
-    } else { // OFF (mode=1) — use A only
-        output = a;
+        if (mode == 0) { // AND
+            float ua = a * 0.5f + 0.5f;
+            float ub = b * 0.5f + 0.5f;
+            output = (ua * ub) * 2.0f - 1.0f;
+        } else if (mode == 2) { // OR
+            float ua = a * 0.5f + 0.5f;
+            float ub = b * 0.5f + 0.5f;
+            output = (ua + ub - ua * ub) * 2.0f - 1.0f;
+        } else { // OFF (mode=1) — use A only
+            output = a;
+        }
+        out[i] = output;
+
+        phase_a += inc_a;
+        if (phase_a >= 1.0f) phase_a -= 1.0f;
+        phase_b += inc_b;
+        if (phase_b >= 1.0f) phase_b -= 1.0f;
     }
 
-    engine->lfo_output_value = output;
-
-    // Fill output buffer with constant value (for potential future modulation routing)
-    for (int i = 0; i < num_frames; i++)
-        out[i] = output;
+    engine->lfo_phase_a = phase_a;
+    engine->lfo_phase_b = phase_b;
+    engine->lfo_output_value = output; // last sample for monitoring
 }

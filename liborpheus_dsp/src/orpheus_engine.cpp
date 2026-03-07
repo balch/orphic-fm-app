@@ -795,7 +795,9 @@ void orpheus_engine_set_delay_mix(OrpheusEngine* engine, float v) {
     engine->delay_mix.store(v, std::memory_order_relaxed);
     engine->delay_bypass.store(v < 0.001f ? 1 : 0, std::memory_order_relaxed);
 }
-void orpheus_engine_set_vibrato(OrpheusEngine* engine, float v) { }
+void orpheus_engine_set_vibrato(OrpheusEngine* engine, float v) {
+    engine->vibrato_depth.store(v, std::memory_order_relaxed);
+}
 void orpheus_engine_set_bend(OrpheusEngine* engine, float v) { }
 
 void orpheus_engine_get_monitor(OrpheusEngine* engine,

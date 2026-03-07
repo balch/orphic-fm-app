@@ -159,6 +159,9 @@ struct OrpheusEngine {
     float delay_time_1_smooth{0.0f};
     float delay_time_2_smooth{0.0f};
 
+    // ── Vibrato (LFO → pitch modulation) ─────────────────────
+    std::atomic<float> vibrato_depth{0.0f};    // 0..1 → 0..2 semitones pitch mod
+
     // ── HyperLFO (dual oscillator with logic combination) ─
     float lfo_phase_a{0.0f};
     float lfo_phase_b{0.0f};
