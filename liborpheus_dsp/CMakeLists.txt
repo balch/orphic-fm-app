@@ -23,14 +23,16 @@ set(COMPAT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 # ── Plaits engine sources ─────────────────────────
 file(GLOB PLAITS_ENGINE_SRC "${EURORACK_DIR}/plaits/dsp/engine/*.cc")
 file(GLOB PLAITS_ENGINE2_SRC "${EURORACK_DIR}/plaits/dsp/engine2/*.cc")
+file(GLOB PLAITS_SPEECH_SRC "${EURORACK_DIR}/plaits/dsp/speech/*.cc")
+file(GLOB PLAITS_PM_SRC "${EURORACK_DIR}/plaits/dsp/physical_modelling/*.cc")
+file(GLOB PLAITS_FM_SRC "${EURORACK_DIR}/plaits/dsp/fm/*.cc")
 set(PLAITS_SRC
     ${PLAITS_ENGINE_SRC}
     ${PLAITS_ENGINE2_SRC}
+    ${PLAITS_SPEECH_SRC}
+    ${PLAITS_PM_SRC}
+    ${PLAITS_FM_SRC}
     "${EURORACK_DIR}/plaits/dsp/voice.cc"
-    "${EURORACK_DIR}/plaits/dsp/speech/naive_speech_synth.cc"
-    "${EURORACK_DIR}/plaits/dsp/speech/sam_speech_synth.cc"
-    "${EURORACK_DIR}/plaits/dsp/physical_modelling/string_voice.cc"
-    "${EURORACK_DIR}/plaits/dsp/physical_modelling/resonator.cc"
     "${EURORACK_DIR}/plaits/dsp/chords/chord_bank.cc"
     "${EURORACK_DIR}/plaits/resources.cc"
 )
@@ -46,6 +48,7 @@ set(STMLIB_SRC
 set(CLOUDS_SRC
     "${EURORACK_DIR}/clouds/dsp/granular_processor.cc"
     "${EURORACK_DIR}/clouds/dsp/mu_law.cc"
+    "${EURORACK_DIR}/clouds/dsp/correlator.cc"
     "${EURORACK_DIR}/clouds/dsp/pvoc/frame_transformation.cc"
     "${EURORACK_DIR}/clouds/dsp/pvoc/phase_vocoder.cc"
     "${EURORACK_DIR}/clouds/dsp/pvoc/stft.cc"
@@ -57,6 +60,7 @@ set(RINGS_SRC
     "${EURORACK_DIR}/rings/dsp/fm_voice.cc"
     "${EURORACK_DIR}/rings/dsp/part.cc"
     "${EURORACK_DIR}/rings/dsp/string_synth_part.cc"
+    "${EURORACK_DIR}/rings/dsp/string.cc"
     "${EURORACK_DIR}/rings/dsp/resonator.cc"
     "${EURORACK_DIR}/rings/resources.cc"
 )
@@ -70,12 +74,10 @@ set(WARPS_SRC
 )
 
 # ── Marbles sources ───────────────────────────────
+file(GLOB MARBLES_RANDOM_SRC "${EURORACK_DIR}/marbles/random/*.cc")
 set(MARBLES_SRC
-    "${EURORACK_DIR}/marbles/dsp/t_generator.cc"
-    "${EURORACK_DIR}/marbles/dsp/x_y_generator.cc"
-    "${EURORACK_DIR}/marbles/dsp/scale_recorder.cc"
-    "${EURORACK_DIR}/marbles/random/t_generator.cc"
-    "${EURORACK_DIR}/marbles/random/x_y_generator.cc"
+    ${MARBLES_RANDOM_SRC}
+    "${EURORACK_DIR}/marbles/ramp/ramp_extractor.cc"
     "${EURORACK_DIR}/marbles/resources.cc"
 )
 
@@ -113,6 +115,11 @@ target_compile_options(orpheus_dsp PRIVATE
     -Wno-sign-compare
     -Wno-unused-variable
     -Wno-missing-field-initializers
+    -Wno-unused-local-typedef
+    -Wno-unused-private-field
+    -Wno-char-subscripts
+    -Wno-tautological-compare
+    -Wno-implicit-const-int-float-conversion
     "$<$<CONFIG:Release>:-O3>"
     "$<$<CONFIG:Release>:-ffast-math>"
 )
