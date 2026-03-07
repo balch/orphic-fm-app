@@ -727,6 +727,12 @@ void orpheus_engine_set_voice_active(OrpheusEngine* engine,
                                       int index, int active) {
     if (index >= 0 && index < kNumVoices) {
         engine->voice_params[index].active.store(active, std::memory_order_relaxed);
+        // Mark as triggered so the idle-voice guard doesn't block rendering.
+        // Voices set active from syncNativeBridgeState need to be ready for
+        // gate/hold events without requiring a prior gate pulse.
+        if (active) {
+            engine->voice_params[index].ever_triggered.store(1, std::memory_order_relaxed);
+        }
     }
 }
 
