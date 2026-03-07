@@ -29,19 +29,19 @@ class DesktopDspBridge {
             val archName = System.getProperty("os.arch", "").lowercase()
 
             val os = when {
-                "mac" in osName || "darwin" in osName -> "macos"
+                "mac" in osName || "darwin" in osName -> "darwin"
                 "win" in osName -> "windows"
                 "linux" in osName -> "linux"
                 else -> error("Unsupported OS: $osName")
             }
             val arch = when {
-                archName == "aarch64" || archName == "arm64" -> "arm64"
-                archName == "amd64" || archName == "x86_64" -> "x64"
+                archName == "aarch64" || archName == "arm64" -> "aarch64"
+                archName == "amd64" || archName == "x86_64" -> "x86_64"
                 else -> error("Unsupported architecture: $archName")
             }
 
             val libName = when (os) {
-                "macos" -> "liborpheus_desktop.dylib"
+                "darwin" -> "liborpheus_desktop.dylib"
                 "linux" -> "liborpheus_desktop.so"
                 "windows" -> "orpheus_desktop.dll"
                 else -> error("Unsupported OS: $os")

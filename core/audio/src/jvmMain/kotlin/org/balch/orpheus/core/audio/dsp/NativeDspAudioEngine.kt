@@ -41,19 +41,20 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
         dspSampleRate = sampleRateHz.toFloat()
         log.info { "nativeOpen($sampleRateHz) completed" }
 
-        // PCM_FLOAT, 48 kHz, 32-bit, stereo, little-endian
+        // PCM_SIGNED, 48 kHz, 16-bit, stereo, little-endian (universally supported)
+        val bytesPerSample = 2
         val format = AudioFormat(
-            AudioFormat.Encoding.PCM_FLOAT,
+            AudioFormat.Encoding.PCM_SIGNED,
             sampleRateHz.toFloat(),
-            32,
+            16,
             channels,
-            channels * 4, // frameSize = channels * bytesPerSample
+            channels * bytesPerSample,
             sampleRateHz.toFloat(),
             false // little-endian
         )
 
         val sdl = AudioSystem.getSourceDataLine(format)
-        val lineBufferSize = bufferFrames * channels * 4 * 2 // 2x headroom
+        val lineBufferSize = bufferFrames * channels * bytesPerSample * 2 // 2x headroom
         sdl.open(format, lineBufferSize)
         sdl.start()
         line = sdl
@@ -63,14 +64,17 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
 
         val thread = Thread({
             val floatBuf = FloatArray(bufferFrames * channels)
-            val byteBuf = ByteArray(bufferFrames * channels * 4)
+            val byteBuf = ByteArray(bufferFrames * channels * bytesPerSample)
             val bb = ByteBuffer.wrap(byteBuf).order(ByteOrder.LITTLE_ENDIAN)
 
             log.info { "Audio thread started" }
             while (running) {
                 bridge.nativeProcess(floatBuf)
                 bb.clear()
-                bb.asFloatBuffer().put(floatBuf)
+                for (sample in floatBuf) {
+                    val clamped = sample.coerceIn(-1f, 1f)
+                    bb.putShort((clamped * 32767f).toInt().toShort())
+                }
                 sdl.write(byteBuf, 0, byteBuf.size)
             }
             log.info { "Audio thread exiting" }
