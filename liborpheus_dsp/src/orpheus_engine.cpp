@@ -48,10 +48,12 @@ int orpheus_engine_load_patch(OrpheusEngine* engine,
 
 void orpheus_engine_process(OrpheusEngine* engine,
                             float* output_buffer, int num_frames) {
+    if (!engine || !output_buffer || num_frames <= 0) return;
+
     // Zero the output
     std::memset(output_buffer, 0, num_frames * 2 * sizeof(float));
 
-    const float volume = engine->master_volume.load();
+    const float volume = engine->master_volume.load(std::memory_order_relaxed);
     const float inv_32768 = 1.0f / 32768.0f;
 
     // Process each main voice
@@ -61,11 +63,11 @@ void orpheus_engine_process(OrpheusEngine* engine,
 
         // Build Plaits Patch from atomic params
         plaits::Patch patch;
-        patch.engine = vp.engine_index.load();
-        patch.note = vp.tune.load();
-        patch.harmonics = vp.harmonics.load();
-        patch.timbre = vp.timbre.load();
-        patch.morph = vp.morph.load();
+        patch.engine = vp.engine_index.load(std::memory_order_relaxed);
+        patch.note = vp.tune.load(std::memory_order_relaxed);
+        patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
+        patch.timbre = vp.timbre.load(std::memory_order_relaxed);
+        patch.morph = vp.morph.load(std::memory_order_relaxed);
         patch.frequency_modulation_amount = 0.0f;
         patch.timbre_modulation_amount = 0.0f;
         patch.morph_modulation_amount = 0.0f;
@@ -76,7 +78,7 @@ void orpheus_engine_process(OrpheusEngine* engine,
         // Voice does its own Schmitt-trigger edge detection internally.
         plaits::Modulations mod;
         std::memset(&mod, 0, sizeof(mod));
-        int current_gate = vp.gate.load();
+        int current_gate = vp.gate.load(std::memory_order_relaxed);
         mod.trigger = current_gate ? 1.0f : 0.0f;
         mod.trigger_patched = true;
         mod.level_patched = false;
@@ -108,7 +110,7 @@ void orpheus_engine_process(OrpheusEngine* engine,
             frames_done += block;
         }
 
-        engine->voice_levels[v] = voice_peak;
+        engine->voice_levels[v].store(voice_peak, std::memory_order_relaxed);
     }
 
     // Process drum voices (voices 8-11, using Plaits drum engines)
@@ -118,11 +120,11 @@ void orpheus_engine_process(OrpheusEngine* engine,
 
         // Build Plaits Patch from atomic params
         plaits::Patch patch;
-        patch.engine = vp.engine_index.load();
-        patch.note = vp.tune.load();
-        patch.harmonics = vp.harmonics.load();
-        patch.timbre = vp.timbre.load();
-        patch.morph = vp.morph.load();
+        patch.engine = vp.engine_index.load(std::memory_order_relaxed);
+        patch.note = vp.tune.load(std::memory_order_relaxed);
+        patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
+        patch.timbre = vp.timbre.load(std::memory_order_relaxed);
+        patch.morph = vp.morph.load(std::memory_order_relaxed);
         patch.frequency_modulation_amount = 0.0f;
         patch.timbre_modulation_amount = 0.0f;
         patch.morph_modulation_amount = 0.0f;
@@ -132,7 +134,7 @@ void orpheus_engine_process(OrpheusEngine* engine,
         // Build Modulations — trigger for one-shot drum hits
         plaits::Modulations mod;
         std::memset(&mod, 0, sizeof(mod));
-        int current_gate = vp.gate.load();
+        int current_gate = vp.gate.load(std::memory_order_relaxed);
         mod.trigger = current_gate ? 1.0f : 0.0f;
         mod.trigger_patched = true;
         mod.level_patched = false;
@@ -166,10 +168,10 @@ void orpheus_engine_process(OrpheusEngine* engine,
 
         // Clear gate after rendering so drums are one-shot triggers
         if (current_gate) {
-            vp.gate.store(0);
+            vp.gate.store(0, std::memory_order_relaxed);
         }
 
-        engine->voice_levels[v] = voice_peak;
+        engine->voice_levels[v].store(voice_peak, std::memory_order_relaxed);
     }
 
     // Process through Clouds granular effect (if not bypassed)
@@ -471,7 +473,7 @@ void orpheus_engine_get_monitor(OrpheusEngine* engine,
     out->peak_right = engine->peak_right.load();
     out->cpu_load = engine->cpu_load.load();
     for (int i = 0; i < kNumVoices && i < 12; i++) {
-        out->voice_levels[i] = engine->voice_levels[i];
+        out->voice_levels[i] = engine->voice_levels[i].load(std::memory_order_relaxed);
     }
 }
 

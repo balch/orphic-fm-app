@@ -18,10 +18,7 @@
 #include "warps/dsp/modulator.h"
 
 #include <atomic>
-#include <cmath>
 #include <cstring>
-#include <memory>
-#include <vector>
 
 static constexpr int kNumMainVoices = 8;
 static constexpr int kNumReplVoices = 4;
@@ -43,7 +40,6 @@ struct OrpheusEngine {
         std::atomic<float> timbre{0.5f};
         std::atomic<float> morph{0.5f};
         std::atomic<int> engine_index{0};
-        int prev_gate{0};  // audio-thread only, for edge detection
     };
     VoiceParams voice_params[kNumVoices];
 
@@ -54,7 +50,7 @@ struct OrpheusEngine {
     std::atomic<float> peak_left{0.0f};
     std::atomic<float> peak_right{0.0f};
     std::atomic<float> cpu_load{0.0f};
-    float voice_levels[kNumVoices] = {};
+    std::atomic<float> voice_levels[kNumVoices] = {};
 
     // Clouds granular processor
     clouds::GranularProcessor clouds_processor;
