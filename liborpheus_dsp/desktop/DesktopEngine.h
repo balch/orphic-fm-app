@@ -3,7 +3,6 @@
 
 #include "orpheus_dsp.h"
 #include <atomic>
-#include <chrono>
 
 /**
  * Simplified DSP engine wrapper for JVM desktop (no Oboe).

@@ -164,9 +164,44 @@ compose.desktop {
             }
         }
 
-        // Forward debug flags from Gradle to the App
-        jvmArgs += listOf("-Dorpheus.debug.gc=${System.getProperty("orpheus.debug.gc", "false")}")
+        // Forward debug flags and engine selection from Gradle to the App
+        jvmArgs += listOf(
+            "-Dorpheus.debug.gc=${System.getProperty("orpheus.debug.gc", "false")}",
+            "-Dorpheus.engine=${System.getProperty("orpheus.engine", "jsyn")}"
+        )
+        // When using C++ engine, add native library path
+        val nativePath = System.getProperty("orpheus.native.path", "")
+        if (nativePath.isNotEmpty()) {
+            jvmArgs += "-Djava.library.path=$nativePath"
+        }
     }
+}
+
+// Build native liborpheus_desktop for JVM desktop C++ DSP engine
+tasks.register<Exec>("buildDesktopNative") {
+    group = "build"
+    description = "Build liborpheus_desktop native library for JVM desktop"
+
+    val desktopDir = rootProject.file("liborpheus_dsp/desktop")
+    val eurorackDir = File(System.getProperty("user.home"), "Source/eurorack").absolutePath
+    val arch = System.getProperty("os.arch").let {
+        if (it == "aarch64" || it == "arm64") "aarch64" else "x86_64"
+    }
+    val osName = System.getProperty("os.name").lowercase().let {
+        when {
+            "mac" in it -> "darwin"
+            "linux" in it -> "linux"
+            else -> "windows"
+        }
+    }
+    val libName = System.mapLibraryName("orpheus_desktop")
+    val targetDir = layout.projectDirectory.dir("src/jvmMain/resources/native/$osName-$arch")
+
+    workingDir = desktopDir
+    commandLine("bash", "-c",
+        "cmake -B build -DCMAKE_BUILD_TYPE=Release -DEURORACK_DIR=$eurorackDir && cmake --build build --config Release && " +
+        "mkdir -p ${targetDir.asFile.absolutePath} && cp build/$libName ${targetDir.asFile.absolutePath}/$libName"
+    )
 }
 
 // Copy dspWorker WASM output to composeApp resources for serving alongside the app.
