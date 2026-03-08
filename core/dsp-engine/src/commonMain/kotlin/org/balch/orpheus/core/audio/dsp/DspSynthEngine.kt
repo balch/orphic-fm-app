@@ -544,6 +544,8 @@ class DspSynthEngine @Inject constructor(
     private fun setDrumsBypass(bypass: Boolean) {
         _drumsBypass = bypass
         pluginProvider.drumPlugin.setBypass(bypass)
+        val chainGain = if (bypass) 0.0f else 1.0f
+        val directGain = if (bypass) 1.0f else 0.0f
         if (bypass) {
             // MAIN mode — drums go direct to stereo output (bypass effects chain)
             wiringGraph.drumChainGainL.inputB.set(0.0)
@@ -557,6 +559,11 @@ class DspSynthEngine @Inject constructor(
             wiringGraph.drumDirectGainL.inputB.set(0.0)
             wiringGraph.drumDirectGainR.inputB.set(0.0)
         }
+        // Forward to C++ ODWG graph
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_chain_gain_l", chainGain)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_chain_gain_r", chainGain)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_gain_l", directGain)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_gain_r", directGain)
     }
 
     // TTS delegations

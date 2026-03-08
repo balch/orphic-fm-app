@@ -873,6 +873,66 @@ static bool test_drum_slot_gains() {
     return pass;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Test: Drum MAIN/FX bypass toggle via set_port
+// Verifies that drumChainGain/drumDirectGain port map entries
+// correctly switch between MAIN (direct) and FX (effects chain) paths
+// ═══════════════════════════════════════════════════════════════════
+static bool test_drum_bypass_toggle() {
+    printf("\n=== Test: Drum MAIN/FX bypass toggle ===\n");
+    bool pass = true;
+
+    // Default: MAIN mode (drumDirectGain=1, drumChainGain=0)
+    {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        load_production_graph(engine);
+        orpheus_engine_trigger_drum(engine, 0, 0.8f);
+        auto r = render_engine(engine, 24000);
+        float rms_main = (r.rms_l + r.rms_r) / 2.0f;
+        printf("  MAIN mode (default): RMS=%.4f %s\n", rms_main,
+               rms_main > 0.001f ? "OK" : "SILENT!");
+        if (rms_main < 0.001f) pass = false;
+        orpheus_engine_destroy(engine);
+    }
+
+    // Switch to FX mode: drumChainGain=1, drumDirectGain=0
+    {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        load_production_graph(engine);
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.drum", "drum_chain_gain_l", 1.0f);
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.drum", "drum_chain_gain_r", 1.0f);
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.drum", "drum_direct_gain_l", 0.0f);
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.drum", "drum_direct_gain_r", 0.0f);
+        orpheus_engine_trigger_drum(engine, 0, 0.8f);
+        auto r = render_engine(engine, 24000);
+        float rms_fx = (r.rms_l + r.rms_r) / 2.0f;
+        printf("  FX mode (toggled):   RMS=%.4f %s\n", rms_fx,
+               rms_fx > 0.001f ? "OK" : "SILENT!");
+        if (rms_fx < 0.001f) pass = false;
+        orpheus_engine_destroy(engine);
+    }
+
+    // Both paths off = silence
+    {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        load_production_graph(engine);
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.drum", "drum_chain_gain_l", 0.0f);
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.drum", "drum_chain_gain_r", 0.0f);
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.drum", "drum_direct_gain_l", 0.0f);
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.drum", "drum_direct_gain_r", 0.0f);
+        orpheus_engine_trigger_drum(engine, 0, 0.8f);
+        auto r = render_engine(engine, 24000);
+        float rms_off = (r.rms_l + r.rms_r) / 2.0f;
+        printf("  Both off:            RMS=%.4f %s\n", rms_off,
+               rms_off < 0.001f ? "OK (silent)" : "LEAKING!");
+        if (rms_off > 0.001f) pass = false;
+        orpheus_engine_destroy(engine);
+    }
+
+    printf("Drum bypass toggle test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_drums_graph_tests() {
     bool all_pass = true;
     all_pass &= test_drum_trigger();
@@ -884,5 +944,6 @@ bool run_drums_graph_tests() {
     all_pass &= test_warps_source_routing();
     all_pass &= test_grids_drum_integration();
     all_pass &= test_drum_slot_gains();
+    all_pass &= test_drum_bypass_toggle();
     return all_pass;
 }
