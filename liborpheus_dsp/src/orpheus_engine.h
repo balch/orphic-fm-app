@@ -28,9 +28,10 @@
 #include <atomic>
 #include <cstring>
 
-static constexpr int kNumMainVoices = 8;
-static constexpr int kNumReplVoices = 4;
-static constexpr int kNumVoices = kNumMainVoices + kNumReplVoices;
+static constexpr int kNumMainVoices = 12;
+static constexpr int kNumDrumVoices = 3;
+static constexpr int kDrumVoiceStart = kNumMainVoices;  // 12
+static constexpr int kNumVoices = kNumMainVoices + kNumDrumVoices;  // 15
 static constexpr int kVoiceAllocBytes = 32768;  // 32KB per voice (generous)
 
 struct OrpheusEngine {

@@ -660,7 +660,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     if (idx >= kNumMainVoices) {
         // REPL (source 2): accumulate REPL voices (8-11)
         for (int i = 0; i < num_frames; i++) {
-            engine->warps_source_buffers[2][i] += out[i] * (1.0f / kNumReplVoices);
+            engine->warps_source_buffers[2][i] += out[i] * (1.0f / kNumDrumVoices);
         }
     }
 }

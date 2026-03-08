@@ -607,7 +607,7 @@ void orpheus_engine_trigger_drum(OrpheusEngine* engine,
     // 3 = bass drum alt (voice 11, engine 21)
     static const int kDrumEngineIndices[] = {21, 22, 23, 21};
 
-    if (drum_index >= 0 && drum_index < kNumReplVoices) {
+    if (drum_index >= 0 && drum_index < kNumDrumVoices) {
         int voice_index = kNumMainVoices + drum_index;
         engine->voice_params[voice_index].engine_index.store(kDrumEngineIndices[drum_index]);
         engine->voice_params[voice_index].tune.store(60.0f);  // default pitch
