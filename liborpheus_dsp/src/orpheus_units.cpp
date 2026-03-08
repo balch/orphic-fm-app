@@ -199,12 +199,21 @@ void unit_process_delay_line(GraphUnit* u, int n, float sr) {
     }
 }
 
-void unit_process_master_out(GraphUnit* u, float* output_buffer, int n) {
+void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_buffer, int n) {
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
+
+    // Master pan (constant-power) — the only global output control not handled
+    // by graph units. Drive is handled by limiter units, headroom by mvL/mvR
+    // multiply nodes, clipping by hardClip units.
+    float master_pan = engine->master_pan.load(std::memory_order_relaxed);
+    float mp_angle = ((master_pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
+    float mp_l = std::cos(mp_angle);
+    float mp_r = std::sin(mp_angle);
+
     for (int i = 0; i < n; i++) {
-        output_buffer[i * 2]     = in_l[i];
-        output_buffer[i * 2 + 1] = in_r[i];
+        output_buffer[i * 2]     = in_l[i] * mp_l;
+        output_buffer[i * 2 + 1] = in_r[i] * mp_r;
     }
 }
 

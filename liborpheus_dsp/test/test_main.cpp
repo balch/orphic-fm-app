@@ -13,6 +13,7 @@ int main() {
     all_pass &= run_snapshot_tests();
     all_pass &= run_drums_graph_tests();
     all_pass &= run_lfo_tests();
+    all_pass &= run_control_routing_tests();
     all_pass &= run_benchmark_tests(); // always last — timing
 
     if (!all_pass) {

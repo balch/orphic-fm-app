@@ -344,7 +344,7 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
             case UNIT_DELAY_LINE:
                 unit_process_delay_line(u, num_frames, sr); break;
             case UNIT_MASTER_OUT:
-                unit_process_master_out(u, output_buffer, num_frames); break;
+                unit_process_master_out(u, engine, output_buffer, num_frames); break;
             case UNIT_PLAITS:
                 unit_process_plaits(u, engine, num_frames, sr); break;
             case UNIT_CLOUDS:

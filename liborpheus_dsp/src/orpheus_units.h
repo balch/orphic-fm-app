@@ -1,6 +1,9 @@
 #pragma once
 #include "orpheus_graph.h"
 
+// Forward decl for engine-aware unit processors
+struct OrpheusEngine;
+
 // Per-type process functions. Each processes num_frames samples.
 void unit_process_triangle_osc(GraphUnit* u, int num_frames, float sample_rate);
 void unit_process_square_osc(GraphUnit* u, int num_frames, float sample_rate);
@@ -14,10 +17,9 @@ void unit_process_peak_follower(GraphUnit* u, int num_frames);
 void unit_process_hard_clip(GraphUnit* u, int num_frames);
 void unit_process_limiter(GraphUnit* u, int num_frames);
 void unit_process_delay_line(GraphUnit* u, int num_frames, float sample_rate);
-void unit_process_master_out(GraphUnit* u, float* output_buffer, int num_frames);
+void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_buffer, int num_frames);
 
-// MI module wrappers -- need OrpheusEngine pointer for processor access
-struct OrpheusEngine;
+// MI module wrappers
 void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);

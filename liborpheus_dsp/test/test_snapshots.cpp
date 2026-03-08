@@ -13,14 +13,12 @@ bool run_snapshot_tests() {
     {
         printf("  Scenario: single_voice_c4\n");
         OrpheusEngine* engine = orpheus_engine_create(sr);
-        orpheus_engine_set_voice_active(engine, 0, 1);
-        orpheus_engine_set_voice_tune(engine, 0, 60.0f);
-        orpheus_engine_set_voice_gate(engine, 0, 1);
-        engine->voice_params[0].engine_index.store(0);
-        engine->voice_params[0].harmonics.store(0.5f);
-        engine->voice_params[0].timbre.store(0.5f);
-        engine->voice_params[0].morph.store(0.5f);
-        engine->voice_params[0].decay.store(0.5f);
+        if (!load_production_graph(engine)) {
+            printf("FAIL: could not load production graph\n");
+            orpheus_engine_destroy(engine);
+            return false;
+        }
+        activate_voice(engine, 0, 0, 60.0f, 0.5f, 0.5f, 0.5f, 0.5f);
         const int total = sr * 2;
         std::vector<float> buf(total * 2, 0.0f);
         for (int off = 0; off < total; off += 128) {
@@ -38,17 +36,14 @@ bool run_snapshot_tests() {
     {
         printf("  Scenario: 4voice_chord\n");
         OrpheusEngine* engine = orpheus_engine_create(sr);
-        float chord[] = {60.0f, 64.0f, 67.0f, 72.0f};
-        for (int v = 0; v < 4; v++) {
-            orpheus_engine_set_voice_active(engine, v, 1);
-            orpheus_engine_set_voice_tune(engine, v, chord[v]);
-            orpheus_engine_set_voice_gate(engine, v, 1);
-            engine->voice_params[v].engine_index.store(0);
-            engine->voice_params[v].harmonics.store(0.5f);
-            engine->voice_params[v].timbre.store(0.5f);
-            engine->voice_params[v].morph.store(0.5f);
-            engine->voice_params[v].decay.store(0.5f);
+        if (!load_production_graph(engine)) {
+            printf("FAIL: could not load production graph\n");
+            orpheus_engine_destroy(engine);
+            return false;
         }
+        float chord[] = {60.0f, 64.0f, 67.0f, 72.0f};
+        for (int v = 0; v < 4; v++)
+            activate_voice(engine, v, 0, chord[v], 0.5f, 0.5f, 0.5f, 0.5f);
         const int total = sr * 2;
         std::vector<float> buf(total * 2, 0.0f);
         for (int off = 0; off < total; off += 128) {

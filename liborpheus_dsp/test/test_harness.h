@@ -175,6 +175,75 @@ inline bool snapshot_check(const char* name, const float* stereo_data, int num_f
     return pass;
 }
 
+// ── Composable render result ────────────────────────────────────────
+
+struct RenderResult {
+    std::vector<float> buffer;  // interleaved stereo
+    float rms_l, rms_r;        // per-channel RMS
+    float peak;                 // absolute peak across both channels
+    int num_frames;
+};
+
+// Activate a voice with standard params. Caller can override fields after.
+inline void activate_voice(OrpheusEngine* engine, int voice_idx, int engine_idx, float note,
+                           float harmonics = 0.5f, float timbre = 0.5f,
+                           float morph = 0.5f, float decay = 0.0f) {
+    orpheus_engine_set_voice_active(engine, voice_idx, 1);
+    orpheus_engine_set_voice_tune(engine, voice_idx, note);
+    orpheus_engine_set_voice_gate(engine, voice_idx, 1);
+    orpheus_engine_set_voice_engine(engine, voice_idx, engine_idx);
+    orpheus_engine_set_voice_harmonics(engine, voice_idx, harmonics);
+    orpheus_engine_set_voice_timbre(engine, voice_idx, timbre);
+    orpheus_engine_set_voice_morph(engine, voice_idx, morph);
+    engine->voice_params[voice_idx].decay.store(decay, std::memory_order_relaxed);
+    engine->voice_params[voice_idx].ever_triggered.store(1, std::memory_order_relaxed);
+}
+
+// Render through orpheus_engine_process. Engine must have a graph loaded.
+// Returns buffer + measurements. Caller sets all engine state beforehand.
+inline RenderResult render_engine(OrpheusEngine* engine, int num_frames, int warmup_blocks = 10) {
+    // Warmup
+    float warmup_buf[128 * 2];
+    for (int i = 0; i < warmup_blocks; i++)
+        orpheus_engine_process(engine, warmup_buf, 128);
+
+    // Render
+    RenderResult r;
+    r.num_frames = num_frames;
+    r.buffer.resize(num_frames * 2, 0.0f);
+    for (int off = 0; off < num_frames; off += 128) {
+        int chunk = std::min(128, num_frames - off);
+        orpheus_engine_process(engine, r.buffer.data() + off * 2, chunk);
+    }
+
+    // Measure
+    double sum_l = 0.0, sum_r = 0.0;
+    r.peak = 0.0f;
+    for (int i = 0; i < num_frames; i++) {
+        float l = r.buffer[i * 2];
+        float rv = r.buffer[i * 2 + 1];
+        sum_l += (double)l * l;
+        sum_r += (double)rv * rv;
+        float al = std::fabs(l), ar = std::fabs(rv);
+        if (al > r.peak) r.peak = al;
+        if (ar > r.peak) r.peak = ar;
+    }
+    r.rms_l = (float)std::sqrt(sum_l / num_frames);
+    r.rms_r = (float)std::sqrt(sum_r / num_frames);
+    return r;
+}
+
+// Compute diff RMS between two render results (using shorter of the two)
+inline float diff_rms(const RenderResult& a, const RenderResult& b) {
+    int n = std::min((int)a.buffer.size(), (int)b.buffer.size());
+    double sum = 0.0;
+    for (int i = 0; i < n; i++) {
+        float d = a.buffer[i] - b.buffer[i];
+        sum += (double)d * d;
+    }
+    return (float)std::sqrt(sum / n);
+}
+
 // ── Voice test helpers ──────────────────────────────────────────────
 
 inline float render_voice(GraphUnit* unit, OrpheusEngine* engine, int total_frames, float sr = 48000.0f) {
@@ -198,9 +267,130 @@ inline void setup_voice_unit(GraphUnit* unit, int voice_idx) {
     unit_init(unit, 48000.0f);
 }
 
+// ── Production graph loader ─────────────────────────────────────────
+// Loads the production ODWG graph descriptor (exported by Gradle task)
+// via orpheus_engine_load_patch. Returns true on success.
+inline bool load_production_graph(OrpheusEngine* engine) {
+    const char* path = TEST_DATA_DIR "/default_graph.odwg";
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        fprintf(stderr, "Cannot open production graph: %s\n", path);
+        return false;
+    }
+    fseek(f, 0, SEEK_END);
+    size_t len = (size_t)ftell(f);
+    fseek(f, 0, SEEK_SET);
+    auto* buf = new uint8_t[len];
+    size_t read = fread(buf, 1, len, f);
+    fclose(f);
+    if (read != len) {
+        fprintf(stderr, "Short read on production graph: %zu/%zu bytes\n", read, len);
+        delete[] buf;
+        return false;
+    }
+    int result = orpheus_engine_load_patch(engine, buf, len);
+    delete[] buf;
+    if (result != 0) {
+        fprintf(stderr, "Failed to load production graph: error %d\n", result);
+        return false;
+    }
+    return true;
+}
+
+// ── Default graph helper ────────────────────────────────────────────
+// Attaches a default graph (all voices → master_out) to the engine.
+// The engine takes ownership; graph is freed on engine destroy.
+inline void attach_default_graph(OrpheusEngine* engine) {
+    auto* graph = new OrpheusGraph();
+    std::memset(graph, 0, sizeof(OrpheusGraph));
+    graph->sample_rate = engine->sample_rate;
+
+    int unit_idx = 0;
+
+    // Add all voice units (main + drum voices)
+    for (int v = 0; v < kNumVoices; v++) {
+        graph->units[unit_idx].type = UNIT_PLAITS;
+        graph->units[unit_idx].id = unit_idx;
+        graph->units[unit_idx].enabled = true;
+        unit_init(&graph->units[unit_idx], engine->sample_rate);
+        graph->units[unit_idx].state.module.index = v;
+        unit_idx++;
+    }
+
+    // LFO unit (needed for mod source routing)
+    int lfo_idx = unit_idx;
+    graph->units[lfo_idx].type = UNIT_HYPER_LFO;
+    graph->units[lfo_idx].id = lfo_idx;
+    graph->units[lfo_idx].enabled = true;
+    unit_init(&graph->units[lfo_idx], engine->sample_rate);
+    unit_idx++;
+
+    // Master out — sums all voices
+    int master_idx = unit_idx;
+    graph->units[master_idx].type = UNIT_MASTER_OUT;
+    graph->units[master_idx].id = master_idx;
+    graph->units[master_idx].enabled = true;
+    unit_init(&graph->units[master_idx], engine->sample_rate);
+
+    // Wire all voice outputs to master_out inputs
+    for (int v = 0; v < kNumVoices; v++) {
+        graph->units[master_idx].inputs[IPORT_INPUT_A].sources[v] = graph->units[v].output_buffers[OPORT_OUT];
+        graph->units[master_idx].inputs[IPORT_INPUT_B].sources[v] = graph->units[v].output_buffers[OPORT_OUT];
+    }
+    graph->units[master_idx].inputs[IPORT_INPUT_A].num_sources = kNumVoices;
+    graph->units[master_idx].inputs[IPORT_INPUT_B].num_sources = kNumVoices;
+    unit_idx++;
+
+    // Execution order: all voices → LFO → master_out
+    int exec = 0;
+    for (int v = 0; v < kNumVoices; v++) graph->exec_order[exec++] = v;
+    graph->exec_order[exec++] = lfo_idx;
+    graph->exec_order[exec++] = master_idx;
+
+    graph->unit_count = unit_idx;
+    graph->exec_count = exec;
+    graph->master_out_index = master_idx;
+
+    engine->graph.store(graph, std::memory_order_release);
+}
+
+// ── Minimal graph helper ────────────────────────────────────────────
+// Creates a heap-allocated graph with a single plaits voice → master_out.
+// Caller must delete the graph when done.
+inline OrpheusGraph* create_minimal_graph(int voice_idx, float sample_rate) {
+    auto* graph = new OrpheusGraph();
+    std::memset(graph, 0, sizeof(OrpheusGraph));
+    graph->sample_rate = sample_rate;
+
+    // Unit 0: plaits voice
+    graph->units[0].type = UNIT_PLAITS;
+    graph->units[0].id = 0;
+    graph->units[0].enabled = true;
+    unit_init(&graph->units[0], sample_rate);
+    graph->units[0].state.module.index = voice_idx;
+
+    // Unit 1: master out (stereo from mono)
+    graph->units[1].type = UNIT_MASTER_OUT;
+    graph->units[1].id = 1;
+    graph->units[1].enabled = true;
+    unit_init(&graph->units[1], sample_rate);
+    graph->units[1].inputs[IPORT_INPUT_A].sources[0] = graph->units[0].output_buffers[OPORT_OUT];
+    graph->units[1].inputs[IPORT_INPUT_A].num_sources = 1;
+    graph->units[1].inputs[IPORT_INPUT_B].sources[0] = graph->units[0].output_buffers[OPORT_OUT];
+    graph->units[1].inputs[IPORT_INPUT_B].num_sources = 1;
+
+    graph->unit_count = 2;
+    graph->exec_count = 2;
+    graph->exec_order[0] = 0;
+    graph->exec_order[1] = 1;
+    graph->master_out_index = 1;
+
+    return graph;
+}
+
 // ── Plaits per-engine render helper ────────────────────────────────
 
-// Renders a single Plaits engine in isolation via orpheus_engine_process().
+// Renders a single Plaits engine via graph path (plaits → master_out).
 // Returns interleaved stereo buffer.
 // engine_index: C++ Plaits engine index (8=VA, 9=waveshaping, etc.)
 // note: MIDI note
@@ -211,26 +401,28 @@ inline std::vector<float> render_plaits_engine(
     float decay, int sample_rate, float duration_s, float gate_s)
 {
     OrpheusEngine* engine = orpheus_engine_create(sample_rate);
-    orpheus_engine_set_voice_active(engine, 0, 1);
-    orpheus_engine_set_voice_tune(engine, 0, note);
-    orpheus_engine_set_voice_gate(engine, 0, 1);
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
     engine->voice_params[0].engine_index.store(engine_index);
+    engine->voice_params[0].tune.store(note);
     engine->voice_params[0].harmonics.store(harmonics);
     engine->voice_params[0].timbre.store(timbre);
     engine->voice_params[0].morph.store(morph);
     engine->voice_params[0].decay.store(decay);
-    // Ensure voice has triggered
-    engine->voice_params[0].ever_triggered.store(1);
+
+    // Set up minimal graph: plaits → master_out
+    auto* graph = create_minimal_graph(0, (float)sample_rate);
 
     int total = (int)(sample_rate * duration_s);
     int gate_frames = (int)(sample_rate * gate_s);
     std::vector<float> buf(total * 2, 0.0f);
     for (int off = 0; off < total; off += 128) {
         int chunk = std::min(128, total - off);
-        if (off >= gate_frames)
-            orpheus_engine_set_voice_gate(engine, 0, 0);
-        orpheus_engine_process(engine, buf.data() + off * 2, chunk);
+        if (off == 0) engine->voice_params[0].gate.store(1);
+        if (off >= gate_frames) engine->voice_params[0].gate.store(0);
+        orpheus_graph_process(graph, engine, buf.data() + off * 2, chunk);
     }
+    delete graph;
     orpheus_engine_destroy(engine);
     return buf;
 }
@@ -238,8 +430,7 @@ inline std::vector<float> render_plaits_engine(
 // ── Graph-based voice render (exercises unit_process_plaits ADSR) ────
 //
 // Renders a single voice through: plaits → master_out
-// This goes through unit_process_plaits() which includes the ADSR envelope,
-// unlike orpheus_engine_process() fallback which bypasses it.
+// Uses the same graph path as production (no fallback).
 // Returns interleaved stereo buffer.
 inline std::vector<float> render_voice_with_envelope(
     int engine_index, float note, float harmonics, float timbre, float morph,
@@ -255,33 +446,7 @@ inline std::vector<float> render_voice_with_envelope(
     engine->voice_params[0].morph.store(morph);
     engine->voice_params[0].decay.store(env_speed); // envSpeed stored in decay
 
-    // Build minimal graph: plaits → master_out (heap-allocated — too large for stack)
-    auto* graph = new OrpheusGraph();
-    std::memset(graph, 0, sizeof(OrpheusGraph));
-    graph->sample_rate = (float)sample_rate;
-
-    // Unit 0: plaits voice
-    graph->units[0].type = UNIT_PLAITS;
-    graph->units[0].id = 0;
-    graph->units[0].enabled = true;
-    unit_init(&graph->units[0], (float)sample_rate);
-    graph->units[0].state.module.index = 0;
-
-    // Unit 1: master out (stereo from mono)
-    graph->units[1].type = UNIT_MASTER_OUT;
-    graph->units[1].id = 1;
-    graph->units[1].enabled = true;
-    unit_init(&graph->units[1], (float)sample_rate);
-    graph->units[1].inputs[IPORT_INPUT_A].sources[0] = graph->units[0].output_buffers[OPORT_OUT];
-    graph->units[1].inputs[IPORT_INPUT_A].num_sources = 1;
-    graph->units[1].inputs[IPORT_INPUT_B].sources[0] = graph->units[0].output_buffers[OPORT_OUT];
-    graph->units[1].inputs[IPORT_INPUT_B].num_sources = 1;
-
-    graph->unit_count = 2;
-    graph->exec_count = 2;
-    graph->exec_order[0] = 0;
-    graph->exec_order[1] = 1;
-    graph->master_out_index = 1;
+    auto* graph = create_minimal_graph(0, (float)sample_rate);
 
     int total = (int)(sample_rate * duration_s);
     int gate_frames = (int)(sample_rate * gate_s);
@@ -310,4 +475,5 @@ bool run_output_chain_tests();
 bool run_snapshot_tests();
 bool run_drums_graph_tests();
 bool run_lfo_tests();
+bool run_control_routing_tests();
 bool run_benchmark_tests();

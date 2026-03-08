@@ -13,6 +13,11 @@ static bool test_drum_trigger() {
 
     for (int d = 0; d < 4; d++) {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        if (!load_production_graph(engine)) {
+            printf("FAIL: could not load production graph\n");
+            orpheus_engine_destroy(engine);
+            return false;
+        }
         orpheus_engine_trigger_drum(engine, d, 0.8f);
 
         // Verify voice params were set correctly
@@ -71,44 +76,22 @@ static bool test_drum_isolation() {
 
     // Create engine with 1 main voice active, no drums triggered
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
-    orpheus_engine_set_voice_active(engine, 0, 1);
-    orpheus_engine_set_voice_tune(engine, 0, 60.0f);
-    orpheus_engine_set_voice_gate(engine, 0, 1);
-    engine->voice_params[0].engine_index.store(8); // VirtualAnalog
-    engine->voice_params[0].harmonics.store(0.5f);
-    engine->voice_params[0].timbre.store(0.5f);
-    engine->voice_params[0].morph.store(0.5f);
-    engine->voice_params[0].decay.store(0.0f);
-    engine->voice_params[0].ever_triggered.store(1);
+    if (!load_production_graph(engine)) {
+        printf("FAIL: could not load production graph\n");
+        orpheus_engine_destroy(engine);
+        return false;
+    }
+    activate_voice(engine, 0, 8, 60.0f);
     engine->voice_pan[0].store(-1.0f); // hard left
 
-    // Warm up
-    float warmup[128 * 2];
-    for (int i = 0; i < 10; i++) orpheus_engine_process(engine, warmup, 128);
+    auto r = render_engine(engine, 24000);
 
-    // Render measurement
-    int total = 24000; // 0.5s
-    std::vector<float> buf(total * 2, 0.0f);
-    for (int off = 0; off < total; off += 128) {
-        int chunk = std::min(128, total - off);
-        orpheus_engine_process(engine, buf.data() + off * 2, chunk);
-    }
-
-    float rms_l, rms_r;
-    double sum_l = 0.0, sum_r = 0.0;
-    for (int i = 0; i < total; i++) {
-        sum_l += (double)buf[i * 2] * buf[i * 2];
-        sum_r += (double)buf[i * 2 + 1] * buf[i * 2 + 1];
-    }
-    rms_l = (float)std::sqrt(sum_l / total);
-    rms_r = (float)std::sqrt(sum_r / total);
-
-    printf("  Voice 0 hard-left, no drums: L=%.4f R=%.4f\n", rms_l, rms_r);
+    printf("  Voice 0 hard-left, no drums: L=%.4f R=%.4f\n", r.rms_l, r.rms_r);
 
     // With voice hard-left, R channel should be near-silent
     // If drums leak, they'd add center-panned signal to R channel
-    if (rms_r > rms_l * 0.05f) {
-        printf("  FAIL: R channel (%.4f) has signal despite hard-left pan — drum leakage?\n", rms_r);
+    if (r.rms_r > r.rms_l * 0.05f) {
+        printf("  FAIL: R channel (%.4f) has signal despite hard-left pan — drum leakage?\n", r.rms_r);
         pass = false;
     }
 
@@ -134,6 +117,11 @@ static bool test_drum_one_shot() {
     bool pass = true;
 
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_production_graph(engine)) {
+        printf("FAIL: could not load production graph\n");
+        orpheus_engine_destroy(engine);
+        return false;
+    }
     orpheus_engine_trigger_drum(engine, 0, 0.8f); // bass drum
 
     // Render first block (gate on)
@@ -256,156 +244,8 @@ static bool test_graph_drum_voice() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Test 5: Graph path vs fallback path produce similar output
-// Same voice config → both paths should produce comparable RMS
+// Test 5: (Removed — fallback render path no longer exists)
 // ═══════════════════════════════════════════════════════════════════
-static bool test_graph_vs_fallback_parity() {
-    printf("\n=== Test: Graph vs fallback path parity ===\n");
-    bool pass = true;
-
-    const int sample_rate = 48000;
-    const float note = 60.0f;
-    const int engine_idx = 8; // VirtualAnalog
-
-    // ── Fallback path (no graph) ──
-    OrpheusEngine* eng_fb = orpheus_engine_create(sample_rate);
-    orpheus_engine_set_voice_active(eng_fb, 0, 1);
-    orpheus_engine_set_voice_tune(eng_fb, 0, note);
-    orpheus_engine_set_voice_gate(eng_fb, 0, 1);
-    eng_fb->voice_params[0].engine_index.store(engine_idx);
-    eng_fb->voice_params[0].harmonics.store(0.5f);
-    eng_fb->voice_params[0].timbre.store(0.5f);
-    eng_fb->voice_params[0].morph.store(0.5f);
-    eng_fb->voice_params[0].decay.store(0.5f);
-    eng_fb->voice_params[0].ever_triggered.store(1);
-    eng_fb->master_volume.store(0.8f);
-
-    // Warm up & render
-    float warmup[128 * 2];
-    for (int i = 0; i < 10; i++) orpheus_engine_process(eng_fb, warmup, 128);
-
-    int total = 24000; // 0.5s
-    std::vector<float> buf_fb(total * 2, 0.0f);
-    for (int off = 0; off < total; off += 128) {
-        int chunk = std::min(128, total - off);
-        orpheus_engine_process(eng_fb, buf_fb.data() + off * 2, chunk);
-    }
-
-    float fb_l, fb_r;
-    double sum_l = 0.0, sum_r = 0.0;
-    for (int i = 0; i < total; i++) {
-        sum_l += (double)buf_fb[i * 2] * buf_fb[i * 2];
-        sum_r += (double)buf_fb[i * 2 + 1] * buf_fb[i * 2 + 1];
-    }
-    fb_l = (float)std::sqrt(sum_l / total);
-    fb_r = (float)std::sqrt(sum_r / total);
-    float fb_rms = (fb_l + fb_r) / 2.0f;
-    orpheus_engine_destroy(eng_fb);
-
-    // ── Graph path ──
-    OrpheusEngine* eng_gr = orpheus_engine_create(sample_rate);
-    eng_gr->voice_params[0].active.store(1);
-    eng_gr->voice_params[0].ever_triggered.store(1);
-    eng_gr->voice_params[0].engine_index.store(engine_idx);
-    eng_gr->voice_params[0].tune.store(note);
-    eng_gr->voice_params[0].gate.store(1);
-    eng_gr->voice_params[0].harmonics.store(0.5f);
-    eng_gr->voice_params[0].timbre.store(0.5f);
-    eng_gr->voice_params[0].morph.store(0.5f);
-    eng_gr->voice_params[0].decay.store(0.5f);
-    eng_gr->master_volume.store(0.8f);
-
-    auto* graph = new OrpheusGraph();
-    std::memset(graph, 0, sizeof(OrpheusGraph));
-    graph->sample_rate = (float)sample_rate;
-
-    graph->units[0].type = UNIT_PLAITS; graph->units[0].id = 0;
-    graph->units[0].enabled = true;
-    unit_init(&graph->units[0], (float)sample_rate);
-    graph->units[0].state.module.index = 0;
-
-    graph->units[1].type = UNIT_HARD_CLIP; graph->units[1].id = 1;
-    graph->units[1].enabled = true; unit_init(&graph->units[1], (float)sample_rate);
-    graph->units[1].inputs[IPORT_INPUT].sources[0] = graph->units[0].output_buffers[OPORT_OUT];
-    graph->units[1].inputs[IPORT_INPUT].num_sources = 1;
-
-    graph->units[2].type = UNIT_MASTER_OUT; graph->units[2].id = 2;
-    graph->units[2].enabled = true; unit_init(&graph->units[2], (float)sample_rate);
-    graph->units[2].inputs[IPORT_INPUT_A].sources[0] = graph->units[1].output_buffers[OPORT_OUT];
-    graph->units[2].inputs[IPORT_INPUT_A].num_sources = 1;
-    graph->units[2].inputs[IPORT_INPUT_B].sources[0] = graph->units[1].output_buffers[OPORT_OUT];
-    graph->units[2].inputs[IPORT_INPUT_B].num_sources = 1;
-
-    graph->unit_count = 3;
-    graph->exec_count = 3;
-    graph->exec_order[0] = 0; graph->exec_order[1] = 1; graph->exec_order[2] = 2;
-    graph->master_out_index = 2;
-
-    // Warm up & render through graph
-    for (int i = 0; i < 10; i++) {
-        std::memset(warmup, 0, sizeof(warmup));
-        orpheus_graph_process(graph, eng_gr, warmup, 128);
-    }
-
-    std::vector<float> buf_gr(total * 2, 0.0f);
-    for (int off = 0; off < total; off += 128) {
-        int chunk = std::min(128, total - off);
-        float stereo[256] = {};
-        orpheus_graph_process(graph, eng_gr, stereo, chunk);
-        std::memcpy(buf_gr.data() + off * 2, stereo, chunk * 2 * sizeof(float));
-    }
-
-    sum_l = 0.0; sum_r = 0.0;
-    for (int i = 0; i < total; i++) {
-        sum_l += (double)buf_gr[i * 2] * buf_gr[i * 2];
-        sum_r += (double)buf_gr[i * 2 + 1] * buf_gr[i * 2 + 1];
-    }
-    float gr_l = (float)std::sqrt(sum_l / total);
-    float gr_r = (float)std::sqrt(sum_r / total);
-    float gr_rms = (gr_l + gr_r) / 2.0f;
-
-    printf("  Fallback: L=%.4f R=%.4f RMS=%.4f\n", fb_l, fb_r, fb_rms);
-    printf("  Graph:    L=%.4f R=%.4f RMS=%.4f\n", gr_l, gr_r, gr_rms);
-
-    // Both paths should produce output
-    if (fb_rms < 0.001f) {
-        printf("  FAIL: fallback path produced near-silence\n");
-        pass = false;
-    }
-    if (gr_rms < 0.001f) {
-        printf("  FAIL: graph path produced near-silence\n");
-        pass = false;
-    }
-
-    // RMS should be in the same order of magnitude (within 10x)
-    // They won't be identical because the signal chains differ:
-    //   fallback: voice → (effects) → drive → tanh(master*0.5)
-    //   graph:    voice → clip(±1) → master_out(volume+pan)
-    if (fb_rms > 0.001f && gr_rms > 0.001f) {
-        float ratio = std::max(fb_rms, gr_rms) / std::min(fb_rms, gr_rms);
-        printf("  RMS ratio: %.2f (both paths produce output)\n", ratio);
-        if (ratio > 10.0f) {
-            printf("  FAIL: paths differ by >10x\n");
-            pass = false;
-        }
-    }
-
-    // Both paths should have L ≈ R (center pan)
-    if (std::fabs(fb_l - fb_r) > (fb_l + fb_r) * 0.1f) {
-        printf("  FAIL: fallback L/R imbalance (L=%.4f R=%.4f)\n", fb_l, fb_r);
-        pass = false;
-    }
-    if (std::fabs(gr_l - gr_r) > (gr_l + gr_r) * 0.1f) {
-        printf("  FAIL: graph L/R imbalance (L=%.4f R=%.4f)\n", gr_l, gr_r);
-        pass = false;
-    }
-
-    delete graph;
-    orpheus_engine_destroy(eng_gr);
-
-    printf("Graph vs fallback parity test: %s\n", pass ? "PASS" : "FAIL");
-    return pass;
-}
 
 // ═══════════════════════════════════════════════════════════════════
 // Test 6: Graph wiring — multi-source summing
@@ -818,100 +658,8 @@ static bool test_warps_source_routing() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Test 9: Drum transient preservation — graph path vs fallback parity
-// Drums bypass ADSR in both paths, so transient peaks should be similar
+// Test 9: (Removed — fallback render path no longer exists)
 // ═══════════════════════════════════════════════════════════════════
-static bool test_drum_transient_preservation() {
-    printf("\n=== Test: Drum transient preservation (graph vs fallback) ===\n");
-    bool pass = true;
-
-    const float sr = 48000.0f;
-    const int drum_engines[] = {21, 22, 23};
-    const char* names[] = {"bass_drum", "snare_drum", "hi_hat"};
-
-    for (int d = 0; d < 3; d++) {
-        int voice_idx = 8 + d;
-
-        // ── Fallback path ──
-        OrpheusEngine* eng_fb = orpheus_engine_create(sr);
-        orpheus_engine_trigger_drum(eng_fb, d, 0.8f);
-
-        float fb_buf[128 * 2] = {};
-        orpheus_engine_process(eng_fb, fb_buf, 128);
-        float fb_peak = compute_peak(fb_buf, 256);
-        orpheus_engine_destroy(eng_fb);
-
-        // ── Graph path ──
-        OrpheusEngine* eng_gr = orpheus_engine_create(sr);
-        eng_gr->voice_params[voice_idx].active.store(1);
-        eng_gr->voice_params[voice_idx].ever_triggered.store(1);
-        eng_gr->voice_params[voice_idx].engine_index.store(drum_engines[d]);
-        eng_gr->voice_params[voice_idx].tune.store(60.0f);
-        eng_gr->voice_params[voice_idx].gate.store(1);
-        eng_gr->voice_params[voice_idx].harmonics.store(0.5f);
-        eng_gr->voice_params[voice_idx].timbre.store(0.5f);
-        eng_gr->voice_params[voice_idx].morph.store(0.5f);
-        eng_gr->voice_params[voice_idx].decay.store(0.0f);
-
-        auto* graph = new OrpheusGraph();
-        std::memset(graph, 0, sizeof(OrpheusGraph));
-        graph->sample_rate = sr;
-
-        graph->units[0].type = UNIT_PLAITS; graph->units[0].id = 0;
-        graph->units[0].enabled = true;
-        unit_init(&graph->units[0], sr);
-        graph->units[0].state.module.index = voice_idx;
-
-        graph->units[1].type = UNIT_MASTER_OUT; graph->units[1].id = 1;
-        graph->units[1].enabled = true; unit_init(&graph->units[1], sr);
-        graph->units[1].inputs[IPORT_INPUT_A].sources[0] = graph->units[0].output_buffers[OPORT_OUT];
-        graph->units[1].inputs[IPORT_INPUT_A].num_sources = 1;
-        graph->units[1].inputs[IPORT_INPUT_B].sources[0] = graph->units[0].output_buffers[OPORT_OUT];
-        graph->units[1].inputs[IPORT_INPUT_B].num_sources = 1;
-
-        graph->unit_count = 2; graph->exec_count = 2;
-        graph->exec_order[0] = 0; graph->exec_order[1] = 1;
-        graph->master_out_index = 1;
-
-        float gr_stereo[256] = {};
-        orpheus_graph_process(graph, eng_gr, gr_stereo, 128);
-        float gr_peak = compute_peak(gr_stereo, 256);
-
-        delete graph;
-        orpheus_engine_destroy(eng_gr);
-
-        printf("  %s: fallback_peak=%.4f graph_peak=%.4f", names[d], fb_peak, gr_peak);
-
-        // Both paths should produce meaningful transients
-        if (fb_peak < 0.01f) {
-            printf(" — FAIL: fallback too quiet\n");
-            pass = false;
-            continue;
-        }
-        if (gr_peak < 0.01f) {
-            printf(" — FAIL: graph ADSR killed transient\n");
-            pass = false;
-            continue;
-        }
-
-        // Graph peak should be within 10x of fallback
-        // (not identical because signal chains differ significantly:
-        //   fallback: voice → volume → drive → tanh(signal*master_pan*0.5)
-        //   graph:    voice → master_out(volume+pan)
-        // The fallback's tanh(x*0.5) is a ~6dB cut + saturation, so graph is naturally louder)
-        float ratio = gr_peak / fb_peak;
-        printf(" ratio=%.2f", ratio);
-        if (ratio < 0.2f || ratio > 10.0f) {
-            printf(" — FAIL: too far apart\n");
-            pass = false;
-        } else {
-            printf(" OK\n");
-        }
-    }
-
-    printf("Drum transient preservation test: %s\n", pass ? "PASS" : "FAIL");
-    return pass;
-}
 
 // ═══════════════════════════════════════════════════════════════════
 // Test 10: Grids → drum voice integration
@@ -1081,8 +829,6 @@ bool run_drums_graph_tests() {
     all_pass &= test_drum_isolation();
     all_pass &= test_drum_one_shot();
     all_pass &= test_graph_drum_voice();
-    all_pass &= test_drum_transient_preservation();
-    all_pass &= test_graph_vs_fallback_parity();
     all_pass &= test_graph_multi_source_sum();
     all_pass &= test_graph_effects_bypass_parity();
     all_pass &= test_warps_source_routing();

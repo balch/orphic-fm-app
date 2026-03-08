@@ -141,6 +141,7 @@ if(BUILD_TESTS)
         test/test_output_chain.cpp
         test/test_drums_graph.cpp
         test/test_lfo.cpp
+        test/test_control_routing.cpp
         test/test_snapshots.cpp
         test/test_benchmark.cpp
     )
@@ -149,5 +150,8 @@ if(BUILD_TESTS)
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${EURORACK_DIR}"
     )
-    target_compile_definitions(orpheus_dsp_test PRIVATE TEST)
+    target_compile_definitions(orpheus_dsp_test PRIVATE
+        TEST
+        TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/data"
+    )
 endif()
