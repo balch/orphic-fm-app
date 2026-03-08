@@ -4,6 +4,8 @@
 #include <cstring>
 #include <algorithm>
 
+// soft_limit() and kOutGain[] are provided by orpheus_voice.h (included via orpheus_engine.h)
+
 // -- Smoothing coefficient (~5ms at any sample rate) --
 static float smooth_coeff(float sample_rate) {
     return 1.0f - std::exp(-1.0f / (0.005f * sample_rate));
@@ -517,78 +519,39 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                      + 0.001f * voice_peak;
 
     } else {
-        // ═══ PLAITS ENGINES (1+): Render Plaits then apply Hold VCA ═══
+        // ═══ PLAITS ENGINES (1+): Render via OrpheusVoice (direct Engine::Render) ═══
         auto& voice = engine->voices_dsp[idx];
 
-        // If hold is active, force gate on for Plaits so its internal LPG stays open
+        // If hold is active, force gate on so engine stays active
         int plaits_gate = actual_gate;
         if (scaled_hold > 0.01f) plaits_gate = 1;
 
-        plaits::Patch patch;
-        patch.engine = engine_index;
-        patch.note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones + bend_offset;
-        patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
-        patch.timbre = std::max(0.0f, std::min(1.0f,
-            vp.timbre.load(std::memory_order_relaxed) + timbre_mod_offset));
-        patch.morph = vp.morph.load(std::memory_order_relaxed);
-        patch.frequency_modulation_amount = 0.0f;
-        patch.timbre_modulation_amount = 0.0f;
-        patch.morph_modulation_amount = 0.0f;
-        patch.decay = env_speed;
-        patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
-
-        plaits::Modulations mod;
-        std::memset(&mod, 0, sizeof(mod));
-
-        // Engine change retrigger: force trigger=0 for one block so the next
-        // render sees a 0→1 rising edge, restarting the LPG envelope.
+        // Engine change retrigger: force gate off for one block so
+        // OrpheusVoice sees a 0→1 rising edge on the next render.
         if (vp.engine_changed.load(std::memory_order_relaxed)) {
-            mod.trigger = 0.0f;
+            plaits_gate = 0;
             vp.engine_changed.store(0, std::memory_order_relaxed);
-        } else {
-            mod.trigger = plaits_gate ? 1.0f : 0.0f;
-        }
-        mod.trigger_patched = true;
-
-        bool is_speech = (engine_index == 15);
-        if (is_speech) {
-            mod.level_patched = true;
-            mod.level = plaits_gate ? 1.0f : 0.0f;
-        } else {
-            mod.level_patched = false;
         }
 
-        const float inv_32768 = 1.0f / 32768.0f;
-        int frames_done = 0;
+        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones + bend_offset;
+        float harmonics = vp.harmonics.load(std::memory_order_relaxed);
+        float timbre = std::max(0.0f, std::min(1.0f,
+            vp.timbre.load(std::memory_order_relaxed) + timbre_mod_offset));
+        float morph = vp.morph.load(std::memory_order_relaxed);
+
+        // Render via OrpheusVoice (handles engine selection, outGain, soft_limit)
+        voice.Render(engine_index, plaits_gate, note, harmonics, timbre, morph, 0.8f,
+                     out, num_frames);
+
+        // Apply hold VCA: when hold active but gate off, scale by hold level
         float voice_peak = 0.0f;
-
-        while (frames_done < num_frames) {
-            int block = std::min(static_cast<int>(plaits::kBlockSize),
-                                 num_frames - frames_done);
-
-            plaits::Voice::Frame frames[plaits::kMaxBlockSize];
-            voice.Render(patch, mod, frames, block);
-
-            for (int i = 0; i < block; i++) {
-                float sample = (frames[i].out + frames[i].aux) * 0.5f * inv_32768;
-
-                // Apply hold VCA for Plaits: when hold active, scale by hold level
-                // Hold ramp smoothed to avoid clicks
-                osc.hold_smoothed += hold_coeff * (scaled_hold - osc.hold_smoothed);
-
-                // For Plaits: if no hold, pass through at unity.
-                // If hold active but gate was off, the forced gate keeps Plaits
-                // producing; scale by hold level for volume control.
-                if (raw_hold > 0.001f && actual_gate == 0) {
-                    sample *= osc.hold_smoothed;
-                }
-
-                out[frames_done + i] = sample;
-                float abs_s = std::fabs(sample);
-                if (abs_s > voice_peak) voice_peak = abs_s;
+        for (int i = 0; i < num_frames; i++) {
+            osc.hold_smoothed += hold_coeff * (scaled_hold - osc.hold_smoothed);
+            if (raw_hold > 0.001f && actual_gate == 0) {
+                out[i] *= osc.hold_smoothed;
             }
-
-            frames_done += block;
+            float abs_s = std::fabs(out[i]);
+            if (abs_s > voice_peak) voice_peak = abs_s;
         }
 
         engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);

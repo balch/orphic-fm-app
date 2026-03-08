@@ -4,8 +4,8 @@
 #include "orpheus_compat.h"
 #include "orpheus_graph.h"
 
-// Include MI Plaits voice
-#include "plaits/dsp/voice.h"
+// OrpheusVoice: direct Engine::Render() without LPG/limiter/int16
+#include "orpheus_voice.h"
 
 // Include MI Clouds granular processor
 #include "clouds/dsp/granular_processor.h"
@@ -40,8 +40,8 @@ struct OrpheusEngine {
     // Atomic: written from JNI thread, read from audio thread
     std::atomic<OrpheusGraph*> graph{nullptr};
 
-    // Plaits voices
-    plaits::Voice voices_dsp[kNumVoices];
+    // Plaits voices (direct engine render, no LPG/limiter)
+    OrpheusVoice voices_dsp[kNumVoices];
     uint8_t voice_alloc_buffers[kNumVoices][kVoiceAllocBytes];
 
     // Per-voice parameter state (written from UI, read from audio)

@@ -288,7 +288,7 @@ bool run_snapshot_tests() {
         }
     }
 
-    // Raw Plaits output — isolated voice rendered via plaits::Voice::Render directly
+    // Raw Plaits output — isolated voice rendered via OrpheusVoice::Render directly
     {
         struct EngineSpec {
             int cpp_index;
@@ -309,38 +309,22 @@ bool run_snapshot_tests() {
 
             OrpheusEngine* eng = orpheus_engine_create(sr);
 
-            plaits::Patch patch;
-            patch.engine = e.cpp_index;
-            patch.note = 60.0f;
-            patch.harmonics = 0.5f;
-            patch.timbre = 0.5f;
-            patch.morph = 0.5f;
-            patch.decay = 0.5f;
-            patch.lpg_colour = 0.5f;
-            patch.frequency_modulation_amount = 0.0f;
-            patch.timbre_modulation_amount = 0.0f;
-            patch.morph_modulation_amount = 0.0f;
-
-            plaits::Modulations mod = {};
-            mod.trigger = 1.0f;
-            mod.trigger_patched = true;
-
             int total = sr * 2;
             std::vector<float> buf(total * 2, 0.0f);
-            const float inv_32768 = 1.0f / 32768.0f;
+            std::vector<float> mono(total, 0.0f);
 
-            for (int off = 0; off < total; off += 12) {
-                int block = std::min(12, total - off);
-                plaits::Voice::Frame frames[plaits::kMaxBlockSize];
-                eng->voices_dsp[0].Render(patch, mod, frames, block);
-                for (int i = 0; i < block; i++) {
-                    float sample = (frames[i].out + frames[i].aux) * 0.5f * inv_32768;
-                    buf[(off + i) * 2]     = sample;
-                    buf[(off + i) * 2 + 1] = sample;
-                }
-                // Keep gate high (sustain)
-                mod.trigger = 1.0f;
+            // Render via OrpheusVoice (direct Engine::Render, outGain + soft_limit applied)
+            eng->voices_dsp[0].Render(e.cpp_index, 1 /*gate*/, 60.0f /*note*/,
+                                       0.5f /*harmonics*/, 0.5f /*timbre*/,
+                                       0.5f /*morph*/, 0.8f /*accent*/,
+                                       mono.data(), total);
+
+            // Convert mono to interleaved stereo
+            for (int i = 0; i < total; i++) {
+                buf[i * 2]     = mono[i];
+                buf[i * 2 + 1] = mono[i];
             }
+
             printf("  Raw %s: RMS=%.4f Peak=%.4f\n", e.name,
                    compute_rms(buf.data(), total * 2), compute_peak(buf.data(), total * 2));
             all_pass &= snapshot_check(label, buf.data(), total, sr, dir);

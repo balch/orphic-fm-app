@@ -20,7 +20,7 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     auto* engine = new OrpheusEngine();
     engine->sample_rate = sample_rate;
 
-    // Initialize all Plaits voices
+    // Initialize all Plaits voices (OrpheusVoice: direct engine render)
     for (int i = 0; i < kNumVoices; i++) {
         stmlib::BufferAllocator allocator(
             engine->voice_alloc_buffers[i], kVoiceAllocBytes);
@@ -148,9 +148,8 @@ void orpheus_engine_process(OrpheusEngine* engine,
         // Graph-based rendering: voices + effects chain via ODWG descriptor
         orpheus_graph_process(graph, engine, output_buffer, num_frames);
     } else {
-        // Fallback: existing procedural rendering (unchanged)
+        // Fallback: procedural rendering via OrpheusVoice (direct Engine::Render)
         const float volume = engine->master_volume.load(std::memory_order_relaxed);
-        const float inv_32768 = 1.0f / 32768.0f;
 
         // Process each main voice
         for (int v = 0; v < kNumMainVoices; v++) {
@@ -159,68 +158,30 @@ void orpheus_engine_process(OrpheusEngine* engine,
             if (!vp.ever_triggered.load(std::memory_order_relaxed)) continue;
             auto& voice = engine->voices_dsp[v];
 
-            // Precompute per-voice pan gains
             float pan_l, pan_r;
             compute_pan(engine->voice_pan[v].load(std::memory_order_relaxed), pan_l, pan_r);
 
-            // Build Plaits Patch from atomic params
-            plaits::Patch patch;
-            patch.engine = vp.engine_index.load(std::memory_order_relaxed);
-            patch.note = vp.tune.load(std::memory_order_relaxed);
-            patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
-            patch.timbre = vp.timbre.load(std::memory_order_relaxed);
-            patch.morph = vp.morph.load(std::memory_order_relaxed);
-            patch.frequency_modulation_amount = 0.0f;
-            patch.timbre_modulation_amount = 0.0f;
-            patch.morph_modulation_amount = 0.0f;
-            patch.decay = vp.decay.load(std::memory_order_relaxed);
-            patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
-
-            // Build Modulations — trigger is a FLOAT value, not an enum.
-            // Voice does its own Schmitt-trigger edge detection internally.
-            plaits::Modulations mod;
-            std::memset(&mod, 0, sizeof(mod));
+            int engine_index = vp.engine_index.load(std::memory_order_relaxed);
+            float note = vp.tune.load(std::memory_order_relaxed);
+            float harmonics = vp.harmonics.load(std::memory_order_relaxed);
+            float timbre = vp.timbre.load(std::memory_order_relaxed);
+            float morph = vp.morph.load(std::memory_order_relaxed);
             int current_gate = vp.gate.load(std::memory_order_relaxed);
-            mod.trigger = current_gate ? 1.0f : 0.0f;
-            mod.trigger_patched = true;
 
-            // Speech engine (index 15) has already_enveloped=true, bypassing the LPG.
-            // Use level_patched to gate amplitude directly so voices are silent when gate=0.
-            // TODO: This causes hard cut-off mid-word. Add amplitude smoothing (short
-            //       fade-out envelope, ~50-100ms) so speech words complete before silence.
-            bool is_speech = (patch.engine == 15);
-            if (is_speech) {
-                mod.level_patched = true;
-                mod.level = current_gate ? 1.0f : 0.0f;
-            } else {
-                mod.level_patched = false;
-            }
+            // Render via OrpheusVoice (direct Engine::Render, no LPG/limiter/int16)
+            float mono_buf[kMaxFrames];
+            voice.Render(engine_index, current_gate, note, harmonics, timbre, morph, 0.8f,
+                         mono_buf, num_frames);
 
-            // Render in kBlockSize (12) chunks
-            int frames_done = 0;
+            // Mix into interleaved stereo with pan and volume
             float voice_peak = 0.0f;
+            for (int i = 0; i < num_frames; i++) {
+                float mono = mono_buf[i] * volume;
+                output_buffer[i * 2]     += mono * pan_l;
+                output_buffer[i * 2 + 1] += mono * pan_r;
 
-            while (frames_done < num_frames) {
-                int block = std::min(static_cast<int>(plaits::kBlockSize),
-                                     num_frames - frames_done);
-
-                plaits::Voice::Frame frames[plaits::kMaxBlockSize];
-                voice.Render(patch, mod, frames, block);
-
-                // Mix into interleaved stereo with per-voice pan and volume
-                for (int i = 0; i < block; i++) {
-                    // Combine out + aux as mono, then pan
-                    float mono = (frames[i].out + frames[i].aux) * 0.5f * inv_32768 * volume;
-
-                    int idx = (frames_done + i) * 2;
-                    output_buffer[idx]     += mono * pan_l;
-                    output_buffer[idx + 1] += mono * pan_r;
-
-                    float abs_out = std::fabs(mono);
-                    if (abs_out > voice_peak) voice_peak = abs_out;
-                }
-
-                frames_done += block;
+                float abs_out = std::fabs(mono);
+                if (abs_out > voice_peak) voice_peak = abs_out;
             }
 
             engine->voice_levels[v].store(voice_peak, std::memory_order_relaxed);
@@ -231,55 +192,30 @@ void orpheus_engine_process(OrpheusEngine* engine,
             auto& vp = engine->voice_params[v];
             auto& voice = engine->voices_dsp[v];
 
-            // Precompute per-voice pan gains for drum voices
             float pan_l, pan_r;
             compute_pan(engine->voice_pan[v].load(std::memory_order_relaxed), pan_l, pan_r);
 
-            // Build Plaits Patch from atomic params
-            plaits::Patch patch;
-            patch.engine = vp.engine_index.load(std::memory_order_relaxed);
-            patch.note = vp.tune.load(std::memory_order_relaxed);
-            patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
-            patch.timbre = vp.timbre.load(std::memory_order_relaxed);
-            patch.morph = vp.morph.load(std::memory_order_relaxed);
-            patch.frequency_modulation_amount = 0.0f;
-            patch.timbre_modulation_amount = 0.0f;
-            patch.morph_modulation_amount = 0.0f;
-            patch.decay = vp.decay.load(std::memory_order_relaxed);
-            patch.lpg_colour = vp.lpg_colour.load(std::memory_order_relaxed);
-
-            // Build Modulations — trigger for one-shot drum hits
-            plaits::Modulations mod;
-            std::memset(&mod, 0, sizeof(mod));
+            int engine_index = vp.engine_index.load(std::memory_order_relaxed);
+            float note = vp.tune.load(std::memory_order_relaxed);
+            float harmonics = vp.harmonics.load(std::memory_order_relaxed);
+            float timbre = vp.timbre.load(std::memory_order_relaxed);
+            float morph = vp.morph.load(std::memory_order_relaxed);
             int current_gate = vp.gate.load(std::memory_order_relaxed);
-            mod.trigger = current_gate ? 1.0f : 0.0f;
-            mod.trigger_patched = true;
-            mod.level_patched = false;
 
-            // Render in kBlockSize (12) chunks
-            int frames_done = 0;
+            // Render via OrpheusVoice (direct Engine::Render, no LPG/limiter/int16)
+            float mono_buf[kMaxFrames];
+            voice.Render(engine_index, current_gate, note, harmonics, timbre, morph, 0.8f,
+                         mono_buf, num_frames);
+
+            // Mix into interleaved stereo with pan and volume
             float voice_peak = 0.0f;
+            for (int i = 0; i < num_frames; i++) {
+                float mono = mono_buf[i] * volume;
+                output_buffer[i * 2]     += mono * pan_l;
+                output_buffer[i * 2 + 1] += mono * pan_r;
 
-            while (frames_done < num_frames) {
-                int block = std::min(static_cast<int>(plaits::kBlockSize),
-                                     num_frames - frames_done);
-
-                plaits::Voice::Frame frames[plaits::kMaxBlockSize];
-                voice.Render(patch, mod, frames, block);
-
-                // Mix into interleaved stereo with per-voice pan and volume
-                for (int i = 0; i < block; i++) {
-                    float mono = (frames[i].out + frames[i].aux) * 0.5f * inv_32768 * volume;
-
-                    int idx = (frames_done + i) * 2;
-                    output_buffer[idx]     += mono * pan_l;
-                    output_buffer[idx + 1] += mono * pan_r;
-
-                    float abs_out = std::fabs(mono);
-                    if (abs_out > voice_peak) voice_peak = abs_out;
-                }
-
-                frames_done += block;
+                float abs_out = std::fabs(mono);
+                if (abs_out > voice_peak) voice_peak = abs_out;
             }
 
             // Clear gate after rendering so drums are one-shot triggers
