@@ -140,6 +140,7 @@ if(BUILD_TESTS)
         test/test_graph.cpp
         test/test_output_chain.cpp
         test/test_drums_graph.cpp
+        test/test_lfo.cpp
         test/test_snapshots.cpp
         test/test_benchmark.cpp
     )

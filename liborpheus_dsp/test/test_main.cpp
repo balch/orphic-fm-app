@@ -12,6 +12,7 @@ int main() {
     all_pass &= run_output_chain_tests();
     all_pass &= run_snapshot_tests();
     all_pass &= run_drums_graph_tests();
+    all_pass &= run_lfo_tests();
     all_pass &= run_benchmark_tests(); // always last — timing
 
     if (!all_pass) {
