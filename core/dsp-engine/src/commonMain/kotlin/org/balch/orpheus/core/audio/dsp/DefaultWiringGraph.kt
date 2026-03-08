@@ -5,7 +5,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Builds the default 12-voice + effects wiring graph descriptor.
+ * Builds the default 12-voice + 3-drum-voice + effects wiring graph descriptor.
  * Returns the ODWG binary format consumed by the C++ graph runtime.
  *
  * Graph structure:
@@ -14,6 +14,11 @@ import kotlin.math.sin
  *   delay (sends: grains+drive+warps, LFO mod) ->
  *   reverb (parallel send from drive) ->
  *   hard clip -> master out (interleaved stereo)
+ *
+ *   3x Dedicated drum voices (slots 12-14) -> drum sum ->
+ *     MAIN path: drum resonator -> limiter -> clip -> master out
+ *     FX path: drum sum -> main resonator excitation inputs
+ *   Drum routing toggle: drumDirectGain (MAIN) vs drumChainGain (FX)
  */
 fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // Default pan values matching Kotlin StereoPlugin and C++ defaults:
@@ -44,6 +49,33 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
         voiceOutsL.add(pL)
         voiceOutsR.add(pR)
     }
+
+    // ── Dedicated drum voices (3 slots) ──
+    val drumSlotGains = floatArrayOf(1.2f, 0.6f, 0.5f)
+    val drumPlaitsUnits = mutableListOf<UnitRef>()
+    val drumOutsL = mutableListOf<UnitRef>()
+    val drumOutsR = mutableListOf<UnitRef>()
+
+    for (d in 0 until 3) {
+        val dp = plaits("d${d}_p") { moduleIndex = (12 + d).toFloat() }
+        drumPlaitsUnits.add(dp)
+        val dv = multiply("d${d}_vol") { inputB = drumSlotGains[d] }
+        val (gl, gr) = panGains(0f)  // center pan
+        val dL = multiply("d${d}_pL") { inputB = gl }
+        val dR = multiply("d${d}_pR") { inputB = gr }
+
+        dp.out to dv.inputA
+        dv.out to dL.inputA
+        dv.out to dR.inputA
+        drumOutsL.add(dL)
+        drumOutsR.add(dR)
+    }
+
+    // Drum sum (all 3 drums per channel)
+    val drumSumL = passThrough("drumSumL")
+    val drumSumR = passThrough("drumSumR")
+    for (d in drumOutsL) { d.out to drumSumL.input }
+    for (d in drumOutsR) { d.out to drumSumR.input }
 
     // Summing tree: each passThrough port supports max 4 sources.
     // Groups of 4, then recurse until a single sum node remains.
@@ -77,7 +109,7 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     mvR.out to grains.inputB
 
     // Rings/Resonator with full 4-input excitation/bypass architecture
-    // Drum inputs = post-grains (Clouds output)
+    // Drum inputs = post-grains (Clouds output) + dedicated drum FX path
     // Synth inputs = master volume output (pre-effects)
     // targetMix: 0=drum only, 0.5=both, 1=synth only
     // mix: wet/dry on resonated signal
@@ -88,8 +120,22 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val synthExGainL = multiply("synthExGainL") { inputB = 1.0f }
     val synthExGainR = multiply("synthExGainR") { inputB = 1.0f }
 
-    grains.out to drumExGainL.inputA
-    grains.outRight to drumExGainR.inputA
+    // Drum FX path: drum sum → gain gate → merge with grains → main resonator excitation
+    val drumChainGainL = multiply("drumChainGainL") { inputB = 0.0f }
+    val drumChainGainR = multiply("drumChainGainR") { inputB = 0.0f }
+    drumSumL.out to drumChainGainL.inputA
+    drumSumR.out to drumChainGainR.inputA
+
+    // Merge grains + drum FX chain into drum excitation gains
+    val drumExMergeL = passThrough("drumExMergeL")
+    val drumExMergeR = passThrough("drumExMergeR")
+    grains.out to drumExMergeL.input
+    drumChainGainL.out to drumExMergeL.input
+    grains.outRight to drumExMergeR.input
+    drumChainGainR.out to drumExMergeR.input
+    drumExMergeL.out to drumExGainL.inputA
+    drumExMergeR.out to drumExGainR.inputA
+
     mvL.out to synthExGainL.inputA
     mvR.out to synthExGainR.inputA
 
@@ -188,10 +234,10 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val marblesUnit = marbles("marbles")
     clock.out to marblesUnit.inputA        // 24 PPQN clock input
 
-    // Wire Grids triggers to drum voices (voices 8, 9, 10)
-    gridsUnit.out to plaitsUnits[8].gate        // kick → voice 8
-    gridsUnit.outRight to plaitsUnits[9].gate   // snare → voice 9
-    gridsUnit.aux to plaitsUnits[10].gate       // hat → voice 10
+    // Wire Grids triggers to dedicated drum voices (slots 12, 13, 14)
+    gridsUnit.out to drumPlaitsUnits[0].gate        // kick → drum voice 12
+    gridsUnit.outRight to drumPlaitsUnits[1].gate   // snare → drum voice 13
+    gridsUnit.aux to drumPlaitsUnits[2].gate        // hat → drum voice 14
 
     // Beat-quantized looper
     val looper = looper("looper")
@@ -215,6 +261,54 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // Master clip + output
     val clipL = hardClip("clipL")
     val clipR = hardClip("clipR")
+
+    // ── Drum MAIN path routing ──
+    // Default: MAIN mode (drumDirectGain=1, drumChainGain=0)
+
+    // MAIN path: drum sum → gain gate → dedicated resonator chain
+    val drumDirectGainL = multiply("drumDirectGainL") { inputB = 1.0f }
+    val drumDirectGainR = multiply("drumDirectGainR") { inputB = 1.0f }
+    drumSumL.out to drumDirectGainL.inputA
+    drumSumR.out to drumDirectGainR.inputA
+
+    // Dedicated drum resonator dry path
+    val drumDirectResoDryGainL = multiply("drumDirectResoDryGainL") { inputB = 1.0f }
+    val drumDirectResoDryGainR = multiply("drumDirectResoDryGainR") { inputB = 1.0f }
+    drumDirectGainL.out to drumDirectResoDryGainL.inputA
+    drumDirectGainR.out to drumDirectResoDryGainR.inputA
+
+    // Mix L+R to mono for drum Rings input
+    val drumResoMix = add("drumResoMix")
+    val drumResoHalf = multiply("drumResoHalf") { inputB = 0.5f }
+    drumDirectGainL.out to drumResoMix.inputA
+    drumDirectGainR.out to drumResoMix.inputB
+    drumResoMix.out to drumResoHalf.inputA
+
+    val drumReso = rings("drumResonator")
+    drumResoHalf.out to drumReso.input
+
+    val drumDirectResoWetGainL = multiply("drumDirectResoWetGainL") { inputB = 0.0f }
+    val drumDirectResoWetGainR = multiply("drumDirectResoWetGainR") { inputB = 0.0f }
+    drumReso.out to drumDirectResoWetGainL.inputA
+    drumReso.outRight to drumDirectResoWetGainR.inputA
+
+    // Sum dry + wet
+    val drumDirectResoSumL = add("drumDirectResoSumL")
+    val drumDirectResoSumR = add("drumDirectResoSumR")
+    drumDirectResoDryGainL.out to drumDirectResoSumL.inputA
+    drumDirectResoWetGainL.out to drumDirectResoSumL.inputB
+    drumDirectResoDryGainR.out to drumDirectResoSumR.inputA
+    drumDirectResoWetGainR.out to drumDirectResoSumR.inputB
+
+    // Limiter (drive=1.0)
+    val drumDirectLimiterL = limiter("drumDirectLimiterL") { driveAmount = 1.0f }
+    val drumDirectLimiterR = limiter("drumDirectLimiterR") { driveAmount = 1.0f }
+    drumDirectResoSumL.out to drumDirectLimiterL.input
+    drumDirectResoSumR.out to drumDirectLimiterR.input
+
+    // MAIN path output → master clip (direct to output)
+    drumDirectLimiterL.out to clipL.input
+    drumDirectLimiterR.out to clipR.input
 
     // Per-String Bender (4 strings × 2 voices + audio)
     val psb = perStringBender("psb")
@@ -259,5 +353,27 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
             map("org.balch.orpheus.plugins.stereo", "voice_pan_L_$v", "v${v}_pL", IPORT_INPUT_B)
             map("org.balch.orpheus.plugins.stereo", "voice_pan_R_$v", "v${v}_pR", IPORT_INPUT_B)
         }
+        // Per-drum volume
+        map("org.balch.orpheus.plugins.drum", "bd_vol", "d0_vol", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.drum", "sd_vol", "d1_vol", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.drum", "hh_vol", "d2_vol", IPORT_INPUT_B)
+        // Per-drum pan
+        for (d in 0 until 3) {
+            map("org.balch.orpheus.plugins.drum", "drum_pan_L_$d", "d${d}_pL", IPORT_INPUT_B)
+            map("org.balch.orpheus.plugins.drum", "drum_pan_R_$d", "d${d}_pR", IPORT_INPUT_B)
+        }
+        // Drum FX/MAIN bypass toggle
+        map("org.balch.orpheus.plugins.drum", "drum_chain_gain_l", "drumChainGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.drum", "drum_chain_gain_r", "drumChainGainR", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.drum", "drum_direct_gain_l", "drumDirectGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.drum", "drum_direct_gain_r", "drumDirectGainR", IPORT_INPUT_B)
+        // Drum direct resonator wet/dry
+        map("org.balch.orpheus.plugins.drum", "drum_direct_reso_dry_l", "drumDirectResoDryGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.drum", "drum_direct_reso_dry_r", "drumDirectResoDryGainR", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.drum", "drum_direct_reso_wet_l", "drumDirectResoWetGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.drum", "drum_direct_reso_wet_r", "drumDirectResoWetGainR", IPORT_INPUT_B)
+        // Drum direct limiter drive
+        map("org.balch.orpheus.plugins.distortion", "drum_drive", "drumDirectLimiterL", IPORT_DRIVE)
+        map("org.balch.orpheus.plugins.distortion", "drum_drive", "drumDirectLimiterR", IPORT_DRIVE)
     }
 }
