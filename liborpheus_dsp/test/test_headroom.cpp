@@ -100,69 +100,100 @@ static bool test_engine_level_parity() {
 // and scale approximately as expected (sqrt(N) for uncorrelated).
 // ═══════════════════════════════════════════════════════════════════
 static bool test_fullchain_headroom() {
-    printf("\n=== Test: Full-chain headroom (1/2/4/8 voices) ===\n");
+    printf("\n=== Test: Full-chain headroom (1/2/4/8/12 voices) ===\n");
     bool pass = true;
 
-    struct Scenario {
-        int num_voices;
-        float notes[8];
+    printf("  %-12s  %8s  %8s  %6s  %s\n",
+           "Config", "Peak", "RMS", "Crest", "Status");
+
+    // Helper lambda for main-voice-only scenarios
+    auto run_main_voices = [&](const char* label, int n, float* notes) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        load_production_graph(engine);
+        orpheus_engine_set_master_volume(engine, 0.8f);
+        for (int v = 0; v < n; v++) {
+            activate_voice(engine, v, 8, notes[v]);
+            char sym[16];
+            snprintf(sym, sizeof(sym), "voice_pan_%d", v);
+            orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.stereo", sym, 0.0f);
+        }
+        auto r = render_engine(engine, 48000);
+        float rms = (r.rms_l + r.rms_r) / 2.0f;
+        float crest = (rms > 0.0001f) ? r.peak / rms : 0.0f;
+        bool no_clip = r.peak <= 1.0f;
+        bool has_signal = rms > 0.01f;
+        bool ok = no_clip && has_signal;
+        printf("  %-12s  %8.4f  %8.4f  %6.2f  %s\n",
+               label, r.peak, rms, crest,
+               ok ? "OK" : (no_clip ? "LOW SIGNAL" : "CLIPPING!"));
+        if (!ok) pass = false;
+        orpheus_engine_destroy(engine);
+        return rms;
     };
-    Scenario scenarios[] = {
-        {1, {60.0f}},
-        {2, {60.0f, 67.0f}},
-        {4, {48.0f, 55.0f, 60.0f, 67.0f}},
-        {8, {48.0f, 52.0f, 55.0f, 60.0f, 64.0f, 67.0f, 72.0f, 76.0f}},
-    };
 
-    float rms_values[4] = {};
-    float peak_values[4] = {};
+    float n1[] = {60.0f};
+    float n2[] = {60.0f, 67.0f};
+    float n4[] = {48.0f, 55.0f, 60.0f, 67.0f};
+    float n8[] = {48.0f, 52.0f, 55.0f, 60.0f, 64.0f, 67.0f, 72.0f, 76.0f};
 
-    printf("  %-8s  %8s  %8s  %6s  %s\n",
-           "Voices", "Peak", "RMS", "Crest", "Status");
+    float rms_1v = run_main_voices("1 main", 1, n1);
+    run_main_voices("2 main", 2, n2);
+    float rms_4v = run_main_voices("4 main", 4, n4);
+    float rms_8v = run_main_voices("8 main", 8, n8);
 
-    for (int s = 0; s < 4; s++) {
-        auto& sc = scenarios[s];
+    // 12-voice scenario: 8 main voices + 4 drum triggers (kick/snare/hat/kick)
+    {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         load_production_graph(engine);
         orpheus_engine_set_master_volume(engine, 0.8f);
 
-        for (int v = 0; v < sc.num_voices; v++) {
-            activate_voice(engine, v, 8, sc.notes[v]);
-            // Center pan all voices for worst-case headroom
+        // Activate all 8 main voices
+        for (int v = 0; v < 8; v++) {
+            activate_voice(engine, v, 8, n8[v]);
             char sym[16];
             snprintf(sym, sizeof(sym), "voice_pan_%d", v);
             orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.stereo", sym, 0.0f);
         }
 
-        auto r = render_engine(engine, 48000); // 1 second
+        // Trigger all 4 drum voices
+        orpheus_engine_trigger_drum(engine, 0, 0.8f); // bass drum
+        orpheus_engine_trigger_drum(engine, 1, 0.8f); // snare
+        orpheus_engine_trigger_drum(engine, 2, 0.8f); // hihat
+        orpheus_engine_trigger_drum(engine, 3, 0.8f); // bass drum alt
 
-        rms_values[s] = (r.rms_l + r.rms_r) / 2.0f;
-        peak_values[s] = r.peak;
-        float crest = (rms_values[s] > 0.0001f) ? peak_values[s] / rms_values[s] : 0.0f;
-
-        bool no_clip = peak_values[s] <= 1.0f;
-        bool has_signal = rms_values[s] > 0.01f;
+        auto r = render_engine(engine, 48000);
+        float rms = (r.rms_l + r.rms_r) / 2.0f;
+        float crest = (rms > 0.0001f) ? r.peak / rms : 0.0f;
+        bool no_clip = r.peak <= 1.0f;
+        bool has_signal = rms > 0.01f;
         bool ok = no_clip && has_signal;
-
-        printf("  %-8d  %8.4f  %8.4f  %6.2f  %s\n",
-               sc.num_voices, peak_values[s], rms_values[s], crest,
+        printf("  %-12s  %8.4f  %8.4f  %6.2f  %s\n",
+               "8+4 drums", r.peak, rms, crest,
                ok ? "OK" : (no_clip ? "LOW SIGNAL" : "CLIPPING!"));
-
         if (!ok) pass = false;
+
+        // Verify drum voices actually contributed
+        int drums_active = 0;
+        for (int v = 8; v < 12; v++) {
+            float level = engine->voice_levels[v].load();
+            if (level > 0.001f) drums_active++;
+        }
+        printf("  Drum voices active: %d/4\n", drums_active);
+
+        float rms_12v = rms;
+        if (rms_12v < rms_8v * 0.95f) {
+            printf("  WARNING: 12v RMS (%.4f) lower than 8v (%.4f) — drums may not be contributing\n",
+                   rms_12v, rms_8v);
+        }
+
         orpheus_engine_destroy(engine);
     }
 
     // Check scaling: 4 voices should be louder than 1, but less than 4x
-    float ratio_4_1 = rms_values[2] / (rms_values[0] + 0.0001f);
+    float ratio_4_1 = rms_4v / (rms_1v + 0.0001f);
     printf("  4v/1v ratio: %.2f (expect 1.5–3.5 for uncorrelated signals)\n", ratio_4_1);
     if (ratio_4_1 < 1.2f || ratio_4_1 > 4.5f) {
         printf("  FAIL: unexpected voice scaling ratio\n");
-        pass = false;
-    }
-
-    // 8 voices should not clip
-    if (peak_values[3] > 1.0f) {
-        printf("  FAIL: 8 voices clip at peak=%.4f\n", peak_values[3]);
         pass = false;
     }
 
