@@ -6,6 +6,8 @@
 
 #include "stmlib/utils/buffer_allocator.h"
 
+#include "plaits/resources.h"
+
 #include "plaits/dsp/engine/additive_engine.h"
 #include "plaits/dsp/engine/bass_drum_engine.h"
 #include "plaits/dsp/engine/chord_engine.h"
@@ -40,10 +42,10 @@ static constexpr int kOrpheusBlockSize = 24;
 // Number of registered Plaits engines.
 static constexpr int kOrpheusMaxEngines = 24;
 
-// Per-engine output gain, matching Kotlin DspPlaitsUnit outGain values.
-// Engines 0-7 (bank 2): no Kotlin impl, use default 0.3.
-// Engines 8-23: match Kotlin per-engine values.
-static const float kOutGain[kOrpheusMaxEngines] = {
+// Per-engine output gain for Orpheus voice rendering.
+// Engines 0-7 (bank 2): default 0.3.
+// Engines 8-23: tuned per engine for balanced output.
+static const float kOrpheusOutGain[kOrpheusMaxEngines] = {
     0.3f,   //  0: VirtualAnalogVCF (no Kotlin impl, default)
     0.3f,   //  1: PhaseDistortion (no Kotlin impl)
     0.3f,   //  2: SixOp FM1 (no Kotlin impl)
@@ -190,13 +192,19 @@ struct OrpheusVoice {
 
         plaits::Engine* e = engines_.get(engine_index);
 
-        // Handle engine switching: reset on change.
+        // Handle engine switching: reset and load user data on change.
+        // SixOp engines (indices 2-4) require FM patch data from resources.
         if (engine_index != previous_engine_index_) {
+            const uint8_t* user_data = nullptr;
+            if (engine_index >= 2 && engine_index <= 4) {
+                user_data = plaits::fm_patches_table[engine_index - 2];
+            }
+            e->LoadUserData(user_data);
             e->Reset();
             previous_engine_index_ = engine_index;
         }
 
-        float gain = kOutGain[engine_index];
+        float gain = kOrpheusOutGain[engine_index];
 
         // Render in blocks of kOrpheusBlockSize (24), matching Kotlin.
         int frames_rendered = 0;
