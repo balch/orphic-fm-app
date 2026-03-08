@@ -29,6 +29,8 @@ enum OrpheusUnitType : uint16_t {
     UNIT_GRIDS = 21,
     UNIT_MARBLES = 22,
     UNIT_LOOPER = 23,
+    UNIT_BENDER = 24,
+    UNIT_PER_STRING_BENDER = 25,
     UNIT_TYPE_COUNT
 };
 

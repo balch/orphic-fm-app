@@ -26,6 +26,8 @@ const val UNIT_CLOCK = 20
 const val UNIT_GRIDS = 21
 const val UNIT_MARBLES = 22
 const val UNIT_LOOPER = 23
+const val UNIT_BENDER = 24
+const val UNIT_PER_STRING_BENDER = 25
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -296,6 +298,12 @@ class WiringGraphBuilder {
         addUnit(UNIT_MARBLES, name, init)
     fun looper(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_LOOPER, name, init)
+
+    fun bender(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_BENDER, name, init)
+
+    fun perStringBender(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_PER_STRING_BENDER, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 
