@@ -289,8 +289,12 @@ static void compute_adsr_from_speed(float speed, float sr,
     float release_s = 0.1f   + eased * 3.9f;     // 100ms – 4s
 
     attack_rate   = 1.0f / (attack_s * sr);
-    decay_coeff   = std::exp(-1.0f / (decay_s * sr));
-    release_coeff = std::exp(-1.0f / (release_s * sr));
+    // Use -6.908 (≈ ln(0.001)) so the time parameters represent
+    // the duration to reach -60 dB, matching JSyn's DAHDSR behavior.
+    // The previous -1.0 treated the time as a time constant (1/e decay),
+    // which is ~7× slower — notes would never fully release.
+    decay_coeff   = std::exp(-6.908f / (decay_s * sr));
+    release_coeff = std::exp(-6.908f / (release_s * sr));
 }
 
 // Compute scaled hold matching Kotlin: (hold^(4-speed*3)) × (0.5+speed*1.5)
@@ -364,10 +368,9 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             return;
         }
     } else {
-        // Plaits: idle if gate off, no hold, and previous peak was near zero
-        // (internal LPG has fully decayed)
+        // Plaits: idle if gate off, no hold, ADSR finished, and previous peak was near zero
         float prev_peak = engine->voice_levels[idx].load(std::memory_order_relaxed);
-        if (actual_gate == 0 && scaled_hold < 0.001f && prev_peak < 0.0001f) {
+        if (actual_gate == 0 && scaled_hold < 0.001f && osc.env_stage == 0 && prev_peak < 0.0001f) {
             // Reset trigger state so next gate-on produces a rising edge.
             // Without this, trigger_state_ stays true (stale from last gate)
             // and OrpheusVoice won't detect TRIGGER_RISING_EDGE on re-trigger.
@@ -548,13 +551,50 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         voice.Render(engine_index, plaits_gate, note, harmonics, timbre, morph, 0.8f,
                      out, num_frames);
 
-        // Apply hold VCA: when hold active but gate off, scale by hold level
+        // ADSR envelope (same as Engine 0 — wraps ALL sources, matching JSyn's DspVoice VCA)
+        float attack_rate, decay_coeff, sustain_level, release_coeff;
+        compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
+                                 sustain_level, release_coeff);
+
         float voice_peak = 0.0f;
         for (int i = 0; i < num_frames; i++) {
-            osc.hold_smoothed += hold_coeff * (scaled_hold - osc.hold_smoothed);
-            if (raw_hold > 0.001f && actual_gate == 0) {
-                out[i] *= osc.hold_smoothed;
+            // ADSR state machine
+            bool gate_on = actual_gate != 0;
+            if (gate_on && !osc.env_gate_was_on) osc.env_stage = 1;
+            if (!gate_on && osc.env_gate_was_on) osc.env_stage = 4;
+            osc.env_gate_was_on = gate_on;
+
+            switch (osc.env_stage) {
+                case 1: // ATTACK
+                    osc.env_level += attack_rate;
+                    if (osc.env_level >= 1.0f) { osc.env_level = 1.0f; osc.env_stage = 2; }
+                    break;
+                case 2: // DECAY
+                    osc.env_level = sustain_level +
+                                    (osc.env_level - sustain_level) * decay_coeff;
+                    if (osc.env_level - sustain_level < 0.0001f) {
+                        osc.env_level = sustain_level; osc.env_stage = 3;
+                    }
+                    break;
+                case 3: // SUSTAIN
+                    osc.env_level = sustain_level;
+                    break;
+                case 4: // RELEASE
+                    osc.env_level *= release_coeff;
+                    if (osc.env_level < 0.0001f) { osc.env_level = 0.0f; osc.env_stage = 0; }
+                    break;
+                default: // IDLE
+                    osc.env_level = 0.0f;
+                    break;
             }
+
+            // Hold ramp (smoothed to avoid clicks)
+            osc.hold_smoothed += hold_coeff * (scaled_hold - osc.hold_smoothed);
+
+            // VCA = envelope + hold (same formula as Engine 0)
+            float vca = osc.env_level + osc.hold_smoothed;
+            out[i] *= vca;
+
             float abs_s = std::fabs(out[i]);
             if (abs_s > voice_peak) voice_peak = abs_s;
         }

@@ -568,6 +568,148 @@ static bool test_voice_mix_cv_defaults() {
     return pass;
 }
 
+// ── Issue 1: Plaits engines must respond to envSpeed ──────────────
+// In JSyn, DspVoice wraps ALL sources (OSC + Plaits) with an ADSR VCA,
+// so envSpeed affects attack/release for Plaits engines too.
+// The C++ path currently has NO ADSR on Plaits — this test should FAIL
+// until we add ADSR wrapping to the Plaits render path.
+static bool test_plaits_envspeed_varies_output() {
+    printf("\n=== Test: Plaits engines respond to envSpeed ===\n");
+    constexpr float sr = 48000.0f;
+    constexpr int plaits_va = 8; // Virtual Analog engine
+
+    // Render at fast (0.0) and slow (1.0) envSpeed
+    // With ADSR: fast should have quick attack/release, slow should have long attack
+    // → RMS over 4s should differ significantly
+    auto buf_fast = render_voice_with_envelope(plaits_va, 60.0f, 0.5f, 0.5f, 0.5f,
+                                                0.0f, (int)sr, 4.0f, 1.0f);
+    auto buf_slow = render_voice_with_envelope(plaits_va, 60.0f, 0.5f, 0.5f, 0.5f,
+                                                1.0f, (int)sr, 4.0f, 1.0f);
+
+    int total = (int)(sr * 4);
+    float rms_fast = compute_rms(buf_fast.data(), total * 2);
+    float rms_slow = compute_rms(buf_slow.data(), total * 2);
+    float peak_fast = compute_peak(buf_fast.data(), total * 2);
+    float peak_slow = compute_peak(buf_slow.data(), total * 2);
+
+    printf("  envspeed=0.0 (fast): RMS=%.4f Peak=%.4f\n", rms_fast, peak_fast);
+    printf("  envspeed=1.0 (slow): RMS=%.4f Peak=%.4f\n", rms_slow, peak_slow);
+
+    // Check release: measure amplitude 500ms after gate-off (at 1500ms = frame 72000)
+    int release_check = (int)(sr * 1.5f); // 500ms after gate-off
+    float release_fast = 0.0f, release_slow = 0.0f;
+    int window = (int)(sr / 100); // 10ms window
+    for (int i = release_check; i < release_check + window && i < total; i++) {
+        float a = std::fabs(buf_fast[i * 2]);
+        if (a > release_fast) release_fast = a;
+        a = std::fabs(buf_slow[i * 2]);
+        if (a > release_slow) release_slow = a;
+    }
+    printf("  500ms after gate-off: fast=%.4f slow=%.4f\n", release_fast, release_slow);
+
+    bool pass = true;
+
+    // The fast and slow renders MUST produce different RMS (ADSR shapes the output)
+    float rms_ratio = std::min(rms_fast, rms_slow) / std::max(rms_fast, rms_slow);
+    if (rms_ratio > 0.95f) {
+        printf("  FAIL: envSpeed has no effect on Plaits — RMS ratio=%.3f (expected < 0.95)\n", rms_ratio);
+        pass = false;
+    } else {
+        printf("  RMS ratio=%.3f — envSpeed affects Plaits output OK\n", rms_ratio);
+    }
+
+    // Fast release should be mostly silent 500ms after gate-off
+    if (release_fast > 0.05f) {
+        printf("  FAIL: fast envSpeed still loud 500ms after gate-off (%.4f > 0.05)\n", release_fast);
+        pass = false;
+    }
+
+    printf("Plaits envSpeed test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// ── Issue 2: Engine 0 ADSR release behavior ──────────────────────
+// Tests the behavioral contract of the ADSR, not JSyn-specific thresholds:
+// 1. Faster envSpeed → faster release (monotonic ordering)
+// 2. envspeed=0.0 (fastest) must reach silence within 3s of release
+// 3. Release must actually reduce output (not stuck at sustain)
+static bool test_engine0_release_timing() {
+    printf("\n=== Test: Engine 0 ADSR release behavior ===\n");
+    constexpr float sr = 48000.0f;
+    bool pass = true;
+
+    float speeds[] = {0.0f, 0.5f, 1.0f};
+    float silence_times[3]; // ms to reach < 0.01 after gate-off
+
+    for (int s = 0; s < 3; s++) {
+        auto buf = render_voice_with_envelope(-1, 60.0f, 0.5f, 0.5f, 0.5f,
+                                               speeds[s], (int)sr, 4.0f, 1.0f);
+        int total = (int)(sr * 4);
+
+        // Sustain level (peak in last 100ms before gate-off)
+        float sustain_peak = 0.0f;
+        int sustain_start = (int)(sr * 0.9f);
+        int sustain_end = (int)sr;
+        for (int i = sustain_start; i < sustain_end; i++) {
+            float a = std::fabs(buf[i * 2]);
+            if (a > sustain_peak) sustain_peak = a;
+        }
+
+        // Measure time to reach silence after gate-off
+        int gate_off_frame = (int)sr;
+        float threshold_silent = 0.01f;
+        silence_times[s] = -1.0f;
+        int window = (int)(sr / 100); // 10ms
+        float level_at_500ms = 0.0f;
+
+        for (int off = gate_off_frame; off < total; off += window) {
+            int end = std::min(off + window, total);
+            float win_peak = 0.0f;
+            for (int i = off; i < end; i++) {
+                float a = std::fabs(buf[i * 2]);
+                if (a > win_peak) win_peak = a;
+            }
+            float ms_after_gate = (float)(off - gate_off_frame) / sr * 1000.0f;
+            if (ms_after_gate >= 490.0f && ms_after_gate <= 510.0f)
+                level_at_500ms = win_peak;
+            if (silence_times[s] < 0 && win_peak < threshold_silent)
+                silence_times[s] = ms_after_gate;
+        }
+
+        printf("  envspeed=%.1f: sustain=%.3f, 500ms_after=%.4f, silence=%.0fms\n",
+               speeds[s], sustain_peak, level_at_500ms, silence_times[s]);
+
+        // Check 1: release must actually reduce level (not stuck)
+        if (level_at_500ms > sustain_peak * 0.9f) {
+            printf("  FAIL: level barely dropped 500ms after gate-off (%.3f vs sustain %.3f)\n",
+                   level_at_500ms, sustain_peak);
+            pass = false;
+        }
+
+        // Check 2: ALL speeds must reach silence within 3s (a note must always fully release)
+        if (silence_times[s] < 0) {
+            printf("  FAIL: envspeed=%.1f never reached silence in 3s\n", speeds[s]);
+            pass = false;
+        }
+    }
+
+    // Check 3: faster envSpeed → faster release (monotonic ordering)
+    // silence_times[0] should be < silence_times[1] < silence_times[2]
+    // (or both slow ones may not reach silence, which is fine)
+    for (int s = 0; s < 2; s++) {
+        if (silence_times[s] > 0 && silence_times[s + 1] > 0) {
+            if (silence_times[s] >= silence_times[s + 1]) {
+                printf("  FAIL: faster speed (%.1f=%.0fms) should release before slower (%.1f=%.0fms)\n",
+                       speeds[s], silence_times[s], speeds[s + 1], silence_times[s + 1]);
+                pass = false;
+            }
+        }
+    }
+
+    printf("Engine 0 release timing test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_graph_tests() {
     bool all_pass = true;
     all_pass &= test_graph_single_voice();
@@ -576,5 +718,7 @@ bool run_graph_tests() {
     all_pass &= test_voice_mix_cv_defaults();
     all_pass &= test_per_voice_signal_parity();
     all_pass &= test_bender_voice_volume_parity();
+    all_pass &= test_plaits_envspeed_varies_output();
+    all_pass &= test_engine0_release_timing();
     return all_pass;
 }
