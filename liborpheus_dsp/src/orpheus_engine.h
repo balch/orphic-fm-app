@@ -108,6 +108,8 @@ struct OrpheusEngine {
     std::atomic<int>   rings_strum{0};          // trigger: set to 1, audio thread clears
     std::atomic<int>   rings_bypass{1};         // bypassed by default
     std::atomic<int>   rings_internal_exciter{1}; // use internal noise exciter
+    std::atomic<float> resonator_target_mix{0.5f};     // 0=drum, 0.5=both, 1=synth
+    std::atomic<float> resonator_mix{0.5f};            // wet/dry
 
     // Warps modulator
     warps::Modulator warps_modulator;

@@ -76,21 +76,87 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     mvL.out to grains.inputA
     mvR.out to grains.inputB
 
-    // Rings/Resonator (mono in -> stereo out) - bypassed by default
-    // Mix L+R to mono for rings input
-    val ringsMix = add("ringsMix")
-    val ringsHalf = multiply("ringsHalf") { inputB = 0.5f }
+    // Rings/Resonator with full 4-input excitation/bypass architecture
+    // Drum inputs = post-grains (Clouds output)
+    // Synth inputs = master volume output (pre-effects)
+    // targetMix: 0=drum only, 0.5=both, 1=synth only
+    // mix: wet/dry on resonated signal
+
+    // Excitation path: drum + synth inputs scaled by targetMix gains
+    val drumExGainL = multiply("drumExGainL") { inputB = 1.0f }
+    val drumExGainR = multiply("drumExGainR") { inputB = 1.0f }
+    val synthExGainL = multiply("synthExGainL") { inputB = 1.0f }
+    val synthExGainR = multiply("synthExGainR") { inputB = 1.0f }
+
+    grains.out to drumExGainL.inputA
+    grains.outRight to drumExGainR.inputA
+    mvL.out to synthExGainL.inputA
+    mvR.out to synthExGainR.inputA
+
+    // Sum excitation to mono for Rings input
+    val exciteSumL = passThrough("exciteSumL")
+    drumExGainL.out to exciteSumL.input
+    synthExGainL.out to exciteSumL.input
+
+    val exciteSumR = passThrough("exciteSumR")
+    drumExGainR.out to exciteSumR.input
+    synthExGainR.out to exciteSumR.input
+
+    // Mix L+R to mono for Rings
+    val resoMix = add("resoMix")
+    val resoHalf = multiply("resoHalf") { inputB = 0.5f }
+    exciteSumL.out to resoMix.inputA
+    exciteSumR.out to resoMix.inputB
+    resoMix.out to resoHalf.inputA
+
     val reso = rings("resonator")
-    grains.out to ringsMix.inputA
-    grains.outRight to ringsMix.inputB
-    ringsMix.out to ringsHalf.inputA
-    ringsHalf.out to reso.input
+    resoHalf.out to reso.input
+
+    // Bypass path: inverse gains (dry signal)
+    val drumBpGainL = multiply("drumBpGainL") { inputB = 0.0f }
+    val drumBpGainR = multiply("drumBpGainR") { inputB = 0.0f }
+    val synthBpGainL = multiply("synthBpGainL") { inputB = 0.0f }
+    val synthBpGainR = multiply("synthBpGainR") { inputB = 0.0f }
+
+    grains.out to drumBpGainL.inputA
+    grains.outRight to drumBpGainR.inputA
+    mvL.out to synthBpGainL.inputA
+    mvR.out to synthBpGainR.inputA
+
+    val bypassSumL = passThrough("bypassSumL")
+    drumBpGainL.out to bypassSumL.input
+    synthBpGainL.out to bypassSumL.input
+
+    val bypassSumR = passThrough("bypassSumR")
+    drumBpGainR.out to bypassSumR.input
+    synthBpGainR.out to bypassSumR.input
+
+    // Wet/dry mix on resonated signal
+    val wetGainL = multiply("wetGainL") { inputB = 0.5f }
+    val wetGainR = multiply("wetGainR") { inputB = 0.5f }
+    val dryGainL = multiply("dryGainL") { inputB = 0.5f }
+    val dryGainR = multiply("dryGainR") { inputB = 0.5f }
+
+    reso.out to wetGainL.inputA
+    reso.outRight to wetGainR.inputA
+    exciteSumL.out to dryGainL.inputA
+    exciteSumR.out to dryGainR.inputA
+
+    // Final resonator output: wet + dry + bypass
+    val resoOutL = passThrough("resoOutL")
+    val resoOutR = passThrough("resoOutR")
+    wetGainL.out to resoOutL.input
+    dryGainL.out to resoOutL.input
+    bypassSumL.out to resoOutL.input
+    wetGainR.out to resoOutR.input
+    dryGainR.out to resoOutR.input
+    bypassSumR.out to resoOutR.input
 
     // Drive / limiter (stereo) - after resonator, matching JSyn chain order
     val driveL = limiter("driveL") { driveAmount = 1.0f }
     val driveR = limiter("driveR") { driveAmount = 1.0f }
-    reso.out to driveL.input
-    reso.outRight to driveR.input
+    resoOutL.out to driveL.input
+    resoOutR.out to driveR.input
 
     // Warps (stereo in/out) - bypassed by default
     val warp = warps("warps")
@@ -166,6 +232,19 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
         // Tempo clock
         map("org.balch.orpheus.plugins.tempo", "bpm", "clock", IPORT_INPUT_A)
         map("org.balch.orpheus.plugins.tempo", "run", "clock", IPORT_INPUT_B)
+        // Resonator targetMix-derived gains
+        map("org.balch.orpheus.plugins.resonator", "drum_ex_gain", "drumExGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "drum_ex_gain", "drumExGainR", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "synth_ex_gain", "synthExGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "synth_ex_gain", "synthExGainR", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "drum_bp_gain", "drumBpGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "drum_bp_gain", "drumBpGainR", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "synth_bp_gain", "synthBpGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "synth_bp_gain", "synthBpGainR", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "wet_gain", "wetGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "wet_gain", "wetGainR", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "dry_gain", "dryGainL", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.resonator", "dry_gain", "dryGainR", IPORT_INPUT_B)
         // Per-voice pan gains (constant-power, computed in Kotlin)
         for (v in 0 until 12) {
             map("org.balch.orpheus.plugins.stereo", "voice_pan_L_$v", "v${v}_pL", IPORT_INPUT_B)

@@ -623,6 +623,19 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
     }
 
+    // Resonator routing
+    {
+        static uint16_t h_reso = engine_hash16("org.balch.orpheus.plugins.resonator");
+        static uint16_t h_target_mix = engine_hash16("target_mix");
+        static uint16_t h_reso_mix = engine_hash16("reso_mix");
+        uint16_t uri_hash = engine_hash16(plugin_uri);
+        uint16_t symbol_hash = engine_hash16(symbol);
+        if (uri_hash == h_reso) {
+            if (symbol_hash == h_target_mix) { engine->resonator_target_mix.store(value, std::memory_order_relaxed); return; }
+            if (symbol_hash == h_reso_mix) { engine->resonator_mix.store(value, std::memory_order_relaxed); return; }
+        }
+    }
+
     // Also set engine atomics (for MI wrappers that read from atomics)
     // Keep ALL existing strcmp chains below
     if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.grains") == 0) {
