@@ -201,6 +201,11 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     looper.out to delay.inputA          // looper output → delay
     looper.outRight to delay.inputB
 
+    // Global Bender (pitch CV + timbre CV + audio)
+    val benderUnit = bender("bender")
+    benderUnit.aux to delay.inputA       // bender audio → delay send
+    benderUnit.aux to delay.inputB
+
     // Reverb (Dattorro plate) — parallel send from drive output
     // Wet-only output sums into clip inputs alongside delay output
     val reverb = reverb("reverb")
@@ -210,6 +215,11 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // Master clip + output
     val clipL = hardClip("clipL")
     val clipR = hardClip("clipR")
+
+    // Per-String Bender (4 strings × 2 voices + audio)
+    val psb = perStringBender("psb")
+    psb.out to clipL.input               // per-string audio → output
+    psb.outRight to clipR.input
     val master = masterOut("master")
     delay.out to clipL.input
     delay.outRight to clipR.input
