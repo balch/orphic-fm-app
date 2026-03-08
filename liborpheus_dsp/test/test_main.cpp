@@ -354,6 +354,98 @@ bool test_fm_modulation() {
     return pass;
 }
 
+bool test_bender() {
+    printf("\n=== Test: Bender CV + audio ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    GraphUnit bender_unit = {};
+    bender_unit.type = UNIT_BENDER;
+    bender_unit.enabled = true;
+    unit_init(&bender_unit, 48000.0f);
+
+    // Apply a bend
+    engine->bend_amount.store(0.5f);
+
+    float max_pitch = 0.0f, max_audio = 0.0f;
+    for (int offset = 0; offset < 48000; offset += 128) {
+        int chunk = std::min(128, 48000 - offset);
+        unit_process_bender(&bender_unit, engine, chunk, 48000.0f);
+        for (int i = 0; i < chunk; i++) {
+            float p = std::fabs(bender_unit.output_buffers[OPORT_OUT][i]);
+            float a = std::fabs(bender_unit.output_buffers[OPORT_AUX][i]);
+            if (p > max_pitch) max_pitch = p;
+            if (a > max_audio) max_audio = a;
+        }
+    }
+
+    printf("Max pitch CV: %.4f, Max audio: %.4f\n", max_pitch, max_audio);
+    bool pass = max_pitch > 0.01f && max_audio > 0.0001f;
+    printf("Bender test: %s\n", pass ? "PASS" : "FAIL");
+
+    // Release bend — should trigger spring
+    engine->bend_amount.store(0.0f);
+    float max_spring = 0.0f;
+    for (int offset = 0; offset < 24000; offset += 128) {
+        int chunk = std::min(128, 24000 - offset);
+        unit_process_bender(&bender_unit, engine, chunk, 48000.0f);
+        for (int i = 0; i < chunk; i++) {
+            float a = std::fabs(bender_unit.output_buffers[OPORT_AUX][i]);
+            if (a > max_spring) max_spring = a;
+        }
+    }
+    printf("Max spring audio after release: %.4f\n", max_spring);
+    bool spring_pass = max_spring > 0.0001f;
+    printf("Spring test: %s\n", spring_pass ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return pass && spring_pass;
+}
+
+bool test_per_string_bender() {
+    printf("\n=== Test: Per-string bender ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    GraphUnit psb_unit = {};
+    psb_unit.type = UNIT_PER_STRING_BENDER;
+    psb_unit.enabled = true;
+    unit_init(&psb_unit, 48000.0f);
+
+    // Activate string 0 with bend
+    engine->string_active[0].store(1);
+    engine->string_bend[0].store(0.5f);
+    engine->string_mix[0].store(0.5f);
+
+    for (int offset = 0; offset < 24000; offset += 128) {
+        int chunk = std::min(128, 24000 - offset);
+        unit_process_per_string_bender(&psb_unit, engine, chunk, 48000.0f);
+    }
+
+    // Check voice CVs
+    float bend_cv = engine->voice_bend_cv[0];
+    float mix_cv = engine->voice_mix_cv[0];
+    printf("Voice 0 bend CV: %.4f semitones\n", bend_cv);
+    printf("Voice 0 mix CV: %.4f\n", mix_cv);
+
+    // Release string — should trigger pluck + spring
+    engine->string_active[0].store(0);
+    float max_audio = 0.0f;
+    for (int offset = 0; offset < 24000; offset += 128) {
+        int chunk = std::min(128, 24000 - offset);
+        unit_process_per_string_bender(&psb_unit, engine, chunk, 48000.0f);
+        for (int i = 0; i < chunk; i++) {
+            float a = std::fabs(psb_unit.output_buffers[OPORT_OUT][i]);
+            if (a > max_audio) max_audio = a;
+        }
+    }
+
+    printf("Max audio after release: %.4f\n", max_audio);
+    bool pass = std::fabs(bend_cv) > 0.1f && mix_cv >= 0.99f && max_audio > 0.001f;
+    printf("Per-string bender test: %s\n", pass ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 int main() {
     if (!test_voice_coupling()) return 1;
     if (!test_fm_modulation()) return 1;
@@ -361,6 +453,8 @@ int main() {
     if (!test_grids()) return 1;
     if (!test_marbles()) return 1;
     if (!test_looper()) return 1;
+    if (!test_bender()) return 1;
+    if (!test_per_string_bender()) return 1;
 
     printf("Creating OrpheusEngine at 48kHz...\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
