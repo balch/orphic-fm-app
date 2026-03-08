@@ -128,6 +128,14 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     gridsUnit.outRight to plaitsUnits[9].gate   // snare → voice 9
     gridsUnit.aux to plaitsUnits[10].gate       // hat → voice 10
 
+    // Beat-quantized looper
+    val looper = looper("looper")
+    driveL.out to looper.inputA         // audio in L (post-drive)
+    driveR.out to looper.inputB         // audio in R
+    clock.outRight to looper.inputC     // beat pulse for quantization
+    looper.out to delay.inputA          // looper output → delay
+    looper.outRight to delay.inputB
+
     // Reverb (Dattorro plate) — parallel send from drive output
     // Wet-only output sums into clip inputs alongside delay output
     val reverb = reverb("reverb")

@@ -246,4 +246,18 @@ struct OrpheusEngine {
     std::atomic<float> grids_density_hat{0.5f};
     std::atomic<float> grids_randomness{0.0f};
     std::atomic<int>   grids_bypass{1};
+
+    // ── Beat-Quantized Looper ─────────────────────────
+    static constexpr int kMaxLoopSamples = 48000 * 30;  // 30 seconds at 48kHz
+    float* looper_buffer_l{nullptr};  // heap allocated in create()
+    float* looper_buffer_r{nullptr};
+    int    looper_length{0};           // recorded loop length in samples
+    int    looper_position{0};         // current read/write position
+    int    looper_current_state{0};    // actual state: 0=stop, 1=record, 2=play, 3=overdub
+    bool   looper_pending_transition{false};
+    int    looper_pending_state{0};    // requested state (waits for beat boundary)
+    std::atomic<int>   looper_requested_state{0}; // from UI: 0=stop, 1=record, 2=play, 3=overdub
+    std::atomic<float> looper_level{1.0f};        // playback level
+    std::atomic<float> looper_feedback{0.8f};     // overdub feedback
+    std::atomic<int>   looper_quantize{1};        // 1 = quantize to beat, 0 = immediate
 };

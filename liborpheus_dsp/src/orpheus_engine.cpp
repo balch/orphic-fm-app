@@ -60,6 +60,10 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->marbles_xy_generator.LoadScale(1, chromatic);
     }
 
+    // Allocate looper buffers
+    engine->looper_buffer_l = new float[OrpheusEngine::kMaxLoopSamples]();
+    engine->looper_buffer_r = new float[OrpheusEngine::kMaxLoopSamples]();
+
     // Default per-voice pans (matches Kotlin StereoPlugin defaults)
     engine->voice_pan[0].store(0.0f);
     engine->voice_pan[1].store(0.0f);
@@ -90,6 +94,8 @@ static void orpheus_graph_free(OrpheusGraph* graph) {
 void orpheus_engine_destroy(OrpheusEngine* engine) {
     if (engine) {
         orpheus_graph_free(engine->graph.load(std::memory_order_relaxed));
+        delete[] engine->looper_buffer_l;
+        delete[] engine->looper_buffer_r;
         delete engine;
     }
 }
@@ -735,6 +741,16 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->reverb_damping.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "diffusion") == 0)
             engine->reverb_diffusion.store(value, std::memory_order_relaxed);
+    }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.looper") == 0) {
+        if (std::strcmp(symbol, "state") == 0)
+            engine->looper_requested_state.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "level") == 0)
+            engine->looper_level.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "feedback") == 0)
+            engine->looper_feedback.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "quantize") == 0)
+            engine->looper_quantize.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.tempo") == 0) {
         if (std::strcmp(symbol, "bpm") == 0)

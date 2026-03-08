@@ -220,10 +220,65 @@ bool test_marbles() {
     return pass;
 }
 
+bool test_looper() {
+    printf("\n=== Test: Looper record/play ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    GraphUnit looper_unit = {};
+    looper_unit.type = UNIT_LOOPER;
+    looper_unit.enabled = true;
+    unit_init(&looper_unit, 48000.0f);
+
+    const int record_frames = 12000; // 0.25 seconds
+    engine->looper_quantize.store(0); // immediate (no beat sync for test simplicity)
+    engine->looper_requested_state.store(1); // record
+
+    // Phase 1: Record a sine tone
+    for (int offset = 0; offset < record_frames; offset += 128) {
+        int chunk = std::min(128, record_frames - offset);
+        for (int i = 0; i < chunk; i++) {
+            float phase = static_cast<float>(offset + i) / 48000.0f;
+            float val = std::sin(phase * 440.0f * 2.0f * 3.14159f) * 0.5f;
+            looper_unit.inputs[IPORT_INPUT_A].buffer[i] = val;
+            looper_unit.inputs[IPORT_INPUT_B].buffer[i] = val;
+            looper_unit.inputs[IPORT_INPUT_C].buffer[i] = 0.0f;
+        }
+        unit_process_looper(&looper_unit, engine, chunk, 48000.0f);
+    }
+
+    printf("Recorded %d samples (loop length: %d)\n", record_frames, engine->looper_length);
+
+    // Phase 2: Switch to play, feed silence, verify loop plays back
+    engine->looper_requested_state.store(2); // play
+    float max_playback = 0.0f;
+
+    for (int offset = 0; offset < record_frames; offset += 128) {
+        int chunk = std::min(128, record_frames - offset);
+        std::memset(looper_unit.inputs[IPORT_INPUT_A].buffer, 0, chunk * sizeof(float));
+        std::memset(looper_unit.inputs[IPORT_INPUT_B].buffer, 0, chunk * sizeof(float));
+        std::memset(looper_unit.inputs[IPORT_INPUT_C].buffer, 0, chunk * sizeof(float));
+
+        unit_process_looper(&looper_unit, engine, chunk, 48000.0f);
+
+        for (int i = 0; i < chunk; i++) {
+            float v = std::fabs(looper_unit.output_buffers[OPORT_OUT][i]);
+            if (v > max_playback) max_playback = v;
+        }
+    }
+
+    printf("Max playback amplitude: %.4f\n", max_playback);
+    bool pass = engine->looper_length == record_frames && max_playback > 0.1f;
+    printf("Looper test: %s\n", pass ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 int main() {
     if (!test_clock()) return 1;
     if (!test_grids()) return 1;
     if (!test_marbles()) return 1;
+    if (!test_looper()) return 1;
 
     printf("Creating OrpheusEngine at 48kHz...\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
