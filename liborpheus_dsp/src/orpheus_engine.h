@@ -121,6 +121,15 @@ struct OrpheusEngine {
     std::atomic<float> warps_level2{0.5f};
     std::atomic<int>   warps_bypass{1};         // bypassed by default
 
+    // ── Warps Source Routing ────────────────────────────
+    static constexpr int kNumWarpsSources = 7;
+    // 0=SYNTH, 1=DRUMS(grains), 2=REPL(v8-11), 3=LFO, 4=RESONATOR(aux), 5=WARPS(feedback), 6=FLUX
+    float warps_source_buffers[kNumWarpsSources][kMaxFrames] = {};
+    float warps_feedback_l[kMaxFrames] = {};
+    float warps_feedback_r[kMaxFrames] = {};
+    std::atomic<int> warps_carrier_source{0};     // 0-6 enum
+    std::atomic<int> warps_modulator_source{0};   // 0-6 enum
+
     // ── Per-voice Engine 0 (OSC mode) state ─────────
     // Used when engine_index == -1 (OSC mode): triangle+square with ADSR + hold
     struct VoiceOscState {

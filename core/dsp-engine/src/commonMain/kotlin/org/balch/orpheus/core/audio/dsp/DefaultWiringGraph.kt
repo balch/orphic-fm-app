@@ -158,10 +158,9 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     resoOutL.out to driveL.input
     resoOutR.out to driveR.input
 
-    // Warps (stereo in/out) - bypassed by default
+    // Warps (source-routed internally via engine source buffers)
     val warp = warps("warps")
-    driveL.out to warp.inputA
-    driveR.out to warp.inputB
+    // No fixed input connections — unit_process_warps reads from source buffers
 
     // Dual Delay (stereo in/out) - bypassed by default via engine atomics
     // JSyn sends grains+distortion+warps all to delay (summed at input)

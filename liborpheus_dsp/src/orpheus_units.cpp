@@ -569,6 +569,20 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             vp.gate.store(0, std::memory_order_relaxed);
         }
     }
+
+    // Populate warps source buffers
+    if (idx < kNumMainVoices) {
+        // SYNTH (source 0): accumulate main voices
+        for (int i = 0; i < num_frames; i++) {
+            engine->warps_source_buffers[0][i] += out[i] * (1.0f / kNumMainVoices);
+        }
+    }
+    if (idx >= kNumMainVoices) {
+        // REPL (source 2): accumulate REPL voices (8-11)
+        for (int i = 0; i < num_frames; i++) {
+            engine->warps_source_buffers[2][i] += out[i] * (1.0f / kNumReplVoices);
+        }
+    }
 }
 
 void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
@@ -623,6 +637,11 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         frames_done += block;
+    }
+
+    // DRUMS source (1) for warps routing
+    for (int i = 0; i < num_frames; i++) {
+        engine->warps_source_buffers[1][i] = (out_l[i] + out_r[i]) * 0.5f;
     }
 }
 
@@ -681,19 +700,46 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
 
         frames_done += block;
     }
+
+    // RESONATOR aux source (4) for warps routing
+    std::memcpy(engine->warps_source_buffers[4], out_r, num_frames * sizeof(float));
 }
 
 void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
-    float* in_l = u->inputs[IPORT_INPUT_A].buffer;
-    float* in_r = u->inputs[IPORT_INPUT_B].buffer;
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
 
     if (engine->warps_bypass.load(std::memory_order_relaxed)) {
-        std::memcpy(out_l, in_l, num_frames * sizeof(float));
-        std::memcpy(out_r, in_r, num_frames * sizeof(float));
+        // When bypassed with source routing, pass through graph port inputs
+        float* fallback_l = u->inputs[IPORT_INPUT_A].buffer;
+        float* fallback_r = u->inputs[IPORT_INPUT_B].buffer;
+        std::memcpy(out_l, fallback_l, num_frames * sizeof(float));
+        std::memcpy(out_r, fallback_r, num_frames * sizeof(float));
         return;
     }
+
+    // Select carrier and modulator from source buffers
+    int c_src = engine->warps_carrier_source.load(std::memory_order_relaxed);
+    int m_src = engine->warps_modulator_source.load(std::memory_order_relaxed);
+
+    float carrier_buf[kMaxFrames];
+    float mod_buf[kMaxFrames];
+
+    auto select_source = [&](int src, float* dest) {
+        if (src == 5) { // WARPS feedback
+            std::memcpy(dest, engine->warps_feedback_l, num_frames * sizeof(float));
+        } else if (src >= 0 && src < OrpheusEngine::kNumWarpsSources) {
+            std::memcpy(dest, engine->warps_source_buffers[src], num_frames * sizeof(float));
+        } else {
+            std::memset(dest, 0, num_frames * sizeof(float));
+        }
+    };
+
+    select_source(c_src, carrier_buf);
+    select_source(m_src, mod_buf);
+
+    float* in_l = carrier_buf;
+    float* in_r = mod_buf;
 
     auto* wp = engine->warps_modulator.mutable_parameters();
     wp->modulation_algorithm = engine->warps_algorithm.load(std::memory_order_relaxed);
@@ -726,6 +772,13 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         }
 
         frames_done += block;
+    }
+
+    // Store output as feedback source (source 5)
+    std::memcpy(engine->warps_feedback_l, out_l, num_frames * sizeof(float));
+    std::memcpy(engine->warps_feedback_r, out_r, num_frames * sizeof(float));
+    for (int i = 0; i < num_frames; i++) {
+        engine->warps_source_buffers[5][i] = (out_l[i] + out_r[i]) * 0.5f;
     }
 }
 
@@ -849,6 +902,9 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     engine->lfo_phase_a = phase_a;
     engine->lfo_phase_b = phase_b;
     engine->lfo_output_value = output; // last sample for monitoring
+
+    // LFO source (3) for warps routing
+    std::memcpy(engine->warps_source_buffers[3], out, num_frames * sizeof(float));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1452,6 +1508,10 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     // Cache CV output for mod source routing
     engine->marbles_cv_output[0] = u->output_buffers[OPORT_OUT_RIGHT][num_frames - 1];
     engine->marbles_cv_output[1] = u->output_buffers[OPORT_AUX][num_frames - 1];
+
+    // FLUX source (6) for warps routing
+    std::memcpy(engine->warps_source_buffers[6],
+                u->output_buffers[OPORT_OUT_RIGHT], num_frames * sizeof(float));
 }
 
 // ── UNIT_LOOPER: Beat-quantized audio looper ────────────────

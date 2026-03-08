@@ -636,6 +636,19 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
     }
 
+    // Warps source routing
+    {
+        static uint16_t h_warps_uri = engine_hash16("org.balch.orpheus.plugins.warps");
+        static uint16_t h_carrier_src = engine_hash16("carrier_source");
+        static uint16_t h_mod_src_w = engine_hash16("modulator_source");
+        uint16_t uri_hash = engine_hash16(plugin_uri);
+        uint16_t symbol_hash = engine_hash16(symbol);
+        if (uri_hash == h_warps_uri) {
+            if (symbol_hash == h_carrier_src) { engine->warps_carrier_source.store(static_cast<int>(value), std::memory_order_relaxed); return; }
+            if (symbol_hash == h_mod_src_w) { engine->warps_modulator_source.store(static_cast<int>(value), std::memory_order_relaxed); return; }
+        }
+    }
+
     // Also set engine atomics (for MI wrappers that read from atomics)
     // Keep ALL existing strcmp chains below
     if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.grains") == 0) {
@@ -695,6 +708,10 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->warps_level2.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->warps_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "carrier_source") == 0)
+            engine->warps_carrier_source.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "modulator_source") == 0)
+            engine->warps_modulator_source.store(static_cast<int>(value), std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.delay") == 0) {
         if (std::strcmp(symbol, "time_1") == 0)

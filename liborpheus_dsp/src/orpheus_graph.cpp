@@ -298,6 +298,10 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     if (num_frames > kMaxFrames) num_frames = kMaxFrames;
     float sr = graph->sample_rate;
 
+    // Zero warps source buffers that are accumulated by individual units
+    std::memset(engine->warps_source_buffers[0], 0, num_frames * sizeof(float)); // SYNTH
+    std::memset(engine->warps_source_buffers[2], 0, num_frames * sizeof(float)); // REPL
+
     for (int ei = 0; ei < graph->exec_count; ei++) {
         int idx = graph->exec_order[ei];
         GraphUnit* u = &graph->units[idx];
