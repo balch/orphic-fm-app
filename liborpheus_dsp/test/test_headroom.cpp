@@ -242,10 +242,145 @@ static bool test_master_volume_linearity() {
     return pass;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Test 4: Quad volume via set_port
+// Verifies quad_vol_N scales output linearly, including silence at 0
+// and cross-quad isolation.
+// ═══════════════════════════════════════════════════════════════════
+static bool test_quad_volume() {
+    printf("\n=== Test: Quad volume via set_port ===\n");
+    bool pass = true;
+
+    // Render with quad_vol_0 = 1.0 (default) — baseline
+    OrpheusEngine* eng_full = orpheus_engine_create(48000.0f);
+    load_production_graph(eng_full);
+    for (int v = 0; v < 4; v++)
+        activate_voice(eng_full, v, 8, 60.0f + v * 5.0f);
+    auto r_full = render_engine(eng_full, 24000);
+    float rms_full = (r_full.rms_l + r_full.rms_r) / 2.0f;
+    orpheus_engine_destroy(eng_full);
+
+    // Render with quad_vol_0 = 0.5 — should be ~half
+    OrpheusEngine* eng_half = orpheus_engine_create(48000.0f);
+    load_production_graph(eng_half);
+    for (int v = 0; v < 4; v++)
+        activate_voice(eng_half, v, 8, 60.0f + v * 5.0f);
+    orpheus_engine_set_port(eng_half, "org.balch.orpheus.plugins.stereo", "quad_vol_0", 0.5f);
+    auto r_half = render_engine(eng_half, 24000);
+    float rms_half = (r_half.rms_l + r_half.rms_r) / 2.0f;
+    orpheus_engine_destroy(eng_half);
+
+    float ratio = rms_half / (rms_full + 0.0001f);
+    printf("  quad_vol=1.0: RMS=%.4f  quad_vol=0.5: RMS=%.4f  ratio=%.2f\n",
+           rms_full, rms_half, ratio);
+    if (ratio < 0.35f || ratio > 0.65f) {
+        printf("  FAIL: expected ratio ~0.5, got %.2f\n", ratio);
+        pass = false;
+    }
+
+    // Render with quad_vol_0 = 0.0 — should be silent
+    OrpheusEngine* eng_zero = orpheus_engine_create(48000.0f);
+    load_production_graph(eng_zero);
+    for (int v = 0; v < 4; v++)
+        activate_voice(eng_zero, v, 8, 60.0f + v * 5.0f);
+    orpheus_engine_set_port(eng_zero, "org.balch.orpheus.plugins.stereo", "quad_vol_0", 0.0f);
+    auto r_zero = render_engine(eng_zero, 24000);
+    float rms_zero = (r_zero.rms_l + r_zero.rms_r) / 2.0f;
+    printf("  quad_vol=0.0: RMS=%.4f %s\n", rms_zero, rms_zero < 0.001f ? "OK (silent)" : "FAIL (not silent)");
+    if (rms_zero > 0.001f) pass = false;
+    orpheus_engine_destroy(eng_zero);
+
+    // Cross-quad isolation: set quad_vol_0=0, quad_vol_1=1, play voices in both
+    OrpheusEngine* eng_iso = orpheus_engine_create(48000.0f);
+    load_production_graph(eng_iso);
+    for (int v = 0; v < 8; v++)
+        activate_voice(eng_iso, v, 8, 60.0f);
+    orpheus_engine_set_port(eng_iso, "org.balch.orpheus.plugins.stereo", "quad_vol_0", 0.0f);
+    // quad_vol_1 stays at default 1.0
+    auto r_iso = render_engine(eng_iso, 24000);
+    float rms_iso = (r_iso.rms_l + r_iso.rms_r) / 2.0f;
+    printf("  quad_vol_0=0 + quad_vol_1=1: RMS=%.4f %s\n",
+           rms_iso, rms_iso > 0.01f ? "OK (quad 1 audible)" : "FAIL (too quiet)");
+    if (rms_iso < 0.01f) pass = false;
+    orpheus_engine_destroy(eng_iso);
+
+    printf("Quad volume test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Test 5: Quad hold (sustained drone without gate)
+// Verifies hold parameter sustains voices without gate, scales output
+// linearly, and produces silence at hold=0.
+// ═══════════════════════════════════════════════════════════════════
+static bool test_quad_hold() {
+    printf("\n=== Test: Quad hold (sustained drone without gate) ===\n");
+    bool pass = true;
+
+    // Hold at 0.8 on all 4 voices of quad 0 — no gate
+    OrpheusEngine* eng = orpheus_engine_create(48000.0f);
+    load_production_graph(eng);
+    for (int v = 0; v < 4; v++) {
+        orpheus_engine_set_voice_active(eng, v, 1);
+        orpheus_engine_set_voice_engine(eng, v, 8);  // VA engine
+        orpheus_engine_set_voice_hold(eng, v, 0.8f);
+        // No gate — hold should sustain the voice
+    }
+    auto r_hold = render_engine(eng, 24000);
+    float rms_hold = (r_hold.rms_l + r_hold.rms_r) / 2.0f;
+    printf("  Hold=0.8 no gate: RMS=%.4f %s\n", rms_hold,
+           rms_hold > 0.01f ? "OK" : "FAIL (silent)");
+    if (rms_hold < 0.01f) pass = false;
+    orpheus_engine_destroy(eng);
+
+    // Hold level scales output: 0.5 vs 1.0
+    float rms_levels[2] = {};
+    float hold_vals[] = {0.5f, 1.0f};
+    for (int h = 0; h < 2; h++) {
+        OrpheusEngine* e = orpheus_engine_create(48000.0f);
+        load_production_graph(e);
+        for (int v = 0; v < 4; v++) {
+            orpheus_engine_set_voice_active(e, v, 1);
+            orpheus_engine_set_voice_engine(e, v, 8);
+            orpheus_engine_set_voice_hold(e, v, hold_vals[h]);
+        }
+        auto r = render_engine(e, 24000);
+        rms_levels[h] = (r.rms_l + r.rms_r) / 2.0f;
+        printf("  Hold=%.1f: RMS=%.4f\n", hold_vals[h], rms_levels[h]);
+        orpheus_engine_destroy(e);
+    }
+    float hold_ratio = rms_levels[0] / (rms_levels[1] + 0.0001f);
+    printf("  hold 0.5/1.0 ratio: %.2f (expect ~0.5)\n", hold_ratio);
+    if (hold_ratio < 0.3f || hold_ratio > 0.7f) {
+        printf("  FAIL: hold ratio %.2f outside expected range\n", hold_ratio);
+        pass = false;
+    }
+
+    // Hold=0 + no gate = silence
+    OrpheusEngine* eng_silent = orpheus_engine_create(48000.0f);
+    load_production_graph(eng_silent);
+    for (int v = 0; v < 4; v++) {
+        orpheus_engine_set_voice_active(eng_silent, v, 1);
+        orpheus_engine_set_voice_engine(eng_silent, v, 8);
+        orpheus_engine_set_voice_hold(eng_silent, v, 0.0f);
+    }
+    auto r_silent = render_engine(eng_silent, 24000);
+    float rms_silent = (r_silent.rms_l + r_silent.rms_r) / 2.0f;
+    printf("  Hold=0 no gate: RMS=%.4f %s\n", rms_silent,
+           rms_silent < 0.001f ? "OK (silent)" : "FAIL (not silent)");
+    if (rms_silent > 0.001f) pass = false;
+    orpheus_engine_destroy(eng_silent);
+
+    printf("Quad hold test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_headroom_tests() {
     bool all_pass = true;
     all_pass &= test_engine_level_parity();
     all_pass &= test_fullchain_headroom();
     all_pass &= test_master_volume_linearity();
+    all_pass &= test_quad_volume();
+    all_pass &= test_quad_hold();
     return all_pass;
 }

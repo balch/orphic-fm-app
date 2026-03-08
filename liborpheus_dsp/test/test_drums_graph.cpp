@@ -824,6 +824,57 @@ static bool test_grids_drum_integration() {
     return pass;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Test 11: Drum slot gain balance and voice isolation
+// Verifies each drum slot produces output at expected relative levels
+// and that main voices are not affected by drum triggers.
+// ═══════════════════════════════════════════════════════════════════
+static bool test_drum_slot_gains() {
+    printf("\n=== Test: Drum slot gain balance (kick > snare > hat) ===\n");
+    bool pass = true;
+
+    float peaks[3] = {};
+    const char* names[] = {"kick", "snare", "hat"};
+
+    for (int d = 0; d < 3; d++) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        load_production_graph(engine);
+        orpheus_engine_trigger_drum(engine, d, 0.8f);
+        auto r = render_engine(engine, 24000);
+        peaks[d] = r.peak;
+
+        // Verify drum voice level at correct index
+        float level = engine->voice_levels[12 + d].load();
+        printf("  %s (v%d): peak=%.4f level=%.4f %s\n",
+               names[d], 12 + d, peaks[d], level,
+               level > 0.001f ? "OK" : "SILENT!");
+        if (level < 0.001f) pass = false;
+
+        // Verify main voices 8-11 are NOT affected
+        for (int v = 8; v < 12; v++) {
+            float main_level = engine->voice_levels[v].load();
+            if (main_level > 0.001f) {
+                printf("  FAIL: main voice %d has level=%.4f during drum trigger\n", v, main_level);
+                pass = false;
+            }
+        }
+
+        orpheus_engine_destroy(engine);
+    }
+
+    // Verify relative levels: kick (1.2) > snare (0.6) > hat (0.5)
+    if (peaks[0] < peaks[1]) {
+        printf("  FAIL: kick (%.4f) should be louder than snare (%.4f)\n", peaks[0], peaks[1]);
+        pass = false;
+    }
+    if (peaks[1] < peaks[2]) {
+        printf("  WARNING: snare (%.4f) quieter than hat (%.4f) — engine-dependent\n", peaks[1], peaks[2]);
+    }
+
+    printf("Drum slot gains test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_drums_graph_tests() {
     bool all_pass = true;
     all_pass &= test_drum_trigger();
@@ -834,5 +885,6 @@ bool run_drums_graph_tests() {
     all_pass &= test_graph_effects_bypass_parity();
     all_pass &= test_warps_source_routing();
     all_pass &= test_grids_drum_integration();
+    all_pass &= test_drum_slot_gains();
     return all_pass;
 }
