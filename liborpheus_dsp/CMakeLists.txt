@@ -131,7 +131,16 @@ target_compile_definitions(orpheus_dsp PRIVATE TEST)
 # ── Desktop test executable (optional) ────────────
 option(BUILD_TESTS "Build test executable" OFF)
 if(BUILD_TESTS)
-    add_executable(orpheus_dsp_test test/test_main.cpp)
+    add_executable(orpheus_dsp_test
+        test/test_main.cpp
+        test/test_units.cpp
+        test/test_voices.cpp
+        test/test_engine_render.cpp
+        test/test_effects.cpp
+        test/test_graph.cpp
+        test/test_snapshots.cpp
+        test/test_benchmark.cpp
+    )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
