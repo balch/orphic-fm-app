@@ -235,6 +235,70 @@ inline std::vector<float> render_plaits_engine(
     return buf;
 }
 
+// ── Graph-based voice render (exercises unit_process_plaits ADSR) ────
+//
+// Renders a single voice through: plaits → master_out
+// This goes through unit_process_plaits() which includes the ADSR envelope,
+// unlike orpheus_engine_process() fallback which bypasses it.
+// Returns interleaved stereo buffer.
+inline std::vector<float> render_voice_with_envelope(
+    int engine_index, float note, float harmonics, float timbre, float morph,
+    float env_speed, int sample_rate, float duration_s, float gate_s)
+{
+    OrpheusEngine* engine = orpheus_engine_create(sample_rate);
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
+    engine->voice_params[0].engine_index.store(engine_index);
+    engine->voice_params[0].tune.store(note);
+    engine->voice_params[0].harmonics.store(harmonics);
+    engine->voice_params[0].timbre.store(timbre);
+    engine->voice_params[0].morph.store(morph);
+    engine->voice_params[0].decay.store(env_speed); // envSpeed stored in decay
+
+    // Build minimal graph: plaits → master_out (heap-allocated — too large for stack)
+    auto* graph = new OrpheusGraph();
+    std::memset(graph, 0, sizeof(OrpheusGraph));
+    graph->sample_rate = (float)sample_rate;
+
+    // Unit 0: plaits voice
+    graph->units[0].type = UNIT_PLAITS;
+    graph->units[0].id = 0;
+    graph->units[0].enabled = true;
+    unit_init(&graph->units[0], (float)sample_rate);
+    graph->units[0].state.module.index = 0;
+
+    // Unit 1: master out (stereo from mono)
+    graph->units[1].type = UNIT_MASTER_OUT;
+    graph->units[1].id = 1;
+    graph->units[1].enabled = true;
+    unit_init(&graph->units[1], (float)sample_rate);
+    graph->units[1].inputs[IPORT_INPUT_A].sources[0] = graph->units[0].output_buffers[OPORT_OUT];
+    graph->units[1].inputs[IPORT_INPUT_A].num_sources = 1;
+    graph->units[1].inputs[IPORT_INPUT_B].sources[0] = graph->units[0].output_buffers[OPORT_OUT];
+    graph->units[1].inputs[IPORT_INPUT_B].num_sources = 1;
+
+    graph->unit_count = 2;
+    graph->exec_count = 2;
+    graph->exec_order[0] = 0;
+    graph->exec_order[1] = 1;
+    graph->master_out_index = 1;
+
+    int total = (int)(sample_rate * duration_s);
+    int gate_frames = (int)(sample_rate * gate_s);
+    std::vector<float> buf(total * 2, 0.0f);
+
+    for (int off = 0; off < total; off += 128) {
+        int chunk = std::min(128, total - off);
+        if (off == 0) engine->voice_params[0].gate.store(1);
+        if (off >= gate_frames) engine->voice_params[0].gate.store(0);
+        orpheus_graph_process(graph, engine, buf.data() + off * 2, chunk);
+    }
+
+    delete graph;
+    orpheus_engine_destroy(engine);
+    return buf;
+}
+
 // ── Test suite declarations ─────────────────────────────────────────
 
 bool run_unit_tests();

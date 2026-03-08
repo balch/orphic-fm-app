@@ -332,6 +332,95 @@ bool run_snapshot_tests() {
         }
     }
 
+    // ── Envelope Speed Sweep: Engine 0 at various envSpeed levels ──
+    // Renders 4s clips (1s gate on, 3s release) via graph-based path
+    // which exercises unit_process_plaits ADSR.
+    // Also extracts per-10ms peak envelope curve for numeric comparison with JSyn.
+    {
+        float speeds[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+        printf("\n  --- Envelope Speed Sweep (Engine 0, graph path) ---\n");
+
+        for (float speed : speeds) {
+            char label[64];
+            snprintf(label, sizeof(label), "cpp_envspeed_%.2f", speed);
+            printf("  Scenario: envspeed=%.2f\n", speed);
+
+            auto buf = render_voice_with_envelope(
+                -1, 60.0f, 0.5f, 0.5f, 0.5f, speed, sr, 4.0f, 1.0f);
+            int total = sr * 4;
+
+            float rms = compute_rms(buf.data(), total * 2);
+            float peak = compute_peak(buf.data(), total * 2);
+            printf("    RMS=%.4f Peak=%.4f\n", rms, peak);
+
+            all_pass &= snapshot_check(label, buf.data(), total, sr, dir);
+
+            // Extract envelope curve: peak amplitude per 10ms window
+            char csv_path[512];
+            snprintf(csv_path, sizeof(csv_path), "%s/%s_envelope.csv", dir, label);
+            FILE* csv = fopen(csv_path, "w");
+            if (csv) {
+                fprintf(csv, "time_ms,peak_amplitude\n");
+                int window = sr / 100; // 10ms at 48kHz = 480 samples
+                for (int off = 0; off < total; off += window) {
+                    int end = std::min(off + window, total);
+                    float win_peak = 0.0f;
+                    for (int i = off; i < end; i++) {
+                        float a = std::fabs(buf[i * 2]); // left channel
+                        if (a > win_peak) win_peak = a;
+                    }
+                    fprintf(csv, "%.1f,%.6f\n", (float)off / sr * 1000.0f, win_peak);
+                }
+                fclose(csv);
+                printf("    Envelope curve: %s\n", csv_path);
+            }
+        }
+    }
+
+    // ── Envelope Speed Sweep: Plaits VA engine at various envSpeed levels ──
+    // Plaits engines have their own internal LPG/decay, so this tests how
+    // envSpeed interacts with that. Uses graph path for the ADSR.
+    {
+        float speeds[] = {0.0f, 0.25f, 0.5f, 0.75f, 1.0f};
+        printf("\n  --- Envelope Speed Sweep (Plaits VA, graph path) ---\n");
+
+        for (float speed : speeds) {
+            char label[64];
+            snprintf(label, sizeof(label), "cpp_plaits_envspeed_%.2f", speed);
+            printf("  Scenario: plaits envspeed=%.2f\n", speed);
+
+            auto buf = render_voice_with_envelope(
+                8, 60.0f, 0.5f, 0.5f, 0.5f, speed, sr, 4.0f, 1.0f);
+            int total = sr * 4;
+
+            float rms = compute_rms(buf.data(), total * 2);
+            float peak = compute_peak(buf.data(), total * 2);
+            printf("    RMS=%.4f Peak=%.4f\n", rms, peak);
+
+            all_pass &= snapshot_check(label, buf.data(), total, sr, dir);
+
+            // Envelope curve CSV
+            char csv_path[512];
+            snprintf(csv_path, sizeof(csv_path), "%s/%s_envelope.csv", dir, label);
+            FILE* csv = fopen(csv_path, "w");
+            if (csv) {
+                fprintf(csv, "time_ms,peak_amplitude\n");
+                int window = sr / 100;
+                for (int off = 0; off < total; off += window) {
+                    int end = std::min(off + window, total);
+                    float win_peak = 0.0f;
+                    for (int i = off; i < end; i++) {
+                        float a = std::fabs(buf[i * 2]);
+                        if (a > win_peak) win_peak = a;
+                    }
+                    fprintf(csv, "%.1f,%.6f\n", (float)off / sr * 1000.0f, win_peak);
+                }
+                fclose(csv);
+                printf("    Envelope curve: %s\n", csv_path);
+            }
+        }
+    }
+
     printf("WAV snapshots: %s\n", all_pass ? "PASS" : "FAIL");
     return all_pass;
 }

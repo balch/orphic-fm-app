@@ -502,6 +502,219 @@ class JsynSnapshotTest {
         println()
     }
 
+    // ── Envelope Speed Sweep: DspVoice at various envSpeed levels ──────
+
+    /**
+     * Renders Engine 0 (Virtual Analog via DspVoice) at envSpeed = 0.0, 0.25, 0.5, 0.75, 1.0.
+     * 4s clips: 1s gate on, 3s release.
+     * Writes WAVs and per-10ms peak envelope CSVs matching the C++ test format.
+     */
+    @Test
+    fun envelopeSpeedSweep() {
+        val speeds = floatArrayOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
+        val durationSeconds = 4f
+        val gateSeconds = 1f
+
+        println("\n  --- Envelope Speed Sweep (JSyn DspVoice, Engine 0) ---")
+
+        for (speed in speeds) {
+            val label = "jsyn_envspeed_%.2f".format(speed)
+            println("  Scenario: envspeed=%.2f".format(speed))
+
+            val engine = OfflineAudioEngine(SR)
+            val factory = createFactory()
+            val voice = DspVoice(engine, factory, pitchMultiplier = 1.0)
+
+            val vaEngine = VirtualAnalogEngine().also { it.init() }
+            voice.plaits.setEngine(vaEngine)
+            voice.setEngineActive(true)
+            voice.plaits.setNote(60f)
+            voice.plaits.setTimbre(0.5f)
+            voice.plaits.setMorph(0.5f)
+            voice.plaits.setHarmonics(0.5f)
+            voice.frequency.set(261.63)
+            voice.setEnvelopeSpeed(speed)
+
+            voice.output.connect(engine.lineOutLeft)
+            voice.output.connect(engine.lineOutRight)
+
+            engine.start()
+
+            val totalFrames = (SR * durationSeconds).toInt()
+            val gateFrames = (SR * gateSeconds).toInt()
+            val buf = engine.renderStereo(totalFrames, chunkSize = 128) { offset ->
+                if (offset == 0) voice.gate.set(1.0)
+                if (offset >= gateFrames) voice.gate.set(0.0)
+            }
+
+            engine.stop()
+
+            val rms = computeRms(buf)
+            val peak = computePeak(buf)
+            println("    RMS=${"%.4f".format(rms)} Peak=${"%.4f".format(peak)}")
+            assertTrue(peak > 0.001f, "Voice at envspeed=$speed should produce audio (peak=$peak)")
+
+            writeWav(File(OUTPUT_DIR, "$label.wav"), buf, totalFrames, SR)
+
+            // Extract envelope curve: peak amplitude per 10ms window
+            val csvFile = File(OUTPUT_DIR, "${label}_envelope.csv")
+            val windowSize = SR / 100 // 10ms
+            csvFile.printWriter().use { pw ->
+                pw.println("time_ms,peak_amplitude")
+                var off = 0
+                while (off < totalFrames) {
+                    val end = minOf(off + windowSize, totalFrames)
+                    var winPeak = 0f
+                    for (i in off until end) {
+                        val a = abs(buf[i * 2]) // left channel
+                        if (a > winPeak) winPeak = a
+                    }
+                    pw.println("%.1f,%.6f".format(off.toFloat() / SR * 1000f, winPeak))
+                    off += windowSize
+                }
+            }
+            println("    Envelope curve: ${csvFile.absolutePath}")
+        }
+    }
+
+    /**
+     * Renders Plaits VA engine via DspVoice at various envSpeed levels.
+     * Same 4s clips for direct comparison with C++ plaits envelope sweep.
+     */
+    @Test
+    fun envelopeSpeedSweepPlaitsVA() {
+        val speeds = floatArrayOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
+        val durationSeconds = 4f
+        val gateSeconds = 1f
+
+        println("\n  --- Envelope Speed Sweep (JSyn DspVoice, Plaits VA) ---")
+
+        for (speed in speeds) {
+            val label = "jsyn_plaits_envspeed_%.2f".format(speed)
+            println("  Scenario: plaits envspeed=%.2f".format(speed))
+
+            val buf = renderEngine(
+                engineId = PlaitsEngineId.VIRTUAL_ANALOG,
+                durationSeconds = durationSeconds,
+                gateSeconds = gateSeconds
+            )
+
+            // We need to re-render with the specific envSpeed since renderEngine uses 0.5
+            val engine = OfflineAudioEngine(SR)
+            val factory = createFactory()
+            val voice = DspVoice(engine, factory, pitchMultiplier = 1.0)
+
+            val vaEngine = VirtualAnalogEngine().also { it.init() }
+            voice.plaits.setEngine(vaEngine)
+            voice.setEngineActive(true)
+            voice.plaits.setNote(60f)
+            voice.plaits.setTimbre(0.5f)
+            voice.plaits.setMorph(0.5f)
+            voice.plaits.setHarmonics(0.5f)
+            voice.frequency.set(261.63)
+            voice.setEnvelopeSpeed(speed)
+
+            voice.output.connect(engine.lineOutLeft)
+            voice.output.connect(engine.lineOutRight)
+
+            engine.start()
+
+            val totalFrames = (SR * durationSeconds).toInt()
+            val gateFrames = (SR * gateSeconds).toInt()
+            val renderedBuf = engine.renderStereo(totalFrames, chunkSize = 128) { offset ->
+                if (offset == 0) voice.gate.set(1.0)
+                if (offset >= gateFrames) voice.gate.set(0.0)
+            }
+
+            engine.stop()
+
+            val rms = computeRms(renderedBuf)
+            val peak = computePeak(renderedBuf)
+            println("    RMS=${"%.4f".format(rms)} Peak=${"%.4f".format(peak)}")
+
+            writeWav(File(OUTPUT_DIR, "$label.wav"), renderedBuf, totalFrames, SR)
+
+            // Envelope curve CSV
+            val csvFile = File(OUTPUT_DIR, "${label}_envelope.csv")
+            val windowSize = SR / 100
+            csvFile.printWriter().use { pw ->
+                pw.println("time_ms,peak_amplitude")
+                var off = 0
+                while (off < totalFrames) {
+                    val end = minOf(off + windowSize, totalFrames)
+                    var winPeak = 0f
+                    for (i in off until end) {
+                        val a = abs(renderedBuf[i * 2])
+                        if (a > winPeak) winPeak = a
+                    }
+                    pw.println("%.1f,%.6f".format(off.toFloat() / SR * 1000f, winPeak))
+                    off += windowSize
+                }
+            }
+            println("    Envelope curve: ${csvFile.absolutePath}")
+        }
+    }
+
+    /**
+     * Compare JSyn vs C++ envelope curves at each envSpeed level.
+     * Reports timing differences for attack peak, -3dB point, and silence point.
+     * Always passes — diagnostic output only.
+     */
+    @Test
+    fun envelopeSpeedComparison() {
+        val speeds = floatArrayOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
+
+        println("\n=== Envelope Speed Comparison (JSyn vs C++) ===")
+        println("%-10s | %12s %12s | %12s %12s | %12s %12s".format(
+            "Speed", "JSyn -3dB", "C++ -3dB", "JSyn -20dB", "C++ -20dB", "JSyn Silent", "C++ Silent"))
+        println("-".repeat(95))
+
+        for (speed in speeds) {
+            val jsynCsv = File(OUTPUT_DIR, "jsyn_envspeed_%.2f_envelope.csv".format(speed))
+            val cppCsv = File(OUTPUT_DIR, "cpp_envspeed_%.2f_envelope.csv".format(speed))
+
+            if (!jsynCsv.exists() || !cppCsv.exists()) {
+                println("%-10.2f | SKIP (CSV missing)".format(speed))
+                continue
+            }
+
+            val jsynEnv = readEnvelopeCsv(jsynCsv)
+            val cppEnv = readEnvelopeCsv(cppCsv)
+
+            // Find peak, then measure how long after gate-off (1000ms) to reach thresholds
+            val jsynPeak = jsynEnv.maxOf { it.second }
+            val cppPeak = cppEnv.maxOf { it.second }
+
+            fun findTimeAfterGateOff(env: List<Pair<Float, Float>>, peak: Float, threshold: Float): String {
+                val gateOffMs = 1000f
+                val thresholdLevel = peak * threshold
+                val entry = env.firstOrNull { it.first >= gateOffMs && it.second < thresholdLevel }
+                return if (entry != null) "%.0fms".format(entry.first - gateOffMs) else ">3000ms"
+            }
+
+            val jsyn3db = findTimeAfterGateOff(jsynEnv, jsynPeak, 0.707f)  // -3dB
+            val cpp3db = findTimeAfterGateOff(cppEnv, cppPeak, 0.707f)
+            val jsyn20db = findTimeAfterGateOff(jsynEnv, jsynPeak, 0.1f)   // -20dB
+            val cpp20db = findTimeAfterGateOff(cppEnv, cppPeak, 0.1f)
+            val jsynSilent = findTimeAfterGateOff(jsynEnv, jsynPeak, 0.001f) // ~silence
+            val cppSilent = findTimeAfterGateOff(cppEnv, cppPeak, 0.001f)
+
+            println("%-10.2f | %12s %12s | %12s %12s | %12s %12s".format(
+                speed, jsyn3db, cpp3db, jsyn20db, cpp20db, jsynSilent, cppSilent))
+        }
+        println()
+    }
+
+    private fun readEnvelopeCsv(file: File): List<Pair<Float, Float>> {
+        return file.readLines().drop(1).mapNotNull { line ->
+            val parts = line.split(",")
+            if (parts.size == 2) {
+                Pair(parts[0].toFloatOrNull() ?: return@mapNotNull null,
+                     parts[1].toFloatOrNull() ?: return@mapNotNull null)
+            } else null
+        }
+    }
+
     private fun normalize(samples: FloatArray, targetRms: Float): FloatArray {
         val rms = computeRms(samples)
         if (rms < 0.00001f) return samples.copyOf()
