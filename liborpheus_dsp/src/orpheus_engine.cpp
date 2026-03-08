@@ -77,14 +77,18 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     engine->looper_buffer_r = new float[OrpheusEngine::kMaxLoopSamples]();
 
     // Default per-voice pans (matches Kotlin StereoPlugin defaults)
+    // Voices 0-3: Quad 0
     engine->voice_pan[0].store(0.0f);
     engine->voice_pan[1].store(0.0f);
     engine->voice_pan[2].store(-0.3f);
     engine->voice_pan[3].store(-0.3f);
+    // Voices 4-7: Quad 1
     engine->voice_pan[4].store(0.3f);
     engine->voice_pan[5].store(0.3f);
     engine->voice_pan[6].store(-0.7f);
     engine->voice_pan[7].store(0.7f);
+    // Voices 8-11: Quad 2 / REPL
+    // Voices 12-14: Drum voices (center)
     for (int i = 8; i < kNumVoices; i++)
         engine->voice_pan[i].store(0.0f);
 
@@ -600,21 +604,20 @@ void orpheus_engine_set_voice_decay(OrpheusEngine* engine,
 
 void orpheus_engine_trigger_drum(OrpheusEngine* engine,
                                  int drum_index, float accent) {
-    // Map drum indices to repl voices (8-11) with drum engine indices:
-    // 0 = bass drum  (voice 8,  engine 21)
-    // 1 = snare drum (voice 9,  engine 22)
-    // 2 = hi-hat     (voice 10, engine 23)
-    // 3 = bass drum alt (voice 11, engine 21)
-    static const int kDrumEngineIndices[] = {21, 22, 23, 21};
+    // Map drum indices to dedicated drum voices (12-14):
+    // 0 = bass drum  (voice 12, engine 21)
+    // 1 = snare drum (voice 13, engine 22)
+    // 2 = hi-hat     (voice 14, engine 23)
+    static const int kDrumEngineIndices[] = {21, 22, 23};
 
     if (drum_index >= 0 && drum_index < kNumDrumVoices) {
-        int voice_index = kNumMainVoices + drum_index;
+        int voice_index = kDrumVoiceStart + drum_index;
         engine->voice_params[voice_index].engine_index.store(kDrumEngineIndices[drum_index]);
-        engine->voice_params[voice_index].tune.store(60.0f);  // default pitch
+        engine->voice_params[voice_index].tune.store(60.0f);
         engine->voice_params[voice_index].morph.store(accent, std::memory_order_relaxed);
         engine->voice_params[voice_index].active.store(1);
         engine->voice_params[voice_index].ever_triggered.store(1);
-        engine->voice_params[voice_index].gate.store(1);       // trigger on
+        engine->voice_params[voice_index].gate.store(1);
     }
 }
 

@@ -645,20 +645,20 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                      + 0.001f * voice_peak;
 
         // Clear gate for drum voices (one-shot triggers)
-        if (idx >= kNumMainVoices && actual_gate) {
+        if (idx >= kDrumVoiceStart && actual_gate) {
             vp.gate.store(0, std::memory_order_relaxed);
         }
     }
 
     // Populate warps source buffers
-    if (idx < kNumMainVoices) {
-        // SYNTH (source 0): accumulate main voices
+    if (idx < kDrumVoiceStart) {
+        // SYNTH (source 0): accumulate main voices (0-11)
         for (int i = 0; i < num_frames; i++) {
             engine->warps_source_buffers[0][i] += out[i] * (1.0f / kNumMainVoices);
         }
     }
-    if (idx >= kNumMainVoices) {
-        // REPL (source 2): accumulate REPL voices (8-11)
+    if (idx >= kDrumVoiceStart) {
+        // DRUMS (source 2): accumulate drum voices (12-14)
         for (int i = 0; i < num_frames; i++) {
             engine->warps_source_buffers[2][i] += out[i] * (1.0f / kNumDrumVoices);
         }
