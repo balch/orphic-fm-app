@@ -366,6 +366,10 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_marbles(u, engine, num_frames, sr); break;
             case UNIT_LOOPER:
                 unit_process_looper(u, engine, num_frames, sr); break;
+            case UNIT_BENDER:
+                unit_process_bender(u, engine, num_frames, sr); break;
+            case UNIT_PER_STRING_BENDER:
+                unit_process_per_string_bender(u, engine, num_frames, sr); break;
             default: break;
         }
     }
