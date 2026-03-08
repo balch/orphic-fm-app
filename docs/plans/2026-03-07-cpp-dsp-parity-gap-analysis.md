@@ -40,14 +40,14 @@ Note: quadPitch is NOT forwarded to C++ yet (see Gap #2).
 | 6 | **Resonator routing** | Complex 4-input routing | Rings gets mono mix post-grains | Different excitation | Open |
 | 7 | ~~Distortion chain~~ | Distortion after resonator | Drive before clouds | Different effect order | **FIXED** — reordered graph |
 | 8 | ~~Delay routing~~ | Multiple sends (grains+dist+bender+warps) | Only warps→delay | Missing delay sends | **FIXED** — grains+drive+warps→delay |
-| 9 | **Looper** | LooperPlugin in chain | Not in graph | No looper | Open (Phase 4) |
+| 9 | ~~Looper~~ | LooperPlugin in chain | UNIT_LOOPER in graph | Beat-quantized looper | **FIXED** — UNIT_LOOPER (record/play/overdub) |
 | 10 | **Bender/PerStringBender** | Audio synthesis + pitch bend | Bend is stub (no-op) | No pitch bend | Open (Phase 4) |
 | 11 | **Voice coupling** | Partner envelope → pitch mod | Not implemented | Missing coupling effect | Open (Phase 3) |
 | 12 | **FM modulation** | Voice-to-voice cross-mod, LFO→FM | Not routed in graph | No FM between voices | Open (Phase 3) |
 | 13 | **Mod source routing** | LFO/FM/Flux → timbre/morph mod | Not implemented | Missing modulation | Open (Phase 3) |
-| 14 | **Flux CV** | Pitch CV + trigger to quads | Not forwarded | No Flux integration | Open (Phase 4) |
+| 14 | ~~Flux CV~~ | Pitch CV + trigger to quads | UNIT_MARBLES in graph | Full MI Marbles port | **FIXED** — UNIT_MARBLES (TGenerator + XYGenerator) |
 | 15 | **Warps source routing** | 7 carrier/modulator options | Fixed: resonator→warps | Static routing only | Open (Phase 4) |
-| 16 | **Drum routing** | Bypass/chain mode, direct resonator | Not in graph | Drums go through full chain | Open (Phase 4) |
+| 16 | ~~Drum routing~~ | Bypass/chain mode, direct resonator | UNIT_GRIDS → UNIT_PLAITS | Graph-native drum triggers | **FIXED** — UNIT_GRIDS (MI Grids pattern ROM) |
 | 17 | ~~Drive scaling~~ | 1.0 + amount*14 (1..15x) | 1.0 + v*4 (1..5x) | Drive range mismatch | **FIXED** — `1 + v*14` |
 | 18 | ~~Master volume~~ | port map sets mvL/mvR inputB | Graph default 0.4 | Correct (0.8 * 0.5) | **FIXED** — verified |
 | 19 | ~~Per-voice pan~~ | Dynamic via setPort | Port map + cos/sin forwarding | Dynamic pan via graph | **FIXED** — constant-power L/R gains |
