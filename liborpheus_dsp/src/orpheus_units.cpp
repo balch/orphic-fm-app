@@ -551,52 +551,65 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         voice.Render(engine_index, plaits_gate, note, harmonics, timbre, morph, 0.8f,
                      out, num_frames);
 
-        // ADSR envelope (same as Engine 0 — wraps ALL sources, matching JSyn's DspVoice VCA)
-        float attack_rate, decay_coeff, sustain_level, release_coeff;
-        compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
-                                 sustain_level, release_coeff);
-
+        // ADSR envelope — wraps main voices (matching JSyn's DspVoice VCA).
+        // Drum voices (idx >= kNumMainVoices) bypass ADSR: their Plaits engines
+        // (BassDrum, SnareDrum, HiHat) have built-in percussive envelopes,
+        // and the JSyn path renders drums without DspVoice ADSR wrapping.
         float voice_peak = 0.0f;
-        for (int i = 0; i < num_frames; i++) {
-            // ADSR state machine
-            bool gate_on = actual_gate != 0;
-            if (gate_on && !osc.env_gate_was_on) osc.env_stage = 1;
-            if (!gate_on && osc.env_gate_was_on) osc.env_stage = 4;
-            osc.env_gate_was_on = gate_on;
 
-            switch (osc.env_stage) {
-                case 1: // ATTACK
-                    osc.env_level += attack_rate;
-                    if (osc.env_level >= 1.0f) { osc.env_level = 1.0f; osc.env_stage = 2; }
-                    break;
-                case 2: // DECAY
-                    osc.env_level = sustain_level +
-                                    (osc.env_level - sustain_level) * decay_coeff;
-                    if (osc.env_level - sustain_level < 0.0001f) {
-                        osc.env_level = sustain_level; osc.env_stage = 3;
-                    }
-                    break;
-                case 3: // SUSTAIN
-                    osc.env_level = sustain_level;
-                    break;
-                case 4: // RELEASE
-                    osc.env_level *= release_coeff;
-                    if (osc.env_level < 0.0001f) { osc.env_level = 0.0f; osc.env_stage = 0; }
-                    break;
-                default: // IDLE
-                    osc.env_level = 0.0f;
-                    break;
+        if (idx < kNumMainVoices) {
+            // Main voices: full ADSR + hold VCA
+            float attack_rate, decay_coeff, sustain_level, release_coeff;
+            compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
+                                     sustain_level, release_coeff);
+
+            for (int i = 0; i < num_frames; i++) {
+                // ADSR state machine
+                bool gate_on = actual_gate != 0;
+                if (gate_on && !osc.env_gate_was_on) osc.env_stage = 1;
+                if (!gate_on && osc.env_gate_was_on) osc.env_stage = 4;
+                osc.env_gate_was_on = gate_on;
+
+                switch (osc.env_stage) {
+                    case 1: // ATTACK
+                        osc.env_level += attack_rate;
+                        if (osc.env_level >= 1.0f) { osc.env_level = 1.0f; osc.env_stage = 2; }
+                        break;
+                    case 2: // DECAY
+                        osc.env_level = sustain_level +
+                                        (osc.env_level - sustain_level) * decay_coeff;
+                        if (osc.env_level - sustain_level < 0.0001f) {
+                            osc.env_level = sustain_level; osc.env_stage = 3;
+                        }
+                        break;
+                    case 3: // SUSTAIN
+                        osc.env_level = sustain_level;
+                        break;
+                    case 4: // RELEASE
+                        osc.env_level *= release_coeff;
+                        if (osc.env_level < 0.0001f) { osc.env_level = 0.0f; osc.env_stage = 0; }
+                        break;
+                    default: // IDLE
+                        osc.env_level = 0.0f;
+                        break;
+                }
+
+                // Hold ramp (smoothed to avoid clicks)
+                osc.hold_smoothed += hold_coeff * (scaled_hold - osc.hold_smoothed);
+
+                // VCA = envelope + hold (same formula as Engine 0)
+                float vca = osc.env_level + osc.hold_smoothed;
+                out[i] *= vca;
+
+                float abs_s = std::fabs(out[i]);
+                if (abs_s > voice_peak) voice_peak = abs_s;
             }
-
-            // Hold ramp (smoothed to avoid clicks)
-            osc.hold_smoothed += hold_coeff * (scaled_hold - osc.hold_smoothed);
-
-            // VCA = envelope + hold (same formula as Engine 0)
-            float vca = osc.env_level + osc.hold_smoothed;
-            out[i] *= vca;
-
-            float abs_s = std::fabs(out[i]);
-            if (abs_s > voice_peak) voice_peak = abs_s;
+        } else {
+            // Drum voices: no ADSR — engine has its own percussive envelope
+            for (int i = 0; i < num_frames; i++) {
+                float abs_s = std::fabs(out[i]);
+                if (abs_s > voice_peak) voice_peak = abs_s;
+            }
         }
 
         engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);

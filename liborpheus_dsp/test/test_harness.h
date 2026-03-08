@@ -306,5 +306,7 @@ bool run_voice_tests();
 bool run_engine_render_tests();
 bool run_effects_tests();
 bool run_graph_tests();
+bool run_output_chain_tests();
 bool run_snapshot_tests();
+bool run_drums_graph_tests();
 bool run_benchmark_tests();

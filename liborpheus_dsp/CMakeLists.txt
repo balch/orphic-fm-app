@@ -138,6 +138,8 @@ if(BUILD_TESTS)
         test/test_engine_render.cpp
         test/test_effects.cpp
         test/test_graph.cpp
+        test/test_output_chain.cpp
+        test/test_drums_graph.cpp
         test/test_snapshots.cpp
         test/test_benchmark.cpp
     )

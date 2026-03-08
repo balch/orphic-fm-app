@@ -187,13 +187,13 @@ void orpheus_engine_process(OrpheusEngine* engine,
                 float abs_out = std::fabs(mono);
                 if (abs_out > voice_peak) voice_peak = abs_out;
             }
-
             engine->voice_levels[v].store(voice_peak, std::memory_order_relaxed);
         }
 
         // Process drum voices (voices 8-11, using Plaits drum engines)
         for (int v = kNumMainVoices; v < kNumVoices; v++) {
             auto& vp = engine->voice_params[v];
+            if (!vp.ever_triggered.load(std::memory_order_relaxed)) continue;
             auto& voice = engine->voices_dsp[v];
 
             float pan_l, pan_r;
@@ -921,6 +921,8 @@ void orpheus_engine_trigger_drum(OrpheusEngine* engine,
         engine->voice_params[voice_index].engine_index.store(kDrumEngineIndices[drum_index]);
         engine->voice_params[voice_index].tune.store(60.0f);  // default pitch
         engine->voice_params[voice_index].morph.store(accent, std::memory_order_relaxed);
+        engine->voice_params[voice_index].active.store(1);
+        engine->voice_params[voice_index].ever_triggered.store(1);
         engine->voice_params[voice_index].gate.store(1);       // trigger on
     }
 }
