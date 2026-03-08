@@ -64,9 +64,10 @@ static bool test_mod_source_routing() {
         float mod_depth;
         float fm_depth;
     };
+    // Kotlin ModSource ordinals: VOICE_FM=0, OFF=1, LFO=2, FLUX=3
     ModConfig configs[] = {
-        {"OFF",  0, 0.0f, 0.0f},
-        {"FM",   1, 0.0f, 0.8f},
+        {"OFF",  1, 0.0f, 0.0f},
+        {"FM",   0, 0.0f, 0.8f},
         {"LFO",  2, 0.8f, 0.0f},
         {"FLUX", 3, 0.8f, 0.0f},
     };
@@ -82,7 +83,7 @@ static bool test_mod_source_routing() {
         engine->mod_depth[0].store(configs[c].mod_depth);
         engine->fm_depth[0].store(configs[c].fm_depth);
 
-        if (configs[c].mod_source == 1) {
+        if (configs[c].mod_source == 0) { // VOICE_FM
             activate_voice(engine, 1, 0, 67.0f, 0.5f, 0.5f, 0.5f, 0.5f);
             GraphUnit v1;
             setup_voice_unit(&v1, 1);

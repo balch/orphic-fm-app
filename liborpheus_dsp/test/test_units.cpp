@@ -271,7 +271,7 @@ static bool test_fm_modulation() {
     engine->voice_params[1].ever_triggered.store(1);
     engine->voice_params[1].engine_index.store(-1);
 
-    engine->mod_source[0].store(1); // VOICE_FM
+    engine->mod_source[0].store(0); // VOICE_FM
     engine->fm_depth[0].store(0.5f);
 
     GraphUnit v0 = {}, v1 = {};

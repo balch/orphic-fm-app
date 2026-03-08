@@ -156,7 +156,7 @@ struct OrpheusEngine {
     static constexpr int kNumDuos = 6;
     float voice_last_output[kNumVoices] = {};          // previous block's peak output
     float marbles_cv_output[2] = {};                   // cached Marbles X1/X2 CV
-    std::atomic<int> mod_source[kNumDuos] = {};        // per-duo: 0=OFF, 1=VOICE_FM, 2=LFO, 3=FLUX
+    std::atomic<int> mod_source[kNumDuos] = {};        // per-duo: 0=VOICE_FM, 1=OFF, 2=LFO, 3=FLUX (Kotlin ModSource ordinals)
     std::atomic<float> mod_depth[kNumDuos] = {};       // per-duo timbre mod depth
     std::atomic<float> fm_depth[kNumDuos] = {};        // per-duo FM depth (semitones)
     std::atomic<int> fm_cross_quad{0};                 // 0=duo pairs, 1=cross-quad circular

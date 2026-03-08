@@ -174,12 +174,15 @@ void unit_process_hard_clip(GraphUnit* u, int n) {
         out[i] = std::max(-1.0f, std::min(1.0f, in[i]));
 }
 
-void unit_process_limiter(GraphUnit* u, int n) {
+void unit_process_limiter(GraphUnit* u, OrpheusEngine* engine, int n) {
     float* in    = u->inputs[IPORT_INPUT].buffer;
     float* drive = u->inputs[IPORT_DRIVE].buffer;
     float* out   = u->output_buffers[OPORT_OUT];
-    for (int i = 0; i < n; i++)
-        out[i] = std::tanh(in[i] * drive[i]);
+    float mix = engine->drive_mix.load(std::memory_order_relaxed);
+    for (int i = 0; i < n; i++) {
+        float wet = std::tanh(in[i] * drive[i]);
+        out[i] = in[i] * (1.0f - mix) + wet * mix;
+    }
 }
 
 void unit_process_delay_line(GraphUnit* u, int n, float sr) {
@@ -331,10 +334,13 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     }
 
     // ── Graph gate input: detect rising/falling edges from IPORT_GATE ──
-    // When connected (e.g. from Grids triggers), overrides voice_params gate.
+    // When connected (e.g. from Grids triggers), supplements voice_params gate.
     // Uses trigger_pending flag so a complete rise+fall within one buffer isn't lost.
+    // The graph gate is OR'd with the API gate so that orpheus_engine_trigger_drum
+    // can trigger drums even when the graph gate input (GRIDS) is silent.
     GraphPort* gate_port = &u->inputs[IPORT_GATE];
     if (gate_port->num_sources > 0) {
+        int api_gate = vp.gate.load(std::memory_order_relaxed);
         for (int i = 0; i < num_frames; i++) {
             bool gate_on = gate_port->buffer[i] > 0.5f;
             if (gate_on && !vp.graph_gate_prev) {
@@ -343,13 +349,13 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
             vp.graph_gate_prev = gate_on;
         }
-        // Apply: if a rising edge was seen, force gate on for this render block.
-        // The gate stays high if the signal ended high, off if it ended low.
+        // Merge: graph trigger OR API gate (don't clobber API-set gate)
         if (vp.graph_trigger_pending) {
             vp.gate.store(1, std::memory_order_relaxed);
             vp.graph_trigger_pending = false;
         } else {
-            vp.gate.store(vp.graph_gate_prev ? 1 : 0, std::memory_order_relaxed);
+            bool graph_gate = vp.graph_gate_prev;
+            vp.gate.store((api_gate || graph_gate) ? 1 : 0, std::memory_order_relaxed);
         }
     }
 
@@ -414,9 +420,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     {
         int duo = idx / 2;
         if (duo < OrpheusEngine::kNumDuos) {
+            // Kotlin ModSource enum: VOICE_FM=0, OFF=1, LFO=2, FLUX=3
             int src = engine->mod_source[duo].load(std::memory_order_relaxed);
             float mod_signal = 0.0f;
-            if (src == 1) { // VOICE_FM
+            if (src == 0) { // VOICE_FM
                 int fm_source;
                 if (!engine->fm_cross_quad.load(std::memory_order_relaxed)) {
                     fm_source = (idx % 2 == 0) ? idx + 1 : idx - 1;
@@ -431,6 +438,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             } else if (src == 3) { // FLUX (Marbles CV)
                 mod_signal = engine->marbles_cv_output[duo % 2];
             }
+            // src == 1 (OFF) leaves mod_signal = 0.0f
             float md = engine->mod_depth[duo].load(std::memory_order_relaxed);
             float fd = engine->fm_depth[duo].load(std::memory_order_relaxed);
             timbre_mod_offset = mod_signal * md;

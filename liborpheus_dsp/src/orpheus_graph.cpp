@@ -340,7 +340,7 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
             case UNIT_HARD_CLIP:
                 unit_process_hard_clip(u, num_frames); break;
             case UNIT_LIMITER:
-                unit_process_limiter(u, num_frames); break;
+                unit_process_limiter(u, engine, num_frames); break;
             case UNIT_DELAY_LINE:
                 unit_process_delay_line(u, num_frames, sr); break;
             case UNIT_MASTER_OUT:

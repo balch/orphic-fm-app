@@ -82,15 +82,16 @@ static bool test_drum_isolation() {
         return false;
     }
     activate_voice(engine, 0, 8, 60.0f);
-    engine->voice_pan[0].store(-1.0f); // hard left
+    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.stereo", "voice_pan_0", -1.0f); // hard left
 
     auto r = render_engine(engine, 24000);
 
     printf("  Voice 0 hard-left, no drums: L=%.4f R=%.4f\n", r.rms_l, r.rms_r);
 
-    // With voice hard-left, R channel should be near-silent
-    // If drums leak, they'd add center-panned signal to R channel
-    if (r.rms_r > r.rms_l * 0.05f) {
+    // With voice hard-left, R channel should be much quieter than L.
+    // Production graph effects (delay, reverb) add some stereo crosstalk,
+    // so we allow up to 30% bleed rather than strict silence.
+    if (r.rms_r > r.rms_l * 0.30f) {
         printf("  FAIL: R channel (%.4f) has signal despite hard-left pan — drum leakage?\n", r.rms_r);
         pass = false;
     }

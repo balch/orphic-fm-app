@@ -178,15 +178,35 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         orpheus_graph_set_port(g, uh, sh, value);
     }
 
-    // Voice coupling
+    // Voice plugin parameters (coupling, mod source/depth, vibrato)
     {
         static uint16_t h_voice = engine_hash16("org.balch.orpheus.plugins.voice");
         static uint16_t h_coupling = engine_hash16("coupling_depth");
+        static uint16_t h_vibrato = engine_hash16("vibrato");
         uint16_t uri_hash = engine_hash16(plugin_uri);
         uint16_t symbol_hash = engine_hash16(symbol);
-        if (uri_hash == h_voice && symbol_hash == h_coupling) {
-            engine->coupling_depth.store(value, std::memory_order_relaxed);
-            return;
+        if (uri_hash == h_voice) {
+            if (symbol_hash == h_coupling) {
+                engine->coupling_depth.store(value, std::memory_order_relaxed);
+                return;
+            }
+            if (symbol_hash == h_vibrato) {
+                engine->vibrato_depth.store(value, std::memory_order_relaxed);
+                return;
+            }
+            // Per-duo mod source/depth: duo_mod_source_N, duo_mod_source_level_N
+            static uint16_t src_hashes[] = {
+                engine_hash16("duo_mod_source_0"), engine_hash16("duo_mod_source_1"),
+                engine_hash16("duo_mod_source_2"), engine_hash16("duo_mod_source_3"),
+                engine_hash16("duo_mod_source_4"), engine_hash16("duo_mod_source_5")};
+            static uint16_t lvl_hashes[] = {
+                engine_hash16("duo_mod_source_level_0"), engine_hash16("duo_mod_source_level_1"),
+                engine_hash16("duo_mod_source_level_2"), engine_hash16("duo_mod_source_level_3"),
+                engine_hash16("duo_mod_source_level_4"), engine_hash16("duo_mod_source_level_5")};
+            for (int i = 0; i < 6; i++) {
+                if (symbol_hash == src_hashes[i]) { engine->mod_source[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
+                if (symbol_hash == lvl_hashes[i]) { engine->mod_depth[i].store(value, std::memory_order_relaxed); return; }
+            }
         }
     }
 
@@ -202,13 +222,22 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 return;
             }
             // Per-duo parameters: mod_source_N, mod_depth_N, fm_depth_N
-            const char* src_names[] = {"mod_source_0","mod_source_1","mod_source_2","mod_source_3","mod_source_4","mod_source_5"};
-            const char* md_names[]  = {"mod_depth_0","mod_depth_1","mod_depth_2","mod_depth_3","mod_depth_4","mod_depth_5"};
-            const char* fm_names[]  = {"fm_depth_0","fm_depth_1","fm_depth_2","fm_depth_3","fm_depth_4","fm_depth_5"};
+            static uint16_t mod_src_hashes[] = {
+                engine_hash16("mod_source_0"), engine_hash16("mod_source_1"),
+                engine_hash16("mod_source_2"), engine_hash16("mod_source_3"),
+                engine_hash16("mod_source_4"), engine_hash16("mod_source_5")};
+            static uint16_t mod_depth_hashes[] = {
+                engine_hash16("mod_depth_0"), engine_hash16("mod_depth_1"),
+                engine_hash16("mod_depth_2"), engine_hash16("mod_depth_3"),
+                engine_hash16("mod_depth_4"), engine_hash16("mod_depth_5")};
+            static uint16_t fm_depth_hashes[] = {
+                engine_hash16("fm_depth_0"), engine_hash16("fm_depth_1"),
+                engine_hash16("fm_depth_2"), engine_hash16("fm_depth_3"),
+                engine_hash16("fm_depth_4"), engine_hash16("fm_depth_5")};
             for (int i = 0; i < 6; i++) {
-                if (symbol_hash == engine_hash16(src_names[i])) { engine->mod_source[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
-                if (symbol_hash == engine_hash16(md_names[i]))  { engine->mod_depth[i].store(value, std::memory_order_relaxed); return; }
-                if (symbol_hash == engine_hash16(fm_names[i]))  { engine->fm_depth[i].store(value, std::memory_order_relaxed); return; }
+                if (symbol_hash == mod_src_hashes[i]) { engine->mod_source[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
+                if (symbol_hash == mod_depth_hashes[i])  { engine->mod_depth[i].store(value, std::memory_order_relaxed); return; }
+                if (symbol_hash == fm_depth_hashes[i])  { engine->fm_depth[i].store(value, std::memory_order_relaxed); return; }
             }
         }
     }
@@ -256,13 +285,19 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (symbol_hash == h_spring) { engine->bend_spring_vol.store(value, std::memory_order_relaxed); return; }
             if (symbol_hash == h_tension) { engine->bend_tension_vol.store(value, std::memory_order_relaxed); return; }
             // Per-string parameters
-            const char* s_bend[] = {"string_bend_0","string_bend_1","string_bend_2","string_bend_3"};
-            const char* s_mix[] = {"string_mix_0","string_mix_1","string_mix_2","string_mix_3"};
-            const char* s_active[] = {"string_active_0","string_active_1","string_active_2","string_active_3"};
+            static uint16_t s_bend_hashes[] = {
+                engine_hash16("string_bend_0"), engine_hash16("string_bend_1"),
+                engine_hash16("string_bend_2"), engine_hash16("string_bend_3")};
+            static uint16_t s_mix_hashes[] = {
+                engine_hash16("string_mix_0"), engine_hash16("string_mix_1"),
+                engine_hash16("string_mix_2"), engine_hash16("string_mix_3")};
+            static uint16_t s_active_hashes[] = {
+                engine_hash16("string_active_0"), engine_hash16("string_active_1"),
+                engine_hash16("string_active_2"), engine_hash16("string_active_3")};
             for (int i = 0; i < 4; i++) {
-                if (symbol_hash == engine_hash16(s_bend[i])) { engine->string_bend[i].store(value, std::memory_order_relaxed); return; }
-                if (symbol_hash == engine_hash16(s_mix[i])) { engine->string_mix[i].store(value, std::memory_order_relaxed); return; }
-                if (symbol_hash == engine_hash16(s_active[i])) { engine->string_active[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
+                if (symbol_hash == s_bend_hashes[i]) { engine->string_bend[i].store(value, std::memory_order_relaxed); return; }
+                if (symbol_hash == s_mix_hashes[i]) { engine->string_mix[i].store(value, std::memory_order_relaxed); return; }
+                if (symbol_hash == s_active_hashes[i]) { engine->string_active[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
             }
             static uint16_t h_slide_y = engine_hash16("slide_bar_y");
             static uint16_t h_slide_x = engine_hash16("slide_bar_x");
@@ -411,10 +446,25 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.stereo") == 0) {
         if (std::strcmp(symbol, "master_pan") == 0)
             engine->master_pan.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "master_vol") == 0)
+            engine->master_volume.store(value, std::memory_order_relaxed);
         else if (std::strncmp(symbol, "voice_pan_", 10) == 0) {
             int idx = std::atoi(symbol + 10);
-            if (idx >= 0 && idx < kNumVoices)
+            if (idx >= 0 && idx < kNumVoices) {
                 engine->voice_pan[idx].store(value, std::memory_order_relaxed);
+                // Compute constant-power gains and update graph pan multiply units
+                if (g) {
+                    float angle = ((value + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
+                    float gl = std::cos(angle);
+                    float gr = std::sin(angle);
+                    static uint16_t uh = engine_hash16("org.balch.orpheus.plugins.stereo");
+                    char sym_l[32], sym_r[32];
+                    snprintf(sym_l, sizeof(sym_l), "voice_pan_L_%d", idx);
+                    snprintf(sym_r, sizeof(sym_r), "voice_pan_R_%d", idx);
+                    orpheus_graph_set_port(g, uh, engine_hash16(sym_l), gl);
+                    orpheus_graph_set_port(g, uh, engine_hash16(sym_r), gr);
+                }
+            }
         }
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.reverb") == 0) {
@@ -570,6 +620,13 @@ void orpheus_engine_trigger_drum(OrpheusEngine* engine,
 
 void orpheus_engine_set_master_volume(OrpheusEngine* engine, float v) {
     engine->master_volume.store(v);
+    // Update graph port map so mvL/mvR multiply units reflect the new volume
+    OrpheusGraph* g = engine->graph.load(std::memory_order_relaxed);
+    if (g) {
+        static uint16_t uh = engine_hash16("org.balch.orpheus.plugins.stereo");
+        static uint16_t sh = engine_hash16("master_vol");
+        orpheus_graph_set_port(g, uh, sh, v);
+    }
 }
 
 void orpheus_engine_set_drive(OrpheusEngine* engine, float v) {

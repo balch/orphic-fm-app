@@ -15,7 +15,7 @@ static bool test_master_volume_scaling() {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         load_production_graph(engine);
         activate_voice(engine, 0, 8, 60.0f);
-        engine->master_volume.store(volumes[v]);
+        orpheus_engine_set_master_volume(engine, volumes[v]);
         auto r = render_engine(engine, 24000);
         rms_values[v] = (r.rms_l + r.rms_r) / 2.0f;
         printf("  vol=%.1f: RMS=%.4f\n", volumes[v], rms_values[v]);
@@ -51,7 +51,7 @@ static bool test_output_headroom() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     load_production_graph(engine);
     activate_voice(engine, 0, 8, 60.0f);
-    engine->master_volume.store(0.8f);
+    orpheus_engine_set_master_volume(engine, 0.8f);
     auto r = render_engine(engine, 24000);
     orpheus_engine_destroy(engine);
 
@@ -83,7 +83,7 @@ static bool test_drive_distortion() {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         load_production_graph(engine);
         activate_voice(engine, 0, 8, 60.0f);
-        engine->master_volume.store(0.8f);
+        orpheus_engine_set_master_volume(engine, 0.8f);
         engine->drive_amount.store(1.0f + drive * 14.0f);
         engine->drive_mix.store(drive_mix);
         auto r = render_engine(engine, 24000);
@@ -135,7 +135,7 @@ static bool test_master_pan() {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         load_production_graph(engine);
         activate_voice(engine, 0, 8, 60.0f);
-        engine->master_volume.store(0.8f);
+        orpheus_engine_set_master_volume(engine, 0.8f);
         engine->master_pan.store(pan);
         auto r = render_engine(engine, 24000);
         orpheus_engine_destroy(engine);
@@ -193,8 +193,10 @@ static bool test_voice_pan() {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         load_production_graph(engine);
         activate_voice(engine, 0, 8, 60.0f);
-        engine->master_volume.store(0.8f);
-        engine->voice_pan[0].store(voice_pan);
+        orpheus_engine_set_master_volume(engine, 0.8f);
+        char sym[16];
+        snprintf(sym, sizeof(sym), "voice_pan_%d", 0);
+        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.stereo", sym, voice_pan);
         auto r = render_engine(engine, 24000, 20);
         orpheus_engine_destroy(engine);
         return r;
@@ -236,7 +238,7 @@ static bool test_multi_voice_gain_staging() {
     OrpheusEngine* eng1 = orpheus_engine_create(48000.0f);
     load_production_graph(eng1);
     activate_voice(eng1, 0, 8, 60.0f);
-    eng1->master_volume.store(0.8f);
+    orpheus_engine_set_master_volume(eng1, 0.8f);
     auto r_1v = render_engine(eng1, 24000);
     orpheus_engine_destroy(eng1);
 
@@ -246,9 +248,11 @@ static bool test_multi_voice_gain_staging() {
     float notes[] = {48.0f, 55.0f, 60.0f, 67.0f};
     for (int v = 0; v < 4; v++) {
         activate_voice(eng4, v, 8, notes[v]);
-        eng4->voice_pan[v].store(0.0f);
+        char sym[16];
+        snprintf(sym, sizeof(sym), "voice_pan_%d", v);
+        orpheus_engine_set_port(eng4, "org.balch.orpheus.plugins.stereo", sym, 0.0f);
     }
-    eng4->master_volume.store(0.8f);
+    orpheus_engine_set_master_volume(eng4, 0.8f);
     auto r_4v = render_engine(eng4, 24000);
     orpheus_engine_destroy(eng4);
 
@@ -308,7 +312,7 @@ static bool test_gain_staging_report() {
         load_production_graph(engine);
         for (int v = 0; v < sc.num_voices; v++)
             activate_voice(engine, v, 8, notes[v]);
-        engine->master_volume.store(sc.volume);
+        orpheus_engine_set_master_volume(engine, sc.volume);
         engine->drive_amount.store(1.0f + sc.drive * 14.0f);
         engine->drive_mix.store(sc.drive_mix);
 

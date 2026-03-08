@@ -279,7 +279,7 @@ static bool test_mod_source_depth_integration() {
     eng_dry->voice_params[0].timbre.store(0.5f);
     eng_dry->voice_params[0].morph.store(0.5f);
     eng_dry->voice_params[0].decay.store(0.0f);
-    eng_dry->mod_source[0].store(0); // OFF
+    eng_dry->mod_source[0].store(1); // OFF
 
     GraphUnit v_dry;
     setup_voice_unit(&v_dry, 0);
@@ -454,25 +454,25 @@ static bool test_kotlin_port_compatibility() {
     check("delay", "mix", 0.5f, "delay_mix",
           engine->delay_mix.load(), 0.5f, true);
 
-    // Mod source via Kotlin URI — KNOWN MISMATCH
+    // Mod source via Kotlin URI (voice plugin)
     engine->mod_source[0].store(0);
     orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.voice", "duo_mod_source_0", 2.0f);
     check("voice", "duo_mod_source_0", 2.0f, "mod_source[0] (Kotlin URI)",
-          (float)engine->mod_source[0].load(), 2.0f, false);
+          (float)engine->mod_source[0].load(), 2.0f, true);
 
-    // Mod source via C++ URI — should work
+    // Mod source via C++ URI (modulation plugin)
     engine->mod_source[0].store(0);
     orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.modulation", "mod_source_0", 2.0f);
     check("modulation", "mod_source_0", 2.0f, "mod_source[0] (C++ URI)",
           (float)engine->mod_source[0].load(), 2.0f, true);
 
-    // Mod depth via Kotlin URI — KNOWN MISMATCH
+    // Mod depth via Kotlin URI (voice plugin)
     engine->mod_depth[0].store(0.0f);
     orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.voice", "duo_mod_source_level_0", 0.8f);
     check("voice", "duo_mod_source_level_0", 0.8f, "mod_depth[0] (Kotlin URI)",
-          engine->mod_depth[0].load(), 0.8f, false);
+          engine->mod_depth[0].load(), 0.8f, true);
 
-    // Mod depth via C++ URI — should work
+    // Mod depth via C++ URI (modulation plugin)
     engine->mod_depth[0].store(0.0f);
     orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.modulation", "mod_depth_0", 0.8f);
     check("modulation", "mod_depth_0", 0.8f, "mod_depth[0] (C++ URI)",
@@ -482,7 +482,7 @@ static bool test_kotlin_port_compatibility() {
     engine->vibrato_depth.store(0.0f);
     orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.voice", "vibrato", 0.8f);
     check("voice", "vibrato", 0.8f, "vibrato_depth",
-          engine->vibrato_depth.load(), 0.8f, false);  // KNOWN GAP: no handler
+          engine->vibrato_depth.load(), 0.8f, true);
 
     orpheus_engine_destroy(engine);
     printf("Kotlin port compatibility test: %s\n", pass ? "PASS" : "FAIL");
@@ -498,8 +498,7 @@ static bool test_mod_source_enum_mapping() {
     bool pass = true;
 
     // Kotlin ModSource enum: VOICE_FM=0, OFF=1, LFO=2, FLUX=3
-    // C++ mod_source: 0=OFF, 1=VOICE_FM, 2=LFO, 3=FLUX
-    // LFO and FLUX match, but OFF and VOICE_FM are swapped!
+    // C++ mod_source now uses same ordinals as Kotlin
 
     struct EnumMapping {
         const char* name;
@@ -507,10 +506,10 @@ static bool test_mod_source_enum_mapping() {
         int cpp_value;
         bool matches;
     } mappings[] = {
-        {"VOICE_FM", 0, 1, false},  // Kotlin=0, C++ expects 1 → MISMATCH
-        {"OFF",      1, 0, false},  // Kotlin=1, C++ expects 0 → MISMATCH
-        {"LFO",      2, 2, true},   // Both 2 → match
-        {"FLUX",     3, 3, true},   // Both 3 → match
+        {"VOICE_FM", 0, 0, true},
+        {"OFF",      1, 1, true},
+        {"LFO",      2, 2, true},
+        {"FLUX",     3, 3, true},
     };
 
     for (auto& m : mappings) {
@@ -521,8 +520,8 @@ static bool test_mod_source_enum_mapping() {
         int stored = engine->mod_source[0].load();
         const char* cpp_interp;
         switch (stored) {
-            case 0: cpp_interp = "OFF"; break;
-            case 1: cpp_interp = "VOICE_FM"; break;
+            case 0: cpp_interp = "VOICE_FM"; break;
+            case 1: cpp_interp = "OFF"; break;
             case 2: cpp_interp = "LFO"; break;
             case 3: cpp_interp = "FLUX"; break;
             default: cpp_interp = "UNKNOWN"; break;

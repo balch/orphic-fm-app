@@ -361,7 +361,7 @@ static bool test_lfo_timbre_modulation() {
     eng_dry->voice_params[0].timbre.store(0.5f);
     eng_dry->voice_params[0].morph.store(0.5f);
     eng_dry->voice_params[0].decay.store(0.0f);
-    eng_dry->mod_source[0].store(0); // OFF
+    eng_dry->mod_source[0].store(1); // OFF
 
     GraphUnit v_dry;
     setup_voice_unit(&v_dry, 0);
@@ -448,7 +448,7 @@ static bool test_lfo_fm_modulation() {
     eng_dry->voice_params[0].timbre.store(0.5f);
     eng_dry->voice_params[0].morph.store(0.5f);
     eng_dry->voice_params[0].decay.store(0.0f);
-    eng_dry->mod_source[0].store(0); // OFF
+    eng_dry->mod_source[0].store(1); // OFF
 
     GraphUnit v_dry;
     setup_voice_unit(&v_dry, 0);
@@ -841,7 +841,7 @@ static bool test_lfo_mod_depth_sweep() {
     eng_base->voice_params[0].timbre.store(0.5f);
     eng_base->voice_params[0].morph.store(0.5f);
     eng_base->voice_params[0].decay.store(0.0f);
-    eng_base->mod_source[0].store(0); // OFF
+    eng_base->mod_source[0].store(1); // OFF
 
     GraphUnit v_base;
     setup_voice_unit(&v_base, 0);
