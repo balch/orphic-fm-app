@@ -143,6 +143,7 @@ if(BUILD_TESTS)
         test/test_lfo.cpp
         test/test_control_routing.cpp
         test/test_snapshots.cpp
+        test/test_headroom.cpp
         test/test_benchmark.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)

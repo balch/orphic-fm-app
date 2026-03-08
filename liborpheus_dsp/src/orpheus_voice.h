@@ -67,9 +67,9 @@ static const float kOrpheusOutGain[kOrpheusMaxEngines] = {
     0.30f,  // 18: Particle
     0.30f,  // 19: String
     0.30f,  // 20: Modal
-    0.30f,  // 21: BassDrum
-    0.30f,  // 22: SnareDrum
-    0.30f,  // 23: HiHat
+    0.80f,  // 21: BassDrum  (matches Kotlin AnalogBassDrumEngine)
+    0.80f,  // 22: SnareDrum (matches Kotlin AnalogSnareDrumEngine)
+    0.80f,  // 23: HiHat     (matches Kotlin MetallicHiHatEngine)
 };
 
 // Soft saturation matching Kotlin DspPlaitsUnit.softLimit():
