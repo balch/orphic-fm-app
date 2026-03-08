@@ -309,17 +309,24 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     // ── Graph gate input: detect rising/falling edges from IPORT_GATE ──
     // When connected (e.g. from Grids triggers), overrides voice_params gate.
+    // Uses trigger_pending flag so a complete rise+fall within one buffer isn't lost.
     GraphPort* gate_port = &u->inputs[IPORT_GATE];
     if (gate_port->num_sources > 0) {
         for (int i = 0; i < num_frames; i++) {
             bool gate_on = gate_port->buffer[i] > 0.5f;
-            bool was_on = vp.gate.load(std::memory_order_relaxed) != 0;
-            if (gate_on && !was_on) {
-                vp.gate.store(1, std::memory_order_relaxed);
+            if (gate_on && !vp.graph_gate_prev) {
+                vp.graph_trigger_pending = true;
                 vp.ever_triggered.store(1, std::memory_order_relaxed);
-            } else if (!gate_on && was_on) {
-                vp.gate.store(0, std::memory_order_relaxed);
             }
+            vp.graph_gate_prev = gate_on;
+        }
+        // Apply: if a rising edge was seen, force gate on for this render block.
+        // The gate stays high if the signal ended high, off if it ended low.
+        if (vp.graph_trigger_pending) {
+            vp.gate.store(1, std::memory_order_relaxed);
+            vp.graph_trigger_pending = false;
+        } else {
+            vp.gate.store(vp.graph_gate_prev ? 1 : 0, std::memory_order_relaxed);
         }
     }
 
@@ -1173,12 +1180,11 @@ void unit_process_grids(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
                         static_cast<uint8_t>(ch),
                         gx, gy);
 
-                    // Add randomness perturbation
+                    // Add randomness perturbation (LCG PRNG, audio-safe)
                     if (randomness > 0.0f) {
-                        // Simple pseudo-random perturbation
-                        uint8_t perturb = static_cast<uint8_t>(
-                            randomness * 64.0f *
-                            (static_cast<float>((step * 7 + ch * 13 + 37) % 256) / 255.0f));
+                        engine->grids_rng_state = engine->grids_rng_state * 1664525u + 1013904223u;
+                        uint8_t noise = static_cast<uint8_t>(engine->grids_rng_state >> 24);
+                        uint8_t perturb = static_cast<uint8_t>(randomness * static_cast<float>(noise) * 0.5f);
                         if (level < 255 - perturb) {
                             level += perturb;
                         } else {

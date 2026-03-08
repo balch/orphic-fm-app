@@ -56,6 +56,8 @@ struct OrpheusEngine {
         std::atomic<int> engine_index{0};
         std::atomic<int> active{0};          // 0 = voice disabled (no Plaits rendering)
         std::atomic<int> ever_triggered{0};  // 0 = never gated on; skip render until first gate
+        bool graph_gate_prev{false};         // previous gate state for graph edge detection
+        bool graph_trigger_pending{false};   // rising edge detected, not yet consumed by render
     };
     VoiceParams voice_params[kNumVoices];
 
@@ -239,6 +241,7 @@ struct OrpheusEngine {
     int grids_pulse_count{0};             // sub-step counter (0..5 for 24PPQN→4PPQN)
     float grids_trigger_duration{0.001f}; // trigger pulse width in seconds
     int grids_trigger_countdown[3] = {};  // countdown samples for each channel trigger
+    uint32_t grids_rng_state{12345};      // LCG PRNG for randomness perturbation
     std::atomic<float> grids_x{0.5f};
     std::atomic<float> grids_y{0.5f};
     std::atomic<float> grids_density_kick{0.5f};
