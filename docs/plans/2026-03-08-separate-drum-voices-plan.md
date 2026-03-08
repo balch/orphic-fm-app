@@ -4,7 +4,7 @@
 
 **Goal:** Separate drum voices from REPL/Quad 2, giving the engine 12 main + 3 drum = 15 voices, matching Kotlin architecture.
 
-**Architecture:** Grow voice arrays to 15 slots. Add 3 dedicated drum plaits units (d0/d1/d2) to the ODWG graph with per-drum volume/pan. Update all boundary checks from `kNumMainVoices` (8) to `kDrumVoiceStart` (12). Add quad volume, quad hold, and drum isolation tests.
+**Architecture:** Grow voice arrays to 15 slots. Add 3 dedicated drum plaits units (d0/d1/d2) to the ODWG graph with per-drum volume/pan and full MAIN/FX routing toggle (MAIN path: drums → dedicated Rings resonator → limiter → output; FX path: drums → main resonator → drive → delay). Update all boundary checks from `kNumMainVoices` (8) to `kDrumVoiceStart` (12). Add quad volume, quad hold, and drum isolation tests.
 
 **Tech Stack:** C++ (liborpheus_dsp), Kotlin (DefaultWiringGraph.kt ODWG builder)
 
@@ -219,20 +219,22 @@ git commit -m "refactor(dsp): Update voice boundary checks for 12+3 layout"
 
 ---
 
-### Task 4: Update ODWG graph to add separate drum plaits units
+### Task 4: Update ODWG graph — dedicated drum voices + MAIN/FX routing
 
 **Files:**
 - Modify: `core/dsp-engine/src/commonMain/kotlin/org/balch/orpheus/core/audio/dsp/DefaultWiringGraph.kt:18-263`
 
-**Step 1: Add 3 drum plaits units after the 12 main voice loop**
+**Reference:** Kotlin JSyn routing in `DspWiringGraph.kt:wireDrums()` (lines 203-242) and `initDrumDirectResonator()` (lines 290-299). The C++ ODWG must replicate this topology exactly.
 
-After line 46 (end of main voice loop), add:
+**Step 1: Add 3 drum plaits units after the 12 main voice loop (line 46)**
 
 ```kotlin
-// Dedicated drum voices with per-drum volume (SLOT_GAINS) and center pan
-val drumEngines = intArrayOf(21, 22, 23)  // BassDrum, SnareDrum, HiHat
-val drumSlotGains = floatArrayOf(1.2f, 0.6f, 0.5f)  // matches Kotlin DrumPlugin.SLOT_GAINS
+// ── Dedicated drum voices (3 slots) ──
+// Per-drum volume defaults from DrumPlugin.SLOT_GAINS, center pan
+val drumSlotGains = floatArrayOf(1.2f, 0.6f, 0.5f)
 val drumPlaitsUnits = mutableListOf<UnitRef>()
+val drumOutsL = mutableListOf<UnitRef>()
+val drumOutsR = mutableListOf<UnitRef>()
 
 for (d in 0 until 3) {
     val dp = plaits("d${d}_p") { moduleIndex = (12 + d).toFloat() }
@@ -245,12 +247,95 @@ for (d in 0 until 3) {
     dp.out to dv.inputA
     dv.out to dL.inputA
     dv.out to dR.inputA
-    voiceOutsL.add(dL)
-    voiceOutsR.add(dR)
+    drumOutsL.add(dL)
+    drumOutsR.add(dR)
 }
+
+// Drum sum (mono sum of all 3 drums, L+R channels)
+val drumSumL = passThrough("drumSumL")
+val drumSumR = passThrough("drumSumR")
+for (d in drumOutsL) { d.out to drumSumL.input }
+for (d in drumOutsR) { d.out to drumSumR.input }
 ```
 
-**Step 2: Rewire GRIDS triggers to drum units**
+Note: drum outputs do NOT feed into the main `voiceOutsL/R` summing tree. They have their own routing below.
+
+**Step 2: Add drum MAIN/FX routing (after drum sum, before effects chain)**
+
+This implements the two-path bypass toggle matching Kotlin's `DspSynthEngine.setDrumsBypass()`:
+- **FX path** (`drumChainGain`): drums → main Rings resonator → drive → delay → output
+- **MAIN path** (`drumDirectGain`): drums → dedicated Rings → wet/dry → limiter → master output
+
+```kotlin
+// ── Drum FX/MAIN routing toggle ──
+// Default: MAIN mode (bypass=true → drumDirectGain=1, drumChainGain=0)
+// Controlled at runtime via drumChainGain/drumDirectGain port map entries
+
+// FX path: drum sum → gain gate → existing resonator excitation inputs
+val drumChainGainL = multiply("drumChainGainL") { inputB = 0.0f }
+val drumChainGainR = multiply("drumChainGainR") { inputB = 0.0f }
+drumSumL.out to drumChainGainL.inputA
+drumSumR.out to drumChainGainR.inputA
+
+// MAIN path: drum sum → gain gate → dedicated resonator chain
+val drumDirectGainL = multiply("drumDirectGainL") { inputB = 1.0f }
+val drumDirectGainR = multiply("drumDirectGainR") { inputB = 1.0f }
+drumSumL.out to drumDirectGainL.inputA
+drumSumR.out to drumDirectGainR.inputA
+
+// Dedicated drum resonator (Rings) — dry/wet mix, defaults: dry=1.0, wet=0.0
+val drumDirectResoDryGainL = multiply("drumDirectResoDryGainL") { inputB = 1.0f }
+val drumDirectResoDryGainR = multiply("drumDirectResoDryGainR") { inputB = 1.0f }
+drumDirectGainL.out to drumDirectResoDryGainL.inputA
+drumDirectGainR.out to drumDirectResoDryGainR.inputA
+
+// Mix L+R to mono for drum Rings input
+val drumResoMix = add("drumResoMix")
+val drumResoHalf = multiply("drumResoHalf") { inputB = 0.5f }
+drumDirectGainL.out to drumResoMix.inputA
+drumDirectGainR.out to drumResoMix.inputB
+drumResoMix.out to drumResoHalf.inputA
+
+val drumReso = rings("drumResonator")
+drumResoHalf.out to drumReso.input
+
+val drumDirectResoWetGainL = multiply("drumDirectResoWetGainL") { inputB = 0.0f }
+val drumDirectResoWetGainR = multiply("drumDirectResoWetGainR") { inputB = 0.0f }
+drumReso.out to drumDirectResoWetGainL.inputA
+drumReso.outRight to drumDirectResoWetGainR.inputA
+
+// Sum dry + wet
+val drumDirectResoSumL = add("drumDirectResoSumL")
+val drumDirectResoSumR = add("drumDirectResoSumR")
+drumDirectResoDryGainL.out to drumDirectResoSumL.inputA
+drumDirectResoWetGainL.out to drumDirectResoSumL.inputB
+drumDirectResoDryGainR.out to drumDirectResoSumR.inputA
+drumDirectResoWetGainR.out to drumDirectResoSumR.inputB
+
+// Limiter (drive=1.0 default, matching Kotlin initDrumDirectResonator)
+val drumDirectLimiterL = limiter("drumDirectLimiterL") { driveAmount = 1.0f }
+val drumDirectLimiterR = limiter("drumDirectLimiterR") { driveAmount = 1.0f }
+drumDirectResoSumL.out to drumDirectLimiterL.input
+drumDirectResoSumR.out to drumDirectLimiterR.input
+
+// MAIN path output → master clip (direct to output, bypassing delay/reverb)
+drumDirectLimiterL.out to clipL.input
+drumDirectLimiterR.out to clipR.input
+```
+
+**Step 3: Wire FX path drums into existing resonator excitation**
+
+The FX path feeds drums into the main Rings resonator (already built above). Add after the drumChainGain definitions:
+
+```kotlin
+// FX path: drumChainGain → main resonator drum excitation inputs
+drumChainGainL.out to drumExGainL.inputA  // joins existing excitation sum
+drumChainGainR.out to drumExGainR.inputA
+```
+
+Note: In the current graph, `grains.out` feeds `drumExGainL.inputA`. The FX path drums should REPLACE that connection or be summed. Check whether `drumExGainL.inputA` can accept multiple sources (passThrough supports multi-input, but multiply's inputA may not). If needed, add a passThrough to merge grains + drumChainGain before drumExGainL.
+
+**Step 4: Rewire GRIDS triggers to drum units**
 
 Replace lines 192-194:
 ```kotlin
@@ -266,9 +351,9 @@ gridsUnit.outRight to drumPlaitsUnits[1].gate   // snare → drum voice 13
 gridsUnit.aux to drumPlaitsUnits[2].gate        // hat → drum voice 14
 ```
 
-**Step 3: Add port map entries for drum volume and pan**
+**Step 5: Add port map entries**
 
-In the `portMap { }` block, add after the voice pan entries:
+In the `portMap { }` block, add:
 
 ```kotlin
 // Per-drum volume
@@ -280,9 +365,22 @@ for (d in 0 until 3) {
     map("org.balch.orpheus.plugins.drum", "drum_pan_L_$d", "d${d}_pL", IPORT_INPUT_B)
     map("org.balch.orpheus.plugins.drum", "drum_pan_R_$d", "d${d}_pR", IPORT_INPUT_B)
 }
+// Drum FX/MAIN bypass toggle
+map("org.balch.orpheus.plugins.drum", "drum_chain_gain_l", "drumChainGainL", IPORT_INPUT_B)
+map("org.balch.orpheus.plugins.drum", "drum_chain_gain_r", "drumChainGainR", IPORT_INPUT_B)
+map("org.balch.orpheus.plugins.drum", "drum_direct_gain_l", "drumDirectGainL", IPORT_INPUT_B)
+map("org.balch.orpheus.plugins.drum", "drum_direct_gain_r", "drumDirectGainR", IPORT_INPUT_B)
+// Drum direct resonator wet/dry
+map("org.balch.orpheus.plugins.drum", "drum_direct_reso_dry_l", "drumDirectResoDryGainL", IPORT_INPUT_B)
+map("org.balch.orpheus.plugins.drum", "drum_direct_reso_dry_r", "drumDirectResoDryGainR", IPORT_INPUT_B)
+map("org.balch.orpheus.plugins.drum", "drum_direct_reso_wet_l", "drumDirectResoWetGainL", IPORT_INPUT_B)
+map("org.balch.orpheus.plugins.drum", "drum_direct_reso_wet_r", "drumDirectResoWetGainR", IPORT_INPUT_B)
+// Drum direct limiter drive
+map("org.balch.orpheus.plugins.distortion", "drum_drive", "drumDirectLimiterL", IPORT_DRIVE)
+map("org.balch.orpheus.plugins.distortion", "drum_drive", "drumDirectLimiterR", IPORT_DRIVE)
 ```
 
-**Step 4: Build the Kotlin module and regenerate ODWG**
+**Step 6: Build the Kotlin module and regenerate ODWG**
 
 Run: `./gradlew :core:dsp-engine:build`
 Then rebuild the desktop native lib and C++ tests:
@@ -293,11 +391,11 @@ cmake --build . && ./orpheus_dsp_test
 
 Expected: All existing tests pass with the new graph. Drum tests now trigger voices 12-14.
 
-**Step 5: Commit**
+**Step 7: Commit**
 
 ```bash
 git add core/dsp-engine/src/commonMain/kotlin/org/balch/orpheus/core/audio/dsp/DefaultWiringGraph.kt
-git commit -m "feat(graph): Add 3 dedicated drum plaits units with per-drum volume/pan"
+git commit -m "feat(graph): Add dedicated drum voices with MAIN/FX routing and resonator"
 ```
 
 ---
