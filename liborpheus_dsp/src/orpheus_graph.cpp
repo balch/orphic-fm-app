@@ -162,6 +162,7 @@ int orpheus_graph_load(OrpheusGraph* graph, const uint8_t* data,
 
     // Topological sort via Tarjan SCC
     orpheus_graph_sort(graph);
+
     return 0;
 }
 

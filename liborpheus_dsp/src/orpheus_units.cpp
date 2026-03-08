@@ -310,6 +310,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     }
 
     auto& vp = engine->voice_params[idx];
+
     if (!vp.active.load(std::memory_order_relaxed)) {
         std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
         engine->voice_levels[idx].store(0.0f, std::memory_order_relaxed);
@@ -367,6 +368,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // (internal LPG has fully decayed)
         float prev_peak = engine->voice_levels[idx].load(std::memory_order_relaxed);
         if (actual_gate == 0 && scaled_hold < 0.001f && prev_peak < 0.0001f) {
+            // Reset trigger state so next gate-on produces a rising edge.
+            // Without this, trigger_state_ stays true (stale from last gate)
+            // and OrpheusVoice won't detect TRIGGER_RISING_EDGE on re-trigger.
+            engine->voices_dsp[idx].trigger_state_ = false;
             std::memset(out, 0, num_frames * sizeof(float));
             engine->voice_levels[idx].store(0.0f, std::memory_order_relaxed);
             return;

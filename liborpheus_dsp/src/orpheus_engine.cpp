@@ -65,6 +65,9 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     engine->string_base_freq[1].store(550.0f, std::memory_order_relaxed);
     engine->string_base_freq[2].store(700.0f, std::memory_order_relaxed);
     engine->string_base_freq[3].store(850.0f, std::memory_order_relaxed);
+    for (int i = 0; i < 4; i++) {
+        engine->string_mix[i].store(0.5f, std::memory_order_relaxed);
+    }
     for (int i = 0; i < kNumMainVoices; i++) {
         engine->voice_mix_cv[i] = 1.0f;
     }
@@ -147,6 +150,7 @@ void orpheus_engine_process(OrpheusEngine* engine,
     if (graph) {
         // Graph-based rendering: voices + effects chain via ODWG descriptor
         orpheus_graph_process(graph, engine, output_buffer, num_frames);
+
     } else {
         // Fallback: procedural rendering via OrpheusVoice (direct Engine::Render)
         const float volume = engine->master_volume.load(std::memory_order_relaxed);
