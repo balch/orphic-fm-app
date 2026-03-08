@@ -382,6 +382,57 @@ static bool test_idle_detection_recovery() {
     return all_pass;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Test: Engine 0 harmonics (self-feedback) and morph (detune)
+// Verifies that harmonics and morph parameters change Engine 0 output
+// ═══════════════════════════════════════════════════════════════════
+static bool test_engine0_harmonics_morph() {
+    printf("\n=== Test: Engine 0 harmonics (feedback) and morph (detune) ===\n");
+    bool pass = true;
+
+    auto render_engine0 = [](float harmonics, float morph) -> float {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        engine->voice_params[0].active.store(1);
+        engine->voice_params[0].ever_triggered.store(1);
+        engine->voice_params[0].engine_index.store(-1);
+        engine->voice_params[0].tune.store(60.0f);
+        engine->voice_params[0].timbre.store(0.0f);  // pure triangle
+        engine->voice_params[0].harmonics.store(harmonics);
+        engine->voice_params[0].morph.store(morph);
+        engine->voice_params[0].gate.store(1);
+
+        GraphUnit v0;
+        setup_voice_unit(&v0, 0);
+        float peak = render_voice(&v0, engine, 24000);
+        orpheus_engine_destroy(engine);
+        return peak;
+    };
+
+    // Baseline: no feedback, no morph
+    float peak_base = render_engine0(0.0f, 0.0f);
+
+    // With feedback: harmonics = 0.8 (should change timbre / peak)
+    float peak_fb = render_engine0(0.8f, 0.0f);
+
+    // With morph (detune): morph = 0.5 (25 cents up)
+    float peak_morph = render_engine0(0.0f, 0.5f);
+
+    float fb_diff = std::fabs(peak_fb - peak_base);
+    printf("  Base peak=%.4f  Feedback(0.8) peak=%.4f  diff=%.4f %s\n",
+           peak_base, peak_fb, fb_diff,
+           fb_diff > 0.001f ? "OK (different)" : "FAIL (same)");
+    if (fb_diff < 0.001f) pass = false;
+
+    // Morph as detune produces same waveform shape but different pitch
+    // Peak may be similar, just verify it produces sound
+    printf("  Morph(0.5) peak=%.4f %s\n", peak_morph,
+           peak_morph > 0.01f ? "OK" : "FAIL (silent)");
+    if (peak_morph < 0.01f) pass = false;
+
+    printf("Engine 0 harmonics/morph test: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 bool run_voice_tests() {
     bool all_pass = true;
     all_pass &= test_single_voice_engine0();
@@ -393,5 +444,6 @@ bool run_voice_tests() {
     all_pass &= test_voice_activation_lifecycle();
     all_pass &= test_engine_switch_while_playing();
     all_pass &= test_idle_detection_recovery();
+    all_pass &= test_engine0_harmonics_morph();
     return all_pass;
 }

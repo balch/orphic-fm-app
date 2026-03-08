@@ -460,7 +460,14 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     if (engine_index < 0) {
         // ═══ ENGINE 0 (OSC MODE): Triangle + Square with ADSR + Hold ═══
-        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones + bend_offset;
+        // Harmonics = self-feedback amount (0-1), creates FM-like timbral richness
+        // Morph = duo voice detune in cents (handled at voice pair level in Kotlin,
+        //         here we use it as a subtle frequency spread: morph * 50 cents)
+        float feedback_amount = vp.harmonics.load(std::memory_order_relaxed);
+        float morph_val = vp.morph.load(std::memory_order_relaxed);
+        float detune_semitones = morph_val * (50.0f / 100.0f);  // 0-0.5 semitones
+
+        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones + bend_offset + detune_semitones;
         float freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
 
@@ -471,15 +478,22 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         float voice_peak = 0.0f;
         for (int i = 0; i < num_frames; i++) {
+            // Self-feedback: previous output modulates phase for FM-like timbre
+            float fb_offset = osc.prev_output * feedback_amount * 0.3f;
+
             // Triangle oscillator: 4×|phase-0.5| - 1
-            float tri = 4.0f * std::fabs(osc.tri_phase - 0.5f) - 1.0f;
+            float tri_phase_mod = osc.tri_phase + fb_offset;
+            tri_phase_mod -= std::floor(tri_phase_mod);
+            float tri = 4.0f * std::fabs(tri_phase_mod - 0.5f) - 1.0f;
             // Square oscillator
-            float sq = (osc.sq_phase < 0.5f) ? 1.0f : -1.0f;
+            float sq_phase_mod = osc.sq_phase + fb_offset;
+            sq_phase_mod -= std::floor(sq_phase_mod);
+            float sq = (sq_phase_mod < 0.5f) ? 1.0f : -1.0f;
 
             // Crossfade: (tri × (1-sharp)) + (sq × sharp)
             float audio = tri * (1.0f - sharpness) + sq * sharpness;
 
-            // Advance phases
+            // Advance phases (unmodulated — feedback only affects read position)
             float phase_inc = freq / sr;
             osc.tri_phase += phase_inc;
             osc.tri_phase -= std::floor(osc.tri_phase);
@@ -522,6 +536,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             // VCA = audio × (envelope + hold)
             float vca = osc.env_level + osc.hold_smoothed;
             float sample = audio * vca;
+            osc.prev_output = audio;  // store pre-VCA for feedback
             out[i] = sample;
 
             float abs_s = std::fabs(sample);

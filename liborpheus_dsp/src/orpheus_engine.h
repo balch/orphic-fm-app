@@ -143,6 +143,8 @@ struct OrpheusEngine {
         bool  env_gate_was_on = false;
         // Smoothed hold ramp (20ms)
         float hold_smoothed = 0.0f;
+        // Self-feedback (previous sample output for FM-like feedback)
+        float prev_output = 0.0f;
     };
     VoiceOscState voice_osc_state[kNumVoices];
 
