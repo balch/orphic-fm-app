@@ -312,8 +312,51 @@ bool test_voice_coupling() {
     return pass;
 }
 
+bool test_fm_modulation() {
+    printf("\n=== Test: FM modulation ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].tune.store(60.0f);
+    engine->voice_params[0].gate.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
+    engine->voice_params[0].engine_index.store(-1);
+
+    engine->voice_params[1].active.store(1);
+    engine->voice_params[1].tune.store(67.0f);
+    engine->voice_params[1].gate.store(1);
+    engine->voice_params[1].ever_triggered.store(1);
+    engine->voice_params[1].engine_index.store(-1);
+
+    engine->mod_source[0].store(1); // VOICE_FM
+    engine->fm_depth[0].store(0.5f);
+
+    GraphUnit v0 = {}, v1 = {};
+    v0.type = UNIT_PLAITS; v0.enabled = true;
+    v1.type = UNIT_PLAITS; v1.enabled = true;
+    unit_init(&v0, 48000.0f);
+    unit_init(&v1, 48000.0f);
+    v0.state.module.index = 0;
+    v1.state.module.index = 1;
+
+    for (int i = 0; i < 10; i++) {
+        unit_process_plaits(&v0, engine, 128, 48000.0f);
+        unit_process_plaits(&v1, engine, 128, 48000.0f);
+    }
+
+    float out0 = engine->voice_last_output[0];
+    float out1 = engine->voice_last_output[1];
+    printf("Voice 0 last output: %.4f, Voice 1: %.4f\n", out0, out1);
+    bool pass = out0 > 0.001f && out1 > 0.001f;
+    printf("FM modulation test: %s\n", pass ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 int main() {
     if (!test_voice_coupling()) return 1;
+    if (!test_fm_modulation()) return 1;
     if (!test_clock()) return 1;
     if (!test_grids()) return 1;
     if (!test_marbles()) return 1;

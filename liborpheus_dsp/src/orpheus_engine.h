@@ -140,6 +140,15 @@ struct OrpheusEngine {
     float voice_envelope[kNumVoices] = {};             // peak follower per voice
     std::atomic<float> coupling_depth{0.0f};           // 0 = off, scales partner env → pitch
 
+    // ── Mod Source Routing + FM ─────────────────────────
+    static constexpr int kNumDuos = 6;
+    float voice_last_output[kNumVoices] = {};          // previous block's peak output
+    float marbles_cv_output[2] = {};                   // cached Marbles X1/X2 CV
+    std::atomic<int> mod_source[kNumDuos] = {};        // per-duo: 0=OFF, 1=VOICE_FM, 2=LFO, 3=FLUX
+    std::atomic<float> mod_depth[kNumDuos] = {};       // per-duo timbre mod depth
+    std::atomic<float> fm_depth[kNumDuos] = {};        // per-duo FM depth (semitones)
+    std::atomic<int> fm_cross_quad{0};                 // 0=duo pairs, 1=cross-quad circular
+
     // ── Marbles Random Sequencer ─────────────────────
     // MI Marbles: TGenerator (rhythmic gates) + XYGenerator (random CV)
     marbles::RandomGenerator marbles_rng;

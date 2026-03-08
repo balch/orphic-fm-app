@@ -379,13 +379,43 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
     }
 
+    // ── Mod source routing: FM + timbre modulation ──────
+    float fm_mod_semitones = 0.0f;
+    float timbre_mod_offset = 0.0f;
+    {
+        int duo = idx / 2;
+        if (duo < OrpheusEngine::kNumDuos) {
+            int src = engine->mod_source[duo].load(std::memory_order_relaxed);
+            float mod_signal = 0.0f;
+            if (src == 1) { // VOICE_FM
+                int fm_source;
+                if (!engine->fm_cross_quad.load(std::memory_order_relaxed)) {
+                    fm_source = (idx % 2 == 0) ? idx + 1 : idx - 1;
+                } else {
+                    fm_source = (idx - 2 + 8) % 8;
+                }
+                if (fm_source >= 0 && fm_source < kNumVoices) {
+                    mod_signal = engine->voice_last_output[fm_source];
+                }
+            } else if (src == 2) { // LFO
+                mod_signal = engine->lfo_output_value;
+            } else if (src == 3) { // FLUX (Marbles CV)
+                mod_signal = engine->marbles_cv_output[duo % 2];
+            }
+            float md = engine->mod_depth[duo].load(std::memory_order_relaxed);
+            float fd = engine->fm_depth[duo].load(std::memory_order_relaxed);
+            timbre_mod_offset = mod_signal * md;
+            fm_mod_semitones = mod_signal * fd * 24.0f;
+        }
+    }
+
     // Smooth hold ramp coefficient (~20ms) — constant for given sr
     // Using fast approximation: 1 - e^(-50/sr)
     float hold_coeff = 50.0f / sr;  // first-order Taylor approx, good enough for smoothing
 
     if (engine_index < 0) {
         // ═══ ENGINE 0 (OSC MODE): Triangle + Square with ADSR + Hold ═══
-        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset;
+        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones;
         float freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
 
@@ -454,6 +484,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);
+        engine->voice_last_output[idx] = voice_peak;
 
         // Update peak follower for voice coupling
         engine->voice_envelope[idx] = engine->voice_envelope[idx] * 0.999f
@@ -469,9 +500,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         plaits::Patch patch;
         patch.engine = engine_index;
-        patch.note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset;
+        patch.note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones;
         patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
-        patch.timbre = vp.timbre.load(std::memory_order_relaxed);
+        patch.timbre = std::max(0.0f, std::min(1.0f,
+            vp.timbre.load(std::memory_order_relaxed) + timbre_mod_offset));
         patch.morph = vp.morph.load(std::memory_order_relaxed);
         patch.frequency_modulation_amount = 0.0f;
         patch.timbre_modulation_amount = 0.0f;
@@ -526,6 +558,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);
+        engine->voice_last_output[idx] = voice_peak;
 
         // Update peak follower for voice coupling
         engine->voice_envelope[idx] = engine->voice_envelope[idx] * 0.999f
@@ -1415,6 +1448,10 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
         out_cv1[i] = xy_output[i * 4 + 0];  // x1 CV
         out_cv2[i] = xy_output[i * 4 + 1];  // x2 CV
     }
+
+    // Cache CV output for mod source routing
+    engine->marbles_cv_output[0] = u->output_buffers[OPORT_OUT_RIGHT][num_frames - 1];
+    engine->marbles_cv_output[1] = u->output_buffers[OPORT_AUX][num_frames - 1];
 }
 
 // ── UNIT_LOOPER: Beat-quantized audio looper ────────────────

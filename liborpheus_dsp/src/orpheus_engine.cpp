@@ -600,6 +600,29 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
     }
 
+    // Mod source routing
+    {
+        static uint16_t h_mod = engine_hash16("org.balch.orpheus.plugins.modulation");
+        uint16_t uri_hash = engine_hash16(plugin_uri);
+        uint16_t symbol_hash = engine_hash16(symbol);
+        if (uri_hash == h_mod) {
+            static uint16_t h_fm_xquad = engine_hash16("fm_cross_quad");
+            if (symbol_hash == h_fm_xquad) {
+                engine->fm_cross_quad.store(static_cast<int>(value), std::memory_order_relaxed);
+                return;
+            }
+            // Per-duo parameters: mod_source_N, mod_depth_N, fm_depth_N
+            const char* src_names[] = {"mod_source_0","mod_source_1","mod_source_2","mod_source_3","mod_source_4","mod_source_5"};
+            const char* md_names[]  = {"mod_depth_0","mod_depth_1","mod_depth_2","mod_depth_3","mod_depth_4","mod_depth_5"};
+            const char* fm_names[]  = {"fm_depth_0","fm_depth_1","fm_depth_2","fm_depth_3","fm_depth_4","fm_depth_5"};
+            for (int i = 0; i < 6; i++) {
+                if (symbol_hash == engine_hash16(src_names[i])) { engine->mod_source[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
+                if (symbol_hash == engine_hash16(md_names[i]))  { engine->mod_depth[i].store(value, std::memory_order_relaxed); return; }
+                if (symbol_hash == engine_hash16(fm_names[i]))  { engine->fm_depth[i].store(value, std::memory_order_relaxed); return; }
+            }
+        }
+    }
+
     // Also set engine atomics (for MI wrappers that read from atomics)
     // Keep ALL existing strcmp chains below
     if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.grains") == 0) {
