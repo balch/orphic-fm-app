@@ -100,7 +100,7 @@ static bool test_engine_level_parity() {
 // and scale approximately as expected (sqrt(N) for uncorrelated).
 // ═══════════════════════════════════════════════════════════════════
 static bool test_fullchain_headroom() {
-    printf("\n=== Test: Full-chain headroom (1/2/4/8/12 voices) ===\n");
+    printf("\n=== Test: Full-chain headroom (1/2/4/8/15 voices) ===\n");
     bool pass = true;
 
     printf("  %-12s  %8s  %8s  %6s  %s\n",
@@ -141,25 +141,26 @@ static bool test_fullchain_headroom() {
     float rms_4v = run_main_voices("4 main", 4, n4);
     float rms_8v = run_main_voices("8 main", 8, n8);
 
-    // 12-voice scenario: 8 main voices + 4 drum triggers (kick/snare/hat/kick)
+    // 15-voice scenario: 12 main voices + 3 drum triggers (kick/snare/hat)
     {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         load_production_graph(engine);
         orpheus_engine_set_master_volume(engine, 0.8f);
 
-        // Activate all 8 main voices
-        for (int v = 0; v < 8; v++) {
-            activate_voice(engine, v, 8, n8[v]);
+        // Activate all 12 main voices
+        float n12[] = {48.0f, 52.0f, 55.0f, 60.0f, 64.0f, 67.0f, 72.0f, 76.0f,
+                       50.0f, 57.0f, 62.0f, 69.0f};
+        for (int v = 0; v < 12; v++) {
+            activate_voice(engine, v, 8, n12[v]);
             char sym[16];
             snprintf(sym, sizeof(sym), "voice_pan_%d", v);
             orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.stereo", sym, 0.0f);
         }
 
-        // Trigger all 4 drum voices
+        // Trigger all 3 drum voices
         orpheus_engine_trigger_drum(engine, 0, 0.8f); // bass drum
         orpheus_engine_trigger_drum(engine, 1, 0.8f); // snare
         orpheus_engine_trigger_drum(engine, 2, 0.8f); // hihat
-        orpheus_engine_trigger_drum(engine, 3, 0.8f); // bass drum alt
 
         auto r = render_engine(engine, 48000);
         float rms = (r.rms_l + r.rms_r) / 2.0f;
@@ -168,22 +169,22 @@ static bool test_fullchain_headroom() {
         bool has_signal = rms > 0.01f;
         bool ok = no_clip && has_signal;
         printf("  %-12s  %8.4f  %8.4f  %6.2f  %s\n",
-               "8+4 drums", r.peak, rms, crest,
+               "12+3 drums", r.peak, rms, crest,
                ok ? "OK" : (no_clip ? "LOW SIGNAL" : "CLIPPING!"));
         if (!ok) pass = false;
 
         // Verify drum voices actually contributed
         int drums_active = 0;
-        for (int v = 8; v < 12; v++) {
+        for (int v = 12; v < 15; v++) {
             float level = engine->voice_levels[v].load();
             if (level > 0.001f) drums_active++;
         }
-        printf("  Drum voices active: %d/4\n", drums_active);
+        printf("  Drum voices active: %d/3\n", drums_active);
 
-        float rms_12v = rms;
-        if (rms_12v < rms_8v * 0.95f) {
-            printf("  WARNING: 12v RMS (%.4f) lower than 8v (%.4f) — drums may not be contributing\n",
-                   rms_12v, rms_8v);
+        float rms_15v = rms;
+        if (rms_15v < rms_8v * 0.95f) {
+            printf("  WARNING: 15v RMS (%.4f) lower than 8v (%.4f) — drums may not be contributing\n",
+                   rms_15v, rms_8v);
         }
 
         orpheus_engine_destroy(engine);

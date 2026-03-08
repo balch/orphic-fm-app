@@ -8,10 +8,10 @@ static bool test_drum_trigger() {
     printf("\n=== Test: Drum trigger via API ===\n");
     bool pass = true;
 
-    const char* names[] = {"bass_drum", "snare_drum", "hi_hat", "bass_drum_alt"};
-    const int expected_engines[] = {21, 22, 23, 21};
+    const char* names[] = {"bass_drum", "snare_drum", "hi_hat"};
+    const int expected_engines[] = {21, 22, 23};
 
-    for (int d = 0; d < 4; d++) {
+    for (int d = 0; d < 3; d++) {
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         if (!load_production_graph(engine)) {
             printf("FAIL: could not load production graph\n");
@@ -21,7 +21,7 @@ static bool test_drum_trigger() {
         orpheus_engine_trigger_drum(engine, d, 0.8f);
 
         // Verify voice params were set correctly
-        int voice_idx = 8 + d; // kNumMainVoices + drum_index
+        int voice_idx = 12 + d; // kDrumVoiceStart + drum_index
         int engine_index = engine->voice_params[voice_idx].engine_index.load();
         int gate = engine->voice_params[voice_idx].gate.load();
 
@@ -97,7 +97,7 @@ static bool test_drum_isolation() {
     }
 
     // Verify drum voice levels are all zero
-    for (int v = 8; v < 12; v++) {
+    for (int v = 12; v < 15; v++) {
         float level = engine->voice_levels[v].load();
         if (level > 0.001f) {
             printf("  FAIL: drum voice %d has level=%.4f (expected 0)\n", v, level);
@@ -162,7 +162,7 @@ static bool test_drum_one_shot() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Test 4: Graph drum voices (UNIT_PLAITS with module.index 8-11)
+// Test 4: Graph drum voices (UNIT_PLAITS with module.index 12-14)
 // ═══════════════════════════════════════════════════════════════════
 static bool test_graph_drum_voice() {
     printf("\n=== Test: Graph — drum voice rendering ===\n");
@@ -172,7 +172,7 @@ static bool test_graph_drum_voice() {
     const char* names[] = {"bass_drum", "snare_drum", "hi_hat"};
 
     for (int d = 0; d < 3; d++) {
-        int voice_idx = 8 + d;
+        int voice_idx = 12 + d;
 
         OrpheusEngine* engine = orpheus_engine_create(48000.0f);
         engine->voice_params[voice_idx].active.store(1);
@@ -554,7 +554,7 @@ static bool test_graph_effects_bypass_parity() {
 
 // ═══════════════════════════════════════════════════════════════════
 // Test 8: Warps source buffer routing — SYNTH vs REPL
-// Main voices (0-7) → source 0 (SYNTH), drum voices (8-11) → source 2 (REPL)
+// Main voices (0-11) → source 0 (SYNTH), drum voices (12-14) → source 2 (REPL)
 // ═══════════════════════════════════════════════════════════════════
 static bool test_warps_source_routing() {
     printf("\n=== Test: Warps source routing (SYNTH vs REPL) ===\n");
@@ -578,7 +578,7 @@ static bool test_warps_source_routing() {
     std::memset(graph, 0, sizeof(OrpheusGraph));
     graph->sample_rate = sr;
 
-    // Main voice (index 0) + drum voice (index 8) → master
+    // Main voice (index 0) + drum voice (index 12) → master
     graph->units[0].type = UNIT_PLAITS; graph->units[0].id = 0;
     graph->units[0].enabled = true;
     unit_init(&graph->units[0], sr);
@@ -587,7 +587,7 @@ static bool test_warps_source_routing() {
     graph->units[1].type = UNIT_PLAITS; graph->units[1].id = 1;
     graph->units[1].enabled = true;
     unit_init(&graph->units[1], sr);
-    graph->units[1].state.module.index = 8; // drum voice
+    graph->units[1].state.module.index = 12; // drum voice
 
     graph->units[2].type = UNIT_PASS_THROUGH; graph->units[2].id = 2;
     graph->units[2].enabled = true; unit_init(&graph->units[2], sr);
@@ -644,7 +644,7 @@ static bool test_warps_source_routing() {
 
     printf("  After drum trigger: SYNTH_buf=%.4f REPL_peak=%.6f\n", synth_rms, repl_peak);
 
-    // REPL buffer is scaled by 1/kNumReplVoices (0.25).
+    // REPL buffer is scaled by 1/kNumDrumVoices (0.333).
     // With ADSR bypass for drums, the transient should be strong.
     if (repl_peak < 0.001f) {
         printf("  FAIL: REPL source buffer too quiet (%.6f)\n", repl_peak);
@@ -686,7 +686,7 @@ static bool test_grids_drum_integration() {
 
     // Activate drum voices
     for (int d = 0; d < 3; d++) {
-        int v = 8 + d;
+        int v = 12 + d;
         int drum_engines[] = {21, 22, 23};
         engine->voice_params[v].active.store(1);
         engine->voice_params[v].engine_index.store(drum_engines[d]);
@@ -724,7 +724,7 @@ static bool test_grids_drum_integration() {
         graph->units[uid].type = UNIT_PLAITS; graph->units[uid].id = uid;
         graph->units[uid].enabled = true;
         unit_init(&graph->units[uid], sr);
-        graph->units[uid].state.module.index = 8 + d;
+        graph->units[uid].state.module.index = 12 + d;
 
         // Wire grids trigger output to drum gate input
         // Grids: OPORT_OUT=kick, OPORT_OUT_RIGHT=snare, OPORT_AUX=hat
@@ -807,7 +807,7 @@ static bool test_grids_drum_integration() {
     // Verify drum voice levels registered hits
     int voices_with_hits = 0;
     for (int d = 0; d < 3; d++) {
-        float level = engine->voice_levels[8 + d].load();
+        float level = engine->voice_levels[12 + d].load();
         printf("  Drum %d level: %.4f %s\n", d, level, level > 0.0f ? "active" : "quiet");
         if (level > 0.0f) voices_with_hits++;
     }
