@@ -905,8 +905,13 @@ void orpheus_engine_set_voice_tune(OrpheusEngine* engine,
 void orpheus_engine_set_voice_engine(OrpheusEngine* engine,
                                      int index, int engine_index) {
     if (index >= 0 && index < kNumVoices) {
+        int old = engine->voice_params[index].engine_index.load(std::memory_order_relaxed);
         engine->voice_params[index].engine_index.store(engine_index, std::memory_order_relaxed);
-        // Don't reset ever_triggered — changing engine on a held voice should not kill audio
+        // If engine changed while gate is on, force a retrigger so the new
+        // engine's LPG gets a fresh attack (Plaits edge-detects the trigger).
+        if (old != engine_index) {
+            engine->voice_params[index].engine_changed.store(1, std::memory_order_relaxed);
+        }
     }
 }
 

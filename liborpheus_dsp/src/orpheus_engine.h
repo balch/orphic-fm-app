@@ -58,6 +58,7 @@ struct OrpheusEngine {
         std::atomic<int> ever_triggered{0};  // 0 = never gated on; skip render until first gate
         bool graph_gate_prev{false};         // previous gate state for graph edge detection
         bool graph_trigger_pending{false};   // rising edge detected, not yet consumed by render
+        std::atomic<int> engine_changed{0};  // 1 = engine just changed, force LPG retrigger
     };
     VoiceParams voice_params[kNumVoices];
 

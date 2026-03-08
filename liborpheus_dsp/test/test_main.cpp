@@ -446,68 +446,550 @@ bool test_per_string_bender() {
     return pass;
 }
 
-int main() {
-    if (!test_voice_coupling()) return 1;
-    if (!test_fm_modulation()) return 1;
-    if (!test_clock()) return 1;
-    if (!test_grids()) return 1;
-    if (!test_marbles()) return 1;
-    if (!test_looper()) return 1;
-    if (!test_bender()) return 1;
-    if (!test_per_string_bender()) return 1;
+// ═══════════════════════════════════════════════════════════════════════
+// Voice Module Tests — polyphonic, lifecycle, idle detection
+// ═══════════════════════════════════════════════════════════════════════
 
-    printf("Creating OrpheusEngine at 48kHz...\n");
+// Helper: process a voice unit for N frames, return max absolute output
+static float render_voice(GraphUnit* unit, OrpheusEngine* engine, int total_frames, float sr = 48000.0f) {
+    float max_amp = 0.0f;
+    for (int offset = 0; offset < total_frames; offset += 128) {
+        int chunk = std::min(128, total_frames - offset);
+        unit_process_plaits(unit, engine, chunk, sr);
+        for (int i = 0; i < chunk; i++) {
+            float a = std::fabs(unit->output_buffers[OPORT_OUT][i]);
+            if (a > max_amp) max_amp = a;
+        }
+    }
+    return max_amp;
+}
+
+// Helper: set up a voice unit for a given voice index
+static void setup_voice_unit(GraphUnit* unit, int voice_idx) {
+    std::memset(unit, 0, sizeof(GraphUnit));
+    unit->type = UNIT_PLAITS;
+    unit->enabled = true;
+    unit->state.module.index = voice_idx;
+    unit_init(unit, 48000.0f);
+}
+
+bool test_single_voice_engine0() {
+    printf("\n=== Test: Single voice Engine 0 (VA) ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool all_pass = true;
 
-    // Set voice 0 to default engine (VA), note C4 (MIDI 60)
-    orpheus_engine_set_voice_tune(engine, 0, 60.0f);
+    // Voice 0: Engine 0 (triangle/square), MIDI note 60 (C4)
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
+    engine->voice_params[0].engine_index.store(-1);  // Engine 0
+    engine->voice_params[0].tune.store(60.0f);
+    engine->voice_params[0].gate.store(1);
 
-    // Gate on
-    orpheus_engine_set_voice_gate(engine, 0, 1);
+    GraphUnit v0;
+    setup_voice_unit(&v0, 0);
 
-    // Render 2 seconds total
-    const int sample_rate = 48000;
-    const int total_frames = sample_rate * 2;
-    std::vector<float> buffer(total_frames * 2, 0.0f);
+    float amp = render_voice(&v0, engine, 12000); // 0.25s
+    printf("  Engine 0 gate=ON: peak=%.4f %s\n", amp, amp > 0.01f ? "OK" : "FAIL");
+    all_pass &= (amp > 0.01f);
 
-    // Process first second with gate on (in 128-frame chunks like Oboe)
-    for (int offset = 0; offset < sample_rate; offset += 128) {
-        int chunk = std::min(128, sample_rate - offset);
-        orpheus_engine_process(engine, buffer.data() + offset * 2, chunk);
+    // Gate off — envelope should release, eventually go silent
+    engine->voice_params[0].gate.store(0);
+    float release_amp = render_voice(&v0, engine, 48000); // 1s of release
+    printf("  Engine 0 after 1s release: peak=%.6f\n", release_amp);
+
+    // Gate back on — must produce sound again (no stuck silence)
+    engine->voice_params[0].gate.store(1);
+    float retrigger_amp = render_voice(&v0, engine, 12000);
+    printf("  Engine 0 re-trigger: peak=%.4f %s\n", retrigger_amp, retrigger_amp > 0.01f ? "OK" : "FAIL");
+    all_pass &= (retrigger_amp > 0.01f);
+
+    printf("Single voice Engine 0 test: %s\n", all_pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return all_pass;
+}
+
+bool test_single_voice_plaits_engines() {
+    printf("\n=== Test: Single voice Plaits engines ===\n");
+    bool all_pass = true;
+
+    // Test engines 0 (VA analog), 1 (waveshaper), 2 (FM), 6 (chord), 8 (wavetable)
+    int engines_to_test[] = {0, 1, 2, 6, 8};
+    int num_engines = sizeof(engines_to_test) / sizeof(engines_to_test[0]);
+
+    for (int e = 0; e < num_engines; e++) {
+        int eng = engines_to_test[e];
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+        engine->voice_params[0].active.store(1);
+        engine->voice_params[0].ever_triggered.store(1);
+        engine->voice_params[0].engine_index.store(eng);
+        engine->voice_params[0].tune.store(60.0f);
+        engine->voice_params[0].gate.store(1);
+        engine->voice_params[0].harmonics.store(0.5f);
+        engine->voice_params[0].timbre.store(0.5f);
+        engine->voice_params[0].morph.store(0.5f);
+        engine->voice_params[0].decay.store(0.5f);
+
+        GraphUnit v0;
+        setup_voice_unit(&v0, 0);
+
+        float amp = render_voice(&v0, engine, 24000); // 0.5s
+        bool pass = amp > 0.001f;
+        printf("  Plaits engine %2d: peak=%.4f %s\n", eng, amp, pass ? "OK" : "FAIL");
+        all_pass &= pass;
+
+        orpheus_engine_destroy(engine);
     }
 
-    // Gate off at 1 second
-    orpheus_engine_set_voice_gate(engine, 0, 0);
+    printf("Plaits engines test: %s\n", all_pass ? "PASS" : "FAIL");
+    return all_pass;
+}
 
-    // Process second second with gate off (release/decay)
-    for (int offset = sample_rate; offset < total_frames; offset += 128) {
+bool test_polyphonic_voices() {
+    printf("\n=== Test: Polyphonic 8 voices ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool all_pass = true;
+
+    // Activate all 8 main voices with different notes, all Engine 0
+    float notes[] = {48.0f, 52.0f, 55.0f, 60.0f, 64.0f, 67.0f, 72.0f, 76.0f};
+    GraphUnit units[kNumMainVoices];
+
+    for (int v = 0; v < kNumMainVoices; v++) {
+        engine->voice_params[v].active.store(1);
+        engine->voice_params[v].ever_triggered.store(1);
+        engine->voice_params[v].engine_index.store(-1); // Engine 0
+        engine->voice_params[v].tune.store(notes[v]);
+        engine->voice_params[v].gate.store(1);
+        setup_voice_unit(&units[v], v);
+    }
+
+    // Render all voices together for 0.5s
+    float voice_peaks[kNumMainVoices] = {};
+    for (int offset = 0; offset < 24000; offset += 128) {
+        int chunk = std::min(128, 24000 - offset);
+        for (int v = 0; v < kNumMainVoices; v++) {
+            unit_process_plaits(&units[v], engine, chunk, 48000.0f);
+            for (int i = 0; i < chunk; i++) {
+                float a = std::fabs(units[v].output_buffers[OPORT_OUT][i]);
+                if (a > voice_peaks[v]) voice_peaks[v] = a;
+            }
+        }
+    }
+
+    int silent_count = 0;
+    for (int v = 0; v < kNumMainVoices; v++) {
+        bool ok = voice_peaks[v] > 0.01f;
+        if (!ok) silent_count++;
+        printf("  Voice %d (note %.0f): peak=%.4f %s\n", v, notes[v], voice_peaks[v], ok ? "OK" : "SILENT!");
+        all_pass &= ok;
+    }
+
+    printf("Polyphonic test: %d/%d voices producing sound — %s\n",
+           kNumMainVoices - silent_count, kNumMainVoices, all_pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return all_pass;
+}
+
+bool test_polyphonic_plaits_voices() {
+    printf("\n=== Test: Polyphonic 8 Plaits voices ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool all_pass = true;
+
+    // Activate all 8 main voices with Plaits engine 0 (virtual analog)
+    float notes[] = {48.0f, 52.0f, 55.0f, 60.0f, 64.0f, 67.0f, 72.0f, 76.0f};
+    GraphUnit units[kNumMainVoices];
+
+    for (int v = 0; v < kNumMainVoices; v++) {
+        engine->voice_params[v].active.store(1);
+        engine->voice_params[v].ever_triggered.store(1);
+        engine->voice_params[v].engine_index.store(0); // Plaits VA
+        engine->voice_params[v].tune.store(notes[v]);
+        engine->voice_params[v].gate.store(1);
+        engine->voice_params[v].harmonics.store(0.5f);
+        engine->voice_params[v].timbre.store(0.5f);
+        engine->voice_params[v].morph.store(0.5f);
+        engine->voice_params[v].decay.store(0.5f);
+        setup_voice_unit(&units[v], v);
+    }
+
+    // Render for 0.5s
+    float voice_peaks[kNumMainVoices] = {};
+    for (int offset = 0; offset < 24000; offset += 128) {
+        int chunk = std::min(128, 24000 - offset);
+        for (int v = 0; v < kNumMainVoices; v++) {
+            unit_process_plaits(&units[v], engine, chunk, 48000.0f);
+            for (int i = 0; i < chunk; i++) {
+                float a = std::fabs(units[v].output_buffers[OPORT_OUT][i]);
+                if (a > voice_peaks[v]) voice_peaks[v] = a;
+            }
+        }
+    }
+
+    int silent_count = 0;
+    for (int v = 0; v < kNumMainVoices; v++) {
+        bool ok = voice_peaks[v] > 0.001f;
+        if (!ok) silent_count++;
+        printf("  Voice %d (Plaits, note %.0f): peak=%.4f %s\n", v, notes[v], voice_peaks[v], ok ? "OK" : "SILENT!");
+        all_pass &= ok;
+    }
+
+    printf("Polyphonic Plaits test: %d/%d voices — %s\n",
+           kNumMainVoices - silent_count, kNumMainVoices, all_pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return all_pass;
+}
+
+bool test_voice_gate_retrigger() {
+    printf("\n=== Test: Voice gate retrigger cycle ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool all_pass = true;
+
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
+    engine->voice_params[0].engine_index.store(0); // Plaits VA
+    engine->voice_params[0].tune.store(60.0f);
+    engine->voice_params[0].harmonics.store(0.5f);
+    engine->voice_params[0].timbre.store(0.5f);
+    engine->voice_params[0].morph.store(0.5f);
+    engine->voice_params[0].decay.store(0.3f); // faster decay
+
+    GraphUnit v0;
+    setup_voice_unit(&v0, 0);
+
+    // 3 gate cycles: on-off-on-off-on-off
+    for (int cycle = 0; cycle < 3; cycle++) {
+        // Gate ON
+        engine->voice_params[0].gate.store(1);
+        float on_amp = render_voice(&v0, engine, 12000); // 0.25s
+
+        // Gate OFF — let decay
+        engine->voice_params[0].gate.store(0);
+        render_voice(&v0, engine, 48000); // 1s full decay
+
+        // Check idle state
+        float idle_level = engine->voice_levels[0].load(std::memory_order_relaxed);
+
+        bool on_pass = on_amp > 0.001f;
+        printf("  Cycle %d: gate-ON peak=%.4f, idle level=%.6f %s\n",
+               cycle, on_amp, idle_level, on_pass ? "OK" : "FAIL");
+        all_pass &= on_pass;
+    }
+
+    printf("Gate retrigger test: %s\n", all_pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return all_pass;
+}
+
+bool test_voice_hold_without_gate() {
+    printf("\n=== Test: Voice hold (no gate) ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    // Engine 0: hold should produce sound even without gate
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
+    engine->voice_params[0].engine_index.store(-1); // Engine 0
+    engine->voice_params[0].tune.store(60.0f);
+    engine->voice_params[0].gate.store(0); // no gate
+    engine->voice_hold_level[0].store(0.8f); // high hold
+
+    GraphUnit v0;
+    setup_voice_unit(&v0, 0);
+
+    float amp = render_voice(&v0, engine, 24000);
+    printf("  Engine 0 hold=0.8 no gate: peak=%.4f %s\n", amp, amp > 0.01f ? "OK" : "FAIL");
+    bool pass = amp > 0.01f;
+
+    // Also test with Plaits engine
+    OrpheusEngine* engine2 = orpheus_engine_create(48000.0f);
+    engine2->voice_params[0].active.store(1);
+    engine2->voice_params[0].ever_triggered.store(1);
+    engine2->voice_params[0].engine_index.store(0); // Plaits VA
+    engine2->voice_params[0].tune.store(60.0f);
+    engine2->voice_params[0].gate.store(0);
+    engine2->voice_params[0].harmonics.store(0.5f);
+    engine2->voice_params[0].timbre.store(0.5f);
+    engine2->voice_params[0].morph.store(0.5f);
+    engine2->voice_params[0].decay.store(0.5f);
+    engine2->voice_hold_level[0].store(0.8f);
+
+    GraphUnit v0p;
+    setup_voice_unit(&v0p, 0);
+
+    float amp2 = render_voice(&v0p, engine2, 24000);
+    printf("  Plaits hold=0.8 no gate: peak=%.4f %s\n", amp2, amp2 > 0.001f ? "OK" : "FAIL");
+    pass &= (amp2 > 0.001f);
+
+    printf("Hold without gate test: %s\n", pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    orpheus_engine_destroy(engine2);
+    return pass;
+}
+
+bool test_voice_activation_lifecycle() {
+    printf("\n=== Test: Voice activation lifecycle ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool all_pass = true;
+
+    GraphUnit v0;
+    setup_voice_unit(&v0, 0);
+
+    // Step 1: Voice not active — should produce silence
+    engine->voice_params[0].active.store(0);
+    engine->voice_params[0].gate.store(1);
+    float amp_inactive = render_voice(&v0, engine, 6000);
+    printf("  Not active + gate=ON: peak=%.6f %s\n", amp_inactive,
+           amp_inactive < 0.001f ? "OK (silent)" : "FAIL (unexpected sound)");
+    all_pass &= (amp_inactive < 0.001f);
+
+    // Step 2: Activate via set_voice_active API (sets ever_triggered=1)
+    orpheus_engine_set_voice_active(engine, 0, 1);
+    engine->voice_params[0].engine_index.store(-1);
+    engine->voice_params[0].tune.store(60.0f);
+    engine->voice_params[0].gate.store(1);
+    float amp_activated = render_voice(&v0, engine, 12000);
+    printf("  After set_voice_active + gate=ON: peak=%.4f %s\n", amp_activated,
+           amp_activated > 0.01f ? "OK" : "FAIL");
+    all_pass &= (amp_activated > 0.01f);
+
+    // Step 3: Deactivate — should go silent
+    orpheus_engine_set_voice_active(engine, 0, 0);
+    float amp_deactivated = render_voice(&v0, engine, 6000);
+    printf("  After deactivate: peak=%.6f %s\n", amp_deactivated,
+           amp_deactivated < 0.001f ? "OK (silent)" : "FAIL");
+    all_pass &= (amp_deactivated < 0.001f);
+
+    // Step 4: Reactivate — must produce sound again
+    orpheus_engine_set_voice_active(engine, 0, 1);
+    engine->voice_params[0].gate.store(1);
+    float amp_reactivated = render_voice(&v0, engine, 12000);
+    printf("  After reactivate + gate=ON: peak=%.4f %s\n", amp_reactivated,
+           amp_reactivated > 0.01f ? "OK" : "FAIL");
+    all_pass &= (amp_reactivated > 0.01f);
+
+    printf("Activation lifecycle test: %s\n", all_pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return all_pass;
+}
+
+bool test_engine_switch_while_playing() {
+    printf("\n=== Test: Engine switch while voice active ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool all_pass = true;
+
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
+    engine->voice_params[0].tune.store(60.0f);
+    engine->voice_params[0].gate.store(1);
+    engine->voice_params[0].harmonics.store(0.5f);
+    engine->voice_params[0].timbre.store(0.5f);
+    engine->voice_params[0].morph.store(0.5f);
+    engine->voice_params[0].decay.store(0.5f);
+
+    GraphUnit v0;
+    setup_voice_unit(&v0, 0);
+
+    // Start with Engine 0
+    engine->voice_params[0].engine_index.store(-1);
+    float amp_e0 = render_voice(&v0, engine, 12000);
+    printf("  Engine 0: peak=%.4f %s\n", amp_e0, amp_e0 > 0.01f ? "OK" : "FAIL");
+    all_pass &= (amp_e0 > 0.01f);
+
+    // Switch to Plaits engine 0 (VA analog)
+    orpheus_engine_set_voice_engine(engine, 0, 0);
+    float amp_p0 = render_voice(&v0, engine, 24000);
+    printf("  Switch to Plaits 0: peak=%.4f %s\n", amp_p0, amp_p0 > 0.001f ? "OK" : "FAIL");
+    all_pass &= (amp_p0 > 0.001f);
+
+    // Switch to Plaits engine 2 (FM)
+    orpheus_engine_set_voice_engine(engine, 0, 2);
+    float amp_p2 = render_voice(&v0, engine, 24000);
+    printf("  Switch to Plaits 2 (FM): peak=%.4f %s\n", amp_p2, amp_p2 > 0.001f ? "OK" : "FAIL");
+    all_pass &= (amp_p2 > 0.001f);
+
+    // Switch back to Engine 0
+    orpheus_engine_set_voice_engine(engine, 0, -1);
+    float amp_back = render_voice(&v0, engine, 12000);
+    printf("  Back to Engine 0: peak=%.4f %s\n", amp_back, amp_back > 0.01f ? "OK" : "FAIL");
+    all_pass &= (amp_back > 0.01f);
+
+    printf("Engine switch test: %s\n", all_pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return all_pass;
+}
+
+bool test_idle_detection_recovery() {
+    printf("\n=== Test: Idle detection recovery ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    bool all_pass = true;
+
+    // Test with Plaits — the tricky idle path checks voice_levels
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
+    engine->voice_params[0].engine_index.store(0); // Plaits VA
+    engine->voice_params[0].tune.store(60.0f);
+    engine->voice_params[0].harmonics.store(0.5f);
+    engine->voice_params[0].timbre.store(0.5f);
+    engine->voice_params[0].morph.store(0.5f);
+    engine->voice_params[0].decay.store(0.2f); // fast decay
+
+    GraphUnit v0;
+    setup_voice_unit(&v0, 0);
+
+    // Gate on, render, gate off, let fully decay to idle
+    engine->voice_params[0].gate.store(1);
+    render_voice(&v0, engine, 12000);
+    engine->voice_params[0].gate.store(0);
+
+    // Long silence to trigger idle detection (voice_levels → 0)
+    render_voice(&v0, engine, 96000); // 2 seconds
+
+    float idle_level = engine->voice_levels[0].load(std::memory_order_relaxed);
+    printf("  After 2s decay, voice_level=%.8f (idle=%s)\n",
+           idle_level, idle_level < 0.0001f ? "yes" : "no");
+
+    // Now gate ON again — the voice MUST recover from idle
+    engine->voice_params[0].gate.store(1);
+    float recovery_amp = render_voice(&v0, engine, 24000);
+    bool recover_pass = recovery_amp > 0.001f;
+    printf("  Recovery after idle: peak=%.4f %s\n", recovery_amp, recover_pass ? "OK" : "FAIL");
+    all_pass &= recover_pass;
+
+    // Test Engine 0 idle recovery too
+    OrpheusEngine* engine2 = orpheus_engine_create(48000.0f);
+    engine2->voice_params[0].active.store(1);
+    engine2->voice_params[0].ever_triggered.store(1);
+    engine2->voice_params[0].engine_index.store(-1);
+    engine2->voice_params[0].tune.store(60.0f);
+
+    GraphUnit v0e;
+    setup_voice_unit(&v0e, 0);
+
+    engine2->voice_params[0].gate.store(1);
+    render_voice(&v0e, engine2, 12000);
+    engine2->voice_params[0].gate.store(0);
+    render_voice(&v0e, engine2, 96000); // full decay
+
+    float idle2 = engine2->voice_levels[0].load(std::memory_order_relaxed);
+    printf("  Engine 0 after 2s decay, voice_level=%.8f\n", idle2);
+
+    engine2->voice_params[0].gate.store(1);
+    float recovery2 = render_voice(&v0e, engine2, 12000);
+    bool recover2_pass = recovery2 > 0.01f;
+    printf("  Engine 0 recovery after idle: peak=%.4f %s\n", recovery2, recover2_pass ? "OK" : "FAIL");
+    all_pass &= recover2_pass;
+
+    printf("Idle detection recovery test: %s\n", all_pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    orpheus_engine_destroy(engine2);
+    return all_pass;
+}
+
+bool test_full_engine_render() {
+    printf("\n=== Test: Full engine render (no graph) ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    // Activate voice 0 and set gate — the OLD test was missing set_voice_active!
+    orpheus_engine_set_voice_active(engine, 0, 1);
+    orpheus_engine_set_voice_tune(engine, 0, 60.0f);
+    orpheus_engine_set_voice_gate(engine, 0, 1);
+
+    const int sample_rate = 48000;
+    const int total_frames = sample_rate; // 1 second
+    std::vector<float> buffer(total_frames * 2, 0.0f);
+
+    for (int offset = 0; offset < total_frames; offset += 128) {
         int chunk = std::min(128, total_frames - offset);
         orpheus_engine_process(engine, buffer.data() + offset * 2, chunk);
     }
 
-    write_wav("test_output.wav", buffer.data(), total_frames, sample_rate);
-
-    OrpheusMonitorData mon;
-    orpheus_engine_get_monitor(engine, &mon);
-    printf("Peak L=%.4f R=%.4f CPU=%.1f%%\n",
-           mon.peak_left, mon.peak_right, mon.cpu_load);
-
-    // Verify non-silence: check if any sample exceeds threshold
     float max_sample = 0.0f;
     for (int i = 0; i < total_frames * 2; i++) {
         float a = std::fabs(buffer[i]);
         if (a > max_sample) max_sample = a;
     }
-    printf("Max sample amplitude: %.4f\n", max_sample);
+    printf("  Max amplitude: %.4f %s\n", max_sample, max_sample > 0.001f ? "OK" : "FAIL (silence!)");
 
-    if (max_sample < 0.001f) {
-        fprintf(stderr, "ERROR: Output is silence!\n");
-        orpheus_engine_destroy(engine);
+    bool pass = max_sample > 0.001f;
+    printf("Full engine render test: %s\n", pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
+bool test_polyphonic_engine_render() {
+    printf("\n=== Test: Polyphonic full engine render ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    // Activate 4 voices with different notes
+    float notes[] = {48.0f, 55.0f, 60.0f, 67.0f};
+    for (int v = 0; v < 4; v++) {
+        orpheus_engine_set_voice_active(engine, v, 1);
+        orpheus_engine_set_voice_tune(engine, v, notes[v]);
+        orpheus_engine_set_voice_gate(engine, v, 1);
+    }
+
+    const int total_frames = 24000; // 0.5s
+    std::vector<float> buffer(total_frames * 2, 0.0f);
+
+    for (int offset = 0; offset < total_frames; offset += 128) {
+        int chunk = std::min(128, total_frames - offset);
+        orpheus_engine_process(engine, buffer.data() + offset * 2, chunk);
+    }
+
+    // Check per-voice levels
+    bool all_pass = true;
+    int producing = 0;
+    for (int v = 0; v < 4; v++) {
+        float level = engine->voice_levels[v].load(std::memory_order_relaxed);
+        bool ok = level > 0.001f;
+        if (ok) producing++;
+        printf("  Voice %d (note %.0f): level=%.4f %s\n", v, notes[v], level, ok ? "OK" : "SILENT!");
+        all_pass &= ok;
+    }
+
+    float max_sample = 0.0f;
+    for (int i = 0; i < total_frames * 2; i++) {
+        float a = std::fabs(buffer[i]);
+        if (a > max_sample) max_sample = a;
+    }
+    printf("  Mix amplitude: %.4f, %d/4 voices producing\n", max_sample, producing);
+    all_pass &= (max_sample > 0.001f);
+
+    printf("Polyphonic engine render test: %s\n", all_pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return all_pass;
+}
+
+int main() {
+    bool all_pass = true;
+
+    // Existing unit tests
+    all_pass &= test_voice_coupling();
+    all_pass &= test_fm_modulation();
+    all_pass &= test_clock();
+    all_pass &= test_grids();
+    all_pass &= test_marbles();
+    all_pass &= test_looper();
+    all_pass &= test_bender();
+    all_pass &= test_per_string_bender();
+
+    // New voice module tests
+    all_pass &= test_single_voice_engine0();
+    all_pass &= test_single_voice_plaits_engines();
+    all_pass &= test_polyphonic_voices();
+    all_pass &= test_polyphonic_plaits_voices();
+    all_pass &= test_voice_gate_retrigger();
+    all_pass &= test_voice_hold_without_gate();
+    all_pass &= test_voice_activation_lifecycle();
+    all_pass &= test_engine_switch_while_playing();
+    all_pass &= test_idle_detection_recovery();
+    all_pass &= test_full_engine_render();
+    all_pass &= test_polyphonic_engine_render();
+
+    if (!all_pass) {
+        fprintf(stderr, "\nFAILURE: One or more tests failed!\n");
         return 1;
     }
 
-    printf("SUCCESS: Audio rendered with amplitude %.4f\n", max_sample);
-    orpheus_engine_destroy(engine);
-    printf("Done.\n");
+    printf("\nSUCCESS: All tests passed.\n");
     return 0;
 }

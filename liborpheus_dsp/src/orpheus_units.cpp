@@ -302,10 +302,17 @@ static float compute_scaled_hold(float hold, float speed) {
 
 void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
     int idx = u->state.module.index;
-    if (idx < 0 || idx >= kNumVoices) return;
+    if (idx < 0 || idx >= kNumVoices) {
+        std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
+        return;
+    }
 
     auto& vp = engine->voice_params[idx];
-    if (!vp.active.load(std::memory_order_relaxed)) return;
+    if (!vp.active.load(std::memory_order_relaxed)) {
+        std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
+        engine->voice_levels[idx].store(0.0f, std::memory_order_relaxed);
+        return;
+    }
 
     // ── Graph gate input: detect rising/falling edges from IPORT_GATE ──
     // When connected (e.g. from Grids triggers), overrides voice_params gate.
@@ -330,7 +337,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
     }
 
-    if (!vp.ever_triggered.load(std::memory_order_relaxed)) return;
+    if (!vp.ever_triggered.load(std::memory_order_relaxed)) {
+        std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
+        return;
+    }
 
     float* out = u->output_buffers[OPORT_OUT];
     int engine_index = vp.engine_index.load(std::memory_order_relaxed);
@@ -529,7 +539,15 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         plaits::Modulations mod;
         std::memset(&mod, 0, sizeof(mod));
-        mod.trigger = plaits_gate ? 1.0f : 0.0f;
+
+        // Engine change retrigger: force trigger=0 for one block so the next
+        // render sees a 0→1 rising edge, restarting the LPG envelope.
+        if (vp.engine_changed.load(std::memory_order_relaxed)) {
+            mod.trigger = 0.0f;
+            vp.engine_changed.store(0, std::memory_order_relaxed);
+        } else {
+            mod.trigger = plaits_gate ? 1.0f : 0.0f;
+        }
         mod.trigger_patched = true;
 
         bool is_speech = (engine_index == 15);
