@@ -367,13 +367,25 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // depth 0..1 → 0..2 semitones of pitch modulation
     float vibrato_semitones = lfo_value * vibrato_depth * 2.0f;
 
+    // ── Voice coupling: partner envelope → pitch modulation ──
+    float coupling_offset = 0.0f;
+    {
+        float coupling = engine->coupling_depth.load(std::memory_order_relaxed);
+        if (coupling > 0.001f) {
+            int partner = (idx % 2 == 0) ? idx + 1 : idx - 1;
+            if (partner >= 0 && partner < kNumVoices) {
+                coupling_offset = engine->voice_envelope[partner] * coupling * 24.0f;
+            }
+        }
+    }
+
     // Smooth hold ramp coefficient (~20ms) — constant for given sr
     // Using fast approximation: 1 - e^(-50/sr)
     float hold_coeff = 50.0f / sr;  // first-order Taylor approx, good enough for smoothing
 
     if (engine_index < 0) {
         // ═══ ENGINE 0 (OSC MODE): Triangle + Square with ADSR + Hold ═══
-        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones;
+        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset;
         float freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
 
@@ -443,6 +455,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);
 
+        // Update peak follower for voice coupling
+        engine->voice_envelope[idx] = engine->voice_envelope[idx] * 0.999f
+                                     + 0.001f * voice_peak;
+
     } else {
         // ═══ PLAITS ENGINES (1+): Render Plaits then apply Hold VCA ═══
         auto& voice = engine->voices_dsp[idx];
@@ -453,7 +469,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         plaits::Patch patch;
         patch.engine = engine_index;
-        patch.note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones;
+        patch.note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset;
         patch.harmonics = vp.harmonics.load(std::memory_order_relaxed);
         patch.timbre = vp.timbre.load(std::memory_order_relaxed);
         patch.morph = vp.morph.load(std::memory_order_relaxed);
@@ -510,6 +526,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         engine->voice_levels[idx].store(voice_peak, std::memory_order_relaxed);
+
+        // Update peak follower for voice coupling
+        engine->voice_envelope[idx] = engine->voice_envelope[idx] * 0.999f
+                                     + 0.001f * voice_peak;
 
         // Clear gate for drum voices (one-shot triggers)
         if (idx >= kNumMainVoices && actual_gate) {

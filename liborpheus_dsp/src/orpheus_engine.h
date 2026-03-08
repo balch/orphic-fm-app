@@ -136,6 +136,10 @@ struct OrpheusEngine {
     // Per-voice hold level (0.0-1.0, raw from UI before scaling)
     std::atomic<float> voice_hold_level[kNumVoices] = {};
 
+    // ── Voice Coupling ─────────────────────────────────
+    float voice_envelope[kNumVoices] = {};             // peak follower per voice
+    std::atomic<float> coupling_depth{0.0f};           // 0 = off, scales partner env → pitch
+
     // ── Marbles Random Sequencer ─────────────────────
     // MI Marbles: TGenerator (rhythmic gates) + XYGenerator (random CV)
     marbles::RandomGenerator marbles_rng;

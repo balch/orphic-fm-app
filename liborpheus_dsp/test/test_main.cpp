@@ -274,7 +274,46 @@ bool test_looper() {
     return pass;
 }
 
+bool test_voice_coupling() {
+    printf("\n=== Test: Voice coupling ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].tune.store(60.0f);
+    engine->voice_params[0].gate.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
+    engine->voice_params[0].engine_index.store(-1);
+
+    engine->voice_params[1].active.store(1);
+    engine->voice_params[1].tune.store(67.0f);
+    engine->voice_params[1].gate.store(0);
+    engine->voice_params[1].ever_triggered.store(1);
+    engine->voice_params[1].engine_index.store(-1);
+
+    engine->coupling_depth.store(0.5f);
+
+    GraphUnit v0_unit = {};
+    v0_unit.type = UNIT_PLAITS;
+    v0_unit.enabled = true;
+    v0_unit.state.module.index = 0;
+    unit_init(&v0_unit, 48000.0f);
+
+    for (int i = 0; i < 200; i++) {
+        unit_process_plaits(&v0_unit, engine, 128, 48000.0f);
+    }
+
+    float env0 = engine->voice_envelope[0];
+    float level0 = engine->voice_levels[0].load(std::memory_order_relaxed);
+    printf("Voice 0 envelope: %.4f (voice_level: %.4f)\n", env0, level0);
+    bool pass = env0 > 0.001f;
+    printf("Coupling test: %s\n", pass ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 int main() {
+    if (!test_voice_coupling()) return 1;
     if (!test_clock()) return 1;
     if (!test_grids()) return 1;
     if (!test_marbles()) return 1;

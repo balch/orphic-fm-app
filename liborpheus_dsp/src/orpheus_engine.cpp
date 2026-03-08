@@ -588,6 +588,18 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         orpheus_graph_set_port(g, uh, sh, value);
     }
 
+    // Voice coupling
+    {
+        static uint16_t h_voice = engine_hash16("org.balch.orpheus.plugins.voice");
+        static uint16_t h_coupling = engine_hash16("coupling_depth");
+        uint16_t uri_hash = engine_hash16(plugin_uri);
+        uint16_t symbol_hash = engine_hash16(symbol);
+        if (uri_hash == h_voice && symbol_hash == h_coupling) {
+            engine->coupling_depth.store(value, std::memory_order_relaxed);
+            return;
+        }
+    }
+
     // Also set engine atomics (for MI wrappers that read from atomics)
     // Keep ALL existing strcmp chains below
     if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.grains") == 0) {
