@@ -60,6 +60,15 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->marbles_xy_generator.LoadScale(1, chromatic);
     }
 
+    // Initialize per-string bender defaults
+    engine->string_base_freq[0].store(400.0f, std::memory_order_relaxed);
+    engine->string_base_freq[1].store(550.0f, std::memory_order_relaxed);
+    engine->string_base_freq[2].store(700.0f, std::memory_order_relaxed);
+    engine->string_base_freq[3].store(850.0f, std::memory_order_relaxed);
+    for (int i = 0; i < kNumMainVoices; i++) {
+        engine->voice_mix_cv[i] = 1.0f;
+    }
+
     // Allocate looper buffers
     engine->looper_buffer_l = new float[OrpheusEngine::kMaxLoopSamples]();
     engine->looper_buffer_r = new float[OrpheusEngine::kMaxLoopSamples]();
@@ -646,6 +655,38 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         if (uri_hash == h_warps_uri) {
             if (symbol_hash == h_carrier_src) { engine->warps_carrier_source.store(static_cast<int>(value), std::memory_order_relaxed); return; }
             if (symbol_hash == h_mod_src_w) { engine->warps_modulator_source.store(static_cast<int>(value), std::memory_order_relaxed); return; }
+        }
+    }
+
+    // Bender parameters
+    {
+        static uint16_t h_bender = engine_hash16("org.balch.orpheus.plugins.bender");
+        uint16_t uri_hash = engine_hash16(plugin_uri);
+        uint16_t symbol_hash = engine_hash16(symbol);
+        if (uri_hash == h_bender) {
+            static uint16_t h_bend = engine_hash16("bend_amount");
+            static uint16_t h_max_semi = engine_hash16("max_semitones");
+            static uint16_t h_timbre = engine_hash16("timbre_mod");
+            static uint16_t h_spring = engine_hash16("spring_vol");
+            static uint16_t h_tension = engine_hash16("tension_vol");
+            if (symbol_hash == h_bend) { engine->bend_amount.store(value, std::memory_order_relaxed); return; }
+            if (symbol_hash == h_max_semi) { engine->bend_max_semitones.store(value, std::memory_order_relaxed); return; }
+            if (symbol_hash == h_timbre) { engine->bend_timbre_mod.store(value, std::memory_order_relaxed); return; }
+            if (symbol_hash == h_spring) { engine->bend_spring_vol.store(value, std::memory_order_relaxed); return; }
+            if (symbol_hash == h_tension) { engine->bend_tension_vol.store(value, std::memory_order_relaxed); return; }
+            // Per-string parameters
+            const char* s_bend[] = {"string_bend_0","string_bend_1","string_bend_2","string_bend_3"};
+            const char* s_mix[] = {"string_mix_0","string_mix_1","string_mix_2","string_mix_3"};
+            const char* s_active[] = {"string_active_0","string_active_1","string_active_2","string_active_3"};
+            for (int i = 0; i < 4; i++) {
+                if (symbol_hash == engine_hash16(s_bend[i])) { engine->string_bend[i].store(value, std::memory_order_relaxed); return; }
+                if (symbol_hash == engine_hash16(s_mix[i])) { engine->string_mix[i].store(value, std::memory_order_relaxed); return; }
+                if (symbol_hash == engine_hash16(s_active[i])) { engine->string_active[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
+            }
+            static uint16_t h_slide_y = engine_hash16("slide_bar_y");
+            static uint16_t h_slide_x = engine_hash16("slide_bar_x");
+            if (symbol_hash == h_slide_y) { engine->slide_bar_y.store(value, std::memory_order_relaxed); return; }
+            if (symbol_hash == h_slide_x) { engine->slide_bar_x.store(value, std::memory_order_relaxed); return; }
         }
     }
 

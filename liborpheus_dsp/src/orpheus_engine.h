@@ -287,4 +287,58 @@ struct OrpheusEngine {
     std::atomic<float> looper_level{1.0f};        // playback level
     std::atomic<float> looper_feedback{0.8f};     // overdub feedback
     std::atomic<int>   looper_quantize{1};        // 1 = quantize to beat, 0 = immediate
+
+    // ── Global Bender ──────────────────────────────────
+    std::atomic<float> bend_amount{0.0f};              // -1..+1
+    std::atomic<float> bend_max_semitones{24.0f};
+    std::atomic<float> bend_timbre_mod{0.3f};
+    std::atomic<float> bend_spring_vol{0.4f};
+    std::atomic<float> bend_tension_vol{0.015f};
+
+    // Internal bender state (audio thread only)
+    float bend_tension_phase{0.0f};
+    float bend_tension_env{0.0f};
+    int   bend_tension_env_stage{0};          // 0=off, 1=attack, 2=decay, 3=sustain, 4=release
+    float bend_spring_phase{0.0f};
+    float bend_spring_env{0.0f};
+    int   bend_spring_env_stage{0};
+    float bend_wobble_phase{0.0f};
+    float bend_random_lfo_phase{0.0f};
+    bool  bend_was_active{false};
+
+    // ── Per-String Bender ──────────────────────────────
+    struct StringState {
+        float bend_amount{0.0f};
+        float voice_mix{0.0f};
+        bool  is_active{false};
+        bool  was_active{false};
+        float tension_phase{0.0f};
+        float tension_env{0.0f};
+        int   tension_env_stage{0};
+        float spring_phase{0.0f};
+        float spring_env{0.0f};
+        int   spring_env_stage{0};
+        float wobble_phase{0.0f};
+        float pluck_phase{0.0f};
+        float pluck_env{0.0f};
+        int   pluck_env_stage{0};
+        float slide_phase{0.0f};
+        float slide_lfo_phase{0.0f};
+        float slide_ramp{0.0f};
+    };
+    StringState string_state[4];
+
+    // Per-string atomics (from UI)
+    std::atomic<float> string_bend[4] = {};
+    std::atomic<float> string_mix[4] = {};
+    std::atomic<int>   string_active[4] = {};
+    std::atomic<float> string_base_freq[4] = {};       // initialized in create()
+
+    // Slide bar
+    std::atomic<float> slide_bar_y{0.0f};
+    std::atomic<float> slide_bar_x{0.0f};
+
+    // Output arrays (read by unit_process_plaits)
+    float voice_bend_cv[kNumMainVoices] = {};          // pitch bend semitones per voice
+    float voice_mix_cv[kNumMainVoices] = {};            // voice volume multiplier per voice (default 1.0)
 };
