@@ -69,6 +69,8 @@ typedef struct {
     float lfo_output;
     float master_level;
     float bend_position;
+    float lfo_output_a;      // individual LFO oscillator A (-1..1)
+    float lfo_output_b;      // individual LFO oscillator B (-1..1)
 } OrpheusMonitorData;
 
 void orpheus_engine_get_monitor(OrpheusEngine* engine,

@@ -1012,9 +1012,12 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     };
 
     float output = 0.0f;
+    float last_a = 0.0f, last_b = 0.0f;
     for (int i = 0; i < num_frames; i++) {
         float a = gen_wave(phase_a, shape);
         float b = gen_wave(phase_b, shape);
+        last_a = a;
+        last_b = b;
 
         if (mode == 0) { // AND
             float ua = a * 0.5f + 0.5f;
@@ -1038,6 +1041,8 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     engine->lfo_phase_a = phase_a;
     engine->lfo_phase_b = phase_b;
     engine->lfo_output_value = output; // last sample for monitoring
+    engine->lfo_output_value_a = last_a;
+    engine->lfo_output_value_b = last_b;
     std::memcpy(engine->lfo_output_buffer, out, num_frames * sizeof(float));
 
     // LFO source (3) for warps routing

@@ -456,7 +456,7 @@ class DspSynthEngine @Inject constructor(
         monitoringJob = if (nativeBridge != null) {
             // Native C++ engine: poll monitor data from C++ via JNI
             monitoringScope.launch(dispatcherProvider.io) {
-                val monitorBuf = FloatArray(18) // OrpheusMonitorData: peak_l, peak_r, cpu, voice_levels[12], lfo, master, bend
+                val monitorBuf = FloatArray(20) // OrpheusMonitorData: peak_l, peak_r, cpu, voice_levels[12], lfo, master, bend, lfo_a, lfo_b
                 while (isActive) {
                     nativeBridge.nativeGetMonitor(monitorBuf)
                     _peakFlow.value = maxOf(monitorBuf[0], monitorBuf[1])
@@ -467,6 +467,8 @@ class DspSynthEngine @Inject constructor(
                     _lfoOutputFlow.value = monitorBuf[15]
                     _masterLevelFlow.value = monitorBuf[16]
                     _bendFlow.value = monitorBuf[17]
+                    _lfoAOutputFlow.value = monitorBuf[18]
+                    _lfoBOutputFlow.value = monitorBuf[19]
                     delay(MONITOR_POLL_INTERVAL_MS)
                 }
             }

@@ -247,7 +247,9 @@ struct OrpheusEngine {
     // ── HyperLFO (dual oscillator with logic combination) ─
     float lfo_phase_a{0.0f};
     float lfo_phase_b{0.0f};
-    float lfo_output_value{0.0f};              // latest output for monitoring
+    float lfo_output_value{0.0f};              // latest combined output for monitoring
+    float lfo_output_value_a{0.0f};            // latest oscillator A output (-1..1)
+    float lfo_output_value_b{0.0f};            // latest oscillator B output (-1..1)
     float lfo_output_buffer[kMaxFrames]{};     // per-sample LFO output for modulation
 
     std::atomic<float> lfo_freq_a{1.0f};       // Hz

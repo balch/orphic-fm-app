@@ -648,7 +648,9 @@ void orpheus_engine_set_delay_mix(OrpheusEngine* engine, float v) {
 void orpheus_engine_set_vibrato(OrpheusEngine* engine, float v) {
     engine->vibrato_depth.store(v, std::memory_order_relaxed);
 }
-void orpheus_engine_set_bend(OrpheusEngine* engine, float v) { }
+void orpheus_engine_set_bend(OrpheusEngine* engine, float v) {
+    engine->bend_amount.store(v, std::memory_order_relaxed);
+}
 
 void orpheus_engine_get_monitor(OrpheusEngine* engine,
                                 OrpheusMonitorData* out) {
@@ -656,10 +658,21 @@ void orpheus_engine_get_monitor(OrpheusEngine* engine,
     out->peak_left = engine->peak_left.load();
     out->peak_right = engine->peak_right.load();
     out->cpu_load = engine->cpu_load.load();
+    float voice_sum = 0.0f;
     for (int i = 0; i < kNumVoices && i < 12; i++) {
-        out->voice_levels[i] = engine->voice_levels[i].load(std::memory_order_relaxed);
+        float level = engine->voice_levels[i].load(std::memory_order_relaxed);
+        out->voice_levels[i] = level;
+        voice_sum += level;
     }
+    float peak = std::max(out->peak_left, out->peak_right);
+    float computed = voice_sum / 12.0f;
+    if (computed > 1.0f) computed = 1.0f;
+    if (peak > 1.0f) peak = 1.0f;
+    out->master_level = std::max(peak, computed);
     out->lfo_output = engine->lfo_output_value;
+    out->lfo_output_a = engine->lfo_output_value_a;
+    out->lfo_output_b = engine->lfo_output_value_b;
+    out->bend_position = engine->bend_amount.load(std::memory_order_relaxed);
 }
 
 void orpheus_engine_get_waveform(OrpheusEngine* engine,
