@@ -203,6 +203,18 @@ class DspSynthEngine @Inject constructor(
                 ?.getPortValue("voice_pan_$v")?.asFloat() ?: defaultPans[v]
             forwardPanToNative(v, pan)
         }
+        // Sync LFO parameters
+        val lfoUri = DuoLfoSymbol.MODE.uri
+        bridge.nativeSetPort(lfoUri, DuoLfoSymbol.FREQ_A.symbol, getHyperLfoFreq(0))
+        bridge.nativeSetPort(lfoUri, DuoLfoSymbol.FREQ_B.symbol, getHyperLfoFreq(1))
+        bridge.nativeSetPort(lfoUri, DuoLfoSymbol.MODE.symbol, getHyperLfoMode().toFloat())
+        bridge.nativeSetPort(lfoUri, DuoLfoSymbol.SHAPE.symbol, getPort(DuoLfoSymbol.SHAPE)?.asFloat() ?: 1f)
+        // Sync bender parameters
+        bridge.nativeSetPort(BENDER_URI, BenderSymbol.MAX_BEND.symbol, getPort(BenderSymbol.MAX_BEND)?.asFloat() ?: 24f)
+        bridge.nativeSetPort(BENDER_URI, BenderSymbol.RANDOM_DEPTH.symbol, getPort(BenderSymbol.RANDOM_DEPTH)?.asFloat() ?: 0.1f)
+        bridge.nativeSetPort(BENDER_URI, BenderSymbol.TIMBRE_MOD.symbol, getPort(BenderSymbol.TIMBRE_MOD)?.asFloat() ?: 0.3f)
+        bridge.nativeSetPort(BENDER_URI, BenderSymbol.SPRING_VOL.symbol, getPort(BenderSymbol.SPRING_VOL)?.asFloat() ?: 0.4f)
+        bridge.nativeSetPort(BENDER_URI, BenderSymbol.TENSION_VOL.symbol, getPort(BenderSymbol.TENSION_VOL)?.asFloat() ?: 0.015f)
     }
 
     private fun setupListeners() {
@@ -673,7 +685,14 @@ class DspSynthEngine @Inject constructor(
 
     // Per-String Bender delegation
     override fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float) {
-        if (pluginProvider.perStringBenderPlugin.setStringBend(stringIndex, bendAmount, voiceMix)) {
+        val shouldTriggerVoice = pluginProvider.perStringBenderPlugin.setStringBend(stringIndex, bendAmount, voiceMix)
+        // Always forward bend to C++ engine (JSyn return value only indicates voice trigger, not bend success)
+        nativeBridge?.let { bridge ->
+            bridge.nativeSetPort(BENDER_URI, "string_bend_$stringIndex", bendAmount)
+            bridge.nativeSetPort(BENDER_URI, "string_mix_$stringIndex", voiceMix)
+            bridge.nativeSetPort(BENDER_URI, "string_active_$stringIndex", 1f)
+        }
+        if (shouldTriggerVoice) {
             val voiceA = stringIndex * 2
             val voiceB = stringIndex * 2 + 1
             if (voiceA < 12) setVoiceGate(voiceA, true)
@@ -683,6 +702,10 @@ class DspSynthEngine @Inject constructor(
 
     override fun releaseStringBend(stringIndex: Int): Int {
         val (springDuration, shouldRelease) = pluginProvider.perStringBenderPlugin.releaseString(stringIndex)
+        nativeBridge?.let { bridge ->
+            bridge.nativeSetPort(BENDER_URI, "string_bend_$stringIndex", 0f)
+            bridge.nativeSetPort(BENDER_URI, "string_active_$stringIndex", 0f)
+        }
         if (shouldRelease) {
              val voiceA = stringIndex * 2
              val voiceB = stringIndex * 2 + 1
@@ -692,9 +715,20 @@ class DspSynthEngine @Inject constructor(
         return springDuration
     }
 
-    override fun setSlideBar(yPosition: Float, xPosition: Float) =
+    override fun setSlideBar(yPosition: Float, xPosition: Float) {
         pluginProvider.perStringBenderPlugin.setSlideBar(yPosition, xPosition)
-    override fun releaseSlideBar() = pluginProvider.perStringBenderPlugin.releaseSlideBar()
+        nativeBridge?.let { bridge ->
+            bridge.nativeSetPort(BENDER_URI, "slide_bar_y", yPosition)
+            bridge.nativeSetPort(BENDER_URI, "slide_bar_x", xPosition)
+        }
+    }
+    override fun releaseSlideBar() {
+        pluginProvider.perStringBenderPlugin.releaseSlideBar()
+        nativeBridge?.let { bridge ->
+            bridge.nativeSetPort(BENDER_URI, "slide_bar_y", 0f)
+            bridge.nativeSetPort(BENDER_URI, "slide_bar_x", 0f)
+        }
+    }
     override fun resetStringBenders() = pluginProvider.perStringBenderPlugin.resetAll()
 
     // Voice Delegation

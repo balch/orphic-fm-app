@@ -456,11 +456,11 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
     }
 
-    // ── Bender pitch offset ─────────────────────────────
-    float bend_offset = 0.0f;
+    // ── Bender pitch offset (Hz domain, matches JSyn benderDepth=100Hz) ──
+    float bend_hz = 0.0f;
     float bend_vol_mult = 1.0f;
     if (idx < kNumMainVoices) {
-        bend_offset = engine->voice_bend_cv[idx];
+        bend_hz = engine->voice_bend_cv[idx];
         bend_vol_mult = engine->voice_mix_cv[idx];
     }
 
@@ -477,7 +477,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float morph_val = vp.morph.load(std::memory_order_relaxed);
         float detune_semitones = morph_val * (50.0f / 100.0f);  // 0-0.5 semitones
 
-        float base_note = vp.tune.load(std::memory_order_relaxed) + coupling_offset + fm_mod_semitones + bend_offset + detune_semitones;
+        float base_note = vp.tune.load(std::memory_order_relaxed) + coupling_offset + fm_mod_semitones + detune_semitones;
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
 
         // Compute ADSR parameters from envSpeed
@@ -492,6 +492,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             float vib_semi = lfo_i * vibrato_depth * 2.0f;
             float note = base_note + vib_semi;
             float freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
+            freq += bend_hz;  // Bend applied as Hz offset (matches JSyn benderDepth architecture)
 
             // Self-feedback: previous output modulates phase for FM-like timbre
             float fb_offset = osc.prev_output * feedback_amount * 0.3f;
@@ -588,7 +589,16 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             vp.engine_changed.store(0, std::memory_order_relaxed);
         }
 
-        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones + bend_offset;
+        // Compute note with bend applied as Hz offset (matches JSyn benderDepth architecture)
+        float note_raw = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones;
+        float note;
+        if (std::fabs(bend_hz) > 0.01f) {
+            float base_freq = 440.0f * std::pow(2.0f, (note_raw - 69.0f) / 12.0f);
+            float bent_freq = base_freq + bend_hz;
+            note = (bent_freq > 0.0f) ? 69.0f + 12.0f * std::log2f(bent_freq / 440.0f) : note_raw;
+        } else {
+            note = note_raw;
+        }
         float harmonics = vp.harmonics.load(std::memory_order_relaxed);
         float timbre = std::max(0.0f, std::min(1.0f,
             vp.timbre.load(std::memory_order_relaxed) + timbre_mod_offset));
@@ -1084,6 +1094,7 @@ void unit_process_bender(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     float amount = engine->bend_amount.load(std::memory_order_relaxed);
     float max_bend = engine->bend_max_semitones.load(std::memory_order_relaxed);
+    float random_depth = engine->bend_random_depth.load(std::memory_order_relaxed);
     float timbre_mod = engine->bend_timbre_mod.load(std::memory_order_relaxed);
     float tension_vol = engine->bend_tension_vol.load(std::memory_order_relaxed);
     float spring_vol = engine->bend_spring_vol.load(std::memory_order_relaxed);
@@ -1102,11 +1113,28 @@ void unit_process_bender(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     constexpr float TWO_PI = 6.2831853f;
 
+    // Random LFO modulation (matches JSyn BenderPlugin randomLfo + randomDepthGain)
+    // JSyn: lfoRate = 1.5 + |bend| * 3.0, randomIntensity = randomDepth * |bend| * 0.1
+    float lfo_rate = 1.5f + std::fabs(amount) * 3.0f;
+    engine->bend_random_lfo_phase += lfo_rate / sr;
+    engine->bend_random_lfo_phase -= std::floor(engine->bend_random_lfo_phase);
+    float random_lfo = std::sin(engine->bend_random_lfo_phase * TWO_PI);
+    float random_intensity = random_depth * std::fabs(amount) * 0.1f;
+
+    // Apply global bend to all main voice pitch CVs (Hz domain, matches JSyn BenderPlugin)
+    // JSyn tension curve: normalizedBend * (1 + |normalizedBend| * 0.5)
+    float tension_curve = amount * (1.0f + std::fabs(amount) * 0.5f);
+    float semitones = tension_curve * max_bend;
+    float freq_mult = std::pow(2.0f, semitones / 12.0f) - 1.0f;
+    // JSyn signal path: nonlinearMixer(bend * 1.5) + randomComponent → × frequencyMultiplier × benderDepth(100Hz)
+    float nonlinear_bend = amount * 1.5f + random_lfo * random_intensity;
+    float bend_hz = nonlinear_bend * freq_mult * 100.0f;
+    for (int v = 0; v < kNumMainVoices; v++) {
+        engine->voice_bend_cv[v] = bend_hz;
+    }
+
     for (int i = 0; i < num_frames; i++) {
-        // Pitch CV: cubic curve preserving sign
-        float cubic = amount * amount * amount;
-        float semitones = cubic * max_bend;
-        out_pitch[i] = semitones;
+        out_pitch[i] = bend_hz;
 
         // Timbre CV
         out_timbre[i] = amount * timbre_mod;
@@ -1167,30 +1195,38 @@ void unit_process_per_string_bender(GraphUnit* u, OrpheusEngine* engine, int num
         }
         if (!active && st.was_active) {
             st.tension_env_stage = 4;
-            st.spring_env_stage = 1;
-            st.pluck_env_stage = 1;
+            // No spring or pluck on normal string release — matches JSyn PerStringBenderPlugin.releaseString()
+            // JSyn only triggers pluck on fast release with sufficient pull (velocity-gated)
         }
         st.was_active = active;
         st.is_active = active;
 
-        // Compute voice CVs (2 voices per string)
+        // Compute voice CVs (Hz domain matching JSyn PerStringBenderPlugin)
+        // Only write when string is active — otherwise let global bender's value stand
+        // Uses += to accumulate with global bender (matching JSyn where both connect to same benderInput)
         int v0 = s * 2, v1 = s * 2 + 1;
-        float cubic = directed_bend * directed_bend * directed_bend;
-        float semi = cubic * 12.0f;
-        engine->voice_bend_cv[v0] = semi;
-        engine->voice_bend_cv[v1] = semi;
-
-        // Voice mix: non-linear crossfade
-        float volA, volB;
-        if (mix <= 0.25f) {
-            volA = 1.0f; volB = mix / 0.25f;
-        } else if (mix >= 0.75f) {
-            volA = (1.0f - mix) / 0.25f; volB = 1.0f;
-        } else {
-            volA = 1.0f; volB = 1.0f;
+        if (active) {
+            float cubic = directed_bend * directed_bend * directed_bend;
+            float semi = cubic * 12.0f;
+            float freq_mult = std::pow(2.0f, semi / 12.0f) - 1.0f;
+            float bend_hz = freq_mult * 100.0f;  // benderDepth = 100 Hz
+            engine->voice_bend_cv[v0] += bend_hz;
+            engine->voice_bend_cv[v1] += bend_hz;
         }
-        engine->voice_mix_cv[v0] = volA;
-        engine->voice_mix_cv[v1] = volB;
+
+        // Voice mix: non-linear crossfade (only override when string active)
+        if (active) {
+            float volA, volB;
+            if (mix <= 0.25f) {
+                volA = 1.0f; volB = mix / 0.25f;
+            } else if (mix >= 0.75f) {
+                volA = (1.0f - mix) / 0.25f; volB = 1.0f;
+            } else {
+                volA = 1.0f; volB = 1.0f;
+            }
+            engine->voice_mix_cv[v0] = volA;
+            engine->voice_mix_cv[v1] = volB;
+        }
 
         // Per-string audio synthesis
         float base_freq = engine->string_base_freq[s].load(std::memory_order_relaxed);
@@ -1255,13 +1291,16 @@ void unit_process_per_string_bender(GraphUnit* u, OrpheusEngine* engine, int num
         }
     }
 
-    // Apply slide bar pitch bend to all voice bend CVs
+    // Apply slide bar pitch bend to all voice bend CVs (Hz domain, matches JSyn PerStringBenderPlugin.setSlideBar)
     float slide_y = engine->slide_bar_y.load(std::memory_order_relaxed);
     if (slide_y > 0.01f) {
-        float slide_cubic = slide_y * slide_y * slide_y;
-        float slide_semi = slide_cubic * 6.0f;
+        // JSyn: tensionCurve = totalBend * (1 + |totalBend| * 0.5), semitones = tensionCurve * MAX_BEND * 0.5
+        float slide_tension = slide_y * (1.0f + std::fabs(slide_y) * 0.5f);
+        float slide_semi = slide_tension * 12.0f * 0.5f;  // MAX_BEND_SEMITONES * 0.5
+        float slide_freq_mult = std::pow(2.0f, slide_semi / 12.0f) - 1.0f;
+        float slide_hz = slide_freq_mult * 100.0f;  // benderDepth = 100 Hz
         for (int v = 0; v < kNumMainVoices; v++) {
-            engine->voice_bend_cv[v] += slide_semi;
+            engine->voice_bend_cv[v] += slide_hz;
         }
     }
 }

@@ -254,7 +254,7 @@ struct OrpheusEngine {
 
     std::atomic<float> lfo_freq_a{1.0f};       // Hz
     std::atomic<float> lfo_freq_b{1.0f};       // Hz
-    std::atomic<float> lfo_shape{0.5f};        // 0=square, 1=triangle
+    std::atomic<float> lfo_shape{1.0f};        // 0=square, 1=triangle (default: triangle, matches Kotlin)
     std::atomic<int>   lfo_mode{1};            // 0=AND, 1=OFF (independent), 2=OR
 
     // ── Dattorro Plate Reverb ─────────────────────────
@@ -318,6 +318,7 @@ struct OrpheusEngine {
     // ── Global Bender ──────────────────────────────────
     std::atomic<float> bend_amount{0.0f};              // -1..+1
     std::atomic<float> bend_max_semitones{24.0f};
+    std::atomic<float> bend_random_depth{0.1f};        // random LFO modulation depth (matches JSyn default)
     std::atomic<float> bend_timbre_mod{0.3f};
     std::atomic<float> bend_spring_vol{0.4f};
     std::atomic<float> bend_tension_vol{0.015f};
@@ -366,6 +367,6 @@ struct OrpheusEngine {
     std::atomic<float> slide_bar_x{0.0f};
 
     // Output arrays (read by unit_process_plaits)
-    float voice_bend_cv[kNumMainVoices] = {};          // pitch bend semitones per voice
+    float voice_bend_cv[kNumMainVoices] = {};          // pitch bend Hz offset per voice (matches JSyn benderDepth=100Hz)
     float voice_mix_cv[kNumMainVoices] = {};            // voice volume multiplier per voice (default 1.0)
 };

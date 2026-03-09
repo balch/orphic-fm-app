@@ -283,13 +283,15 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         uint16_t uri_hash = engine_hash16(plugin_uri);
         uint16_t symbol_hash = engine_hash16(symbol);
         if (uri_hash == h_bender) {
-            static uint16_t h_bend = engine_hash16("bend_amount");
-            static uint16_t h_max_semi = engine_hash16("max_semitones");
+            static uint16_t h_bend = engine_hash16("bend");
+            static uint16_t h_max_semi = engine_hash16("max_bend");
+            static uint16_t h_random = engine_hash16("random_depth");
             static uint16_t h_timbre = engine_hash16("timbre_mod");
             static uint16_t h_spring = engine_hash16("spring_vol");
             static uint16_t h_tension = engine_hash16("tension_vol");
             if (symbol_hash == h_bend) { engine->bend_amount.store(value, std::memory_order_relaxed); return; }
             if (symbol_hash == h_max_semi) { engine->bend_max_semitones.store(value, std::memory_order_relaxed); return; }
+            if (symbol_hash == h_random) { engine->bend_random_depth.store(value, std::memory_order_relaxed); return; }
             if (symbol_hash == h_timbre) { engine->bend_timbre_mod.store(value, std::memory_order_relaxed); return; }
             if (symbol_hash == h_spring) { engine->bend_spring_vol.store(value, std::memory_order_relaxed); return; }
             if (symbol_hash == h_tension) { engine->bend_tension_vol.store(value, std::memory_order_relaxed); return; }

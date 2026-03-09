@@ -1,6 +1,10 @@
 package org.balch.orpheus.core.audio.dsp
 
+import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.plugins.bender.BenderPlugin
+import org.balch.orpheus.plugins.perstringbender.PerStringBenderPlugin
 import org.balch.orpheus.plugins.plaits.EngineParameters
+import org.balch.orpheus.plugins.plaits.JsynPlaitsUnitFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngine
 import org.balch.orpheus.plugins.plaits.PlaitsEngineId
 import org.balch.orpheus.plugins.plaits.TriggerState
@@ -15,9 +19,8 @@ import org.balch.orpheus.plugins.plaits.engine.SpeechEngine
 import org.balch.orpheus.plugins.plaits.engine.StringEngine
 import org.balch.orpheus.plugins.plaits.engine.SwarmEngine
 import org.balch.orpheus.plugins.plaits.engine.VirtualAnalogEngine
-import org.balch.orpheus.plugins.plaits.engine.WavetableEngine
 import org.balch.orpheus.plugins.plaits.engine.WaveshapingEngine
-import org.balch.orpheus.plugins.plaits.JsynPlaitsUnitFactory
+import org.balch.orpheus.plugins.plaits.engine.WavetableEngine
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
@@ -818,5 +821,253 @@ class JsynSnapshotTest {
             if (a > peak) peak = a
         }
         return peak
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Bender A/B comparison tests
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Bender pitch CV comparison: computes both JSyn and C++ pitch curves
+     * for the same bend input ramp. Both engines now work in Hz domain
+     * (benderDepth=100Hz), so we compare Hz offsets.
+     *
+     * Global bender: maxSemitones=24 (JSyn default), tension curve
+     * Per-string bender: maxSemitones=12, cubic curve
+     */
+    @Test
+    fun benderPitchCurveComparison() {
+        val globalMaxSemitones = 24.0  // JSyn BenderPlugin default
+        val perStringMaxSemitones = 12.0  // JSyn PerStringBenderPlugin constant
+        val benderDepth = 100.0  // Hz, matching JSyn voice benderDepth
+        val durationMs = 3000
+        val stepMs = 10
+
+        val csvFile = File(OUTPUT_DIR, "bender_pitch_comparison.csv")
+        csvFile.printWriter().use { pw ->
+            pw.println("time_ms,bend_input,jsyn_bender_hz,jsyn_perstring_hz,cpp_bender_hz,cpp_perstring_hz")
+
+            for (t in 0..durationMs step stepMs) {
+                val tSec = t / 1000.0
+                val bendInput = when {
+                    tSec < 1.0 -> tSec
+                    tSec < 1.5 -> 1.0
+                    else -> 0.0
+                }
+
+                // JSyn BenderPlugin (Hz domain): tensionCurve → freqMult → Hz
+                val normalizedBend = bendInput
+                val tensionCurve = normalizedBend * (1.0 + abs(normalizedBend) * 0.5)
+                val benderSemitones = tensionCurve * globalMaxSemitones
+                val benderFreqMult = 2.0.pow(benderSemitones / 12.0) - 1.0
+                val jsynBenderHz = normalizedBend * 1.5 * benderFreqMult * benderDepth
+
+                // JSyn PerStringBenderPlugin (Hz domain): cubic → freqMult → Hz
+                val cubic = normalizedBend.pow(3)
+                val perStringSemitones = cubic * perStringMaxSemitones
+                val perStringFreqMult = 2.0.pow(perStringSemitones / 12.0) - 1.0
+                val jsynPerStringHz = perStringFreqMult * benderDepth
+
+                // C++ bender (now matches JSyn): tension curve → freqMult → Hz
+                val cppTension = bendInput * (1.0 + abs(bendInput) * 0.5)
+                val cppBenderSemi = cppTension * globalMaxSemitones
+                val cppBenderFreqMult = 2.0.pow(cppBenderSemi / 12.0) - 1.0
+                val cppBenderHz = bendInput * 1.5 * cppBenderFreqMult * benderDepth
+
+                // C++ per-string (now matches JSyn): cubic → freqMult → Hz
+                val cppCubic = bendInput.pow(3)
+                val cppPerStringSemi = cppCubic * perStringMaxSemitones
+                val cppPerStringFreqMult = 2.0.pow(cppPerStringSemi / 12.0) - 1.0
+                val cppPerStringHz = cppPerStringFreqMult * benderDepth
+
+                pw.println("$t,%.4f,%.4f,%.4f,%.4f,%.4f".format(
+                    bendInput, jsynBenderHz, jsynPerStringHz, cppBenderHz, cppPerStringHz))
+            }
+        }
+        println("  Wrote ${csvFile.absolutePath}")
+        println("  At full bend (amount=1.0):")
+        val fullTension = 1.0 * 1.5
+        val fullFreqMult = 2.0.pow(fullTension * globalMaxSemitones / 12.0) - 1.0
+        println("    Global bender Hz offset: ${1.0 * 1.5 * fullFreqMult * benderDepth}")
+        val fullCubic = 1.0
+        val fullPerStringFreqMult = 2.0.pow(fullCubic * perStringMaxSemitones / 12.0) - 1.0
+        println("    Per-string Hz offset:    ${fullPerStringFreqMult * benderDepth}")
+    }
+
+    /**
+     * Bender audio snapshot: renders BenderPlugin through OfflineAudioEngine
+     * with the same parameter ramp as C++ test_snapshots bender scenario.
+     * 3s: bend ramps 0→1 over 1s, holds 0.5s, then releases.
+     */
+    @Test
+    fun benderAudioSnapshot() {
+        val engine = OfflineAudioEngine(SR)
+        val factory = createFactory()
+        val bender = BenderPlugin(engine, factory)
+        bender.initialize()
+
+        // Set parameters matching C++ test
+        bender.setPortValue("max_bend", PortValue.FloatValue(12f))
+        bender.setPortValue("spring_vol", PortValue.FloatValue(0.4f))
+        bender.setPortValue("tension_vol", PortValue.FloatValue(0.02f))
+
+        // Connect bender audio output to line out
+        val audioOutput = bender.outputs["audioOutput"]!!
+        audioOutput.connect(engine.lineOutLeft)
+        audioOutput.connect(engine.lineOutRight)
+
+        engine.start()
+
+        val totalFrames = SR * 3 // 3 seconds
+        val buf = engine.renderStereo(totalFrames, chunkSize = 128) { offset ->
+            val tSec = offset.toFloat() / SR
+            val bendAmount = when {
+                tSec < 1.0f -> tSec          // ramp 0→1
+                tSec < 1.5f -> 1.0f          // hold at 1
+                else -> 0.0f                  // release
+            }
+            bender.setPortValue("bend", PortValue.FloatValue(bendAmount))
+        }
+
+        engine.stop()
+
+        val rms = computeRms(buf)
+        val peak = computePeak(buf)
+        println("  jsyn_bender_sweep: RMS=${"%.4f".format(rms)} Peak=${"%.4f".format(peak)}")
+        writeWav(File(OUTPUT_DIR, "jsyn_bender_sweep.wav"), buf, totalFrames, SR)
+
+        // Write audio envelope CSV for comparison with C++
+        val csvFile = File(OUTPUT_DIR, "jsyn_bender_sweep_envelope.csv")
+        val windowSize = SR / 100 // 10ms
+        csvFile.printWriter().use { pw ->
+            pw.println("time_ms,peak_amplitude")
+            var off = 0
+            while (off < totalFrames) {
+                val end = minOf(off + windowSize, totalFrames)
+                var winPeak = 0f
+                for (i in off until end) {
+                    val a = abs(buf[i * 2])
+                    if (a > winPeak) winPeak = a
+                }
+                pw.println("%.1f,%.6f".format(off.toFloat() / SR * 1000f, winPeak))
+                off += windowSize
+            }
+        }
+        println("  Wrote ${csvFile.absolutePath}")
+    }
+
+    /**
+     * Per-string bender audio snapshot: renders PerStringBenderPlugin with
+     * the same staggered pluck sequence as C++ test_snapshots scenario 4.
+     * 4s: strings 0-3 plucked sequentially at 0.5s intervals.
+     */
+    @Test
+    fun perStringBenderAudioSnapshot() {
+        val engine = OfflineAudioEngine(SR)
+        val factory = createFactory()
+
+        // PerStringBenderPlugin needs a ResonatorPlugin; create a minimal one
+        val resonator = org.balch.orpheus.plugins.resonator.ResonatorPlugin(engine, factory)
+        resonator.initialize()
+
+        val psb = PerStringBenderPlugin(engine, resonator, factory)
+        psb.initialize()
+
+        // Connect per-string bender audio output to line out
+        val audioOutput = psb.outputs["audioOutput"]!!
+        audioOutput.connect(engine.lineOutLeft)
+        audioOutput.connect(engine.lineOutRight)
+
+        engine.start()
+
+        val totalFrames = SR * 4 // 4 seconds
+        val buf = engine.renderStereo(totalFrames, chunkSize = 128) { offset ->
+            val tSec = offset.toFloat() / SR
+            for (s in 0 until 4) {
+                val start = s * 0.5f
+                val active = tSec >= start && tSec < start + 0.5f
+                if (active) {
+                    psb.setStringBend(s, 0.7f, 0.8f)
+                } else if (tSec >= start + 0.5f && tSec < start + 0.55f) {
+                    // Release just after the active window
+                    psb.releaseString(s)
+                }
+            }
+        }
+
+        engine.stop()
+
+        val rms = computeRms(buf)
+        val peak = computePeak(buf)
+        println("  jsyn_per_string_bender: RMS=${"%.4f".format(rms)} Peak=${"%.4f".format(peak)}")
+        writeWav(File(OUTPUT_DIR, "jsyn_per_string_bender.wav"), buf, totalFrames, SR)
+
+        // Write audio envelope CSV
+        val csvFile = File(OUTPUT_DIR, "jsyn_per_string_bender_envelope.csv")
+        val windowSize = SR / 100
+        csvFile.printWriter().use { pw ->
+            pw.println("time_ms,peak_amplitude")
+            var off = 0
+            while (off < totalFrames) {
+                val end = minOf(off + windowSize, totalFrames)
+                var winPeak = 0f
+                for (i in off until end) {
+                    val a = abs(buf[i * 2])
+                    if (a > winPeak) winPeak = a
+                }
+                pw.println("%.1f,%.6f".format(off.toFloat() / SR * 1000f, winPeak))
+                off += windowSize
+            }
+        }
+        println("  Wrote ${csvFile.absolutePath}")
+    }
+
+    /**
+     * Cross-engine bender comparison: reads JSyn and C++ bender WAVs and reports
+     * audio envelope differences at key time points.
+     */
+    @Test
+    fun benderComparison() {
+        println("\n=== Bender A/B Comparison ===")
+
+        val scenarios = listOf(
+            "bender_sweep" to "Bender (global)",
+            "per_string_bender" to "Per-String Bender"
+        )
+
+        for ((name, label) in scenarios) {
+            val jsynFile = File(OUTPUT_DIR, "jsyn_${name}.wav")
+            val cppFile = File(OUTPUT_DIR, "cpp_${name}.wav")
+            val jsynCsv = File(OUTPUT_DIR, "jsyn_${name}_envelope.csv")
+            val cppCsv = File(OUTPUT_DIR, "cpp_${name}_envelope.csv")
+
+            if (!jsynFile.exists() || !cppFile.exists()) {
+                println("  $label: SKIP (WAV missing, run both snapshot suites first)")
+                continue
+            }
+
+            val jsynWav = readWavMono(jsynFile)
+            val cppWav = readWavMono(cppFile)
+            println("  $label:")
+            println("    JSyn: RMS=${"%.4f".format(computeRms(jsynWav.samples))} Peak=${"%.4f".format(computePeak(jsynWav.samples))} ${jsynWav.sampleRate}Hz")
+            println("    C++:  RMS=${"%.4f".format(computeRms(cppWav.samples))} Peak=${"%.4f".format(computePeak(cppWav.samples))} ${cppWav.sampleRate}Hz")
+
+            // Compare envelopes if CSVs exist
+            if (jsynCsv.exists() && cppCsv.exists()) {
+                val jsynEnv = readEnvelopeCsv(jsynCsv)
+                val cppEnv = readEnvelopeCsv(cppCsv)
+
+                println("    Envelope comparison (10ms windows):")
+                // Compare at key time points
+                val checkPoints = listOf(0f, 250f, 500f, 750f, 1000f, 1250f, 1500f, 2000f, 2500f)
+                for (ms in checkPoints) {
+                    val jVal = jsynEnv.minByOrNull { abs(it.first - ms) }?.second ?: 0f
+                    val cVal = cppEnv.minByOrNull { abs(it.first - ms) }?.second ?: 0f
+                    val diff = abs(jVal - cVal)
+                    val marker = if (diff > 0.01f) " <<<" else ""
+                    println("      ${ms.toInt()}ms: JSyn=${"%.4f".format(jVal)} C++=${"%.4f".format(cVal)} Δ=${"%.4f".format(diff)}$marker")
+                }
+            }
+        }
     }
 }

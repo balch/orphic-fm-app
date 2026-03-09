@@ -30,4 +30,8 @@ gradle/gradle-daemon-jvm.properties
 
 # C++ DSP build artifacts
 liborpheus_dsp/build_test/
+liborpheus_dsp/build-desktop/
 liborpheus_dsp/.cache/
+
+# C++ DSP test output (WAV/CSV files)
+liborpheus_dsp/test/output/
