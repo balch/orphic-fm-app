@@ -36,7 +36,6 @@ plugins {
 
 include(":apps:androidApp")
 include(":apps:composeApp")
-include(":apps:dspWorker")
 include(":apps:macrobenchmark")
 include(":core:ai")
 include(":core:audio")
