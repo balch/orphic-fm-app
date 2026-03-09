@@ -195,9 +195,26 @@ fun jsSendVoiceMorphCmd(index: Int, value: Float): Unit =
 fun jsSendVoiceDecayCmd(index: Int, value: Float): Unit =
     js("globalThis.__dspWorker.postMessage({ cmd: 25, idx: index, val: value })")
 
+/** Allocate a JS Uint8Array of given size */
+private fun jsNewUint8Array(size: Int): JsAny =
+    js("new Uint8Array(size)")
+
+/** Set a byte in a Uint8Array */
+private fun jsSetByte(arr: JsAny, index: Int, value: Int): Unit =
+    js("arr[index] = value")
+
+/** Post the Uint8Array's buffer as CMD_LOAD_GRAPH */
+private fun jsPostGraphCmd(arr: JsAny): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 30, graph: arr.buffer }, [arr.buffer])")
+
 /** Send LOAD_GRAPH command with ODWG binary as ArrayBuffer Transferable */
-fun jsSendLoadGraphCmd(bytes: ByteArray): Unit =
-    js("(function(){ var a = new Uint8Array(bytes); globalThis.__dspWorker.postMessage({ cmd: 30, graph: a.buffer }, [a.buffer]) })()")
+fun jsSendLoadGraphCmd(bytes: ByteArray) {
+    val arr = jsNewUint8Array(bytes.size)
+    for (i in bytes.indices) {
+        jsSetByte(arr, i, bytes[i].toInt() and 0xFF)
+    }
+    jsPostGraphCmd(arr)
+}
 
 /** Read Worker's CPU load (set by listener) */
 fun jsGetProxyCpuLoad(): Float =

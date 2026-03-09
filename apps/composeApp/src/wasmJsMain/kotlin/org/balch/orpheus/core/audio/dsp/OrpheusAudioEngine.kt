@@ -4,6 +4,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_BEND
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DELAY_MIX
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DRIVE
@@ -22,7 +23,7 @@ import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_VIBRATO
  * jitter from setInterval and GC pauses.
  */
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
+@ContributesBinding(AppScope::class, binding = binding<AudioEngine>())
 class OrpheusAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
     private val scheduler = DspGraphScheduler()
     private var audioContext: AudioContext? = null
