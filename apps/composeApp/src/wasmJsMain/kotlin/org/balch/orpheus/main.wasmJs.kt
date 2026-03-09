@@ -8,6 +8,7 @@ import com.diamondedge.logging.KmLogging
 import dev.zacsweers.metro.createGraphFactory
 import kotlinx.browser.document
 import org.balch.orpheus.core.audio.dsp.DspWorkerProxy
+import org.balch.orpheus.core.audio.dsp.buildDefaultWiringGraph
 import org.balch.orpheus.core.audio.dsp.jsCreateDspWorker
 import org.balch.orpheus.core.audio.dsp.jsSendSetPortCmd
 import org.balch.orpheus.core.audio.dsp.jsSetupWorkerListener
@@ -28,7 +29,7 @@ fun main() {
 
     if (useWorker) {
         // Create the Web Worker and set up message listener before user gesture
-        jsCreateDspWorker("dsp-worker-entry.js")
+        jsCreateDspWorker("orpheus-dsp-worker.js")
         jsSetupWorkerListener()
         workerProxy = DspWorkerProxy()
 
@@ -54,8 +55,9 @@ fun main() {
     }
 
     // Start audio on first user interaction (browser autoplay policy)
+    val graphBytes = if (useWorker) buildDefaultWiringGraph() else null
     val startAudio: () -> Unit = if (useWorker) {
-        { workerProxy?.start(); Unit }
+        { workerProxy?.start(graphBytes); Unit }
     } else {
         { graph.synthEngine.start(); Unit }
     }

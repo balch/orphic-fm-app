@@ -19,4 +19,5 @@ object DspWorkerProtocol {
     const val CMD_SET_DELAY_MIX = 22
     const val CMD_SET_VIBRATO = 23
     const val CMD_SET_BEND = 24
+    const val CMD_LOAD_GRAPH = 30
 }

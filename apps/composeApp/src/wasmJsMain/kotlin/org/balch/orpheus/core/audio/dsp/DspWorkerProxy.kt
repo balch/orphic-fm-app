@@ -32,7 +32,7 @@ class DspWorkerProxy {
      * to the Worker. Must be called from a user gesture handler (click/keydown/touchstart)
      * to satisfy browser autoplay restrictions.
      */
-    fun start() {
+    fun start(graphBytes: ByteArray? = null) {
         if (audioContext != null) return // Already started
 
         val ctx = createAudioContext()
@@ -52,6 +52,11 @@ class DspWorkerProxy {
 
             // Tell the Worker to start its render loop
             jsSendWorkerCmd(CMD_START)
+
+            // Send graph after engine is created (CMD_INIT creates it)
+            if (graphBytes != null) {
+                jsSendLoadGraphCmd(graphBytes)
+            }
 
             _isReady = true
         }
@@ -161,6 +166,10 @@ fun jsSendVoiceTuneCmd(index: Int, tune: Float): Unit =
 /** Send TRIGGER_DRUM command */
 fun jsSendTriggerDrumCmd(drumIndex: Int, accent: Float): Unit =
     js("globalThis.__dspWorker.postMessage({ cmd: 13, idx: drumIndex, accent: accent })")
+
+/** Send LOAD_GRAPH command with ODWG binary as ArrayBuffer Transferable */
+fun jsSendLoadGraphCmd(bytes: ByteArray): Unit =
+    js("(function(){ var a = new Uint8Array(bytes); globalThis.__dspWorker.postMessage({ cmd: 30, graph: a.buffer }, [a.buffer]) })()")
 
 /** Read Worker's CPU load (set by listener) */
 fun jsGetProxyCpuLoad(): Float =
