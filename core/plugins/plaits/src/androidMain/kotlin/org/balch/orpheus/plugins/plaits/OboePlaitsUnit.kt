@@ -2,11 +2,12 @@ package org.balch.orpheus.plugins.plaits
 
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeAudioInput
-import org.balch.orpheus.core.audio.dsp.OboeAudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeProcessable
+import org.balch.orpheus.core.audio.dsp.DspAudioInput
+import org.balch.orpheus.core.audio.dsp.DspAudioOutput
+import org.balch.orpheus.core.audio.dsp.DspProcessable
 import org.balch.orpheus.core.audio.dsp.PlaitsUnit
 import org.balch.orpheus.plugins.plaits.engine.SpeechEngine
+import kotlin.concurrent.Volatile
 import kotlin.math.absoluteValue
 import kotlin.math.exp
 import kotlin.math.ln
@@ -19,21 +20,20 @@ import kotlin.math.tanh
  * Renders audio by splitting blocks into Plaits-sized sub-blocks (~24 samples)
  * for parameter interpolation. Provides audio-rate trigger input with edge detection.
  */
-class OboePlaitsUnit : PlaitsUnit, OboeProcessable {
+class OboePlaitsUnit : PlaitsUnit, DspProcessable {
     @Volatile override var enabled = true
 
     companion object {
         private const val PLAITS_BLOCK_SIZE = 24
-        private const val SAMPLE_RATE = org.balch.orpheus.core.audio.dsp.DSP_SAMPLE_RATE
         private const val LN2 = 0.6931472f
     }
 
     // Oboe ports
-    private val oboeOutput = OboeAudioOutput("Output")
-    private val oboeTriggerInput = OboeAudioInput("Trigger")
-    private val oboeTimbreInput = OboeAudioInput("TimbreMod", smoothed = true)
-    private val oboeMorphInput = OboeAudioInput("MorphMod", smoothed = true)
-    private val oboeFrequencyInput = OboeAudioInput("Frequency")
+    private val oboeOutput = DspAudioOutput("Output")
+    private val oboeTriggerInput = DspAudioInput("Trigger")
+    private val oboeTimbreInput = DspAudioInput("TimbreMod", smoothed = true)
+    private val oboeMorphInput = DspAudioInput("MorphMod", smoothed = true)
+    private val oboeFrequencyInput = DspAudioInput("Frequency")
 
     override val output: AudioOutput = oboeOutput
     override val triggerInput: AudioInput = oboeTriggerInput
@@ -114,7 +114,7 @@ class OboePlaitsUnit : PlaitsUnit, OboeProcessable {
         // Compute per-sample decay coefficient from morph (0..1 -> 30ms..2000ms)
         val decayCoeff = if (percussive) {
             val decayMs = 30f + _morph * 1970f
-            val decaySamples = decayMs * SAMPLE_RATE / 1000f
+            val decaySamples = decayMs * org.balch.orpheus.core.audio.dsp.dspSampleRate / 1000f
             exp(-6.9f / decaySamples)
         } else 1f
 

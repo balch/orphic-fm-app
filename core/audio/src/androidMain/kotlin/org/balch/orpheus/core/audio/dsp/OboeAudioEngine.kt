@@ -4,28 +4,26 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import dev.zacsweers.metro.SingleIn
 
 /**
- * Oboe-backed AudioEngine for Android. Replaces OrpheusAudioEngine (JSyn).
+ * Oboe-backed AudioEngine for Android using liborpheus_dsp.
+ * Audio rendering happens entirely in C++ — no JNI in the audio callback.
  */
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
-class OboeAudioEngine @Inject constructor() : AudioEngine {
-    private val scheduler = OboeGraphScheduler()
-    private val bridge = OboeAudioBridge(scheduler)
+@ContributesBinding(AppScope::class, binding = binding<AudioEngine>())
+class OboeAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
+    private val bridge = OboeAudioBridge()
 
     init {
-        log.info { "OboeAudioEngine created" }
+        log.info { "OboeAudioEngine created (C++ DSP)" }
     }
 
     override fun start() {
-        log.info { "start() called, ${scheduler.unitCount} units registered" }
+        if (isRunning) return
+        log.info { "start() called" }
 
-        // Sort the graph using Tarjan's SCC algorithm (handles feedback cycles)
-        scheduler.sortTopologically()
-
-        // 1. Open stream (no audio yet)
         val openResult = bridge.nativeOpen()
         log.info { "nativeOpen() returned $openResult (0=OK)" }
         if (openResult != 0) {
@@ -33,16 +31,11 @@ class OboeAudioEngine @Inject constructor() : AudioEngine {
             return
         }
 
-        // 2. Allocate Kotlin buffers BEFORE starting audio
-        val framesPerBuffer = bridge.nativeGetFramesPerBuffer()
         val sampleRate = bridge.nativeGetSampleRate()
+        val framesPerBuffer = bridge.nativeGetFramesPerBuffer()
         log.info { "Stream opened: sampleRate=$sampleRate, framesPerBuffer=$framesPerBuffer" }
-        if (sampleRate != DSP_SAMPLE_RATE.toInt()) {
-            log.warn { "Oboe stream rate ($sampleRate) != DSP_SAMPLE_RATE (${DSP_SAMPLE_RATE.toInt()})" }
-        }
-        scheduler.allocate(framesPerBuffer.coerceAtLeast(256))
+        dspSampleRate = sampleRate.toFloat()
 
-        // 3. Now start — callback can fire immediately, buffers are ready
         val startResult = bridge.nativeRequestStart()
         log.info { "nativeRequestStart() returned $startResult (0=OK)" }
         if (startResult != 0) {
@@ -61,37 +54,54 @@ class OboeAudioEngine @Inject constructor() : AudioEngine {
         get() = bridge.nativeGetSampleRate().let { if (it > 0) it else 48000 }
 
     override fun addUnit(unit: AudioUnit) {
-        if (unit is OboeProcessable) {
-            scheduler.addUnit(unit)
-        }
+        // No-op: C++ engine manages its own units
     }
 
     override fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {
-        if (unit is OboeProcessable) {
-            unit.enabled = enabled
-            // Zero primary output buffer when disabling to prevent stale audio
-            if (!enabled) {
-                val out = unit.output
-                if (out is OboeAudioOutput) {
-                    out.getBuffer().fill(0f)
-                }
-            }
-        }
+        // No-op: C++ engine manages its own units
     }
 
-    // Expose scheduler's master inputs directly — plugins connect their
-    // final outputs here, and the scheduler reads from them in process().
     override val lineOutLeft: AudioInput
-        get() = scheduler.masterLeft
+        get() = NoOpAudioInput
 
     override val lineOutRight: AudioInput
-        get() = scheduler.masterRight
+        get() = NoOpAudioInput
 
     override fun getCpuLoad(): Float = (bridge.nativeGetCpuLoad() * 100f).toFloat()
 
     override fun getCurrentTime(): Double = System.nanoTime() / 1_000_000_000.0
 
+    /** Access the bridge for parameter control from SynthController delegates. */
+    val nativeBridgeImpl: OboeAudioBridge get() = bridge
+
+    // ── NativeDspBridge implementation ──────────────────────
+    override fun nativeSetVoiceGate(index: Int, active: Boolean) = bridge.nativeSetVoiceGate(index, active)
+    override fun nativeSetVoiceTune(index: Int, tune: Float) = bridge.nativeSetVoiceTune(index, tune)
+    override fun nativeSetVoiceEngine(index: Int, engineIndex: Int) = bridge.nativeSetVoiceEngine(index, engineIndex)
+    override fun nativeSetVoiceHarmonics(index: Int, value: Float) = bridge.nativeSetVoiceHarmonics(index, value)
+    override fun nativeSetVoiceTimbre(index: Int, value: Float) = bridge.nativeSetVoiceTimbre(index, value)
+    override fun nativeSetVoiceMorph(index: Int, value: Float) = bridge.nativeSetVoiceMorph(index, value)
+    override fun nativeSetVoiceDecay(index: Int, value: Float) = bridge.nativeSetVoiceDecay(index, value)
+    override fun nativeSetVoiceActive(index: Int, active: Boolean) = bridge.nativeSetVoiceActive(index, active)
+    override fun nativeSetVoiceHold(index: Int, level: Float) = bridge.nativeSetVoiceHold(index, level)
+    override fun nativeSetMasterVolume(value: Float) = bridge.nativeSetMasterVolume(value)
+    override fun nativeSetDrive(value: Float) = bridge.nativeSetDrive(value)
+    override fun nativeSetDelayMix(value: Float) = bridge.nativeSetDelayMix(value)
+    override fun nativeSetVibrato(value: Float) = bridge.nativeSetVibrato(value)
+    override fun nativeSetBend(value: Float) = bridge.nativeSetBend(value)
+    override fun nativeSetPort(uri: String, symbol: String, value: Float) = bridge.nativeSetPort(uri, symbol, value)
+    override fun nativeGetPort(uri: String, symbol: String): Float = bridge.nativeGetPort(uri, symbol)
+    override fun nativeGetMonitor(out: FloatArray) = bridge.nativeGetMonitor(out)
+    override fun nativeTriggerDrum(drumIndex: Int, accent: Float) = bridge.nativeTriggerDrum(drumIndex, accent)
+    override fun nativeLoadGraph(data: ByteArray): Int = bridge.nativeLoadGraph(data)
+
     companion object {
         private val log = logging("OboeAudioEngine")
     }
+}
+
+/** Placeholder AudioInput — C++ handles all routing internally. */
+private object NoOpAudioInput : AudioInput {
+    override fun set(value: Double) {}
+    override fun disconnectAll() {}
 }

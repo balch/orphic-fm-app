@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
@@ -49,8 +50,18 @@ import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
+/**
+ * Panel display mode for the gesture/camera panel.
+ * - VIZ: Transparent — background visualization shows through
+ * - OFF: Panel disabled (black, no camera or tracking)
+ * - CAMERA: Camera feed with hand tracking (when hardware available)
+ */
+enum class GesturePanelMode { VIZ, OFF, CAMERA }
+
 @Immutable
 data class MediaPipeUiState(
+    val panelMode: GesturePanelMode = GesturePanelMode.OFF,
+    val cameraAvailable: Boolean = false,
     val isEnabled: Boolean = false,
     val isTracking: Boolean = false,
     val hands: List<TrackedHand> = emptyList(),
@@ -74,9 +85,10 @@ data class MediaPipeUiState(
 data class MediaPipePanelActions(
     val toggleEnabled: () -> Unit,
     val toggleHold: (voiceIndex: Int) -> Unit,
+    val setPanelMode: (GesturePanelMode) -> Unit,
 ) {
     companion object {
-        val EMPTY = MediaPipePanelActions({}, {})
+        val EMPTY = MediaPipePanelActions({}, {}, {})
     }
 }
 
@@ -166,6 +178,7 @@ class MediaPipeViewModel(
     private var lastModeToggleMs = 0L // cooldown prevents re-toggle bounce
     private val modeToggleCooldownMs = 1500L
 
+    private val _panelMode = MutableStateFlow(GesturePanelMode.OFF)
     private val _isEnabled = MutableStateFlow(false)
     private val _heldVoiceIndices = MutableStateFlow<Set<Int>>(emptySet())
     private val _selectedTarget = MutableStateFlow<AslSign?>(null)
@@ -207,6 +220,17 @@ class MediaPipeViewModel(
         toggleHold = { vi ->
             val currentlyHeld = vi in _heldVoiceIndices.value
             synthController.emitHoldChange(vi, !currentlyHeld, ControlEventOrigin.UI)
+        },
+        setPanelMode = { mode ->
+            _panelMode.value = mode
+            when (mode) {
+                GesturePanelMode.CAMERA, GesturePanelMode.VIZ -> {
+                    if (!_isEnabled.value && handTracker.isAvailable) toggleTracking()
+                }
+                GesturePanelMode.OFF -> {
+                    if (_isEnabled.value) toggleTracking()
+                }
+            }
         },
     )
 
@@ -329,8 +353,8 @@ class MediaPipeViewModel(
 
     override val stateFlow: StateFlow<MediaPipeUiState> =
         combine(
-            _isEnabled,
-            handTracker.results,
+            combine(_isEnabled, _panelMode) { e, m -> Pair(e, m) },
+            handTracker.results.onStart { emit(null) },
             handTracker.cameraFrame,
             combine(
                 _heldVoiceIndices,
@@ -345,9 +369,11 @@ class MediaPipeViewModel(
             combine(_isBending, _cachedGestures, _pressedKeys, _keyboardEngineName) { b, g, pk, en ->
                 GestureUiExtras(b, g, pk, en)
             },
-        ) { enabled, result, frame, aslExtras, gestureExtras ->
+        ) { (enabled, panelMode), result, frame, aslExtras, gestureExtras ->
             if (!enabled || result == null || result.hands.isEmpty()) {
                 MediaPipeUiState(
+                    panelMode = panelMode,
+                    cameraAvailable = handTracker.isAvailable,
                     isEnabled = enabled,
                     isTracking = false,
                     cameraFrame = if (enabled) frame else null,
@@ -365,6 +391,8 @@ class MediaPipeViewModel(
                 )
             } else {
                 MediaPipeUiState(
+                    panelMode = panelMode,
+                    cameraAvailable = handTracker.isAvailable,
                     isEnabled = enabled,
                     isTracking = true,
                     hands = result.hands,

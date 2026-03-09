@@ -27,37 +27,27 @@ oboe::Result OboeEngine::openStream() {
     return builder.openStream(mStream);
 }
 
-oboe::Result OboeEngine::open(JNIEnv *env, jobject kotlinCallback) {
-    env->GetJavaVM(&mJvm);
-    mKotlinCallback = env->NewGlobalRef(kotlinCallback);
-
-    jclass cls = env->GetObjectClass(kotlinCallback);
-    mRenderMethod = env->GetMethodID(cls, "renderAudio", "([FI)V");
-    if (!mRenderMethod) {
-        LOGE("Could not find renderAudio method");
-        return oboe::Result::ErrorInternal;
-    }
-
+oboe::Result OboeEngine::open() {
     oboe::Result result = openStream();
     if (result != oboe::Result::OK) {
         LOGE("Failed to open stream: %s", oboe::convertToText(result));
         return result;
     }
 
-    int32_t bufferCapacity = mStream->getBufferCapacityInFrames();
-    jfloatArray localBuffer = env->NewFloatArray(bufferCapacity * 2);
-    mJniOutputBuffer = (jfloatArray)env->NewGlobalRef(localBuffer);
-    env->DeleteLocalRef(localBuffer);
+    float sr = static_cast<float>(mStream->getSampleRate());
+    dsp_engine_ = orpheus_engine_create(sr);
 
-    LOGI("Stream opened: sampleRate=%d, framesPerBurst=%d, bufferCapacity=%d",
-         mStream->getSampleRate(), mStream->getFramesPerBurst(), bufferCapacity);
-
+    LOGI("Stream opened: sampleRate=%d, framesPerBurst=%d, dsp_engine=%p",
+         mStream->getSampleRate(), mStream->getFramesPerBurst(), dsp_engine_);
     return oboe::Result::OK;
 }
 
+int OboeEngine::loadGraph(const uint8_t* data, size_t length) {
+    if (!dsp_engine_) return -100;
+    return orpheus_engine_load_patch(dsp_engine_, data, length);
+}
+
 oboe::Result OboeEngine::requestStart() {
-    // Set running BEFORE requestStart — the callback can fire immediately
-    // on another thread, and if mIsRunning is false it returns Stop.
     mIsRunning.store(true);
     oboe::Result result = mStream->requestStart();
     if (result != oboe::Result::OK) {
@@ -79,20 +69,9 @@ oboe::Result OboeEngine::stop() {
         mStream.reset();
     }
 
-    // Audio thread detaches itself: once the stream is stopped/closed above,
-    // the callback won't fire again. The audio thread's JNI attachment is
-    // cleaned up by the system when the thread exits.
-    mAudioThreadAttached.store(false);
-    mAudioThreadEnv = nullptr;
-
-    if (mJvm && mKotlinCallback) {
-        JNIEnv *env;
-        mJvm->AttachCurrentThread(&env, nullptr);
-        env->DeleteGlobalRef(mKotlinCallback);
-        env->DeleteGlobalRef(mJniOutputBuffer);
-        mJvm->DetachCurrentThread();
-        mKotlinCallback = nullptr;
-        mJniOutputBuffer = nullptr;
+    if (dsp_engine_) {
+        orpheus_engine_destroy(dsp_engine_);
+        dsp_engine_ = nullptr;
     }
 
     return result;
@@ -104,68 +83,93 @@ int32_t OboeEngine::getFramesPerBuffer() const { return mStream ? mStream->getFr
 double OboeEngine::getCpuLoad() const { return mCpuLoad.load(); }
 
 oboe::DataCallbackResult OboeEngine::onAudioReady(
-        oboe::AudioStream *stream, void *audioData, int32_t numFrames) {
-
-    if (!mIsRunning.load()) {
+        oboe::AudioStream* stream, void* audioData, int32_t numFrames) {
+    if (!mIsRunning.load() || !dsp_engine_) {
         memset(audioData, 0, numFrames * 2 * sizeof(float));
         return oboe::DataCallbackResult::Stop;
     }
 
-    auto startTime = std::chrono::steady_clock::now();
+    auto start = std::chrono::steady_clock::now();
 
-    if (!mAudioThreadAttached.load()) {
-        JNIEnv *env;
-        JavaVMAttachArgs args;
-        args.version = JNI_VERSION_1_6;
-        args.name = "OboeAudioThread";
-        args.group = nullptr;
-        mJvm->AttachCurrentThread(&env, &args);
-        mAudioThreadEnv = env;
-        mAudioThreadAttached.store(true);
-        setpriority(PRIO_PROCESS, 0, -19);
-    }
+    // Direct C++ DSP — no JNI, no Kotlin, no GC
+    orpheus_engine_process(dsp_engine_, static_cast<float*>(audioData), numFrames);
 
-    mAudioThreadEnv->CallVoidMethod(mKotlinCallback, mRenderMethod,
-                                     mJniOutputBuffer, numFrames);
-
-    mAudioThreadEnv->GetFloatArrayRegion(mJniOutputBuffer, 0,
-                                          numFrames * 2, (float *)audioData);
-
-    auto endTime = std::chrono::steady_clock::now();
-    double processingUs = std::chrono::duration_cast<std::chrono::microseconds>(
-        endTime - startTime).count();
-    double bufferUs = (double)numFrames / stream->getSampleRate() * 1e6;
-    mCpuLoad.store(processingUs / bufferUs);
+    auto end = std::chrono::steady_clock::now();
+    double us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    double budget = static_cast<double>(numFrames) / stream->getSampleRate() * 1e6;
+    mCpuLoad.store(us / budget);
 
     return oboe::DataCallbackResult::Continue;
 }
 
-void OboeEngine::onErrorAfterClose(oboe::AudioStream *stream, oboe::Result error) {
+void OboeEngine::onErrorAfterClose(oboe::AudioStream* stream, oboe::Result error) {
     LOGE("Stream disconnected: %s — reopening", oboe::convertToText(error));
     if (mIsRunning.load()) {
-        // onErrorAfterClose runs on Oboe's error notification thread, NOT the
-        // audio thread — we must attach this thread to get a valid JNIEnv.
-        JNIEnv *env;
-        mJvm->AttachCurrentThread(&env, nullptr);
-
         oboe::Result result = openStream();
         if (result == oboe::Result::OK) {
-            // Reallocate JNI buffer — new stream may have different capacity
-            if (mJniOutputBuffer) {
-                int32_t newCapacity = mStream->getBufferCapacityInFrames();
-                env->DeleteGlobalRef(mJniOutputBuffer);
-                jfloatArray localBuffer = env->NewFloatArray(newCapacity * 2);
-                mJniOutputBuffer = (jfloatArray)env->NewGlobalRef(localBuffer);
-                env->DeleteLocalRef(localBuffer);
-                LOGI("Reallocated JNI buffer: capacity=%d", newCapacity);
-            }
-            // Audio thread will re-attach itself on next onAudioReady
-            mAudioThreadAttached.store(false);
-            mAudioThreadEnv = nullptr;
+            // DSP engine persists across reconnects — just restart audio
             mIsRunning.store(true);
             mStream->requestStart();
         }
+    }
+}
 
-        mJvm->DetachCurrentThread();
+// ── C API pass-throughs ──────────────────────────────
+void OboeEngine::setPort(const char* uri, const char* sym, float value) {
+    if (dsp_engine_) orpheus_engine_set_port(dsp_engine_, uri, sym, value);
+}
+float OboeEngine::getPort(const char* uri, const char* sym) {
+    return dsp_engine_ ? orpheus_engine_get_port(dsp_engine_, uri, sym) : 0.0f;
+}
+void OboeEngine::setVoiceGate(int index, int active) {
+    if (dsp_engine_) orpheus_engine_set_voice_gate(dsp_engine_, index, active);
+}
+void OboeEngine::setVoiceTune(int index, float tune) {
+    if (dsp_engine_) orpheus_engine_set_voice_tune(dsp_engine_, index, tune);
+}
+void OboeEngine::setVoiceEngine(int index, int engineIndex) {
+    if (dsp_engine_) orpheus_engine_set_voice_engine(dsp_engine_, index, engineIndex);
+}
+void OboeEngine::setVoiceHarmonics(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_harmonics(dsp_engine_, index, value);
+}
+void OboeEngine::setVoiceTimbre(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_timbre(dsp_engine_, index, value);
+}
+void OboeEngine::setVoiceMorph(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_morph(dsp_engine_, index, value);
+}
+void OboeEngine::setVoiceDecay(int index, float value) {
+    if (dsp_engine_) orpheus_engine_set_voice_decay(dsp_engine_, index, value);
+}
+void OboeEngine::setVoiceActive(int index, int active) {
+    if (dsp_engine_) orpheus_engine_set_voice_active(dsp_engine_, index, active);
+}
+void OboeEngine::setVoiceHold(int index, float level) {
+    if (dsp_engine_) orpheus_engine_set_voice_hold(dsp_engine_, index, level);
+}
+void OboeEngine::triggerDrum(int drumIndex, float accent) {
+    if (dsp_engine_) orpheus_engine_trigger_drum(dsp_engine_, drumIndex, accent);
+}
+void OboeEngine::setMasterVolume(float v) {
+    if (dsp_engine_) orpheus_engine_set_master_volume(dsp_engine_, v);
+}
+void OboeEngine::setDrive(float v) {
+    if (dsp_engine_) orpheus_engine_set_drive(dsp_engine_, v);
+}
+void OboeEngine::setDelayMix(float v) {
+    if (dsp_engine_) orpheus_engine_set_delay_mix(dsp_engine_, v);
+}
+void OboeEngine::setVibrato(float v) {
+    if (dsp_engine_) orpheus_engine_set_vibrato(dsp_engine_, v);
+}
+void OboeEngine::setBend(float v) {
+    if (dsp_engine_) orpheus_engine_set_bend(dsp_engine_, v);
+}
+void OboeEngine::getMonitor(OrpheusMonitorData* out) {
+    if (dsp_engine_) {
+        orpheus_engine_get_monitor(dsp_engine_, out);
+    } else {
+        memset(out, 0, sizeof(OrpheusMonitorData));
     }
 }

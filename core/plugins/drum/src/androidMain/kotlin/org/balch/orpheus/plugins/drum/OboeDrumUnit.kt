@@ -3,13 +3,14 @@ package org.balch.orpheus.plugins.drum
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.DrumUnit
-import org.balch.orpheus.core.audio.dsp.OboeAudioInput
-import org.balch.orpheus.core.audio.dsp.OboeAudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeProcessable
+import org.balch.orpheus.core.audio.dsp.DspAudioInput
+import org.balch.orpheus.core.audio.dsp.DspAudioOutput
+import org.balch.orpheus.core.audio.dsp.DspProcessable
 import org.balch.orpheus.plugins.drum.engine.AnalogBassDrum
 import org.balch.orpheus.plugins.drum.engine.AnalogSnareDrum
 import org.balch.orpheus.plugins.drum.engine.FmDrum
 import org.balch.orpheus.plugins.drum.engine.MetallicHiHat
+import kotlin.concurrent.Volatile
 import kotlin.math.absoluteValue
 import kotlin.math.sign
 import kotlin.math.tanh
@@ -20,21 +21,21 @@ import kotlin.math.tanh
  * Renders ALL drums simultaneously (not just the last triggered type).
  * This prevents clicks when rapidly triggering different drums.
  */
-class OboeDrumUnit : DrumUnit, OboeProcessable {
+class OboeDrumUnit : DrumUnit, DspProcessable {
     @Volatile override var enabled = true
 
     private val bd = AnalogBassDrum()
     private val sd = AnalogSnareDrum()
     private val hh = MetallicHiHat()
-    private val fm = FmDrum(org.balch.orpheus.core.audio.dsp.DSP_SAMPLE_RATE)
+    private val fm = FmDrum(org.balch.orpheus.core.audio.dsp.dspSampleRate)
 
     // Output port
-    private val oboeOutput = OboeAudioOutput("Output")
+    private val oboeOutput = DspAudioOutput("Output")
 
     // Trigger input ports
-    private val oboeTriggerBd = OboeAudioInput("TriggerBD")
-    private val oboeTriggerSd = OboeAudioInput("TriggerSD")
-    private val oboeTriggerHh = OboeAudioInput("TriggerHH")
+    private val oboeTriggerBd = DspAudioInput("TriggerBD")
+    private val oboeTriggerSd = DspAudioInput("TriggerSD")
+    private val oboeTriggerHh = DspAudioInput("TriggerHH")
 
     override val output: AudioOutput = oboeOutput
     override val triggerInputBd: AudioInput = oboeTriggerBd
@@ -53,7 +54,7 @@ class OboeDrumUnit : DrumUnit, OboeProcessable {
     // Per-drum parameters
     // Bass Drum
     private var bdAccent = 0.5f
-    private var bdF0 = 55.0f / org.balch.orpheus.core.audio.dsp.DSP_SAMPLE_RATE
+    private var bdF0 = 55.0f / org.balch.orpheus.core.audio.dsp.dspSampleRate
     private var bdTone = 0.5f
     private var bdDecay = 0.5f
     private var bdP4 = 0.5f
@@ -61,14 +62,14 @@ class OboeDrumUnit : DrumUnit, OboeProcessable {
 
     // Snare Drum
     private var sdAccent = 0.5f
-    private var sdF0 = 180.0f / org.balch.orpheus.core.audio.dsp.DSP_SAMPLE_RATE
+    private var sdF0 = 180.0f / org.balch.orpheus.core.audio.dsp.dspSampleRate
     private var sdTone = 0.5f
     private var sdDecay = 0.5f
     private var sdP4 = 0.5f
 
     // Hi-Hat
     private var hhAccent = 0.5f
-    private var hhF0 = 400.0f / org.balch.orpheus.core.audio.dsp.DSP_SAMPLE_RATE
+    private var hhF0 = 400.0f / org.balch.orpheus.core.audio.dsp.dspSampleRate
     private var hhTone = 0.5f
     private var hhDecay = 0.5f
     private var hhP4 = 0.5f
@@ -101,7 +102,7 @@ class OboeDrumUnit : DrumUnit, OboeProcessable {
         param4: Float,
         param5: Float
     ) {
-        val f0 = frequency / org.balch.orpheus.core.audio.dsp.DSP_SAMPLE_RATE
+        val f0 = frequency / org.balch.orpheus.core.audio.dsp.dspSampleRate
         when (type) {
             0 -> { bdF0 = f0; bdTone = tone; bdDecay = decay; bdP4 = param4; bdP5 = param5 }
             1 -> { sdF0 = f0; sdTone = tone; sdDecay = decay; sdP4 = param4 }

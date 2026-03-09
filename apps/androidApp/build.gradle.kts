@@ -21,6 +21,7 @@ android {
             cmake {
                 cppFlags += "-std=c++17"
                 arguments += "-DANDROID_STL=c++_shared"
+                arguments += "-DEURORACK_DIR=/Users/balch/Source/eurorack"
             }
         }
         ndk {

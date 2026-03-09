@@ -20,6 +20,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import org.balch.orpheus.core.features.LocalSynthFeatures
 import org.balch.orpheus.core.features.feature
 import org.balch.orpheus.features.mediapipe.MediaPipeFeature
@@ -63,6 +64,7 @@ fun DesktopSynthScreen(
 
     // Request focus for keyboard input handling
     LaunchedEffect(Unit) {
+        delay(100)
         focusRequester.requestFocus()
     }
 

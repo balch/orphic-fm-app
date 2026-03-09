@@ -225,6 +225,13 @@ interface SynthEngine {
     fun clearLooper()
     fun getLooperPosition(): Float
     fun getLooperDuration(): Double
+
+    /**
+     * Push current voice/parameter state to the native C++ engine.
+     * Called after the native engine is ready (e.g., after Worker starts on WASM).
+     * Default no-op for engines without a native bridge.
+     */
+    fun syncToNative() {}
 }
 
 enum class ModSource {

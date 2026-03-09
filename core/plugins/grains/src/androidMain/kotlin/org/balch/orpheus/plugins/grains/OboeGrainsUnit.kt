@@ -2,38 +2,39 @@ package org.balch.orpheus.plugins.grains
 
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
+import org.balch.orpheus.core.audio.dsp.DspAudioInput
+import org.balch.orpheus.core.audio.dsp.DspAudioOutput
+import org.balch.orpheus.core.audio.dsp.DspProcessable
 import org.balch.orpheus.core.audio.dsp.GrainsUnit
-import org.balch.orpheus.core.audio.dsp.OboeAudioInput
-import org.balch.orpheus.core.audio.dsp.OboeAudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeProcessable
 import org.balch.orpheus.plugins.grains.engine.GrainsMode
 import org.balch.orpheus.plugins.grains.engine.GranularProcessor
+import kotlin.concurrent.Volatile
 
 /**
  * Oboe implementation of GrainsUnit.
  * Block processing with Float buffers (no conversion needed).
  */
-class OboeGrainsUnit : GrainsUnit, OboeProcessable {
+class OboeGrainsUnit : GrainsUnit, DspProcessable {
     @Volatile override var enabled = true
 
     private val processor = GranularProcessor()
     @Volatile private var bypass = false
 
     // Audio ports
-    private val oboeInputLeft = OboeAudioInput("InputLeft")
-    private val oboeInputRight = OboeAudioInput("InputRight")
-    private val oboeOutputLeft = OboeAudioOutput("OutputLeft")
-    private val oboeOutputRight = OboeAudioOutput("OutputRight")
+    private val oboeInputLeft = DspAudioInput("InputLeft")
+    private val oboeInputRight = DspAudioInput("InputRight")
+    private val oboeOutputLeft = DspAudioOutput("OutputLeft")
+    private val oboeOutputRight = DspAudioOutput("OutputRight")
 
     // Parameter ports
-    private val oboePosition = OboeAudioInput("Position", smoothed = true)
-    private val oboeSize = OboeAudioInput("Size", smoothed = true)
-    private val oboePitch = OboeAudioInput("Pitch", smoothed = true)
-    private val oboeDensity = OboeAudioInput("Density", smoothed = true)
-    private val oboeTexture = OboeAudioInput("Texture", smoothed = true)
-    private val oboeDryWet = OboeAudioInput("DryWet", smoothed = true)
-    private val oboeFreeze = OboeAudioInput("Freeze")
-    private val oboeTrigger = OboeAudioInput("Trigger")
+    private val oboePosition = DspAudioInput("Position", smoothed = true)
+    private val oboeSize = DspAudioInput("Size", smoothed = true)
+    private val oboePitch = DspAudioInput("Pitch", smoothed = true)
+    private val oboeDensity = DspAudioInput("Density", smoothed = true)
+    private val oboeTexture = DspAudioInput("Texture", smoothed = true)
+    private val oboeDryWet = DspAudioInput("DryWet", smoothed = true)
+    private val oboeFreeze = DspAudioInput("Freeze")
+    private val oboeTrigger = DspAudioInput("Trigger")
 
     // Interface implementation
     override val output: AudioOutput = oboeOutputLeft

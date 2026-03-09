@@ -1,5 +1,6 @@
 package org.balch.orpheus.plugins.duolfo
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -27,6 +28,8 @@ class VoicePlugin : DspPlugin {
         name = "Voice Engine",
         author = "Orpheus"
     )
+
+    private val log = logging("VoicePlugin")
 
     companion object {
         const val URI = VOICE_URI
@@ -139,6 +142,7 @@ class VoicePlugin : DspPlugin {
                     get { _duoEngine[i] }
                     set {
                         _duoEngine[i] = it
+                        log.info { "VoicePlugin.duoEngine[$i] = $it (listener=${listener != null})" }
                         listener?.onVoiceParamChange(i, "duo_engine", it)
                     }
                 }
@@ -319,6 +323,15 @@ class VoicePlugin : DspPlugin {
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
     
+    // Direct getters for native bridge sync
+    fun getDuoEngine(i: Int): Int = _duoEngine[i]
+    fun getDuoHarmonics(i: Int): Float = _duoHarmonics[i]
+    fun getDuoSharpness(i: Int): Float = _duoSharpness[i]
+    fun getDuoMorph(i: Int): Float = _duoMorph[i]
+    fun getEnvSpeed(i: Int): Float = _envSpeed[i]
+    fun getDuoProsody(i: Int): Float = _duoProsody[i]
+    fun getDuoSpeed(i: Int): Float = _duoSpeed[i]
+
     // Direct getters/setters for DspSynthEngine sync (updates state ONLY, no listener trigger)
     fun setTune(i: Int, v: Float) { _tune[i] = v }
     fun setModDepth(i: Int, v: Float) { _modDepth[i] = v }

@@ -24,3 +24,10 @@ node_modules/
 # Python virtual environments
 tools/train-asl-model/.venv/
 .worktrees/
+
+# Gradle generated files
+gradle/gradle-daemon-jvm.properties
+
+# C++ DSP build artifacts
+liborpheus_dsp/build_test/
+liborpheus_dsp/.cache/

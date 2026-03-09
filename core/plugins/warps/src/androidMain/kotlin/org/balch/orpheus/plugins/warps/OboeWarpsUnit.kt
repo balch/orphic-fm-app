@@ -2,29 +2,30 @@ package org.balch.orpheus.plugins.warps
 
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeAudioInput
-import org.balch.orpheus.core.audio.dsp.OboeAudioOutput
-import org.balch.orpheus.core.audio.dsp.OboeProcessable
+import org.balch.orpheus.core.audio.dsp.DspAudioInput
+import org.balch.orpheus.core.audio.dsp.DspAudioOutput
+import org.balch.orpheus.core.audio.dsp.DspProcessable
 import org.balch.orpheus.core.audio.dsp.WarpsUnit
 import org.balch.orpheus.plugins.warps.engine.WarpsProcessor
+import kotlin.concurrent.Volatile
 
-class OboeWarpsUnit : WarpsUnit, OboeProcessable {
+class OboeWarpsUnit : WarpsUnit, DspProcessable {
     @Volatile override var enabled = true
 
     private val processor = WarpsProcessor()
     @Volatile private var bypass = false
 
     // Audio Ports
-    private val oboeInputLeft = OboeAudioInput("InputLeft")
-    private val oboeInputRight = OboeAudioInput("InputRight")
-    private val oboeOutputLeft = OboeAudioOutput("OutputLeft")
-    private val oboeOutputRight = OboeAudioOutput("OutputRight")
+    private val oboeInputLeft = DspAudioInput("InputLeft")
+    private val oboeInputRight = DspAudioInput("InputRight")
+    private val oboeOutputLeft = DspAudioOutput("OutputLeft")
+    private val oboeOutputRight = DspAudioOutput("OutputRight")
 
     // Parameter Ports
-    private val oboeAlgorithm = OboeAudioInput("Algorithm", smoothed = true)
-    private val oboeTimbre = OboeAudioInput("Timbre", smoothed = true)
-    private val oboeLevel1 = OboeAudioInput("Level1", smoothed = true)
-    private val oboeLevel2 = OboeAudioInput("Level2", smoothed = true)
+    private val oboeAlgorithm = DspAudioInput("Algorithm", smoothed = true)
+    private val oboeTimbre = DspAudioInput("Timbre", smoothed = true)
+    private val oboeLevel1 = DspAudioInput("Level1", smoothed = true)
+    private val oboeLevel2 = DspAudioInput("Level2", smoothed = true)
 
     // Interface Implementation
     override val output: AudioOutput = oboeOutputLeft
@@ -39,7 +40,7 @@ class OboeWarpsUnit : WarpsUnit, OboeProcessable {
     override val level2: AudioInput = oboeLevel2
 
     init {
-        processor.init(org.balch.orpheus.core.audio.dsp.DSP_SAMPLE_RATE)
+        processor.init(org.balch.orpheus.core.audio.dsp.dspSampleRate)
         oboeAlgorithm.set(0.0)
         oboeTimbre.set(0.5)
         oboeLevel1.set(0.5)

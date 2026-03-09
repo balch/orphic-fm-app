@@ -1,4 +1,5 @@
 @file:Suppress("NOTHING_TO_INLINE")
+@file:OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
 
 package org.balch.orpheus.core.audio.dsp
 
@@ -169,3 +170,75 @@ external object OrphicFM {
     @JsName("syncNode")
     fun syncNode(node: AudioNode)
 }
+
+// --- AudioWorklet API declarations ---
+
+external interface AudioWorkletNode : AudioNode {
+    val port: MessagePort
+}
+
+external interface MessagePort : JsAny {
+    fun postMessage(message: JsAny)
+    fun postMessage(message: JsAny, transfer: JsArray<JsAny>)
+}
+
+// --- JS bridge functions ---
+// These delegate to dsp-worklet-bridge.js loaded as a regular script.
+// Kotlin/WASM js() only supports single-expression bodies.
+
+fun jsAddWorkletModule(ctx: AudioContext, url: String): JsAny =
+    js("ctx.audioWorklet.addModule(url)")
+
+fun jsCreateWorkletNode(ctx: AudioContext, name: String): AudioWorkletNode =
+    js("new AudioWorkletNode(ctx, name, { outputChannelCount: [2] })")
+
+fun jsSetInterval(ms: Int, callback: () -> Unit): Int =
+    js("setInterval(callback, ms)")
+
+fun jsClearInterval(id: Int): Unit =
+    js("clearInterval(id)")
+
+/**
+ * Create a new Float32Array of the given length.
+ */
+fun jsNewFloat32Array(length: Int): Float32Array =
+    js("new Float32Array(length)")
+
+/**
+ * De-interleave a staging Float32Array [L0,R0,L1,R1,...] into separate
+ * L/R buffers and post to a worklet node's port with Transferable (zero-copy).
+ * The split loop runs in pure JS — no per-element WASM↔JS interop.
+ */
+fun jsSplitAndPostToWorklet(node: AudioWorkletNode, interleaved: Float32Array, frames: Int): Unit =
+    js("(function(){var l=new Float32Array(frames),r=new Float32Array(frames);for(var i=0;i<frames;i++){l[i]=interleaved[i*2];r[i]=interleaved[i*2+1]}node.port.postMessage({type:'buffer',left:l,right:r},[l.buffer,r.buffer])})()")
+
+/**
+ * Attach a then-handler to a JS Promise.
+ */
+fun jsPromiseThen(promise: JsAny, callback: () -> Unit): Unit =
+    js("promise.then(callback)")
+
+/**
+ * Set up a listener that stores queue depth in a global variable.
+ * Avoids Kotlin/WASM callback parameter conversion issues.
+ */
+fun jsSetupQueueDepthListener(node: AudioWorkletNode): Unit =
+    js("node.port.onmessage = function(e) { if (e.data.type === 'queueDepth') { globalThis.__orpheusQueueDepth = e.data.depth; globalThis.__orpheusUnderruns = e.data.underruns || 0 } }")
+
+/**
+ * Read the latest queue depth stored by the worklet listener.
+ */
+fun jsGetQueueDepth(): Int =
+    js("globalThis.__orpheusQueueDepth || 0")
+
+/**
+ * Read the cumulative underrun count reported by the worklet.
+ */
+fun jsGetUnderrunCount(): Int =
+    js("globalThis.__orpheusUnderruns || 0")
+
+/**
+ * High-resolution timestamp in milliseconds (sub-ms precision).
+ */
+fun jsPerformanceNow(): Double =
+    js("performance.now()")

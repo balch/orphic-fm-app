@@ -6,15 +6,13 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
+@ContributesBinding(AppScope::class, replaces = [DspAutomationPlayerFactory::class])
 class JsynAutomationPlayerFactory @Inject constructor() : AutomationPlayer.Factory {
     override fun create(): AutomationPlayer = JsynAutomationPlayer()
 }
 
-
-
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
+@ContributesBinding(AppScope::class, replaces = [DspClockUnitFactory::class])
 class JsynClockUnitFactory @Inject constructor() : ClockUnit.Factory {
     override fun create(): ClockUnit = JsynClockUnit()
 }

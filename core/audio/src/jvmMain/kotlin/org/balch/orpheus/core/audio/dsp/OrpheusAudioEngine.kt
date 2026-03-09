@@ -3,7 +3,6 @@ package org.balch.orpheus.core.audio.dsp
 import com.jsyn.JSyn
 import com.jsyn.unitgen.LineOut
 import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import java.util.Arrays
@@ -12,7 +11,6 @@ import java.util.Arrays
  * JVM actual implementation of AudioEngine using JSyn.
  */
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
 class OrpheusAudioEngine @Inject constructor() : AudioEngine {
     private val synth = JSyn.createSynthesizer()
     private val lineOut = LineOut()
@@ -31,6 +29,7 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
     }
 
     override fun start() {
+        if (synth.isRunning) return // Already started
         synth.add(lineOut)
         synth.start()
         lineOut.start()
