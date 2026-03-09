@@ -15,9 +15,9 @@ void unit_process_linear_ramp(GraphUnit* u, int num_frames, float sample_rate);
 void unit_process_pass_through(GraphUnit* u, int num_frames);
 void unit_process_peak_follower(GraphUnit* u, int num_frames);
 void unit_process_hard_clip(GraphUnit* u, int num_frames);
-void unit_process_limiter(GraphUnit* u, OrpheusEngine* engine, int num_frames);
+void unit_process_limiter(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_delay_line(GraphUnit* u, int num_frames, float sample_rate);
-void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_buffer, int num_frames);
+void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_buffer, int num_frames, float sample_rate);
 
 // MI module wrappers
 void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);

@@ -284,7 +284,7 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     drumDirectGainR.out to drumResoMix.inputB
     drumResoMix.out to drumResoHalf.inputA
 
-    val drumReso = rings("drumResonator")
+    val drumReso = rings("drumResonator") { moduleIndex = 1.0f }
     drumResoHalf.out to drumReso.input
 
     val drumDirectResoWetGainL = multiply("drumDirectResoWetGainL") { inputB = 0.0f }

@@ -174,12 +174,15 @@ void unit_process_hard_clip(GraphUnit* u, int n) {
         out[i] = std::max(-1.0f, std::min(1.0f, in[i]));
 }
 
-void unit_process_limiter(GraphUnit* u, OrpheusEngine* engine, int n) {
+void unit_process_limiter(GraphUnit* u, OrpheusEngine* engine, int n, float sr) {
     float* in    = u->inputs[IPORT_INPUT].buffer;
     float* drive = u->inputs[IPORT_DRIVE].buffer;
     float* out   = u->output_buffers[OPORT_OUT];
-    float mix = engine->drive_mix.load(std::memory_order_relaxed);
+    float mix_target = engine->drive_mix.load(std::memory_order_relaxed);
+    float coeff = smooth_coeff(sr);
     for (int i = 0; i < n; i++) {
+        engine->smooth_drive_mix += coeff * (mix_target - engine->smooth_drive_mix);
+        float mix = engine->smooth_drive_mix;
         float wet = std::tanh(in[i] * drive[i]);
         out[i] = in[i] * (1.0f - mix) + wet * mix;
     }
@@ -202,21 +205,19 @@ void unit_process_delay_line(GraphUnit* u, int n, float sr) {
     }
 }
 
-void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_buffer, int n) {
+void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_buffer, int n, float sr) {
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
 
-    // Master pan (constant-power) — the only global output control not handled
-    // by graph units. Drive is handled by limiter units, headroom by mvL/mvR
-    // multiply nodes, clipping by hardClip units.
-    float master_pan = engine->master_pan.load(std::memory_order_relaxed);
-    float mp_angle = ((master_pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
-    float mp_l = std::cos(mp_angle);
-    float mp_r = std::sin(mp_angle);
+    // Master pan (constant-power) with per-sample smoothing
+    float pan_target = engine->master_pan.load(std::memory_order_relaxed);
+    float coeff = smooth_coeff(sr);
 
     for (int i = 0; i < n; i++) {
-        output_buffer[i * 2]     = in_l[i] * mp_l;
-        output_buffer[i * 2 + 1] = in_r[i] * mp_r;
+        engine->smooth_master_pan += coeff * (pan_target - engine->smooth_master_pan);
+        float mp_angle = ((engine->smooth_master_pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
+        output_buffer[i * 2]     = in_l[i] * std::cos(mp_angle);
+        output_buffer[i * 2 + 1] = in_r[i] * std::sin(mp_angle);
     }
 }
 
@@ -396,16 +397,23 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
     }
 
+    // ── Smoothing coefficient for this block ──────────────────
+    float sc = smooth_coeff(sr);
+
     // ── LFO vibrato modulation ───────────────────────────────
-    float vibrato_depth = engine->vibrato_depth.load(std::memory_order_relaxed);
-    float lfo_value = engine->lfo_output_value;
-    // depth 0..1 → 0..2 semitones of pitch modulation
-    float vibrato_semitones = lfo_value * vibrato_depth * 2.0f;
+    // Per-sample LFO buffer for Engine 0; block-midpoint for Plaits engines
+    float vib_target = engine->vibrato_depth.load(std::memory_order_relaxed);
+    engine->smooth_vibrato_depth += sc * (vib_target - engine->smooth_vibrato_depth);
+    float vibrato_depth = engine->smooth_vibrato_depth;
+    float lfo_mid = engine->lfo_output_buffer[num_frames / 2];
+    float vibrato_semitones = lfo_mid * vibrato_depth * 2.0f;
 
     // ── Voice coupling: partner envelope → pitch modulation ──
     float coupling_offset = 0.0f;
     {
-        float coupling = engine->coupling_depth.load(std::memory_order_relaxed);
+        float cp_target = engine->coupling_depth.load(std::memory_order_relaxed);
+        engine->smooth_coupling_depth += sc * (cp_target - engine->smooth_coupling_depth);
+        float coupling = engine->smooth_coupling_depth;
         if (coupling > 0.001f) {
             int partner = (idx % 2 == 0) ? idx + 1 : idx - 1;
             if (partner >= 0 && partner < kNumVoices) {
@@ -434,15 +442,17 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     mod_signal = engine->voice_last_output[fm_source];
                 }
             } else if (src == 2) { // LFO
-                mod_signal = engine->lfo_output_value;
+                mod_signal = lfo_mid;
             } else if (src == 3) { // FLUX (Marbles CV)
                 mod_signal = engine->marbles_cv_output[duo % 2];
             }
             // src == 1 (OFF) leaves mod_signal = 0.0f
-            float md = engine->mod_depth[duo].load(std::memory_order_relaxed);
-            float fd = engine->fm_depth[duo].load(std::memory_order_relaxed);
-            timbre_mod_offset = mod_signal * md;
-            fm_mod_semitones = mod_signal * fd * 24.0f;
+            float md_target = engine->mod_depth[duo].load(std::memory_order_relaxed);
+            float fd_target = engine->fm_depth[duo].load(std::memory_order_relaxed);
+            engine->smooth_mod_depth[duo] += sc * (md_target - engine->smooth_mod_depth[duo]);
+            engine->smooth_fm_depth[duo] += sc * (fd_target - engine->smooth_fm_depth[duo]);
+            timbre_mod_offset = mod_signal * engine->smooth_mod_depth[duo];
+            fm_mod_semitones = mod_signal * engine->smooth_fm_depth[duo] * 24.0f;
         }
     }
 
@@ -467,8 +477,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float morph_val = vp.morph.load(std::memory_order_relaxed);
         float detune_semitones = morph_val * (50.0f / 100.0f);  // 0-0.5 semitones
 
-        float note = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones + bend_offset + detune_semitones;
-        float freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
+        float base_note = vp.tune.load(std::memory_order_relaxed) + coupling_offset + fm_mod_semitones + bend_offset + detune_semitones;
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
 
         // Compute ADSR parameters from envSpeed
@@ -478,6 +487,12 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         float voice_peak = 0.0f;
         for (int i = 0; i < num_frames; i++) {
+            // Per-sample LFO vibrato modulation
+            float lfo_i = engine->lfo_output_buffer[i];
+            float vib_semi = lfo_i * vibrato_depth * 2.0f;
+            float note = base_note + vib_semi;
+            float freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
+
             // Self-feedback: previous output modulates phase for FM-like timbre
             float fb_offset = osc.prev_output * feedback_amount * 0.3f;
 
@@ -745,12 +760,24 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
 
-    if (engine->rings_bypass.load(std::memory_order_relaxed)) {
-        std::memcpy(out_l, in, num_frames * sizeof(float));
-        std::memcpy(out_r, in, num_frames * sizeof(float));
-        return;
+    // moduleIndex distinguishes main resonator (0) from drum resonator (1)
+    bool is_drum = u->state.module.index == 1;
+
+    if (is_drum) {
+        if (engine->rings_drum_bypass.load(std::memory_order_relaxed)) {
+            std::memcpy(out_l, in, num_frames * sizeof(float));
+            std::memcpy(out_r, in, num_frames * sizeof(float));
+            return;
+        }
+    } else {
+        if (engine->rings_bypass.load(std::memory_order_relaxed)) {
+            std::memcpy(out_l, in, num_frames * sizeof(float));
+            std::memcpy(out_r, in, num_frames * sizeof(float));
+            return;
+        }
     }
 
+    // Both resonators share the same parameter values (controlled from same UI)
     rings::Patch rings_patch;
     rings_patch.structure = engine->rings_structure.load(std::memory_order_relaxed);
     rings_patch.brightness = engine->rings_brightness.load(std::memory_order_relaxed);
@@ -765,14 +792,19 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     perf.internal_strum = false;
     perf.internal_note = false;
 
-    int strum = engine->rings_strum.load(std::memory_order_relaxed);
-    perf.strum = strum != 0;
-    if (strum) engine->rings_strum.store(0, std::memory_order_relaxed);
+    // Pick the right Part instance
+    rings::Part& part = is_drum ? engine->rings_drum_part : engine->rings_part;
 
-    engine->rings_part.set_model(
+    if (!is_drum) {
+        int strum = engine->rings_strum.load(std::memory_order_relaxed);
+        perf.strum = strum != 0;
+        if (strum) engine->rings_strum.store(0, std::memory_order_relaxed);
+    }
+
+    part.set_model(
         static_cast<rings::ResonatorModel>(
             engine->rings_model.load(std::memory_order_relaxed)));
-    engine->rings_part.set_polyphony(
+    part.set_polyphony(
         engine->rings_polyphony.load(std::memory_order_relaxed));
 
     int frames_done = 0;
@@ -783,8 +815,8 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         float out_buf[rings::kMaxBlockSize];
         float aux_buf[rings::kMaxBlockSize];
 
-        engine->rings_part.Process(perf, rings_patch,
-                                    in + frames_done, out_buf, aux_buf, block);
+        part.Process(perf, rings_patch,
+                     in + frames_done, out_buf, aux_buf, block);
 
         perf.strum = false; // Only trigger on first block
 
@@ -796,8 +828,10 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         frames_done += block;
     }
 
-    // RESONATOR aux source (4) for warps routing
-    std::memcpy(engine->warps_source_buffers[4], out_r, num_frames * sizeof(float));
+    // RESONATOR aux source (4) for warps routing (main resonator only)
+    if (!is_drum) {
+        std::memcpy(engine->warps_source_buffers[4], out_r, num_frames * sizeof(float));
+    }
 }
 
 void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
@@ -893,8 +927,8 @@ void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames
         return;
     }
 
-    const float mix = engine->delay_mix.load(std::memory_order_relaxed);
-    const float fb = std::min(engine->delay_feedback.load(std::memory_order_relaxed), 0.95f);
+    float mix_target = engine->delay_mix.load(std::memory_order_relaxed);
+    float fb_target = std::min(engine->delay_feedback.load(std::memory_order_relaxed), 0.95f);
     const float mod_depth_1 = engine->delay_mod_depth_1.load(std::memory_order_relaxed);
     const float mod_depth_2 = engine->delay_mod_depth_2.load(std::memory_order_relaxed);
 
@@ -902,13 +936,20 @@ void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames
     float base_time_1 = 0.01f + engine->delay_time_1.load(std::memory_order_relaxed) * 1.99f;
     float base_time_2 = 0.01f + engine->delay_time_2.load(std::memory_order_relaxed) * 1.99f;
 
-    const float dry = 1.0f - mix;
     const int max_d = OrpheusEngine::kMaxDelaySamples;
 
     // Smooth delay times (~20ms ramp)
     const float smooth = 1.0f - std::exp(-1.0f / (0.02f * sr));
+    float coeff = smooth_coeff(sr);
 
     for (int i = 0; i < num_frames; i++) {
+        // Per-sample smoothing for mix and feedback
+        engine->smooth_delay_mix += coeff * (mix_target - engine->smooth_delay_mix);
+        engine->smooth_delay_feedback += coeff * (fb_target - engine->smooth_delay_feedback);
+        float mix = engine->smooth_delay_mix;
+        float fb = engine->smooth_delay_feedback;
+        float dry = 1.0f - mix;
+
         // LFO modulation: convert -1..1 to 0..1 unipolar, scale by mod depth
         float lfo_uni = (lfo_in[i] + 1.0f) * 0.5f;
         float mod_time_1 = (base_time_1 + lfo_uni * mod_depth_1) * sr;
@@ -983,8 +1024,8 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             float ua = a * 0.5f + 0.5f;
             float ub = b * 0.5f + 0.5f;
             output = (ua + ub - ua * ub) * 2.0f - 1.0f;
-        } else { // OFF (mode=1) — use A only
-            output = a;
+        } else { // OFF (mode=1) — silence
+            output = 0.0f;
         }
         out[i] = output;
 
@@ -997,6 +1038,7 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     engine->lfo_phase_a = phase_a;
     engine->lfo_phase_b = phase_b;
     engine->lfo_output_value = output; // last sample for monitoring
+    std::memcpy(engine->lfo_output_buffer, out, num_frames * sizeof(float));
 
     // LFO source (3) for warps routing
     std::memcpy(engine->warps_source_buffers[3], out, num_frames * sizeof(float));
@@ -1239,11 +1281,12 @@ void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine,
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
 
     // Load parameters
-    const float amount = engine->reverb_amount.load(std::memory_order_relaxed);
+    float amount_target = engine->reverb_amount.load(std::memory_order_relaxed);
     const float krt    = engine->reverb_time.load(std::memory_order_relaxed);
     const float klp    = engine->reverb_damping.load(std::memory_order_relaxed);
     const float kap    = engine->reverb_diffusion.load(std::memory_order_relaxed);
     const float gain   = 0.5f;  // inputGain
+    float rv_coeff = smooth_coeff(sample_rate);
 
     // Reference delay lengths at 48kHz, scaled to runtime sample rate
     const float rr = sample_rate / 48000.0f;
@@ -1351,6 +1394,8 @@ void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine,
         ALLPASS(dap1a_base, dap1a_len, acc, -kap, acc);
         ALLPASS(dap1b_base, dap1b_len, acc,  kap, acc);
         WB(del1_base, acc);
+        engine->smooth_reverb_amount += rv_coeff * (amount_target - engine->smooth_reverb_amount);
+        float amount = engine->smooth_reverb_amount;
         out_l[i] = acc * 2.0f * amount;
 
         // Path 2 (right output)

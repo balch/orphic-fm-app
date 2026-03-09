@@ -183,7 +183,12 @@ class DspSynthEngine @Inject constructor(
             // Sync tune with correct MIDI note conversion
             bridge.nativeSetVoiceTune(voiceA, tuneToMidiNote(voiceA, voiceManager.getVoiceTune(voiceA)))
             bridge.nativeSetVoiceTune(voiceA + 1, tuneToMidiNote(voiceA + 1, voiceManager.getVoiceTune(voiceA + 1)))
-            log.info { "syncNative: duo=$duo engine=$engineOrdinal→cpp=$cppIndex active=true" }
+            // Sync mod source and depth
+            val modSrc = voiceManager.getDuoModSource(duo)
+            val modLvl = voiceManager.getDuoModSourceLevel(duo)
+            bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_$duo", modSrc.ordinal.toFloat())
+            bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_level_$duo", modLvl)
+            log.debug { "syncNative: duo=$duo engine=$engineOrdinal→cpp=$cppIndex active=true modSrc=$modSrc modLvl=$modLvl" }
         }
         // Sync per-quad volume
         for (quad in 0..2) {
@@ -891,6 +896,14 @@ class DspSynthEngine @Inject constructor(
         wiringGraph.drumDirectResoWetGainR.inputB.set(finalWet)
         wiringGraph.drumDirectResoDryGainL.inputB.set(finalDry)
         wiringGraph.drumDirectResoDryGainR.inputB.set(finalDry)
+
+        // Forward to C++ engine
+        val wetF = finalWet.toFloat()
+        val dryF = finalDry.toFloat()
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_reso_wet_l", wetF)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_reso_wet_r", wetF)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_reso_dry_l", dryF)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_reso_dry_r", dryF)
     }
 
     private fun strumResonator(frequency: Float) {

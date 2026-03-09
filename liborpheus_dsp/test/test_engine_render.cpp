@@ -90,6 +90,7 @@ static bool test_mod_source_routing() {
             render_voice(&v1, engine, 12000);
         } else if (configs[c].mod_source == 2) {
             engine->lfo_output_value = 0.7f;
+            for (int i = 0; i < kMaxFrames; i++) engine->lfo_output_buffer[i] = 0.7f;
         } else if (configs[c].mod_source == 3) {
             engine->marbles_cv_output[0] = 2.5f;
         }

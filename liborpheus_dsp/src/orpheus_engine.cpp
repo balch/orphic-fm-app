@@ -36,10 +36,15 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     // Zero-init parameters to avoid undefined fields (stereo_spread, trigger, gate)
     std::memset(engine->clouds_processor.mutable_parameters(), 0, sizeof(clouds::Parameters));
 
-    // Initialize Rings resonator
+    // Initialize Rings resonator (main)
     engine->rings_part.Init(engine->rings_reverb_buffer);
     engine->rings_part.set_model(rings::RESONATOR_MODEL_MODAL);
     engine->rings_part.set_polyphony(1);
+
+    // Initialize Rings resonator (drum direct path)
+    engine->rings_drum_part.Init(engine->rings_drum_reverb_buffer);
+    engine->rings_drum_part.set_model(rings::RESONATOR_MODEL_MODAL);
+    engine->rings_drum_part.set_polyphony(1);
 
     // Initialize Warps modulator
     engine->warps_modulator.Init(engine->sample_rate);
@@ -209,7 +214,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine_hash16("duo_mod_source_level_4"), engine_hash16("duo_mod_source_level_5")};
             for (int i = 0; i < 6; i++) {
                 if (symbol_hash == src_hashes[i]) { engine->mod_source[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
-                if (symbol_hash == lvl_hashes[i]) { engine->mod_depth[i].store(value, std::memory_order_relaxed); return; }
+                if (symbol_hash == lvl_hashes[i]) { engine->mod_depth[i].store(value, std::memory_order_relaxed); engine->fm_depth[i].store(value, std::memory_order_relaxed); return; }
             }
         }
     }

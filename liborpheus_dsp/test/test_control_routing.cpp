@@ -76,6 +76,7 @@ static bool test_mod_source_port_routing() {
         orpheus_engine_set_port(engine, tc.uri, tc.src_symbol, 2.0f);  // LFO
         orpheus_engine_set_port(engine, tc.uri, tc.depth_symbol, 0.8f);
         engine->lfo_output_value = 0.7f;  // simulate running LFO
+        for (int i = 0; i < kMaxFrames; i++) engine->lfo_output_buffer[i] = 0.7f;
 
         int actual_src = engine->mod_source[0].load();
         float actual_depth = engine->mod_depth[0].load();
@@ -310,6 +311,7 @@ static bool test_mod_source_depth_integration() {
     orpheus_engine_set_port(eng_mod, "org.balch.orpheus.plugins.modulation",
                             "mod_depth_0", 0.8f);
     eng_mod->lfo_output_value = 0.7f;
+    for (int i = 0; i < kMaxFrames; i++) eng_mod->lfo_output_buffer[i] = 0.7f;
 
     // Verify values were stored
     int src = eng_mod->mod_source[0].load();

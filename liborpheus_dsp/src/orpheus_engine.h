@@ -95,7 +95,7 @@ struct OrpheusEngine {
     std::atomic<int>   clouds_mode{0};       // PlaybackMode enum
     std::atomic<int>   clouds_bypass{1};     // bypassed by default
 
-    // Rings resonator
+    // Rings resonator (main)
     rings::Part rings_part;
     uint16_t rings_reverb_buffer[32768];  // 64KB reverb buffer for Rings
 
@@ -112,6 +112,13 @@ struct OrpheusEngine {
     std::atomic<int>   rings_internal_exciter{1}; // use internal noise exciter
     std::atomic<float> resonator_target_mix{0.5f};     // 0=drum, 0.5=both, 1=synth
     std::atomic<float> resonator_mix{0.5f};            // wet/dry
+
+    // Rings resonator (drum direct path, moduleIndex=1)
+    rings::Part rings_drum_part;
+    uint16_t rings_drum_reverb_buffer[32768];
+    // Drum resonator shares the same parameter values as main resonator by default,
+    // but has its own processor instance for independent DSP state
+    std::atomic<int>   rings_drum_bypass{0};   // enabled by default (drum MAIN path)
 
     // Warps modulator
     warps::Modulator warps_modulator;
@@ -221,6 +228,19 @@ struct OrpheusEngine {
     float delay_time_1_smooth{0.0f};
     float delay_time_2_smooth{0.0f};
 
+    // ── Parameter smoothing (prevents clicks on gain/level changes) ──
+    // Smoothed shadows for atomic parameters that multiply audio signals.
+    // Updated per-sample with one-pole filter (~5ms ramp).
+    float smooth_drive_mix{0.0f};
+    float smooth_delay_mix{0.0f};
+    float smooth_delay_feedback{0.3f};
+    float smooth_master_pan{0.0f};
+    float smooth_vibrato_depth{0.0f};
+    float smooth_coupling_depth{0.0f};
+    float smooth_reverb_amount{0.0f};
+    float smooth_mod_depth[kNumDuos] = {};
+    float smooth_fm_depth[kNumDuos] = {};
+
     // ── Vibrato (LFO → pitch modulation) ─────────────────────
     std::atomic<float> vibrato_depth{0.0f};    // 0..1 → 0..2 semitones pitch mod
 
@@ -228,6 +248,7 @@ struct OrpheusEngine {
     float lfo_phase_a{0.0f};
     float lfo_phase_b{0.0f};
     float lfo_output_value{0.0f};              // latest output for monitoring
+    float lfo_output_buffer[kMaxFrames]{};     // per-sample LFO output for modulation
 
     std::atomic<float> lfo_freq_a{1.0f};       // Hz
     std::atomic<float> lfo_freq_b{1.0f};       // Hz
