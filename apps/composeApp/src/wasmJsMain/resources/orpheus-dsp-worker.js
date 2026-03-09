@@ -38,11 +38,11 @@ const CMD_LOAD_GRAPH        = 30;
 /* ── State ── */
 let Module       = null;   // Emscripten module instance
 let engine       = 0;      // Pointer returned by _wasm_engine_create
-let outputPtr    = 0;      // WASM heap pointer for interleaved output
 let workletPort  = null;   // MessagePort to AudioWorklet
 let renderTimer  = null;   // setInterval handle
 let queueDepth   = 0;      // Latest reported queue depth from worklet
 let running      = false;
+let pendingMessages = [];   // Commands queued before WASM module loads
 
 /* ── Load Emscripten module ── */
 importScripts('orpheus_dsp.js');
@@ -51,7 +51,24 @@ OrpheusDSP().then(mod => {
     Module = mod;
     console.log('[DSP-Worker] WASM module loaded');
     postMessage({ type: 'ready' });
+
+    // Replay any commands that arrived before the module was ready
+    const pending = pendingMessages;
+    pendingMessages = null; // Signal that module is ready
+    for (const msg of pending) {
+        handleCommand(msg);
+    }
 });
+
+/** Get a fresh Float32Array view of WASM memory (safe after memory growth) */
+function getHeapF32() {
+    return new Float32Array(Module.wasmMemory.buffer);
+}
+
+/** Get a fresh Uint8Array view of WASM memory (safe after memory growth) */
+function getHeapU8() {
+    return new Uint8Array(Module.wasmMemory.buffer);
+}
 
 /* ── Render loop ── */
 function startRenderLoop() {
@@ -79,18 +96,23 @@ function renderTick() {
     const t0 = performance.now();
 
     for (let i = 0; i < buffersNeeded; i++) {
-        // Render one quantum of interleaved stereo audio into WASM heap
-        Module._wasm_engine_process(engine, outputPtr, RENDER_QUANTUM);
+        // Render one quantum into the internal WASM output buffer
+        Module._wasm_engine_process(engine, RENDER_QUANTUM);
 
-        // De-interleave from HEAPF32 into separate L/R arrays
-        // outputPtr is a byte offset; HEAPF32 is indexed by float (4 bytes)
+        // Get the output pointer (stable across calls, allocated once)
+        const outputPtr = Module._wasm_get_output_ptr();
+
+        // Create fresh heap view each iteration (safe after memory growth)
+        const heap = getHeapF32();
         const floatOffset = outputPtr >> 2;
+
+        // De-interleave from WASM heap into separate L/R arrays
         const left  = new Float32Array(RENDER_QUANTUM);
         const right = new Float32Array(RENDER_QUANTUM);
 
         for (let s = 0; s < RENDER_QUANTUM; s++) {
-            left[s]  = Module.HEAPF32[floatOffset + s * 2];
-            right[s] = Module.HEAPF32[floatOffset + s * 2 + 1];
+            left[s]  = heap[floatOffset + s * 2];
+            right[s] = heap[floatOffset + s * 2 + 1];
         }
 
         // Transfer to worklet (zero-copy)
@@ -102,7 +124,8 @@ function renderTick() {
 
     const elapsed = performance.now() - t0;
     // CPU load: time spent rendering vs. real-time equivalent of buffers produced
-    const realTimeDuration = (buffersNeeded * RENDER_QUANTUM / 48000) * 1000;
+    const sampleRate = 48000; // C++ engine uses 48kHz
+    const realTimeDuration = (buffersNeeded * RENDER_QUANTUM / sampleRate) * 1000;
     if (realTimeDuration > 0) {
         postMessage({ type: 'monitor', cpuLoad: elapsed / realTimeDuration });
     }
@@ -112,6 +135,17 @@ function renderTick() {
 onmessage = function(e) {
     const msg = e.data;
 
+    // Queue commands that arrive before WASM module is loaded
+    if (pendingMessages !== null) {
+        console.log('[DSP-Worker] Queuing cmd ' + msg.cmd + ' (module loading)');
+        pendingMessages.push(msg);
+        return;
+    }
+
+    handleCommand(msg);
+};
+
+function handleCommand(msg) {
     switch (msg.cmd) {
         case CMD_INIT: {
             workletPort = msg.workletPort;
@@ -124,16 +158,12 @@ onmessage = function(e) {
                 }
             };
 
-            if (!Module) {
-                console.error('[DSP-Worker] CMD_INIT received before module loaded');
-                return;
-            }
-
-            // Create engine and allocate output buffer
+            // Create engine
             engine = Module._wasm_engine_create(sampleRate);
-            outputPtr = Module._wasm_alloc_output(RENDER_QUANTUM);
+            // Pre-allocate output buffer (stays allocated across process calls)
+            Module._wasm_alloc_output(RENDER_QUANTUM);
             console.log('[DSP-Worker] Engine created, sampleRate=' + sampleRate +
-                        ', engine=' + engine + ', outputPtr=' + outputPtr);
+                        ', engine=' + engine);
             break;
         }
 
@@ -146,7 +176,7 @@ onmessage = function(e) {
             break;
 
         case CMD_SET_PORT:
-            if (engine && Module) {
+            if (engine) {
                 Module.ccall(
                     'wasm_engine_set_port', null,
                     ['number', 'string', 'string', 'number'],
@@ -156,97 +186,97 @@ onmessage = function(e) {
             break;
 
         case CMD_VOICE_GATE:
-            if (engine && Module) {
-                Module._wasm_engine_voice_gate(engine, msg.idx, msg.gate ? 1 : 0);
+            if (engine) {
+                Module._wasm_engine_set_voice_gate(engine, msg.idx, msg.gate ? 1 : 0);
             }
             break;
 
         case CMD_VOICE_TUNE:
-            if (engine && Module) {
-                Module._wasm_engine_voice_tune(engine, msg.idx, msg.val);
+            if (engine) {
+                Module._wasm_engine_set_voice_tune(engine, msg.idx, msg.val);
             }
             break;
 
         case CMD_TRIGGER_DRUM:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_trigger_drum(engine, msg.idx, msg.accent);
             }
             break;
 
         case CMD_VOICE_ENGINE:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_voice_engine(engine, msg.idx, msg.val);
             }
             break;
 
         case CMD_VOICE_ACTIVE:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_voice_active(engine, msg.idx, msg.val);
             }
             break;
 
         case CMD_VOICE_HOLD:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_voice_hold(engine, msg.idx, msg.val);
             }
             break;
 
         case CMD_VOICE_HARMONICS:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_voice_harmonics(engine, msg.idx, msg.val);
             }
             break;
 
         case CMD_VOICE_TIMBRE:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_voice_timbre(engine, msg.idx, msg.val);
             }
             break;
 
         case CMD_VOICE_MORPH:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_voice_morph(engine, msg.idx, msg.val);
             }
             break;
 
         case CMD_VOICE_DECAY:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_voice_decay(engine, msg.idx, msg.val);
             }
             break;
 
         case CMD_SET_MASTER_VOLUME:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_master_volume(engine, msg.val);
             }
             break;
 
         case CMD_SET_DRIVE:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_drive(engine, msg.val);
             }
             break;
 
         case CMD_SET_DELAY_MIX:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_delay_mix(engine, msg.val);
             }
             break;
 
         case CMD_SET_VIBRATO:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_vibrato(engine, msg.val);
             }
             break;
 
         case CMD_SET_BEND:
-            if (engine && Module) {
+            if (engine) {
                 Module._wasm_engine_set_bend(engine, msg.val);
             }
             break;
 
         case CMD_LOAD_GRAPH: {
-            if (!engine || !Module) {
+            if (!engine) {
                 console.error('[DSP-Worker] CMD_LOAD_GRAPH: engine not ready');
                 return;
             }
@@ -257,8 +287,8 @@ onmessage = function(e) {
                 console.error('[DSP-Worker] CMD_LOAD_GRAPH: malloc failed for ' + len + ' bytes');
                 return;
             }
-            Module.HEAPU8.set(graphData, ptr);
-            Module._wasm_engine_load_graph(engine, ptr, len);
+            getHeapU8().set(graphData, ptr);
+            Module._wasm_engine_load_patch(engine, ptr, len);
             Module._free(ptr);
             console.log('[DSP-Worker] Graph loaded, ' + len + ' bytes');
             break;
@@ -268,4 +298,4 @@ onmessage = function(e) {
             console.log('[DSP-Worker] Unknown command: ' + msg.cmd);
             break;
     }
-};
+}

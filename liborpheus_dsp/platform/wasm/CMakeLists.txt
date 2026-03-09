@@ -141,7 +141,7 @@ target_link_options(orpheus_dsp PRIVATE
     --no-entry
 
     # Runtime methods accessible from JS
-    -sEXPORTED_RUNTIME_METHODS=ccall,cwrap
+    -sEXPORTED_RUNTIME_METHODS=ccall,cwrap,HEAPF32,HEAPU8,wasmMemory
     -sEXPORTED_FUNCTIONS=_malloc,_free
 
     # Optimisation

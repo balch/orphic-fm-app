@@ -10,7 +10,7 @@ Orphic-FM is an 8-oscillator Synthesizer Emulator combining sounds and harmonics
 
 This instrument is inspired by the [Lyra-8 Orgasmic Synthesizer](https://somasynths.com/lyra-organismic-synthesizer/) and adds additional synthesis engines ported from the awesome OSS [Mutable Instruments' Eurorack firmware](https://github.com/pichenettes/eurorack) repository – FM, virtual analog, granular, physical modeling strings, modal resonators, additive, waveshaping, speech synthesis, and four drum voices.
 
-Under the hood, **Desktop** uses [JSyn](http://www.softsynth.com/jsyn/) for real-time audio synthesis -- a high-performance engine wrapped in a Java API that works for Kotlin JVM. I mainly run the app on **desktop** for its form and **CPU** capabilities, but I also needed an Android Mobile version to play around with on my phone. **Android** uses [Oboe](https://github.com/google/oboe) (Google's C++ low-latency audio library) with a fully Kotlin-native DSP graph running at 48kHz.
+Under the hood, a shared **C++ DSP engine** (`liborpheus_dsp/`) ports the Eurorack firmware and provides a graph-based audio routing system. On **Android**, it runs natively via [Oboe](https://github.com/google/oboe) (Google's C++ low-latency audio library) at 48kHz. On **WASM**, the same C++ code is compiled to WebAssembly via [Emscripten](https://emscripten.org/) and runs in a Web Worker. **Desktop** uses [JSyn](http://www.softsynth.com/jsyn/) for real-time audio synthesis, with an optional C++ engine mode (`-Dorpheus.engine=cpp`) via JNI.
 
 I had multiple motivations for building this project, but I mainly did it because I've always wanted to build some kind of instrument, and now AI agents make that possible. AI played a big part in the development, and it will be interesting to see what happens as Orpheus learns to master the synth. 
 
@@ -64,7 +64,7 @@ core/plugins/        14 self-contained DSP plugin modules
 features/            20+ UI feature modules (Compose + ViewModel, MVI)
 ui/theme, ui/widgets Dark synth theme, knobs, sliders, collapsible panels
 apps/composeApp/     App wiring: signal routing, voice management, DI
-apps/dspWorker/      WASM Web Worker for off-main-thread DSP processing
+liborpheus_dsp/      C++ DSP engine (Plaits, effects, graph routing)
 build-logic/         Convention plugins for consistent KMP module config
 ```
 
@@ -100,28 +100,33 @@ The fusion algorithm boosts confidence when both classifiers agree and penalizes
 
 | Platform | Audio | Status |
 |----------|-------|--------|
-| Desktop (JVM) | JSyn | Primary target |
-| Android | Oboe (C++ / JNI) + Kotlin DSP | Full support |
-| wasmJs | Kotlin DSP → AudioWorklet | Functional ([orphic.fm](https://orphic.fm/)) |
+| Desktop (JVM) | JSyn (default) or C++ via JNI | Primary target |
+| Android | Oboe (C++ / JNI) at 48kHz | Full support |
+| wasmJs | C++ DSP → Emscripten WASM → AudioWorklet | Functional ([orphic.fm](https://orphic.fm/)) |
 | iOS | -- | Skeleton |
 
-The **WASM** target runs the full Kotlin DSP engine compiled to WebAssembly. Audio is rendered via `setInterval` into ring buffers that feed an `AudioWorkletNode` for gapless playback. An optional **Web Worker** mode (`?worker` URL flag) moves DSP processing off the main thread so Compose UI recomposition doesn't starve the audio render timer. The main thread keeps a local shadow of engine state for UI reads while forwarding parameter changes to the Worker via `postMessage`.
+The **WASM** target compiles the C++ DSP engine to WebAssembly via Emscripten. Audio runs in a Web Worker that renders 128-frame buffers and posts them to an `AudioWorkletNode` for gapless playback. The main thread keeps a local shadow of engine state for UI reads while forwarding parameter changes to the Worker via `postMessage`. A fallback Kotlin DSP mode is available with `?noworker`.
 
 ## Build & Run
 
-### Configuration
+```bash
+# Desktop (JSyn audio)
+./gradlew :apps:composeApp:run
 
-**AI API Keys (optional):** The AI agent feature requires API keys. Create or edit `local.properties` in the project root and add:
+# Desktop with C++ DSP engine
+./gradlew buildDesktopNative && ./gradlew :apps:composeApp:run -Dorpheus.engine=cpp
 
-```properties
-# Gemini API Key - https://ai.google.dev/
-GEMINI_API_KEY=your_gemini_api_key_here
+# Android
+./gradlew :apps:androidApp:installDebugRelease
 
-# Anthropic API Key - https://console.anthropic.com/
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# WASM (opens browser at localhost:8080)
+./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun
+
+# Desktop release (dmg/msi/deb depending on OS)
+./gradlew :apps:composeApp:packageReleaseDistributionForCurrentOS
 ```
 
-> `local.properties` is gitignored and will not be committed. The keys are injected at build time via [BuildKonfig](https://github.com/nichenqin/buildkonfig). The app builds and runs without them allowing the user to add their own AI API key at runtime.
+See **[BUILD.md](BUILD.md)** for prerequisites, platform details, C++ DSP builds, Emscripten setup, and configuration. See **[TESTS.md](TESTS.md)** for testing strategies, C++ test suites, and cross-platform verification.
 
 ### Hand Tracking (Desktop)
 
@@ -164,37 +169,6 @@ curl -L -o core/mediapipe/src/jvmMain/resources/models/hand_landmarker.task \
 
 </details>
 
-### JDK Requirement
-
-Desktop packaging (`packageReleaseDistributionForCurrentOS`) requires a full JDK 17+ with `jpackage` — the standard `run` task works without it. Android Studio's bundled JBR does **not** include `jpackage`. If you see `'jpackage' is missing`, add this to `local.properties`:
-
-```properties
-org.gradle.java.home=/path/to/your/full/jdk
-```
-
-For example on macOS with [jenv](https://www.jenv.be/): `org.gradle.java.home=/Users/you/.jenv/versions/21`
-
-> **Note:** The `.java-version` file pins JDK 21 (current LTS). JDK 17 is the minimum supported version.
-
-### Commands
-
-```bash
-# Desktop
-./gradlew :apps:composeApp:run
-
-# Android
-./gradlew :apps:androidApp:installDebugRelease
-
-# WASM (opens browser at localhost:8080)
-./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun
-
-# Desktop release (dmg/msi/deb depending on OS)
-./gradlew :apps:composeApp:packageReleaseDistributionForCurrentOS
-
-# Full build
-./gradlew build
-```
-
 ## Dependencies
 
 | Dependency                                                                         | Description                                                                                                      |
@@ -220,5 +194,6 @@ For example on macOS with [jenv](https://www.jenv.be/): `org.gradle.java.home=/U
 | [MediaPipe](https://ai.google.dev/edge/mediapipe/solutions/guide)                  | Hand landmark detection and gesture recognition ([Tasks SDK](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker) on Android, C API via JNI on Desktop) |
 | [AndroidX CameraX](https://developer.android.com/jetpack/androidx/releases/camera) | Camera capture and lifecycle management on Android                                                               |
 | [JavaCV](https://github.com/bytedeco/javacv)                                       | Camera capture on Desktop (FFmpeg/avfoundation)                                                                  |
+| [Emscripten](https://emscripten.org/)                                              | C++ to WebAssembly compiler for WASM DSP engine                                                                  |
 
 **License:** [GNU GPLv3](LICENSE)
