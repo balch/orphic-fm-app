@@ -21,11 +21,18 @@ const CMD_SET_PORT          = 10;
 const CMD_VOICE_GATE        = 11;
 const CMD_VOICE_TUNE        = 12;
 const CMD_TRIGGER_DRUM      = 13;
+const CMD_VOICE_ENGINE      = 14;
+const CMD_VOICE_ACTIVE      = 15;
+const CMD_VOICE_HOLD        = 16;
+const CMD_VOICE_HARMONICS   = 17;
+const CMD_VOICE_TIMBRE      = 18;
+const CMD_VOICE_MORPH       = 19;
 const CMD_SET_MASTER_VOLUME = 20;
 const CMD_SET_DRIVE         = 21;
 const CMD_SET_DELAY_MIX     = 22;
 const CMD_SET_VIBRATO       = 23;
 const CMD_SET_BEND          = 24;
+const CMD_VOICE_DECAY       = 25;
 const CMD_LOAD_GRAPH        = 30;
 
 /* ── State ── */
@@ -163,6 +170,48 @@ onmessage = function(e) {
         case CMD_TRIGGER_DRUM:
             if (engine && Module) {
                 Module._wasm_engine_trigger_drum(engine, msg.idx, msg.accent);
+            }
+            break;
+
+        case CMD_VOICE_ENGINE:
+            if (engine && Module) {
+                Module._wasm_engine_set_voice_engine(engine, msg.idx, msg.val);
+            }
+            break;
+
+        case CMD_VOICE_ACTIVE:
+            if (engine && Module) {
+                Module._wasm_engine_set_voice_active(engine, msg.idx, msg.val);
+            }
+            break;
+
+        case CMD_VOICE_HOLD:
+            if (engine && Module) {
+                Module._wasm_engine_set_voice_hold(engine, msg.idx, msg.val);
+            }
+            break;
+
+        case CMD_VOICE_HARMONICS:
+            if (engine && Module) {
+                Module._wasm_engine_set_voice_harmonics(engine, msg.idx, msg.val);
+            }
+            break;
+
+        case CMD_VOICE_TIMBRE:
+            if (engine && Module) {
+                Module._wasm_engine_set_voice_timbre(engine, msg.idx, msg.val);
+            }
+            break;
+
+        case CMD_VOICE_MORPH:
+            if (engine && Module) {
+                Module._wasm_engine_set_voice_morph(engine, msg.idx, msg.val);
+            }
+            break;
+
+        case CMD_VOICE_DECAY:
+            if (engine && Module) {
+                Module._wasm_engine_set_voice_decay(engine, msg.idx, msg.val);
             }
             break;
 

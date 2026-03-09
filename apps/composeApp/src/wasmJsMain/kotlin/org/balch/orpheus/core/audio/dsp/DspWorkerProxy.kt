@@ -167,6 +167,34 @@ fun jsSendVoiceTuneCmd(index: Int, tune: Float): Unit =
 fun jsSendTriggerDrumCmd(drumIndex: Int, accent: Float): Unit =
     js("globalThis.__dspWorker.postMessage({ cmd: 13, idx: drumIndex, accent: accent })")
 
+/** Send VOICE_ENGINE command */
+fun jsSendVoiceEngineCmd(index: Int, engineIndex: Int): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 14, idx: index, val: engineIndex })")
+
+/** Send VOICE_ACTIVE command */
+fun jsSendVoiceActiveCmd(index: Int, active: Boolean): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 15, idx: index, val: active ? 1 : 0 })")
+
+/** Send VOICE_HOLD command */
+fun jsSendVoiceHoldCmd(index: Int, level: Float): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 16, idx: index, val: level })")
+
+/** Send VOICE_HARMONICS command */
+fun jsSendVoiceHarmonicsCmd(index: Int, value: Float): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 17, idx: index, val: value })")
+
+/** Send VOICE_TIMBRE command */
+fun jsSendVoiceTimbreCmd(index: Int, value: Float): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 18, idx: index, val: value })")
+
+/** Send VOICE_MORPH command */
+fun jsSendVoiceMorphCmd(index: Int, value: Float): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 19, idx: index, val: value })")
+
+/** Send VOICE_DECAY command */
+fun jsSendVoiceDecayCmd(index: Int, value: Float): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 25, idx: index, val: value })")
+
 /** Send LOAD_GRAPH command with ODWG binary as ArrayBuffer Transferable */
 fun jsSendLoadGraphCmd(bytes: ByteArray): Unit =
     js("(function(){ var a = new Uint8Array(bytes); globalThis.__dspWorker.postMessage({ cmd: 30, graph: a.buffer }, [a.buffer]) })()")

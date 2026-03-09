@@ -4,6 +4,11 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_BEND
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DELAY_MIX
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DRIVE
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_MASTER_VOLUME
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_VIBRATO
 
 /**
  * WASM AudioEngine implementation.
@@ -18,7 +23,7 @@ import dev.zacsweers.metro.SingleIn
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class OrpheusAudioEngine @Inject constructor() : AudioEngine {
+class OrpheusAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
     private val scheduler = DspGraphScheduler()
     private var audioContext: AudioContext? = null
     private var workletNode: AudioWorkletNode? = null
@@ -166,4 +171,80 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine {
     override fun getCpuLoad(): Float = cpuLoadAvg
     override fun getCurrentTime(): Double = audioContext?.currentTime ?: 0.0
 
+    // ─── NativeDspBridge implementation ──────────────────────────────────────
+
+    override fun nativeSetVoiceGate(index: Int, active: Boolean) {
+        jsSendVoiceGateCmd(index, active)
+    }
+
+    override fun nativeSetVoiceTune(index: Int, tune: Float) {
+        jsSendVoiceTuneCmd(index, tune)
+    }
+
+    override fun nativeSetVoiceEngine(index: Int, engineIndex: Int) {
+        jsSendVoiceEngineCmd(index, engineIndex)
+    }
+
+    override fun nativeSetVoiceHarmonics(index: Int, value: Float) {
+        jsSendVoiceHarmonicsCmd(index, value)
+    }
+
+    override fun nativeSetVoiceTimbre(index: Int, value: Float) {
+        jsSendVoiceTimbreCmd(index, value)
+    }
+
+    override fun nativeSetVoiceMorph(index: Int, value: Float) {
+        jsSendVoiceMorphCmd(index, value)
+    }
+
+    override fun nativeSetVoiceDecay(index: Int, value: Float) {
+        jsSendVoiceDecayCmd(index, value)
+    }
+
+    override fun nativeSetVoiceActive(index: Int, active: Boolean) {
+        jsSendVoiceActiveCmd(index, active)
+    }
+
+    override fun nativeSetVoiceHold(index: Int, level: Float) {
+        jsSendVoiceHoldCmd(index, level)
+    }
+
+    override fun nativeSetMasterVolume(value: Float) {
+        jsSendFloatCmd(CMD_SET_MASTER_VOLUME, value)
+    }
+
+    override fun nativeSetDrive(value: Float) {
+        jsSendFloatCmd(CMD_SET_DRIVE, value)
+    }
+
+    override fun nativeSetDelayMix(value: Float) {
+        jsSendFloatCmd(CMD_SET_DELAY_MIX, value)
+    }
+
+    override fun nativeSetVibrato(value: Float) {
+        jsSendFloatCmd(CMD_SET_VIBRATO, value)
+    }
+
+    override fun nativeSetBend(value: Float) {
+        jsSendFloatCmd(CMD_SET_BEND, value)
+    }
+
+    override fun nativeSetPort(uri: String, symbol: String, value: Float) {
+        jsSendSetPortCmd(uri, symbol, value)
+    }
+
+    override fun nativeGetPort(uri: String, symbol: String): Float = 0f
+
+    override fun nativeGetMonitor(out: FloatArray) {
+        // No-op: monitoring handled via separate Worker message channel
+    }
+
+    override fun nativeTriggerDrum(drumIndex: Int, accent: Float) {
+        jsSendTriggerDrumCmd(drumIndex, accent)
+    }
+
+    override fun nativeLoadGraph(data: ByteArray): Int {
+        jsSendLoadGraphCmd(data)
+        return 0
+    }
 }
