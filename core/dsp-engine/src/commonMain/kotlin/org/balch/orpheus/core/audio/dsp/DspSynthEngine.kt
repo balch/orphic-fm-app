@@ -153,6 +153,8 @@ class DspSynthEngine @Inject constructor(
         setDrumTriggerSource(2, 0) // HiHat -> Internal (manual only)
     }
 
+    override fun syncToNative() = syncNativeBridgeState()
+
     /** Push current voice state to C++ engine so it matches Kotlin on startup. */
     private fun syncNativeBridgeState() {
         val bridge = nativeBridge ?: return

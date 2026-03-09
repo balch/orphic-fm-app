@@ -57,7 +57,13 @@ fun main() {
     // Start audio on first user interaction (browser autoplay policy)
     val graphBytes = if (useWorker) buildDefaultWiringGraph() else null
     val startAudio: () -> Unit = if (useWorker) {
-        { workerProxy?.start(graphBytes); Unit }
+        {
+            workerProxy?.start(graphBytes)
+            // Sync voice/parameter state to the C++ worker now that it exists.
+            // The init{} sync ran before the worker was created, so re-sync here.
+            graph.synthEngine.syncToNative()
+            Unit
+        }
     } else {
         { graph.synthEngine.start(); Unit }
     }
