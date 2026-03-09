@@ -204,18 +204,17 @@ tasks.register<Exec>("buildDesktopNative") {
     )
 }
 
-// Copy dspWorker WASM output to composeApp resources for serving alongside the app.
-// The worker entry script (dsp-worker-entry.js) loads dsp-worker.js and the .wasm file.
-val copyDspWorker by tasks.registering(Copy::class) {
-    from(project(":apps:dspWorker").layout.buildDirectory.dir(
-        "dist/wasmJs/developmentExecutable"
-    ))
+// Copy Emscripten WASM DSP module to app resources for serving alongside the app.
+// The worker script (orpheus-dsp-worker.js) loads orpheus_dsp.js which loads orpheus_dsp.wasm.
+val copyWasmDsp by tasks.registering(Copy::class) {
+    from("${rootProject.projectDir}/liborpheus_dsp/platform/wasm/build") {
+        include("orpheus_dsp.js", "orpheus_dsp.wasm")
+    }
     into(layout.buildDirectory.dir("processedResources/wasmJs/main"))
-    dependsOn(":apps:dspWorker:wasmJsBrowserDevelopmentExecutableDistribution")
 }
 
 tasks.named("wasmJsProcessResources") {
-    dependsOn(copyDspWorker)
+    dependsOn(copyWasmDsp)
 }
 
 // BuildKonfig configuration for cross-platform BuildConfig
