@@ -591,7 +591,9 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
 
-        engine->voice_last_output[idx] = voice_peak;
+        // Store last audio sample for VOICE_FM cross-modulation (not peak —
+        // peak gives a DC envelope that sounds like an LFO ramp instead of FM)
+        engine->voice_last_output[idx] = out[num_frames - 1];
 
         // Update peak follower for voice coupling
         engine->voice_envelope[idx] = engine->voice_envelope[idx] * 0.999f
@@ -704,7 +706,9 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
 
-        engine->voice_last_output[idx] = voice_peak;
+        // Store last audio sample for VOICE_FM cross-modulation (not peak —
+        // peak gives a DC envelope that sounds like an LFO ramp instead of FM)
+        engine->voice_last_output[idx] = out[num_frames - 1];
 
         // Update peak follower for voice coupling
         engine->voice_envelope[idx] = engine->voice_envelope[idx] * 0.999f

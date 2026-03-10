@@ -156,7 +156,7 @@ struct OrpheusEngine {
 
     // ── Mod Source Routing + FM ─────────────────────────
     static constexpr int kNumDuos = 6;
-    float voice_last_output[kNumVoices] = {};          // previous block's peak output
+    float voice_last_output[kNumVoices] = {};          // previous block's last audio sample (for VOICE_FM cross-mod)
     float marbles_cv_output[2] = {};                   // cached Marbles X1/X2 CV
     std::atomic<int> mod_source[kNumDuos] = {};        // per-duo: 0=VOICE_FM, 1=OFF, 2=LFO, 3=FLUX (Kotlin ModSource ordinals)
     std::atomic<float> mod_depth[kNumDuos] = {};       // per-duo timbre mod depth
