@@ -95,8 +95,8 @@ class ResonatorPlugin(
     private val portDefs = ports(startIndex = 8) {
         controlPort(ResonatorSymbol.MODE) {
             intType {
-                min = 0; max = 5
-                options = listOf("Modal", "String", "Sympathetic", "Modaloid", "Stringoid", "Sympatheroid")
+                min = 0; max = 2
+                options = listOf("Bar", "Sitar", "String")
                 get { _mode }
                 set { _mode = it; resonator.setMode(it) }
             }

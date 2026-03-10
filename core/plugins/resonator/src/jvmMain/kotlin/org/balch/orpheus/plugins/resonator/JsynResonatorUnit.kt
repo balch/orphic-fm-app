@@ -31,7 +31,7 @@ class JsynResonatorUnit : UnitGenerator(), ResonatorUnit {
     
     // State
     private var enabled = false
-    private var mode = 0 // 0=Modal, 1=String, 2=Sympathetic
+    private var mode = 0 // 0=Modal, 1=Sympathetic, 2=String (matches C++ ResonatorModel)
     private var structure = 0.25f
     private var brightness = 0.5f
     private var damping = 0.3f
@@ -121,17 +121,17 @@ class JsynResonatorUnit : UnitGenerator(), ResonatorUnit {
                     outputs[i] = modalResonator.outOdd.toDouble()
                     auxOutputs[i] = modalResonator.outEven.toDouble()
                 }
-                1 -> { // String
-                    stringResonator.process(excitation)
-                    outputs[i] = stringResonator.outMain.toDouble()
-                    auxOutputs[i] = stringResonator.outAux.toDouble()
-                }
-                2 -> { // Sympathetic (uses both)
+                1 -> { // Sympathetic (uses both)
                     // Process through modal first, then string
                     modalResonator.process(excitation)
                     stringResonator.process(modalResonator.outOdd)
                     outputs[i] = stringResonator.outMain.toDouble()
                     auxOutputs[i] = modalResonator.outEven.toDouble()
+                }
+                2 -> { // String
+                    stringResonator.process(excitation)
+                    outputs[i] = stringResonator.outMain.toDouble()
+                    auxOutputs[i] = stringResonator.outAux.toDouble()
                 }
                 else -> {
                     outputs[i] = inputSample.toDouble()

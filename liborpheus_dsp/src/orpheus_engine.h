@@ -10,10 +10,8 @@
 // Include MI Clouds granular processor
 #include "clouds/dsp/granular_processor.h"
 
-// Include MI Rings resonator
-#include "rings/dsp/part.h"
-#include "rings/dsp/patch.h"
-#include "rings/dsp/performance_state.h"
+// Orpheus resonator (modal + Karplus-Strong, ported from Kotlin)
+#include "orpheus_resonator.h"
 
 // Include MI Warps modulator
 #include "warps/dsp/modulator.h"
@@ -64,7 +62,7 @@ struct OrpheusEngine {
     VoiceParams voice_params[kNumVoices];
 
     // Master controls
-    std::atomic<float> master_volume{0.8f};
+    std::atomic<float> master_volume{0.7f};
     std::atomic<float> master_pan{0.0f};       // -1..+1, 0 = center
 
     // Per-voice stereo pan (-1..+1, constant-power)
@@ -95,9 +93,8 @@ struct OrpheusEngine {
     std::atomic<int>   clouds_mode{0};       // PlaybackMode enum
     std::atomic<int>   clouds_bypass{1};     // bypassed by default
 
-    // Rings resonator (main)
-    rings::Part rings_part;
-    uint16_t rings_reverb_buffer[32768];  // 64KB reverb buffer for Rings
+    // Orpheus resonator (main)
+    OrpheusResonator resonator;
 
     // Rings parameter atomics (written from UI, read from audio thread)
     std::atomic<float> rings_structure{0.5f};
@@ -106,18 +103,13 @@ struct OrpheusEngine {
     std::atomic<float> rings_position{0.5f};
     std::atomic<float> rings_frequency{60.0f};  // MIDI note
     std::atomic<int>   rings_model{0};          // ResonatorModel enum
-    std::atomic<int>   rings_polyphony{1};
     std::atomic<int>   rings_strum{0};          // trigger: set to 1, audio thread clears
     std::atomic<int>   rings_bypass{1};         // bypassed by default
-    std::atomic<int>   rings_internal_exciter{1}; // use internal noise exciter
     std::atomic<float> resonator_target_mix{0.5f};     // 0=drum, 0.5=both, 1=synth
-    std::atomic<float> resonator_mix{0.5f};            // wet/dry
+    std::atomic<float> resonator_mix{0.0f};            // wet/dry (0=bypass, 1=fully wet)
 
-    // Rings resonator (drum direct path, moduleIndex=1)
-    rings::Part rings_drum_part;
-    uint16_t rings_drum_reverb_buffer[32768];
-    // Drum resonator shares the same parameter values as main resonator by default,
-    // but has its own processor instance for independent DSP state
+    // Orpheus resonator (drum direct path, moduleIndex=1)
+    OrpheusResonator drum_resonator;
     std::atomic<int>   rings_drum_bypass{0};   // enabled by default (drum MAIN path)
 
     // Warps modulator
@@ -235,6 +227,7 @@ struct OrpheusEngine {
     float smooth_delay_mix{0.0f};
     float smooth_delay_feedback{0.3f};
     float smooth_master_pan{0.0f};
+    float smooth_master_volume{0.7f};
     float smooth_vibrato_depth{0.0f};
     float smooth_coupling_depth{0.0f};
     float smooth_reverb_amount{0.0f};

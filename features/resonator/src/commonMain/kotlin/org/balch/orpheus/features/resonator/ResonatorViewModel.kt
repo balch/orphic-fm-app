@@ -2,7 +2,6 @@ package org.balch.orpheus.features.resonator
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -14,17 +13,17 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
 import org.balch.orpheus.core.controller.enumSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 
 enum class ResonatorMode(val displayName: String) {
     MODAL("Bar"),
@@ -38,7 +37,7 @@ enum class ResonatorMode(val displayName: String) {
 @Immutable
 data class ResonatorUiState(
     val mode: ResonatorMode = ResonatorMode.MODAL,
-    val targetMix: Float = 0.5f,     // 0=Drums only, 0.5=Both, 1=Synth only
+    val targetMix: Float = 0.0f,     // 0=Drums only, 0.5=Both, 1=Synth only
     val snapBack: Boolean = false,   // Whether fader snaps back to center on release
     val structure: Float = 0.25f,    // Material/inharmonicity (0-1)
     val brightness: Float = 0.5f,    // High freq content (0-1)
@@ -91,12 +90,12 @@ interface ResonatorFeature : SynthFeature<ResonatorUiState, ResonatorPanelAction
         Physical modeling resonator that transforms any sound into metallic, string-like, or bell tones. Uses modal synthesis to simulate vibrating objects.
 
         ## Modes
-        - **Modal**: Simulates plates and bells. Produces clear, ringing metallic tones with distinct harmonics.
-        - **String**: Karplus-Strong plucked string model. Creates guitar-like and harp-like tones.
-        - **Sympathetic**: Sitar-like sympathetic resonance. Multiple strings ring in response to the input, creating rich, shimmering textures.
+        - **Bar**: Modal resonance — plates and bells with clear, ringing metallic tones.
+        - **Sitar**: Sympathetic string resonance — multiple strings ring together creating shimmering textures.
+        - **String**: Karplus-Strong plucked string — guitar-like and harp-like tones.
 
         ## Controls
-        - **MODE**: Selects the resonance model (Modal / String / Sympathetic).
+        - **MODE**: Selects the resonance model (Bar / Sitar / String).
         - **STRUCTURE**: Harmonic spread and inharmonicity. Low values = clean harmonics; high values = metallic, bell-like inharmonics.
         - **BRIGHTNESS**: High-frequency content of the resonance. Low = dark and muted; high = bright and shimmery.
         - **DAMPING**: How quickly the resonance decays. Low = long, ringing sustain; high = quick, percussive decay.
@@ -114,7 +113,7 @@ interface ResonatorFeature : SynthFeature<ResonatorUiState, ResonatorPanelAction
     """.trimIndent()
 
             override val portControlKeys = mapOf(
-                ResonatorSymbol.MODE.controlId.key to "Resonance model: Modal (bell), String (plucked), Sympathetic (sitar)",
+                ResonatorSymbol.MODE.controlId.key to "Resonance model: Bar (modal), Sitar (sympathetic), String (plucked)",
                 ResonatorSymbol.STRUCTURE.controlId.key to "Harmonic spread / inharmonicity",
                 ResonatorSymbol.BRIGHTNESS.controlId.key to "High-frequency content of the resonance",
                 ResonatorSymbol.DAMPING.controlId.key to "Resonance decay speed",

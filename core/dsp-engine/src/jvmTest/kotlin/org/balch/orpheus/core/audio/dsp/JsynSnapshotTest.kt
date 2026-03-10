@@ -1026,6 +1026,232 @@ class JsynSnapshotTest {
      * Cross-engine bender comparison: reads JSyn and C++ bender WAVs and reports
      * audio envelope differences at key time points.
      */
+    // ═══════════════════════════════════════════════════════════════════════
+    // Gain staging comparison tests
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Compares JSyn vs C++ gain staging for every Plaits engine.
+     * Renders each engine through the full DspVoice chain (with ADSR envelope)
+     * and reports peak/RMS differences. This catches:
+     * - outGain mismatches
+     * - softLimit differences
+     * - ADSR/VCA level differences
+     * - Master volume/pan ordering issues
+     *
+     * Run C++ snapshots first: cmake --build ... && ./orpheus_dsp_test
+     */
+    /**
+     * Render a voice through the full master chain (matching production signal path):
+     * DspVoice → StereoPlugin (pan → masterGain(×0.7) → peakFollower) → hardClip → lineOut
+     *
+     * This captures what we actually hear, including master volume and constant-power pan.
+     */
+    private fun renderEngineWithMaster(
+        engineId: PlaitsEngineId,
+        note: Float = 60f,
+        harmonics: Float = 0.5f,
+        timbre: Float = 0.5f,
+        morph: Float = 0.5f,
+        masterVolume: Float = 0.7f,
+        durationSeconds: Float = 2f,
+        gateSeconds: Float = 1f
+    ): FloatArray {
+        val engine = OfflineAudioEngine(SR)
+        val factory = createFactory()
+        val voice = DspVoice(engine, factory, pitchMultiplier = 1.0)
+
+        val plaitsEngine = createPlaitsEngine(engineId)
+        voice.plaits.setEngine(plaitsEngine)
+        voice.setEngineActive(true)
+        voice.plaits.setNote(note)
+        voice.plaits.setTimbre(timbre)
+        voice.plaits.setMorph(morph)
+        voice.plaits.setHarmonics(harmonics)
+
+        val freqHz = 440.0 * 2.0.pow((note - 69.0) / 12.0)
+        voice.frequency.set(freqHz)
+        voice.setEnvelopeSpeed(0.5f)
+
+        // Master gain (matches StereoPlugin: masterGainLeft.inputB = 0.7)
+        val masterGainL = factory.createMultiply()
+        val masterGainR = factory.createMultiply()
+        masterGainL.inputB.set(masterVolume.toDouble())
+        masterGainR.inputB.set(masterVolume.toDouble())
+
+        // Master pan at center: constant-power gives cos(π/4) = sin(π/4) ≈ 0.707
+        val masterPanL = factory.createMultiply()
+        val masterPanR = factory.createMultiply()
+        val panAngle = (kotlin.math.PI / 4.0) // center pan
+        masterPanL.inputB.set(kotlin.math.cos(panAngle))
+        masterPanR.inputB.set(kotlin.math.sin(panAngle))
+
+        // Hard clip (matches DspWiringGraph masterClipL/R)
+        val clipL = factory.createHardClip()
+        val clipR = factory.createHardClip()
+
+        // Wire: voice → pan → gain → clip → lineOut
+        voice.output.connect(masterPanL.inputA)
+        voice.output.connect(masterPanR.inputA)
+        masterPanL.output.connect(masterGainL.inputA)
+        masterPanR.output.connect(masterGainR.inputA)
+        masterGainL.output.connect(clipL.input)
+        masterGainR.output.connect(clipR.input)
+        clipL.output.connect(engine.lineOutLeft)
+        clipR.output.connect(engine.lineOutRight)
+
+        engine.addUnit(masterPanL)
+        engine.addUnit(masterPanR)
+        engine.addUnit(masterGainL)
+        engine.addUnit(masterGainR)
+        engine.addUnit(clipL)
+        engine.addUnit(clipR)
+
+        engine.start()
+
+        val totalFrames = (SR * durationSeconds).toInt()
+        val gateFrames = (SR * gateSeconds).toInt()
+        val buf = engine.renderStereo(totalFrames, chunkSize = 1024) { offset ->
+            if (offset == 0) voice.gate.set(1.0)
+            if (offset >= gateFrames) voice.gate.set(0.0)
+        }
+
+        engine.stop()
+        return buf
+    }
+
+    @Test
+    fun gainStagingComparison() {
+        println("\n=== Gain Staging Comparison (JSyn vs C++) — Full Master Path ===")
+        println("  JSyn: voice → pan(center) → masterGain(×0.7) → hardClip → output")
+        println("  C++:  voice → masterOut(pan → vol(0.7) → peak → clip) → output")
+        println()
+
+        val engines = listOf(
+            PlaitsEngineId.VIRTUAL_ANALOG to "VirtualAnalog",
+            PlaitsEngineId.WAVESHAPING to "Waveshaping",
+            PlaitsEngineId.FM to "FM",
+            PlaitsEngineId.GRAIN to "Grain",
+            PlaitsEngineId.ADDITIVE to "Additive",
+            PlaitsEngineId.WAVETABLE to "Wavetable",
+            PlaitsEngineId.CHORD to "Chord",
+            PlaitsEngineId.SPEECH to "Speech",
+            PlaitsEngineId.SWARM to "Swarm",
+            PlaitsEngineId.NOISE to "Noise",
+            PlaitsEngineId.PARTICLE to "Particle",
+            PlaitsEngineId.STRING to "String",
+            PlaitsEngineId.MODAL to "Modal",
+        )
+
+        // Also write a CSV for deeper analysis
+        val csvFile = File(OUTPUT_DIR, "gain_staging_comparison.csv")
+        csvFile.printWriter().use { pw ->
+            pw.println("engine,jsyn_peak,jsyn_rms,cpp_peak,cpp_rms,peak_ratio,rms_ratio")
+
+            for ((engineId, name) in engines) {
+                // JSyn: render through full path including master gain + pan + clip
+                val jsynBuf = renderEngineWithMaster(engineId, note = 60f, durationSeconds = 2f, gateSeconds = 1f)
+                val jsynPeak = computePeak(jsynBuf)
+                val jsynRms = computeRms(jsynBuf)
+
+                // Write JSyn gain staging WAV
+                val jsynWavFile = File(OUTPUT_DIR, "jsyn_gain_${name.lowercase()}.wav")
+                writeWav(jsynWavFile, jsynBuf, jsynBuf.size / 2, SR)
+
+                // C++ comparison: look for matching WAV
+                val cppWavFile = File(OUTPUT_DIR, "cpp_gain_${name.lowercase()}.wav")
+                if (cppWavFile.exists()) {
+                    val cppWav = readWavMono(cppWavFile)
+                    val cppPeak = computePeak(cppWav.samples)
+                    val cppRms = computeRms(cppWav.samples)
+                    val peakRatio = if (jsynPeak > 0.001f) cppPeak / jsynPeak else 0f
+                    val rmsRatio = if (jsynRms > 0.001f) cppRms / jsynRms else 0f
+                    val marker = if (abs(peakRatio - 1f) > 0.15f) " <<<" else ""
+
+                    println("  %-15s JSyn peak=%.4f rms=%.4f  C++ peak=%.4f rms=%.4f  ratio=%.2f/%.2f%s".format(
+                        name, jsynPeak, jsynRms, cppPeak, cppRms, peakRatio, rmsRatio, marker))
+                    pw.println("$name,${"%.6f".format(jsynPeak)},${"%.6f".format(jsynRms)},${"%.6f".format(cppPeak)},${"%.6f".format(cppRms)},${"%.4f".format(peakRatio)},${"%.4f".format(rmsRatio)}")
+                } else {
+                    println("  %-15s JSyn peak=%.4f rms=%.4f  C++: (no WAV, run cpp gain staging test first)".format(
+                        name, jsynPeak, jsynRms))
+                    pw.println("$name,${"%.6f".format(jsynPeak)},${"%.6f".format(jsynRms)},,,")
+                }
+            }
+        }
+        println("\n  CSV: ${csvFile.absolutePath}")
+    }
+
+    /**
+     * Render noise excitation through JSyn resonator at a given mode.
+     * Returns interleaved stereo buffer.
+     */
+    private fun renderResonatorMode(
+        mode: Int,
+        durationSeconds: Float = 2f
+    ): FloatArray {
+        val engine = OfflineAudioEngine(SR)
+        val factory = createFactory()
+        val resonator = factory.createResonatorUnit()
+        engine.addUnit(resonator)
+
+        resonator.setResonatorEnabled(true)
+        resonator.setMode(mode)
+        resonator.setStructure(0.5f)
+        resonator.setBrightness(0.5f)
+        resonator.setDamping(0.5f)
+        resonator.setPosition(0.5f)
+        resonator.strum(261.63f) // C4
+
+        resonator.output.connect(engine.lineOutLeft)
+        resonator.output.connect(engine.lineOutRight)
+
+        engine.start()
+
+        val totalFrames = (SR * durationSeconds).toInt()
+        val buf = engine.renderStereo(totalFrames, chunkSize = 1024) { _ -> }
+
+        engine.stop()
+        return buf
+    }
+
+    @Test
+    fun ringsModeComparison() {
+        println("\n=== Rings Mode Comparison (JSyn vs C++) ===")
+
+        val modeNames = listOf("modal", "sympathetic", "string")
+
+        val csvFile = File(OUTPUT_DIR, "rings_mode_comparison.csv")
+        csvFile.printWriter().use { pw ->
+            pw.println("mode,jsyn_peak,jsyn_rms,cpp_peak,cpp_rms,peak_ratio,rms_ratio")
+
+            for ((index, name) in modeNames.withIndex()) {
+                val jsynBuf = renderResonatorMode(index)
+                val jsynPeak = computePeak(jsynBuf)
+                val jsynRms = computeRms(jsynBuf)
+
+                writeWav(File(OUTPUT_DIR, "jsyn_rings_mode_$name.wav"), jsynBuf, jsynBuf.size / 2, SR)
+
+                val cppWavFile = File(OUTPUT_DIR, "cpp_rings_mode_$name.wav")
+                if (cppWavFile.exists()) {
+                    val cppWav = readWavMono(cppWavFile)
+                    val cppPeak = computePeak(cppWav.samples)
+                    val cppRms = computeRms(cppWav.samples)
+                    val peakRatio = if (jsynPeak > 0.001f) cppPeak / jsynPeak else 0f
+                    val rmsRatio = if (jsynRms > 0.001f) cppRms / jsynRms else 0f
+
+                    println("  %-25s JSyn peak=%.4f rms=%.4f  C++ peak=%.4f rms=%.4f  ratio=%.2f/%.2f".format(
+                        name, jsynPeak, jsynRms, cppPeak, cppRms, peakRatio, rmsRatio))
+                    pw.println("$name,${"%.6f".format(jsynPeak)},${"%.6f".format(jsynRms)},${"%.6f".format(cppPeak)},${"%.6f".format(cppRms)},${"%.4f".format(peakRatio)},${"%.4f".format(rmsRatio)}")
+                } else {
+                    println("  %-25s JSyn peak=%.4f rms=%.4f  C++: (no WAV)".format(name, jsynPeak, jsynRms))
+                    pw.println("$name,${"%.6f".format(jsynPeak)},${"%.6f".format(jsynRms)},,,")
+                }
+            }
+        }
+
+        println("\n  CSV: ${csvFile.absolutePath}")
+    }
+
     @Test
     fun benderComparison() {
         println("\n=== Bender A/B Comparison ===")

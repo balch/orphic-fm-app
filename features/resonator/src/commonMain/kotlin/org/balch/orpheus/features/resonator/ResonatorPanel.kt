@@ -91,25 +91,19 @@ fun ResonatorPanel(
             modifier = Modifier.padding(horizontal = 8.dp)
         ) {
             SingleChoiceSegmentedButtonRow(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(32.dp),
             ) {
-                // Regular modes (no "Off" option)
                 ResonatorMode.entries.forEachIndexed { index, mode ->
                     SegmentedButton(
-                        shape = SegmentedButtonDefaults.itemShape(
-                            index = index,
-                            count = ResonatorMode.entries.size
-                        ),
-                        onClick = {
-                            actions.setMode(mode)
-                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = ResonatorMode.entries.size),
+                        onClick = { actions.setMode(mode) },
                         selected = state.mode == mode,
                         colors = segColors,
                         icon = {}
                     ) {
                         Text(
                             text = mode.displayName,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelSmall,
                             maxLines = 1
                         )
                     }

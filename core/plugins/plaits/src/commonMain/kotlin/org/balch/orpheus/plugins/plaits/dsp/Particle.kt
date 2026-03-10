@@ -55,6 +55,7 @@ class Particle {
             }
             aux[i] += s
             out[i] += filter.processBp(preGain * s)
+            u = random.getFloat() // regenerate per-sample (matches C++ particle.h:80)
         }
     }
 }

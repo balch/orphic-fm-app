@@ -7,10 +7,11 @@ import org.balch.orpheus.plugins.resonator.engine.ResonatorString
  * DSP ResonatorUnit — delegates to the existing [ModalResonator] and
  * [ResonatorString] engines for real physical-modeling resonance.
  *
- * Modes:
+ * Modes (matches C++ ResonatorModel ordering):
  * - 0 = Modal: bank of SVF bandpass filters simulating resonant modes
- * - 1 = String: Karplus-Strong comb-filter delay line
- * - 2 = Sympathetic: modal feeds into string for coupled resonance
+ * - 1 = Sympathetic: modal feeds into string for coupled resonance
+ * - 2 = String: Karplus-Strong comb-filter delay line
+ * - 3-5 = C++ bonus modes (fall back to 0-2 in Kotlin)
  *
  * On [strum], the normalized frequency is set on both engines and an impulse
  * excitation is injected at the first sample of the next process block.
@@ -24,7 +25,7 @@ class DspResonatorUnit : ResonatorUnit, DspProcessable {
 
     // State
     private var resonatorEnabled = false
-    private var mode = 0 // 0=Modal, 1=String, 2=Sympathetic
+    private var mode = 0 // 0=Modal, 1=Sympathetic, 2=String (matches C++ ResonatorModel)
     private var strumPending = false
     private var strumFrequency = 220f
 
@@ -49,7 +50,12 @@ class DspResonatorUnit : ResonatorUnit, DspProcessable {
     }
 
     override fun setMode(mode: Int) {
-        this.mode = mode.coerceIn(0, 2)
+        this.mode = when (mode.coerceIn(0, 5)) {
+            0, 3 -> 0  // Modal (Bell falls back to Modal)
+            1, 4 -> 1  // Sympathetic (Harp falls back to Sympathetic)
+            2, 5 -> 2  // String (Hall falls back to String)
+            else -> 0
+        }
     }
 
     override fun setStructure(value: Float) {
@@ -112,16 +118,16 @@ class DspResonatorUnit : ResonatorUnit, DspProcessable {
                     outBuf[i] = modalResonator.outOdd
                     auxBuf[i] = modalResonator.outEven
                 }
-                1 -> { // String
-                    stringResonator.process(excitation)
-                    outBuf[i] = stringResonator.outMain
-                    auxBuf[i] = stringResonator.outAux
-                }
-                2 -> { // Sympathetic (modal -> string)
+                1 -> { // Sympathetic (modal -> string)
                     modalResonator.process(excitation)
                     stringResonator.process(modalResonator.outOdd)
                     outBuf[i] = stringResonator.outMain
                     auxBuf[i] = modalResonator.outEven
+                }
+                2 -> { // String
+                    stringResonator.process(excitation)
+                    outBuf[i] = stringResonator.outMain
+                    auxBuf[i] = stringResonator.outAux
                 }
                 else -> {
                     outBuf[i] = inputSample

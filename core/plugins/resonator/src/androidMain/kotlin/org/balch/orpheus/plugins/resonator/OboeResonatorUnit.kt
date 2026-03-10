@@ -27,7 +27,7 @@ class OboeResonatorUnit : ResonatorUnit, DspProcessable {
 
     // State
     private var resonatorEnabled = false
-    private var mode = 0 // 0=Modal, 1=String, 2=Sympathetic
+    private var mode = 0 // 0=Modal, 1=Sympathetic, 2=String (matches C++ ResonatorModel)
     private var structure = 0.25f
     private var brightness = 0.5f
     private var damping = 0.3f
@@ -44,7 +44,14 @@ class OboeResonatorUnit : ResonatorUnit, DspProcessable {
 
     override fun setResonatorEnabled(enabled: Boolean) { this.resonatorEnabled = enabled }
 
-    override fun setMode(mode: Int) { this.mode = mode.coerceIn(0, 2) }
+    override fun setMode(mode: Int) {
+        this.mode = when (mode.coerceIn(0, 5)) {
+            0, 3 -> 0  // Modal (Bell falls back to Modal)
+            1, 4 -> 1  // Sympathetic (Harp falls back to Sympathetic)
+            2, 5 -> 2  // String (Hall falls back to String)
+            else -> 0
+        }
+    }
 
     override fun setStructure(value: Float) {
         structure = value.coerceIn(0f, 1f)
@@ -105,16 +112,16 @@ class OboeResonatorUnit : ResonatorUnit, DspProcessable {
                     outputBuf[i] = modalResonator.outOdd
                     auxBuf[i] = modalResonator.outEven
                 }
-                1 -> { // String
-                    stringResonator.process(excitation)
-                    outputBuf[i] = stringResonator.outMain
-                    auxBuf[i] = stringResonator.outAux
-                }
-                2 -> { // Sympathetic (uses both)
+                1 -> { // Sympathetic (modal -> string)
                     modalResonator.process(excitation)
                     stringResonator.process(modalResonator.outOdd)
                     outputBuf[i] = stringResonator.outMain
                     auxBuf[i] = modalResonator.outEven
+                }
+                2 -> { // String
+                    stringResonator.process(excitation)
+                    outputBuf[i] = stringResonator.outMain
+                    auxBuf[i] = stringResonator.outAux
                 }
                 else -> {
                     outputBuf[i] = inputSample

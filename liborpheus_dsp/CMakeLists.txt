@@ -55,16 +55,6 @@ set(CLOUDS_SRC
     "${EURORACK_DIR}/clouds/resources.cc"
 )
 
-# ── Rings sources ─────────────────────────────────
-set(RINGS_SRC
-    "${EURORACK_DIR}/rings/dsp/fm_voice.cc"
-    "${EURORACK_DIR}/rings/dsp/part.cc"
-    "${EURORACK_DIR}/rings/dsp/string_synth_part.cc"
-    "${EURORACK_DIR}/rings/dsp/string.cc"
-    "${EURORACK_DIR}/rings/dsp/resonator.cc"
-    "${EURORACK_DIR}/rings/resources.cc"
-)
-
 # ── Warps sources ─────────────────────────────────
 set(WARPS_SRC
     "${EURORACK_DIR}/warps/dsp/modulator.cc"
@@ -89,6 +79,7 @@ set(ORPHEUS_SRC
     "src/orpheus_monitor.cpp"
     "src/orpheus_units.cpp"
     "src/orpheus_patch.cpp"
+    "src/orpheus_resonator.cpp"
 )
 
 # ── Library target ────────────────────────────────
@@ -97,7 +88,6 @@ add_library(orpheus_dsp STATIC
     ${STMLIB_SRC}
     ${PLAITS_SRC}
     ${CLOUDS_SRC}
-    ${RINGS_SRC}
     ${WARPS_SRC}
     ${MARBLES_SRC}
 )
@@ -144,6 +134,7 @@ if(BUILD_TESTS)
         test/test_control_routing.cpp
         test/test_snapshots.cpp
         test/test_headroom.cpp
+        test/test_chain_compare.cpp
         test/test_benchmark.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)

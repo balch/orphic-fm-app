@@ -15,6 +15,7 @@ int main() {
     all_pass &= run_lfo_tests();
     all_pass &= run_control_routing_tests();
     all_pass &= run_headroom_tests();
+    run_chain_compare_tests(); // comparison WAVs (no pass/fail, just output)
     all_pass &= run_benchmark_tests(); // always last — timing
 
     if (!all_pass) {

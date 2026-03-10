@@ -36,15 +36,9 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     // Zero-init parameters to avoid undefined fields (stereo_spread, trigger, gate)
     std::memset(engine->clouds_processor.mutable_parameters(), 0, sizeof(clouds::Parameters));
 
-    // Initialize Rings resonator (main)
-    engine->rings_part.Init(engine->rings_reverb_buffer);
-    engine->rings_part.set_model(rings::RESONATOR_MODEL_MODAL);
-    engine->rings_part.set_polyphony(1);
-
-    // Initialize Rings resonator (drum direct path)
-    engine->rings_drum_part.Init(engine->rings_drum_reverb_buffer);
-    engine->rings_drum_part.set_model(rings::RESONATOR_MODEL_MODAL);
-    engine->rings_drum_part.set_polyphony(1);
+    // Initialize Orpheus resonators (modal + Karplus-Strong)
+    engine->resonator.init(engine->sample_rate);
+    engine->drum_resonator.init(engine->sample_rate);
 
     // Initialize Warps modulator
     engine->warps_modulator.Init(engine->sample_rate);
@@ -157,16 +151,8 @@ void orpheus_engine_process(OrpheusEngine* engine,
         // No graph loaded — silent output (graph required for audio rendering)
     }
 
-    // Peak monitoring (always runs, regardless of graph/procedural path)
-    float pk_l = 0.0f, pk_r = 0.0f;
-    for (int i = 0; i < num_frames; i++) {
-        float l = std::fabs(output_buffer[i * 2]);
-        float r = std::fabs(output_buffer[i * 2 + 1]);
-        if (l > pk_l) pk_l = l;
-        if (r > pk_r) pk_r = r;
-    }
-    engine->peak_left.store(pk_l);
-    engine->peak_right.store(pk_r);
+    // Peak monitoring is handled inside unit_process_master_out (pre-clip, matching JSyn).
+    // If no graph is loaded, peaks remain at 0.
 
     // CPU load: elapsed time / audio buffer duration
     auto t1 = std::chrono::steady_clock::now();
@@ -354,16 +340,16 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->rings_position.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "frequency") == 0)
             engine->rings_frequency.store(value, std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "model") == 0)
+        else if (std::strcmp(symbol, "mode") == 0)
             engine->rings_model.store(static_cast<int>(value), std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "polyphony") == 0)
-            engine->rings_polyphony.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "strum") == 0)
             engine->rings_strum.store(1, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mix") == 0) {
+            engine->resonator_mix.store(value, std::memory_order_relaxed);
+            engine->rings_bypass.store(value < 0.001f ? 1 : 0, std::memory_order_relaxed);
+        }
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->rings_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "internal_exciter") == 0)
-            engine->rings_internal_exciter.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.warps") == 0) {
         if (std::strcmp(symbol, "algorithm") == 0)
@@ -629,14 +615,9 @@ void orpheus_engine_trigger_drum(OrpheusEngine* engine,
 }
 
 void orpheus_engine_set_master_volume(OrpheusEngine* engine, float v) {
+    // Volume is applied in unit_process_master_out (after pan, before clip)
+    // matching JSyn's StereoPlugin chain: pan → volume → peak → clip
     engine->master_volume.store(v);
-    // Update graph port map so mvL/mvR multiply units reflect the new volume
-    OrpheusGraph* g = engine->graph.load(std::memory_order_relaxed);
-    if (g) {
-        static uint16_t uh = engine_hash16("org.balch.orpheus.plugins.stereo");
-        static uint16_t sh = engine_hash16("master_vol");
-        orpheus_graph_set_port(g, uh, sh, v);
-    }
 }
 
 void orpheus_engine_set_drive(OrpheusEngine* engine, float v) {

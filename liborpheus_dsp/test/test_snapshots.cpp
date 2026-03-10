@@ -456,6 +456,130 @@ bool run_snapshot_tests() {
         }
     }
 
+    // ── Gain Staging Comparison: full path (voice → master_out) ──
+    // Renders each Plaits engine through the full graph path including master_out
+    // (pan → volume(0.7) → peak → hard clip) — captures what we actually hear.
+    // JSyn test looks for: cpp_gain_virtualanalog.wav, cpp_gain_waveshaping.wav, etc.
+    {
+        struct GainSpec {
+            int cpp_index;
+            const char* name; // must match JSyn's PlaitsEngineId name lowercased
+        };
+        GainSpec engines[] = {
+            { 8, "virtualanalog"}, { 9, "waveshaping"}, {10, "fm"},
+            {11, "grain"}, {12, "additive"}, {13, "wavetable"},
+            {14, "chord"}, {15, "speech"}, {16, "swarm"},
+            {17, "noise"}, {18, "particle"}, {19, "string"},
+            {20, "modal"},
+        };
+
+        printf("\n  --- Gain Staging Comparison (full path: voice → master_out) ---\n");
+
+        for (auto& e : engines) {
+            char label[64];
+            snprintf(label, sizeof(label), "cpp_gain_%s", e.name);
+            printf("  Scenario: gain_%s\n", e.name);
+
+            // Create engine and set master volume to 0.7 (matching JSyn StereoPlugin default)
+            OrpheusEngine* eng = orpheus_engine_create(sr);
+            eng->master_volume.store(0.7f);
+            eng->smooth_master_volume = 0.7f;
+            eng->voice_params[0].active.store(1);
+            eng->voice_params[0].ever_triggered.store(1);
+            eng->voice_params[0].engine_index.store(e.cpp_index);
+            eng->voice_params[0].tune.store(60.0f);
+            eng->voice_params[0].harmonics.store(0.5f);
+            eng->voice_params[0].timbre.store(0.5f);
+            eng->voice_params[0].morph.store(0.5f);
+            eng->voice_params[0].decay.store(0.5f); // envSpeed = 0.5
+
+            // Minimal graph: plaits → master_out (includes pan, volume, peak, clip)
+            auto* graph = create_minimal_graph(0, (float)sr);
+
+            const int total = sr * 2; // 2 seconds
+            const int gate_frames = sr * 1; // 1 second gate
+            std::vector<float> buf(total * 2, 0.0f);
+
+            for (int off = 0; off < total; off += 128) {
+                int chunk = std::min(128, total - off);
+                if (off == 0) eng->voice_params[0].gate.store(1);
+                if (off >= gate_frames) eng->voice_params[0].gate.store(0);
+                orpheus_graph_process(graph, eng, buf.data() + off * 2, chunk);
+            }
+
+            float rms = compute_rms(buf.data(), total * 2);
+            float peak = compute_peak(buf.data(), total * 2);
+            printf("    RMS=%.4f Peak=%.4f\n", rms, peak);
+            all_pass &= snapshot_check(label, buf.data(), total, sr, dir);
+            delete graph;
+            orpheus_engine_destroy(eng);
+        }
+    }
+
+    // ── Resonator mode snapshots: 3 modes (Modal, Sympathetic, String) ──
+    // Renders noise excitation through each OrpheusResonator mode to verify
+    // all modes produce distinct non-silent output.
+    {
+        const char* mode_names[] = {
+            "modal", "sympathetic", "string"
+        };
+
+        printf("\n  --- Resonator Mode Snapshots ---\n");
+
+        for (int m = 0; m < 3; m++) {
+            char label[64];
+            snprintf(label, sizeof(label), "cpp_rings_mode_%s", mode_names[m]);
+            printf("  Scenario: resonator_mode_%s\n", mode_names[m]);
+
+            OrpheusEngine* eng = orpheus_engine_create(sr);
+            eng->rings_bypass.store(0);
+            eng->rings_model.store(m);
+            eng->rings_structure.store(0.5f);
+            eng->rings_brightness.store(0.5f);
+            eng->rings_damping.store(0.5f);
+            eng->rings_position.store(0.5f);
+            eng->rings_frequency.store(60.0f);
+            eng->rings_strum.store(1); // trigger strum
+
+            // Set up a single rings unit
+            GraphUnit unit = {};
+            unit.type = UNIT_RINGS;
+            unit.enabled = true;
+            unit.state.module.index = 0; // main resonator (not drum)
+            unit_init(&unit, (float)sr);
+
+            // Render 2 seconds with noise excitation in first block
+            const int total = sr * 2;
+            std::vector<float> buf(total * 2, 0.0f);
+
+            for (int off = 0; off < total; off += 128) {
+                int chunk = std::min(128, total - off);
+                // Fill input buffer with noise excitation (only first 64 samples of first block)
+                for (int i = 0; i < chunk; i++) {
+                    unit.inputs[IPORT_INPUT].buffer[i] = (off == 0 && i < 64)
+                        ? ((float)rand() / RAND_MAX * 2.0f - 1.0f) * 0.5f : 0.0f;
+                }
+                unit.inputs[IPORT_INPUT].num_sources = 1;
+
+                unit_process_rings(&unit, eng, chunk, (float)sr);
+
+                for (int i = 0; i < chunk; i++) {
+                    buf[(off + i) * 2]     = unit.output_buffers[OPORT_OUT][i];
+                    buf[(off + i) * 2 + 1] = unit.output_buffers[OPORT_OUT_RIGHT][i];
+                }
+
+                // Clear strum after first block
+                if (off == 0) eng->rings_strum.store(0);
+            }
+
+            float rms = compute_rms(buf.data(), total * 2);
+            float peak = compute_peak(buf.data(), total * 2);
+            printf("    RMS=%.4f Peak=%.4f\n", rms, peak);
+            all_pass &= snapshot_check(label, buf.data(), total, sr, dir);
+            orpheus_engine_destroy(eng);
+        }
+    }
+
     printf("WAV snapshots: %s\n", all_pass ? "PASS" : "FAIL");
     return all_pass;
 }

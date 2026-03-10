@@ -209,16 +209,39 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
 
-    // Master pan (constant-power) with per-sample smoothing
+    // Matches JSyn StereoPlugin chain: pan → volume → peak (pre-clip) → hard clip → output
     float pan_target = engine->master_pan.load(std::memory_order_relaxed);
+    float vol_target = engine->master_volume.load(std::memory_order_relaxed);
     float coeff = smooth_coeff(sr);
 
+    float pk_l = 0.0f, pk_r = 0.0f;
+
     for (int i = 0; i < n; i++) {
+        // Pan (constant-power, per-sample smoothed)
         engine->smooth_master_pan += coeff * (pan_target - engine->smooth_master_pan);
         float mp_angle = ((engine->smooth_master_pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
-        output_buffer[i * 2]     = in_l[i] * std::cos(mp_angle);
-        output_buffer[i * 2 + 1] = in_r[i] * std::sin(mp_angle);
+        float l = in_l[i] * std::cos(mp_angle);
+        float r = in_r[i] * std::sin(mp_angle);
+
+        // Volume (smoothed)
+        engine->smooth_master_volume += coeff * (vol_target - engine->smooth_master_volume);
+        l *= engine->smooth_master_volume;
+        r *= engine->smooth_master_volume;
+
+        // Peak measurement (pre-clip, matching JSyn peakFollower position)
+        float al = std::fabs(l);
+        float ar = std::fabs(r);
+        if (al > pk_l) pk_l = al;
+        if (ar > pk_r) pk_r = ar;
+
+        // Hard clip (matching JSyn DspWiringGraph.masterClipL/R)
+        output_buffer[i * 2]     = std::max(-1.0f, std::min(1.0f, l));
+        output_buffer[i * 2 + 1] = std::max(-1.0f, std::min(1.0f, r));
     }
+
+    // Store pre-clip peaks for monitoring (JSyn measures before clip too)
+    engine->peak_left.store(pk_l, std::memory_order_relaxed);
+    engine->peak_right.store(pk_r, std::memory_order_relaxed);
 }
 
 // -- Unit initialization from descriptor params --
@@ -578,9 +601,12 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // ═══ PLAITS ENGINES (1+): Render via OrpheusVoice (direct Engine::Render) ═══
         auto& voice = engine->voices_dsp[idx];
 
-        // If hold is active, force gate on so engine stays active
+        // Gate and hold are independent signals (matching JSyn DspVoice):
+        //   - gate goes to Plaits engine for trigger edge detection
+        //   - hold is an additive VCA floor (envelope + hold), never touches the gate
+        // This ensures PulsePad retriggering works during quad hold,
+        // and engines behave identically to the JSyn path.
         int plaits_gate = actual_gate;
-        if (scaled_hold > 0.01f) plaits_gate = 1;
 
         // Engine change retrigger: force gate off for one block so
         // OrpheusVoice sees a 0→1 rising edge on the next render.
@@ -787,55 +813,53 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         }
     }
 
-    // Both resonators share the same parameter values (controlled from same UI)
-    rings::Patch rings_patch;
-    rings_patch.structure = engine->rings_structure.load(std::memory_order_relaxed);
-    rings_patch.brightness = engine->rings_brightness.load(std::memory_order_relaxed);
-    rings_patch.damping = engine->rings_damping.load(std::memory_order_relaxed);
-    rings_patch.position = engine->rings_position.load(std::memory_order_relaxed);
+    OrpheusResonator& reso = is_drum ? engine->drum_resonator : engine->resonator;
 
-    rings::PerformanceState perf;
-    std::memset(&perf, 0, sizeof(perf));
-    perf.tonic = engine->rings_frequency.load(std::memory_order_relaxed);
-    perf.note = 0.0f;
-    perf.internal_exciter = engine->rings_internal_exciter.load(std::memory_order_relaxed) != 0;
-    perf.internal_strum = false;
-    perf.internal_note = false;
+    // Update resonator parameters from engine atomics
+    float structure  = engine->rings_structure.load(std::memory_order_relaxed);
+    float brightness = engine->rings_brightness.load(std::memory_order_relaxed);
+    float damping    = engine->rings_damping.load(std::memory_order_relaxed);
+    float position   = engine->rings_position.load(std::memory_order_relaxed);
+    int   mode       = engine->rings_model.load(std::memory_order_relaxed);
 
-    // Pick the right Part instance
-    rings::Part& part = is_drum ? engine->rings_drum_part : engine->rings_part;
+    // Clamp mode to 0-2 (Modal, Sympathetic, String)
+    if (mode < 0) mode = 0;
+    if (mode > 2) mode = 2;
 
+    reso.modal.structure  = structure;
+    reso.modal.brightness = brightness;
+    reso.modal.damping    = damping;
+    reso.modal.position   = position;
+
+    reso.string.brightness = brightness;
+    reso.string.damping    = damping;
+    reso.string.position   = position;
+
+    // Handle strum trigger (main resonator only)
+    bool strum_pending = false;
     if (!is_drum) {
         int strum = engine->rings_strum.load(std::memory_order_relaxed);
-        perf.strum = strum != 0;
-        if (strum) engine->rings_strum.store(0, std::memory_order_relaxed);
+        if (strum) {
+            engine->rings_strum.store(0, std::memory_order_relaxed);
+            // Convert MIDI note to Hz: freq = 440 * 2^((note-69)/12)
+            float midi_note = engine->rings_frequency.load(std::memory_order_relaxed);
+            float freq_hz = 440.0f * std::pow(2.0f, (midi_note - 69.0f) / 12.0f);
+            reso.strum(freq_hz, sr);
+            strum_pending = true;
+        }
     }
 
-    part.set_model(
-        static_cast<rings::ResonatorModel>(
-            engine->rings_model.load(std::memory_order_relaxed)));
-    part.set_polyphony(
-        engine->rings_polyphony.load(std::memory_order_relaxed));
-
-    int frames_done = 0;
-    while (frames_done < num_frames) {
-        int block = std::min(static_cast<int>(rings::kMaxBlockSize),
-                             num_frames - frames_done);
-
-        float out_buf[rings::kMaxBlockSize];
-        float aux_buf[rings::kMaxBlockSize];
-
-        part.Process(perf, rings_patch,
-                     in + frames_done, out_buf, aux_buf, block);
-
-        perf.strum = false; // Only trigger on first block
-
-        for (int i = 0; i < block; i++) {
-            out_l[frames_done + i] = out_buf[i];
-            out_r[frames_done + i] = aux_buf[i];
+    // Per-sample processing
+    for (int i = 0; i < num_frames; i++) {
+        float sample = in[i];
+        // Inject 1.0f impulse on first sample of strum (matches JSyn behavior)
+        if (strum_pending && i == 0) {
+            sample = 1.0f;
+            strum_pending = false;
         }
-
-        frames_done += block;
+        reso.process(sample, mode);
+        out_l[i] = reso.out_l;
+        out_r[i] = reso.out_r;
     }
 
     // RESONATOR aux source (4) for warps routing (main resonator only)

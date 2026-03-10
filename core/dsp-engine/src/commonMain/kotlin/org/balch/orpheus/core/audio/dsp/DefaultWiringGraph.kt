@@ -96,10 +96,10 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val sumL = buildSumTree("sumL", voiceOutsL)
     val sumR = buildSumTree("sumR", voiceOutsR)
 
-    // Master volume (stereo)
-    // 0.4 = 0.8 volume × 0.5 headroom (matching procedural path's master_gain)
-    val mvL = multiply("mvL") { inputB = 0.4f }
-    val mvR = multiply("mvR") { inputB = 0.4f }
+    // Master volume pass-through (volume is applied in masterOut after pan,
+    // matching JSyn's StereoPlugin: pan → volume → peak → clip → output)
+    val mvL = multiply("mvL") { inputB = 1.0f }
+    val mvR = multiply("mvR") { inputB = 1.0f }
     sumL.out to mvL.inputA
     sumR.out to mvR.inputA
 
@@ -120,24 +120,19 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val synthExGainL = multiply("synthExGainL") { inputB = 1.0f }
     val synthExGainR = multiply("synthExGainR") { inputB = 1.0f }
 
-    // Drum FX path: drum sum → gain gate → merge with grains → main resonator excitation
+    // Drum FX path: drum sum → gain gate → drum excitation (no grains/synth mixing)
     val drumChainGainL = multiply("drumChainGainL") { inputB = 0.0f }
     val drumChainGainR = multiply("drumChainGainR") { inputB = 0.0f }
     drumSumL.out to drumChainGainL.inputA
     drumSumR.out to drumChainGainR.inputA
 
-    // Merge grains + drum FX chain into drum excitation gains
-    val drumExMergeL = passThrough("drumExMergeL")
-    val drumExMergeR = passThrough("drumExMergeR")
-    grains.out to drumExMergeL.input
-    drumChainGainL.out to drumExMergeL.input
-    grains.outRight to drumExMergeR.input
-    drumChainGainR.out to drumExMergeR.input
-    drumExMergeL.out to drumExGainL.inputA
-    drumExMergeR.out to drumExGainR.inputA
+    // Drum excitation = drum chain only (no grains merge to prevent synth leak)
+    drumChainGainL.out to drumExGainL.inputA
+    drumChainGainR.out to drumExGainR.inputA
 
-    mvL.out to synthExGainL.inputA
-    mvR.out to synthExGainR.inputA
+    // Synth excitation = post-grains output (grains processes synth signal)
+    grains.out to synthExGainL.inputA
+    grains.outRight to synthExGainR.inputA
 
     // Sum excitation to mono for Rings input
     val exciteSumL = passThrough("exciteSumL")
@@ -164,10 +159,12 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val synthBpGainL = multiply("synthBpGainL") { inputB = 0.0f }
     val synthBpGainR = multiply("synthBpGainR") { inputB = 0.0f }
 
-    grains.out to drumBpGainL.inputA
-    grains.outRight to drumBpGainR.inputA
-    mvL.out to synthBpGainL.inputA
-    mvR.out to synthBpGainR.inputA
+    // Drum bypass = drum sum (drums that bypass resonator go straight to output)
+    drumSumL.out to drumBpGainL.inputA
+    drumSumR.out to drumBpGainR.inputA
+    // Synth bypass = post-grains (synth that bypasses resonator goes straight to output)
+    grains.out to synthBpGainL.inputA
+    grains.outRight to synthBpGainR.inputA
 
     val bypassSumL = passThrough("bypassSumL")
     drumBpGainL.out to bypassSumL.input
@@ -178,10 +175,10 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     synthBpGainR.out to bypassSumR.input
 
     // Wet/dry mix on resonated signal
-    val wetGainL = multiply("wetGainL") { inputB = 0.5f }
-    val wetGainR = multiply("wetGainR") { inputB = 0.5f }
-    val dryGainL = multiply("dryGainL") { inputB = 0.5f }
-    val dryGainR = multiply("dryGainR") { inputB = 0.5f }
+    val wetGainL = multiply("wetGainL") { inputB = 0.0f }
+    val wetGainR = multiply("wetGainR") { inputB = 0.0f }
+    val dryGainL = multiply("dryGainL") { inputB = 1.0f }
+    val dryGainR = multiply("dryGainR") { inputB = 1.0f }
 
     reso.out to wetGainL.inputA
     reso.outRight to wetGainR.inputA
@@ -258,9 +255,8 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     driveL.out to reverb.inputA
     driveR.out to reverb.inputB
 
-    // Master clip + output
-    val clipL = hardClip("clipL")
-    val clipR = hardClip("clipR")
+    // Master output (no hard clip — matches JSyn path which has no clip stage)
+    val master = masterOut("master")
 
     // ── Drum MAIN path routing ──
     // Default: MAIN mode (drumDirectGain=1, drumChainGain=0)
@@ -306,26 +302,22 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     drumDirectResoSumL.out to drumDirectLimiterL.input
     drumDirectResoSumR.out to drumDirectLimiterR.input
 
-    // MAIN path output → master clip (direct to output)
-    drumDirectLimiterL.out to clipL.input
-    drumDirectLimiterR.out to clipR.input
+    // MAIN path output → master (direct to output, no hard clip)
+    drumDirectLimiterL.out to master.inputA
+    drumDirectLimiterR.out to master.inputB
 
     // Per-String Bender (4 strings × 2 voices + audio)
     val psb = perStringBender("psb")
-    psb.out to clipL.input               // per-string audio → output
-    psb.outRight to clipR.input
-    val master = masterOut("master")
-    delay.out to clipL.input
-    delay.outRight to clipR.input
-    reverb.out to clipL.input
-    reverb.outRight to clipR.input
-    clipL.out to master.inputA
-    clipR.out to master.inputB
+    psb.out to master.inputA               // per-string audio → output
+    psb.outRight to master.inputB
+    delay.out to master.inputA
+    delay.outRight to master.inputB
+    reverb.out to master.inputA
+    reverb.outRight to master.inputB
 
     // Port map for nativeSetPort routing
     portMap {
-        map("org.balch.orpheus.plugins.stereo", "master_vol", "mvL", IPORT_INPUT_B)
-        map("org.balch.orpheus.plugins.stereo", "master_vol", "mvR", IPORT_INPUT_B)
+        // master_vol is applied in masterOut (engine atomic), not via graph ports
         map("org.balch.orpheus.plugins.distortion", "drive", "driveL", IPORT_DRIVE)
         map("org.balch.orpheus.plugins.distortion", "drive", "driveR", IPORT_DRIVE)
         // Per-quad volume: sets inputB on all voice volume multiply nodes in each quad

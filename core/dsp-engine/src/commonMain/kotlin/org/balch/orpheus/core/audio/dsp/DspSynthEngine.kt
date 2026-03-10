@@ -215,6 +215,21 @@ class DspSynthEngine @Inject constructor(
         bridge.nativeSetPort(BENDER_URI, BenderSymbol.TIMBRE_MOD.symbol, getPort(BenderSymbol.TIMBRE_MOD)?.asFloat() ?: 0.3f)
         bridge.nativeSetPort(BENDER_URI, BenderSymbol.SPRING_VOL.symbol, getPort(BenderSymbol.SPRING_VOL)?.asFloat() ?: 0.4f)
         bridge.nativeSetPort(BENDER_URI, BenderSymbol.TENSION_VOL.symbol, getPort(BenderSymbol.TENSION_VOL)?.asFloat() ?: 0.015f)
+        // Sync master volume (default 0.7)
+        bridge.nativeSetMasterVolume(getMasterVolume())
+        // Sync resonator state (mix=0 → bypassed, target_mix=0.5 → both sources)
+        val resoUri = ResonatorSymbol.MIX.uri
+        val mix = _resoMix
+        bridge.nativeSetPort(resoUri, "mix", mix)
+        bridge.nativeSetPort(resoUri, "wet_gain", mix)
+        bridge.nativeSetPort(resoUri, "dry_gain", 1f - mix)
+        val tm = _resoTargetMix
+        val drumEx = if (tm <= 0.5f) 1f else (1f - (tm - 0.5f) * 2f).coerceIn(0f, 1f)
+        val synthEx = if (tm >= 0.5f) 1f else (tm * 2f).coerceIn(0f, 1f)
+        bridge.nativeSetPort(resoUri, "drum_ex_gain", drumEx)
+        bridge.nativeSetPort(resoUri, "synth_ex_gain", synthEx)
+        bridge.nativeSetPort(resoUri, "drum_bp_gain", 1f - drumEx)
+        bridge.nativeSetPort(resoUri, "synth_bp_gain", 1f - synthEx)
     }
 
     private fun setupListeners() {
@@ -464,6 +479,9 @@ class DspSynthEngine @Inject constructor(
         nativeBridge?.nativeLoadGraph(buildDefaultWiringGraph())?.also { result ->
             log.info { "nativeLoadGraph result: $result" }
         }
+
+        // Re-sync port map values after graph load (graph load resets node defaults)
+        syncNativeBridgeState()
 
         monitoringJob = if (nativeBridge != null) {
             // Native C++ engine: poll monitor data from C++ via JNI
@@ -887,12 +905,20 @@ class DspSynthEngine @Inject constructor(
         wiringGraph.drumDirectResonator.setMode(mode)
     }
 
-    private var _resoTargetMix = 0.5f
+    private var _resoTargetMix = 0.0f // Must match ResonatorPlugin default (0=drum)
     private var _resoMix = 0.0f
 
     private fun setResonatorTargetMix(targetMix: Float) {
         _resoTargetMix = targetMix
         setPort(ResonatorSymbol.TARGET_MIX, PortValue.FloatValue(targetMix))
+        // Forward excitation/bypass gains to C++ graph port map
+        val drumExcite = if (targetMix <= 0.5f) 1f else (1f - (targetMix - 0.5f) * 2f).coerceIn(0f, 1f)
+        val synthExcite = if (targetMix >= 0.5f) 1f else (targetMix * 2f).coerceIn(0f, 1f)
+        val uri = ResonatorSymbol.TARGET_MIX.uri
+        nativeBridge?.nativeSetPort(uri, "drum_ex_gain", drumExcite)
+        nativeBridge?.nativeSetPort(uri, "synth_ex_gain", synthExcite)
+        nativeBridge?.nativeSetPort(uri, "drum_bp_gain", 1f - drumExcite)
+        nativeBridge?.nativeSetPort(uri, "synth_bp_gain", 1f - synthExcite)
         updateDirectResonatorGains()
     }
 
@@ -919,6 +945,12 @@ class DspSynthEngine @Inject constructor(
     private fun setResonatorMix(value: Float) {
         _resoMix = value
         setPort(ResonatorSymbol.MIX, PortValue.FloatValue(value))
+        // Forward synth resonator wet/dry gains to C++ graph port map
+        val wet = value.coerceIn(0f, 1f)
+        val dry = 1f - wet
+        val uri = ResonatorSymbol.MIX.uri
+        nativeBridge?.nativeSetPort(uri, "wet_gain", wet)
+        nativeBridge?.nativeSetPort(uri, "dry_gain", dry)
         updateDirectResonatorGains()
     }
 
