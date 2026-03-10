@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * this uses StateFlow because highlight state is persistent until explicitly cleared.
  */
 @SingleIn(AppScope::class)
-class ControlHighlightEventBus @Inject constructor() {
+@Inject
+class ControlHighlightEventBus() {
 
     private val log = logging("ControlHighlightEventBus")
 

@@ -21,8 +21,9 @@ import org.balch.orpheus.core.preferences.AppPreferencesRepository
  *
  * Exposes reactive state so UI can respond to key changes.
  */
+@Inject
 @SingleIn(AppScope::class)
-class AiKeyRepository @Inject constructor(
+class AiKeyRepository(
     private val preferencesRepository: AppPreferencesRepository,
     private val dispatcherProvider: DispatcherProvider,
 ) {

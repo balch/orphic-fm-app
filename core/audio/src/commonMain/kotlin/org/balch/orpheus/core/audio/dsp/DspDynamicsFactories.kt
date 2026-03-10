@@ -7,24 +7,28 @@ import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspEnvelopeFactory @Inject constructor() : Envelope.Factory {
+@Inject
+class DspEnvelopeFactory() : Envelope.Factory {
     override fun create(): Envelope = DspEnvelope()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspPeakFollowerFactory @Inject constructor() : PeakFollower.Factory {
+@Inject
+class DspPeakFollowerFactory() : PeakFollower.Factory {
     override fun create(): PeakFollower = DspPeakFollower()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspLimiterFactory @Inject constructor() : Limiter.Factory {
+@Inject
+class DspLimiterFactory() : Limiter.Factory {
     override fun create(): Limiter = DspLimiter()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspHardClipFactory @Inject constructor() : HardClip.Factory {
+@Inject
+class DspHardClipFactory() : HardClip.Factory {
     override fun create(): HardClip = DspHardClip()
 }

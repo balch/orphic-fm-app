@@ -7,24 +7,28 @@ import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspDelayLineFactory @Inject constructor() : DelayLine.Factory {
+@Inject
+class DspDelayLineFactory() : DelayLine.Factory {
     override fun create(): DelayLine = DspDelayLine()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspLooperUnitFactory @Inject constructor() : LooperUnit.Factory {
+@Inject
+class DspLooperUnitFactory() : LooperUnit.Factory {
     override fun create(): LooperUnit = DspLooperUnit()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspTtsPlayerUnitFactory @Inject constructor() : TtsPlayerUnit.Factory {
+@Inject
+class DspTtsPlayerUnitFactory() : TtsPlayerUnit.Factory {
     override fun create(): TtsPlayerUnit = DspTtsPlayerUnit()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspSpeechEffectsUnitFactory @Inject constructor() : SpeechEffectsUnit.Factory {
+@Inject
+class DspSpeechEffectsUnitFactory() : SpeechEffectsUnit.Factory {
     override fun create(): SpeechEffectsUnit = DspSpeechEffectsUnit()
 }

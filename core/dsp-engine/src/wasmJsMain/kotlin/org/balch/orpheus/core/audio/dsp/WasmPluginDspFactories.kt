@@ -19,42 +19,49 @@ import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class WasmResonatorUnitFactory @Inject constructor() : ResonatorUnit.Factory {
+@Inject
+class WasmResonatorUnitFactory() : ResonatorUnit.Factory {
     override fun create(): ResonatorUnit = DspResonatorUnit()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class WasmGrainsUnitFactory @Inject constructor() : GrainsUnit.Factory {
+@Inject
+class WasmGrainsUnitFactory() : GrainsUnit.Factory {
     override fun create(): GrainsUnit = DspGrainsUnit()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class WasmWarpsUnitFactory @Inject constructor() : WarpsUnit.Factory {
+@Inject
+class WasmWarpsUnitFactory() : WarpsUnit.Factory {
     override fun create(): WarpsUnit = DspWarpsUnit()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class WasmFluxUnitFactory @Inject constructor() : FluxUnit.Factory {
+@Inject
+class WasmFluxUnitFactory() : FluxUnit.Factory {
     override fun create(): FluxUnit = DspFluxUnit()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class WasmReverbUnitFactory @Inject constructor() : ReverbUnit.Factory {
+@Inject
+class WasmReverbUnitFactory() : ReverbUnit.Factory {
     override fun create(): ReverbUnit = DspReverbUnit()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class WasmPlaitsUnitFactory @Inject constructor() : PlaitsUnit.Factory {
+@Inject
+class WasmPlaitsUnitFactory() : PlaitsUnit.Factory {
     override fun create(): PlaitsUnit = DspPlaitsUnit()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class WasmDrumUnitFactory @Inject constructor() : DrumUnit.Factory {
+@Inject
+class WasmDrumUnitFactory() : DrumUnit.Factory {
     override fun create(): DrumUnit = DspDrumUnit()
 }

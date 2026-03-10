@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.ResonatorUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class JsynResonatorUnitFactory @Inject constructor() : ResonatorUnit.Factory {
+@Inject
+class JsynResonatorUnitFactory() : ResonatorUnit.Factory {
     override fun create(): ResonatorUnit = JsynResonatorUnit()
 }

@@ -26,7 +26,8 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
  *    audio frame rate. The [bpm] property here drives the logic for both.
  */
 @SingleIn(AppScope::class)
-class GlobalTempo @Inject constructor(
+@Inject
+class GlobalTempo(
     private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory
 ) {

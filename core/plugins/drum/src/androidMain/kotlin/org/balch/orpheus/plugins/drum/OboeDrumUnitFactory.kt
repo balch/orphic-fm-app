@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.DrumUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class OboeDrumUnitFactory @Inject constructor() : DrumUnit.Factory {
+@Inject
+class OboeDrumUnitFactory() : DrumUnit.Factory {
     override fun create(): DrumUnit = OboeDrumUnit()
 }

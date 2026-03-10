@@ -32,7 +32,8 @@ data class PanelSetEvent(
  * or to apply an entire panel set configuration.
  */
 @SingleIn(AppScope::class)
-class PanelExpansionEventBus @Inject constructor() {
+@Inject
+class PanelExpansionEventBus() {
 
     private val log = logging("PanelExpansionEventBus")
 

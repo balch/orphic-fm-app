@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.GrainsUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class OboeGrainsUnitFactory @Inject constructor() : GrainsUnit.Factory {
+@Inject
+class OboeGrainsUnitFactory() : GrainsUnit.Factory {
     override fun create(): GrainsUnit = OboeGrainsUnit()
 }

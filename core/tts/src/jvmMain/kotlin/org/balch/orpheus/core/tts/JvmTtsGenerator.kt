@@ -13,7 +13,8 @@ import javax.sound.sampled.AudioSystem
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class JvmTtsGenerator @Inject constructor(
+@Inject
+class JvmTtsGenerator(
     private val dispatcherProvider: DispatcherProvider,
 ) : TtsGenerator {
 

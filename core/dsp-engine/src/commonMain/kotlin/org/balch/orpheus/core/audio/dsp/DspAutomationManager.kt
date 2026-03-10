@@ -8,7 +8,8 @@ import dev.zacsweers.metro.SingleIn
  * Manages audio-rate automation players and their wiring.
  */
 @SingleIn(AppScope::class)
-class DspAutomationManager @Inject constructor(
+@Inject
+class DspAutomationManager(
     private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory
 ) {

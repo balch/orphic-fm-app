@@ -7,24 +7,28 @@ import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, replaces = [DspEnvelopeFactory::class])
-class JsynEnvelopeFactory @Inject constructor() : Envelope.Factory {
+@Inject
+class JsynEnvelopeFactory() : Envelope.Factory {
     override fun create(): Envelope = JsynEnvelope()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, replaces = [DspPeakFollowerFactory::class])
-class JsynPeakFollowerFactory @Inject constructor() : PeakFollower.Factory {
+@Inject
+class JsynPeakFollowerFactory() : PeakFollower.Factory {
     override fun create(): PeakFollower = JsynPeakFollowerWrapper()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, replaces = [DspLimiterFactory::class])
-class JsynLimiterFactory @Inject constructor() : Limiter.Factory {
+@Inject
+class JsynLimiterFactory() : Limiter.Factory {
     override fun create(): Limiter = JsynLimiter()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, replaces = [DspHardClipFactory::class])
-class JsynHardClipFactory @Inject constructor() : HardClip.Factory {
+@Inject
+class JsynHardClipFactory() : HardClip.Factory {
     override fun create(): HardClip = JsynHardClip()
 }

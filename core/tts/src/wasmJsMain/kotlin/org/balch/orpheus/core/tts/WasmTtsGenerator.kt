@@ -7,7 +7,8 @@ import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class WasmTtsGenerator @Inject constructor() : TtsGenerator {
+@Inject
+class WasmTtsGenerator() : TtsGenerator {
     override val isAvailable: Boolean = false
     override suspend fun generate(text: String, voice: String?, speakingRate: Int?): TtsAudioResult? = null
     override suspend fun listVoices(): List<String> = emptyList()

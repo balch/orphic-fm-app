@@ -3,17 +3,17 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.tidal.ReplCodeEventBus
 import org.balch.orpheus.core.tidal.ReplResult
 import org.balch.orpheus.core.tidal.TidalRepl
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
-import org.balch.orpheus.core.features.PanelId
 
 @LLMDescription("Arguments for executing REPL code. Provide an array of lines to execute together as one block.")
 @Serializable
@@ -64,7 +64,8 @@ data class ReplExecuteResult(
  * This tool automatically expands the CODE panel and populates it with the executed code.
  */
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
-class ReplExecuteTool @Inject constructor(
+@Inject
+class ReplExecuteTool(
     private val tidalRepl: TidalRepl,
     private val replCodeEventBus: ReplCodeEventBus,
     private val panelExpansionEventBus: PanelExpansionEventBus

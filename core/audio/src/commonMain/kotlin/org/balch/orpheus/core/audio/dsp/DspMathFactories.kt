@@ -7,42 +7,49 @@ import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspMultiplyFactory @Inject constructor() : Multiply.Factory {
+@Inject
+class DspMultiplyFactory() : Multiply.Factory {
     override fun create(): Multiply = DspMultiply()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspAddFactory @Inject constructor() : Add.Factory {
+@Inject
+class DspAddFactory() : Add.Factory {
     override fun create(): Add = DspAdd()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspMultiplyAddFactory @Inject constructor() : MultiplyAdd.Factory {
+@Inject
+class DspMultiplyAddFactory() : MultiplyAdd.Factory {
     override fun create(): MultiplyAdd = DspMultiplyAdd()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspPassThroughFactory @Inject constructor() : PassThrough.Factory {
+@Inject
+class DspPassThroughFactory() : PassThrough.Factory {
     override fun create(): PassThrough = DspPassThrough()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspMinimumFactory @Inject constructor() : Minimum.Factory {
+@Inject
+class DspMinimumFactory() : Minimum.Factory {
     override fun create(): Minimum = DspMinimum()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspMaximumFactory @Inject constructor() : Maximum.Factory {
+@Inject
+class DspMaximumFactory() : Maximum.Factory {
     override fun create(): Maximum = DspMaximum()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspLinearRampFactory @Inject constructor() : LinearRamp.Factory {
+@Inject
+class DspLinearRampFactory() : LinearRamp.Factory {
     override fun create(): LinearRamp = DspLinearRamp()
 }

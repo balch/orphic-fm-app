@@ -49,7 +49,8 @@ import org.balch.orpheus.plugins.duolfo.VoicePlugin
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspSynthEngine @Inject constructor(
+@Inject
+class DspSynthEngine(
     private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory,
     private val pluginProvider: DspPluginProvider,
@@ -256,7 +257,10 @@ class DspSynthEngine @Inject constructor(
                         nativeBridge?.nativeSetVoiceTimbre(voiceA, value)
                         nativeBridge?.nativeSetVoiceTimbre(voiceA + 1, value)
                     }
-                    "duo_mod_source" -> voiceManager.setDuoModSource(index, ModSource.entries[value as Int])
+                    "duo_mod_source" -> {
+                        voiceManager.setDuoModSource(index, ModSource.entries[value as Int])
+                        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_$index", (value as Int).toFloat())
+                    }
                     "duo_engine" -> {
                         val engineOrdinal = value as Int
                         voiceManager.setDuoEngine(index, engineOrdinal)
@@ -292,7 +296,10 @@ class DspSynthEngine @Inject constructor(
                             nativeBridge?.nativeSetVoiceMorph(voiceA + 1, value)
                         }
                     }
-                    "duo_mod_source_level" -> voiceManager.setDuoModSourceLevel(index, value as Float)
+                    "duo_mod_source_level" -> {
+                        voiceManager.setDuoModSourceLevel(index, value as Float)
+                        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_level_$index", value as Float)
+                    }
                     "quad_pitch" -> setQuadPitch(index, value as Float)
                     "quad_hold" -> {
                         voiceManager.setQuadHold(index, value as Float)

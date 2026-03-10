@@ -3,13 +3,13 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
-import org.balch.orpheus.core.features.FeatureCollection
 import org.balch.orpheus.core.ai.ToolProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCollection
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.features.ai.ControlHighlightEventBus
 
@@ -38,7 +38,8 @@ data class ControlHighlightResult(
  * (e.g. "org.balch.orpheus.plugins.flux:steps") so they match the UI widget controlIds.
  */
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
-class ControlHighlightTool @Inject constructor(
+@Inject
+class ControlHighlightTool(
     private val controlHighlightEventBus: ControlHighlightEventBus,
     private val featureCollection: FeatureCollection
 ) : ToolProvider {

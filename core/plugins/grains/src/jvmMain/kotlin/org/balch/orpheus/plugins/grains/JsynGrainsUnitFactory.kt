@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.GrainsUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class JsynGrainsUnitFactory @Inject constructor() : GrainsUnit.Factory {
+@Inject
+class JsynGrainsUnitFactory() : GrainsUnit.Factory {
     override fun create(): GrainsUnit = JsynGrainsUnit()
 }

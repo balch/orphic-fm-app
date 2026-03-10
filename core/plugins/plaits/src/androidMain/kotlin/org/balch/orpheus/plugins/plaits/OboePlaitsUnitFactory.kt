@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.PlaitsUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class OboePlaitsUnitFactory @Inject constructor() : PlaitsUnit.Factory {
+@Inject
+class OboePlaitsUnitFactory() : PlaitsUnit.Factory {
     override fun create(): PlaitsUnit = OboePlaitsUnit()
 }

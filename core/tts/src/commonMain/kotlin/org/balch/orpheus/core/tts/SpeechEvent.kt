@@ -16,7 +16,8 @@ sealed interface SpeechEvent {
 }
 
 @SingleIn(AppScope::class)
-class SpeechEventBus @Inject constructor() {
+@Inject
+class SpeechEventBus() {
 
     private val log = logging("SpeechEventBus")
 

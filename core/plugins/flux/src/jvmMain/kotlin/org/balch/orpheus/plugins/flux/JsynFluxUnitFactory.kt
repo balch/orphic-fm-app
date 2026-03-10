@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.FluxUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class JsynFluxUnitFactory @Inject constructor() : FluxUnit.Factory {
+@Inject
+class JsynFluxUnitFactory() : FluxUnit.Factory {
     override fun create(): FluxUnit = JsynFluxUnit()
 }

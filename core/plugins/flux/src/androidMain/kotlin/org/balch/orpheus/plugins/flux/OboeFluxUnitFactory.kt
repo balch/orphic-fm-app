@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.FluxUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class OboeFluxUnitFactory @Inject constructor() : FluxUnit.Factory {
+@Inject
+class OboeFluxUnitFactory() : FluxUnit.Factory {
     override fun create(): FluxUnit = OboeFluxUnit()
 }

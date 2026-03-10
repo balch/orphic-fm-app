@@ -7,7 +7,8 @@ import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspFactoryImpl @Inject constructor(
+@Inject
+class DspFactoryImpl(
     private val sineFactory: SineOscillator.Factory,
     private val triangleFactory: TriangleOscillator.Factory,
     private val squareFactory: SquareOscillator.Factory,

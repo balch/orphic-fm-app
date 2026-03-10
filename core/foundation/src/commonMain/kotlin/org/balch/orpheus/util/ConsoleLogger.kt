@@ -26,7 +26,8 @@ data class LogEntry(
  * when logging is disabled.
  */
 @SingleIn(AppScope::class)
-class ConsoleLogger @Inject constructor() : Logger {
+@Inject
+class ConsoleLogger() : Logger {
 
     @PublishedApi
     internal var enabled: Boolean = true

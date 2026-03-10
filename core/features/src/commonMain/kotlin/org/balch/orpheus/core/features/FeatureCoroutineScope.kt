@@ -14,7 +14,8 @@ import org.balch.orpheus.core.di.FeatureScope
  * when the app's ViewModelStore is cleared.
  */
 @SingleIn(FeatureScope::class)
-class FeatureCoroutineScope @Inject constructor() : CoroutineScope {
+@Inject
+class FeatureCoroutineScope() : CoroutineScope {
     private val job = SupervisorJob()
     override val coroutineContext = job + Dispatchers.Main.immediate
     fun cancel() { job.cancel() }

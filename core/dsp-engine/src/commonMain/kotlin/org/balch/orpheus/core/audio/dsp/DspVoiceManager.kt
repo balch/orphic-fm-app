@@ -12,7 +12,8 @@ import kotlin.math.pow
  * Manages the lifecycle, state, and parameters of the 12 DSP voices.
  */
 @SingleIn(AppScope::class)
-class DspVoiceManager @Inject constructor(
+@Inject
+class DspVoiceManager(
     private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory,
     private val pluginProvider: DspPluginProvider,

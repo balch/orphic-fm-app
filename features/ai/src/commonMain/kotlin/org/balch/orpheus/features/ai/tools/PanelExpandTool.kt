@@ -3,14 +3,14 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
-import org.balch.orpheus.features.ai.PanelExpansionEventBus
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.features.ai.PanelExpansionEventBus
 
 @Serializable
 data class PanelExpandArgs(
@@ -38,7 +38,8 @@ data class PanelExpandResult(
  * - Focus on specific panels during tutorials
  */
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
-class PanelExpandTool @Inject constructor(
+@Inject
+class PanelExpandTool(
     private val panelExpansionEventBus: PanelExpansionEventBus
 ) : ToolProvider {
 

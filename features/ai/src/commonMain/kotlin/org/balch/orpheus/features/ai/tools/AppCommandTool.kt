@@ -3,20 +3,19 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonClassDiscriminator
-import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.ai.AiModel
 import org.balch.orpheus.core.ai.AiModelProvider
+import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.ai.currentKoogModel
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.tidal.TidalRepl
 
 /**
@@ -59,7 +58,8 @@ data class AppCommandResult(
  * Tool for executing built-in commands to control the app
  */
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
-class AppCommandTool @Inject constructor(
+@Inject
+class AppCommandTool(
     private val tidalRepl: TidalRepl,
     private val aiModelProvider: AiModelProvider,
 ) : ToolProvider {

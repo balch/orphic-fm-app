@@ -4,8 +4,8 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.binding
 import dev.zacsweers.metro.SingleIn
+import dev.zacsweers.metro.binding
 
 /**
  * Oboe-backed AudioEngine for Android using liborpheus_dsp.
@@ -13,7 +13,8 @@ import dev.zacsweers.metro.SingleIn
  */
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, binding = binding<AudioEngine>())
-class OboeAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
+@Inject
+class OboeAudioEngine() : AudioEngine, NativeDspBridge {
     private val bridge = OboeAudioBridge()
 
     init {

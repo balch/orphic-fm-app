@@ -11,7 +11,8 @@ import org.balch.orpheus.core.tempo.GlobalTempo
  * Handles bus creation, plugin interconnection, and voice routing.
  */
 @SingleIn(AppScope::class)
-class DspWiringGraph @Inject constructor(
+@Inject
+class DspWiringGraph(
     private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory,
     private val pluginProvider: DspPluginProvider,

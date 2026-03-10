@@ -48,8 +48,9 @@ enum class AiModel(
  * 
  * Persists model selection via preferences and exposes reactive state.
  */
+@Inject
 @SingleIn(AppScope::class)
-class AiModelProvider @Inject constructor(
+class AiModelProvider(
     private val preferencesRepository: AppPreferencesRepository,
     private val dispatcherProvider: DispatcherProvider,
 ) {

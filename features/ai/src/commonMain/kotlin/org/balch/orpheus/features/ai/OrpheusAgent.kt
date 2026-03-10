@@ -54,7 +54,8 @@ import kotlin.time.ExperimentalTime
  * Uses Gemini to provide expert advice on sounds and can control the synth.
  */
 @SingleIn(FeatureScope::class)
-class OrpheusAgent @Inject constructor(
+@Inject
+class OrpheusAgent(
     private val config: OrpheusAgentConfig,
     private val aiKeyRepository: AiKeyRepository,
     private val aiModelProvider: AiModelProvider,

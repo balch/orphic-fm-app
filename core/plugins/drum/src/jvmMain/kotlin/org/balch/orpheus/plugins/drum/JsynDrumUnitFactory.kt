@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.DrumUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class JsynDrumUnitFactory @Inject constructor() : DrumUnit.Factory {
+@Inject
+class JsynDrumUnitFactory() : DrumUnit.Factory {
     override fun create(): DrumUnit = JsynDrumUnit()
 }

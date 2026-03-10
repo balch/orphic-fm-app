@@ -20,7 +20,8 @@ All feature ViewModels follow this MVI pattern:
 2. `@Immutable data class *PanelActions` — action lambdas with `EMPTY` companion
 3. `private sealed interface *Intent` — one variant per control
 4. `interface *Feature : SynthFeature<UiState, Actions>` — with `SynthControlDescriptor` (panelId, title, markdown docs, portControlKeys)
-5. `@Inject class *ViewModel` — takes `SynthController`, `DispatcherProvider`, `FeatureCoroutineScope`
+5. `@Inject
+class *ViewModel` — takes `SynthController`, `DispatcherProvider`, `FeatureCoroutineScope`
    - `controlFlow()` per port symbol
    - `actions` wired to setters (floatSetter, enumSetter, boolSetter, or custom)
    - `merge()` control flows → `scan()` reducer → `stateIn()`

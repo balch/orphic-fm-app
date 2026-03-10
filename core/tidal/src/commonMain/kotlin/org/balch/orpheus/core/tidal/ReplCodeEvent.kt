@@ -45,7 +45,8 @@ sealed interface ReplCodeEvent {
  * AiOptionsViewModel to track generation state.
  */
 @SingleIn(AppScope::class)
-class ReplCodeEventBus @Inject constructor() {
+@Inject
+class ReplCodeEventBus() {
     
     private val log = logging("ReplCodeEventBus")
     

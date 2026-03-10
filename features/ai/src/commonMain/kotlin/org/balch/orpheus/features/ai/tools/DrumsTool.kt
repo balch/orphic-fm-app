@@ -2,7 +2,6 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -11,6 +10,7 @@ import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortSymbol
 import org.balch.orpheus.core.plugin.PortValue
@@ -155,7 +155,8 @@ data class DrumsControlResult(val success: Boolean, val message: String)
  * 5. Switch modes (BEATS_MODE) for dramatic pattern changes
  */
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
-class DrumsTool @Inject constructor(
+@Inject
+class DrumsTool(
     private val synthController: SynthController
 ) : ToolProvider {
 

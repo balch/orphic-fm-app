@@ -3,16 +3,16 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
-import org.balch.orpheus.ui.panels.PanelSetRegistry
-import org.balch.orpheus.core.panels.panelSet
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.panels.panelSet
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
+import org.balch.orpheus.ui.panels.PanelSetRegistry
 
 @Serializable
 data class PanelSetArgs(
@@ -44,7 +44,8 @@ data class PanelSetResult(
  * - create: Build a new panel set from panel IDs, add to registry, and activate it
  */
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
-class PanelSetTool @Inject constructor(
+@Inject
+class PanelSetTool(
     private val registry: PanelSetRegistry,
     private val eventBus: PanelExpansionEventBus,
 ) : ToolProvider {

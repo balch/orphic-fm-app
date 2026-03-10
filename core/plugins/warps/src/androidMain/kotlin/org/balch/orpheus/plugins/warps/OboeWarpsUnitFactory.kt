@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.WarpsUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class OboeWarpsUnitFactory @Inject constructor() : WarpsUnit.Factory {
+@Inject
+class OboeWarpsUnitFactory() : WarpsUnit.Factory {
     override fun create(): WarpsUnit = OboeWarpsUnit()
 }

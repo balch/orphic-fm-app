@@ -59,7 +59,8 @@ data class HoldEvent(
  * needing to know about specific protocols like MIDI or OSC.
  */
 @SingleIn(AppScope::class)
-class SynthController @Inject constructor() {
+@Inject
+class SynthController() {
 
     // Private mutable flows
     private val _onPulseStart = MutableSharedFlow<Int>(

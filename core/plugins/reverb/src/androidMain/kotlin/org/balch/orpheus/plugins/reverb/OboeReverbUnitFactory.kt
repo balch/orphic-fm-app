@@ -8,6 +8,7 @@ import org.balch.orpheus.core.audio.dsp.ReverbUnit
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class OboeReverbUnitFactory @Inject constructor() : ReverbUnit.Factory {
+@Inject
+class OboeReverbUnitFactory() : ReverbUnit.Factory {
     override fun create(): ReverbUnit = OboeReverbUnit()
 }

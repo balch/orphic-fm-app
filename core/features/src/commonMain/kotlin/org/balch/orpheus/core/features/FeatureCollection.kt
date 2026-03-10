@@ -19,7 +19,8 @@ import kotlin.reflect.KClass
  * AI tools inject this directly for feature access without needing the ViewModel.
  */
 @SingleIn(FeatureScope::class)
-class FeatureCollection @Inject constructor(
+@Inject
+class FeatureCollection(
     private val providers: Map<KClass<*>, Provider<SynthFeature<*, *>>>,
 ) : AutoCloseable {
     private val log = logging("FeatureCollection")

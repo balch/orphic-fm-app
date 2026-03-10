@@ -54,7 +54,8 @@ sealed class ModeChangeEvent {
  * which are then handled by AiOptionsViewModel.
  */
 @SingleIn(AppScope::class)
-class ModeChangeEventBus @Inject constructor() {
+@Inject
+class ModeChangeEventBus() {
 
     private val log = logging("ModeChangeEventBus")
 

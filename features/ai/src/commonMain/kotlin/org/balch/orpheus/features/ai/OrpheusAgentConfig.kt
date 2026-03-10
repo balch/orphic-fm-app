@@ -9,25 +9,24 @@ import ai.koog.agents.core.dsl.extension.nodeLLMSendMultipleToolResults
 import ai.koog.agents.core.dsl.extension.onMultipleAssistantMessages
 import ai.koog.agents.core.dsl.extension.onMultipleToolCalls
 import ai.koog.agents.core.environment.ReceivedToolResult
-import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.ext.tool.ExitTool
 import ai.koog.prompt.llm.LLModel
 import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.Provider
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.ai.AiModelProvider
-import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.ai.ToolProvider
 import org.balch.orpheus.core.ai.currentKoogModel
 import org.balch.orpheus.core.config.AppConfig
-import org.balch.orpheus.core.ai.ToolProvider
+import org.balch.orpheus.core.di.FeatureScope
 import kotlin.time.ExperimentalTime
 
 /**
  * Configuration for the Orpheus AI agent persona and behavior.
  */
 @SingleIn(FeatureScope::class)
-class OrpheusAgentConfig @Inject constructor(
+@Inject
+class OrpheusAgentConfig(
     private val toolSet: Set<ToolProvider>,
     private val aiModelProvider: AiModelProvider,
 ) {

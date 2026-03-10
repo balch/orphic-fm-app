@@ -2,10 +2,10 @@ package org.balch.orpheus.features.ai
 
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCollection
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
-import org.balch.orpheus.core.features.FeatureCollection
-import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.input.KeyBinding
 
 /**
@@ -15,7 +15,8 @@ import org.balch.orpheus.core.input.KeyBinding
  * lookup-by-panel, search-by-query, and find-panel-for-control.
  */
 @SingleIn(FeatureScope::class)
-class UserManualRegistry @Inject constructor(
+@Inject
+class UserManualRegistry(
     private val featureCollection: FeatureCollection
 ) {
     private val features get() = featureCollection.allFeatures

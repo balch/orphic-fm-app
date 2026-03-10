@@ -15,7 +15,8 @@ import org.balch.orpheus.core.panels.PanelSet
  * Starts empty; the app module seeds it with factory sets.
  */
 @SingleIn(AppScope::class)
-class PanelSetRegistry @Inject constructor() {
+@Inject
+class PanelSetRegistry() {
 
     private val log = logging("PanelSetRegistry")
 

@@ -7,24 +7,28 @@ import dev.zacsweers.metro.SingleIn
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspSineOscillatorFactory @Inject constructor() : SineOscillator.Factory {
+@Inject
+class DspSineOscillatorFactory() : SineOscillator.Factory {
     override fun create(): SineOscillator = DspSineOscillator()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspTriangleOscillatorFactory @Inject constructor() : TriangleOscillator.Factory {
+@Inject
+class DspTriangleOscillatorFactory() : TriangleOscillator.Factory {
     override fun create(): TriangleOscillator = DspTriangleOscillator()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspSquareOscillatorFactory @Inject constructor() : SquareOscillator.Factory {
+@Inject
+class DspSquareOscillatorFactory() : SquareOscillator.Factory {
     override fun create(): SquareOscillator = DspSquareOscillator()
 }
 
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class DspSawtoothOscillatorFactory @Inject constructor() : SawtoothOscillator.Factory {
+@Inject
+class DspSawtoothOscillatorFactory() : SawtoothOscillator.Factory {
     override fun create(): SawtoothOscillator = DspSawtoothOscillator()
 }

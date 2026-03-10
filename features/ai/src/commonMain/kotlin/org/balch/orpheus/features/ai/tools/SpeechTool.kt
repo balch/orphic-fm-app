@@ -3,17 +3,17 @@ package org.balch.orpheus.features.ai.tools
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
-import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
@@ -65,7 +65,8 @@ data class SpeechResult(
  * If `words` is provided, uses the synth LPC engine. Can be overridden with `mode`.
  */
 @ContributesIntoSet(FeatureScope::class, binding = binding<ToolProvider>())
-class SpeechTool @Inject constructor(
+@Inject
+class SpeechTool(
     private val synthController: SynthController,
     private val synthEngine: SynthEngine,
     private val ttsGenerator: TtsGenerator,

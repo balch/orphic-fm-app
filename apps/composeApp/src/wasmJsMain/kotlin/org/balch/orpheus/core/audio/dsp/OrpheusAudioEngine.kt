@@ -22,9 +22,10 @@ import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_VIBRATO
  * per timer tick to maintain a target queue depth in the worklet, absorbing
  * jitter from setInterval and GC pauses.
  */
+@Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class, binding = binding<AudioEngine>())
-class OrpheusAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
+class OrpheusAudioEngine: AudioEngine, NativeDspBridge {
     private val scheduler = DspGraphScheduler()
     private var audioContext: AudioContext? = null
     private var workletNode: AudioWorkletNode? = null
@@ -72,6 +73,7 @@ class OrpheusAudioEngine @Inject constructor() : AudioEngine, NativeDspBridge {
         loadWorklet(ctx)
     }
 
+    @OptIn(ExperimentalWasmJsInterop::class)
     private fun loadWorklet(ctx: AudioContext) {
         val promise = jsAddWorkletModule(ctx, "dsp-output-processor.js")
         jsPromiseThen(promise) {

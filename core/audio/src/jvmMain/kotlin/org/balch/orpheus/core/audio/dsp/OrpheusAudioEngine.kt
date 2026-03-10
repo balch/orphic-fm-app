@@ -11,7 +11,8 @@ import java.util.Arrays
  * JVM actual implementation of AudioEngine using JSyn.
  */
 @SingleIn(AppScope::class)
-class OrpheusAudioEngine @Inject constructor() : AudioEngine {
+@Inject
+class OrpheusAudioEngine() : AudioEngine {
     private val synth = JSyn.createSynthesizer()
     private val lineOut = LineOut()
 
