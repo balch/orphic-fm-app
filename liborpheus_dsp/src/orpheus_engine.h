@@ -153,14 +153,18 @@ struct OrpheusEngine {
     // ── Voice Coupling ─────────────────────────────────
     float voice_envelope[kNumVoices] = {};             // peak follower per voice
     std::atomic<float> coupling_depth{0.0f};           // 0 = off, scales partner env → pitch
+    std::atomic<float> total_feedback{0.0f};           // master output → LFO feedback (0-1)
 
     // ── Mod Source Routing + FM ─────────────────────────
     static constexpr int kNumDuos = 6;
-    float voice_last_output[kNumVoices] = {};          // previous block's last audio sample (for VOICE_FM cross-mod)
+    // Previous block's full output per voice (for audio-rate VOICE_FM cross-mod).
+    // Stores post-VCA, post-gain signal (includes envelope shaping and kEngine0OutGain
+    // or kOrpheusOutGain), matching JSyn where voiceA.output connects post-VCA.
+    float voice_fm_buffer[kNumVoices][kMaxFrames] = {};
     float marbles_cv_output[2] = {};                   // cached Marbles X1/X2 CV
     std::atomic<int> mod_source[kNumDuos] = {};        // per-duo: 0=VOICE_FM, 1=OFF, 2=LFO, 3=FLUX (Kotlin ModSource ordinals)
     std::atomic<float> mod_depth[kNumDuos] = {};       // per-duo timbre mod depth
-    std::atomic<float> fm_depth[kNumDuos] = {};        // per-duo FM depth (semitones)
+    std::atomic<float> fm_depth[kNumDuos] = {};        // per-duo FM depth (0-1, scaled to ±200Hz matching JSyn)
     std::atomic<int> fm_cross_quad{0};                 // 0=duo pairs, 1=cross-quad circular
 
     // ── Marbles Random Sequencer ─────────────────────
@@ -230,12 +234,16 @@ struct OrpheusEngine {
     float smooth_master_volume{0.7f};
     float smooth_vibrato_depth{0.0f};
     float smooth_coupling_depth{0.0f};
+    float smooth_total_feedback{0.0f};
     float smooth_reverb_amount{0.0f};
     float smooth_mod_depth[kNumDuos] = {};
     float smooth_fm_depth[kNumDuos] = {};
 
-    // ── Vibrato (LFO → pitch modulation) ─────────────────────
-    std::atomic<float> vibrato_depth{0.0f};    // 0..1 → 0..2 semitones pitch mod
+    // ── Vibrato (dedicated sine oscillator → pitch modulation) ──
+    std::atomic<float> vibrato_depth{0.0f};    // 0..1 → depth * 20 Hz pitch mod
+    std::atomic<float> vibrato_rate{5.0f};     // Hz (JSyn VibratoPlugin default = 5 Hz)
+    float vibrato_phase{0.0f};                 // dedicated vibrato oscillator phase [0..1)
+    float vibrato_output_buffer[kMaxFrames]{}; // per-sample vibrato in Hz
 
     // ── HyperLFO (dual oscillator with logic combination) ─
     float lfo_phase_a{0.0f};
@@ -358,6 +366,10 @@ struct OrpheusEngine {
     // Slide bar
     std::atomic<float> slide_bar_y{0.0f};
     std::atomic<float> slide_bar_x{0.0f};
+
+    // Pre-allocated scratch unit for Plaits fallback in duo voice rendering.
+    // Avoids ~27KB stack allocation + zero-init on every audio block.
+    GraphUnit plaits_fallback_unit;
 
     // Output arrays (read by unit_process_plaits)
     float voice_bend_cv[kNumMainVoices] = {};          // pitch bend Hz offset per voice (matches JSyn benderDepth=100Hz)

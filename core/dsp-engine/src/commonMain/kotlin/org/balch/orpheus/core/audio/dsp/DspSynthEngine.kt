@@ -123,6 +123,7 @@ class DspSynthEngine(
                     DistortionSymbol.DRIVE.controlId -> { setDrive(value.asFloat()); true }
                     DelaySymbol.MIX.controlId -> { setDelayMix(value.asFloat()); true }
                     VibratoSymbol.DEPTH.controlId -> { setVibrato(value.asFloat()); true }
+                    VibratoSymbol.RATE.controlId -> { nativeBridge?.nativeSetVibratoRate(value.asFloat()); true }
                     ResonatorSymbol.MODE.controlId -> { setResonatorMode(value.asInt()); true }
                     ResonatorSymbol.STRUCTURE.controlId -> { setResonatorStructure(value.asFloat()); true }
                     ResonatorSymbol.BRIGHTNESS.controlId -> { setResonatorBrightness(value.asFloat()); true }
@@ -164,11 +165,13 @@ class DspSynthEngine(
             val engineOrdinal = vp.getDuoEngine(duo)
             val voiceA = duo * 2
             val cppIndex = plaitsEngineOrdinalToCpp(engineOrdinal)
+            // Set engine BEFORE active to avoid race: audio thread may see active=1
+            // with stale engine_index=0, triggering the Plaits fallback path.
+            bridge.nativeSetVoiceEngine(voiceA, cppIndex)
+            bridge.nativeSetVoiceEngine(voiceA + 1, cppIndex)
             // Always keep voices active in C++ — it's the only audio path on Android
             bridge.nativeSetVoiceActive(voiceA, true)
             bridge.nativeSetVoiceActive(voiceA + 1, true)
-            bridge.nativeSetVoiceEngine(voiceA, cppIndex)
-            bridge.nativeSetVoiceEngine(voiceA + 1, cppIndex)
             bridge.nativeSetVoiceHarmonics(voiceA, vp.getDuoHarmonics(duo))
             bridge.nativeSetVoiceHarmonics(voiceA + 1, vp.getDuoHarmonics(duo))
             bridge.nativeSetVoiceTimbre(voiceA, vp.getDuoSharpness(duo))
@@ -210,6 +213,9 @@ class DspSynthEngine(
         bridge.nativeSetPort(lfoUri, DuoLfoSymbol.FREQ_B.symbol, getHyperLfoFreq(1))
         bridge.nativeSetPort(lfoUri, DuoLfoSymbol.MODE.symbol, getHyperLfoMode().toFloat())
         bridge.nativeSetPort(lfoUri, DuoLfoSymbol.SHAPE.symbol, getPort(DuoLfoSymbol.SHAPE)?.asFloat() ?: 1f)
+        // Sync vibrato rate (dedicated sine oscillator, default 5 Hz)
+        bridge.nativeSetVibratoRate(getPort(VibratoSymbol.RATE)?.asFloat() ?: 5f)
+        bridge.nativeSetVibrato(getVibrato())
         // Sync bender parameters
         bridge.nativeSetPort(BENDER_URI, BenderSymbol.MAX_BEND.symbol, getPort(BenderSymbol.MAX_BEND)?.asFloat() ?: 24f)
         bridge.nativeSetPort(BENDER_URI, BenderSymbol.RANDOM_DEPTH.symbol, getPort(BenderSymbol.RANDOM_DEPTH)?.asFloat() ?: 0.1f)
@@ -231,6 +237,10 @@ class DspSynthEngine(
         bridge.nativeSetPort(resoUri, "synth_ex_gain", synthEx)
         bridge.nativeSetPort(resoUri, "drum_bp_gain", 1f - drumEx)
         bridge.nativeSetPort(resoUri, "synth_bp_gain", 1f - synthEx)
+        // Sync global voice parameters
+        bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "coupling_depth", voiceManager.getVoiceCoupling())
+        bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "total_feedback", voiceManager.getTotalFeedback())
+        bridge.nativeSetPort("org.balch.orpheus.plugins.modulation", "fm_cross_quad", if (voiceManager.getFmStructureCrossQuad()) 1f else 0f)
     }
 
     private fun setupListeners() {
@@ -268,10 +278,10 @@ class DspSynthEngine(
                         // Always keep active — C++ is the only audio path on Android
                         val voiceA = index * 2
                         val cppIndex = plaitsEngineOrdinalToCpp(engineOrdinal)
-                        nativeBridge?.nativeSetVoiceActive(voiceA, true)
-                        nativeBridge?.nativeSetVoiceActive(voiceA + 1, true)
                         nativeBridge?.nativeSetVoiceEngine(voiceA, cppIndex)
                         nativeBridge?.nativeSetVoiceEngine(voiceA + 1, cppIndex)
+                        nativeBridge?.nativeSetVoiceActive(voiceA, true)
+                        nativeBridge?.nativeSetVoiceActive(voiceA + 1, true)
                         // Speech engine: override C++ morph with per-voice envSpeed for word selection
                         if (engineOrdinal == SPEECH_ENGINE_ORDINAL) {
                             val vp = pluginProvider.voicePlugin
@@ -811,13 +821,20 @@ class DspSynthEngine(
     }
     override fun setVoiceWobble(index: Int, wobbleOffset: Float, range: Float) = voiceManager.setVoiceWobble(index, wobbleOffset, range)
     override fun setDuoModSource(duoIndex: Int, source: ModSource) = voiceManager.setDuoModSource(duoIndex, source)
-    override fun setFmStructure(crossQuad: Boolean) = voiceManager.setFmStructure(crossQuad)
+    override fun setFmStructure(crossQuad: Boolean) {
+        voiceManager.setFmStructure(crossQuad)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.modulation", "fm_cross_quad", if (crossQuad) 1f else 0f)
+    }
 
     override fun setTotalFeedback(amount: Float) {
         voiceManager.setTotalFeedback(amount)
         wiringGraph.totalFbGain.inputB.set(amount * 20.0)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "total_feedback", amount)
     }
-    override fun setVoiceCoupling(amount: Float) = voiceManager.setVoiceCoupling(amount)
+    override fun setVoiceCoupling(amount: Float) {
+        voiceManager.setVoiceCoupling(amount)
+        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "coupling_depth", amount)
+    }
 
     // Trigger delegations
     override fun triggerDrum(type: Int, accent: Float, frequency: Float, tone: Float, decay: Float, p4: Float, p5: Float) {

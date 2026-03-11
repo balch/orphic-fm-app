@@ -42,6 +42,7 @@ class OboeAudioBridge {
     external fun nativeSetDrive(value: Float)
     external fun nativeSetDelayMix(value: Float)
     external fun nativeSetVibrato(value: Float)
+    external fun nativeSetVibratoRate(value: Float)
     external fun nativeSetBend(value: Float)
     external fun nativeGetMonitor(out: FloatArray)
     external fun nativeLoadGraph(serialized: ByteArray): Int

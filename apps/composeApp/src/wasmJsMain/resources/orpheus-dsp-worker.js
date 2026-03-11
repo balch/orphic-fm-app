@@ -33,6 +33,7 @@ const CMD_SET_DELAY_MIX     = 22;
 const CMD_SET_VIBRATO       = 23;
 const CMD_SET_BEND          = 24;
 const CMD_VOICE_DECAY       = 25;
+const CMD_SET_VIBRATO_RATE  = 26;
 const CMD_LOAD_GRAPH        = 30;
 
 /* ── State ── */
@@ -266,6 +267,12 @@ function handleCommand(msg) {
         case CMD_SET_VIBRATO:
             if (engine) {
                 Module._wasm_engine_set_vibrato(engine, msg.val);
+            }
+            break;
+
+        case CMD_SET_VIBRATO_RATE:
+            if (engine) {
+                Module._wasm_engine_set_vibrato_rate(engine, msg.val);
             }
             break;
 

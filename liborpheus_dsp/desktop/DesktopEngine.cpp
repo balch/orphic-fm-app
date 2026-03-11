@@ -103,6 +103,9 @@ void DesktopEngine::setDelayMix(float v) {
 void DesktopEngine::setVibrato(float v) {
     if (dsp_engine_) orpheus_engine_set_vibrato(dsp_engine_, v);
 }
+void DesktopEngine::setVibratoRate(float hz) {
+    if (dsp_engine_) orpheus_engine_set_vibrato_rate(dsp_engine_, hz);
+}
 void DesktopEngine::setBend(float v) {
     if (dsp_engine_) orpheus_engine_set_bend(dsp_engine_, v);
 }

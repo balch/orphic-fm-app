@@ -42,34 +42,39 @@ static constexpr int kOrpheusBlockSize = 24;
 // Number of registered Plaits engines.
 static constexpr int kOrpheusMaxEngines = 24;
 
+// Engine 0 (triangle/square oscillator) output gain.
+// Balances Engine 0 level against Plaits engines so switching engines
+// doesn't produce a jarring volume jump.
+static constexpr float kEngine0OutGain = 0.65f;
+
 // Per-engine output gain for Orpheus voice rendering.
-// Engines 0-7 (bank 2): default 0.3.
+// Engines 0-7 (bank 2): default 0.45.
 // Engines 8-23: tuned per engine for balanced output.
 static const float kOrpheusOutGain[kOrpheusMaxEngines] = {
-    0.3f,   //  0: VirtualAnalogVCF (no Kotlin impl, default)
-    0.3f,   //  1: PhaseDistortion (no Kotlin impl)
-    0.3f,   //  2: SixOp FM1 (no Kotlin impl)
-    0.3f,   //  3: SixOp FM2 (no Kotlin impl)
-    0.3f,   //  4: SixOp FM3 (no Kotlin impl)
-    0.3f,   //  5: WaveTerrain (no Kotlin impl)
-    0.3f,   //  6: StringMachine (no Kotlin impl)
-    0.3f,   //  7: Chiptune (no Kotlin impl)
-    0.30f,  //  8: VirtualAnalog
-    0.25f,  //  9: Waveshaping
-    0.30f,  // 10: FM
-    0.30f,  // 11: Grain
-    0.30f,  // 12: Additive
-    0.50f,  // 13: Wavetable
-    0.30f,  // 14: Chord
-    0.50f,  // 15: Speech
-    0.30f,  // 16: Swarm
-    0.30f,  // 17: Noise
-    0.30f,  // 18: Particle
-    0.30f,  // 19: String
-    0.30f,  // 20: Modal
-    0.80f,  // 21: BassDrum  (matches Kotlin AnalogBassDrumEngine)
-    0.80f,  // 22: SnareDrum (matches Kotlin AnalogSnareDrumEngine)
-    0.80f,  // 23: HiHat     (matches Kotlin MetallicHiHatEngine)
+    0.45f,  //  0: VirtualAnalogVCF (no Kotlin impl, default)
+    0.45f,  //  1: PhaseDistortion (no Kotlin impl)
+    0.45f,  //  2: SixOp FM1 (no Kotlin impl)
+    0.45f,  //  3: SixOp FM2 (no Kotlin impl)
+    0.45f,  //  4: SixOp FM3 (no Kotlin impl)
+    0.45f,  //  5: WaveTerrain (no Kotlin impl)
+    0.45f,  //  6: StringMachine (no Kotlin impl)
+    0.45f,  //  7: Chiptune (no Kotlin impl)
+    0.45f,  //  8: VirtualAnalog
+    0.38f,  //  9: Waveshaping
+    0.45f,  // 10: FM
+    0.55f,  // 11: Grain
+    0.45f,  // 12: Additive
+    0.70f,  // 13: Wavetable
+    0.45f,  // 14: Chord
+    0.70f,  // 15: Speech
+    0.45f,  // 16: Swarm
+    0.65f,  // 17: Noise
+    0.45f,  // 18: Particle
+    0.75f,  // 19: String
+    0.65f,  // 20: Modal
+    1.00f,  // 21: BassDrum  (matches Kotlin AnalogBassDrumEngine)
+    1.00f,  // 22: SnareDrum (matches Kotlin AnalogSnareDrumEngine)
+    1.00f,  // 23: HiHat     (matches Kotlin MetallicHiHatEngine)
 };
 
 // Soft saturation matching Kotlin DspPlaitsUnit.softLimit():

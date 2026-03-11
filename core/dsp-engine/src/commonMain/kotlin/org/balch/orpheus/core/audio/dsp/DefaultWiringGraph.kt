@@ -33,21 +33,37 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
 
     val voiceOutsL = mutableListOf<UnitRef>()
     val voiceOutsR = mutableListOf<UnitRef>()
-    val plaitsUnits = mutableListOf<UnitRef>()
+    val duoVoiceUnits = mutableListOf<UnitRef>()
 
-    for (v in 0 until 12) {
-        val p = plaits("v${v}_p") { moduleIndex = v.toFloat() }
-        plaitsUnits.add(p)
-        val vol = multiply("v${v}_vol") { inputB = 1.0f }
-        val (gl, gr) = panGains(defaultPans[v])
-        val pL = multiply("v${v}_pL") { inputB = gl }
-        val pR = multiply("v${v}_pR") { inputB = gr }
+    for (duo in 0 until 6) {
+        val vA = duo * 2
+        val vB = vA + 1
+        val dv = duoVoice("duo${duo}_dv") { moduleIndex = duo.toFloat() }
+        duoVoiceUnits.add(dv)
 
-        p.out to vol.inputA
-        vol.out to pL.inputA
-        vol.out to pR.inputA
-        voiceOutsL.add(pL)
-        voiceOutsR.add(pR)
+        // Voice A downstream: volume + pan
+        val volA = multiply("v${vA}_vol") { inputB = 1.0f }
+        val (glA, grA) = panGains(defaultPans[vA])
+        val pLA = multiply("v${vA}_pL") { inputB = glA }
+        val pRA = multiply("v${vA}_pR") { inputB = grA }
+
+        dv.out to volA.inputA       // OPORT_OUT = voice A
+        volA.out to pLA.inputA
+        volA.out to pRA.inputA
+        voiceOutsL.add(pLA)
+        voiceOutsR.add(pRA)
+
+        // Voice B downstream: volume + pan
+        val volB = multiply("v${vB}_vol") { inputB = 1.0f }
+        val (glB, grB) = panGains(defaultPans[vB])
+        val pLB = multiply("v${vB}_pL") { inputB = glB }
+        val pRB = multiply("v${vB}_pR") { inputB = grB }
+
+        dv.aux to volB.inputA       // OPORT_AUX = voice B
+        volB.out to pLB.inputA
+        volB.out to pRB.inputA
+        voiceOutsL.add(pLB)
+        voiceOutsR.add(pRB)
     }
 
     // ── Dedicated drum voices (3 slots) ──

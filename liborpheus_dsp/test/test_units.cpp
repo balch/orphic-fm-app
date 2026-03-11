@@ -287,10 +287,10 @@ static bool test_fm_modulation() {
         unit_process_plaits(&v1, engine, 128, 48000.0f);
     }
 
-    float out0 = engine->voice_last_output[0];
-    float out1 = engine->voice_last_output[1];
+    float out0 = engine->voice_fm_buffer[0][127];  // last sample of 128-frame buffer
+    float out1 = engine->voice_fm_buffer[1][127];
     printf("Voice 0 last output: %.4f, Voice 1: %.4f\n", out0, out1);
-    bool pass = out0 > 0.001f && out1 > 0.001f;
+    bool pass = std::fabs(out0) > 0.001f && std::fabs(out1) > 0.001f;
     printf("FM modulation test: %s\n", pass ? "PASS" : "FAIL");
 
     orpheus_engine_destroy(engine);
@@ -384,6 +384,81 @@ static bool test_per_string_bender() {
     return pass;
 }
 
+static bool test_duo_voice_fm() {
+    printf("\n=== Test: Duo voice FM rendering ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    // Set up duo 0: voices 0 and 1, both active
+    engine->voice_params[0].active.store(1);
+    engine->voice_params[0].ever_triggered.store(1);
+    engine->voice_params[0].engine_index.store(-1);
+    engine->voice_params[0].tune.store(60.0f);
+    engine->voice_params[0].gate.store(1);
+    engine->voice_params[0].timbre.store(0.0f);
+    engine->voice_params[0].morph.store(0.0f);
+    engine->voice_params[0].decay.store(0.0f);
+
+    engine->voice_params[1].active.store(1);
+    engine->voice_params[1].ever_triggered.store(1);
+    engine->voice_params[1].engine_index.store(-1);
+    engine->voice_params[1].tune.store(67.0f);
+    engine->voice_params[1].gate.store(1);
+    engine->voice_params[1].timbre.store(0.0f);
+    engine->voice_params[1].morph.store(0.0f);
+    engine->voice_params[1].decay.store(0.0f);
+
+    // Enable VOICE_FM cross-modulation for duo 0
+    engine->mod_source[0].store(0);  // VOICE_FM
+    engine->fm_depth[0].store(0.5f);
+
+    GraphUnit duo_unit = {};
+    duo_unit.type = UNIT_DUO_VOICE;
+    duo_unit.enabled = true;
+    duo_unit.state.module.index = 0;
+    unit_init(&duo_unit, 48000.0f);
+
+    // Render 100 blocks of 128 samples
+    for (int i = 0; i < 100; i++) {
+        unit_process_duo_voice(&duo_unit, engine, 128, 48000.0f);
+    }
+
+    // Check voice A output (OPORT_OUT = 0) peak > 0.01
+    float peak_a = 0.0f;
+    for (int i = 0; i < 128; i++) {
+        float v = std::fabs(duo_unit.output_buffers[OPORT_OUT][i]);
+        if (v > peak_a) peak_a = v;
+    }
+
+    // Check voice B output (OPORT_AUX = 2) peak > 0.01
+    float peak_b = 0.0f;
+    for (int i = 0; i < 128; i++) {
+        float v = std::fabs(duo_unit.output_buffers[OPORT_AUX][i]);
+        if (v > peak_b) peak_b = v;
+    }
+
+    // Check cross-mod asymmetry: A and B outputs differ (diff_rms > 0.001)
+    float diff_sum_sq = 0.0f;
+    for (int i = 0; i < 128; i++) {
+        float d = duo_unit.output_buffers[OPORT_OUT][i] - duo_unit.output_buffers[OPORT_AUX][i];
+        diff_sum_sq += d * d;
+    }
+    float diff_rms = std::sqrt(diff_sum_sq / 128.0f);
+
+    printf("Voice A peak: %.4f, Voice B peak: %.4f\n", peak_a, peak_b);
+    printf("A vs B diff RMS: %.4f\n", diff_rms);
+
+    bool output_pass = peak_a > 0.01f && peak_b > 0.01f;
+    bool asym_pass = diff_rms > 0.001f;
+    printf("Output presence test: %s (A=%.4f, B=%.4f)\n", output_pass ? "PASS" : "FAIL", peak_a, peak_b);
+    printf("Cross-mod asymmetry test: %s (diff_rms=%.4f)\n", asym_pass ? "PASS" : "FAIL", diff_rms);
+
+    bool pass = output_pass && asym_pass;
+    printf("Duo voice FM test: %s\n", pass ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 bool run_unit_tests() {
     bool all_pass = true;
     all_pass &= test_voice_coupling();
@@ -394,5 +469,6 @@ bool run_unit_tests() {
     all_pass &= test_looper();
     all_pass &= test_bender();
     all_pass &= test_per_string_bender();
+    all_pass &= test_duo_voice_fm();
     return all_pass;
 }

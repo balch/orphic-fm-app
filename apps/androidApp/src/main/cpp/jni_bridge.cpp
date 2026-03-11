@@ -168,6 +168,12 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVibrato(
 }
 
 JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetVibratoRate(
+        JNIEnv *env, jobject thiz, jfloat value) {
+    sEngine.setVibratoRate(value);
+}
+
+JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetBend(
         JNIEnv *env, jobject thiz, jfloat value) {
     sEngine.setBend(value);

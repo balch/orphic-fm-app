@@ -142,6 +142,7 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
     override fun nativeSetDrive(value: Float) = bridge.nativeSetDrive(value)
     override fun nativeSetDelayMix(value: Float) = bridge.nativeSetDelayMix(value)
     override fun nativeSetVibrato(value: Float) = bridge.nativeSetVibrato(value)
+    override fun nativeSetVibratoRate(value: Float) = bridge.nativeSetVibratoRate(value)
     override fun nativeSetBend(value: Float) = bridge.nativeSetBend(value)
     override fun nativeSetPort(uri: String, symbol: String, value: Float) = bridge.nativeSetPort(uri, symbol, value)
     override fun nativeGetPort(uri: String, symbol: String): Float = bridge.nativeGetPort(uri, symbol)

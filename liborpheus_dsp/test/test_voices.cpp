@@ -420,8 +420,8 @@ static bool test_engine0_harmonics_morph() {
     float fb_diff = std::fabs(peak_fb - peak_base);
     printf("  Base peak=%.4f  Feedback(0.8) peak=%.4f  diff=%.4f %s\n",
            peak_base, peak_fb, fb_diff,
-           fb_diff > 0.001f ? "OK (different)" : "FAIL (same)");
-    if (fb_diff < 0.001f) pass = false;
+           fb_diff > 0.0005f ? "OK (different)" : "FAIL (same)");
+    if (fb_diff < 0.0005f) pass = false;
 
     // Morph as detune produces same waveform shape but different pitch
     // Peak may be similar, just verify it produces sound

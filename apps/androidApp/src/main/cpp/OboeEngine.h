@@ -43,6 +43,7 @@ public:
     void setDrive(float v);
     void setDelayMix(float v);
     void setVibrato(float v);
+    void setVibratoRate(float hz);
     void setBend(float v);
     void getMonitor(OrpheusMonitorData* out);
 

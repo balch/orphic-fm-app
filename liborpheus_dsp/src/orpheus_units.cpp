@@ -423,16 +423,15 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     // ── Smoothing coefficient for this block ──────────────────
     float sc = smooth_coeff(sr);
 
-    // ── LFO vibrato modulation ───────────────────────────────
-    // Per-sample LFO buffer for Engine 0; block-midpoint for Plaits engines
-    float vib_target = engine->vibrato_depth.load(std::memory_order_relaxed);
-    engine->smooth_vibrato_depth += sc * (vib_target - engine->smooth_vibrato_depth);
-    float vibrato_depth = engine->smooth_vibrato_depth;
-    float lfo_mid = engine->lfo_output_buffer[num_frames / 2];
-    float vibrato_semitones = lfo_mid * vibrato_depth * 2.0f;
+    // ── Vibrato modulation ───────────────────────────────────
+    // Block-midpoint from dedicated vibrato buffer (Hz domain, matches JSyn)
+    float vibrato_hz_mid = engine->vibrato_output_buffer[num_frames / 2];
+    // For Plaits: convert Hz to semitones for tune offset
+    float base_freq = 440.0f * std::pow(2.0f, (vp.tune.load(std::memory_order_relaxed) - 69.0f) / 12.0f);
+    float vibrato_semitones = (base_freq > 1.0f) ? 12.0f * std::log2(1.0f + vibrato_hz_mid / base_freq) : 0.0f;
 
     // ── Voice coupling: partner envelope → pitch modulation ──
-    float coupling_offset = 0.0f;
+    float coupling_hz = 0.0f;
     {
         float cp_target = engine->coupling_depth.load(std::memory_order_relaxed);
         engine->smooth_coupling_depth += sc * (cp_target - engine->smooth_coupling_depth);
@@ -440,20 +439,32 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         if (coupling > 0.001f) {
             int partner = (idx % 2 == 0) ? idx + 1 : idx - 1;
             if (partner >= 0 && partner < kNumVoices) {
-                coupling_offset = engine->voice_envelope[partner] * coupling * 24.0f;
+                coupling_hz = engine->voice_envelope[partner] * coupling * 30.0f;
             }
         }
     }
 
     // ── Mod source routing: FM + timbre modulation ──────
-    float fm_mod_semitones = 0.0f;
+    // JSyn architecture:
+    //   Engine 0: modInput → fmDepthControl → fmFreqMixer = linear FM in Hz (±200Hz).
+    //             ALL mod sources (VOICE_FM, LFO, FLUX) go through this path.
+    //   Plaits:   modInput → timbreModDepth = timbre modulation only (no pitch FM).
+    //             ALL mod sources go through timbre mod, not frequency.
+    //
+    // For Engine 0, VOICE_FM uses per-sample audio-rate FM from the partner's
+    // output buffer. LFO uses per-sample from lfo_output_buffer. FLUX uses
+    // block-rate from marbles CV.
     float timbre_mod_offset = 0.0f;
+    int fm_mod_source = -1;      // 0=VOICE_FM, 2=LFO, 3=FLUX (-1=OFF)
+    int fm_voice_idx = -1;       // partner voice index (only for VOICE_FM)
+    float fm_depth_smoothed = 0.0f;
+    float fm_flux_signal = 0.0f; // block-rate FLUX signal for Engine 0 FM
     {
         int duo = idx / 2;
         if (duo < OrpheusEngine::kNumDuos) {
             // Kotlin ModSource enum: VOICE_FM=0, OFF=1, LFO=2, FLUX=3
             int src = engine->mod_source[duo].load(std::memory_order_relaxed);
-            float mod_signal = 0.0f;
+            float mod_signal = 0.0f;  // block-level signal for Plaits timbre mod
             if (src == 0) { // VOICE_FM
                 int fm_source;
                 if (!engine->fm_cross_quad.load(std::memory_order_relaxed)) {
@@ -462,20 +473,26 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     fm_source = (idx - 2 + 8) % 8;
                 }
                 if (fm_source >= 0 && fm_source < kNumVoices) {
-                    mod_signal = engine->voice_last_output[fm_source];
+                    fm_mod_source = 0;
+                    fm_voice_idx = fm_source;
+                    // For Plaits timbre mod, use mid-point of partner's buffer
+                    mod_signal = engine->voice_fm_buffer[fm_source][num_frames / 2];
                 }
             } else if (src == 2) { // LFO
-                mod_signal = lfo_mid;
+                fm_mod_source = 2;
+                mod_signal = engine->lfo_output_buffer[num_frames / 2];
             } else if (src == 3) { // FLUX (Marbles CV)
-                mod_signal = engine->marbles_cv_output[duo % 2];
+                fm_mod_source = 3;
+                fm_flux_signal = engine->marbles_cv_output[duo % 2];
+                mod_signal = fm_flux_signal;
             }
-            // src == 1 (OFF) leaves mod_signal = 0.0f
+            // src == 1 (OFF) leaves fm_mod_source = -1
             float md_target = engine->mod_depth[duo].load(std::memory_order_relaxed);
             float fd_target = engine->fm_depth[duo].load(std::memory_order_relaxed);
             engine->smooth_mod_depth[duo] += sc * (md_target - engine->smooth_mod_depth[duo]);
             engine->smooth_fm_depth[duo] += sc * (fd_target - engine->smooth_fm_depth[duo]);
             timbre_mod_offset = mod_signal * engine->smooth_mod_depth[duo];
-            fm_mod_semitones = mod_signal * engine->smooth_fm_depth[duo] * 24.0f;
+            fm_depth_smoothed = engine->smooth_fm_depth[duo];
         }
     }
 
@@ -498,9 +515,12 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         //         here we use it as a subtle frequency spread: morph * 50 cents)
         float feedback_amount = vp.harmonics.load(std::memory_order_relaxed);
         float morph_val = vp.morph.load(std::memory_order_relaxed);
-        float detune_semitones = morph_val * (50.0f / 100.0f);  // 0-0.5 semitones
+        // Detune: ±morph × 25 cents (matching JSyn: MAX_DETUNE=50 cents, split ±half)
+        // Voice A (even idx) gets positive detune, Voice B (odd) gets negative
+        float detune_sign = (idx % 2 == 0) ? 1.0f : -1.0f;
+        float detune_semitones = detune_sign * morph_val * (25.0f / 100.0f);
 
-        float base_note = vp.tune.load(std::memory_order_relaxed) + coupling_offset + fm_mod_semitones + detune_semitones;
+        float base_note = vp.tune.load(std::memory_order_relaxed) + detune_semitones;
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
 
         // Compute ADSR parameters from envSpeed
@@ -510,24 +530,36 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         float voice_peak = 0.0f;
         for (int i = 0; i < num_frames; i++) {
-            // Per-sample LFO vibrato modulation
+            // Per-sample vibrato + LFO modulation
             float lfo_i = engine->lfo_output_buffer[i];
-            float vib_semi = lfo_i * vibrato_depth * 2.0f;
-            float note = base_note + vib_semi;
-            float freq = 440.0f * std::pow(2.0f, (note - 69.0f) / 12.0f);
-            freq += bend_hz;  // Bend applied as Hz offset (matches JSyn benderDepth architecture)
+            float vib_hz_i = engine->vibrato_output_buffer[i];  // Hz from dedicated vibrato osc
+            float freq = 440.0f * std::pow(2.0f, (base_note - 69.0f) / 12.0f);
+            freq += vib_hz_i;     // Vibrato in Hz (matches JSyn VibratoPlugin)
+            freq += bend_hz;      // Bend applied as Hz offset (matches JSyn benderDepth architecture)
+            freq += coupling_hz;  // Coupling applied as Hz offset (matches JSyn couplingDepth × 30Hz)
 
-            // Self-feedback: previous output modulates phase for FM-like timbre
-            float fb_offset = osc.prev_output * feedback_amount * 0.3f;
+            // Linear FM in Hz — matches JSyn: fmFreqMixer = (fmSignal * fmDepth * 200Hz) + baseFreq
+            // All mod sources modulate Engine 0 frequency through the same path.
+            if (fm_mod_source == 0 && fm_voice_idx >= 0) {
+                // VOICE_FM: per-sample from partner's previous output buffer
+                float fm_sample = engine->voice_fm_buffer[fm_voice_idx][i];
+                freq += fm_sample * fm_depth_smoothed * 200.0f;
+            } else if (fm_mod_source == 2) {
+                // LFO: per-sample from lfo_output_buffer (audio-rate)
+                float lfo_fm = engine->lfo_output_buffer[i];
+                freq += lfo_fm * fm_depth_smoothed * 200.0f;
+            } else if (fm_mod_source == 3) {
+                // FLUX: block-rate from marbles CV
+                freq += fm_flux_signal * fm_depth_smoothed * 200.0f;
+            }
+
+            // Self-feedback as FM (matches JSyn: oscOutput * feedbackAmount * 200Hz)
+            freq += osc.prev_output * feedback_amount * 200.0f;
 
             // Triangle oscillator: 4×|phase-0.5| - 1
-            float tri_phase_mod = osc.tri_phase + fb_offset;
-            tri_phase_mod -= std::floor(tri_phase_mod);
-            float tri = 4.0f * std::fabs(tri_phase_mod - 0.5f) - 1.0f;
+            float tri = 4.0f * std::fabs(osc.tri_phase - 0.5f) - 1.0f;
             // Square oscillator
-            float sq_phase_mod = osc.sq_phase + fb_offset;
-            sq_phase_mod -= std::floor(sq_phase_mod);
-            float sq = (sq_phase_mod < 0.5f) ? 1.0f : -1.0f;
+            float sq = (osc.sq_phase < 0.5f) ? 1.0f : -1.0f;
 
             // Crossfade: (tri × (1-sharp)) + (sq × sharp)
             float audio = tri * (1.0f - sharpness) + sq * sharpness;
@@ -576,7 +608,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             float vca = osc.env_level + osc.hold_smoothed;
             float sample = audio * vca;
             osc.prev_output = audio;  // store pre-VCA for feedback
-            out[i] = sample;
+            out[i] = sample * kEngine0OutGain;
 
             float abs_s = std::fabs(sample);
             if (abs_s > voice_peak) voice_peak = abs_s;
@@ -591,13 +623,16 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
 
-        // Store last audio sample for VOICE_FM cross-modulation (not peak —
-        // peak gives a DC envelope that sounds like an LFO ramp instead of FM)
-        engine->voice_last_output[idx] = out[num_frames - 1];
+        // Store full output buffer for audio-rate VOICE_FM cross-modulation
+        std::memcpy(engine->voice_fm_buffer[idx], out, num_frames * sizeof(float));
 
-        // Update peak follower for voice coupling
-        engine->voice_envelope[idx] = engine->voice_envelope[idx] * 0.999f
-                                     + 0.001f * voice_peak;
+        // Update peak follower for voice coupling (150ms half-life, matching JSyn PeakFollower)
+        {
+            float env_decay = 1.0f - 0.693f / (sr * 0.15f);
+            float env = engine->voice_envelope[idx];
+            env = (voice_peak > env) ? (1.0f - env_decay) * voice_peak + env_decay * env : env * env_decay;
+            engine->voice_envelope[idx] = env;
+        }
 
     } else {
         // ═══ PLAITS ENGINES (1+): Render via OrpheusVoice (direct Engine::Render) ═══
@@ -617,12 +652,14 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             vp.engine_changed.store(0, std::memory_order_relaxed);
         }
 
-        // Compute note with bend applied as Hz offset (matches JSyn benderDepth architecture)
-        float note_raw = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones + coupling_offset + fm_mod_semitones;
+        // Plaits note: NO fm_mod_semitones — in JSyn, VOICE_FM only modulates
+        // Plaits timbre (via plaitsTimbreModInput), not pitch. Frequency FM is
+        // Engine 0 only, applied per-sample in the oscillator loop above.
+        float note_raw = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones;
         float note;
-        if (std::fabs(bend_hz) > 0.01f) {
+        if (std::fabs(bend_hz) > 0.01f || std::fabs(coupling_hz) > 0.01f) {
             float base_freq = 440.0f * std::pow(2.0f, (note_raw - 69.0f) / 12.0f);
-            float bent_freq = base_freq + bend_hz;
+            float bent_freq = base_freq + bend_hz + coupling_hz;
             note = (bent_freq > 0.0f) ? 69.0f + 12.0f * std::log2f(bent_freq / 440.0f) : note_raw;
         } else {
             note = note_raw;
@@ -706,13 +743,16 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             }
         }
 
-        // Store last audio sample for VOICE_FM cross-modulation (not peak —
-        // peak gives a DC envelope that sounds like an LFO ramp instead of FM)
-        engine->voice_last_output[idx] = out[num_frames - 1];
+        // Store full output buffer for audio-rate VOICE_FM cross-modulation
+        std::memcpy(engine->voice_fm_buffer[idx], out, num_frames * sizeof(float));
 
-        // Update peak follower for voice coupling
-        engine->voice_envelope[idx] = engine->voice_envelope[idx] * 0.999f
-                                     + 0.001f * voice_peak;
+        // Update peak follower for voice coupling (150ms half-life, matching JSyn PeakFollower)
+        {
+            float env_decay = 1.0f - 0.693f / (sr * 0.15f);
+            float env = engine->voice_envelope[idx];
+            env = (voice_peak > env) ? (1.0f - env_decay) * voice_peak + env_decay * env : env * env_decay;
+            engine->voice_envelope[idx] = env;
+        }
 
         // Clear gate for drum voices (one-shot triggers)
         if (idx >= kDrumVoiceStart && actual_gate) {
@@ -1038,10 +1078,23 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     float shape = engine->lfo_shape.load(std::memory_order_relaxed);
     int mode = engine->lfo_mode.load(std::memory_order_relaxed);
 
-    float inc_a = freq_a / sr;
-    float inc_b = freq_b / sr;
     float phase_a = engine->lfo_phase_a;
     float phase_b = engine->lfo_phase_b;
+
+    // Total feedback: master output peak modulates LFO frequency (FM, not AM).
+    // Matches JSyn: peakOutput → totalFbGain(amount*20) → Add → LFO.frequency
+    // The feedback signal is added to the LFO base frequency in Hz.
+    float fb_target = engine->total_feedback.load(std::memory_order_relaxed);
+    engine->smooth_total_feedback += smooth_coeff(sr) * (fb_target - engine->smooth_total_feedback);
+    float fb_amount = engine->smooth_total_feedback;
+    float master_peak = std::max(
+        engine->peak_left.load(std::memory_order_relaxed),
+        engine->peak_right.load(std::memory_order_relaxed));
+    float fb_hz = master_peak * fb_amount * 20.0f;  // Hz offset added to LFO freq
+
+    // Compute per-sample phase increments with feedback FM
+    float inc_a = (freq_a + fb_hz) / sr;
+    float inc_b = (freq_b + fb_hz) / sr;
 
     auto gen_wave = [](float phase, float shp) -> float {
         float sq = phase < 0.5f ? 1.0f : -1.0f;
@@ -1068,6 +1121,7 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
         } else { // OFF (mode=1) — silence
             output = 0.0f;
         }
+
         out[i] = output;
 
         phase_a += inc_a;
@@ -1085,6 +1139,23 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
 
     // LFO source (3) for warps routing
     std::memcpy(engine->warps_source_buffers[3], out, num_frames * sizeof(float));
+
+    // ── Dedicated vibrato sine oscillator ──────────────────────
+    // Separate from HyperLFO (matches JSyn VibratoPlugin architecture).
+    // Outputs Hz offset: sine(rate) * depth * 20 Hz
+    float vib_depth = engine->vibrato_depth.load(std::memory_order_relaxed);
+    float vib_depth_hz = vib_depth * 20.0f;  // 0..1 → 0..20 Hz (matches JSyn: depth * 20)
+    float vib_rate = engine->vibrato_rate.load(std::memory_order_relaxed);
+    float vib_phase_inc = vib_rate / sr;
+    float vib_phase = engine->vibrato_phase;
+
+    for (int i = 0; i < num_frames; i++) {
+        float vib_sine = std::sin(vib_phase * 6.283185307f);
+        engine->vibrato_output_buffer[i] = vib_sine * vib_depth_hz;
+        vib_phase += vib_phase_inc;
+        if (vib_phase >= 1.0f) vib_phase -= 1.0f;
+    }
+    engine->vibrato_phase = vib_phase;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2033,4 +2104,424 @@ void unit_process_looper(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 break;
         }
     }
+}
+
+// ── Duo Voice ──────────────────────────────────────────────────────────────────
+// Renders both voices of a duo pair in a single per-sample loop for
+// sample-coherent cross-modulation:
+//   Voice A sample[i] is immediately available to Voice B sample[i] (zero delay)
+//   Voice B sample[i] feeds back to Voice A sample[i+1] (1-sample delay, matching JSyn)
+
+void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
+    int duo = u->state.module.index;
+    int idxA = duo * 2;
+    int idxB = idxA + 1;
+
+    float* outA = u->output_buffers[OPORT_OUT];
+    float* outB = u->output_buffers[OPORT_AUX];
+
+    if (duo < 0 || duo >= OrpheusEngine::kNumDuos ||
+        idxA >= kNumMainVoices || idxB >= kNumMainVoices) {
+        std::memset(outA, 0, num_frames * sizeof(float));
+        std::memset(outB, 0, num_frames * sizeof(float));
+        return;
+    }
+
+    auto& vpA = engine->voice_params[idxA];
+    auto& vpB = engine->voice_params[idxB];
+
+    bool activeA = vpA.active.load(std::memory_order_relaxed) &&
+                   vpA.ever_triggered.load(std::memory_order_relaxed);
+    bool activeB = vpB.active.load(std::memory_order_relaxed) &&
+                   vpB.ever_triggered.load(std::memory_order_relaxed);
+
+    if (!activeA && !activeB) {
+        std::memset(outA, 0, num_frames * sizeof(float));
+        std::memset(outB, 0, num_frames * sizeof(float));
+        engine->voice_levels[idxA].store(0.0f, std::memory_order_relaxed);
+        engine->voice_levels[idxB].store(0.0f, std::memory_order_relaxed);
+        return;
+    }
+
+    // ── Plaits fallback: delegate to unit_process_plaits per voice ──
+    // UNIT_DUO_VOICE only implements Engine 0 sample-coherent rendering.
+    // If either voice uses a Plaits engine, fall back to independent rendering.
+    int engineA = vpA.engine_index.load(std::memory_order_relaxed);
+    int engineB = vpB.engine_index.load(std::memory_order_relaxed);
+    if (engineA >= 0 || engineB >= 0) {
+        // Pre-smooth coupling/FM/mod once per block, then save+restore around
+        // the two unit_process_plaits calls to prevent double-smoothing.
+        // (unit_process_plaits applies the same smoothing internally)
+        float sc = smooth_coeff(sr);
+        float cp_target = engine->coupling_depth.load(std::memory_order_relaxed);
+        engine->smooth_coupling_depth += sc * (cp_target - engine->smooth_coupling_depth);
+        float fd_target = engine->fm_depth[duo].load(std::memory_order_relaxed);
+        engine->smooth_fm_depth[duo] += sc * (fd_target - engine->smooth_fm_depth[duo]);
+        float md_target = engine->mod_depth[duo].load(std::memory_order_relaxed);
+        engine->smooth_mod_depth[duo] += sc * (md_target - engine->smooth_mod_depth[duo]);
+
+        float saved_coupling = engine->smooth_coupling_depth;
+        float saved_fm = engine->smooth_fm_depth[duo];
+        float saved_mod = engine->smooth_mod_depth[duo];
+
+        auto& tmp = engine->plaits_fallback_unit;
+        std::memset(&tmp, 0, sizeof(tmp));
+        tmp.type = UNIT_PLAITS;
+        tmp.enabled = true;
+
+        tmp.state.module.index = idxA;
+        unit_process_plaits(&tmp, engine, num_frames, sr);
+        std::memcpy(outA, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
+
+        // Restore smoothed state so B sees the same once-smoothed values
+        engine->smooth_coupling_depth = saved_coupling;
+        engine->smooth_fm_depth[duo] = saved_fm;
+        engine->smooth_mod_depth[duo] = saved_mod;
+
+        tmp.state.module.index = idxB;
+        std::memset(tmp.output_buffers, 0, sizeof(tmp.output_buffers));
+        unit_process_plaits(&tmp, engine, num_frames, sr);
+        std::memcpy(outB, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
+
+        // Restore final correct state (smoothed exactly once this block)
+        engine->smooth_coupling_depth = saved_coupling;
+        engine->smooth_fm_depth[duo] = saved_fm;
+        engine->smooth_mod_depth[duo] = saved_mod;
+        return;
+    }
+
+    // ── Block-rate setup ──────────────────────────────────────────
+    float sc = smooth_coeff(sr);
+
+    // Vibrato: read from dedicated sine oscillator buffer (computed in HyperLFO unit)
+    // vibrato_output_buffer already contains sine(rate) * depth * 20 Hz
+
+    // Coupling depth (shared, smoothed)
+    float cp_target = engine->coupling_depth.load(std::memory_order_relaxed);
+    engine->smooth_coupling_depth += sc * (cp_target - engine->smooth_coupling_depth);
+    float coupling = engine->smooth_coupling_depth;
+
+    // FM mod source + depth (per-duo, smoothed)
+    int src = engine->mod_source[duo].load(std::memory_order_relaxed);
+    float fd_target = engine->fm_depth[duo].load(std::memory_order_relaxed);
+    engine->smooth_fm_depth[duo] += sc * (fd_target - engine->smooth_fm_depth[duo]);
+    float fm_depth_smoothed = engine->smooth_fm_depth[duo];
+
+    // FM source routing
+    // Kotlin ModSource: 0=VOICE_FM, 1=OFF, 2=LFO, 3=FLUX
+    int fm_mod_source = -1;
+    float fm_flux_signal = 0.0f;
+    // For VOICE_FM in duo mode, A reads from B and B reads from A (default)
+    // With cross-quad: A reads from A's cross-quad source, B reads from B's cross-quad source
+    int fm_source_for_A = -1;
+    int fm_source_for_B = -1;
+    if (src == 0) { // VOICE_FM
+        fm_mod_source = 0;
+        if (!engine->fm_cross_quad.load(std::memory_order_relaxed)) {
+            // Standard duo pairs: A reads B, B reads A
+            fm_source_for_A = idxB;
+            fm_source_for_B = idxA;
+        } else {
+            // Cross-quad circular: each voice reads from (idx-2+8)%8
+            fm_source_for_A = (idxA - 2 + 8) % 8;
+            fm_source_for_B = (idxB - 2 + 8) % 8;
+        }
+    } else if (src == 2) { // LFO
+        fm_mod_source = 2;
+    } else if (src == 3) { // FLUX
+        fm_mod_source = 3;
+        fm_flux_signal = engine->marbles_cv_output[duo % 2];
+    }
+
+    // ── Per-voice parameters ──────────────────────────────────────
+    // Voice A
+    int gateA = vpA.gate.load(std::memory_order_relaxed);
+    float env_speedA = vpA.decay.load(std::memory_order_relaxed);
+    float raw_holdA = engine->voice_hold_level[idxA].load(std::memory_order_relaxed);
+    float scaled_holdA = compute_scaled_hold(raw_holdA, env_speedA);
+    float feedbackA = vpA.harmonics.load(std::memory_order_relaxed);
+    float morph_valA = vpA.morph.load(std::memory_order_relaxed);
+    // Voice A: positive detune (+morph × 25 cents, matching JSyn ±split)
+    float detune_semiA = morph_valA * (25.0f / 100.0f);
+    float base_noteA = vpA.tune.load(std::memory_order_relaxed) + detune_semiA;
+    float sharpnessA = vpA.timbre.load(std::memory_order_relaxed);
+    float bend_hzA = engine->voice_bend_cv[idxA];
+    float bend_volA = engine->voice_mix_cv[idxA];
+
+    float attack_rateA, decay_coeffA, sustain_levelA, release_coeffA;
+    compute_adsr_from_speed(env_speedA, sr, attack_rateA, decay_coeffA,
+                             sustain_levelA, release_coeffA);
+
+    // Voice B
+    int gateB = vpB.gate.load(std::memory_order_relaxed);
+    float env_speedB = vpB.decay.load(std::memory_order_relaxed);
+    float raw_holdB = engine->voice_hold_level[idxB].load(std::memory_order_relaxed);
+    float scaled_holdB = compute_scaled_hold(raw_holdB, env_speedB);
+    float feedbackB = vpB.harmonics.load(std::memory_order_relaxed);
+    float morph_valB = vpB.morph.load(std::memory_order_relaxed);
+    // Voice B: negative detune (-morph × 25 cents, matching JSyn ±split)
+    float detune_semiB = -morph_valB * (25.0f / 100.0f);
+    float base_noteB = vpB.tune.load(std::memory_order_relaxed) + detune_semiB;
+    float sharpnessB = vpB.timbre.load(std::memory_order_relaxed);
+    float bend_hzB = engine->voice_bend_cv[idxB];
+    float bend_volB = engine->voice_mix_cv[idxB];
+
+    float attack_rateB, decay_coeffB, sustain_levelB, release_coeffB;
+    compute_adsr_from_speed(env_speedB, sr, attack_rateB, decay_coeffB,
+                             sustain_levelB, release_coeffB);
+
+    auto& oscA = engine->voice_osc_state[idxA];
+    auto& oscB = engine->voice_osc_state[idxB];
+
+    // Hold smoothing coefficient (~20ms)
+    float hold_coeff = 50.0f / sr;
+
+    // ── Cross-mod init: load last sample from previous block ──────
+    // For Voice A reading Voice B: use last sample of B's previous fm_buffer
+    // For Voice B reading Voice A: use last sample of A's current output (computed this sample)
+    float prev_outB = (num_frames > 0) ?
+        engine->voice_fm_buffer[idxB][num_frames - 1] : 0.0f;
+
+    // ── Idle voice checks ─────────────────────────────────────────
+    bool idleA = !activeA ||
+        (oscA.env_stage == 0 && scaled_holdA < 0.001f && gateA == 0);
+    bool idleB = !activeB ||
+        (oscB.env_stage == 0 && scaled_holdB < 0.001f && gateB == 0);
+
+    if (idleA && idleB) {
+        std::memset(outA, 0, num_frames * sizeof(float));
+        std::memset(outB, 0, num_frames * sizeof(float));
+        engine->voice_levels[idxA].store(0.0f, std::memory_order_relaxed);
+        engine->voice_levels[idxB].store(0.0f, std::memory_order_relaxed);
+        return;
+    }
+
+    // ── Per-sample peak follower coefficient for coupling ──────────
+    // JSyn PeakFollower uses 150ms half-life. Per-sample:
+    //   decay = e^(-ln(2) / (sr * 0.15)) ≈ 0.99990 at 48kHz
+    // Uses fast attack / slow decay (matching unit_process_plaits).
+    float env_decay = 1.0f - 0.693f / (sr * 0.15f);  // ~150ms half-life
+    float envA = engine->voice_envelope[idxA];
+    float envB = engine->voice_envelope[idxB];
+
+    // ── Per-sample loop ───────────────────────────────────────────
+    float peakA = 0.0f, peakB = 0.0f;
+
+    for (int i = 0; i < num_frames; i++) {
+        float vib_hz = engine->vibrato_output_buffer[i];  // Hz offset from dedicated vibrato osc
+
+        // ── Voice A ──────────────────────────────────────────
+        float sampleA = 0.0f;
+        if (!idleA) {
+            float freqA = 440.0f * std::pow(2.0f, (base_noteA - 69.0f) / 12.0f);
+            freqA += vib_hz;   // vibrato in Hz (matches JSyn: VibratoPlugin sine * depth * 20)
+            freqA += bend_hzA;
+
+            // Coupling: B's per-sample envelope → A's pitch
+            if (coupling > 0.001f) {
+                freqA += envB * coupling * 30.0f;
+            }
+
+            // FM modulation
+            if (fm_mod_source == 0 && fm_source_for_A >= 0) {
+                // VOICE_FM: per-sample from B's previous output (1-sample delay)
+                // In standard duo mode, fm_source_for_A == idxB, so we use prev_outB
+                // In cross-quad mode, fm_source_for_A may be a different voice — use buffer
+                if (fm_source_for_A == idxB) {
+                    freqA += prev_outB * fm_depth_smoothed * 200.0f;
+                } else {
+                    freqA += engine->voice_fm_buffer[fm_source_for_A][i] * fm_depth_smoothed * 200.0f;
+                }
+            } else if (fm_mod_source == 2) {
+                freqA += engine->lfo_output_buffer[i] * fm_depth_smoothed * 200.0f;
+            } else if (fm_mod_source == 3) {
+                freqA += fm_flux_signal * fm_depth_smoothed * 200.0f;
+            }
+
+            // Self-feedback as FM (matches JSyn: oscOutput * feedbackAmount * 200Hz)
+            freqA += oscA.prev_output * feedbackA * 200.0f;
+
+            // Triangle oscillator
+            float triA = 4.0f * std::fabs(oscA.tri_phase - 0.5f) - 1.0f;
+
+            // Square oscillator
+            float sqA = (oscA.sq_phase < 0.5f) ? 1.0f : -1.0f;
+
+            // Crossfade
+            float audioA = triA * (1.0f - sharpnessA) + sqA * sharpnessA;
+
+            // Advance phases
+            float phase_incA = freqA / sr;
+            oscA.tri_phase += phase_incA;
+            oscA.tri_phase -= std::floor(oscA.tri_phase);
+            oscA.sq_phase += phase_incA;
+            oscA.sq_phase -= std::floor(oscA.sq_phase);
+
+            // ADSR envelope
+            bool gate_onA = gateA != 0;
+            if (gate_onA && !oscA.env_gate_was_on) oscA.env_stage = 1;
+            if (!gate_onA && oscA.env_gate_was_on) oscA.env_stage = 4;
+            oscA.env_gate_was_on = gate_onA;
+
+            switch (oscA.env_stage) {
+                case 1:
+                    oscA.env_level += attack_rateA;
+                    if (oscA.env_level >= 1.0f) { oscA.env_level = 1.0f; oscA.env_stage = 2; }
+                    break;
+                case 2:
+                    oscA.env_level = sustain_levelA +
+                                     (oscA.env_level - sustain_levelA) * decay_coeffA;
+                    if (oscA.env_level - sustain_levelA < 0.0001f) {
+                        oscA.env_level = sustain_levelA; oscA.env_stage = 3;
+                    }
+                    break;
+                case 3:
+                    oscA.env_level = sustain_levelA;
+                    break;
+                case 4:
+                    oscA.env_level *= release_coeffA;
+                    if (oscA.env_level < 0.0001f) { oscA.env_level = 0.0f; oscA.env_stage = 0; }
+                    break;
+                default:
+                    oscA.env_level = 0.0f;
+                    break;
+            }
+
+            // Hold ramp
+            oscA.hold_smoothed += hold_coeff * (scaled_holdA - oscA.hold_smoothed);
+
+            // VCA
+            float vcaA = oscA.env_level + oscA.hold_smoothed;
+            sampleA = audioA * vcaA * kEngine0OutGain;
+            oscA.prev_output = audioA;  // pre-VCA for feedback
+
+            float absA = std::fabs(sampleA);
+            if (absA > peakA) peakA = absA;
+
+            // Update A's envelope per-sample (150ms half-life peak follower)
+            // Fast attack / slow decay — matches unit_process_plaits peak follower
+            envA = (absA > envA) ? (1.0f - env_decay) * absA + env_decay * envA : envA * env_decay;
+        }
+        outA[i] = sampleA;
+
+        // ── Voice B ──────────────────────────────────────────
+        float sampleB = 0.0f;
+        if (!idleB) {
+            float freqB = 440.0f * std::pow(2.0f, (base_noteB - 69.0f) / 12.0f);
+            freqB += vib_hz;   // vibrato in Hz (same oscillator for both voices)
+            freqB += bend_hzB;
+
+            // Coupling: A's per-sample envelope → B's pitch
+            if (coupling > 0.001f) {
+                freqB += envA * coupling * 30.0f;
+            }
+
+            // FM modulation
+            if (fm_mod_source == 0 && fm_source_for_B >= 0) {
+                // VOICE_FM: per-sample from A's CURRENT output (zero delay!)
+                // In standard duo mode, fm_source_for_B == idxA, so we use sampleA directly
+                // In cross-quad mode, fm_source_for_B may be a different voice — use buffer
+                if (fm_source_for_B == idxA) {
+                    freqB += sampleA * fm_depth_smoothed * 200.0f;
+                } else {
+                    freqB += engine->voice_fm_buffer[fm_source_for_B][i] * fm_depth_smoothed * 200.0f;
+                }
+            } else if (fm_mod_source == 2) {
+                freqB += engine->lfo_output_buffer[i] * fm_depth_smoothed * 200.0f;
+            } else if (fm_mod_source == 3) {
+                freqB += fm_flux_signal * fm_depth_smoothed * 200.0f;
+            }
+
+            // Self-feedback as FM (matches JSyn: oscOutput * feedbackAmount * 200Hz)
+            freqB += oscB.prev_output * feedbackB * 200.0f;
+
+            // Triangle oscillator
+            float triB = 4.0f * std::fabs(oscB.tri_phase - 0.5f) - 1.0f;
+
+            // Square oscillator
+            float sqB = (oscB.sq_phase < 0.5f) ? 1.0f : -1.0f;
+
+            // Crossfade
+            float audioB = triB * (1.0f - sharpnessB) + sqB * sharpnessB;
+
+            // Advance phases
+            float phase_incB = freqB / sr;
+            oscB.tri_phase += phase_incB;
+            oscB.tri_phase -= std::floor(oscB.tri_phase);
+            oscB.sq_phase += phase_incB;
+            oscB.sq_phase -= std::floor(oscB.sq_phase);
+
+            // ADSR envelope
+            bool gate_onB = gateB != 0;
+            if (gate_onB && !oscB.env_gate_was_on) oscB.env_stage = 1;
+            if (!gate_onB && oscB.env_gate_was_on) oscB.env_stage = 4;
+            oscB.env_gate_was_on = gate_onB;
+
+            switch (oscB.env_stage) {
+                case 1:
+                    oscB.env_level += attack_rateB;
+                    if (oscB.env_level >= 1.0f) { oscB.env_level = 1.0f; oscB.env_stage = 2; }
+                    break;
+                case 2:
+                    oscB.env_level = sustain_levelB +
+                                     (oscB.env_level - sustain_levelB) * decay_coeffB;
+                    if (oscB.env_level - sustain_levelB < 0.0001f) {
+                        oscB.env_level = sustain_levelB; oscB.env_stage = 3;
+                    }
+                    break;
+                case 3:
+                    oscB.env_level = sustain_levelB;
+                    break;
+                case 4:
+                    oscB.env_level *= release_coeffB;
+                    if (oscB.env_level < 0.0001f) { oscB.env_level = 0.0f; oscB.env_stage = 0; }
+                    break;
+                default:
+                    oscB.env_level = 0.0f;
+                    break;
+            }
+
+            // Hold ramp
+            oscB.hold_smoothed += hold_coeff * (scaled_holdB - oscB.hold_smoothed);
+
+            // VCA
+            float vcaB = oscB.env_level + oscB.hold_smoothed;
+            sampleB = audioB * vcaB * kEngine0OutGain;
+            oscB.prev_output = audioB;  // pre-VCA for feedback
+
+            float absB = std::fabs(sampleB);
+            if (absB > peakB) peakB = absB;
+
+            // Update B's envelope per-sample (150ms half-life peak follower)
+            // Fast attack / slow decay — matches unit_process_plaits peak follower
+            envB = (absB > envB) ? (1.0f - env_decay) * absB + env_decay * envB : envB * env_decay;
+        }
+        outB[i] = sampleB;
+
+        // Update prev_outB for next iteration (1-sample delay for A reading B)
+        prev_outB = sampleB;
+    }
+
+    // ── Post-processing ───────────────────────────────────────────
+
+    // Store voice levels
+    engine->voice_levels[idxA].store(peakA, std::memory_order_relaxed);
+    engine->voice_levels[idxB].store(peakB, std::memory_order_relaxed);
+
+    // Apply bender voice mix volume
+    if (bend_volA < 0.999f) {
+        for (int i = 0; i < num_frames; i++) outA[i] *= bend_volA;
+    }
+    if (bend_volB < 0.999f) {
+        for (int i = 0; i < num_frames; i++) outB[i] *= bend_volB;
+    }
+
+    // Store full output buffers for audio-rate VOICE_FM cross-modulation
+    // (used by other units that may read these voices' fm_buffers)
+    std::memcpy(engine->voice_fm_buffer[idxA], outA, num_frames * sizeof(float));
+    std::memcpy(engine->voice_fm_buffer[idxB], outB, num_frames * sizeof(float));
+
+    // Store per-sample envelope (already tracked in the loop with 150ms half-life)
+    engine->voice_envelope[idxA] = envA;
+    engine->voice_envelope[idxB] = envB;
 }

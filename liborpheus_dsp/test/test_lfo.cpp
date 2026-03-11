@@ -9,6 +9,13 @@ static void fill_lfo_buffer(OrpheusEngine* eng, float value) {
     }
 }
 
+// Fill vibrato_output_buffer with Hz offset (simulates dedicated vibrato oscillator output)
+static void fill_vibrato_buffer(OrpheusEngine* eng, float hz_offset) {
+    for (int i = 0; i < kMaxFrames; i++) {
+        eng->vibrato_output_buffer[i] = hz_offset;
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Helper: render LFO in isolation via UNIT_HYPER_LFO graph unit
 // Returns mono output buffer
@@ -431,16 +438,20 @@ static bool test_lfo_fm_modulation() {
     float sr = 48000.0f;
     int total = 48000;
 
-    // ── Baseline: no modulation ──
+    // Engine 0 (engine_index=-1): LFO as mod source modulates frequency via
+    // linear FM in Hz (matching JSyn fmFreqMixer path).
+    // Plaits engines only get timbre modulation from mod sources, not pitch FM.
+
+    // ── Baseline: no modulation (Engine 0) ──
     OrpheusEngine* eng_dry = orpheus_engine_create(sr);
     eng_dry->voice_params[0].active.store(1);
     eng_dry->voice_params[0].ever_triggered.store(1);
-    eng_dry->voice_params[0].engine_index.store(8);
+    eng_dry->voice_params[0].engine_index.store(-1);  // Engine 0 (OSC mode)
     eng_dry->voice_params[0].tune.store(60.0f);
     eng_dry->voice_params[0].gate.store(1);
-    eng_dry->voice_params[0].harmonics.store(0.5f);
-    eng_dry->voice_params[0].timbre.store(0.5f);
-    eng_dry->voice_params[0].morph.store(0.5f);
+    eng_dry->voice_params[0].harmonics.store(0.0f);
+    eng_dry->voice_params[0].timbre.store(0.0f);
+    eng_dry->voice_params[0].morph.store(0.0f);
     eng_dry->voice_params[0].decay.store(0.0f);
     eng_dry->mod_source[0].store(1); // OFF
 
@@ -455,16 +466,16 @@ static bool test_lfo_fm_modulation() {
     }
     orpheus_engine_destroy(eng_dry);
 
-    // ── With LFO FM modulation ──
+    // ── With LFO FM modulation (Engine 0) ──
     OrpheusEngine* eng_fm = orpheus_engine_create(sr);
     eng_fm->voice_params[0].active.store(1);
     eng_fm->voice_params[0].ever_triggered.store(1);
-    eng_fm->voice_params[0].engine_index.store(8);
+    eng_fm->voice_params[0].engine_index.store(-1);  // Engine 0 (OSC mode)
     eng_fm->voice_params[0].tune.store(60.0f);
     eng_fm->voice_params[0].gate.store(1);
-    eng_fm->voice_params[0].harmonics.store(0.5f);
-    eng_fm->voice_params[0].timbre.store(0.5f);
-    eng_fm->voice_params[0].morph.store(0.5f);
+    eng_fm->voice_params[0].harmonics.store(0.0f);
+    eng_fm->voice_params[0].timbre.store(0.0f);
+    eng_fm->voice_params[0].morph.store(0.0f);
     eng_fm->voice_params[0].decay.store(0.0f);
     eng_fm->mod_source[0].store(2); // LFO
     eng_fm->mod_depth[0].store(0.0f);
@@ -482,7 +493,7 @@ static bool test_lfo_fm_modulation() {
     }
     orpheus_engine_destroy(eng_fm);
 
-    // Signals should differ due to pitch modulation
+    // Signals should differ due to LFO frequency modulation
     float diff_sum = 0.0f;
     for (int i = 0; i < total; i++) {
         float d = buf_dry[i] - buf_fm[i];
@@ -492,7 +503,7 @@ static bool test_lfo_fm_modulation() {
     printf("  FM diff_rms: %.6f\n", diff_rms);
 
     if (diff_rms < 0.001f) {
-        printf("  FAIL: LFO FM modulation should change voice pitch\n");
+        printf("  FAIL: LFO FM modulation should change Engine 0 pitch\n");
         pass = false;
     } else {
         printf("  OK: LFO FM mod produces different output (pitch shift)\n");
@@ -546,8 +557,9 @@ static bool test_lfo_vibrato() {
     eng_vib->voice_params[0].timbre.store(0.5f);
     eng_vib->voice_params[0].morph.store(0.5f);
     eng_vib->voice_params[0].decay.store(0.0f);
-    eng_vib->vibrato_depth.store(1.0f); // max vibrato = 2 semitones
-    fill_lfo_buffer(eng_vib, 1.0f);   // full positive → pitch up 2 semitones
+    eng_vib->vibrato_depth.store(1.0f); // depth=1.0 → 20 Hz vibrato range
+    // Fill vibrato buffer with +20 Hz offset (simulates sine at peak with depth=1.0)
+    fill_vibrato_buffer(eng_vib, 20.0f);
 
     GraphUnit v_vib;
     setup_voice_unit(&v_vib, 0);

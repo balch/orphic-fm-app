@@ -151,6 +151,11 @@ JNI_FN(nativeSetVibrato)(JNIEnv *env, jobject thiz, jfloat value) {
 }
 
 JNIEXPORT void JNICALL
+JNI_FN(nativeSetVibratoRate)(JNIEnv *env, jobject thiz, jfloat value) {
+    sEngine.setVibratoRate(value);
+}
+
+JNIEXPORT void JNICALL
 JNI_FN(nativeSetBend)(JNIEnv *env, jobject thiz, jfloat value) {
     sEngine.setBend(value);
 }

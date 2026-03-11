@@ -7,6 +7,7 @@ import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DELAY_MIX
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DRIVE
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_MASTER_VOLUME
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_VIBRATO
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_VIBRATO_RATE
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_START
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_STOP
 
@@ -109,6 +110,11 @@ class DspWorkerProxy {
     /** Send a SET_VIBRATO command to the Worker */
     fun setVibrato(value: Float) {
         jsSendFloatCmd(CMD_SET_VIBRATO, value)
+    }
+
+    /** Send a SET_VIBRATO_RATE command to the Worker */
+    fun setVibratoRate(hz: Float) {
+        jsSendFloatCmd(CMD_SET_VIBRATO_RATE, hz)
     }
 
     /** Send a SET_BEND command to the Worker */

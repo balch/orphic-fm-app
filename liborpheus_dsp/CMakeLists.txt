@@ -135,6 +135,7 @@ if(BUILD_TESTS)
         test/test_snapshots.cpp
         test/test_headroom.cpp
         test/test_chain_compare.cpp
+        test/test_fm_compare.cpp
         test/test_benchmark.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)

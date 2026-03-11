@@ -10,6 +10,7 @@ import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DELAY_MIX
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_DRIVE
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_MASTER_VOLUME
 import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_VIBRATO
+import org.balch.orpheus.core.audio.DspWorkerProtocol.CMD_SET_VIBRATO_RATE
 
 /**
  * WASM AudioEngine implementation.
@@ -226,6 +227,10 @@ class OrpheusAudioEngine: AudioEngine, NativeDspBridge {
 
     override fun nativeSetVibrato(value: Float) {
         jsSendFloatCmd(CMD_SET_VIBRATO, value)
+    }
+
+    override fun nativeSetVibratoRate(value: Float) {
+        jsSendFloatCmd(CMD_SET_VIBRATO_RATE, value)
     }
 
     override fun nativeSetBend(value: Float) {

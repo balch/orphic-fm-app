@@ -139,6 +139,11 @@ void wasm_engine_set_vibrato(OrpheusEngine* engine, float v) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+void wasm_engine_set_vibrato_rate(OrpheusEngine* engine, float hz) {
+    orpheus_engine_set_vibrato_rate(engine, hz);
+}
+
+EMSCRIPTEN_KEEPALIVE
 void wasm_engine_set_bend(OrpheusEngine* engine, float v) {
     orpheus_engine_set_bend(engine, v);
 }

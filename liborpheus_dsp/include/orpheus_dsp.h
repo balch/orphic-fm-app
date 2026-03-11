@@ -58,6 +58,7 @@ void orpheus_engine_set_master_volume(OrpheusEngine* engine, float v);
 void orpheus_engine_set_drive(OrpheusEngine* engine, float v);
 void orpheus_engine_set_delay_mix(OrpheusEngine* engine, float v);
 void orpheus_engine_set_vibrato(OrpheusEngine* engine, float v);
+void orpheus_engine_set_vibrato_rate(OrpheusEngine* engine, float hz);
 void orpheus_engine_set_bend(OrpheusEngine* engine, float v);
 
 // ── Monitoring (polled at ~60fps from UI thread) ─

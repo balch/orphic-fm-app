@@ -28,6 +28,7 @@ const val UNIT_MARBLES = 22
 const val UNIT_LOOPER = 23
 const val UNIT_BENDER = 24
 const val UNIT_PER_STRING_BENDER = 25
+const val UNIT_DUO_VOICE = 26
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -304,6 +305,9 @@ class WiringGraphBuilder {
 
     fun perStringBender(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_PER_STRING_BENDER, name, init)
+
+    fun duoVoice(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_DUO_VOICE, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

@@ -185,6 +185,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->coupling_depth.store(value, std::memory_order_relaxed);
                 return;
             }
+            static uint16_t h_total_fb = engine_hash16("total_feedback");
+            if (symbol_hash == h_total_fb) {
+                engine->total_feedback.store(value, std::memory_order_relaxed);
+                return;
+            }
             if (symbol_hash == h_vibrato) {
                 engine->vibrato_depth.store(value, std::memory_order_relaxed);
                 return;
@@ -630,6 +635,9 @@ void orpheus_engine_set_delay_mix(OrpheusEngine* engine, float v) {
 }
 void orpheus_engine_set_vibrato(OrpheusEngine* engine, float v) {
     engine->vibrato_depth.store(v, std::memory_order_relaxed);
+}
+void orpheus_engine_set_vibrato_rate(OrpheusEngine* engine, float hz) {
+    engine->vibrato_rate.store(hz, std::memory_order_relaxed);
 }
 void orpheus_engine_set_bend(OrpheusEngine* engine, float v) {
     engine->bend_amount.store(v, std::memory_order_relaxed);

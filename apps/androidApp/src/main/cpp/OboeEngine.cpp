@@ -163,6 +163,9 @@ void OboeEngine::setDelayMix(float v) {
 void OboeEngine::setVibrato(float v) {
     if (dsp_engine_) orpheus_engine_set_vibrato(dsp_engine_, v);
 }
+void OboeEngine::setVibratoRate(float hz) {
+    if (dsp_engine_) orpheus_engine_set_vibrato_rate(dsp_engine_, hz);
+}
 void OboeEngine::setBend(float v) {
     if (dsp_engine_) orpheus_engine_set_bend(dsp_engine_, v);
 }

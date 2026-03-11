@@ -20,6 +20,7 @@ interface NativeDspBridge {
     fun nativeSetDrive(value: Float)
     fun nativeSetDelayMix(value: Float)
     fun nativeSetVibrato(value: Float)
+    fun nativeSetVibratoRate(value: Float)
     fun nativeSetBend(value: Float)
     fun nativeSetPort(uri: String, symbol: String, value: Float)
     fun nativeGetPort(uri: String, symbol: String): Float

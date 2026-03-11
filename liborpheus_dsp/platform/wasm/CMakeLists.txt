@@ -82,6 +82,7 @@ set(ORPHEUS_SRC
     "${LIB_SRC}/orpheus_monitor.cpp"
     "${LIB_SRC}/orpheus_units.cpp"
     "${LIB_SRC}/orpheus_patch.cpp"
+    "${LIB_SRC}/orpheus_resonator.cpp"
 )
 
 # ── WASM export wrappers ─────────────────────────

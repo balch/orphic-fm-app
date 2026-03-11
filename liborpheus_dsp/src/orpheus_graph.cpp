@@ -371,6 +371,8 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_bender(u, engine, num_frames, sr); break;
             case UNIT_PER_STRING_BENDER:
                 unit_process_per_string_bender(u, engine, num_frames, sr); break;
+            case UNIT_DUO_VOICE:
+                unit_process_duo_voice(u, engine, num_frames, sr); break;
             default: break;
         }
     }
