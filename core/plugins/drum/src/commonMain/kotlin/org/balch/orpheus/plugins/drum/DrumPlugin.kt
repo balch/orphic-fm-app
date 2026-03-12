@@ -14,9 +14,9 @@ import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.audio.dsp.PlaitsUnit
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.DRUM_URI
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.plugins.plaits.PlaitsEngineFactory
@@ -71,7 +71,8 @@ class DrumPlugin(
 
     // Internal state
     private var _mix = 0.7f
-    private val frequencies = FloatArray(3) { 0.5f }
+    // Musical defaults: BD low, SD mid, HH high (matching ViewModel)
+    private val frequencies = floatArrayOf(0.3f, 0.4f, 0.6f)
     private val tones = FloatArray(3) { 0.5f }
     private val decays = FloatArray(3) { 0.5f }
     private val p4s = FloatArray(3) { 0.5f }

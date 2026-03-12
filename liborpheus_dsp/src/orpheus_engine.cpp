@@ -91,6 +91,21 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     for (int i = 8; i < kNumVoices; i++)
         engine->voice_pan[i].store(0.0f);
 
+    // Default drum voice params (matching Kotlin DrumPlugin musical defaults)
+    // BD (voice 12): MIDI note 28 + 0.3*24 = 35.2 (~62Hz, low kick)
+    // SD (voice 13): MIDI note 48 + 0.4*24 = 57.6 (~220Hz, mid snare)
+    // HH (voice 14): MIDI note 60 + 0.6*24 = 74.4 (~700Hz, bright hat)
+    static const float kDrumDefaultNote[] = {35.2f, 57.6f, 74.4f};
+    static const int kDrumEngineIndices[] = {21, 22, 23};
+    for (int i = 0; i < kNumDrumVoices; i++) {
+        auto& vp = engine->voice_params[kDrumVoiceStart + i];
+        vp.tune.store(kDrumDefaultNote[i]);
+        vp.timbre.store(0.5f);
+        vp.morph.store(0.5f);
+        vp.harmonics.store(0.5f);
+        vp.engine_index.store(kDrumEngineIndices[i]);
+    }
+
     return engine;
 }
 
@@ -429,6 +444,54 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->marbles_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.drum") == 0) {
+        // Drum synthesis parameters: map 0-1 knob values to voice_params for drum voices 12-14
+        // Frequency is converted from 0-1 to MIDI note range (matching Kotlin DrumPlugin.frequencyToNote)
+        auto set_drum_param = [&](int drum_index, const char* sym) {
+            auto& vp = engine->voice_params[kDrumVoiceStart + drum_index];
+            if (std::strcmp(sym, "freq") == 0) {
+                // BD: MIDI 28-52, SD: MIDI 48-72, HH: MIDI 60-84
+                static const float kBaseNote[] = {28.0f, 48.0f, 60.0f};
+                float note = kBaseNote[drum_index] + value * 24.0f;
+                vp.tune.store(note, std::memory_order_relaxed);
+            } else if (std::strcmp(sym, "tone") == 0) {
+                vp.timbre.store(value, std::memory_order_relaxed);
+            } else if (std::strcmp(sym, "decay") == 0) {
+                vp.morph.store(value, std::memory_order_relaxed);
+            } else if (std::strcmp(sym, "p4") == 0) {
+                vp.harmonics.store(value, std::memory_order_relaxed);
+            } else if (std::strcmp(sym, "engine") == 0) {
+                // Map Kotlin PlaitsEngineId ordinal to C++ Plaits engine index
+                // Kotlin: 0=BD, 1=SD, 2=HH, 3=FMDrum, 4=FM, 5=Noise, 6=Waveshaping,
+                //         7=VA, 8=Additive, 9=Grain, 10=String, 11=Modal, 12=Particle,
+                //         13=Swarm, 14=Chord, 15=Wavetable, 16=Speech
+                // C++: see kOrpheusOutGain[] in orpheus_voice.h for index meanings
+                static const int kKotlinToEngine[] = {
+                    21, 22, 23, 10, // BD, SD, HH, FMDrum→FM(10) (no C++ FmDrum; Kotlin has custom impl)
+                    10, 17,  9,  8, // FM, Noise, Waveshaping, VA
+                    12, 11, 19, 20, // Additive, Grain, String, Modal
+                    18, 16, 14, 13, // Particle, Swarm, Chord, Wavetable
+                    15              // Speech
+                };
+                int ordinal = static_cast<int>(value);
+                if (ordinal >= 0 && ordinal < static_cast<int>(sizeof(kKotlinToEngine)/sizeof(kKotlinToEngine[0]))) {
+                    vp.engine_index.store(kKotlinToEngine[ordinal], std::memory_order_relaxed);
+                    vp.engine_changed.store(1, std::memory_order_relaxed);
+                }
+            }
+        };
+        if (std::strncmp(symbol, "bd_", 3) == 0)
+            set_drum_param(0, symbol + 3);
+        else if (std::strncmp(symbol, "sd_", 3) == 0)
+            set_drum_param(1, symbol + 3);
+        else if (std::strncmp(symbol, "hh_", 3) == 0)
+            set_drum_param(2, symbol + 3);
+        else if (std::strcmp(symbol, "mix") == 0) {
+            engine->drum_mix.store(value, std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "bypass") == 0)
+            engine->rings_drum_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.drums") == 0) {
         if (std::strcmp(symbol, "x") == 0)
             engine->grids_x.store(value, std::memory_order_relaxed);
@@ -602,20 +665,17 @@ void orpheus_engine_set_voice_decay(OrpheusEngine* engine,
 
 void orpheus_engine_trigger_drum(OrpheusEngine* engine,
                                  int drum_index, float accent) {
-    // Map drum indices to dedicated drum voices (12-14):
-    // 0 = bass drum  (voice 12, engine 21)
-    // 1 = snare drum (voice 13, engine 22)
-    // 2 = hi-hat     (voice 14, engine 23)
-    static const int kDrumEngineIndices[] = {21, 22, 23};
-
+    // Drum voices 12-14: engine_index, tune, timbre, morph, harmonics
+    // are all set via set_port (and init defaults). Trigger sets gate + accent.
+    // Gate is auto-cleared after each render (one-shot, line ~776 in orpheus_units.cpp).
+    // Re-triggering works because the idle exit resets trigger_state_ after decay.
     if (drum_index >= 0 && drum_index < kNumDrumVoices) {
         int voice_index = kDrumVoiceStart + drum_index;
-        engine->voice_params[voice_index].engine_index.store(kDrumEngineIndices[drum_index]);
-        engine->voice_params[voice_index].tune.store(60.0f);
-        engine->voice_params[voice_index].morph.store(accent, std::memory_order_relaxed);
-        engine->voice_params[voice_index].active.store(1);
-        engine->voice_params[voice_index].ever_triggered.store(1);
-        engine->voice_params[voice_index].gate.store(1);
+        auto& vp = engine->voice_params[voice_index];
+        vp.accent.store(accent, std::memory_order_relaxed);
+        vp.active.store(1);
+        vp.ever_triggered.store(1);
+        vp.gate.store(1);
     }
 }
 

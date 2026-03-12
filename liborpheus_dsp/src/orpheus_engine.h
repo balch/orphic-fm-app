@@ -50,6 +50,7 @@ struct OrpheusEngine {
         std::atomic<float> harmonics{0.5f};
         std::atomic<float> timbre{0.5f};
         std::atomic<float> morph{0.5f};
+        std::atomic<float> accent{0.8f};    // velocity/accent for Plaits Engine::Render()
         std::atomic<float> decay{0.5f};     // LPG decay (maps to Plaits patch.decay)
         std::atomic<float> lpg_colour{0.5f}; // LPG colour (filter character)
         std::atomic<int> engine_index{0};
@@ -107,6 +108,13 @@ struct OrpheusEngine {
     std::atomic<int>   rings_bypass{1};         // bypassed by default
     std::atomic<float> resonator_target_mix{0.5f};     // 0=drum, 0.5=both, 1=synth
     std::atomic<float> resonator_mix{0.0f};            // wet/dry (0=bypass, 1=fully wet)
+
+    // Percussive envelope for drum voices (audio-thread-only, not shared with UI)
+    // Only applied to engines without built-in envelopes (alreadyEnveloped=false).
+    float drum_env_amplitude[kNumDrumVoices] = {};  // 0..1, reset to 1.0 on trigger
+
+    // Drum mix/volume (0..1 from UI, applied as baseGain * mix to drum output)
+    std::atomic<float> drum_mix{0.7f};
 
     // Orpheus resonator (drum direct path, moduleIndex=1)
     OrpheusResonator drum_resonator;

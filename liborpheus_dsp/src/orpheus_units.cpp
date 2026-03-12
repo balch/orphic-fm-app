@@ -668,9 +668,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float timbre = std::max(0.0f, std::min(1.0f,
             vp.timbre.load(std::memory_order_relaxed) + timbre_mod_offset));
         float morph = vp.morph.load(std::memory_order_relaxed);
+        float accent = vp.accent.load(std::memory_order_relaxed);
 
         // Render via OrpheusVoice (handles engine selection, outGain, soft_limit)
-        voice.Render(engine_index, plaits_gate, note, harmonics, timbre, morph, 0.8f,
+        voice.Render(engine_index, plaits_gate, note, harmonics, timbre, morph, accent,
                      out, num_frames);
 
         // ADSR envelope — wraps main voices (matching JSyn's DspVoice VCA).
@@ -727,10 +728,40 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 if (abs_s > voice_peak) voice_peak = abs_s;
             }
         } else {
-            // Drum voices: no ADSR — engine has its own percussive envelope
-            for (int i = 0; i < num_frames; i++) {
-                float abs_s = std::fabs(out[i]);
-                if (abs_s > voice_peak) voice_peak = abs_s;
+            // Drum voices: external percussive envelope matching Kotlin's
+            // setPercussiveMode(!engine.alreadyEnveloped).
+            // Engines with built-in envelopes (indices 20-23: Modal, BD, SD, HH)
+            // already decay naturally — skip external envelope for those.
+            // Non-percussive engines (FM, Swarm, etc.) need this to avoid
+            // sustaining indefinitely.
+            bool already_enveloped = (engine_index >= 20 && engine_index <= 23);
+            int drum_slot = idx - kDrumVoiceStart;
+            float& env_amp = engine->drum_env_amplitude[drum_slot];
+
+            if (!already_enveloped) {
+                // Reset envelope on trigger (gate is auto-cleared after each render)
+                if (actual_gate) {
+                    env_amp = 1.0f;
+                }
+
+                // Decay coefficient from morph (decay knob): 30ms..2000ms → -60dB
+                // -ln(0.001) = 6.908 → envelope reaches -60dB after decay_samples
+                float decay_ms = 30.0f + morph * 1970.0f;
+                float decay_samples = decay_ms * sr / 1000.0f;
+                float decay_coeff = std::exp(-6.908f / decay_samples);
+
+                for (int i = 0; i < num_frames; i++) {
+                    out[i] *= env_amp;
+                    env_amp *= decay_coeff;
+                    float abs_s = std::fabs(out[i]);
+                    if (abs_s > voice_peak) voice_peak = abs_s;
+                }
+            } else {
+                // Built-in envelope engines: just track peak, no external decay
+                for (int i = 0; i < num_frames; i++) {
+                    float abs_s = std::fabs(out[i]);
+                    if (abs_s > voice_peak) voice_peak = abs_s;
+                }
             }
         }
 
@@ -758,6 +789,15 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         if (idx >= kDrumVoiceStart && actual_gate) {
             vp.gate.store(0, std::memory_order_relaxed);
         }
+
+        // Apply drum_mix gain to output buffer (matching Kotlin DrumPlugin: baseGain=1.6 * mix).
+        // This scales the graph output so downstream units (pan, resonator, master) see the gain.
+        if (idx >= kDrumVoiceStart) {
+            float drum_gain = 1.6f * engine->drum_mix.load(std::memory_order_relaxed);
+            for (int i = 0; i < num_frames; i++) {
+                out[i] *= drum_gain;
+            }
+        }
     }
 
     // Populate warps source buffers
@@ -769,6 +809,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     }
     if (idx >= kDrumVoiceStart) {
         // DRUMS (source 2): accumulate drum voices (12-14)
+        // drum_mix gain already applied to out[] above
         for (int i = 0; i < num_frames; i++) {
             engine->warps_source_buffers[2][i] += out[i] * (1.0f / kNumDrumVoices);
         }
