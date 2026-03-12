@@ -368,7 +368,8 @@ interface GrainsUnit : AudioUnit {
     val density: AudioInput  // Feedback / Decay
     val texture: AudioInput  // Filter / Color
     val dryWet: AudioInput   // Mix
-    
+    val feedback: AudioInput // Feedback amount
+
     val freeze: AudioInput   // > 0.5 = Freeze
     val trigger: AudioInput  // Trigger loop/granular
     

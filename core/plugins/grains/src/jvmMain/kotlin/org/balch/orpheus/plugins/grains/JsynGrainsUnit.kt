@@ -36,7 +36,8 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
     private val jsynDryWet = UnitInputPort("DryWet")
     private val jsynFreeze = UnitInputPort("Freeze")
     private val jsynTrigger = UnitInputPort("Trigger")
-    
+    private val jsynFeedback = UnitInputPort("Feedback")
+
     // AudioUnit Interface Implementation
     override val output: AudioOutput = JsynAudioOutput(jsynOutputLeft) // Default output (Main Left)
     override val outputRight: AudioOutput = JsynAudioOutput(jsynOutputRight)
@@ -52,7 +53,8 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
     override val dryWet: AudioInput = JsynAudioInput(jsynDryWet)
     override val freeze: AudioInput = JsynAudioInput(jsynFreeze)
     override val trigger: AudioInput = JsynAudioInput(jsynTrigger)
-    
+    override val feedback: AudioInput = JsynAudioInput(jsynFeedback)
+
     private var mode = 0 // Default Granular mode
     
     // Buffers for block processing
@@ -73,7 +75,8 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
         jsynDryWet.set(0.5)
         jsynFreeze.set(0.0)
         jsynTrigger.set(0.0)
-        
+        jsynFeedback.set(0.0)
+
         addPort(jsynInputLeft)
         addPort(jsynInputRight)
         addPort(jsynOutputLeft)
@@ -86,6 +89,7 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
         addPort(jsynDryWet)
         addPort(jsynFreeze)
         addPort(jsynTrigger)
+        addPort(jsynFeedback)
     }
 
     override fun setMode(mode: Int) {
@@ -93,8 +97,9 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
         // Update processor parameters mode to enable mode switching
         processor.parameters.mode = when (mode) {
             0 -> GrainsMode.GRANULAR
-            1 -> GrainsMode.LOOPING_DELAY
-            2 -> GrainsMode.SHIMMER
+            1 -> GrainsMode.STRETCH
+            2 -> GrainsMode.LOOPING_DELAY
+            3 -> GrainsMode.SPECTRAL
             else -> GrainsMode.GRANULAR
         }
     }
@@ -135,9 +140,7 @@ class JsynGrainsUnit : UnitGenerator(), GrainsUnit {
         p.size = jsynSize.getValue(start).toFloat()
         p.pitch = jsynPitch.getValue(start).toFloat()
         p.density = jsynDensity.getValue(start).toFloat()
-        // Feedback: In original Clouds, this is a separate BLEND parameter (0-100%)
-        // Since we don't have a dedicated feedback knob, set to 0 for cleaner sound
-        p.feedback = 0f
+        p.feedback = jsynFeedback.getValue(start).toFloat()
         p.texture = jsynTexture.getValue(start).toFloat()
         p.dryWet = jsynDryWet.getValue(start).toFloat()
         

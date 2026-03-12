@@ -2,7 +2,6 @@ package org.balch.orpheus.features.grains
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -15,17 +14,18 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
 import org.balch.orpheus.core.controller.enumSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.plugins.grains.engine.GrainsMode
 
 @Immutable
@@ -36,6 +36,8 @@ data class GrainsUiState(
     val density: Float = 0.5f,   // Feedback / Grain Overlap
     val texture: Float = 0.5f,   // Filter (LP/HP)
     val dryWet: Float = 0.0f,    // Mix (0=dry, 1=wet)
+    val feedback: Float = 0.0f,  // Feedback loop amount
+    val reverb: Float = 0.0f,    // Built-in reverb amount
     val freeze: Boolean = false, // Loop/Freeze
     val trigger: Boolean = false, // Trigger
     val mode: GrainsMode = GrainsMode.GRANULAR // Processing mode
@@ -49,12 +51,14 @@ data class GrainsPanelActions(
     val setDensity: (Float) -> Unit,
     val setTexture: (Float) -> Unit,
     val setDryWet: (Float) -> Unit,
+    val setFeedback: (Float) -> Unit,
+    val setReverb: (Float) -> Unit,
     val setFreeze: (Boolean) -> Unit,
     val trigger: () -> Unit,
     val setMode: (GrainsMode) -> Unit
 ) {
     companion object Companion {
-        val EMPTY = GrainsPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = GrainsPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -66,6 +70,8 @@ private sealed interface GrainsIntent {
     data class Density(val value: Float) : GrainsIntent
     data class Texture(val value: Float) : GrainsIntent
     data class DryWet(val value: Float) : GrainsIntent
+    data class Feedback(val value: Float) : GrainsIntent
+    data class Reverb(val value: Float) : GrainsIntent
     data class Freeze(val frozen: Boolean) : GrainsIntent
     data class Trigger(val active: Boolean) : GrainsIntent
     data class Mode(val mode: GrainsMode) : GrainsIntent
@@ -90,6 +96,8 @@ interface GrainsFeature : SynthFeature<GrainsUiState, GrainsPanelActions> {
         - **DENSITY**: Grain overlap / feedback amount.
         - **TEXTURE**: Filter character (low-pass to high-pass).
         - **DRY/WET**: Mix between dry input and granular output.
+        - **FEEDBACK**: Internal feedback loop amount.
+        - **REVERB**: Built-in reverb amount.
 
         ## Switches
         - **FREEZE**: Captures and loops the current buffer contents.
@@ -109,6 +117,8 @@ interface GrainsFeature : SynthFeature<GrainsUiState, GrainsPanelActions> {
                 GrainsSymbol.DRY_WET.controlId.key to "Dry/wet mix",
                 GrainsSymbol.FREEZE.controlId.key to "Freeze/loop the audio buffer",
                 GrainsSymbol.MODE.controlId.key to "Processing mode selection",
+                GrainsSymbol.FEEDBACK.controlId.key to "Internal feedback loop amount",
+                GrainsSymbol.REVERB.controlId.key to "Built-in reverb amount",
             )
         }
     }
@@ -138,6 +148,8 @@ class GrainsViewModel(
     private val freezeId = synthController.controlFlow(GrainsSymbol.FREEZE.controlId)
     private val triggerId = synthController.controlFlow(GrainsSymbol.TRIGGER.controlId)
     private val modeId = synthController.controlFlow(GrainsSymbol.MODE.controlId)
+    private val feedbackId = synthController.controlFlow(GrainsSymbol.FEEDBACK.controlId)
+    private val reverbId = synthController.controlFlow(GrainsSymbol.REVERB.controlId)
 
     override val actions = GrainsPanelActions(
         setPosition = positionId.floatSetter(),
@@ -146,6 +158,8 @@ class GrainsViewModel(
         setDensity = densityId.floatSetter(),
         setTexture = textureId.floatSetter(),
         setDryWet = dryWetId.floatSetter(),
+        setFeedback = feedbackId.floatSetter(),
+        setReverb = reverbId.floatSetter(),
         setFreeze = freezeId.boolSetter(),
         trigger = ::trigger,
         setMode = modeId.enumSetter()
@@ -159,6 +173,8 @@ class GrainsViewModel(
         densityId.map { GrainsIntent.Density(it.asFloat()) },
         textureId.map { GrainsIntent.Texture(it.asFloat()) },
         dryWetId.map { GrainsIntent.DryWet(it.asFloat()) },
+        feedbackId.map { GrainsIntent.Feedback(it.asFloat()) },
+        reverbId.map { GrainsIntent.Reverb(it.asFloat()) },
         freezeId.map { GrainsIntent.Freeze(it.asBoolean()) },
         triggerId.map { GrainsIntent.Trigger(it.asBoolean()) },
         modeId.map {
@@ -192,6 +208,8 @@ class GrainsViewModel(
             is GrainsIntent.Density -> state.copy(density = intent.value)
             is GrainsIntent.Texture -> state.copy(texture = intent.value)
             is GrainsIntent.DryWet -> state.copy(dryWet = intent.value)
+            is GrainsIntent.Feedback -> state.copy(feedback = intent.value)
+            is GrainsIntent.Reverb -> state.copy(reverb = intent.value)
             is GrainsIntent.Freeze -> state.copy(freeze = intent.frozen)
             is GrainsIntent.Mode -> state.copy(mode = intent.mode)
             is GrainsIntent.Trigger -> state.copy(trigger = intent.active)

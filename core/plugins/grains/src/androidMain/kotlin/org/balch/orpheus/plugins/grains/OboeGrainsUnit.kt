@@ -35,6 +35,7 @@ class OboeGrainsUnit : GrainsUnit, DspProcessable {
     private val oboeDryWet = DspAudioInput("DryWet", smoothed = true)
     private val oboeFreeze = DspAudioInput("Freeze")
     private val oboeTrigger = DspAudioInput("Trigger")
+    private val oboeFeedback = DspAudioInput("Feedback", smoothed = true)
 
     // Interface implementation
     override val output: AudioOutput = oboeOutputLeft
@@ -51,6 +52,7 @@ class OboeGrainsUnit : GrainsUnit, DspProcessable {
     override val dryWet: AudioInput = oboeDryWet
     override val freeze: AudioInput = oboeFreeze
     override val trigger: AudioInput = oboeTrigger
+    override val feedback: AudioInput = oboeFeedback
 
     private var lastTrigState = false
 
@@ -65,13 +67,15 @@ class OboeGrainsUnit : GrainsUnit, DspProcessable {
         oboeDryWet.set(0.5)
         oboeFreeze.set(0.0)
         oboeTrigger.set(0.0)
+        oboeFeedback.set(0.0)
     }
 
     override fun setMode(mode: Int) {
         processor.parameters.mode = when (mode) {
             0 -> GrainsMode.GRANULAR
-            1 -> GrainsMode.LOOPING_DELAY
-            2 -> GrainsMode.SHIMMER
+            1 -> GrainsMode.STRETCH
+            2 -> GrainsMode.LOOPING_DELAY
+            3 -> GrainsMode.SPECTRAL
             else -> GrainsMode.GRANULAR
         }
     }
@@ -95,7 +99,7 @@ class OboeGrainsUnit : GrainsUnit, DspProcessable {
         p.size = oboeSize.getValue(0)
         p.pitch = oboePitch.getValue(0)
         p.density = oboeDensity.getValue(0)
-        p.feedback = 0f
+        p.feedback = oboeFeedback.getValue(0)
         p.texture = oboeTexture.getValue(0)
         p.dryWet = oboeDryWet.getValue(0)
 
@@ -130,12 +134,13 @@ class OboeGrainsUnit : GrainsUnit, DspProcessable {
         oboeDryWet.allocate(maxFrames)
         oboeFreeze.allocate(maxFrames)
         oboeTrigger.allocate(maxFrames)
+        oboeFeedback.allocate(maxFrames)
     }
 
     private val inputPorts = listOf(
         oboeInputLeft, oboeInputRight,
         oboePosition, oboeSize, oboePitch, oboeDensity,
-        oboeTexture, oboeDryWet, oboeFreeze, oboeTrigger
+        oboeTexture, oboeDryWet, oboeFreeze, oboeTrigger, oboeFeedback
     )
     private val outputPorts = listOf(oboeOutputLeft, oboeOutputRight)
     override fun getInputPorts() = inputPorts

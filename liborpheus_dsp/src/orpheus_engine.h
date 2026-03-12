@@ -86,12 +86,12 @@ struct OrpheusEngine {
     std::atomic<float> clouds_pitch{0.0f};
     std::atomic<float> clouds_density{0.5f};
     std::atomic<float> clouds_texture{0.5f};
-    std::atomic<float> clouds_dry_wet{0.5f};
+    std::atomic<float> clouds_dry_wet{0.0f};
     std::atomic<float> clouds_feedback{0.0f};
     std::atomic<float> clouds_reverb{0.0f};
     std::atomic<int>   clouds_freeze{0};
     std::atomic<int>   clouds_mode{0};       // PlaybackMode enum
-    std::atomic<int>   clouds_bypass{1};     // bypassed by default
+    std::atomic<int>   clouds_bypass{0};     // not bypassed — dry_wet=0 handles passthrough
 
     // Orpheus resonator (main)
     OrpheusResonator resonator;

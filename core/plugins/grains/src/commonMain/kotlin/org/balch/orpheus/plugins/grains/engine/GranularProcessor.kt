@@ -184,18 +184,18 @@ class GranularProcessor {
         val tempOutput = tempInterleaved // Pre-allocated interleaved stereo buffer
         
         when (currentMode) {
-            GrainsMode.GRANULAR -> {
-                // Use granular sample player
+            GrainsMode.GRANULAR,
+            GrainsMode.STRETCH -> {
+                // STRETCH: Kotlin approximation uses granular player
                 granularPlayer.play(buffer, parameters, tempOutput, 0, size)
             }
-            
+
             GrainsMode.LOOPING_DELAY -> {
-                // Use looping delay player
                 looper.play(buffer, parameters, tempOutput, 0, size)
             }
-            
-            GrainsMode.SHIMMER -> {
-                // Use shimmer player - grains pitched up with heavy diffusion
+
+            GrainsMode.SPECTRAL -> {
+                // SPECTRAL: Kotlin approximation uses shimmer player
                 shimmerPlayer.play(buffer, parameters, tempOutput, 0, size)
             }
         }
@@ -207,7 +207,7 @@ class GranularProcessor {
         }
         
         // --- 2b. Pitch Shifter (for Looping Delay mode when not frozen) ---
-        if (currentMode == GrainsMode.LOOPING_DELAY && 
+        if ((currentMode == GrainsMode.LOOPING_DELAY || currentMode == GrainsMode.STRETCH) &&
             (!parameters.freeze || looper.synchronized)) {
             
             // Calculate pitch ratio from semitones
@@ -257,16 +257,15 @@ class GranularProcessor {
         // In LOOPING_DELAY: density controls diffusion
         // In SHIMMER: always heavy diffusion (0.7-1.0)
         val diffusionAmount = when (currentMode) {
-            GrainsMode.GRANULAR -> {
+            GrainsMode.GRANULAR,
+            GrainsMode.STRETCH -> {
                 val texture = parameters.smoothedTexture()
                 if (texture > 0.75f) (texture - 0.75f) * 4f else 0f
             }
-            GrainsMode.SHIMMER -> {
-                // Shimmer always uses heavy diffusion (0.7 to 1.0 based on density)
+            GrainsMode.SPECTRAL -> {
                 0.7f + parameters.smoothedDensity() * 0.3f
             }
             GrainsMode.LOOPING_DELAY -> {
-                // In delay mode, density controls diffusion
                 parameters.smoothedDensity()
             }
         }
@@ -275,7 +274,7 @@ class GranularProcessor {
         
         // --- 3. Post-Processing Filters ---
         // Texture controls LP/HP filter sweep for looping delay mode only
-        if (currentMode == GrainsMode.LOOPING_DELAY) {
+        if (currentMode == GrainsMode.LOOPING_DELAY || currentMode == GrainsMode.STRETCH) {
             val texture = parameters.texture
             val lpCutoff = 0.5f * SynthDsp.semitonesToRatio(
                 (if (texture < 0.5f) texture - 0.5f else 0.0f) * 216.0f

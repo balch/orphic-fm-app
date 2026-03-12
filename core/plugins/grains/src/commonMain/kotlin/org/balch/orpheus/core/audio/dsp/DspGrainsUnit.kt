@@ -35,6 +35,7 @@ class DspGrainsUnit : GrainsUnit, DspProcessable {
     private val dspDryWet = DspAudioInput("Grains.dryWet")
     private val dspFreeze = DspAudioInput("Grains.freeze")
     private val dspTrigger = DspAudioInput("Grains.trigger")
+    private val dspFeedback = DspAudioInput("Grains.feedback")
     private val dspOutput = DspAudioOutput("Grains.outL")
     private val dspOutputR = DspAudioOutput("Grains.outR")
 
@@ -48,6 +49,7 @@ class DspGrainsUnit : GrainsUnit, DspProcessable {
     override val dryWet: AudioInput = dspDryWet
     override val freeze: AudioInput = dspFreeze
     override val trigger: AudioInput = dspTrigger
+    override val feedback: AudioInput = dspFeedback
     override val output: AudioOutput = dspOutput
     override val outputRight: AudioOutput = dspOutputR
 
@@ -58,8 +60,9 @@ class DspGrainsUnit : GrainsUnit, DspProcessable {
     override fun setMode(mode: Int) {
         processor.parameters.mode = when (mode) {
             0 -> GrainsMode.GRANULAR
-            1 -> GrainsMode.LOOPING_DELAY
-            2 -> GrainsMode.SHIMMER
+            1 -> GrainsMode.STRETCH
+            2 -> GrainsMode.LOOPING_DELAY
+            3 -> GrainsMode.SPECTRAL
             else -> GrainsMode.GRANULAR
         }
     }
@@ -89,7 +92,7 @@ class DspGrainsUnit : GrainsUnit, DspProcessable {
         p.size = dspSize.getBuffer()[0]
         p.pitch = dspPitch.getBuffer()[0]
         p.density = dspDensity.getBuffer()[0]
-        p.feedback = 0f // No dedicated feedback knob — keep clean
+        p.feedback = dspFeedback.getBuffer()[0]
         p.texture = dspTexture.getBuffer()[0]
         p.dryWet = dspDryWet.getBuffer()[0]
 
@@ -120,6 +123,7 @@ class DspGrainsUnit : GrainsUnit, DspProcessable {
         dspDryWet.allocate(maxFrames)
         dspFreeze.allocate(maxFrames)
         dspTrigger.allocate(maxFrames)
+        dspFeedback.allocate(maxFrames)
         dspOutput.allocate(maxFrames)
         dspOutputR.allocate(maxFrames)
 
@@ -132,7 +136,7 @@ class DspGrainsUnit : GrainsUnit, DspProcessable {
         }
     }
 
-    private val inputPorts = listOf(dspInputL, dspInputR, dspPosition, dspSize, dspPitch, dspDensity, dspTexture, dspDryWet, dspFreeze, dspTrigger)
+    private val inputPorts = listOf(dspInputL, dspInputR, dspPosition, dspSize, dspPitch, dspDensity, dspTexture, dspDryWet, dspFreeze, dspTrigger, dspFeedback)
     private val outputPorts = listOf(dspOutput, dspOutputR)
     override fun getInputPorts() = inputPorts
     override fun getOutputPorts() = outputPorts

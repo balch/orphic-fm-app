@@ -1,16 +1,18 @@
 package org.balch.orpheus.plugins.grains.engine
 
 /**
- * Processing modes matching the original Mutable Instruments Clouds.
- * 
- * GRANULAR: Normal granular synthesis - overlapping grains with random/deterministic playback
- * LOOPING_DELAY: Delay line when not frozen, looped buffer when frozen.
- * SHIMMER: Ethereal shimmer effect - grains pitched up an octave with heavy diffusion
+ * Processing modes matching MI Clouds PlaybackMode ordinals.
+ *
+ * GRANULAR: Overlapping grains with random/deterministic playback
+ * STRETCH: Time-stretching (C++ only; Kotlin maps to granular player)
+ * LOOPING_DELAY: Delay line when not frozen, looped buffer when frozen
+ * SPECTRAL: FFT-based spectral processing (C++ only; Kotlin maps to shimmer player)
  */
 enum class GrainsMode(val displayName: String) {
-    GRANULAR("Gran"),
-    LOOPING_DELAY("Loop"),
-    SHIMMER("Shim"),
+    GRANULAR("Gran"),       // 0
+    STRETCH("Stretch"),     // 1
+    LOOPING_DELAY("Loop"),  // 2
+    SPECTRAL("Spectral"),   // 3
 }
 
 class GrainsParameters {

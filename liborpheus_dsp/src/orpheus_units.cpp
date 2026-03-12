@@ -790,8 +790,19 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     auto* p = engine->clouds_processor.mutable_parameters();
     p->position = engine->clouds_position.load(std::memory_order_relaxed);
     p->size = engine->clouds_size.load(std::memory_order_relaxed);
-    p->pitch = engine->clouds_pitch.load(std::memory_order_relaxed);
-    p->density = engine->clouds_density.load(std::memory_order_relaxed);
+    // Kotlin sends pitch as -1..1 normalized; MI Clouds expects semitones
+    p->pitch = engine->clouds_pitch.load(std::memory_order_relaxed) * 24.0f;
+    // MI Clouds has a dead zone at density 0.47-0.53 where overlap=0 and
+    // no grains spawn (silence). On hardware ADC noise avoids this; remap
+    // the 0..1 range to skip it: 0..0.5 → 0..0.47, 0.5..1 → 0.53..1.0
+    {
+        float d = engine->clouds_density.load(std::memory_order_relaxed);
+        if (d <= 0.5f) {
+            p->density = d * 0.94f;
+        } else {
+            p->density = 0.53f + (d - 0.5f) * 0.94f;
+        }
+    }
     p->texture = engine->clouds_texture.load(std::memory_order_relaxed);
     p->dry_wet = engine->clouds_dry_wet.load(std::memory_order_relaxed);
     p->feedback = engine->clouds_feedback.load(std::memory_order_relaxed);

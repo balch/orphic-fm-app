@@ -149,9 +149,11 @@ fun GrainsPanel(
                             val knobProgressColor = panelColor
                             val knobColor = OrpheusColors.fadedCyan
                             val labelColor = panelColor
-                            
+
                             RotaryKnob(state.density, actions.setDensity, label = "DENS", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_density")
                             RotaryKnob(state.texture, actions.setTexture, label = "TEX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_texture")
+                            RotaryKnob(state.feedback, actions.setFeedback, label = "FB", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_feedback")
+                            RotaryKnob(state.reverb, actions.setReverb, label = "REV", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_reverb")
                             RotaryKnob(state.dryWet, actions.setDryWet, label = "MIX", size = 40.dp, trackColor = knobTrackColor, progressColor = knobProgressColor, knobColor = knobColor, labelColor = labelColor, controlId = "clouds_mix")
                         }
                     }

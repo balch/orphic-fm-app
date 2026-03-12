@@ -18,5 +18,7 @@ enum class GrainsSymbol(
     DRY_WET("dry_wet", displayName = "Dry/Wet"),
     FREEZE("freeze", displayName = "Freeze"),
     TRIGGER("trigger", displayName = "Trigger"),
-    MODE("mode", displayName = "Mode")
+    MODE("mode", displayName = "Mode"),
+    FEEDBACK("feedback", displayName = "Feedback"),
+    REVERB("reverb", displayName = "Reverb")
 }

@@ -15,9 +15,9 @@ import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
 import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.GRAINS_URI
 import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
 
@@ -63,6 +63,8 @@ class GrainsPlugin(
     private var _freeze = false
     private var _trigger = false
     private var _mode = 0
+    private var _feedback = 0f
+    private var _reverb = 0f
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 4) {
@@ -142,10 +144,26 @@ class GrainsPlugin(
 
         controlPort(GrainsSymbol.MODE) {
             intType {
-                min = 0; max = 2
-                options = listOf("Granular", "Reverse", "Shimmer")
+                min = 0; max = 3
+                options = listOf("Granular", "Stretch", "Loop", "Spectral")
                 get { _mode }
                 set { _mode = it; grains.setMode(it) }
+            }
+        }
+
+        controlPort(GrainsSymbol.FEEDBACK) {
+            floatType {
+                default = 0f
+                get { _feedback }
+                set { _feedback = it; grains.feedback.set(it.toDouble()) }
+            }
+        }
+
+        controlPort(GrainsSymbol.REVERB) {
+            floatType {
+                default = 0f
+                get { _reverb }
+                set { _reverb = it }
             }
         }
     }
@@ -171,7 +189,8 @@ class GrainsPlugin(
         "texture" to grains.texture,
         "dryWet" to grains.dryWet,
         "freeze" to grains.freeze,
-        "trigger" to grains.trigger
+        "trigger" to grains.trigger,
+        "feedback" to grains.feedback
     )
 
     override val outputs: Map<String, AudioOutput> = mapOf(
