@@ -116,3 +116,9 @@ void DesktopEngine::getMonitor(OrpheusMonitorData* out) {
         memset(out, 0, sizeof(OrpheusMonitorData));
     }
 }
+void DesktopEngine::setAutomation(int target, int voiceIndex, const float* times, const float* values, int count) {
+    if (dsp_engine_) orpheus_engine_set_automation(dsp_engine_, target, voiceIndex, times, values, count);
+}
+void DesktopEngine::clearAutomation(int target, int voiceIndex) {
+    if (dsp_engine_) orpheus_engine_clear_automation(dsp_engine_, target, voiceIndex);
+}

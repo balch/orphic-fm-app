@@ -127,6 +127,11 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
 
     override fun getCurrentTime(): Double = System.nanoTime() / 1_000_000_000.0
 
+    // -- AudioEngine plugin port forwarding (delegates to C++ bridge) ----------
+    override fun setPort(uri: String, symbol: String, value: Float) = bridge.nativeSetPort(uri, symbol, value)
+    override fun getPort(uri: String, symbol: String): Float = bridge.nativeGetPort(uri, symbol)
+    override fun triggerDrum(type: Int, accent: Float) = bridge.nativeTriggerDrum(type, accent)
+
     // -- NativeDspBridge implementation ---------------------------------------
 
     override fun nativeSetVoiceGate(index: Int, active: Boolean) = bridge.nativeSetVoiceGate(index, active)
@@ -149,6 +154,10 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
     override fun nativeGetMonitor(out: FloatArray) = bridge.nativeGetMonitor(out)
     override fun nativeTriggerDrum(drumIndex: Int, accent: Float) = bridge.nativeTriggerDrum(drumIndex, accent)
     override fun nativeLoadGraph(data: ByteArray): Int = bridge.nativeLoadGraph(data)
+    override fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int) =
+        bridge.nativeSetAutomation(target, voiceIndex, times, values, count)
+    override fun nativeClearAutomation(target: Int, voiceIndex: Int) =
+        bridge.nativeClearAutomation(target, voiceIndex)
 
     companion object {
         private val log = logging("NativeDspAudioEngine")

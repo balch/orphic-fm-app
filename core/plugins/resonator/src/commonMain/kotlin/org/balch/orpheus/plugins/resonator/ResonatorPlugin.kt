@@ -300,6 +300,19 @@ class ResonatorPlugin(
         synthBypassGainR.inputB.set(synthBypass)
     }
 
+    // Native forwarding — no-op on JSyn, forwards on native engine
+    fun setTargetMixGains(drumExcite: Float, synthExcite: Float) {
+        audioEngine.setPort(URI, "drum_ex_gain", drumExcite)
+        audioEngine.setPort(URI, "synth_ex_gain", synthExcite)
+        audioEngine.setPort(URI, "drum_bp_gain", 1f - drumExcite)
+        audioEngine.setPort(URI, "synth_bp_gain", 1f - synthExcite)
+    }
+
+    fun setMixGains(wet: Float, dry: Float) {
+        audioEngine.setPort(URI, "wet_gain", wet)
+        audioEngine.setPort(URI, "dry_gain", dry)
+    }
+
     // Utility methods
     fun strum(frequency: Float) = resonator.strum(frequency)
 }

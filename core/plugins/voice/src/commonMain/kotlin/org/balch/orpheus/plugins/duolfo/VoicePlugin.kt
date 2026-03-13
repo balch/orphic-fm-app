@@ -6,22 +6,25 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.AudioInput
 import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
-class VoicePlugin : DspPlugin {
+class VoicePlugin(
+    private val audioEngine: AudioEngine
+) : DspPlugin {
 
     override val info = PluginInfo(
         uri = URI,
@@ -33,6 +36,7 @@ class VoicePlugin : DspPlugin {
 
     companion object {
         const val URI = VOICE_URI
+        const val MODULATION_URI = "org.balch.orpheus.plugins.modulation"
     }
 
     // Listeners for engine updates
@@ -337,16 +341,12 @@ class VoicePlugin : DspPlugin {
     fun setModDepth(i: Int, v: Float) { _modDepth[i] = v }
     fun setEnvSpeed(i: Int, v: Float) { _envSpeed[i] = v }
     fun setDuoSharpness(i: Int, v: Float) { _duoSharpness[i] = v }
-    fun setDuoModSource(i: Int, v: Int) { _duoModSource[i] = v }
     fun setDuoEngine(i: Int, v: Int) { _duoEngine[i] = v }
     fun setDuoHarmonics(i: Int, v: Float) { _duoHarmonics[i] = v }
     fun setDuoProsody(i: Int, v: Float) { _duoProsody[i] = v }
     fun setDuoSpeed(i: Int, v: Float) { _duoSpeed[i] = v }
     fun setDuoMorph(i: Int, v: Float) { _duoMorph[i] = v }
-    fun setDuoModSourceLevel(i: Int, v: Float) { _duoModSourceLevel[i] = v }
-
     fun setFmStructure(v: Boolean) { _fmStructureCrossQuad = v }
-    fun setTotalFeedback(v: Float) { _totalFeedback = v }
     fun setVibrato(v: Float) { _vibrato = v }
     fun setCoupling(v: Float) { _coupling = v }
     
@@ -356,4 +356,28 @@ class VoicePlugin : DspPlugin {
     fun setQuadTriggerSource(i: Int, v: Int) { _quadTriggerSource[i] = v }
     fun setQuadPitchSource(i: Int, v: Int) { _quadPitchSource[i] = v }
     fun setQuadEnvTriggerMode(i: Int, v: Boolean) { _quadEnvTriggerMode[i] = v }
+
+    // Native forwarding — no-op on JSyn, forwards on native engine
+    fun setDuoModSource(duoIndex: Int, modSourceOrdinal: Int) {
+        _duoModSource[duoIndex] = modSourceOrdinal
+        audioEngine.setPort(URI, "duo_mod_source_$duoIndex", modSourceOrdinal.toFloat())
+    }
+
+    fun setDuoModSourceLevel(duoIndex: Int, level: Float) {
+        _duoModSourceLevel[duoIndex] = level
+        audioEngine.setPort(URI, "duo_mod_source_level_$duoIndex", level)
+    }
+
+    fun setTotalFeedback(amount: Float) {
+        _totalFeedback = amount
+        audioEngine.setPort(URI, "total_feedback", amount)
+    }
+
+    fun setCouplingDepth(amount: Float) {
+        audioEngine.setPort(URI, "coupling_depth", amount)
+    }
+
+    fun setFmCrossQuad(crossQuad: Boolean) {
+        audioEngine.setPort(MODULATION_URI, "fm_cross_quad", if (crossQuad) 1f else 0f)
+    }
 }

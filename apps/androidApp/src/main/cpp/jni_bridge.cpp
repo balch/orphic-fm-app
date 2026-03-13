@@ -189,4 +189,26 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetMonitor(
                              reinterpret_cast<float*>(&mon));
 }
 
+// -- Automation ---------------------------------------------------------------
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetAutomation(
+        JNIEnv *env, jobject thiz,
+        jint target, jint voiceIndex,
+        jfloatArray jtimes, jfloatArray jvalues,
+        jint count) {
+    jfloat* times = env->GetFloatArrayElements(jtimes, nullptr);
+    jfloat* values = env->GetFloatArrayElements(jvalues, nullptr);
+    sEngine.setAutomation(target, voiceIndex, times, values, count);
+    env->ReleaseFloatArrayElements(jtimes, times, JNI_ABORT);
+    env->ReleaseFloatArrayElements(jvalues, values, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeClearAutomation(
+        JNIEnv *env, jobject thiz,
+        jint target, jint voiceIndex) {
+    sEngine.clearAutomation(target, voiceIndex);
+}
+
 } // extern "C"

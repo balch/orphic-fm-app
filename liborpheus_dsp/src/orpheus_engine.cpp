@@ -106,6 +106,19 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         vp.engine_index.store(kDrumEngineIndices[i]);
     }
 
+    // Initialize automation slots: 0-11 = voice gates, 12-23 = voice freqs
+    for (int i = 0; i < kNumMainVoices; i++) {
+        auto& gate_slot = engine->automation_slots[i];
+        gate_slot.target = AUTO_TARGET_VOICE_GATE;
+        gate_slot.voice_index = static_cast<uint8_t>(i);
+        gate_slot.allocated = true;
+
+        auto& freq_slot = engine->automation_slots[kNumMainVoices + i];
+        freq_slot.target = AUTO_TARGET_VOICE_FREQ;
+        freq_slot.voice_index = static_cast<uint8_t>(i);
+        freq_slot.allocated = true;
+    }
+
     return engine;
 }
 
@@ -149,11 +162,76 @@ int orpheus_engine_load_patch(OrpheusEngine* engine,
     return 0;
 }
 
+// Step through automation paths at block boundaries (called from audio thread)
+static void orpheus_automation_process(OrpheusEngine* engine, int num_frames) {
+    float sr = engine->sample_rate;
+
+    for (int s = 0; s < kMaxAutomationSlots; s++) {
+        auto& slot = engine->automation_slots[s];
+        if (!slot.allocated) continue;
+
+        // Check for pending path swap (lock-free: single atomic load)
+        int pending = slot.pending_path.load(std::memory_order_acquire);
+        if (pending >= 0) {
+            slot.active_path.store(pending, std::memory_order_relaxed);
+            slot.current_index = 0;
+            slot.start_sample = engine->sample_counter;
+            slot.pending_path.store(-1, std::memory_order_release);
+        }
+
+        int active = slot.active_path.load(std::memory_order_relaxed);
+        if (active < 0) continue;
+
+        auto& path = slot.paths[active];
+        if (slot.current_index >= path.count) {
+            slot.active_path.store(-1, std::memory_order_relaxed);  // path completed
+            continue;
+        }
+
+        // Fire all events whose time falls within this block
+        // Use double to avoid float precision loss after ~5.5 min at 48kHz
+        double block_end_time = static_cast<double>(engine->sample_counter + num_frames - slot.start_sample) / sr;
+
+        while (slot.current_index < path.count &&
+               static_cast<double>(path.times[slot.current_index]) <= block_end_time) {
+            float value = path.values[slot.current_index];
+
+            switch (slot.target) {
+                case AUTO_TARGET_VOICE_GATE: {
+                    int idx = slot.voice_index;
+                    int gate = value > 0.5f ? 1 : 0;
+                    engine->voice_params[idx].gate.store(gate, std::memory_order_relaxed);
+                    if (gate) {
+                        engine->voice_params[idx].active.store(1, std::memory_order_relaxed);
+                        engine->voice_params[idx].ever_triggered.store(1, std::memory_order_relaxed);
+                    }
+                    break;
+                }
+                case AUTO_TARGET_VOICE_FREQ: {
+                    int idx = slot.voice_index;
+                    if (value > 0.0f) {
+                        // Hz to MIDI note: note = 69 + 12 * log2(freq / 440)
+                        float midi_note = 69.0f + 12.0f * log2f(value / 440.0f);
+                        engine->voice_params[idx].tune.store(midi_note, std::memory_order_relaxed);
+                    }
+                    break;
+                }
+            }
+            slot.current_index++;
+        }
+    }
+
+    engine->sample_counter += num_frames;
+}
+
 void orpheus_engine_process(OrpheusEngine* engine,
                             float* output_buffer, int num_frames) {
     if (!engine || !output_buffer || num_frames <= 0) return;
 
     auto t0 = std::chrono::steady_clock::now();
+
+    // Step automation paths before rendering
+    orpheus_automation_process(engine, num_frames);
 
     std::memset(output_buffer, 0, num_frames * 2 * sizeof(float));
 
@@ -508,6 +586,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 vp.morph.store(value, std::memory_order_relaxed);
             } else if (std::strcmp(sym, "p4") == 0) {
                 vp.harmonics.store(value, std::memory_order_relaxed);
+            } else if (std::strcmp(sym, "p5") == 0) {
+                vp.lpg_colour.store(value, std::memory_order_relaxed);
             } else if (std::strcmp(sym, "engine") == 0) {
                 // Map Kotlin PlaitsEngineId ordinal to C++ Plaits engine index
                 // Kotlin: 0=BD, 1=SD, 2=HH, 3=FMDrum, 4=FM, 5=Noise, 6=Waveshaping,
@@ -777,6 +857,49 @@ void orpheus_engine_get_monitor(OrpheusEngine* engine,
 void orpheus_engine_get_waveform(OrpheusEngine* engine,
                                  float* buffer, int max_frames) {
     std::memset(buffer, 0, max_frames * sizeof(float));
+}
+
+// ── Automation API (called from UI thread) ─────────────────────────────
+
+void orpheus_engine_set_automation(OrpheusEngine* engine,
+                                    int target, int voice_index,
+                                    const float* times, const float* values,
+                                    int count) {
+    if (!engine || count <= 0 || count > kMaxAutomationPoints) return;
+    if (voice_index < 0 || voice_index >= kNumMainVoices) return;
+
+    // Slot layout: 0-11 = gates, 12-23 = freqs
+    int slot_idx = (target == AUTO_TARGET_VOICE_FREQ)
+        ? kNumMainVoices + voice_index
+        : voice_index;
+
+    auto& slot = engine->automation_slots[slot_idx];
+
+    // Write to the non-active buffer (relaxed: worst case we pick the same buffer, brief glitch)
+    int write_buf = (slot.active_path.load(std::memory_order_relaxed) == 0) ? 1 : 0;
+    auto& path = slot.paths[write_buf];
+    std::memcpy(path.times, times, count * sizeof(float));
+    std::memcpy(path.values, values, count * sizeof(float));
+    path.count = count;
+
+    // Signal the audio thread (release ensures writes above are visible)
+    slot.pending_path.store(write_buf, std::memory_order_release);
+}
+
+void orpheus_engine_clear_automation(OrpheusEngine* engine,
+                                      int target, int voice_index) {
+    if (!engine) return;
+    if (voice_index < 0 || voice_index >= kNumMainVoices) return;
+
+    int slot_idx = (target == AUTO_TARGET_VOICE_FREQ)
+        ? kNumMainVoices + voice_index
+        : voice_index;
+
+    auto& slot = engine->automation_slots[slot_idx];
+    // Write an empty path to stop playback
+    int write_buf = (slot.active_path.load(std::memory_order_relaxed) == 0) ? 1 : 0;
+    slot.paths[write_buf].count = 0;
+    slot.pending_path.store(write_buf, std::memory_order_release);
 }
 
 }  // extern "C"

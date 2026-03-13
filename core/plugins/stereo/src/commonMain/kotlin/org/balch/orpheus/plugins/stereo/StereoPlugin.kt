@@ -13,9 +13,9 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.STEREO_URI
 import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import kotlin.math.PI
@@ -201,4 +201,13 @@ class StereoPlugin(
 
 
     fun getPeak(): Float = peakFollower.getCurrent().toFloat()
+
+    fun setQuadVolume(quadIndex: Int, volume: Float) {
+        audioEngine.setPort(URI, "quad_vol_$quadIndex", volume)
+    }
+
+    fun setVoicePan(voiceIndex: Int, leftGain: Float, rightGain: Float) {
+        audioEngine.setPort(URI, "voice_pan_L_$voiceIndex", leftGain)
+        audioEngine.setPort(URI, "voice_pan_R_$voiceIndex", rightGain)
+    }
 }

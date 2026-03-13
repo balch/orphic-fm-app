@@ -23,6 +23,8 @@
 #include "marbles/random/random_generator.h"
 #include "stmlib/utils/gate_flags.h"
 
+#include "orpheus_automation.h"
+
 #include <atomic>
 #include <cstring>
 
@@ -409,4 +411,10 @@ struct OrpheusEngine {
     // Output arrays (read by unit_process_plaits)
     float voice_bend_cv[kNumMainVoices] = {};          // pitch bend Hz offset per voice (matches JSyn benderDepth=100Hz)
     float voice_mix_cv[kNumMainVoices] = {};            // voice volume multiplier per voice (default 1.0)
+
+    // ── Automation Player ────────────────────────────
+    // Sample-accurate automation: Kotlin sends time/value paths via JNI,
+    // audio thread steps through them per-block.
+    int64_t sample_counter{0};  // monotonic, incremented by num_frames each process()
+    AutomationSlot automation_slots[kMaxAutomationSlots];
 };

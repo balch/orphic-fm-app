@@ -80,6 +80,20 @@ void orpheus_engine_get_monitor(OrpheusEngine* engine,
 void orpheus_engine_get_waveform(OrpheusEngine* engine,
                                  float* buffer, int max_frames);
 
+// ── Automation (called from UI thread) ──────────
+// target: 0=VOICE_GATE, 1=VOICE_FREQ
+// voice_index: 0-11
+// times[]: seconds from "now" (relative to when this call is made)
+// values[]: raw values (gate: 0/1, freq: Hz)
+// count: number of points (max 128)
+void orpheus_engine_set_automation(OrpheusEngine* engine,
+                                    int target, int voice_index,
+                                    const float* times, const float* values,
+                                    int count);
+
+void orpheus_engine_clear_automation(OrpheusEngine* engine,
+                                      int target, int voice_index);
+
 #ifdef __cplusplus
 }
 #endif

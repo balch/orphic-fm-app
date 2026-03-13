@@ -299,6 +299,7 @@ class DrumPlugin(
         p5s[type] = p5
         applyParamsToSlot(type)
         slots[type].trigger(accent)
+        forwardTriggerNative(type, accent, frequency, tone, decay, p4, p5)
     }
 
     fun setParameters(
@@ -322,6 +323,35 @@ class DrumPlugin(
         if (type !in 0..2) return
         applyParamsToSlot(type)
         slots[type].trigger(accent)
+        audioEngine.triggerDrum(type, accent)
+    }
+
+    /** Forward drum routing gains (no-op on JSyn, forwards on native). */
+    fun setRouting(chainGain: Float, directGain: Float) {
+        audioEngine.setPort(URI, "drum_chain_gain_l", chainGain)
+        audioEngine.setPort(URI, "drum_chain_gain_r", chainGain)
+        audioEngine.setPort(URI, "drum_direct_gain_l", directGain)
+        audioEngine.setPort(URI, "drum_direct_gain_r", directGain)
+    }
+
+    /** Forward drum direct-resonator wet/dry gains (no-op on JSyn, forwards on native). */
+    fun setDirectResonatorGains(wet: Float, dry: Float) {
+        audioEngine.setPort(URI, "drum_direct_reso_wet_l", wet)
+        audioEngine.setPort(URI, "drum_direct_reso_wet_r", wet)
+        audioEngine.setPort(URI, "drum_direct_reso_dry_l", dry)
+        audioEngine.setPort(URI, "drum_direct_reso_dry_r", dry)
+    }
+
+    private fun forwardTriggerNative(type: Int, accent: Float,
+                                     frequency: Float, tone: Float, decay: Float,
+                                     p4: Float, p5: Float) {
+        val prefix = when (type) { 0 -> "bd_"; 1 -> "sd_"; 2 -> "hh_"; else -> return }
+        audioEngine.setPort(URI, "${prefix}freq", frequency)
+        audioEngine.setPort(URI, "${prefix}tone", tone)
+        audioEngine.setPort(URI, "${prefix}decay", decay)
+        audioEngine.setPort(URI, "${prefix}p4", p4)
+        audioEngine.setPort(URI, "${prefix}p5", p5)
+        audioEngine.triggerDrum(type, accent)
     }
 
     // Getters for persistence

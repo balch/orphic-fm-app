@@ -301,4 +301,29 @@ class FluxPlugin(
     // Generic port value accessors delegating to DSL builder
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
+
+    // Native forwarding — no-op on JSyn, forwards on native engine
+    fun setQuadTriggerMode(quadIndex: Int, enabled: Boolean) {
+        audioEngine.setPort(URI, "quad_trigger_mode_$quadIndex", if (enabled) 1f else 0f)
+    }
+
+    fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int) {
+        audioEngine.setPort(URI, "drum_trigger_source_$drumIndex", sourceIndex.toFloat())
+    }
+
+    fun setDrumPitchSource(drumIndex: Int, xIndex: Int) {
+        audioEngine.setPort(URI, "drum_pitch_source_$drumIndex", xIndex.toFloat())
+    }
+
+    fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) {
+        audioEngine.setPort(URI, "quad_pitch_source_$quadIndex", sourceIndex.toFloat())
+    }
+
+    fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) {
+        audioEngine.setPort(URI, "quad_trigger_source_$quadIndex", sourceIndex.toFloat())
+    }
+
+    fun setClockSource(sourceIndex: Int) {
+        audioEngine.setPort(URI, "clock_source", sourceIndex.toFloat())
+    }
 }

@@ -29,7 +29,6 @@ import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
-import org.balch.orpheus.core.plugin.symbols.FLUX_URI
 import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 import org.balch.orpheus.core.plugin.symbols.STEREO_URI
@@ -111,6 +110,7 @@ class DspSynthEngine(
 
     // Monitoring
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
 
     init {
         voiceManager.initialize()
@@ -200,13 +200,13 @@ class DspSynthEngine(
             // Sync mod source and depth
             val modSrc = voiceManager.getDuoModSource(duo)
             val modLvl = voiceManager.getDuoModSourceLevel(duo)
-            bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_$duo", modSrc.ordinal.toFloat())
-            bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_level_$duo", modLvl)
+            pluginProvider.voicePlugin.setDuoModSource(duo, modSrc.ordinal)
+            pluginProvider.voicePlugin.setDuoModSourceLevel(duo, modLvl)
             log.debug { "syncNative: duo=$duo engine=$engineOrdinal→cpp=$cppIndex active=true modSrc=$modSrc modLvl=$modLvl" }
         }
         // Sync per-quad volume
         for (quad in 0..2) {
-            bridge.nativeSetPort("org.balch.orpheus.plugins.stereo", "quad_vol_$quad", voiceManager.getQuadVolume(quad))
+            pluginProvider.stereoPlugin.setQuadVolume(quad, voiceManager.getQuadVolume(quad))
         }
         // Sync per-voice pan (default pans match graph build-time values)
         val defaultPans = floatArrayOf(0f, 0f, -0.3f, -0.3f, 0.3f, 0.3f, -0.7f, 0.7f, 0f, 0f, 0f, 0f)
@@ -217,53 +217,48 @@ class DspSynthEngine(
         }
         // Sync LFO parameters
         val lfoUri = DuoLfoSymbol.MODE.uri
-        bridge.nativeSetPort(lfoUri, DuoLfoSymbol.FREQ_A.symbol, getHyperLfoFreq(0))
-        bridge.nativeSetPort(lfoUri, DuoLfoSymbol.FREQ_B.symbol, getHyperLfoFreq(1))
-        bridge.nativeSetPort(lfoUri, DuoLfoSymbol.MODE.symbol, getHyperLfoMode().toFloat())
-        bridge.nativeSetPort(lfoUri, DuoLfoSymbol.SHAPE.symbol, getPort(DuoLfoSymbol.SHAPE)?.asFloat() ?: 1f)
+        audioEngine.setPort(lfoUri, DuoLfoSymbol.FREQ_A.symbol, getHyperLfoFreq(0))
+        audioEngine.setPort(lfoUri, DuoLfoSymbol.FREQ_B.symbol, getHyperLfoFreq(1))
+        audioEngine.setPort(lfoUri, DuoLfoSymbol.MODE.symbol, getHyperLfoMode().toFloat())
+        audioEngine.setPort(lfoUri, DuoLfoSymbol.SHAPE.symbol, getPort(DuoLfoSymbol.SHAPE)?.asFloat() ?: 1f)
         // Sync vibrato rate (dedicated sine oscillator, default 5 Hz)
         bridge.nativeSetVibratoRate(getPort(VibratoSymbol.RATE)?.asFloat() ?: 5f)
         bridge.nativeSetVibrato(getVibrato())
         // Sync bender parameters
-        bridge.nativeSetPort(BENDER_URI, BenderSymbol.MAX_BEND.symbol, getPort(BenderSymbol.MAX_BEND)?.asFloat() ?: 24f)
-        bridge.nativeSetPort(BENDER_URI, BenderSymbol.RANDOM_DEPTH.symbol, getPort(BenderSymbol.RANDOM_DEPTH)?.asFloat() ?: 0.1f)
-        bridge.nativeSetPort(BENDER_URI, BenderSymbol.TIMBRE_MOD.symbol, getPort(BenderSymbol.TIMBRE_MOD)?.asFloat() ?: 0.3f)
-        bridge.nativeSetPort(BENDER_URI, BenderSymbol.SPRING_VOL.symbol, getPort(BenderSymbol.SPRING_VOL)?.asFloat() ?: 0.4f)
-        bridge.nativeSetPort(BENDER_URI, BenderSymbol.TENSION_VOL.symbol, getPort(BenderSymbol.TENSION_VOL)?.asFloat() ?: 0.015f)
+        audioEngine.setPort(BENDER_URI, BenderSymbol.MAX_BEND.symbol, getPort(BenderSymbol.MAX_BEND)?.asFloat() ?: 24f)
+        audioEngine.setPort(BENDER_URI, BenderSymbol.RANDOM_DEPTH.symbol, getPort(BenderSymbol.RANDOM_DEPTH)?.asFloat() ?: 0.1f)
+        audioEngine.setPort(BENDER_URI, BenderSymbol.TIMBRE_MOD.symbol, getPort(BenderSymbol.TIMBRE_MOD)?.asFloat() ?: 0.3f)
+        audioEngine.setPort(BENDER_URI, BenderSymbol.SPRING_VOL.symbol, getPort(BenderSymbol.SPRING_VOL)?.asFloat() ?: 0.4f)
+        audioEngine.setPort(BENDER_URI, BenderSymbol.TENSION_VOL.symbol, getPort(BenderSymbol.TENSION_VOL)?.asFloat() ?: 0.015f)
         // Sync master volume (default 0.7)
         bridge.nativeSetMasterVolume(getMasterVolume())
         // Sync resonator state (mix=0 → bypassed, target_mix=0.5 → both sources)
         val resoUri = ResonatorSymbol.MIX.uri
         val mix = _resoMix
-        bridge.nativeSetPort(resoUri, "mix", mix)
-        bridge.nativeSetPort(resoUri, "wet_gain", mix)
-        bridge.nativeSetPort(resoUri, "dry_gain", 1f - mix)
+        audioEngine.setPort(resoUri, "mix", mix)
+        pluginProvider.resonatorPlugin.setMixGains(mix, 1f - mix)
         val tm = _resoTargetMix
         val drumEx = if (tm <= 0.5f) 1f else (1f - (tm - 0.5f) * 2f).coerceIn(0f, 1f)
         val synthEx = if (tm >= 0.5f) 1f else (tm * 2f).coerceIn(0f, 1f)
-        bridge.nativeSetPort(resoUri, "drum_ex_gain", drumEx)
-        bridge.nativeSetPort(resoUri, "synth_ex_gain", synthEx)
-        bridge.nativeSetPort(resoUri, "drum_bp_gain", 1f - drumEx)
-        bridge.nativeSetPort(resoUri, "synth_bp_gain", 1f - synthEx)
+        pluginProvider.resonatorPlugin.setTargetMixGains(drumEx, synthEx)
         // Sync global voice parameters
-        bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "coupling_depth", voiceManager.getVoiceCoupling())
-        bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "total_feedback", voiceManager.getTotalFeedback())
-        bridge.nativeSetPort("org.balch.orpheus.plugins.modulation", "fm_cross_quad", if (voiceManager.getFmStructureCrossQuad()) 1f else 0f)
+        pluginProvider.voicePlugin.setCouplingDepth(voiceManager.getVoiceCoupling())
+        pluginProvider.voicePlugin.setTotalFeedback(voiceManager.getTotalFeedback())
+        pluginProvider.voicePlugin.setFmCrossQuad(voiceManager.getFmStructureCrossQuad())
         // Sync Flux clock source (not a control port, so generic loop won't catch it)
-        bridge.nativeSetPort(FLUX_URI, "clock_source", fluxClockSource.toFloat())
+        pluginProvider.fluxPlugin.setClockSource(fluxClockSource)
         // Sync trigger router source selectors
         for (i in 0..2) {
-            bridge.nativeSetPort(FLUX_URI, "drum_trigger_source_$i", drumTriggerSources[i].toFloat())
+            pluginProvider.fluxPlugin.setDrumTriggerSource(i, drumTriggerSources[i])
             // Map DrumTriggerSource pitch ordinals to X output index (1=X1, 2=X2, 3=X3)
-            bridge.nativeSetPort(FLUX_URI, "drum_pitch_source_$i", (drumPitchSources[i] - DrumTriggerSource.FLUX_X1.ordinal + 1).toFloat())
+            pluginProvider.fluxPlugin.setDrumPitchSource(i, drumPitchSources[i] - DrumTriggerSource.FLUX_X1.ordinal + 1)
             // Activate drum voice in C++ if it has an external trigger source
             if (drumTriggerSources[i] != 0) {
                 bridge.nativeSetVoiceActive(12 + i, true) // kDrumVoiceStart=12
             }
-            bridge.nativeSetPort(FLUX_URI, "quad_trigger_source_$i", voiceManager.getQuadTriggerSource(i).toFloat())
-            // quadPitchSources already stored as mapped values (1/2/3) by setQuadPitchSource
-            bridge.nativeSetPort(FLUX_URI, "quad_pitch_source_$i", voiceManager.getQuadPitchSource(i).toFloat())
-            bridge.nativeSetPort(FLUX_URI, "quad_trigger_mode_$i", if (voiceManager.getQuadEnvelopeTriggerMode(i)) 1f else 0f)
+            pluginProvider.fluxPlugin.setQuadTriggerSource(i, voiceManager.getQuadTriggerSource(i))
+            pluginProvider.fluxPlugin.setQuadPitchSource(i, voiceManager.getQuadPitchSource(i))
+            pluginProvider.fluxPlugin.setQuadTriggerMode(i, voiceManager.getQuadEnvelopeTriggerMode(i))
         }
 
         // Generic sync: forward ALL plugin control port values to C++ native bridge.
@@ -280,7 +275,7 @@ class DspSynthEngine(
                     val voiceIndex = port.symbol.removePrefix("voice_pan_").toIntOrNull()
                     if (voiceIndex != null) forwardPanToNative(voiceIndex, value.asFloat())
                 } else {
-                    bridge.nativeSetPort(uri, port.symbol, value.asFloat())
+                    audioEngine.setPort(uri, port.symbol, value.asFloat())
                 }
             }
         }
@@ -313,7 +308,7 @@ class DspSynthEngine(
                     "duo_mod_source" -> {
                         val modSourceOrdinal = value as Int
                         voiceManager.setDuoModSource(index, ModSource.entries[modSourceOrdinal])
-                        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_$index", modSourceOrdinal.toFloat())
+                        pluginProvider.voicePlugin.setDuoModSource(index, modSourceOrdinal)
                     }
                     "duo_engine" -> {
                         val engineOrdinal = value as Int
@@ -353,7 +348,7 @@ class DspSynthEngine(
                     "duo_mod_source_level" -> {
                         val level = value as Float
                         voiceManager.setDuoModSourceLevel(index, level)
-                        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_level_$index", level)
+                        pluginProvider.voicePlugin.setDuoModSourceLevel(index, level)
                     }
                     "quad_pitch" -> setQuadPitch(index, value as Float)
                     "quad_hold" -> {
@@ -371,7 +366,7 @@ class DspSynthEngine(
                     "quad_env_trigger_mode" -> {
                         val enabled = value as Boolean
                         voiceManager.setQuadEnvelopeTriggerMode(index, enabled)
-                        nativeBridge?.nativeSetPort(FLUX_URI, "quad_trigger_mode_$index", if (enabled) 1f else 0f)
+                        pluginProvider.fluxPlugin.setQuadTriggerMode(index, enabled)
                     }
                 }
             }
@@ -665,10 +660,7 @@ class DspSynthEngine(
             wiringGraph.drumDirectGainR.inputB.set(0.0)
         }
         // Forward to C++ ODWG graph
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_chain_gain_l", chainGain)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_chain_gain_r", chainGain)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_gain_l", directGain)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_gain_r", directGain)
+        pluginProvider.drumPlugin.setRouting(chainGain, directGain)
     }
 
     // TTS delegations
@@ -771,11 +763,9 @@ class DspSynthEngine(
     override fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float) {
         val shouldTriggerVoice = pluginProvider.perStringBenderPlugin.setStringBend(stringIndex, bendAmount, voiceMix)
         // Always forward bend to C++ engine (JSyn return value only indicates voice trigger, not bend success)
-        nativeBridge?.let { bridge ->
-            bridge.nativeSetPort(BENDER_URI, "string_bend_$stringIndex", bendAmount)
-            bridge.nativeSetPort(BENDER_URI, "string_mix_$stringIndex", voiceMix)
-            bridge.nativeSetPort(BENDER_URI, "string_active_$stringIndex", 1f)
-        }
+        audioEngine.setPort(BENDER_URI, "string_bend_$stringIndex", bendAmount)
+        audioEngine.setPort(BENDER_URI, "string_mix_$stringIndex", voiceMix)
+        audioEngine.setPort(BENDER_URI, "string_active_$stringIndex", 1f)
         if (shouldTriggerVoice) {
             val voiceA = stringIndex * 2
             val voiceB = stringIndex * 2 + 1
@@ -786,10 +776,8 @@ class DspSynthEngine(
 
     override fun releaseStringBend(stringIndex: Int): Int {
         val (springDuration, shouldRelease) = pluginProvider.perStringBenderPlugin.releaseString(stringIndex)
-        nativeBridge?.let { bridge ->
-            bridge.nativeSetPort(BENDER_URI, "string_bend_$stringIndex", 0f)
-            bridge.nativeSetPort(BENDER_URI, "string_active_$stringIndex", 0f)
-        }
+        audioEngine.setPort(BENDER_URI, "string_bend_$stringIndex", 0f)
+        audioEngine.setPort(BENDER_URI, "string_active_$stringIndex", 0f)
         if (shouldRelease) {
              val voiceA = stringIndex * 2
              val voiceB = stringIndex * 2 + 1
@@ -801,17 +789,13 @@ class DspSynthEngine(
 
     override fun setSlideBar(yPosition: Float, xPosition: Float) {
         pluginProvider.perStringBenderPlugin.setSlideBar(yPosition, xPosition)
-        nativeBridge?.let { bridge ->
-            bridge.nativeSetPort(BENDER_URI, "slide_bar_y", yPosition)
-            bridge.nativeSetPort(BENDER_URI, "slide_bar_x", xPosition)
-        }
+        audioEngine.setPort(BENDER_URI, "slide_bar_y", yPosition)
+        audioEngine.setPort(BENDER_URI, "slide_bar_x", xPosition)
     }
     override fun releaseSlideBar() {
         pluginProvider.perStringBenderPlugin.releaseSlideBar()
-        nativeBridge?.let { bridge ->
-            bridge.nativeSetPort(BENDER_URI, "slide_bar_y", 0f)
-            bridge.nativeSetPort(BENDER_URI, "slide_bar_x", 0f)
-        }
+        audioEngine.setPort(BENDER_URI, "slide_bar_y", 0f)
+        audioEngine.setPort(BENDER_URI, "slide_bar_x", 0f)
     }
     override fun resetStringBenders() = pluginProvider.perStringBenderPlugin.resetAll()
 
@@ -860,7 +844,7 @@ class DspSynthEngine(
     }
     override fun setQuadVolume(quadIndex: Int, volume: Float) {
         voiceManager.setQuadVolume(quadIndex, volume)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.stereo", "quad_vol_$quadIndex", volume)
+        pluginProvider.stereoPlugin.setQuadVolume(quadIndex, volume)
     }
     override fun fadeQuadVolume(quadIndex: Int, targetVolume: Float, durationSeconds: Float) = voiceManager.fadeQuadVolume(quadIndex, targetVolume, durationSeconds)
     override fun setVoiceHold(index: Int, amount: Float) {
@@ -872,17 +856,17 @@ class DspSynthEngine(
     override fun setDuoModSource(duoIndex: Int, source: ModSource) = voiceManager.setDuoModSource(duoIndex, source)
     override fun setFmStructure(crossQuad: Boolean) {
         voiceManager.setFmStructure(crossQuad)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.modulation", "fm_cross_quad", if (crossQuad) 1f else 0f)
+        pluginProvider.voicePlugin.setFmCrossQuad(crossQuad)
     }
 
     override fun setTotalFeedback(amount: Float) {
         voiceManager.setTotalFeedback(amount)
         wiringGraph.totalFbGain.inputB.set(amount * 20.0)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "total_feedback", amount)
+        pluginProvider.voicePlugin.setTotalFeedback(amount)
     }
     override fun setVoiceCoupling(amount: Float) {
         voiceManager.setVoiceCoupling(amount)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "coupling_depth", amount)
+        pluginProvider.voicePlugin.setCouplingDepth(amount)
     }
 
     // Trigger delegations
@@ -893,7 +877,6 @@ class DspSynthEngine(
         pluginProvider.drumPlugin.setParameters(type, frequency, tone, decay, p4, p5)
     }
     override fun triggerDrum(type: Int, accent: Float) {
-        nativeBridge?.nativeTriggerDrum(type, accent)
         pluginProvider.drumPlugin.trigger(type, accent)
     }
 
@@ -929,7 +912,7 @@ class DspSynthEngine(
                 forwardPanToNative(voiceIndex, pan)
             }
         } else {
-            nativeBridge?.nativeSetPort(pluginUri, symbol, value.asFloat())
+            audioEngine.setPort(pluginUri, symbol, value.asFloat())
         }
         val result = pluginProvider.getPlugin(pluginUri)?.setPortValue(symbol, value) ?: false
         // Keep bendFlow in sync when Bender BEND is set externally (gesture, MIDI, AI)
@@ -944,17 +927,65 @@ class DspSynthEngine(
         val angle = ((pan + 1f) * 0.5f) * (kotlin.math.PI.toFloat() * 0.5f)
         val leftGain = kotlin.math.cos(angle)
         val rightGain = kotlin.math.sin(angle)
-        nativeBridge?.nativeSetPort(STEREO_URI, "voice_pan_L_$voiceIndex", leftGain)
-        nativeBridge?.nativeSetPort(STEREO_URI, "voice_pan_R_$voiceIndex", rightGain)
+        pluginProvider.stereoPlugin.setVoicePan(voiceIndex, leftGain, rightGain)
     }
     override fun getPluginPort(pluginUri: String, symbol: String): PortValue? =
         pluginProvider.getPlugin(pluginUri)?.getPortValue(symbol)
 
     // Automation Delegation
-    override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) =
-        automationManager.setParameterAutomation(controlId, times, values, count, duration, mode)
-    override fun clearParameterAutomation(controlId: String) =
+    override fun setParameterAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int, duration: Float, mode: Int) {
+        // Pre-activate voice on gate automation (REPL voices 8-11 start idle)
+        if (controlId.startsWith("voice_gate_")) {
+            val index = controlId.removePrefix("voice_gate_").toIntOrNull()
+            if (index != null) {
+                voiceManager.setVoiceIdle(index, false)
+                nativeBridge?.nativeSetVoiceActive(index, true)
+            }
+        }
+
+        if (nativeBridge != null) {
+            scheduleNativeAutomation(controlId, times, values, count)
+        } else {
+            automationManager.setParameterAutomation(controlId, times, values, count, duration, mode)
+        }
+    }
+
+    override fun clearParameterAutomation(controlId: String) {
+        if (nativeBridge != null) {
+            when {
+                controlId.startsWith("voice_gate_") -> {
+                    val index = controlId.removePrefix("voice_gate_").toIntOrNull()
+                    if (index != null) nativeBridge.nativeClearAutomation(0, index)
+                }
+                controlId.startsWith("voice_freq_") -> {
+                    val index = controlId.removePrefix("voice_freq_").toIntOrNull()
+                    if (index != null) nativeBridge.nativeClearAutomation(1, index)
+                }
+            }
+        }
         automationManager.clearParameterAutomation(controlId)
+    }
+
+    /**
+     * Forward automation paths to the C++ engine for sample-accurate playback.
+     * The C++ audio thread steps through time/value paths at block boundaries,
+     * converting Hz to MIDI notes internally for voice_freq targets.
+     */
+    private fun scheduleNativeAutomation(controlId: String, times: FloatArray, values: FloatArray, count: Int) {
+        val bridge = nativeBridge ?: return
+
+        when {
+            controlId.startsWith("voice_gate_") -> {
+                val index = controlId.removePrefix("voice_gate_").toIntOrNull() ?: return
+                bridge.nativeSetAutomation(0, index, times, values, count) // 0 = VOICE_GATE
+            }
+            controlId.startsWith("voice_freq_") -> {
+                val index = controlId.removePrefix("voice_freq_").toIntOrNull() ?: return
+                bridge.nativeSetAutomation(1, index, times, values, count) // 1 = VOICE_FREQ
+            }
+            else -> log.debug { "Native automation: unhandled controlId=$controlId" }
+        }
+    }
 
     // State Getters (Delegated)
     override fun getPeak(): Float = pluginProvider.stereoPlugin.getPeak()
@@ -987,11 +1018,7 @@ class DspSynthEngine(
         // Forward excitation/bypass gains to C++ graph port map
         val drumExcite = if (targetMix <= 0.5f) 1f else (1f - (targetMix - 0.5f) * 2f).coerceIn(0f, 1f)
         val synthExcite = if (targetMix >= 0.5f) 1f else (targetMix * 2f).coerceIn(0f, 1f)
-        val uri = ResonatorSymbol.TARGET_MIX.uri
-        nativeBridge?.nativeSetPort(uri, "drum_ex_gain", drumExcite)
-        nativeBridge?.nativeSetPort(uri, "synth_ex_gain", synthExcite)
-        nativeBridge?.nativeSetPort(uri, "drum_bp_gain", 1f - drumExcite)
-        nativeBridge?.nativeSetPort(uri, "synth_bp_gain", 1f - synthExcite)
+        pluginProvider.resonatorPlugin.setTargetMixGains(drumExcite, synthExcite)
         updateDirectResonatorGains()
     }
 
@@ -1021,9 +1048,7 @@ class DspSynthEngine(
         // Forward synth resonator wet/dry gains to C++ graph port map
         val wet = value.coerceIn(0f, 1f)
         val dry = 1f - wet
-        val uri = ResonatorSymbol.MIX.uri
-        nativeBridge?.nativeSetPort(uri, "wet_gain", wet)
-        nativeBridge?.nativeSetPort(uri, "dry_gain", dry)
+        pluginProvider.resonatorPlugin.setMixGains(wet, dry)
         updateDirectResonatorGains()
     }
 
@@ -1041,12 +1066,7 @@ class DspSynthEngine(
         wiringGraph.drumDirectResoDryGainR.inputB.set(finalDry)
 
         // Forward to C++ engine
-        val wetF = finalWet.toFloat()
-        val dryF = finalDry.toFloat()
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_reso_wet_l", wetF)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_reso_wet_r", wetF)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_reso_dry_l", dryF)
-        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.drum", "drum_direct_reso_dry_r", dryF)
+        pluginProvider.drumPlugin.setDirectResonatorGains(finalWet.toFloat(), finalDry.toFloat())
     }
 
     private fun strumResonator(frequency: Float) {
@@ -1067,7 +1087,7 @@ class DspSynthEngine(
         drumTriggerSources[drumIndex] = sourceIndex
 
         // Forward to C++ native bridge
-        nativeBridge?.nativeSetPort(FLUX_URI, "drum_trigger_source_$drumIndex", sourceIndex.toFloat())
+        pluginProvider.fluxPlugin.setDrumTriggerSource(drumIndex, sourceIndex)
         // Activate drum voice in C++ so the gate routing code runs.
         // Drum voices start inactive (active=0) and only get activated by pad hits.
         // Without this, the active check at line 354 returns before external gates are read.
@@ -1100,7 +1120,7 @@ class DspSynthEngine(
         val xIndex = sourceIndex - DrumTriggerSource.FLUX_X1.ordinal + 1
 
         // Forward mapped index to C++ native bridge
-        nativeBridge?.nativeSetPort(FLUX_URI, "drum_pitch_source_$drumIndex", xIndex.toFloat())
+        pluginProvider.fluxPlugin.setDrumPitchSource(drumIndex, xIndex)
 
         val drumPitchIn = when(drumIndex) {
             0 -> pluginProvider.drumPlugin.inputs["pitchBD"]
@@ -1123,11 +1143,11 @@ class DspSynthEngine(
         // Quads receive raw indices (1=X1, 2=X2, 3=X3) from TriggerRouterPanel — no mapping needed.
         // (Drums use DrumTriggerSource enum ordinals 4/5/6, mapped in setDrumPitchSource.)
         voiceManager.setQuadPitchSource(quadIndex, sourceIndex)
-        nativeBridge?.nativeSetPort(FLUX_URI, "quad_pitch_source_$quadIndex", sourceIndex.toFloat())
+        pluginProvider.fluxPlugin.setQuadPitchSource(quadIndex, sourceIndex)
     }
     override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) {
         voiceManager.setQuadTriggerSource(quadIndex, sourceIndex)
-        nativeBridge?.nativeSetPort(FLUX_URI, "quad_trigger_source_$quadIndex", sourceIndex.toFloat())
+        pluginProvider.fluxPlugin.setQuadTriggerSource(quadIndex, sourceIndex)
     }
     override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) = voiceManager.setQuadEnvelopeTriggerMode(quadIndex, enabled)
     override fun getQuadPitchSource(quadIndex: Int) = voiceManager.getQuadPitchSource(quadIndex)
@@ -1138,7 +1158,7 @@ class DspSynthEngine(
     private fun setFluxClockSource(sourceIndex: Int) {
         fluxClockSource = sourceIndex
         // Forward to C++ native bridge
-        nativeBridge?.nativeSetPort(FLUX_URI, "clock_source", sourceIndex.toFloat())
+        pluginProvider.fluxPlugin.setClockSource(sourceIndex)
         // JSyn path: rewire audio graph
         val fluxIn = pluginProvider.fluxPlugin.inputs["clock"] ?: return
         fluxIn.disconnectAll()

@@ -46,6 +46,8 @@ public:
     void setVibratoRate(float hz);
     void setBend(float v);
     void getMonitor(OrpheusMonitorData* out);
+    void setAutomation(int target, int voiceIndex, const float* times, const float* values, int count);
+    void clearAutomation(int target, int voiceIndex);
 
     // Oboe callbacks
     oboe::DataCallbackResult onAudioReady(

@@ -5,12 +5,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.features.SynthFeature
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,11 +18,13 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.tidal.ConsoleEntry
 import org.balch.orpheus.core.tidal.EvalMode
 import org.balch.orpheus.core.tidal.Pattern
@@ -573,56 +573,26 @@ d2 $ voices:1 2 3 4
 
             "gadda" to """
 bpm 108
+drive:0.05
+distmix:0.04
+feedback:0.3
+delaymix:0.1
 
-# In-A-Gadda-Da-Vida
-drive:0.6
-distmix:0.6
-feedback:0.35
-delaymix:0.2
-
-# VA organ pad on pair 1 (voices 1-2)
+# Organ riff
 engine:1 va
-sharp:1 0.7
-tune:1 0.354
-tune:2 0.500
+sharp:1 0.35
 envspeed:1 0.85
-envspeed:2 0.85
+d1 $ note "d3 d3 d3 d3 [a3 g#3 g3 f#3]"
 
-# String bass drone on pair 2 (voices 3-4)
-engine:2 string
-tune:3 0.354
-tune:4 0.354
-envspeed:3 0.8
-envspeed:4 0.8
+# Bass
+engine:2 va
+sharp:2 0.2
+envspeed:2 0.8
+d2 $ note "d2 d2 d2 d2 [a2 g#2 g2 f#2]"
 
-# FM shimmer on pair 3 (voices 5-6)
-engine:3 fm
-tune:5 0.604
-tune:6 0.500
-envspeed:5 0.7
-envspeed:6 0.7
-
-# Drums - rock groove
-d1 $ s "<[bd ~ sn ~] [bd ~ sn ~] [bd ~ sn ~] [bd ~ sn [sn sn]]>"
-d2 $ s "hh hh <hh oh> hh"
-
-# Organ riff - the iconic melody
-d3 $ note "d3 d3 d3 d3 a3 g#3 g3 f#3"
-
-# Bass line
-d4 $ note "d2@4 [a2 g#2 g2 f#2]"
-
-# High doubling (sparse)
-d5 $ note "d4 ~ d4 ~ [a4 g#4 g4 f#4] ~"
-
-# Organ pad drone (pair 1)
-d6 $ voices "1 2" # hold "0.6"
-
-# Bass drone (pair 2)
-d7 $ slow 2 $ voices "3 ~ 4 ~"
-
-# FM texture (pair 3, euclidean)
-d8 $ voices "5(3,8) 6(5,8)"
+# Drums
+d3 $ s "[bd ~ sn ~] [bd ~ sn ~]"
+d4 $ s "hh*8"
             """.trimIndent(),
 
             "euclidean" to """

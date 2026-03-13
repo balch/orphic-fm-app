@@ -27,4 +27,6 @@ interface NativeDspBridge {
     fun nativeGetMonitor(out: FloatArray)
     fun nativeTriggerDrum(drumIndex: Int, accent: Float)
     fun nativeLoadGraph(data: ByteArray): Int
+    fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int)
+    fun nativeClearAutomation(target: Int, voiceIndex: Int)
 }
