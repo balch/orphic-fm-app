@@ -344,6 +344,10 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->clouds_reverb.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "freeze") == 0)
             engine->clouds_freeze.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "trigger") == 0) {
+            if (value > 0.5f)
+                engine->clouds_trigger.store(1, std::memory_order_relaxed);
+        }
         else if (std::strcmp(symbol, "mode") == 0)
             engine->clouds_mode.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "bypass") == 0)
@@ -416,13 +420,14 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.flux") == 0
           || std::strcmp(plugin_uri, "marbles") == 0) {
         if (std::strcmp(symbol, "rate") == 0)
-            engine->marbles_t_rate.store(value, std::memory_order_relaxed);
+            // Map [0,1] UI knob → [-48,+48] semitone rate offset (matches Kotlin FluxProcessor)
+            engine->marbles_t_rate.store((value - 0.5f) * 96.0f, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "spread") == 0)
             engine->marbles_x_spread.store(value, std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "bias") == 0)
-            engine->marbles_t_bias.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "x_bias") == 0)
             engine->marbles_x_bias.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "probability") == 0)
+            engine->marbles_t_bias.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "steps") == 0)
             engine->marbles_x_steps.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "jitter") == 0)
@@ -441,8 +446,49 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->marbles_x_range.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "x_scale") == 0)
             engine->marbles_x_scale.store(static_cast<int>(value), std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "bypass") == 0)
-            engine->marbles_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mix") == 0)
+            engine->marbles_mix.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "pulse_width") == 0)
+            engine->marbles_pulse_width.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "pulse_width_std") == 0)
+            engine->marbles_pulse_width_std.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "clock_source") == 0)
+            engine->marbles_clock_source.store(static_cast<int>(value), std::memory_order_relaxed);
+        // Trigger router: drum source selectors
+        else if (std::strcmp(symbol, "drum_trigger_source_0") == 0)
+            engine->drum_trigger_source[0].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "drum_trigger_source_1") == 0)
+            engine->drum_trigger_source[1].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "drum_trigger_source_2") == 0)
+            engine->drum_trigger_source[2].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "drum_pitch_source_0") == 0)
+            engine->drum_pitch_source[0].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "drum_pitch_source_1") == 0)
+            engine->drum_pitch_source[1].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "drum_pitch_source_2") == 0)
+            engine->drum_pitch_source[2].store(static_cast<int>(value), std::memory_order_relaxed);
+        // Trigger router: quad source selectors
+        else if (std::strcmp(symbol, "quad_trigger_source_0") == 0) {
+            engine->quad_trigger_source[0].store(static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "quad_trigger_source_1") == 0) {
+            engine->quad_trigger_source[1].store(static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "quad_trigger_source_2") == 0) {
+            engine->quad_trigger_source[2].store(static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "quad_pitch_source_0") == 0)
+            engine->quad_pitch_source[0].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "quad_pitch_source_1") == 0)
+            engine->quad_pitch_source[1].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "quad_pitch_source_2") == 0)
+            engine->quad_pitch_source[2].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "quad_trigger_mode_0") == 0)
+            engine->quad_trigger_mode[0].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "quad_trigger_mode_1") == 0)
+            engine->quad_trigger_mode[1].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "quad_trigger_mode_2") == 0)
+            engine->quad_trigger_mode[2].store(static_cast<int>(value), std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.drum") == 0) {
         // Drum synthesis parameters: map 0-1 knob values to voice_params for drum voices 12-14

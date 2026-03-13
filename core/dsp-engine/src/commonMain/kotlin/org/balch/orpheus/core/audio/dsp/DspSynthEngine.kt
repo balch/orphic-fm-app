@@ -20,6 +20,7 @@ import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.plugin.ControlPort
 import org.balch.orpheus.core.plugin.PortSymbol
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.BENDER_URI
@@ -28,6 +29,7 @@ import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
+import org.balch.orpheus.core.plugin.symbols.FLUX_URI
 import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 import org.balch.orpheus.core.plugin.symbols.STEREO_URI
@@ -35,6 +37,7 @@ import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import org.balch.orpheus.core.plugin.symbols.VibratoSymbol
 import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.core.triggers.DrumTriggerSource
 import org.balch.orpheus.plugins.drum.DrumPlugin
 import org.balch.orpheus.plugins.duolfo.VoicePlugin
 
@@ -140,7 +143,8 @@ class DspSynthEngine(
             },
             getter = { id ->
                 getPluginPort(id.uri, id.symbol)
-            }
+            },
+            nativeSync = ::syncNativeBridgeState
         )
 
         setupListeners()
@@ -160,6 +164,10 @@ class DspSynthEngine(
     /** Push current voice state to C++ engine so it matches Kotlin on startup. */
     private fun syncNativeBridgeState() {
         val bridge = nativeBridge ?: return
+        // Reset all voice gates to prevent stale gates from previous preset/T-gen routing
+        for (v in 0 until 15) {
+            bridge.nativeSetVoiceGate(v, false)
+        }
         val vp = pluginProvider.voicePlugin
         for (duo in 0..5) {
             val engineOrdinal = vp.getDuoEngine(duo)
@@ -241,6 +249,41 @@ class DspSynthEngine(
         bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "coupling_depth", voiceManager.getVoiceCoupling())
         bridge.nativeSetPort("org.balch.orpheus.plugins.voice", "total_feedback", voiceManager.getTotalFeedback())
         bridge.nativeSetPort("org.balch.orpheus.plugins.modulation", "fm_cross_quad", if (voiceManager.getFmStructureCrossQuad()) 1f else 0f)
+        // Sync Flux clock source (not a control port, so generic loop won't catch it)
+        bridge.nativeSetPort(FLUX_URI, "clock_source", fluxClockSource.toFloat())
+        // Sync trigger router source selectors
+        for (i in 0..2) {
+            bridge.nativeSetPort(FLUX_URI, "drum_trigger_source_$i", drumTriggerSources[i].toFloat())
+            // Map DrumTriggerSource pitch ordinals to X output index (1=X1, 2=X2, 3=X3)
+            bridge.nativeSetPort(FLUX_URI, "drum_pitch_source_$i", (drumPitchSources[i] - DrumTriggerSource.FLUX_X1.ordinal + 1).toFloat())
+            // Activate drum voice in C++ if it has an external trigger source
+            if (drumTriggerSources[i] != 0) {
+                bridge.nativeSetVoiceActive(12 + i, true) // kDrumVoiceStart=12
+            }
+            bridge.nativeSetPort(FLUX_URI, "quad_trigger_source_$i", voiceManager.getQuadTriggerSource(i).toFloat())
+            // quadPitchSources already stored as mapped values (1/2/3) by setQuadPitchSource
+            bridge.nativeSetPort(FLUX_URI, "quad_pitch_source_$i", voiceManager.getQuadPitchSource(i).toFloat())
+            bridge.nativeSetPort(FLUX_URI, "quad_trigger_mode_$i", if (voiceManager.getQuadEnvelopeTriggerMode(i)) 1f else 0f)
+        }
+
+        // Generic sync: forward ALL plugin control port values to C++ native bridge.
+        // This catches reverb, distortion, delay, warps, clouds, drums, grains, flux,
+        // and any other plugins not explicitly synced above.
+        for (plugin in pluginProvider.plugins) {
+            val uri = plugin.info.uri
+            for (port in plugin.ports) {
+                if (port !is ControlPort || !port.isInput) continue
+                val value = plugin.getPortValue(port.symbol) ?: continue
+                if (uri == STEREO_URI && port.symbol.startsWith("voice_pan_")) {
+                    // Pan ports need constant-power L/R conversion (already synced above,
+                    // but harmless to re-sync via the correct path)
+                    val voiceIndex = port.symbol.removePrefix("voice_pan_").toIntOrNull()
+                    if (voiceIndex != null) forwardPanToNative(voiceIndex, value.asFloat())
+                } else {
+                    bridge.nativeSetPort(uri, port.symbol, value.asFloat())
+                }
+            }
+        }
     }
 
     private fun setupListeners() {
@@ -268,8 +311,9 @@ class DspSynthEngine(
                         nativeBridge?.nativeSetVoiceTimbre(voiceA + 1, value)
                     }
                     "duo_mod_source" -> {
-                        voiceManager.setDuoModSource(index, ModSource.entries[value as Int])
-                        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_$index", (value as Int).toFloat())
+                        val modSourceOrdinal = value as Int
+                        voiceManager.setDuoModSource(index, ModSource.entries[modSourceOrdinal])
+                        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_$index", modSourceOrdinal.toFloat())
                     }
                     "duo_engine" -> {
                         val engineOrdinal = value as Int
@@ -307,23 +351,28 @@ class DspSynthEngine(
                         }
                     }
                     "duo_mod_source_level" -> {
-                        voiceManager.setDuoModSourceLevel(index, value as Float)
-                        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_level_$index", value as Float)
+                        val level = value as Float
+                        voiceManager.setDuoModSourceLevel(index, level)
+                        nativeBridge?.nativeSetPort("org.balch.orpheus.plugins.voice", "duo_mod_source_level_$index", level)
                     }
                     "quad_pitch" -> setQuadPitch(index, value as Float)
                     "quad_hold" -> {
-                        voiceManager.setQuadHold(index, value as Float)
+                        val holdAmount = value as Float
+                        voiceManager.setQuadHold(index, holdAmount)
                         // Forward raw hold to C++ for all voices in the quad
                         val startVoice = index * 4
-                        val holdAmount = value as Float
                         for (i in startVoice until (startVoice + 4).coerceAtMost(12)) {
                             nativeBridge?.nativeSetVoiceHold(i, holdAmount)
                         }
                     }
                     "quad_volume" -> setQuadVolume(index, value as Float)
-                    "quad_trigger_source" -> voiceManager.setQuadTriggerSource(index, value as Int)
-                    "quad_pitch_source" -> voiceManager.setQuadPitchSource(index, value as Int)
-                    "quad_env_trigger_mode" -> voiceManager.setQuadEnvelopeTriggerMode(index, value as Boolean)
+                    "quad_trigger_source" -> setQuadTriggerSource(index, value as Int)
+                    "quad_pitch_source" -> setQuadPitchSource(index, value as Int)
+                    "quad_env_trigger_mode" -> {
+                        val enabled = value as Boolean
+                        voiceManager.setQuadEnvelopeTriggerMode(index, enabled)
+                        nativeBridge?.nativeSetPort(FLUX_URI, "quad_trigger_mode_$index", if (enabled) 1f else 0f)
+                    }
                 }
             }
 
@@ -1012,10 +1061,20 @@ class DspSynthEngine(
     override fun getDrumP4(type: Int): Float = pluginProvider.drumPlugin.getP4(type)
     override fun getDrumP5(type: Int): Float = pluginProvider.drumPlugin.getP5(type)
 
-    // Drum Sources (side effects: rewires audio inputs)
+    // Drum Sources (side effects: rewires audio inputs + forwards to C++)
     private fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int) {
         if (drumIndex !in 0..2) return
         drumTriggerSources[drumIndex] = sourceIndex
+
+        // Forward to C++ native bridge
+        nativeBridge?.nativeSetPort(FLUX_URI, "drum_trigger_source_$drumIndex", sourceIndex.toFloat())
+        // Activate drum voice in C++ so the gate routing code runs.
+        // Drum voices start inactive (active=0) and only get activated by pad hits.
+        // Without this, the active check at line 354 returns before external gates are read.
+        if (sourceIndex != 0) {
+            val voiceIndex = 12 + drumIndex // kDrumVoiceStart=12
+            nativeBridge?.nativeSetVoiceActive(voiceIndex, true)
+        }
 
         val drumIn = when(drumIndex) {
             0 -> pluginProvider.drumPlugin.inputs["triggerBD"]
@@ -1037,6 +1096,12 @@ class DspSynthEngine(
         if (drumIndex !in 0..2) return
         drumPitchSources[drumIndex] = sourceIndex
 
+        // Map DrumTriggerSource pitch ordinals to X output index (1=X1, 2=X2, 3=X3)
+        val xIndex = sourceIndex - DrumTriggerSource.FLUX_X1.ordinal + 1
+
+        // Forward mapped index to C++ native bridge
+        nativeBridge?.nativeSetPort(FLUX_URI, "drum_pitch_source_$drumIndex", xIndex.toFloat())
+
         val drumPitchIn = when(drumIndex) {
             0 -> pluginProvider.drumPlugin.inputs["pitchBD"]
             1 -> pluginProvider.drumPlugin.inputs["pitchSD"]
@@ -1045,7 +1110,7 @@ class DspSynthEngine(
         } ?: return
 
         drumPitchIn.disconnectAll()
-        when (sourceIndex) {
+        when (xIndex) {
             1 -> pluginProvider.fluxPlugin.outputs["outputX1"]?.connect(drumPitchIn)
             2 -> pluginProvider.fluxPlugin.outputs["output"]?.connect(drumPitchIn)
             3 -> pluginProvider.fluxPlugin.outputs["outputX3"]?.connect(drumPitchIn)
@@ -1053,17 +1118,28 @@ class DspSynthEngine(
         }
     }
 
-    // Quad delegations
-    override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) = voiceManager.setQuadPitchSource(quadIndex, sourceIndex)
-    override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) = voiceManager.setQuadTriggerSource(quadIndex, sourceIndex)
+    // Quad delegations (with C++ forwarding)
+    override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) {
+        // Quads receive raw indices (1=X1, 2=X2, 3=X3) from TriggerRouterPanel — no mapping needed.
+        // (Drums use DrumTriggerSource enum ordinals 4/5/6, mapped in setDrumPitchSource.)
+        voiceManager.setQuadPitchSource(quadIndex, sourceIndex)
+        nativeBridge?.nativeSetPort(FLUX_URI, "quad_pitch_source_$quadIndex", sourceIndex.toFloat())
+    }
+    override fun setQuadTriggerSource(quadIndex: Int, sourceIndex: Int) {
+        voiceManager.setQuadTriggerSource(quadIndex, sourceIndex)
+        nativeBridge?.nativeSetPort(FLUX_URI, "quad_trigger_source_$quadIndex", sourceIndex.toFloat())
+    }
     override fun setQuadEnvelopeTriggerMode(quadIndex: Int, enabled: Boolean) = voiceManager.setQuadEnvelopeTriggerMode(quadIndex, enabled)
     override fun getQuadPitchSource(quadIndex: Int) = voiceManager.getQuadPitchSource(quadIndex)
     override fun getQuadTriggerSource(quadIndex: Int) = voiceManager.getQuadTriggerSource(quadIndex)
     override fun getQuadEnvelopeTriggerMode(quadIndex: Int) = voiceManager.getQuadEnvelopeTriggerMode(quadIndex)
 
-    // Flux clock source (side effect: rewires clock input)
+    // Flux clock source (side effect: rewires JSyn clock input + forwards to C++)
     private fun setFluxClockSource(sourceIndex: Int) {
         fluxClockSource = sourceIndex
+        // Forward to C++ native bridge
+        nativeBridge?.nativeSetPort(FLUX_URI, "clock_source", sourceIndex.toFloat())
+        // JSyn path: rewire audio graph
         val fluxIn = pluginProvider.fluxPlugin.inputs["clock"] ?: return
         fluxIn.disconnectAll()
         when (sourceIndex) {

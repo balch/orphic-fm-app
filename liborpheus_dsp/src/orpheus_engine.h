@@ -58,6 +58,7 @@ struct OrpheusEngine {
         std::atomic<int> ever_triggered{0};  // 0 = never gated on; skip render until first gate
         bool graph_gate_prev{false};         // previous gate state for graph edge detection
         bool graph_trigger_pending{false};   // rising edge detected, not yet consumed by render
+        bool ext_retrigger{false};           // external gate re-trigger: force ADSR back to attack
         std::atomic<int> engine_changed{0};  // 1 = engine just changed, force LPG retrigger
     };
     VoiceParams voice_params[kNumVoices];
@@ -91,6 +92,7 @@ struct OrpheusEngine {
     std::atomic<float> clouds_feedback{0.0f};
     std::atomic<float> clouds_reverb{0.0f};
     std::atomic<int>   clouds_freeze{0};
+    std::atomic<int>   clouds_trigger{0};    // rising-edge flag, cleared by audio thread
     std::atomic<int>   clouds_mode{0};       // PlaybackMode enum
     std::atomic<int>   clouds_bypass{0};     // not bypassed — dry_wet=0 handles passthrough
 
@@ -206,7 +208,31 @@ struct OrpheusEngine {
     std::atomic<int>   marbles_x_scale{0};           // scale index
     std::atomic<float> marbles_deja_vu{0.0f};        // 0..1 deja vu amount
     std::atomic<int>   marbles_deja_vu_length{8};    // loop length (1-16)
-    std::atomic<int>   marbles_bypass{1};            // bypassed by default
+    std::atomic<float> marbles_mix{0.0f};            // 0..1 output scaling (self-bypass at 0)
+    std::atomic<float> marbles_pulse_width{0.5f};    // 0..1 pulse width mean
+    std::atomic<float> marbles_pulse_width_std{0.0f};// 0..1 pulse width randomization
+    std::atomic<int>   marbles_clock_source{0};      // 0=global clock, 1=LFO
+
+    // ── Marbles Deinterleaved Output Buffers ─────────
+    // Written by unit_process_marbles, read by unit_process_plaits for trigger routing.
+    // All 6 streams extracted from interleaved TGenerator/XYGenerator output.
+    float marbles_t1_buffer[kMaxFrames] = {};  // T1 gate (TGenerator ch0)
+    float marbles_t2_buffer[kMaxFrames] = {};  // T2 gate (master ramp < pulseWidth)
+    float marbles_t3_buffer[kMaxFrames] = {};  // T3 gate (TGenerator ch1)
+    float marbles_x1_buffer[kMaxFrames] = {};  // X1 CV (post mix+exp)
+    float marbles_x2_buffer[kMaxFrames] = {};  // X2 CV (post mix+exp)
+    float marbles_x3_buffer[kMaxFrames] = {};  // X3 CV (post mix+exp)
+
+    // ── Trigger Router: source selection atomics ─────
+    // Written from Kotlin UI, read by unit_process_plaits.
+    // Drums: 0=Grids (default graph wiring), 1=T1, 2=T2, 3=T3
+    // Quads: 0=Internal/MIDI, 1=T1, 2=T2, 3=T3
+    // Pitch: 0=None, 1=X1, 2=X2, 3=X3
+    std::atomic<int> drum_trigger_source[kNumDrumVoices] = {};
+    std::atomic<int> drum_pitch_source[kNumDrumVoices] = {};
+    std::atomic<int> quad_trigger_source[3] = {};  // 3 quads of 4 voices each
+    std::atomic<int> quad_pitch_source[3] = {};
+    std::atomic<int> quad_trigger_mode[3] = {};   // 0=sustain, 1=trigger (percussive)
 
     // ── Drive (tanh saturation) ──────────────────────
     std::atomic<float> drive_amount{1.0f};       // 1.0 = clean, higher = more saturation

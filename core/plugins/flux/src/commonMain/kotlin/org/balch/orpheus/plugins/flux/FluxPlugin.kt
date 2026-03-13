@@ -15,9 +15,9 @@ import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
 import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.FLUX_URI
 import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 
@@ -260,11 +260,11 @@ class FluxPlugin(
     override fun initialize() {
         // Initialize default values via port API
         setPortValue("spread", PortValue.FloatValue(0.5f))
-        setPortValue("bias", PortValue.FloatValue(0.5f))
+        setPortValue("x_bias", PortValue.FloatValue(0.5f))
         setPortValue("steps", PortValue.FloatValue(0.5f))
-        setPortValue("dejavu", PortValue.FloatValue(0.0f))
-        setPortValue("length", PortValue.IntValue(8))
-        setPortValue("scale", PortValue.IntValue(0))
+        setPortValue("deja_vu", PortValue.FloatValue(0.0f))
+        setPortValue("deja_vu_length", PortValue.IntValue(8))
+        setPortValue("x_scale", PortValue.IntValue(0))
         setPortValue("rate", PortValue.FloatValue(0.5f))
         setPortValue("jitter", PortValue.FloatValue(0.0f))
         setPortValue("probability", PortValue.FloatValue(0.5f))
@@ -272,8 +272,8 @@ class FluxPlugin(
         setPortValue("t_range", PortValue.IntValue(1))
         setPortValue("pulse_width", PortValue.FloatValue(0.5f))
         setPortValue("pulse_width_std", PortValue.FloatValue(0.0f))
-        setPortValue("control_mode", PortValue.IntValue(0))
-        setPortValue("voltage_range", PortValue.IntValue(2))
+        setPortValue("x_control_mode", PortValue.IntValue(0))
+        setPortValue("x_range", PortValue.IntValue(2))
         setPortValue("mix", PortValue.FloatValue(0.0f))
 
         audioUnits.forEach { audioEngine.addUnit(it) }

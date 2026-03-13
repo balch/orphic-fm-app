@@ -11,11 +11,11 @@ enum class FluxSymbol(
     override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
 ) : PortSymbol {
     SPREAD("spread", displayName = "Spread"),
-    BIAS("bias", displayName = "Bias"),
+    BIAS("x_bias", displayName = "Bias"),
     STEPS("steps", displayName = "Steps"),
-    DEJAVU("dejavu", displayName = "Déjà Vu"),
-    LENGTH("length", displayName = "Length"),
-    SCALE("scale", displayName = "Scale"),
+    DEJAVU("deja_vu", displayName = "Déjà Vu"),
+    LENGTH("deja_vu_length", displayName = "Length"),
+    SCALE("x_scale", displayName = "Scale"),
     RATE("rate", displayName = "Rate"),
     JITTER("jitter", displayName = "Jitter"),
     PROBABILITY("probability", displayName = "Probability"),
@@ -24,7 +24,7 @@ enum class FluxSymbol(
     T_RANGE("t_range", displayName = "T Range"),
     PULSE_WIDTH("pulse_width", displayName = "Pulse Width"),
     PULSE_WIDTH_STD("pulse_width_std", displayName = "PW Rand"),
-    CONTROL_MODE("control_mode", displayName = "Control Mode"),
-    VOLTAGE_RANGE("voltage_range", displayName = "Voltage Range"),
+    CONTROL_MODE("x_control_mode", displayName = "Control Mode"),
+    VOLTAGE_RANGE("x_range", displayName = "Voltage Range"),
     MIX("mix", displayName = "Mix")
 }

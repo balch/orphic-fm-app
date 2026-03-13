@@ -119,15 +119,24 @@ class SynthController() {
         private set
 
     /**
+     * Delegate to sync all plugin state to the native C++ bridge.
+     * Set once by DspSynthEngine during initialization via [setDelegates].
+     */
+    var nativeSyncCallback: (() -> Unit)? = null
+        private set
+
+    /**
      * Initialize the engine delegates. Must be called exactly once during setup.
      */
     fun setDelegates(
         setter: (PluginControlId, PortValue) -> Boolean,
-        getter: (PluginControlId) -> PortValue?
+        getter: (PluginControlId) -> PortValue?,
+        nativeSync: (() -> Unit)? = null
     ) {
         check(pluginPortSetter == null && pluginPortGetter == null) { "Delegates already set" }
         pluginPortSetter = setter
         pluginPortGetter = getter
+        nativeSyncCallback = nativeSync
     }
 
     /**

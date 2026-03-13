@@ -6,6 +6,60 @@
 
 // soft_limit() and kOutGain[] are provided by orpheus_voice.h (included via orpheus_engine.h)
 
+// ── Helper: process external gate buffer for a voice ──
+// Scans ext_gate_buffer for rising edges, sets trigger_pending/ext_retrigger/ever_triggered,
+// then merges with API gate. Returns true if an external gate was processed.
+static inline void process_ext_gate(OrpheusEngine::VoiceParams& vp,
+                                    const float* ext_gate_buffer, int num_frames) {
+    int api_gate = vp.gate.load(std::memory_order_relaxed);
+    for (int i = 0; i < num_frames; i++) {
+        bool gate_on = ext_gate_buffer[i] > 0.5f;
+        if (gate_on && !vp.graph_gate_prev) {
+            vp.graph_trigger_pending = true;
+            vp.ext_retrigger = true;
+            vp.ever_triggered.store(1, std::memory_order_relaxed);
+        }
+        vp.graph_gate_prev = gate_on;
+    }
+    // Merge: external trigger OR API gate (don't clobber API-set gate)
+    if (vp.graph_trigger_pending) {
+        vp.gate.store(1, std::memory_order_relaxed);
+        vp.graph_trigger_pending = false;
+    } else {
+        bool graph_gate = vp.graph_gate_prev;
+        vp.gate.store((api_gate || graph_gate) ? 1 : 0, std::memory_order_relaxed);
+    }
+}
+
+// ── Helper: release a voice from external gate ──
+static inline void release_ext_gate(OrpheusEngine::VoiceParams& vp) {
+    if (vp.graph_gate_prev) {
+        vp.graph_gate_prev = false;
+        vp.graph_trigger_pending = false;
+        vp.gate.store(0, std::memory_order_relaxed);
+    }
+}
+
+// ── Helper: resolve Marbles T buffer from trigger source index ──
+// Returns pointer to T1/T2/T3 buffer, or nullptr if trig_src is not 1-3.
+static inline float* resolve_marbles_t(OrpheusEngine* engine, int trig_src) {
+    if (trig_src < 1 || trig_src > 3) return nullptr;
+    float* marbles_t[] = { engine->marbles_t1_buffer,
+                           engine->marbles_t2_buffer,
+                           engine->marbles_t3_buffer };
+    return marbles_t[trig_src - 1];
+}
+
+// ── Helper: resolve Marbles X (CV) buffer from pitch source index ──
+// Returns pointer to X1/X2/X3 buffer, or nullptr if pitch_src is not 1-3.
+static inline float* resolve_marbles_x(OrpheusEngine* engine, int pitch_src) {
+    if (pitch_src < 1 || pitch_src > 3) return nullptr;
+    float* marbles_x[] = { engine->marbles_x1_buffer,
+                           engine->marbles_x2_buffer,
+                           engine->marbles_x3_buffer };
+    return marbles_x[pitch_src - 1];
+}
+
 // -- Smoothing coefficient (~5ms at any sample rate) --
 static float smooth_coeff(float sample_rate) {
     return 1.0f - std::exp(-1.0f / (0.005f * sample_rate));
@@ -357,30 +411,31 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         return;
     }
 
-    // ── Graph gate input: detect rising/falling edges from IPORT_GATE ──
-    // When connected (e.g. from Grids triggers), supplements voice_params gate.
+    // ── External gate routing ──
+    // Drums: Grids (graph) or Marbles T1/T2/T3. Quads: Internal/MIDI or Marbles T1/T2/T3.
     // Uses trigger_pending flag so a complete rise+fall within one buffer isn't lost.
-    // The graph gate is OR'd with the API gate so that orpheus_engine_trigger_drum
-    // can trigger drums even when the graph gate input (GRIDS) is silent.
-    GraphPort* gate_port = &u->inputs[IPORT_GATE];
-    if (gate_port->num_sources > 0) {
-        int api_gate = vp.gate.load(std::memory_order_relaxed);
-        for (int i = 0; i < num_frames; i++) {
-            bool gate_on = gate_port->buffer[i] > 0.5f;
-            if (gate_on && !vp.graph_gate_prev) {
-                vp.graph_trigger_pending = true;
-                vp.ever_triggered.store(1, std::memory_order_relaxed);
-            }
-            vp.graph_gate_prev = gate_on;
-        }
-        // Merge: graph trigger OR API gate (don't clobber API-set gate)
-        if (vp.graph_trigger_pending) {
-            vp.gate.store(1, std::memory_order_relaxed);
-            vp.graph_trigger_pending = false;
+    // Gate is OR'd with API gate so manual triggers still work.
+    {
+        float* ext_gate_buffer = nullptr;
+        if (idx >= kDrumVoiceStart) {
+            int drum_slot = idx - kDrumVoiceStart;
+            int trig_src = engine->drum_trigger_source[drum_slot].load(std::memory_order_relaxed);
+            ext_gate_buffer = resolve_marbles_t(engine, trig_src);
+            if (!ext_gate_buffer && u->inputs[IPORT_GATE].num_sources > 0)
+                ext_gate_buffer = u->inputs[IPORT_GATE].buffer;
         } else {
-            bool graph_gate = vp.graph_gate_prev;
-            vp.gate.store((api_gate || graph_gate) ? 1 : 0, std::memory_order_relaxed);
+            int quad = idx / 4;
+            if (quad < 3) {
+                int trig_src = engine->quad_trigger_source[quad].load(std::memory_order_relaxed);
+                ext_gate_buffer = resolve_marbles_t(engine, trig_src);
+            }
+            if (!ext_gate_buffer && u->inputs[IPORT_GATE].num_sources > 0)
+                ext_gate_buffer = u->inputs[IPORT_GATE].buffer;
         }
+        if (ext_gate_buffer)
+            process_ext_gate(vp, ext_gate_buffer, num_frames);
+        else
+            release_ext_gate(vp);
     }
 
     if (!vp.ever_triggered.load(std::memory_order_relaxed)) {
@@ -504,6 +559,22 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         bend_vol_mult = engine->voice_mix_cv[idx];
     }
 
+    // ── Flux pitch CV modulation (trigger router X1/X2/X3) ──
+    // Flux outputs 2^(V*mix)-1 (frequency ratio). JSyn applies as: freq * (1 + cv).
+    // Per-sample buffer pointer for smooth pitch modulation (avoids zipper artifacts).
+    float* pitch_cv_buffer = nullptr;
+    if (idx >= kDrumVoiceStart) {
+        int drum_slot = idx - kDrumVoiceStart;
+        int pitch_src = engine->drum_pitch_source[drum_slot].load(std::memory_order_relaxed);
+        pitch_cv_buffer = resolve_marbles_x(engine, pitch_src);
+    } else {
+        int quad = idx / 4;
+        if (quad < 3) {
+            int pitch_src = engine->quad_pitch_source[quad].load(std::memory_order_relaxed);
+            pitch_cv_buffer = resolve_marbles_x(engine, pitch_src);
+        }
+    }
+
     // Smooth hold ramp coefficient (~20ms) — constant for given sr
     // Using fast approximation: 1 - e^(-50/sr)
     float hold_coeff = 50.0f / sr;  // first-order Taylor approx, good enough for smoothing
@@ -527,6 +598,12 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float attack_rate, decay_coeff, sustain_level, release_coeff;
         compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
                                  sustain_level, release_coeff);
+        // Trigger mode: percussive envelope (sustain = 0)
+        if (idx < kNumMainVoices) {
+            int q = idx / 4;
+            if (q < 3 && engine->quad_trigger_mode[q].load(std::memory_order_relaxed))
+                sustain_level = 0.0f;
+        }
 
         float voice_peak = 0.0f;
         for (int i = 0; i < num_frames; i++) {
@@ -537,6 +614,10 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             freq += vib_hz_i;     // Vibrato in Hz (matches JSyn VibratoPlugin)
             freq += bend_hz;      // Bend applied as Hz offset (matches JSyn benderDepth architecture)
             freq += coupling_hz;  // Coupling applied as Hz offset (matches JSyn couplingDepth × 30Hz)
+            // Flux pitch CV: per-sample multiplicative ratio, matches JSyn baseFreq * (1 + cv)
+            if (pitch_cv_buffer) {
+                freq *= (1.0f + pitch_cv_buffer[i]);
+            }
 
             // Linear FM in Hz — matches JSyn: fmFreqMixer = (fmSignal * fmDepth * 200Hz) + baseFreq
             // All mod sources modulate Engine 0 frequency through the same path.
@@ -571,10 +652,15 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             osc.sq_phase += phase_inc;
             osc.sq_phase -= std::floor(osc.sq_phase);
 
-            // ADSR envelope
+            // ADSR envelope (with external re-trigger support)
             bool gate_on = actual_gate != 0;
-            if (gate_on && !osc.env_gate_was_on) osc.env_stage = 1;
-            if (!gate_on && osc.env_gate_was_on) osc.env_stage = 4;
+            if (vp.ext_retrigger) {
+                osc.env_stage = 1;
+                vp.ext_retrigger = false;
+            } else {
+                if (gate_on && !osc.env_gate_was_on) osc.env_stage = 1;
+                if (!gate_on && osc.env_gate_was_on) osc.env_stage = 4;
+            }
             osc.env_gate_was_on = gate_on;
 
             switch (osc.env_stage) {
@@ -657,9 +743,16 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Engine 0 only, applied per-sample in the oscillator loop above.
         float note_raw = vp.tune.load(std::memory_order_relaxed) + vibrato_semitones;
         float note;
-        if (std::fabs(bend_hz) > 0.01f || std::fabs(coupling_hz) > 0.01f) {
+        // Plaits renders block-rate, so use last sample of CV buffer as block-rate pitch offset
+        float pitch_cv_block = pitch_cv_buffer ? pitch_cv_buffer[num_frames - 1] : 0.0f;
+        if (std::fabs(bend_hz) > 0.01f || std::fabs(coupling_hz) > 0.01f
+            || std::fabs(pitch_cv_block) > 0.0001f) {
             float base_freq = 440.0f * std::pow(2.0f, (note_raw - 69.0f) / 12.0f);
             float bent_freq = base_freq + bend_hz + coupling_hz;
+            // Flux pitch CV: multiplicative ratio, matches JSyn baseFreq * (1 + cv)
+            if (std::fabs(pitch_cv_block) > 0.0001f) {
+                bent_freq *= (1.0f + pitch_cv_block);
+            }
             note = (bent_freq > 0.0f) ? 69.0f + 12.0f * std::log2f(bent_freq / 440.0f) : note_raw;
         } else {
             note = note_raw;
@@ -685,12 +778,23 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             float attack_rate, decay_coeff, sustain_level, release_coeff;
             compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
                                      sustain_level, release_coeff);
+            // Trigger mode: percussive envelope (sustain = 0)
+            {
+                int q = idx / 4;
+                if (q < 3 && engine->quad_trigger_mode[q].load(std::memory_order_relaxed))
+                    sustain_level = 0.0f;
+            }
 
             for (int i = 0; i < num_frames; i++) {
-                // ADSR state machine
+                // ADSR state machine (with external re-trigger support)
                 bool gate_on = actual_gate != 0;
-                if (gate_on && !osc.env_gate_was_on) osc.env_stage = 1;
-                if (!gate_on && osc.env_gate_was_on) osc.env_stage = 4;
+                if (vp.ext_retrigger) {
+                    osc.env_stage = 1;
+                    vp.ext_retrigger = false;
+                } else {
+                    if (gate_on && !osc.env_gate_was_on) osc.env_stage = 1;
+                    if (!gate_on && osc.env_gate_was_on) osc.env_stage = 4;
+                }
                 osc.env_gate_was_on = gate_on;
 
                 switch (osc.env_stage) {
@@ -849,6 +953,7 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     p->feedback = engine->clouds_feedback.load(std::memory_order_relaxed);
     p->reverb = engine->clouds_reverb.load(std::memory_order_relaxed);
     p->freeze = engine->clouds_freeze.load(std::memory_order_relaxed) != 0;
+    p->trigger = engine->clouds_trigger.exchange(0, std::memory_order_relaxed) != 0;
 
     engine->clouds_processor.set_playback_mode(
         static_cast<clouds::PlaybackMode>(
@@ -1933,21 +2038,27 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     float* out_cv1  = u->output_buffers[OPORT_OUT_RIGHT];
     float* out_cv2  = u->output_buffers[OPORT_AUX];
 
-    // Self-bypass: output silence when disabled
-    if (engine->marbles_bypass.load(std::memory_order_relaxed)) {
+    // Self-bypass: output silence when mix is zero
+    float mix = engine->marbles_mix.load(std::memory_order_relaxed);
+    if (mix <= 0.001f) {
         std::memset(out_gate, 0, num_frames * sizeof(float));
         std::memset(out_cv1,  0, num_frames * sizeof(float));
         std::memset(out_cv2,  0, num_frames * sizeof(float));
         return;
     }
 
-    float* clock_in = u->inputs[IPORT_INPUT_A].buffer;
+    // Clock source: 0=global 24 PPQN clock, 1=LFO output (-1..+1 continuous waveform)
+    float* clock_in = (engine->marbles_clock_source.load(std::memory_order_relaxed) == 1)
+        ? engine->lfo_output_buffer
+        : u->inputs[IPORT_INPUT_A].buffer;
 
-    // ── Step 1: Convert float clock pulses (0/1) to stmlib::GateFlags ──
+    // ── Step 1: Convert float clock pulses to stmlib::GateFlags ──
+    // Threshold 0.1 (not 0.5): LFO waveforms (-1..+1) need a low threshold for reliable
+    // edge detection. Harmless for digital 0/1 clock pulses (well above 0.1).
     stmlib::GateFlags* gate_flags = engine->marbles_gate_flags;
     stmlib::GateFlags prev_flag = engine->marbles_prev_gate_flag;
     for (int i = 0; i < num_frames; i++) {
-        bool high = clock_in[i] > 0.5f;
+        bool high = clock_in[i] > 0.1f;
         gate_flags[i] = stmlib::ExtractGateFlags(prev_flag, high);
         prev_flag = gate_flags[i];
     }
@@ -1979,8 +2090,10 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     engine->marbles_t_generator.set_jitter(t_jitter);
     engine->marbles_t_generator.set_deja_vu(deja_vu);
     engine->marbles_t_generator.set_length(deja_vu_length);
-    engine->marbles_t_generator.set_pulse_width_mean(0.5f);
-    engine->marbles_t_generator.set_pulse_width_std(0.0f);
+    engine->marbles_t_generator.set_pulse_width_mean(
+        engine->marbles_pulse_width.load(std::memory_order_relaxed));
+    engine->marbles_t_generator.set_pulse_width_std(
+        engine->marbles_pulse_width_std.load(std::memory_order_relaxed));
 
     // ── Step 3: Set up Ramps struct with working buffer pointers ──
     marbles::Ramps ramps;
@@ -2043,27 +2156,49 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
         xy_output,
         static_cast<size_t>(num_frames));
 
-    // ── Step 7: Deinterleave outputs to graph buffers ──
-    // TGenerator gate output: interleaved [t1_0, t2_0, t1_1, t2_1, ...]
-    // We take t1 (channel 0) as the primary gate output
+    // ── Step 7: Deinterleave all 6 outputs ──
+    // T1 gate (TGenerator channel 0)
     for (int i = 0; i < num_frames; i++) {
-        out_gate[i] = gate_out[i * 2] ? 1.0f : 0.0f;  // t1 gate
+        out_gate[i] = gate_out[i * 2] ? 1.0f : 0.0f;
+    }
+    // T2 gate (master ramp < pulseWidth, matching Kotlin FluxProcessor)
+    float pw = engine->marbles_pulse_width.load(std::memory_order_relaxed);
+    for (int i = 0; i < num_frames; i++) {
+        engine->marbles_t2_buffer[i] = (ramps.master[i] < pw) ? 1.0f : 0.0f;
+    }
+    // T3 gate (TGenerator channel 1)
+    for (int i = 0; i < num_frames; i++) {
+        engine->marbles_t3_buffer[i] = gate_out[i * 2 + 1] ? 1.0f : 0.0f;
     }
 
-    // XYGenerator output: interleaved [x1, x2, x3, y] per sample (stride = kNumChannels = 4)
-    // We take x1 and x2 as the two CV outputs
+    // CV outputs: scale voltage by mix before exp conversion for perceptually linear control.
+    // 2^(V * mix) - 1 → at mix=0.5, a 3-octave range becomes 1.5 octaves.
+    // Matches Kotlin FluxProcessor.kt output path.
     for (int i = 0; i < num_frames; i++) {
-        out_cv1[i] = xy_output[i * 4 + 0];  // x1 CV
-        out_cv2[i] = xy_output[i * 4 + 1];  // x2 CV
+        float v1 = xy_output[i * 4 + 0] * mix;
+        float v2 = xy_output[i * 4 + 1] * mix;
+        float v3 = xy_output[i * 4 + 2] * mix;
+        // Clamp to [-1, 4] octaves before exp to prevent blowout (2^4 = 16x max)
+        v1 = std::fmin(std::fmax(v1, -1.0f), 4.0f);
+        v2 = std::fmin(std::fmax(v2, -1.0f), 4.0f);
+        v3 = std::fmin(std::fmax(v3, -1.0f), 4.0f);
+        out_cv1[i] = std::exp2f(v1) - 1.0f;
+        out_cv2[i] = std::exp2f(v2) - 1.0f;
+        engine->marbles_x3_buffer[i] = std::exp2f(v3) - 1.0f;
     }
 
-    // Cache CV output for mod source routing
-    engine->marbles_cv_output[0] = u->output_buffers[OPORT_OUT_RIGHT][num_frames - 1];
-    engine->marbles_cv_output[1] = u->output_buffers[OPORT_AUX][num_frames - 1];
+    // Copy to shared engine buffers for trigger router consumers
+    std::memcpy(engine->marbles_t1_buffer, out_gate, num_frames * sizeof(float));
+    std::memcpy(engine->marbles_x1_buffer, out_cv1, num_frames * sizeof(float));
+    std::memcpy(engine->marbles_x2_buffer, out_cv2, num_frames * sizeof(float));
 
-    // FLUX source (6) for warps routing
+    // Cache CV output for mod source routing (post-mix/exp)
+    engine->marbles_cv_output[0] = out_cv1[num_frames - 1];
+    engine->marbles_cv_output[1] = out_cv2[num_frames - 1];
+
+    // FLUX source (6) for warps routing (post-mix/exp)
     std::memcpy(engine->warps_source_buffers[6],
-                u->output_buffers[OPORT_OUT_RIGHT], num_frames * sizeof(float));
+                out_cv1, num_frames * sizeof(float));
 }
 
 // ── UNIT_LOOPER: Beat-quantized audio looper ────────────────
@@ -2181,6 +2316,21 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
 
     auto& vpA = engine->voice_params[idxA];
     auto& vpB = engine->voice_params[idxB];
+
+    // ── External gate routing must run before active check ──
+    // External gates set ever_triggered, which is part of the active check below.
+    int quad = duo / 2;
+    if (quad < 3) {
+        int trig_src = engine->quad_trigger_source[quad].load(std::memory_order_relaxed);
+        float* ext_gate_buffer = resolve_marbles_t(engine, trig_src);
+        if (ext_gate_buffer) {
+            process_ext_gate(vpA, ext_gate_buffer, num_frames);
+            process_ext_gate(vpB, ext_gate_buffer, num_frames);
+        } else {
+            release_ext_gate(vpA);
+            release_ext_gate(vpB);
+        }
+    }
 
     bool activeA = vpA.active.load(std::memory_order_relaxed) &&
                    vpA.ever_triggered.load(std::memory_order_relaxed);
@@ -2322,6 +2472,20 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     compute_adsr_from_speed(env_speedB, sr, attack_rateB, decay_coeffB,
                              sustain_levelB, release_coeffB);
 
+    // Trigger mode: percussive envelope (sustain = 0)
+    if (quad < 3 && engine->quad_trigger_mode[quad].load(std::memory_order_relaxed)) {
+        sustain_levelA = 0.0f;
+        sustain_levelB = 0.0f;
+    }
+
+    // ── Flux pitch CV modulation (quad_pitch_source → X1/X2/X3) ──
+    // Per-sample buffer pointer for smooth pitch modulation (avoids zipper artifacts).
+    float* pitch_cv_buffer = nullptr;
+    if (quad < 3) {
+        int pitch_src = engine->quad_pitch_source[quad].load(std::memory_order_relaxed);
+        pitch_cv_buffer = resolve_marbles_x(engine, pitch_src);
+    }
+
     auto& oscA = engine->voice_osc_state[idxA];
     auto& oscB = engine->voice_osc_state[idxB];
 
@@ -2368,6 +2532,10 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             float freqA = 440.0f * std::pow(2.0f, (base_noteA - 69.0f) / 12.0f);
             freqA += vib_hz;   // vibrato in Hz (matches JSyn: VibratoPlugin sine * depth * 20)
             freqA += bend_hzA;
+            // Flux pitch CV: per-sample multiplicative ratio, matches JSyn baseFreq * (1 + cv)
+            if (pitch_cv_buffer) {
+                freqA *= (1.0f + pitch_cv_buffer[i]);
+            }
 
             // Coupling: B's per-sample envelope → A's pitch
             if (coupling > 0.001f) {
@@ -2409,10 +2577,16 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             oscA.sq_phase += phase_incA;
             oscA.sq_phase -= std::floor(oscA.sq_phase);
 
-            // ADSR envelope
+            // ADSR envelope (with external re-trigger support)
             bool gate_onA = gateA != 0;
-            if (gate_onA && !oscA.env_gate_was_on) oscA.env_stage = 1;
-            if (!gate_onA && oscA.env_gate_was_on) oscA.env_stage = 4;
+            if (vpA.ext_retrigger) {
+                // External gate rising edge: force re-attack even if gate was already on
+                oscA.env_stage = 1;
+                vpA.ext_retrigger = false;
+            } else {
+                if (gate_onA && !oscA.env_gate_was_on) oscA.env_stage = 1;
+                if (!gate_onA && oscA.env_gate_was_on) oscA.env_stage = 4;
+            }
             oscA.env_gate_was_on = gate_onA;
 
             switch (oscA.env_stage) {
@@ -2462,6 +2636,10 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             float freqB = 440.0f * std::pow(2.0f, (base_noteB - 69.0f) / 12.0f);
             freqB += vib_hz;   // vibrato in Hz (same oscillator for both voices)
             freqB += bend_hzB;
+            // Flux pitch CV: per-sample multiplicative ratio, matches JSyn baseFreq * (1 + cv)
+            if (pitch_cv_buffer) {
+                freqB *= (1.0f + pitch_cv_buffer[i]);
+            }
 
             // Coupling: A's per-sample envelope → B's pitch
             if (coupling > 0.001f) {
@@ -2503,10 +2681,15 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
             oscB.sq_phase += phase_incB;
             oscB.sq_phase -= std::floor(oscB.sq_phase);
 
-            // ADSR envelope
+            // ADSR envelope (with external re-trigger support)
             bool gate_onB = gateB != 0;
-            if (gate_onB && !oscB.env_gate_was_on) oscB.env_stage = 1;
-            if (!gate_onB && oscB.env_gate_was_on) oscB.env_stage = 4;
+            if (vpB.ext_retrigger) {
+                oscB.env_stage = 1;
+                vpB.ext_retrigger = false;
+            } else {
+                if (gate_onB && !oscB.env_gate_was_on) oscB.env_stage = 1;
+                if (!gate_onB && oscB.env_gate_was_on) oscB.env_stage = 4;
+            }
             oscB.env_gate_was_on = gate_onB;
 
             switch (oscB.env_stage) {

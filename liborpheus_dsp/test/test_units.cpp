@@ -96,7 +96,7 @@ static bool test_marbles() {
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     engine->clock_bpm.store(120.0f);
     engine->clock_running.store(1);
-    engine->marbles_bypass.store(0);
+    engine->marbles_mix.store(1.0f);
 
     engine->marbles_t_rate.store(0.0f);
     engine->marbles_t_bias.store(0.5f);

@@ -9,8 +9,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.plugin.PortValue
-import org.balch.orpheus.core.plugin.symbols.BEATS_URI
-import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.DRUM_URI
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
@@ -74,6 +72,11 @@ class PresetLoader(
 
         // Sync StateFlows with engine state set by restoreState
         synthController.refreshControlFlows()
+
+        // Push all plugin port values to C++ native bridge.
+        // restoreState() sets Kotlin plugins directly, bypassing the native bridge,
+        // so we must explicitly sync all control ports to C++ here.
+        synthController.nativeSyncCallback?.invoke()
 
         // Broadcast to ViewModels for UI updates
         _presetFlow.tryEmit(preset)
