@@ -101,7 +101,7 @@ class DrumPlugin(
                 get { _mix }
                 set {
                     _mix = it.coerceIn(0f, 1f)
-                    val baseGain = 1.6f
+                    val baseGain = 3.2f
                     val finalGain = baseGain * it
                     drumGainLeft.inputB.set(finalGain.toDouble())
                     drumGainRight.inputB.set(finalGain.toDouble())

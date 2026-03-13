@@ -897,7 +897,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Apply drum_mix gain to output buffer (matching Kotlin DrumPlugin: baseGain=1.6 * mix).
         // This scales the graph output so downstream units (pan, resonator, master) see the gain.
         if (idx >= kDrumVoiceStart) {
-            float drum_gain = 1.6f * engine->drum_mix.load(std::memory_order_relaxed);
+            float drum_gain = 3.2f * engine->drum_mix.load(std::memory_order_relaxed);
             for (int i = 0; i < num_frames; i++) {
                 out[i] *= drum_gain;
             }
