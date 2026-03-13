@@ -615,6 +615,9 @@ interface FluxUnit : AudioUnit {
     /** Set pulse width randomness (0.0-1.0). */
     fun setPulseWidthStd(value: Float) {}
 
+    /** Set déjà vu mode (0=T+X both, 1=T only, 2=X only). */
+    fun setDejaVuMode(mode: Int) {}
+
     /** Set control mode (0=Identical, 1=Bump, 2=Tilt). */
     fun setControlMode(index: Int) {}
 

@@ -89,6 +89,7 @@ class OboeFluxUnit : FluxUnit, DspProcessable {
     override fun setPulseWidthStd(value: Float) { processor.setPulseWidthStd(value) }
     override fun setControlMode(index: Int) { processor.setControlMode(index) }
     override fun setVoltageRange(index: Int) { processor.setVoltageRange(index) }
+    override fun setDejaVuMode(mode: Int) { processor.setDejaVuMode(mode) }
 
     override fun process(numFrames: Int) {
         if (bypass) {

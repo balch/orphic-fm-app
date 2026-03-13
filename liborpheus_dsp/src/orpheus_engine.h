@@ -209,6 +209,7 @@ struct OrpheusEngine {
     std::atomic<float> marbles_deja_vu{0.0f};        // 0..1 deja vu amount
     std::atomic<int>   marbles_deja_vu_length{8};    // loop length (1-16)
     std::atomic<float> marbles_mix{0.0f};            // 0..1 output scaling (self-bypass at 0)
+    std::atomic<int>   marbles_deja_vu_mode{0};     // 0=T+X, 1=T only, 2=X only
     std::atomic<float> marbles_pulse_width{0.5f};    // 0..1 pulse width mean
     std::atomic<float> marbles_pulse_width_std{0.0f};// 0..1 pulse width randomization
     std::atomic<int>   marbles_clock_source{0};      // 0=global clock, 1=LFO

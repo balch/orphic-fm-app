@@ -111,6 +111,7 @@ class JsynFluxUnit : UnitGenerator(), FluxUnit {
     override fun setPulseWidthStd(value: Float) { processor.setPulseWidthStd(value) }
     override fun setControlMode(index: Int) { processor.setControlMode(index) }
     override fun setVoltageRange(index: Int) { processor.setVoltageRange(index) }
+    override fun setDejaVuMode(mode: Int) { processor.setDejaVuMode(mode) }
 
     override fun generate(start: Int, end: Int) {
         val count = end - start

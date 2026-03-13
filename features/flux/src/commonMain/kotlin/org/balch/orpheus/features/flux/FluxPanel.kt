@@ -16,6 +16,7 @@ import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.ValueCycleButton
+import org.balch.orpheus.ui.widgets.Vertical3WaySwitch
 
 private val TModelNames = listOf("BERN", "CLST", "DRUM", "IND", "DIV", "3ST", "MRKV")
 private val TRangeNames = listOf("1/4x", "1x", "4x")
@@ -112,6 +113,7 @@ fun FluxPanel(
                 label = "V RANGE",
                 color = OrpheusColors.metallicBlueLight
             )
+
         }
 
         // Row 2: Primary knobs — the controls you reach for most
@@ -154,6 +156,28 @@ fun FluxPanel(
                 controlId = FluxSymbol.DEJAVU.controlId.key,
                 size = 36.dp,
                 progressColor = OrpheusColors.metallicBlueLight
+            )
+
+            // 3-way switch: top=T only, middle=T+X both, bottom=X only
+            // Map mode (0=T+X, 1=T, 2=X) ↔ position (0=top/T, 1=mid/T+X, 2=bot/X)
+            Vertical3WaySwitch(
+                topLabel = "T",
+                bottomLabel = "X",
+                position = when (state.dejaVuMode) {
+                    1 -> 0   // T only → top
+                    2 -> 2   // X only → bottom
+                    else -> 1 // T+X → middle
+                },
+                onPositionChange = { pos ->
+                    actions.setDejaVuMode(
+                        when (pos) {
+                            0 -> 1   // top → T only
+                            2 -> 2   // bottom → X only
+                            else -> 0 // middle → T+X
+                        }
+                    )
+                },
+                color = OrpheusColors.metallicBlueLight
             )
 
             RotaryKnob(

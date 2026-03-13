@@ -54,6 +54,7 @@ class FluxProcessor(private val sampleRate: Float) {
     private var tRange = TGenerator.Range.RANGE_1X
     private var pulseWidth = 0.5f
     private var pulseWidthStd = 0.0f
+    private var dejaVuMode = 0  // 0=T+X, 1=T only, 2=X only
     private var controlMode = ControlMode.IDENTICAL
     private var voltageRange = VoltageRange.FULL
     private var mix = 0.0f
@@ -158,7 +159,9 @@ class FluxProcessor(private val sampleRate: Float) {
         tGenerator.setRate((rate - 0.5f) * 96f)
         tGenerator.setBias(probability)
         tGenerator.setJitter(jitter)
-        tGenerator.setDejaVu(dejaVu)
+        // Déjà vu mode: 0=T+X, 1=T only, 2=X only
+        val tDejaVu = if (dejaVuMode == 2) 0.0f else dejaVu  // X-only → disable T looping
+        tGenerator.setDejaVu(tDejaVu)
         tGenerator.setLength(length)
         tGenerator.setPulseWidthMean(pulseWidth)
         tGenerator.setPulseWidthStd(pulseWidthStd)
@@ -203,7 +206,9 @@ class FluxProcessor(private val sampleRate: Float) {
             } else {
                 sequence = randomSequences[0]
                 sequence.record()
-                sequence.setDejaVu(dejaVu)
+                // Déjà vu mode: 0=T+X, 1=T only, 2=X only
+                val xDejaVu = if (dejaVuMode == 1) 0.0f else dejaVu  // T-only → disable X looping
+                sequence.setDejaVu(xDejaVu)
                 sequence.setLength(length)
             }
 
@@ -314,6 +319,7 @@ class FluxProcessor(private val sampleRate: Float) {
     fun setControlMode(mode: Int) { controlMode = ControlMode.entries[mode.coerceIn(0, 2)] }
     fun setVoltageRange(range: Int) { voltageRange = VoltageRange.entries[range.coerceIn(0, 2)] }
     fun setMix(mix: Float) { this.mix = mix.coerceIn(0f, 1f) }
+    fun setDejaVuMode(mode: Int) { dejaVuMode = mode.coerceIn(0, 2) }
 
     fun reset() {
         for (seq in randomSequences) seq.reset()

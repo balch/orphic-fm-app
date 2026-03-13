@@ -436,6 +436,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->marbles_deja_vu.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "deja_vu_length") == 0)
             engine->marbles_deja_vu_length.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "deja_vu_mode") == 0)
+            engine->marbles_deja_vu_mode.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "t_model") == 0)
             engine->marbles_t_model.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "t_range") == 0)

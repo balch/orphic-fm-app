@@ -2072,6 +2072,9 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     int t_range_i = engine->marbles_t_range.load(std::memory_order_relaxed);
     float deja_vu = engine->marbles_deja_vu.load(std::memory_order_relaxed);
     int deja_vu_length = engine->marbles_deja_vu_length.load(std::memory_order_relaxed);
+    int deja_vu_mode = engine->marbles_deja_vu_mode.load(std::memory_order_relaxed);
+    if (deja_vu_mode < 0) deja_vu_mode = 0;
+    if (deja_vu_mode > 2) deja_vu_mode = 2;
 
     // Clamp enums to valid ranges
     if (t_model_i < 0) t_model_i = 0;
@@ -2088,7 +2091,9 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     engine->marbles_t_generator.set_rate(t_rate);
     engine->marbles_t_generator.set_bias(t_bias);
     engine->marbles_t_generator.set_jitter(t_jitter);
-    engine->marbles_t_generator.set_deja_vu(deja_vu);
+    // Déjà vu mode: 0=T+X, 1=T only, 2=X only
+    float t_deja_vu = (deja_vu_mode == 2) ? 0.0f : deja_vu;  // X-only → disable T looping
+    engine->marbles_t_generator.set_deja_vu(t_deja_vu);
     engine->marbles_t_generator.set_length(deja_vu_length);
     engine->marbles_t_generator.set_pulse_width_mean(
         engine->marbles_pulse_width.load(std::memory_order_relaxed));
@@ -2136,7 +2141,8 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     x_settings.spread = x_spread;
     x_settings.bias = x_bias;
     x_settings.steps = x_steps;
-    x_settings.deja_vu = deja_vu;
+    float x_deja_vu = (deja_vu_mode == 1) ? 0.0f : deja_vu;  // T-only → disable X looping
+    x_settings.deja_vu = x_deja_vu;
     x_settings.scale_index = x_scale_i;
     x_settings.length = deja_vu_length;
     x_settings.ratio = { 1, 1 };

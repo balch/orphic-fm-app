@@ -72,6 +72,7 @@ class FluxPlugin(
     private var _tRange = 1
     private var _pulseWidth = 0.5f
     private var _pulseWidthStd = 0.0f
+    private var _dejaVuMode = 0  // 0=T+X, 1=T only, 2=X only
     private var _controlMode = 0
     private var _voltageRange = 2
     private var _mix = 0.0f
@@ -181,6 +182,15 @@ class FluxPlugin(
             }
         }
 
+        controlPort(FluxSymbol.DEJAVU_MODE) {
+            intType {
+                min = 0; max = 2
+                options = listOf("T+X", "T Only", "X Only")
+                get { _dejaVuMode }
+                set { _dejaVuMode = it; flux.setDejaVuMode(it) }
+            }
+        }
+
         controlPort(FluxSymbol.CONTROL_MODE) {
             intType {
                 min = 0; max = 2
@@ -272,6 +282,7 @@ class FluxPlugin(
         setPortValue("t_range", PortValue.IntValue(1))
         setPortValue("pulse_width", PortValue.FloatValue(0.5f))
         setPortValue("pulse_width_std", PortValue.FloatValue(0.0f))
+        setPortValue("deja_vu_mode", PortValue.IntValue(0))
         setPortValue("x_control_mode", PortValue.IntValue(0))
         setPortValue("x_range", PortValue.IntValue(2))
         setPortValue("mix", PortValue.FloatValue(0.0f))

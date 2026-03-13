@@ -2,7 +2,6 @@ package org.balch.orpheus.features.flux
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -14,16 +13,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.controller.intSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.plugin.symbols.FluxSymbol
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 
 @Immutable
 data class FluxUiState(
@@ -43,7 +42,8 @@ data class FluxUiState(
     val pulseWidthStd: Float = 0.0f,
     val controlMode: Int = 0,
     val voltageRange: Int = 2,
-    val mix: Float = 0.0f
+    val mix: Float = 0.0f,
+    val dejaVuMode: Int = 0
 )
 
 @Immutable
@@ -64,10 +64,11 @@ data class FluxPanelActions(
     val setPulseWidthStd: (Float) -> Unit,
     val setControlMode: (Int) -> Unit,
     val setVoltageRange: (Int) -> Unit,
-    val setMix: (Float) -> Unit
+    val setMix: (Float) -> Unit,
+    val setDejaVuMode: (Int) -> Unit
 ) {
     companion object {
-        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -89,6 +90,7 @@ private sealed interface FluxIntent {
     data class ControlMode(val value: Int) : FluxIntent
     data class VoltageRange(val value: Int) : FluxIntent
     data class Mix(val value: Float) : FluxIntent
+    data class DejaVuMode(val value: Int) : FluxIntent
 }
 
 interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
@@ -122,6 +124,7 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
         - **SCALE**: Musical scale quantization (Major, Minor, Pentatonic, Phrygian, Whole Tone, Chromatic).
         - **MODE**: Control voltage behavior mode (Identity, Bump, Tilt).
         - **V RANGE**: Output voltage range (Narrow, Positive, Full).
+        - **DV MODE**: Déjà vu target section — T+X (both rhythm and pitch repeat), T (rhythm only), X (pitch only).
 
         ## Activating Flux on Voice Pairs
         Flux must be assigned as the duo modulation source on a voice duo to take effect.
@@ -160,6 +163,7 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
                 FluxSymbol.CONTROL_MODE.controlId.key to "CV behavior mode (0=Identity, 1=Bump, 2=Tilt)",
                 FluxSymbol.VOLTAGE_RANGE.controlId.key to "Output voltage range (0=Narrow, 1=Positive, 2=Full)",
                 FluxSymbol.MIX.controlId.key to "Flux pitch modulation depth (must be > 0 for Flux to be audible)",
+                FluxSymbol.DEJAVU_MODE.controlId.key to "Déjà vu target (0=T+X both, 1=T only rhythms, 2=X only pitches)",
             )
         }
     }
@@ -197,6 +201,7 @@ class FluxViewModel(
     private val controlModeId = synthController.controlFlow(FluxSymbol.CONTROL_MODE.controlId)
     private val voltageRangeId = synthController.controlFlow(FluxSymbol.VOLTAGE_RANGE.controlId)
     private val mixId = synthController.controlFlow(FluxSymbol.MIX.controlId)
+    private val dejaVuModeId = synthController.controlFlow(FluxSymbol.DEJAVU_MODE.controlId)
 
     override val actions = FluxPanelActions(
         setSpread = spreadId.floatSetter(),
@@ -215,7 +220,8 @@ class FluxViewModel(
         setPulseWidthStd = pulseWidthStdId.floatSetter(),
         setControlMode = controlModeId.intSetter(),
         setVoltageRange = voltageRangeId.intSetter(),
-        setMix = mixId.floatSetter()
+        setMix = mixId.floatSetter(),
+        setDejaVuMode = dejaVuModeId.intSetter()
     )
 
     // Control changes -> FluxIntent
@@ -236,7 +242,8 @@ class FluxViewModel(
         pulseWidthStdId.map { FluxIntent.PulseWidthStd(it.asFloat()) },
         controlModeId.map { FluxIntent.ControlMode(it.asInt()) },
         voltageRangeId.map { FluxIntent.VoltageRange(it.asInt()) },
-        mixId.map { FluxIntent.Mix(it.asFloat()) }
+        mixId.map { FluxIntent.Mix(it.asFloat()) },
+        dejaVuModeId.map { FluxIntent.DejaVuMode(it.asInt()) }
     )
 
     override val stateFlow: StateFlow<FluxUiState> =
@@ -269,6 +276,7 @@ class FluxViewModel(
         is FluxIntent.ControlMode -> state.copy(controlMode = intent.value)
         is FluxIntent.VoltageRange -> state.copy(voltageRange = intent.value)
         is FluxIntent.Mix -> state.copy(mix = intent.value)
+        is FluxIntent.DejaVuMode -> state.copy(dejaVuMode = intent.value)
     }
 
     companion object {

@@ -24,6 +24,7 @@ enum class FluxSymbol(
     T_RANGE("t_range", displayName = "T Range"),
     PULSE_WIDTH("pulse_width", displayName = "Pulse Width"),
     PULSE_WIDTH_STD("pulse_width_std", displayName = "PW Rand"),
+    DEJAVU_MODE("deja_vu_mode", displayName = "Déjà Vu Mode"),
     CONTROL_MODE("x_control_mode", displayName = "Control Mode"),
     VOLTAGE_RANGE("x_range", displayName = "Voltage Range"),
     MIX("mix", displayName = "Mix")
