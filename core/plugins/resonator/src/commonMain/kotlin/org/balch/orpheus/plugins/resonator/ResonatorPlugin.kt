@@ -6,13 +6,8 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
-import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.PortValue
@@ -23,19 +18,15 @@ import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 
 /**
  * Resonator Plugin (Modal synthesis and string).
- * 
- * Port Map:
- * 0-7: Audio ports (drum in, synth in, outputs, aux)
- * 
- * Controls (via DSL):
- * - mode, target_mix, structure, brightness, damping, position, mix, snap_back
+ *
+ * Pure state container — C++ handles all audio processing.
+ * Keeps `audioEngine` for native forwarding methods.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
 class ResonatorPlugin(
-    private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
+    private val audioEngine: AudioEngine
 ) : DspPlugin {
 
     override val info = PluginInfo(
@@ -47,39 +38,6 @@ class ResonatorPlugin(
     companion object {
         const val URI = RESONATOR_URI
     }
-
-    // Core resonator unit
-    private val resonator = dspFactory.createResonatorUnit()
-    
-    // Excitation gains
-    private val drumExciteGainL = dspFactory.createMultiply()
-    private val drumExciteGainR = dspFactory.createMultiply()
-    private val synthExciteGainL = dspFactory.createMultiply()
-    private val synthExciteGainR = dspFactory.createMultiply()
-    
-    // Dry bypass gains
-    private val drumBypassGainL = dspFactory.createMultiply()
-    private val drumBypassGainR = dspFactory.createMultiply()
-    private val synthBypassGainL = dspFactory.createMultiply()
-    private val synthBypassGainR = dspFactory.createMultiply()
-    
-    // Summing units
-    private val excitationSumL = dspFactory.createAdd()
-    private val excitationSumR = dspFactory.createAdd()
-    private val bypassSumL = dspFactory.createAdd()
-    private val bypassSumR = dspFactory.createAdd()
-    
-    // Wet/Dry mix for resonator output
-    private val wetGainL = dspFactory.createMultiply()
-    private val wetGainR = dspFactory.createMultiply()
-    private val dryGainL = dspFactory.createMultiply()
-    private val dryGainR = dspFactory.createMultiply()
-    
-    // Mix resonated (wet+dry) with bypass
-    private val resoMixL = dspFactory.createAdd()
-    private val resoMixR = dspFactory.createAdd()
-    private val finalSumL = dspFactory.createAdd()
-    private val finalSumR = dspFactory.createAdd()
 
     // Internal state
     private var _mode = 0
@@ -98,74 +56,56 @@ class ResonatorPlugin(
                 min = 0; max = 2
                 options = listOf("Bar", "Sitar", "String")
                 get { _mode }
-                set { _mode = it; resonator.setMode(it) }
+                set { _mode = it }
             }
         }
-        
+
         controlPort(ResonatorSymbol.TARGET_MIX) {
             floatType {
                 default = 0f
                 get { _targetMix }
-                set { _targetMix = it.coerceIn(0f, 1f); applyTargetMixRouting() }
+                set { _targetMix = it.coerceIn(0f, 1f) }
             }
         }
-        
+
         controlPort(ResonatorSymbol.STRUCTURE) {
             floatType {
                 default = 0.25f
                 get { _structure }
-                set { _structure = it; resonator.setStructure(it) }
+                set { _structure = it }
             }
         }
-        
+
         controlPort(ResonatorSymbol.BRIGHTNESS) {
             floatType {
                 get { _brightness }
-                set { _brightness = it; resonator.setBrightness(it) }
+                set { _brightness = it }
             }
         }
-        
+
         controlPort(ResonatorSymbol.DAMPING) {
             floatType {
                 default = 0.3f
                 get { _damping }
-                set { _damping = it; resonator.setDamping(it) }
+                set { _damping = it }
             }
         }
-        
+
         controlPort(ResonatorSymbol.POSITION) {
             floatType {
                 get { _position }
-                set { _position = it; resonator.setPosition(it) }
+                set { _position = it }
             }
         }
-        
+
         controlPort(ResonatorSymbol.MIX) {
             floatType {
                 default = 0.0f
                 get { _mix }
-                set {
-                    val wasDisabled = _mix <= PLUGIN_DISABLE_THRESHOLD
-                    _mix = it.coerceIn(0f, 1f)
-                    if (wasDisabled && _mix > PLUGIN_ENABLE_THRESHOLD) {
-                        // Zero wet gains before enabling to prevent blowout
-                        wetGainL.inputB.set(0.0)
-                        wetGainR.inputB.set(0.0)
-                        setPluginEnabled(true, audioEngine)
-                    }
-                    val wetLevel = it.toDouble()
-                    val dryLevel = (1.0 - it).toDouble()
-                    wetGainL.inputB.set(wetLevel)
-                    wetGainR.inputB.set(wetLevel)
-                    dryGainL.inputB.set(dryLevel)
-                    dryGainR.inputB.set(dryLevel)
-                    if (_mix <= PLUGIN_DISABLE_THRESHOLD) {
-                        setPluginEnabled(false, audioEngine)
-                    }
-                }
+                set { _mix = it.coerceIn(0f, 1f) }
             }
         }
-        
+
         controlPort(ResonatorSymbol.SNAP_BACK) {
             boolType {
                 get { _snapBack }
@@ -187,93 +127,7 @@ class ResonatorPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = listOf(
-        resonator,
-        drumExciteGainL, drumExciteGainR, synthExciteGainL, synthExciteGainR,
-        drumBypassGainL, drumBypassGainR, synthBypassGainL, synthBypassGainR,
-        excitationSumL, excitationSumR, bypassSumL, bypassSumR,
-        wetGainL, wetGainR, dryGainL, dryGainR,
-        resoMixL, resoMixR, finalSumL, finalSumR
-    )
-
-    // Only disable expensive resonator + wet path — keep routing alive
-    // since Resonator feeds into Distortion in the series path
-    private val expensiveUnits: List<AudioUnit> = listOf(resonator, wetGainL, wetGainR)
-
-    override fun setPluginEnabled(enabled: Boolean, audioEngine: AudioEngine) {
-        for (unit in expensiveUnits) {
-            audioEngine.setUnitEnabled(unit, enabled)
-        }
-    }
-
-    override val inputs: Map<String, AudioInput> = mapOf(
-        "drumLeft" to drumExciteGainL.inputA,
-        "drumRight" to drumExciteGainR.inputA,
-        "synthLeft" to synthExciteGainL.inputA,
-        "synthRight" to synthExciteGainR.inputA,
-        "fullDrumLeft" to drumBypassGainL.inputA,
-        "fullDrumRight" to drumBypassGainR.inputA,
-        "fullSynthLeft" to synthBypassGainL.inputA,
-        "fullSynthRight" to synthBypassGainR.inputA
-    )
-
-    override val outputs: Map<String, AudioOutput> = mapOf(
-        "outputLeft" to finalSumL.output,
-        "outputRight" to finalSumR.output,
-        "auxLeft" to resonator.auxOutput,
-        "auxRight" to resonator.auxOutput
-    )
-
-    override fun initialize() {
-        // Excitation path: gated sources -> sum -> resonator
-        drumExciteGainL.output.connect(excitationSumL.inputA)
-        synthExciteGainL.output.connect(excitationSumL.inputB)
-        drumExciteGainR.output.connect(excitationSumR.inputA)
-        synthExciteGainR.output.connect(excitationSumR.inputB)
-        
-        excitationSumL.output.connect(resonator.input)
-        excitationSumR.output.connect(resonator.input)
-        
-        // Bypass path: inverse-gated sources -> sum
-        drumBypassGainL.output.connect(bypassSumL.inputA)
-        synthBypassGainL.output.connect(bypassSumL.inputB)
-        drumBypassGainR.output.connect(bypassSumR.inputA)
-        synthBypassGainR.output.connect(bypassSumR.inputB)
-        
-        // Resonator wet/dry: excitationSum -> dryGain, resonator -> wetGain
-        excitationSumL.output.connect(dryGainL.inputA)
-        excitationSumR.output.connect(dryGainR.inputA)
-        resonator.output.connect(wetGainL.inputA)
-        resonator.output.connect(wetGainR.inputA)
-        
-        // Mix wet + dry of resonated signal
-        wetGainL.output.connect(resoMixL.inputA)
-        dryGainL.output.connect(resoMixL.inputB)
-        wetGainR.output.connect(resoMixR.inputA)
-        dryGainR.output.connect(resoMixR.inputB)
-        
-        // Final: resonated mix + bypass
-        resoMixL.output.connect(finalSumL.inputA)
-        bypassSumL.output.connect(finalSumL.inputB)
-        resoMixR.output.connect(finalSumR.inputA)
-        bypassSumR.output.connect(finalSumR.inputB)
-        
-        // Apply initial settings
-        resonator.setResonatorEnabled(true)
-        resonator.setMode(_mode)
-        resonator.setStructure(_structure)
-        resonator.setBrightness(_brightness)
-        resonator.setDamping(_damping)
-        resonator.setPosition(_position)
-        portDefs.setValue(ResonatorSymbol.MIX, PortValue.FloatValue(_mix))
-        applyTargetMixRouting()
-
-        audioUnits.forEach { audioEngine.addUnit(it) }
-    }
-
-    override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_mix > PLUGIN_ENABLE_THRESHOLD, audioEngine)
-    }
+    override val audioUnits: List<AudioUnit> = emptyList()
 
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
@@ -283,24 +137,7 @@ class ResonatorPlugin(
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    private fun applyTargetMixRouting() {
-        val drumExcite = if (_targetMix <= 0.5f) 1.0 else (1.0 - (_targetMix.toDouble() - 0.5) * 2.0).coerceIn(0.0, 1.0)
-        val synthExcite = if (_targetMix >= 0.5f) 1.0 else (_targetMix.toDouble() * 2.0).coerceIn(0.0, 1.0)
-        
-        val drumBypass = 1.0 - drumExcite
-        val synthBypass = 1.0 - synthExcite
-        
-        drumExciteGainL.inputB.set(drumExcite)
-        drumExciteGainR.inputB.set(drumExcite)
-        synthExciteGainL.inputB.set(synthExcite)
-        synthExciteGainR.inputB.set(synthExcite)
-        drumBypassGainL.inputB.set(drumBypass)
-        drumBypassGainR.inputB.set(drumBypass)
-        synthBypassGainL.inputB.set(synthBypass)
-        synthBypassGainR.inputB.set(synthBypass)
-    }
-
-    // Native forwarding — no-op on JSyn, forwards on native engine
+    // Native forwarding methods
     fun setTargetMixGains(drumExcite: Float, synthExcite: Float) {
         audioEngine.setPort(URI, "drum_ex_gain", drumExcite)
         audioEngine.setPort(URI, "synth_ex_gain", synthExcite)
@@ -313,6 +150,7 @@ class ResonatorPlugin(
         audioEngine.setPort(URI, "dry_gain", dry)
     }
 
-    // Utility methods
-    fun strum(frequency: Float) = resonator.strum(frequency)
+    fun strum(frequency: Float) {
+        audioEngine.setPort(URI, "strum_freq", frequency)
+    }
 }
