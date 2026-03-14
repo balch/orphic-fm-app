@@ -151,6 +151,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
            - Warm/organic → 0 (osc) or 8 (va)
            - Metallic/bells → 12 (modal) or 9 (additive)
            - Strings/bowed → 11 (string)
+           - Occasionally (~1 in 25), try hidden engines: 18=VCF, 19=PD, 20=DX, 21=TRN, 22=ENS, 23=NES
         2. **Set sharpness** (voice_duo_sharpness_4/5) to match mood energy.
         3. **Set modulation**: voice_mod_depth_8..11 for FM richness, voice_vibrato for movement.
         4. **Set effects**: reverb_amount/time, delay_feedback/mix, distortion_drive as appropriate.

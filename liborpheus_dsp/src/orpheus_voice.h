@@ -48,17 +48,17 @@ static constexpr int kOrpheusMaxEngines = 24;
 static constexpr float kEngine0OutGain = 0.65f;
 
 // Per-engine output gain for Orpheus voice rendering.
-// Engines 0-7 (bank 2): default 0.45.
-// Engines 8-23: tuned per engine for balanced output.
+// Scaled from MI registration out_gain × ~0.56 to match Kotlin levels,
+// accounting for Orpheus bypassing the Plaits LPG/limiter pipeline.
 static const float kOrpheusOutGain[kOrpheusMaxEngines] = {
-    0.45f,  //  0: VirtualAnalogVCF (no Kotlin impl, default)
-    0.45f,  //  1: PhaseDistortion (no Kotlin impl)
-    0.45f,  //  2: SixOp FM1 (no Kotlin impl)
-    0.45f,  //  3: SixOp FM2 (no Kotlin impl)
-    0.45f,  //  4: SixOp FM3 (no Kotlin impl)
-    0.45f,  //  5: WaveTerrain (no Kotlin impl)
-    0.45f,  //  6: StringMachine (no Kotlin impl)
-    0.45f,  //  7: Chiptune (no Kotlin impl)
+    0.55f,  //  0: VirtualAnalogVCF (MI out_gain=1.0, hot analog + filter)
+    0.38f,  //  1: PhaseDistortion  (MI out_gain=0.7, moderate output)
+    0.55f,  //  2: SixOp FM1        (MI out_gain=1.0, internal envelope)
+    0.55f,  //  3: SixOp FM2        (MI out_gain=1.0, internal envelope)
+    0.55f,  //  4: SixOp FM3        (MI out_gain=1.0, internal envelope)
+    0.38f,  //  5: WaveTerrain      (MI out_gain=0.7, moderate output)
+    0.45f,  //  6: StringMachine    (MI out_gain=0.8, ensemble adds energy)
+    0.28f,  //  7: Chiptune         (MI out_gain=0.5, loudest raw output)
     0.45f,  //  8: VirtualAnalog
     0.38f,  //  9: Waveshaping
     0.45f,  // 10: FM
@@ -211,11 +211,13 @@ struct OrpheusVoice {
 
         float gain = kOrpheusOutGain[engine_index];
 
-        // Render in blocks of kOrpheusBlockSize (24), matching Kotlin.
+        // Render in fixed blocks of kOrpheusBlockSize (24), matching Kotlin.
+        // Always render full blocks even when fewer frames remain — SixOpEngine's
+        // staggered rendering uses acc_buffer_ across calls and breaks if block
+        // sizes vary (produces crackling from stale look-ahead samples).
         int frames_rendered = 0;
         while (frames_rendered < num_frames) {
-            int block = num_frames - frames_rendered;
-            if (block > kOrpheusBlockSize) block = kOrpheusBlockSize;
+            int frames_needed = num_frames - frames_rendered;
 
             // Trigger edge detection (Schmitt trigger).
             bool gate_on = (gate != 0);
@@ -238,14 +240,16 @@ struct OrpheusVoice {
             p.accent = accent;
 
             bool already_enveloped = false;
-            e->Render(p, out_buffer_, aux_buffer_, block, &already_enveloped);
+            e->Render(p, out_buffer_, aux_buffer_, kOrpheusBlockSize, &already_enveloped);
 
-            // Apply per-engine outGain and soft_limit, matching Kotlin path.
-            for (int i = 0; i < block; i++) {
+            // Copy only the frames we need (may be < kOrpheusBlockSize for final block).
+            int copy_count = (frames_needed < kOrpheusBlockSize)
+                ? frames_needed : kOrpheusBlockSize;
+            for (int i = 0; i < copy_count; i++) {
                 out[frames_rendered + i] = soft_limit(out_buffer_[i] * gain);
             }
 
-            frames_rendered += block;
+            frames_rendered += copy_count;
         }
     }
 };

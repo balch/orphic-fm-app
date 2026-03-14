@@ -79,7 +79,8 @@ fun VoiceGroupSection(
         voiceActions = voiceActions,
         midiActions = midiActions,
         isVoiceBeingLearned = midiFeature.actions.isVoiceBeingLearned,
-        effects = effects
+        effects = effects,
+        hasNativeEngine = voiceState.hasNativeEngine
     )
 }
 
@@ -114,7 +115,8 @@ fun VoiceGroupSectionLayout(
     voiceActions: VoiceActions,
     midiActions: MidiActions,
     isVoiceBeingLearned: (Int) -> Boolean,
-    effects: VisualizationLiquidEffects
+    effects: VisualizationLiquidEffects,
+    hasNativeEngine: Boolean = false,
 ) {
     val liquidState = LocalLiquidState.current
 
@@ -254,7 +256,8 @@ fun VoiceGroupSectionLayout(
                 voiceActions = voiceActions,
                 midiActions = midiActions,
                 isVoiceBeingLearned = isVoiceBeingLearned,
-                aiVoiceEngineHighlight = voiceState.aiVoiceEngineHighlights[voiceStartIndex / 2]
+                aiVoiceEngineHighlight = voiceState.aiVoiceEngineHighlights[voiceStartIndex / 2],
+                hasNativeEngine = hasNativeEngine
             )
             DuoVoiceBox(
                 voiceA = voiceStartIndex + 2,
@@ -275,7 +278,8 @@ fun VoiceGroupSectionLayout(
                 voiceActions = voiceActions,
                 midiActions = midiActions,
                 isVoiceBeingLearned = isVoiceBeingLearned,
-                aiVoiceEngineHighlight = voiceState.aiVoiceEngineHighlights[(voiceStartIndex + 2) / 2]
+                aiVoiceEngineHighlight = voiceState.aiVoiceEngineHighlights[(voiceStartIndex + 2) / 2],
+                hasNativeEngine = hasNativeEngine
             )
         }
     }

@@ -38,6 +38,7 @@ import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.ModFaderSelector
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import org.balch.orpheus.ui.widgets.VOICE_PICKER_V2_CONFIG
 import org.balch.orpheus.ui.widgets.engineLabel
 
 @Composable
@@ -60,7 +61,9 @@ fun DuoVoiceBox(
     voiceActions: VoiceActions,
     midiActions: MidiActions,
     isVoiceBeingLearned: (Int) -> Boolean,
-    aiVoiceEngineHighlight: Boolean = false
+    aiVoiceEngineHighlight: Boolean = false,
+    hasNativeEngine: Boolean = false,
+    glowEnergy: Float = 0f, // TODO: wire to real audio energy from SynthEngine voice levels
 ) {
     Column(
         modifier =
@@ -258,6 +261,9 @@ fun DuoVoiceBox(
                     onEngineChange = { voiceActions.setDuoEngine(voiceA / 2, it) },
                     color = color,
                     label = engineLabel(duoEngine),
+                    v2Config = if (hasNativeEngine) VOICE_PICKER_V2_CONFIG else null,
+                    gestureKey = voiceA / 2,
+                    glowEnergy = glowEnergy,
                     showExternalSelection = aiVoiceEngineHighlight,
                 )
                 RotaryKnob(

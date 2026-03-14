@@ -24,4 +24,15 @@ enum class PlaitsEngineId(val displayName: String) {
     CHORD("Chord"),
     WAVETABLE("Wavetable"),
     SPEECH("Speech"),
+    // V1.2 engines (C++ only — no Kotlin DSP)
+    VIRTUAL_ANALOG_VCF("Virtual Analog VCF"),
+    PHASE_DISTORTION("Phase Distortion"),
+    SIX_OP_FM("Six-Op FM"),
+    WAVE_TERRAIN("Wave Terrain"),
+    STRING_MACHINE("String Machine"),
+    CHIPTUNE("Chiptune"),
+;
+
+/** True for v1.2 engines that only render in C++ (no Kotlin DSP). */
+val isNativeOnly: Boolean get() = ordinal >= 17
 }

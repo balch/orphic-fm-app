@@ -13,13 +13,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -45,6 +48,7 @@ import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.theme.darken
+import org.balch.orpheus.util.currentTimeMillis
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -90,6 +94,21 @@ val VOICE_PICKER_CONFIG = PickerConfig(
     centerOrdinal = 0,
 )
 
+// ── V1.2 engines (C++ only, easter egg ring) ──
+
+val VOICE_PICKER_V2_CONFIG = PickerConfig(
+    ring = listOf(
+        PickerEntry("VCF", 18, OrpheusColors.engineRed),
+        PickerEntry("PD",  19, OrpheusColors.enginePurple),
+        PickerEntry("DX",  20, OrpheusColors.warmGlow),
+        PickerEntry("TRN", 21, OrpheusColors.engineGreen),
+        PickerEntry("ENS", 22, OrpheusColors.engineBlue),
+        PickerEntry("NES", 23, OrpheusColors.neonCyan),
+    ),
+    centerLabel = "V2",
+    centerOrdinal = -1,
+)
+
 // ── Drum engines (PlaitsEngineId ordinals, skipping 3=FMD) ──
 
 private val DRUM_RING = listOf(
@@ -118,6 +137,19 @@ val DRUM_BD_PICKER_CONFIG = PickerConfig(DRUM_RING, "BD", 0)
 val DRUM_SD_PICKER_CONFIG = PickerConfig(DRUM_RING, "SD", 1)
 /** Drum picker with HH as center default. */
 val DRUM_HH_PICKER_CONFIG = PickerConfig(DRUM_RING, "HH", 2)
+
+// ── V1.2 drum engines (C++ only, easter egg ring) ──
+
+private val DRUM_V2_RING = listOf(
+    PickerEntry("VCF", 17, OrpheusColors.engineRed),
+    PickerEntry("PD",  18, OrpheusColors.enginePurple),
+    PickerEntry("DX",  19, OrpheusColors.warmGlow),
+    PickerEntry("TRN", 20, OrpheusColors.engineGreen),
+    PickerEntry("ENS", 21, OrpheusColors.engineBlue),
+    PickerEntry("NES", 22, OrpheusColors.neonCyan),
+)
+
+val DRUM_V2_PICKER_CONFIG = PickerConfig(DRUM_V2_RING, "V2", -1)
 
 // ═══════════════════════════════════════════════════════════
 // Segment hit-testing
@@ -158,6 +190,7 @@ fun engineLabel(ordinal: Int): String = when (ordinal) {
     5 -> "FM"; 6 -> "NSE"; 7 -> "WSH"
     8 -> "VA"; 9 -> "ADD"; 10 -> "GRN"; 11 -> "STR"; 12 -> "MOD"
     13 -> "PAR"; 14 -> "SWM"; 15 -> "CHD"; 16 -> "WTB"; 17 -> "SPK"
+    18 -> "VCF"; 19 -> "PD"; 20 -> "DX"; 21 -> "TRN"; 22 -> "ENS"; 23 -> "NES"
     else -> "?"
 }
 
@@ -167,6 +200,7 @@ fun drumEngineLabel(ordinal: Int): String = when (ordinal) {
     4 -> "FM2"; 5 -> "NSE"; 6 -> "WSH"
     7 -> "VA"; 8 -> "ADD"; 9 -> "GRN"; 10 -> "STR"; 11 -> "MOD"
     12 -> "PAR"; 13 -> "SWM"; 14 -> "CHD"; 15 -> "WTB"; 16 -> "SPK"
+    17 -> "VCF"; 18 -> "PD"; 19 -> "DX"; 20 -> "TRN"; 21 -> "ENS"; 22 -> "NES"
     else -> "?"
 }
 
@@ -174,9 +208,12 @@ fun drumEngineLabel(ordinal: Int): String = when (ordinal) {
 // Self-contained button + popup
 // ═══════════════════════════════════════════════════════════
 
+private const val DOUBLE_CLICK_THRESHOLD_MS = 300L
+
 /**
  * Self-contained engine picker button that manages its own popup state and gesture handling.
  * Press-and-drag to select an engine from the radial popup.
+ * Double-click-and-drag opens the [v2Config] ring (if provided).
  */
 @Composable
 fun EnginePickerButton(
@@ -185,6 +222,9 @@ fun EnginePickerButton(
     color: Color,
     label: String,
     config: PickerConfig = VOICE_PICKER_CONFIG,
+    v2Config: PickerConfig? = null,
+    gestureKey: Any = Unit,
+    glowEnergy: Float = 0f,
     size: Dp = 28.dp,
     anchorSize: Dp = size,
     labelStyle: TextStyle = TextStyle(
@@ -196,6 +236,9 @@ fun EnginePickerButton(
 ) {
     var showEnginePicker by remember { mutableStateOf(false) }
     var hoveredSegment by remember { mutableStateOf<Int?>(null) }
+    val currentOnEngineChange by rememberUpdatedState(onEngineChange)
+    var lastDownTimeMs by remember { mutableStateOf(0L) }
+    var activeConfig by remember { mutableStateOf(config) }
 
     // Show popup for either user gesture or external (AI) selection
     val displayPopup = showEnginePicker || showExternalSelection
@@ -208,18 +251,56 @@ fun EnginePickerButton(
         else -> hoveredSegment
     }
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        // Audio-reactive glow for v1.2 engines — advances per recomposition, not per time-delta
+        val isV2Engine = v2Config != null && (
+            config.ring.none { it.ordinal == currentEngine } && currentEngine > 0
+        )
+        val smoothedGlow = remember { mutableStateOf(0f) }
+        smoothedGlow.value = if (isV2Engine && glowEnergy > 0f) {
+            (smoothedGlow.value * 0.7f + glowEnergy * 0.3f).coerceAtMost(1f)
+        } else if (isV2Engine) {
+            // Idle pulse: V2 engines glow faintly even without audio energy
+            (smoothedGlow.value * 0.95f).coerceAtLeast(0.15f)
+        } else {
+            smoothedGlow.value * 0.85f
+        }
+
+        // V2 engine: brighter base button tint
+        val buttonBgAlpha = if (isV2Engine) 0.3f else 0.15f
+        val buttonBorderAlpha = if (isV2Engine) 0.7f else 0.4f
+
         Box(
             modifier = Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(color.copy(alpha = 0.15f))
-                .border(1.dp, color.copy(alpha = 0.4f), CircleShape)
-                .pointerInput(Unit) {
+                .background(color.copy(alpha = buttonBgAlpha))
+                .border(1.dp, color.copy(alpha = buttonBorderAlpha), CircleShape)
+                .drawBehind {
+                    // Glow drawn behind the button — no extra layout space
+                    if (smoothedGlow.value > 0.01f) {
+                        val glowRadius = this.size.width / 2f + 9.dp.toPx()
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                0f to color.copy(alpha = smoothedGlow.value * 0.9f),
+                                0.5f to color.copy(alpha = smoothedGlow.value * 0.3f),
+                                1f to Color.Transparent,
+                            ),
+                            radius = glowRadius,
+                        )
+                    }
+                }
+                .pointerInput(gestureKey) {
                     val pickerRadiusPx = PICKER_SIZE.toPx() / 2f
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
                             .also { it.consume() }
+                        val nowMs = currentTimeMillis()
+                        val isDoubleClick = v2Config != null &&
+                            (nowMs - lastDownTimeMs) < DOUBLE_CLICK_THRESHOLD_MS
+                        lastDownTimeMs = nowMs
+
+                        activeConfig = if (isDoubleClick) v2Config!! else config
                         showEnginePicker = true
                         hoveredSegment = null
 
@@ -234,7 +315,7 @@ fun EnginePickerButton(
                                 val dy = pos.y - cy
                                 val dist = sqrt(dx * dx + dy * dy)
                                 hoveredSegment =
-                                    computePickerSegment(dx, dy, dist, pickerRadiusPx, config)
+                                    computePickerSegment(dx, dy, dist, pickerRadiusPx, activeConfig)
                             }
                             event.changes.forEach { it.consume() }
                             anyPressed = event.changes.any { it.pressed }
@@ -242,7 +323,10 @@ fun EnginePickerButton(
 
                         val seg = hoveredSegment
                         if (seg != null) {
-                            onEngineChange(pickerSegmentToOrdinal(seg, config))
+                            val ordinal = pickerSegmentToOrdinal(seg, activeConfig)
+                            if (ordinal >= 0) {
+                                currentOnEngineChange(ordinal)
+                            }
                         }
                         showEnginePicker = false
                         hoveredSegment = null
@@ -262,7 +346,7 @@ fun EnginePickerButton(
                 currentEngine = currentEngine,
                 hoveredSegment = displaySegment,
                 color = color,
-                config = config,
+                config = activeConfig,
                 anchorSize = anchorSize,
             )
         }

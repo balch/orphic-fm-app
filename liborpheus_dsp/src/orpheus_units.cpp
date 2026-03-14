@@ -834,11 +834,12 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         } else {
             // Drum voices: external percussive envelope matching Kotlin's
             // setPercussiveMode(!engine.alreadyEnveloped).
-            // Engines with built-in envelopes (indices 20-23: Modal, BD, SD, HH)
-            // already decay naturally — skip external envelope for those.
+            // Engines with built-in envelopes (indices 19-23: String, Modal, BD, SD, HH;
+            // and indices 2-4: Six-Op FM hardware slots) already decay naturally —
+            // skip external envelope for those.
             // Non-percussive engines (FM, Swarm, etc.) need this to avoid
             // sustaining indefinitely.
-            bool already_enveloped = (engine_index >= 20 && engine_index <= 23);
+            bool already_enveloped = (engine_index >= 19 && engine_index <= 23) || (engine_index >= 2 && engine_index <= 4);
             int drum_slot = idx - kDrumVoiceStart;
             float& env_amp = engine->drum_env_amplitude[drum_slot];
 

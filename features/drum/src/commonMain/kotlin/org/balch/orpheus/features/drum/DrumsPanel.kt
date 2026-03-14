@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.widgets.DRUM_V2_PICKER_CONFIG
 import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.HorizontalToggle
 import org.balch.orpheus.ui.widgets.PickerConfig
@@ -83,6 +84,7 @@ fun DrumsPanel(
                 engine = state.bdEngine,
                 onEngineChange = actions.setBdEngine,
                 pickerConfig = org.balch.orpheus.ui.widgets.DRUM_BD_PICKER_CONFIG,
+                hasNativeEngine = state.hasNativeEngine,
                 isActive = state.isBdActive,
                 onFrequencyChange = actions.setBdFrequency,
                 onToneChange = actions.setBdTone,
@@ -105,6 +107,7 @@ fun DrumsPanel(
                 engine = state.sdEngine,
                 onEngineChange = actions.setSdEngine,
                 pickerConfig = org.balch.orpheus.ui.widgets.DRUM_SD_PICKER_CONFIG,
+                hasNativeEngine = state.hasNativeEngine,
                 isActive = state.isSdActive,
                 onFrequencyChange = actions.setSdFrequency,
                 onToneChange = actions.setSdTone,
@@ -127,6 +130,7 @@ fun DrumsPanel(
                 engine = state.hhEngine,
                 onEngineChange = actions.setHhEngine,
                 pickerConfig = org.balch.orpheus.ui.widgets.DRUM_HH_PICKER_CONFIG,
+                hasNativeEngine = state.hasNativeEngine,
                 isActive = state.isHhActive,
                 onFrequencyChange = actions.setHhFrequency,
                 onToneChange = actions.setHhTone,
@@ -179,6 +183,8 @@ private fun DrumRow(
     engine: Int,
     onEngineChange: (Int) -> Unit,
     pickerConfig: PickerConfig,
+    hasNativeEngine: Boolean = false,
+    glowEnergy: Float = 0f, // TODO: wire to real audio energy from SynthEngine drum levels
     isActive: Boolean,
     onFrequencyChange: (Float) -> Unit,
     onToneChange: (Float) -> Unit,
@@ -208,6 +214,9 @@ private fun DrumRow(
                 color = color,
                 label = drumEngineLabel(engine),
                 config = pickerConfig,
+                v2Config = if (hasNativeEngine) DRUM_V2_PICKER_CONFIG else null,
+                gestureKey = tag,
+                glowEnergy = glowEnergy,
                 size = 36.dp,
                 anchorSize = 34.dp,
                 labelStyle = MaterialTheme.typography.labelMedium,

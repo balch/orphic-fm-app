@@ -71,6 +71,8 @@ class DspSynthEngine(
         log.info { "NativeDspBridge: ${if (it != null) "AVAILABLE" else "null"} (audioEngine=${audioEngine::class.simpleName})" }
     }
 
+    override val hasNativeEngine: Boolean get() = nativeBridge != null
+
     private fun setPort(ps: PortSymbol, value: PortValue): Boolean =
         setPluginPort(ps.uri, ps.symbol, value)
     private fun getPort(ps: PortSymbol): PortValue? =
@@ -1270,6 +1272,13 @@ class DspSynthEngine(
             14, // CHORD
             13, // WAVETABLE
             15, // SPEECH
+            // V1.2 engines (engine2/ directory)
+            0,  // VIRTUAL_ANALOG_VCF (C++ index 0)
+            1,  // PHASE_DISTORTION (C++ index 1)
+            2,  // SIX_OP_FM (C++ index 2; indices 3,4 are duplicate hardware slots, unused)
+            5,  // WAVE_TERRAIN (C++ index 5)
+            6,  // STRING_MACHINE (C++ index 6)
+            7,  // CHIPTUNE (C++ index 7)
         )
     }
 }

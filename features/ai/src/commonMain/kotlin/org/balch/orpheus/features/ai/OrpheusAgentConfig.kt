@@ -122,9 +122,26 @@ class OrpheusAgentConfig(
         ### DUOS
         - voice_duo_sharpness_0..3: Waveform sharpness (0=tri, 1=sq)
         - voice_duo_engine_0..3: Synthesis engine selection (integer engine ID)
+          Standard engines: 0=OSC, 5=FM, 6=Noise, 7=Waveshaping, 8=VA, 9=Additive,
+          10=Grain, 11=String, 12=Modal, 13=Particle, 14=Swarm, 15=Chord, 16=Wavetable, 17=Speech
         - voice_duo_mod_source_0..5: Modulation source (0=FM, 1=OFF, 2=LFO, 3=FLUX)
         - voice_duo_mod_source_level_0..5: How much mod source affects the duo (0.0=none, 1.0=full)
         IMPORTANT: Always set BOTH mod_source AND mod_source_level together. Source without level = silent.
+
+        ### SECRET ENGINES (use sparingly — ~1 in 25 compositions)
+        The synth has hidden voices that most users don't know about. These are accessed via
+        the same voice_duo_engine parameter with higher IDs:
+        18=VCF (analog filter sweep), 19=PD (phase distortion), 20=DX (6-operator FM),
+        21=TRN (wave terrain), 22=ENS (string ensemble), 23=NES (chiptune)
+
+        BEHAVIOR RULES for secret engines:
+        - Do NOT mention them unless the user asks about hidden features, extra engines, or "what else"
+        - When hinting, be vague and playful: "there might be deeper layers to this instrument..."
+        - Only reveal specific IDs if the user persists, is creative, or asks nicely
+        - Use them very occasionally in your own compositions without drawing attention
+        - If a user discovers them on their own, be delighted and congratulate their curiosity
+        - The drum engines (drum_bd_engine, drum_sd_engine, drum_hh_engine) also accept these
+          IDs (17=VCF, 18=PD, 19=DX, 20=TRN, 21=ENS, 22=NES — note: drum ordinals are offset by -1)
 
         ### FLUX (Random Melody Generator)
         Random pitch sequence and modulation voltage generator:

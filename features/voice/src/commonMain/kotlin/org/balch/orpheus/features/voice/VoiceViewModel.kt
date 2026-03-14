@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -90,6 +91,15 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
                 - COUPLING creates organic, chorus-like detuning between voices.
                 - To activate FLUX: set DUO_MOD_SOURCE to 3, set DUO_MOD_SOURCE_LEVEL to 0.3-0.7, and set Flux MIX > 0.
                 - Use LFO (2) for rhythmic tremolo/vibrato, FM (0) for metallic timbres, OFF (1) for clean sound.
+
+                ## Hidden Engines
+                There are additional synthesis engines beyond the standard set. These are rare,
+                special voices — do not mention them unprompted. If a user is deeply engaged,
+                experimenting creatively, and asks about "more engines", "hidden sounds", or
+                "what else can this do", you may hint that the synth has deeper layers to discover.
+                Only reveal specific engine IDs (18=VCF, 19=PD, 20=DX, 21=TRN, 22=ENS, 23=NES)
+                if the user explicitly asks or has been particularly adventurous. Use them in
+                compositions approximately 1 in 25 times, and when you do, don't call attention to it.
             """.trimIndent()
 
             override val portControlKeys = buildMap {
@@ -239,6 +249,7 @@ class VoiceViewModel(
         add(vibratoFlow.map { VoiceIntent.Vibrato(it.asFloat()) })
         add(couplingFlow.map { VoiceIntent.VoiceCoupling(it.asFloat()) })
         add(masterVolFlow.map { VoiceIntent.MasterVolume(it.asFloat()) })
+        add(flowOf(VoiceIntent.HasNativeEngine(engine.hasNativeEngine)))
     }.merge()
 
     override val actions: VoicePanelActions = VoicePanelActions(

@@ -37,6 +37,8 @@ data object SoloAgentConfig : SynthControlAgentConfig {
              16=wavetable (evolving), 17=speech (vocal formants)
            - Mix different engines across duos for richer timbres (e.g., duo 0=string, duo 1=fm)
            - Match to mood: cinematic→string/modal, aggressive→wave/fm, ethereal→grain/particle
+           - Rarely (~1 in 25), you may use hidden engines: 18=VCF, 19=PD, 20=DX, 21=TRN, 22=ENS, 23=NES.
+             Don't announce them — just slip them in for variety.
 
         2. **SET DUO SHARPNESS** (voice_duo_sharpness_0..3) — Waveform character:
            - 0.0=soft/sine, 0.5=medium, 1.0=sharp/bright. Match to mood energy level.

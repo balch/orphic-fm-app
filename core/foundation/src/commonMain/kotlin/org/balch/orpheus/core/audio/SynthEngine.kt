@@ -7,6 +7,9 @@ interface SynthEngine {
     fun start()
     fun stop()
 
+    /** True when a native C++ DSP engine is available (WASM, Android, desktop-native). */
+    val hasNativeEngine: Boolean get() = false
+
     // Voice Control
     fun setVoiceTune(index: Int, tune: Float)
     fun setVoiceGate(index: Int, active: Boolean)

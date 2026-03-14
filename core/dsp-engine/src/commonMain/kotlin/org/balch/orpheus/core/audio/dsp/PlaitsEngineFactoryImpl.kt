@@ -14,6 +14,7 @@ import org.balch.orpheus.plugins.plaits.engine.ChordEngine
 import org.balch.orpheus.plugins.plaits.engine.FmEngine
 import org.balch.orpheus.plugins.plaits.engine.GrainEngine
 import org.balch.orpheus.plugins.plaits.engine.ModalEngine
+import org.balch.orpheus.plugins.plaits.engine.NativeOnlyEngine
 import org.balch.orpheus.plugins.plaits.engine.NoiseEngine
 import org.balch.orpheus.plugins.plaits.engine.ParticleEngine
 import org.balch.orpheus.plugins.plaits.engine.SpeechEngine
@@ -54,6 +55,12 @@ class PlaitsEngineFactoryImpl(
             PlaitsEngineId.CHORD -> ChordEngine().also { it.init() }
             PlaitsEngineId.WAVETABLE -> WavetableEngine().also { it.init() }
             PlaitsEngineId.SPEECH -> SpeechEngine().also { it.init() }
+            PlaitsEngineId.VIRTUAL_ANALOG_VCF,
+            PlaitsEngineId.PHASE_DISTORTION,
+            PlaitsEngineId.SIX_OP_FM,
+            PlaitsEngineId.WAVE_TERRAIN,
+            PlaitsEngineId.STRING_MACHINE,
+            PlaitsEngineId.CHIPTUNE -> NativeOnlyEngine(id)
         }
     }
 }

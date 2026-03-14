@@ -89,6 +89,9 @@ internal fun reduceVoiceState(state: VoiceUiState, intent: VoiceIntent): VoiceUi
         is VoiceIntent.ToggleRightQuad ->
             state.copy(selectedRightQuad = if (state.selectedRightQuad == 1) 2 else 1)
 
+        is VoiceIntent.HasNativeEngine ->
+            state.copy(hasNativeEngine = intent.value)
+
         is VoiceIntent.ToggleLeftPanel ->
             state.copy(selectedLeftPanel = when (state.selectedLeftPanel) {
                 LeftPanelMode.VOICES -> LeftPanelMode.BENDER_STRINGS

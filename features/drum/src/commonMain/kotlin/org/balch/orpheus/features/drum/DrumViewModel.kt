@@ -2,7 +2,7 @@ package org.balch.orpheus.features.drum
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.di.FeatureScope
+import androidx.compose.ui.input.key.Key
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -10,16 +10,12 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-import androidx.compose.ui.input.key.Key
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
-import org.balch.orpheus.core.input.KeyAction
-import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
@@ -27,9 +23,14 @@ import org.balch.orpheus.core.controller.enumSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.controller.intSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.plugin.symbols.DrumSymbol
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.input.KeyAction
+import org.balch.orpheus.core.input.KeyBinding
+import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.triggers.DrumTriggerSource
 
 @Immutable
@@ -68,7 +69,8 @@ data class DrumUiState(
     val isBdActive: Boolean = false,
     val isSdActive: Boolean = false,
     val isHhActive: Boolean = false,
-    val drumsBypass: Boolean = true
+    val drumsBypass: Boolean = true,
+    val hasNativeEngine: Boolean = false
 )
 
 data class DrumPanelActions(
@@ -147,6 +149,7 @@ private sealed interface DrumIntent {
     data class HhEngine(val ordinal: Int) : DrumIntent
 
     data class Bypass(val active: Boolean) : DrumIntent
+    data class HasNativeEngine(val value: Boolean) : DrumIntent
 }
 
 interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
@@ -173,6 +176,10 @@ interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
                 - Lower BD FREQ for deep sub-bass kicks; raise for punchy, clicky attacks.
                 - Combine with Beats for algorithmic pattern generation.
                 - Use BYPASS to mute drums without losing your parameter settings.
+                - There are hidden synthesis engines available for drum voices too.
+                  Don't mention them unless the user is exploring deeply. When they ask,
+                  you might say something like "the drums have a few surprises if you
+                  know where to look." Only reveal specific engine IDs on request.
             """.trimIndent()
 
             override val portControlKeys = mapOf(
@@ -349,7 +356,8 @@ class DrumViewModel(
         sdEngineId.map { DrumIntent.SdEngine(it.asInt()) },
         hhEngineId.map { DrumIntent.HhEngine(it.asInt()) },
 
-        bypassId.map { DrumIntent.Bypass(it.asBoolean()) }
+        bypassId.map { DrumIntent.Bypass(it.asBoolean()) },
+        flowOf(DrumIntent.HasNativeEngine(synthEngine.hasNativeEngine))
     )
 
     override val stateFlow: StateFlow<DrumUiState> =
@@ -400,6 +408,7 @@ class DrumViewModel(
             is DrumIntent.HhEngine -> state.copy(hhEngine = intent.ordinal)
 
             is DrumIntent.Bypass -> state.copy(drumsBypass = intent.active)
+            is DrumIntent.HasNativeEngine -> state.copy(hasNativeEngine = intent.value)
         }
 
     fun startBdTrigger() {
