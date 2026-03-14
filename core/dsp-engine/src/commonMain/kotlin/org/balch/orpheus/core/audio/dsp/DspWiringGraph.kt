@@ -242,50 +242,10 @@ class DspWiringGraph(
         drumDirectLimiterR.output.connect(pluginProvider.looperPlugin.inputs["inputRight"]!!)
     }
     
+    @Suppress("UNUSED_PARAMETER")
     private fun wireVoices(voiceManager: DspVoiceManager) {
-        // Wire voices to audio paths
-        voiceManager.voices.forEachIndexed { index, voice ->
-            // VIBRATO → Voice frequency modulation
-            pluginProvider.vibratoPlugin.outputs["output"]?.connect(voice.vibratoInput)
-            voice.vibratoDepth.set(1.0)
-
-            // GLOBAL BENDER → Voice pitch bend modulation
-            pluginProvider.benderPlugin.outputs["pitchOutput"]?.connect(voice.benderInput)
-            
-            // PER-STRING BENDER
-            if (index < 8) {
-                pluginProvider.perStringBenderPlugin.outputs["voiceBend$index"]?.connect(voice.benderInput)
-            }
-        }
-        
-        // Per-String Bender audio effects (tension/spring sounds) → Stereo sum
-        pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputLeft"]!!)
-        pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.connect(pluginProvider.stereoPlugin.inputs["dryInputRight"]!!)
-
-        // Wire per-voice panning: Voice → PanL/R → voiceSum (for Grains) AND Resonator
-        voiceManager.voices.forEachIndexed { index, voice ->
-            // Voice audio goes to pan gain inputs
-            voice.output.connect(pluginProvider.stereoPlugin.getVoicePanInputLeft(index))
-            voice.output.connect(pluginProvider.stereoPlugin.getVoicePanInputRight(index))
-            
-            // Panned audio goes to voice sum buses (feeds Grains in parallel)
-            pluginProvider.stereoPlugin.getVoicePanOutputLeft(index).connect(voiceSumLeft.input)
-            pluginProvider.stereoPlugin.getVoicePanOutputRight(index).connect(voiceSumRight.input)
-            
-            // Panned audio ALSO goes to Resonator gated inputs (excitation) - parallel path
-            pluginProvider.stereoPlugin.getVoicePanOutputLeft(index).connect(pluginProvider.resonatorPlugin.inputs["synthLeft"]!!)
-            pluginProvider.stereoPlugin.getVoicePanOutputRight(index).connect(pluginProvider.resonatorPlugin.inputs["synthRight"]!!)
-            
-            // Panned audio ALSO goes to Resonator non-gated inputs (full dry path)
-            pluginProvider.stereoPlugin.getVoicePanOutputLeft(index).connect(pluginProvider.resonatorPlugin.inputs["fullSynthLeft"]!!)
-            pluginProvider.stereoPlugin.getVoicePanOutputRight(index).connect(pluginProvider.resonatorPlugin.inputs["fullSynthRight"]!!)
-
-            // REPL Voices (8-11) go to separate REPL bus
-            if (index >= 8) {
-                pluginProvider.stereoPlugin.getVoicePanOutputLeft(index).connect(replSumLeft.input)
-                pluginProvider.stereoPlugin.getVoicePanOutputRight(index).connect(replSumRight.input)
-            }
-        }
+        // No-op: voice graph wiring removed (C++ handles voice routing).
+        // DspWiringGraph itself is dead code pending deletion in a later task.
     }
     
     private fun initDrumDirectResonator() {
