@@ -2,6 +2,13 @@
 #include <cstring>
 #include <chrono>
 
+// miniaudio calls this from the OS audio thread (CoreAudio/WASAPI/ALSA).
+// No JNI, no Java, no float-to-int16 conversion — just fill the float buffer.
+static void ma_audio_callback(ma_device* pDevice, void* pOutput, const void* /*pInput*/, ma_uint32 frameCount) {
+    auto* engine = static_cast<DesktopEngine*>(pDevice->pUserData);
+    engine->process(static_cast<float*>(pOutput), static_cast<int>(frameCount));
+}
+
 DesktopEngine::DesktopEngine() = default;
 
 DesktopEngine::~DesktopEngine() {
@@ -38,7 +45,38 @@ void DesktopEngine::process(float* outputBuffer, int numFrames) {
     cpu_load_.store(us / budget);
 }
 
+bool DesktopEngine::startAudio() {
+    if (audio_device_initialized_.load()) return true;
+    if (!dsp_engine_) return false;
+
+    ma_device_config config = ma_device_config_init(ma_device_type_playback);
+    config.playback.format    = ma_format_f32;
+    config.playback.channels  = 2;
+    config.sampleRate         = static_cast<ma_uint32>(sample_rate_);
+    config.periodSizeInFrames = 512;
+    config.dataCallback       = ma_audio_callback;
+    config.pUserData          = this;
+
+    if (ma_device_init(nullptr, &config, &audio_device_) != MA_SUCCESS) {
+        return false;
+    }
+    if (ma_device_start(&audio_device_) != MA_SUCCESS) {
+        ma_device_uninit(&audio_device_);
+        return false;
+    }
+    audio_device_initialized_.store(true);
+    return true;
+}
+
+void DesktopEngine::stopAudio() {
+    if (audio_device_initialized_.load()) {
+        ma_device_uninit(&audio_device_);
+        audio_device_initialized_.store(false);
+    }
+}
+
 void DesktopEngine::close() {
+    stopAudio();
     is_running_.store(false);
 
     if (dsp_engine_) {

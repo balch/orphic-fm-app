@@ -2,7 +2,6 @@ package org.balch.orpheus.features.beats
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -20,18 +19,19 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.plugins.drum.engine.DrumBeatsGenerator
 
@@ -291,6 +291,7 @@ class DrumBeatsViewModel(
 
     private fun startClock() {
         clockJob?.cancel()
+        patternGenerator.reset()
         clockJob = scope.launch(dispatcherProvider.io) {
             var nextTickTime = synthEngine.getCurrentTime()
 
@@ -337,7 +338,7 @@ class DrumBeatsViewModel(
         stopClock()
     }
 
-    companion object Companion {
+    companion object {
         fun previewFeature(state: BeatsUiState = BeatsUiState()): DrumBeatsFeature =
             object : DrumBeatsFeature {
                 override val stateFlow: StateFlow<BeatsUiState> = MutableStateFlow(state)

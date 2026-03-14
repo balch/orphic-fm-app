@@ -225,3 +225,59 @@ fun jsSendLoadGraphCmd(bytes: ByteArray) {
 /** Read Worker's CPU load (set by listener) */
 fun jsGetProxyCpuLoad(): Float =
     js("globalThis.__workerCpuLoad || 0")
+
+// ─── Automation ──────────────────────────────────────────────────────────────
+
+/** Allocate a JS Float32Array of given size */
+private fun jsNewFloat32ArraySized(size: Int): JsAny =
+    js("new Float32Array(size)")
+
+/** Set a float in a Float32Array */
+private fun jsSetFloat(arr: JsAny, index: Int, value: Float): Unit =
+    js("arr[index] = value")
+
+/** Post CMD_SET_AUTOMATION with times/values as Transferable Float32Arrays */
+private fun jsPostAutomationCmd(target: Int, voiceIndex: Int, timesArr: JsAny, valuesArr: JsAny, count: Int): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 31, target: target, voiceIdx: voiceIndex, times: timesArr.buffer, values: valuesArr.buffer, count: count }, [timesArr.buffer, valuesArr.buffer])")
+
+/** Send SET_AUTOMATION command with times/values arrays as Transferable buffers */
+fun jsSendSetAutomationCmd(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int) {
+    val timesArr = jsNewFloat32ArraySized(count)
+    val valuesArr = jsNewFloat32ArraySized(count)
+    for (i in 0 until count) {
+        jsSetFloat(timesArr, i, times[i])
+        jsSetFloat(valuesArr, i, values[i])
+    }
+    jsPostAutomationCmd(target, voiceIndex, timesArr, valuesArr, count)
+}
+
+/** Send CLEAR_AUTOMATION command */
+fun jsSendClearAutomationCmd(target: Int, voiceIndex: Int): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 32, target: target, voiceIdx: voiceIndex })")
+
+// ─── TTS ─────────────────────────────────────────────────────────────────────
+
+/** Post CMD_LOAD_TTS_AUDIO with samples as Transferable Float32Array */
+private fun jsPostLoadTtsCmd(samplesArr: JsAny, sampleRate: Int): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 40, samples: samplesArr.buffer, sampleRate: sampleRate }, [samplesArr.buffer])")
+
+/** Send LOAD_TTS_AUDIO command with audio samples as Transferable buffer */
+fun jsSendLoadTtsAudioCmd(samples: FloatArray, sampleRate: Int) {
+    val arr = jsNewFloat32ArraySized(samples.size)
+    for (i in samples.indices) {
+        jsSetFloat(arr, i, samples[i])
+    }
+    jsPostLoadTtsCmd(arr, sampleRate)
+}
+
+/** Send PLAY_TTS command */
+fun jsSendPlayTtsCmd(): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 41 })")
+
+/** Send STOP_TTS command */
+fun jsSendStopTtsCmd(): Unit =
+    js("globalThis.__dspWorker.postMessage({ cmd: 42 })")
+
+/** Check TTS playing state (polled from Worker via globalThis) */
+fun jsGetTtsPlaying(): Int =
+    js("globalThis.__ttsPlaying || 0")

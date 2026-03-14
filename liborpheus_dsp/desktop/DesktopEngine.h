@@ -2,11 +2,12 @@
 #define ORPHEUS_DESKTOP_ENGINE_H
 
 #include "orpheus_dsp.h"
+#include "miniaudio.h"
 #include <atomic>
 
 /**
  * Simplified DSP engine wrapper for JVM desktop (no Oboe).
- * Pull-model: Kotlin calls process() from its audio callback.
+ * Push-model: miniaudio's OS audio thread calls process() via callback.
  */
 class DesktopEngine {
 public:
@@ -17,6 +18,9 @@ public:
     int  loadGraph(const uint8_t* data, size_t length);
     void process(float* outputBuffer, int numFrames);
     void close();
+
+    bool startAudio();  // Start miniaudio playback device
+    void stopAudio();   // Stop miniaudio playback device
 
     bool   isRunning() const;
     float  getSampleRate() const;
@@ -54,6 +58,8 @@ private:
     float sample_rate_ = 0.0f;
     std::atomic<bool> is_running_{false};
     std::atomic<double> cpu_load_{0.0};
+    ma_device audio_device_{};
+    std::atomic<bool> audio_device_initialized_{false};
 };
 
 #endif

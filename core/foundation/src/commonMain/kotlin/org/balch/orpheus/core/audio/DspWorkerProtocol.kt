@@ -28,4 +28,10 @@ object DspWorkerProtocol {
     const val CMD_VOICE_DECAY = 25
     const val CMD_SET_VIBRATO_RATE = 26
     const val CMD_LOAD_GRAPH = 30
+    const val CMD_SET_AUTOMATION = 31
+    const val CMD_CLEAR_AUTOMATION = 32
+    const val CMD_LOAD_TTS_AUDIO = 40
+    const val CMD_PLAY_TTS = 41
+    const val CMD_STOP_TTS = 42
+    const val CMD_IS_TTS_PLAYING = 43 // Reserved — TTS state is polled via globalThis, not postMessage
 }

@@ -4,6 +4,14 @@ project(orpheus_desktop CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# -- miniaudio (fetched at configure time) ----------------------------------
+include(FetchContent)
+FetchContent_Declare(miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG        0.11.25
+)
+FetchContent_MakeAvailable(miniaudio)
+
 # -- JNI headers -----------------------------------------------------------
 find_package(JNI REQUIRED)
 
@@ -27,15 +35,27 @@ add_subdirectory(
 add_library(orpheus_desktop SHARED
     DesktopEngine.cpp
     jni_bridge_desktop.cpp
+    miniaudio_impl.cpp
 )
 
 target_include_directories(orpheus_desktop PRIVATE
     ${JNI_INCLUDE_DIRS}
     "${CMAKE_CURRENT_SOURCE_DIR}/../include"
-    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${miniaudio_SOURCE_DIR}"
 )
 
 target_link_libraries(orpheus_desktop PRIVATE orpheus_dsp)
+
+# Platform audio frameworks for miniaudio
+if(APPLE)
+    target_link_libraries(orpheus_desktop PRIVATE
+        "-framework CoreAudio"
+        "-framework AudioToolbox"
+        "-framework CoreFoundation"
+    )
+elseif(UNIX)
+    target_link_libraries(orpheus_desktop PRIVATE pthread m dl)
+endif()
 
 # -- macOS RPATH -----------------------------------------------------------
 if(APPLE)

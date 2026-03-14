@@ -255,4 +255,26 @@ class OrpheusAudioEngine: AudioEngine, NativeDspBridge {
         jsSendLoadGraphCmd(data)
         return 0
     }
+
+    override fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int) {
+        jsSendSetAutomationCmd(target, voiceIndex, times, values, count)
+    }
+
+    override fun nativeClearAutomation(target: Int, voiceIndex: Int) {
+        jsSendClearAutomationCmd(target, voiceIndex)
+    }
+
+    override fun nativeLoadTtsAudio(samples: FloatArray, sampleRate: Int) {
+        jsSendLoadTtsAudioCmd(samples, sampleRate)
+    }
+
+    override fun nativePlayTts() {
+        jsSendPlayTtsCmd()
+    }
+
+    override fun nativeStopTts() {
+        jsSendStopTtsCmd()
+    }
+
+    override fun nativeIsTtsPlaying(): Int = jsGetTtsPlaying()
 }

@@ -103,4 +103,8 @@ class DesktopDspBridge {
     external fun nativePlayTts()
     external fun nativeStopTts()
     external fun nativeIsTtsPlaying(): Int
+
+    // miniaudio audio device control
+    external fun nativeStartAudio(): Boolean
+    external fun nativeStopAudio()
 }

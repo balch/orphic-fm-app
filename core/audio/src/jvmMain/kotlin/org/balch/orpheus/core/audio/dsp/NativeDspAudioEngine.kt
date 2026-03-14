@@ -1,34 +1,25 @@
 package org.balch.orpheus.core.audio.dsp
 
 import com.diamondedge.logging.logging
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import javax.sound.sampled.AudioFormat
-import javax.sound.sampled.AudioSystem
-import javax.sound.sampled.SourceDataLine
 
 /**
  * JVM desktop AudioEngine backed by the C++ DSP engine (liborpheus_desktop).
  *
- * Audio output uses javax.sound.sampled with a pull model:
- * a dedicated thread calls [DesktopDspBridge.nativeProcess] to fill interleaved stereo
- * float buffers, then writes them to a [SourceDataLine].
+ * Audio output uses miniaudio: a native CoreAudio/WASAPI/ALSA callback
+ * calls DesktopEngine::process() directly from the OS audio thread.
+ * No Java Sound mixer, no float-to-int16 conversion, no JNI per-buffer round-trip.
  */
 class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
 
     private val bridge = DesktopDspBridge()
 
     private val sampleRateHz = 48000
-    private val bufferFrames = 512
-    private val channels = 2
 
     @Volatile
     private var running = false
-    private var audioThread: Thread? = null
-    private var line: SourceDataLine? = null
 
     init {
-        log.info { "NativeDspAudioEngine created (C++ DSP)" }
+        log.info { "NativeDspAudioEngine created (C++ DSP + miniaudio)" }
     }
 
     // -- AudioEngine ----------------------------------------------------------
@@ -41,50 +32,14 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
         dspSampleRate = sampleRateHz.toFloat()
         log.info { "nativeOpen($sampleRateHz) completed" }
 
-        // PCM_SIGNED, 48 kHz, 16-bit, stereo, little-endian (universally supported)
-        val bytesPerSample = 2
-        val format = AudioFormat(
-            AudioFormat.Encoding.PCM_SIGNED,
-            sampleRateHz.toFloat(),
-            16,
-            channels,
-            channels * bytesPerSample,
-            sampleRateHz.toFloat(),
-            false // little-endian
-        )
-
-        val sdl = AudioSystem.getSourceDataLine(format)
-        val lineBufferSize = bufferFrames * channels * bytesPerSample * 2 // 2x headroom
-        sdl.open(format, lineBufferSize)
-        sdl.start()
-        line = sdl
-        log.info { "SourceDataLine opened: bufferSize=$lineBufferSize, format=$format" }
+        if (!bridge.nativeStartAudio()) {
+            log.error { "Failed to start miniaudio device" }
+            bridge.nativeClose()
+            return
+        }
 
         running = true
-
-        val thread = Thread({
-            val floatBuf = FloatArray(bufferFrames * channels)
-            val byteBuf = ByteArray(bufferFrames * channels * bytesPerSample)
-            val bb = ByteBuffer.wrap(byteBuf).order(ByteOrder.LITTLE_ENDIAN)
-
-            log.info { "Audio thread started" }
-            while (running) {
-                bridge.nativeProcess(floatBuf)
-                bb.clear()
-                for (sample in floatBuf) {
-                    val clamped = sample.coerceIn(-1f, 1f)
-                    bb.putShort((clamped * 32767f).toInt().toShort())
-                }
-                sdl.write(byteBuf, 0, byteBuf.size)
-            }
-            log.info { "Audio thread exiting" }
-        }, "OrpheusAudio")
-        thread.isDaemon = true
-        thread.priority = Thread.MAX_PRIORITY
-        thread.start()
-        audioThread = thread
-
-        log.info { "Audio engine started" }
+        log.info { "Audio engine started (miniaudio)" }
     }
 
     override fun stop() {
@@ -92,13 +47,7 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
         log.info { "stop() called" }
 
         running = false
-        audioThread?.join(2000)
-        audioThread = null
-
-        line?.stop()
-        line?.close()
-        line = null
-
+        bridge.nativeStopAudio()
         bridge.nativeClose()
         log.info { "Audio engine stopped" }
     }

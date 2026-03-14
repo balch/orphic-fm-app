@@ -9,7 +9,7 @@ package org.balch.orpheus.plugins.drum.engine
 class DrumBeatsGenerator(
     private val onTrigger: (Int, Float) -> Unit
 ) {
-    companion object Companion {
+    companion object {
         const val NUM_PARTS = 3
         const val NUM_STEPS = 32
     }
@@ -25,7 +25,7 @@ class DrumBeatsGenerator(
     private var randomness = 0f
     
     private var step = 0
-    private var clockCounter = 0
+    private var clockCounter = 5 // Prime to (resolution - 1) so first tick() fires immediately
     private val resolution = 6 // 6 ticks per 16th note (24 PPQN)
     
     // Per-part settings
@@ -79,7 +79,8 @@ class DrumBeatsGenerator(
     
     fun reset() {
         step = 0
-        clockCounter = 0
+        // Prime so the very first tick() processes a step immediately
+        clockCounter = resolution - 1
         for (i in 0 until NUM_PARTS) euclideanStep[i] = 0
     }
 
@@ -116,18 +117,18 @@ class DrumBeatsGenerator(
         // We interpolate between i and i+1
         val xMapped = x * 4.0f
         val yMapped = y * 4.0f
-        
+
         var xi = xMapped.toInt()
         var yi = yMapped.toInt()
-        
+
         // Clamp to 0..3 for base index, so we always have a neighbor at +1
         // If we are exactly at 4.0, we clamp to 3 and use dx=1.0 (or just clamp input)
         if (xi >= 4) xi = 3
         if (yi >= 4) yi = 3
-        
+
         val dx = (xMapped - xi).coerceIn(0f, 1f)
         val dy = (yMapped - yi).coerceIn(0f, 1f)
-        
+
         // Get 4 nearest neighbor nodes
         // Map is [row][col] -> [y][x]
         val nodeIndexA = GridsPatternData.DRUM_MAP[yi][xi]
@@ -143,21 +144,21 @@ class DrumBeatsGenerator(
         for (p in 0 until NUM_PARTS) {
             // Planar layout: Instrument offset is p * 32
             val offset = p * NUM_STEPS + step
-            
+
             // Get values from 4 nodes (unsigned byte 0..255)
             val valA = nodeA[offset].toInt() and 0xFF
             val valB = nodeB[offset].toInt() and 0xFF
             val valC = nodeC[offset].toInt() and 0xFF
             val valD = nodeD[offset].toInt() and 0xFF
-            
+
             // Bilinear Interpolation
             // mix(a, b, x) + dy * (mix(c, d, x) - mix(a, b, x))
             // mix(a, b, x) = a + x * (b - a)
-            
+
             val topRow = valA + dx * (valB - valA)
             val bottomRow = valC + dx * (valD - valC)
             val interpolated = topRow + dy * (bottomRow - topRow)
-            
+
             // Apply perturbation
             var level = interpolated.toInt()
             val purt = partPerturbation[p]
@@ -166,11 +167,14 @@ class DrumBeatsGenerator(
             } else {
                 level = 255
             }
-            
+
             val value = level / 255.0f
-            
-            // Check density threshold
-            if (value > (1.0f - densities[p])) {
+
+            // Force a kick on the downbeat so playback is immediately audible
+            // even at low densities where the pattern may not exceed threshold.
+            val threshold = if (step == 0 && p == 0) 0f else (1.0f - densities[p])
+
+            if (value > threshold) {
                 onTrigger(p, 1.0f)
             }
         }

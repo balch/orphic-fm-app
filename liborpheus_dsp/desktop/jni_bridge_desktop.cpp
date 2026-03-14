@@ -130,6 +130,16 @@ JNI_FN(nativeTriggerDrum)(JNIEnv *env, jobject thiz, jint drumIndex, jfloat acce
     sEngine.triggerDrum(drumIndex, accent);
 }
 
+JNIEXPORT jboolean JNICALL
+JNI_FN(nativeStartAudio)(JNIEnv *env, jobject thiz) {
+    return sEngine.startAudio() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(nativeStopAudio)(JNIEnv *env, jobject thiz) {
+    sEngine.stopAudio();
+}
+
 JNIEXPORT void JNICALL
 JNI_FN(nativeSetMasterVolume)(JNIEnv *env, jobject thiz, jfloat value) {
     sEngine.setMasterVolume(value);
