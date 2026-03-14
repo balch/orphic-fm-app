@@ -6,34 +6,22 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.NativeDspBridge
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.ports
 
 /**
  * DSP Plugin for Native Audio Looper.
- * Wraps JsynLooperUnit.
- * 
- * Port Map:
- * 0: Input Left (Audio)
- * 1: Input Right (Audio)
- * 2: Output Left (Audio)
- * 3: Output Right (Audio)
- * 4: Record Gate (Audio/Control)
- * 5: Play Gate (Audio/Control)
+ *
+ * Pure state container — C++ handles all audio processing.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
 class LooperPlugin(
-    private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
+    private val audioEngine: AudioEngine
 ) : DspPlugin {
 
     override val info = PluginInfo(
@@ -47,42 +35,15 @@ class LooperPlugin(
         audioPort { index = 1; symbol = "in_r"; name = "Input Right"; isInput = true }
         audioPort { index = 2; symbol = "out_l"; name = "Output Left"; isInput = false }
         audioPort { index = 3; symbol = "out_r"; name = "Output Right"; isInput = false }
-        // Gates can be treated as audio ports for sample-accurate control or control ports
         audioPort { index = 4; symbol = "record_gate"; name = "Record Gate"; isInput = true }
         audioPort { index = 5; symbol = "play_gate"; name = "Play Gate"; isInput = true }
     }
 
     override val ports: List<Port> = audioPorts.ports
 
-    private val looper = dspFactory.createLooperUnit()
-    
-    // Internal proxies for clean input routing
-    private val inputLeftProxy = dspFactory.createPassThrough()
-    private val inputRightProxy = dspFactory.createPassThrough()
-
-    override val audioUnits: List<AudioUnit> = listOf(
-        looper, inputLeftProxy, inputRightProxy
-    )
-
-    override val inputs: Map<String, AudioInput> = mapOf(
-        "inputLeft" to inputLeftProxy.input,
-        "inputRight" to inputRightProxy.input,
-        "recordGate" to looper.recordGate,
-        "playGate" to looper.playGate
-    )
-
-    override val outputs: Map<String, AudioOutput> = mapOf(
-        "output" to looper.output,
-        "outputRight" to looper.outputRight
-    )
+    override val audioUnits: List<AudioUnit> = emptyList()
 
     override fun initialize() {
-        looper.allocate(60.0)
-
-        inputLeftProxy.output.connect(looper.inputLeft)
-        inputRightProxy.output.connect(looper.inputRight)
-
-        audioUnits.forEach { audioEngine.addUnit(it) }
         audioEngine.setPort(URI, "level", DEFAULT_LEVEL * LEVEL_SCALE)
     }
 
@@ -91,36 +52,21 @@ class LooperPlugin(
         const val DEFAULT_LEVEL = 0.7f
         private const val LEVEL_SCALE = 2f
     }
-    
+
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
-    
-    // In native mode, C++ handles all audio — skip Kotlin looper unit calls
-    // (JsynLooperUnit crashes without a running JSyn synthesisEngine).
-    private val isNative = audioEngine is NativeDspBridge
-
-    fun allocate(seconds: Double) { if (!isNative) looper.allocate(seconds) }
 
     fun clear() {
-        if (!isNative) looper.clear()
         audioEngine.setPort(URI, "state", 0f)
     }
 
     fun setRecording(active: Boolean) {
-        if (isNative) {
-            audioEngine.setPort(URI, "state", if (active) 1f else 2f)
-        } else {
-            looper.setRecording(active)
-        }
+        audioEngine.setPort(URI, "state", if (active) 1f else 2f)
     }
 
     fun setPlaying(active: Boolean) {
-        if (isNative) {
-            audioEngine.setPort(URI, "state", if (active) 2f else 0f)
-        } else {
-            looper.setPlaying(active)
-        }
+        audioEngine.setPort(URI, "state", if (active) 2f else 0f)
     }
 
     fun setQuantize(enabled: Boolean) {
@@ -130,7 +76,4 @@ class LooperPlugin(
     fun setLevel(level: Float) {
         audioEngine.setPort(URI, "level", level * LEVEL_SCALE)
     }
-
-    fun getLoopDuration(): Double = looper.getLoopDuration()
-    fun getPosition(): Float = looper.getPosition()
 }

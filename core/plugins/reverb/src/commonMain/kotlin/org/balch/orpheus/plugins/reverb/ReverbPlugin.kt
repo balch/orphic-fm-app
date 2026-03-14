@@ -5,14 +5,8 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
-import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.Symbol
@@ -22,20 +16,14 @@ import org.balch.orpheus.core.plugin.symbols.REVERB_URI
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 
 /**
- * Reverb Plugin — Dattorro plate reverb ported from Mutable Instruments Rings.
+ * Reverb Plugin — Dattorro plate reverb.
  *
- * Parallel send effect alongside the delay. Both receive from distortion output,
- * both feed stereo sum independently.
- *
- * Controls: AMOUNT, TIME, DAMPING, DIFFUSION
+ * Pure state container — C++ handles all audio processing.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
-class ReverbPlugin(
-    private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
-) : DspPlugin {
+class ReverbPlugin : DspPlugin {
 
     override val info = PluginInfo(
         uri = URI,
@@ -46,9 +34,6 @@ class ReverbPlugin(
     companion object {
         const val URI = REVERB_URI
     }
-
-    // Core reverb unit (stereo)
-    private val reverbUnit = dspFactory.createReverbUnit()
 
     // Internal state
     private var _amount = 0f
@@ -62,22 +47,7 @@ class ReverbPlugin(
             floatType {
                 default = 0f
                 get { _amount }
-                set {
-                    val wasDisabled = _amount <= PLUGIN_DISABLE_THRESHOLD
-                    _amount = it
-                    val shouldDisable = _amount <= PLUGIN_DISABLE_THRESHOLD
-                    if (wasDisabled && _amount > PLUGIN_ENABLE_THRESHOLD) {
-                        // Zero output before enabling to prevent blowout
-                        reverbUnit.setAmount(0f)
-                        reverbUnit.setBypass(false)
-                        setPluginEnabled(true, audioEngine)
-                    }
-                    reverbUnit.setAmount(it)
-                    reverbUnit.setBypass(shouldDisable)
-                    if (shouldDisable) {
-                        setPluginEnabled(false, audioEngine)
-                    }
-                }
+                set { _amount = it }
             }
         }
 
@@ -85,7 +55,7 @@ class ReverbPlugin(
             floatType {
                 default = 0.5f
                 get { _time }
-                set { _time = it; reverbUnit.setTime(it) }
+                set { _time = it }
             }
         }
 
@@ -93,7 +63,7 @@ class ReverbPlugin(
             floatType {
                 default = 0.7f
                 get { _damping }
-                set { _damping = it; reverbUnit.setLp(it) }
+                set { _damping = it }
             }
         }
 
@@ -101,7 +71,7 @@ class ReverbPlugin(
             floatType {
                 default = 0.625f
                 get { _diffusion }
-                set { _diffusion = it; reverbUnit.setDiffusion(it) }
+                set { _diffusion = it }
             }
         }
     }
@@ -115,32 +85,7 @@ class ReverbPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = listOf(reverbUnit)
-
-    override val inputs: Map<String, AudioInput> = mapOf(
-        "inputLeft" to reverbUnit.inputLeft,
-        "inputRight" to reverbUnit.inputRight
-    )
-
-    override val outputs: Map<String, AudioOutput> = mapOf(
-        "outputLeft" to reverbUnit.output,
-        "outputRight" to reverbUnit.outputRight
-    )
-
-    override fun initialize() {
-        // Apply initial parameter values
-        reverbUnit.setAmount(_amount)
-        reverbUnit.setTime(_time)
-        reverbUnit.setLp(_damping)
-        reverbUnit.setDiffusion(_diffusion)
-        reverbUnit.setInputGain(0.5f)
-
-        audioUnits.forEach { audioEngine.addUnit(it) }
-    }
-
-    override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_amount > PLUGIN_ENABLE_THRESHOLD, audioEngine)
-    }
+    override val audioUnits: List<AudioUnit> = emptyList()
 
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
