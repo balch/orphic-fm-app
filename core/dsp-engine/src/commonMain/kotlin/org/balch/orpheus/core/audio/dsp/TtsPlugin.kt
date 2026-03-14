@@ -14,19 +14,16 @@ import org.balch.orpheus.core.plugin.symbols.TTS_URI
 import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 
 /**
- * TTS Plugin — Wraps a TtsPlayerUnit and dedicated SpeechEffectsUnit
- * for routing synthesized speech through its own effects chain
- * (phaser → feedback delay → reverb) directly to stereo sum,
- * bypassing the main distortion/delay/reverb chain.
+ * TTS Plugin — Routes synthesized speech through C++ audio engine.
  *
- * Controls: PITCH, SPEED, VOLUME, REVERB, PHASER, FEEDBACK
+ * Pure state container — C++ handles all audio processing.
+ * Always uses native path via NativeDspBridge.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
 class TtsPlugin(
-    private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
+    private val audioEngine: AudioEngine
 ) : DspPlugin {
 
     override val info = PluginInfo(
@@ -38,12 +35,6 @@ class TtsPlugin(
     companion object {
         const val URI = TTS_URI
     }
-
-    internal val ttsPlayer = dspFactory.createTtsPlayerUnit()
-    internal val speechEffects = dspFactory.createSpeechEffectsUnit()
-
-    // In native mode, C++ handles TTS playback — skip JSyn unit calls
-    private val isNative = audioEngine is NativeDspBridge
 
     private var _rate = 0.5f
     private var _speed = 0.5f
@@ -59,11 +50,7 @@ class TtsPlugin(
                 min = 0.25f
                 max = 2f
                 get { _rate }
-                set {
-                    _rate = it
-                    if (isNative) audioEngine.setPort(URI, "rate", it)
-                    else ttsPlayer.setRate(it)
-                }
+                set { _rate = it }
             }
         }
 
@@ -79,11 +66,7 @@ class TtsPlugin(
             floatType {
                 default = 0.5f
                 get { _volume }
-                set {
-                    _volume = it
-                    if (isNative) audioEngine.setPort(URI, "volume", it * 7f)
-                    else ttsPlayer.setVolume(it * 7f)
-                }
+                set { _volume = it }
             }
         }
 
@@ -91,11 +74,7 @@ class TtsPlugin(
             floatType {
                 default = 0f
                 get { _reverb }
-                set {
-                    _reverb = it
-                    if (isNative) audioEngine.setPort(URI, "reverb", it)
-                    else speechEffects.setReverbAmount(it)
-                }
+                set { _reverb = it }
             }
         }
 
@@ -103,11 +82,7 @@ class TtsPlugin(
             floatType {
                 default = 0f
                 get { _phaser }
-                set {
-                    _phaser = it
-                    if (isNative) audioEngine.setPort(URI, "phaser", it)
-                    else speechEffects.setPhaserIntensity(it)
-                }
+                set { _phaser = it }
             }
         }
 
@@ -115,11 +90,7 @@ class TtsPlugin(
             floatType {
                 default = 0f
                 get { _feedback }
-                set {
-                    _feedback = it
-                    if (isNative) audioEngine.setPort(URI, "feedback", it)
-                    else speechEffects.setFeedbackAmount(it)
-                }
+                set { _feedback = it }
             }
         }
     }
@@ -131,26 +102,7 @@ class TtsPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = listOf(ttsPlayer, speechEffects)
-
-    override val inputs: Map<String, AudioInput> = emptyMap()
-
-    // Outputs come from speechEffects (after the effects chain)
-    override val outputs: Map<String, AudioOutput> = mapOf(
-        "output" to speechEffects.output,
-        "outputRight" to speechEffects.outputRight
-    )
-
-    override fun initialize() {
-        if (!isNative) {
-            ttsPlayer.setRate(_rate)
-            ttsPlayer.setVolume(_volume * 3f)
-
-            // Internal wiring: TTS player → speech effects chain
-            ttsPlayer.output.connect(speechEffects.inputLeft)
-            ttsPlayer.outputRight.connect(speechEffects.inputRight)
-        }
-    }
+    override val audioUnits: List<AudioUnit> = emptyList()
 
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
@@ -165,27 +117,20 @@ class TtsPlugin(
         return (80 + _speed * 220).toInt()
     }
 
-    // Direct access for SynthEngine
+    // Direct access for SynthEngine — always native path
     fun loadAudio(samples: FloatArray, sampleRate: Int) {
-        if (isNative) {
-            (audioEngine as NativeDspBridge).nativeLoadTtsAudio(samples, sampleRate)
-        } else {
-            ttsPlayer.loadAudio(samples, sampleRate)
-        }
+        (audioEngine as NativeDspBridge).nativeLoadTtsAudio(samples, sampleRate)
     }
 
     fun play() {
-        if (isNative) (audioEngine as NativeDspBridge).nativePlayTts()
-        else ttsPlayer.play()
+        (audioEngine as NativeDspBridge).nativePlayTts()
     }
 
     fun stopPlayback() {
-        if (isNative) (audioEngine as NativeDspBridge).nativeStopTts()
-        else ttsPlayer.stop()
+        (audioEngine as NativeDspBridge).nativeStopTts()
     }
 
     fun isPlaying(): Boolean {
-        return if (isNative) (audioEngine as NativeDspBridge).nativeIsTtsPlaying() != 0
-        else ttsPlayer.isPlaying()
+        return (audioEngine as NativeDspBridge).nativeIsTtsPlaying() != 0
     }
 }

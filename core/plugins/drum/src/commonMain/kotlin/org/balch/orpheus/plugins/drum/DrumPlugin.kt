@@ -6,12 +6,8 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.PlaitsUnit
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.PortValue
@@ -19,22 +15,19 @@ import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.core.plugin.symbols.DRUM_URI
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
-import org.balch.orpheus.plugins.plaits.PlaitsEngineFactory
 import org.balch.orpheus.plugins.plaits.PlaitsEngineId
 
 /**
  * DSP Plugin for drum synthesis with selectable Plaits engines per slot.
  *
- * Uses 3 independent [PlaitsUnit] instances (BD/SD/HH), each of which can
- * host any [PlaitsEngine]. Outputs are summed through a mixer to stereo gain stages.
+ * Pure state container — C++ handles all audio processing.
+ * Keeps `audioEngine` for `triggerDrum()` and `setPort()` forwarding.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
 class DrumPlugin(
-    private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory,
-    private val engineFactory: PlaitsEngineFactory
+    private val audioEngine: AudioEngine
 ) : DspPlugin {
 
     override val info = PluginInfo(
@@ -51,23 +44,7 @@ class DrumPlugin(
             PlaitsEngineId.ANALOG_SNARE_DRUM,
             PlaitsEngineId.METALLIC_HI_HAT
         )
-        /** Per-slot output gain for balanced mix */
-        private val SLOT_GAINS = floatArrayOf(1.2f, 0.6f, 0.5f)
     }
-
-    // 3 independent PlaitsUnit slots
-    private val slots: Array<PlaitsUnit> = Array(3) { dspFactory.createPlaitsUnit() }
-
-    // Mixer: slot outputs → add chain → gain
-    private val mixer01 = dspFactory.createAdd()   // BD + SD
-    private val mixer012 = dspFactory.createAdd()   // (BD+SD) + HH
-
-    // Per-slot gain multipliers
-    private val slotGains = Array(3) { dspFactory.createMultiply() }
-
-    // Stereo output gain for drums
-    private val drumGainLeft = dspFactory.createMultiply()
-    private val drumGainRight = dspFactory.createMultiply()
 
     // Internal state
     private var _mix = 0.7f
@@ -99,13 +76,7 @@ class DrumPlugin(
             floatType {
                 default = 0.7f
                 get { _mix }
-                set {
-                    _mix = it.coerceIn(0f, 1f)
-                    val baseGain = 3.2f
-                    val finalGain = baseGain * it
-                    drumGainLeft.inputB.set(finalGain.toDouble())
-                    drumGainRight.inputB.set(finalGain.toDouble())
-                }
+                set { _mix = it.coerceIn(0f, 1f) }
             }
         }
 
@@ -122,47 +93,47 @@ class DrumPlugin(
 
         // BD
         controlPort(DrumSymbol.BD_FREQ) {
-            floatType { get { frequencies[0] }; set { updateSlotParam(0, freq = it) } }
+            floatType { get { frequencies[0] }; set { frequencies[0] = it } }
         }
         controlPort(DrumSymbol.BD_TONE) {
-            floatType { get { tones[0] }; set { updateSlotParam(0, tone = it) } }
+            floatType { get { tones[0] }; set { tones[0] = it } }
         }
         controlPort(DrumSymbol.BD_DECAY) {
-            floatType { get { decays[0] }; set { updateSlotParam(0, decay = it) } }
+            floatType { get { decays[0] }; set { decays[0] = it } }
         }
         controlPort(DrumSymbol.BD_P4) {
-            floatType { get { p4s[0] }; set { updateSlotParam(0, p4 = it) } }
+            floatType { get { p4s[0] }; set { p4s[0] = it } }
         }
         controlPort(DrumSymbol.BD_P5) {
-            floatType { get { p5s[0] }; set { updateSlotParam(0, p5 = it) } }
+            floatType { get { p5s[0] }; set { p5s[0] = it } }
         }
 
         // SD
         controlPort(DrumSymbol.SD_FREQ) {
-            floatType { get { frequencies[1] }; set { updateSlotParam(1, freq = it) } }
+            floatType { get { frequencies[1] }; set { frequencies[1] = it } }
         }
         controlPort(DrumSymbol.SD_TONE) {
-            floatType { get { tones[1] }; set { updateSlotParam(1, tone = it) } }
+            floatType { get { tones[1] }; set { tones[1] = it } }
         }
         controlPort(DrumSymbol.SD_DECAY) {
-            floatType { get { decays[1] }; set { updateSlotParam(1, decay = it) } }
+            floatType { get { decays[1] }; set { decays[1] = it } }
         }
         controlPort(DrumSymbol.SD_P4) {
-            floatType { get { p4s[1] }; set { updateSlotParam(1, p4 = it) } }
+            floatType { get { p4s[1] }; set { p4s[1] = it } }
         }
 
         // HH
         controlPort(DrumSymbol.HH_FREQ) {
-            floatType { get { frequencies[2] }; set { updateSlotParam(2, freq = it) } }
+            floatType { get { frequencies[2] }; set { frequencies[2] = it } }
         }
         controlPort(DrumSymbol.HH_TONE) {
-            floatType { get { tones[2] }; set { updateSlotParam(2, tone = it) } }
+            floatType { get { tones[2] }; set { tones[2] = it } }
         }
         controlPort(DrumSymbol.HH_DECAY) {
-            floatType { get { decays[2] }; set { updateSlotParam(2, decay = it) } }
+            floatType { get { decays[2] }; set { decays[2] = it } }
         }
         controlPort(DrumSymbol.HH_P4) {
-            floatType { get { p4s[2] }; set { updateSlotParam(2, p4 = it) } }
+            floatType { get { p4s[2] }; set { p4s[2] = it } }
         }
 
         // Routing
@@ -224,53 +195,7 @@ class DrumPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = listOf(
-        slots[0], slots[1], slots[2],
-        slotGains[0], slotGains[1], slotGains[2],
-        mixer01, mixer012,
-        drumGainLeft, drumGainRight
-    )
-
-    override val outputs: Map<String, AudioOutput> = mapOf(
-        "outputLeft" to drumGainLeft.output,
-        "outputRight" to drumGainRight.output
-    )
-
-    override val inputs: Map<String, AudioInput> = mapOf(
-        "triggerBD" to slots[0].triggerInput,
-        "triggerSD" to slots[1].triggerInput,
-        "triggerHH" to slots[2].triggerInput
-    )
-
-    override fun initialize() {
-        // Install default engines
-        for (i in 0..2) {
-            val engine = engineFactory.create(DEFAULT_ENGINES[i])
-            slots[i].setEngine(engine)
-        }
-
-        // Wire: slot[i].output → slotGain[i].inputA, with static gain on inputB
-        for (i in 0..2) {
-            slots[i].output.connect(slotGains[i].inputA)
-            slotGains[i].inputB.set(SLOT_GAINS[i].toDouble())
-        }
-
-        // Mix: slotGain[0] + slotGain[1] → mixer01
-        slotGains[0].output.connect(mixer01.inputA)
-        slotGains[1].output.connect(mixer01.inputB)
-
-        // Mix: mixer01 + slotGain[2] → mixer012
-        mixer01.output.connect(mixer012.inputA)
-        slotGains[2].output.connect(mixer012.inputB)
-
-        // Stereo gain
-        mixer012.output.connect(drumGainLeft.inputA)
-        mixer012.output.connect(drumGainRight.inputA)
-
-        portDefs.setValue(DrumSymbol.MIX, PortValue.FloatValue(_mix))
-
-        audioUnits.forEach { audioEngine.addUnit(it) }
-    }
+    override val audioUnits: List<AudioUnit> = emptyList()
 
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
@@ -297,8 +222,6 @@ class DrumPlugin(
         decays[type] = decay
         p4s[type] = p4
         p5s[type] = p5
-        applyParamsToSlot(type)
-        slots[type].trigger(accent)
         forwardTriggerNative(type, accent, frequency, tone, decay, p4, p5)
     }
 
@@ -316,17 +239,14 @@ class DrumPlugin(
         decays[type] = decay
         p4s[type] = p4
         p5s[type] = p5
-        applyParamsToSlot(type)
     }
 
     fun trigger(type: Int, accent: Float) {
         if (type !in 0..2) return
-        applyParamsToSlot(type)
-        slots[type].trigger(accent)
         audioEngine.triggerDrum(type, accent)
     }
 
-    /** Forward drum routing gains (no-op on JSyn, forwards on native). */
+    /** Forward drum routing gains. */
     fun setRouting(chainGain: Float, directGain: Float) {
         audioEngine.setPort(URI, "drum_chain_gain_l", chainGain)
         audioEngine.setPort(URI, "drum_chain_gain_r", chainGain)
@@ -334,7 +254,7 @@ class DrumPlugin(
         audioEngine.setPort(URI, "drum_direct_gain_r", directGain)
     }
 
-    /** Forward drum direct-resonator wet/dry gains (no-op on JSyn, forwards on native). */
+    /** Forward drum direct-resonator wet/dry gains. */
     fun setDirectResonatorGains(wet: Float, dry: Float) {
         audioEngine.setPort(URI, "drum_direct_reso_wet_l", wet)
         audioEngine.setPort(URI, "drum_direct_reso_wet_r", wet)
@@ -372,49 +292,9 @@ class DrumPlugin(
 
     // --- Private helpers ---
 
-    private fun updateSlotParam(
-        slot: Int,
-        freq: Float = frequencies[slot],
-        tone: Float = tones[slot],
-        decay: Float = decays[slot],
-        p4: Float = p4s[slot],
-        p5: Float = p5s[slot]
-    ) {
-        frequencies[slot] = freq
-        tones[slot] = tone
-        decays[slot] = decay
-        p4s[slot] = p4
-        p5s[slot] = p5
-        applyParamsToSlot(slot)
-    }
-
-    private fun applyParamsToSlot(slot: Int) {
-        // Convert 0..1 frequency to MIDI note range appropriate for the slot's default range
-        val note = frequencyToNote(slot, frequencies[slot])
-        slots[slot].setNote(note)
-        slots[slot].setTimbre(tones[slot])
-        slots[slot].setMorph(decays[slot])
-        slots[slot].setHarmonics(p4s[slot])
-    }
-
-    private fun frequencyToNote(slot: Int, freq01: Float): Float {
-        // Map 0..1 to the MIDI note range appropriate for this drum slot
-        return when (slot) {
-            0 -> 28f + freq01 * 24f  // BD: ~55Hz-220Hz → MIDI 28-52
-            1 -> 48f + freq01 * 24f  // SD: ~130Hz-520Hz → MIDI 48-72
-            2 -> 60f + freq01 * 24f  // HH: ~260Hz-1040Hz → MIDI 60-84
-            else -> 60f
-        }
-    }
-
     private fun setSlotEngine(slot: Int, engineOrdinal: Int) {
         val entries = PlaitsEngineId.entries
         if (engineOrdinal !in entries.indices) return
         engineIds[slot] = engineOrdinal
-        val engineId = entries[engineOrdinal]
-        val engine = engineFactory.create(engineId)
-        slots[slot].setEngine(engine)
-        slots[slot].setPercussiveMode(!engine.alreadyEnveloped)
-        applyParamsToSlot(slot)
     }
 }

@@ -782,7 +782,7 @@ class DspSynthEngine(
     }
 
     // State Getters (Delegated)
-    override fun getPeak(): Float = pluginProvider.stereoPlugin.getPeak()
+    override fun getPeak(): Float = _peakFlow.value
     override fun getCpuLoad(): Float = audioEngine.getCpuLoad()
 
     override fun getVoiceTune(index: Int) = voiceManager.getVoiceTune(index)
