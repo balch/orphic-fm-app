@@ -44,6 +44,10 @@ public:
     void  getMonitor(OrpheusMonitorData* out);
     void  setAutomation(int target, int voiceIndex, const float* times, const float* values, int count);
     void  clearAutomation(int target, int voiceIndex);
+    void  loadTtsAudio(const float* samples, int count, int sampleRate);
+    void  playTts();
+    void  stopTts();
+    int   isTtsPlaying();
 
 private:
     OrpheusEngine* dsp_engine_ = nullptr;

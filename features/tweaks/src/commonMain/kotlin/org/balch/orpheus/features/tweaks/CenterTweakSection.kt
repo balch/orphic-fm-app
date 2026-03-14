@@ -3,6 +3,7 @@ package org.balch.orpheus.features.tweaks
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,7 +19,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
+import org.balch.orpheus.features.beats.BeatsUiState
+import org.balch.orpheus.features.beats.DrumBeatsFeature
+import org.balch.orpheus.features.beats.DrumBeatsViewModel
 import org.balch.orpheus.features.visualizations.preview.LiquidEffectsProvider
 import org.balch.orpheus.features.voice.VoicePanelActions
 import org.balch.orpheus.features.voice.VoiceUiState
@@ -35,10 +40,13 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 @Composable
 fun CenterControlSection(
     voiceFeature: SynthFeature<VoiceUiState, VoicePanelActions>,
+    beatsFeature: DrumBeatsFeature = DrumBeatsViewModel.feature(),
     modifier: Modifier = Modifier,
 ) {
     val voiceState by voiceFeature.stateFlow.collectAsState()
     val actions = voiceFeature.actions
+    val beatsState by beatsFeature.stateFlow.collectAsState()
+    val beatsActions = beatsFeature.actions
     val effects = LocalLiquidEffects.current
     val liquidState = LocalLiquidState.current
     val shape = RoundedCornerShape(8.dp)
@@ -56,44 +64,65 @@ fun CenterControlSection(
             .border(1.dp, Color.White.copy(alpha = 0.1f), shape)
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Spacer(modifier = Modifier.height(80.dp))
-        CrossModSelector(
-            isCrossQuad = voiceState.fmStructureCrossQuad,
-            onToggle = actions.setFmStructure
-        )
-        Spacer(modifier = Modifier.weight(.1f))
-        RotaryKnob(
-            value = voiceState.totalFeedback,
-            onValueChange = actions.setTotalFeedback,
-            label = "\u221E\u221E", // infinity",
-            labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = VoiceSymbol.TOTAL_FEEDBACK.controlId.key,
-            size = 32.dp,
-            progressColor = OrpheusColors.neonCyan
-        )
-        Spacer(modifier = Modifier.weight(.1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            RotaryKnob(
+                value = beatsState.bpm,
+                onValueChange = beatsActions.setBpm,
+                label = "BPM",
+                controlId = BeatsSymbol.BPM.controlId.key,
+                range = 60f..200f,
+                size = 32.dp,
+                progressColor = OrpheusColors.warmGlow,
+                valueFormatter = { "${it.toInt()}" }
+            )
+            RotaryKnob(
+                value = beatsState.mix,
+                onValueChange = beatsActions.setMix,
+                label = "DRUM",
+                controlId = "drum_mix",
+                size = 32.dp,
+                progressColor = OrpheusColors.warmGlow,
+            )
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            RotaryKnob(
+                value = voiceState.totalFeedback,
+                onValueChange = actions.setTotalFeedback,
+                label = "\u221E\u221E", // infinity",
+                labelStyle = MaterialTheme.typography.labelLarge,
+                controlId = VoiceSymbol.TOTAL_FEEDBACK.controlId.key,
+                size = 32.dp,
+                progressColor = OrpheusColors.neonCyan
+            )
+            RotaryKnob(
+                value = voiceState.voiceCoupling,
+                onValueChange = actions.setVoiceCoupling,
+                label = "\u2A1D",  // join
+                labelStyle = MaterialTheme.typography.labelLarge,
+                controlId = VoiceSymbol.COUPLING.controlId.key,
+                size = 32.dp,
+                progressColor = OrpheusColors.warmGlow
+            )
+        }
+
         RotaryKnob(
             value = voiceState.vibrato,
             onValueChange = actions.setVibrato,
             label = "\u2307",
             labelStyle = MaterialTheme.typography.labelLarge,
             controlId = VoiceSymbol.VIBRATO.controlId.key,
-            size = 32.dp,
+            size = 38.dp,
             progressColor = OrpheusColors.neonMagenta
         )
-        Spacer(modifier = Modifier.weight(.1f))
-        RotaryKnob(
-            value = voiceState.voiceCoupling,
-            onValueChange = actions.setVoiceCoupling,
-            label = "\u2A1D",  // join
-            labelStyle = MaterialTheme.typography.labelLarge,
-            controlId = VoiceSymbol.COUPLING.controlId.key,
-            size = 32.dp,
-            progressColor = OrpheusColors.warmGlow
+
+        CrossModSelector(
+            isCrossQuad = voiceState.fmStructureCrossQuad,
+            onToggle = actions.setFmStructure
         )
-        Spacer(modifier = Modifier.weight(.2f))
     }
 }
 
@@ -105,7 +134,9 @@ fun CenterControlPanelPreview(
 ) {
     LiquidPreviewContainerWithGradient(effects = effects) {
         CenterControlSection(
-            voiceFeature = VoiceViewModel.previewFeature()
+            voiceFeature = VoiceViewModel.previewFeature(),
+            beatsFeature = DrumBeatsViewModel.previewFeature(BeatsUiState()),
+
         )
     }
 }

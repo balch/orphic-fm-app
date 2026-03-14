@@ -326,6 +326,8 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val psb = perStringBender("psb")
     psb.out to master.inputA               // per-string audio → output
     psb.outRight to master.inputB
+    warp.out to master.inputA              // Warps direct to output
+    warp.outRight to master.inputB
     delay.out to master.inputA
     delay.outRight to master.inputB
     reverb.out to master.inputA

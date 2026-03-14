@@ -13,11 +13,13 @@ enum class HyperLfoMode {
  * Audio sources available for Warps carrier and modulator inputs.
  */
 enum class WarpsSource(val displayName: String) {
-    SYNTH("Synth"),
-    DRUMS("Drums"),
-    REPL("REPL"),
-    LFO("LFO"),
-    RESONATOR("Cowbell"),
-    WARPS("Feedback"),
-    FLUX("Warbles")
+    SYNTH("Synth"),       // 0
+    DRUMS("Drums"),       // 1
+    REPL("REPL"),         // 2
+    LFO("LFO"),           // 3
+    RESONATOR("Cowbell"), // 4
+    WARPS("Feedback"),    // 5
+    FLUX("Warbles"),      // 6
+    BENDER("Bender"),     // 7
+    STRINGS("Strings")    // 8
 }

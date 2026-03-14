@@ -182,3 +182,15 @@ void OboeEngine::setAutomation(int target, int voiceIndex, const float* times, c
 void OboeEngine::clearAutomation(int target, int voiceIndex) {
     if (dsp_engine_) orpheus_engine_clear_automation(dsp_engine_, target, voiceIndex);
 }
+void OboeEngine::loadTtsAudio(const float* samples, int count, int sampleRate) {
+    if (dsp_engine_) orpheus_engine_load_tts_audio(dsp_engine_, samples, count, sampleRate);
+}
+void OboeEngine::playTts() {
+    if (dsp_engine_) orpheus_engine_play_tts(dsp_engine_);
+}
+void OboeEngine::stopTts() {
+    if (dsp_engine_) orpheus_engine_stop_tts(dsp_engine_);
+}
+int OboeEngine::isTtsPlaying() {
+    return dsp_engine_ ? orpheus_engine_is_tts_playing(dsp_engine_) : 0;
+}

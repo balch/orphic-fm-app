@@ -122,3 +122,15 @@ void DesktopEngine::setAutomation(int target, int voiceIndex, const float* times
 void DesktopEngine::clearAutomation(int target, int voiceIndex) {
     if (dsp_engine_) orpheus_engine_clear_automation(dsp_engine_, target, voiceIndex);
 }
+void DesktopEngine::loadTtsAudio(const float* samples, int count, int sampleRate) {
+    if (dsp_engine_) orpheus_engine_load_tts_audio(dsp_engine_, samples, count, sampleRate);
+}
+void DesktopEngine::playTts() {
+    if (dsp_engine_) orpheus_engine_play_tts(dsp_engine_);
+}
+void DesktopEngine::stopTts() {
+    if (dsp_engine_) orpheus_engine_stop_tts(dsp_engine_);
+}
+int DesktopEngine::isTtsPlaying() {
+    return dsp_engine_ ? orpheus_engine_is_tts_playing(dsp_engine_) : 0;
+}

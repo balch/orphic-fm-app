@@ -189,4 +189,28 @@ JNI_FN(nativeClearAutomation)(JNIEnv *env, jobject thiz,
     sEngine.clearAutomation(target, voiceIndex);
 }
 
+JNIEXPORT void JNICALL
+JNI_FN(nativeLoadTtsAudio)(JNIEnv *env, jobject thiz,
+                            jfloatArray jsamples, jint sampleRate) {
+    jint count = env->GetArrayLength(jsamples);
+    jfloat* samples = env->GetFloatArrayElements(jsamples, nullptr);
+    sEngine.loadTtsAudio(samples, count, sampleRate);
+    env->ReleaseFloatArrayElements(jsamples, samples, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(nativePlayTts)(JNIEnv *env, jobject thiz) {
+    sEngine.playTts();
+}
+
+JNIEXPORT void JNICALL
+JNI_FN(nativeStopTts)(JNIEnv *env, jobject thiz) {
+    sEngine.stopTts();
+}
+
+JNIEXPORT jint JNICALL
+JNI_FN(nativeIsTtsPlaying)(JNIEnv *env, jobject thiz) {
+    return sEngine.isTtsPlaying();
+}
+
 } // extern "C"

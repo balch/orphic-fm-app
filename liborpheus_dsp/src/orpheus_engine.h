@@ -132,11 +132,12 @@ struct OrpheusEngine {
     std::atomic<float> warps_timbre{0.5f};
     std::atomic<float> warps_level1{0.5f};
     std::atomic<float> warps_level2{0.5f};
+    std::atomic<float> warps_mix{0.0f};          // dry/wet mix (0=dry, 1=wet)
     std::atomic<int>   warps_bypass{1};         // bypassed by default
 
     // ── Warps Source Routing ────────────────────────────
-    static constexpr int kNumWarpsSources = 7;
-    // 0=SYNTH, 1=DRUMS(grains), 2=REPL(v8-11), 3=LFO, 4=RESONATOR(aux), 5=WARPS(feedback), 6=FLUX
+    static constexpr int kNumWarpsSources = 9;
+    // 0=SYNTH, 1=DRUMS, 2=REPL, 3=LFO, 4=RESONATOR, 5=WARPS(feedback), 6=FLUX, 7=BENDER, 8=STRINGS
     float warps_source_buffers[kNumWarpsSources][kMaxFrames] = {};
     float warps_feedback_l[kMaxFrames] = {};
     float warps_feedback_r[kMaxFrames] = {};
@@ -411,6 +412,49 @@ struct OrpheusEngine {
     // Output arrays (read by unit_process_plaits)
     float voice_bend_cv[kNumMainVoices] = {};          // pitch bend Hz offset per voice (matches JSyn benderDepth=100Hz)
     float voice_mix_cv[kNumMainVoices] = {};            // voice volume multiplier per voice (default 1.0)
+
+    // ── TTS Sample Player ────────────────────────────
+    // Kotlin loads TTS-generated audio, C++ plays it back with variable rate.
+    static constexpr int kMaxTtsSamples = 48000 * 60;  // 60 seconds at 48kHz
+    float* tts_buffer{nullptr};                    // heap allocated on first load
+    std::atomic<int> tts_buffer_length{0};         // loaded sample count (release/acquire gate)
+    std::atomic<int> tts_source_rate{48000};       // source sample rate
+    double tts_position{0.0};           // fractional read position (audio thread)
+    std::atomic<float> tts_rate{1.0f};  // playback rate multiplier
+    std::atomic<float> tts_volume{3.5f}; // playback volume (Kotlin 0.5 * 7)
+    std::atomic<int>   tts_playing{0};  // 0=stopped, 1=playing
+    std::atomic<int>   tts_trigger{0};  // 1=start from beginning
+
+    // TTS speech effects (phaser → feedback delay → Schroeder reverb)
+    std::atomic<float> tts_phaser{0.0f};
+    std::atomic<float> tts_feedback{0.0f};
+    std::atomic<float> tts_reverb{0.0f};
+
+    // Phaser state (6-stage all-pass)
+    static constexpr int kTtsPhaserStages = 6;
+    float tts_phaser_buf[kTtsPhaserStages] = {};
+    double tts_phaser_lfo_phase{0.0};
+
+    // Feedback delay (~375ms circular buffer — longer for dramatic effect)
+    static constexpr int kTtsDelayMaxSamples = 48000 / 2; // 500ms max at 48kHz
+    float* tts_delay_buffer{nullptr};  // heap allocated in create()
+    int   tts_delay_len{0};            // actual delay length (sample-rate adjusted)
+    int   tts_delay_write_pos{0};
+    float tts_delay_fb_sample{0.0f};
+
+    // Schroeder reverb (4 comb + 2 all-pass, sample-rate scaled)
+    // Reference lengths at 44100Hz — scaled to actual sample rate in create()
+    static constexpr float kTtsCombRef[4] = {1116.0f/44100, 1188.0f/44100, 1277.0f/44100, 1356.0f/44100};
+    static constexpr float kTtsApRef[2] = {225.0f/44100, 556.0f/44100};
+    static constexpr int kTtsCombMaxLen = 3000;  // safe up to 96kHz
+    static constexpr int kTtsApMaxLen = 1300;   // safe up to 96kHz
+    float tts_comb_bufs[4][kTtsCombMaxLen] = {};
+    int   tts_comb_len[4] = {};
+    int   tts_comb_pos[4] = {};
+    float tts_ap_bufs[2][kTtsApMaxLen] = {};
+    int   tts_ap_len[2] = {};
+    int   tts_ap_pos[2] = {};
+    float tts_reverb_lp{0.0f};
 
     // ── Automation Player ────────────────────────────
     // Sample-accurate automation: Kotlin sends time/value paths via JNI,

@@ -904,18 +904,18 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
     }
 
-    // Populate warps source buffers
-    if (idx < kDrumVoiceStart) {
-        // SYNTH (source 0): accumulate main voices (0-11)
+    // Populate warps source buffers (normalized by voice count to prevent saturation)
+    // Main voices (0-7) → SYNTH (source 0), REPL voices (8-11) → REPL (source 2)
+    // Drum voices (12-14) are handled by unit_process_drum_sum → source 1
+    if (idx < 8) {
+        constexpr float kSynthNorm = 1.0f / 8.0f;
         for (int i = 0; i < num_frames; i++) {
-            engine->warps_source_buffers[0][i] += out[i] * (1.0f / kNumMainVoices);
+            engine->warps_source_buffers[0][i] += out[i] * kSynthNorm;
         }
-    }
-    if (idx >= kDrumVoiceStart) {
-        // DRUMS (source 2): accumulate drum voices (12-14)
-        // drum_mix gain already applied to out[] above
+    } else if (idx >= 8 && idx < kDrumVoiceStart) {
+        constexpr float kReplNorm = 1.0f / 4.0f;
         for (int i = 0; i < num_frames; i++) {
-            engine->warps_source_buffers[2][i] += out[i] * (1.0f / kNumDrumVoices);
+            engine->warps_source_buffers[2][i] += out[i] * kReplNorm;
         }
     }
 }
@@ -1074,11 +1074,9 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
 
     if (engine->warps_bypass.load(std::memory_order_relaxed)) {
-        // When bypassed with source routing, pass through graph port inputs
-        float* fallback_l = u->inputs[IPORT_INPUT_A].buffer;
-        float* fallback_r = u->inputs[IPORT_INPUT_B].buffer;
-        std::memcpy(out_l, fallback_l, num_frames * sizeof(float));
-        std::memcpy(out_r, fallback_r, num_frames * sizeof(float));
+        // Warps is a parallel processor — when bypassed, output silence
+        std::memset(out_l, 0, num_frames * sizeof(float));
+        std::memset(out_r, 0, num_frames * sizeof(float));
         return;
     }
 
@@ -1105,11 +1103,16 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     float* in_l = carrier_buf;
     float* in_r = mod_buf;
 
+    float drive1 = engine->warps_level1.load(std::memory_order_relaxed);
+    float drive2 = engine->warps_level2.load(std::memory_order_relaxed);
+
     auto* wp = engine->warps_modulator.mutable_parameters();
-    wp->modulation_algorithm = engine->warps_algorithm.load(std::memory_order_relaxed);
+    // UI sends 0-8 (SegmentedAlgoKnob range), MI Warps expects 0-1 (internally * 8)
+    wp->modulation_algorithm = engine->warps_algorithm.load(std::memory_order_relaxed) / 8.0f;
     wp->modulation_parameter = engine->warps_timbre.load(std::memory_order_relaxed);
-    wp->channel_drive[0] = engine->warps_level1.load(std::memory_order_relaxed);
-    wp->channel_drive[1] = engine->warps_level2.load(std::memory_order_relaxed);
+    // Drive applied as pre-gain below; MI internal drive set to neutral
+    wp->channel_drive[0] = 0.5f;
+    wp->channel_drive[1] = 0.5f;
     wp->carrier_shape = 0;
 
     int frames_done = 0;
@@ -1121,8 +1124,12 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         warps::ShortFrame out_frames[warps::kMaxBlockSize];
 
         for (int i = 0; i < block; i++) {
-            float l = std::max(-1.0f, std::min(1.0f, in_l[frames_done + i]));
-            float r = std::max(-1.0f, std::min(1.0f, in_r[frames_done + i]));
+            // Apply drive as pre-gain, then soft-clip to avoid int16 hard clipping
+            float l = in_l[frames_done + i] * drive1;
+            float r = in_r[frames_done + i] * drive2;
+            // Soft clip: tanh-style saturation keeps signal musical
+            l = l / (1.0f + std::fabs(l));
+            r = r / (1.0f + std::fabs(r));
             in_frames[i].l = static_cast<short>(l * 32767.0f);
             in_frames[i].r = static_cast<short>(r * 32767.0f);
         }
@@ -1136,6 +1143,15 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         }
 
         frames_done += block;
+    }
+
+    // Mix controls wet output level (dry signal already in master from normal voice path)
+    float mix = engine->warps_mix.load(std::memory_order_relaxed);
+    if (mix < 1.0f) {
+        for (int i = 0; i < num_frames; i++) {
+            out_l[i] *= mix;
+            out_r[i] *= mix;
+        }
     }
 
     // Store output as feedback source (source 5)
@@ -1420,6 +1436,9 @@ void unit_process_bender(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         out_audio[i] = tension + spring;
     }
+
+    // Populate Warps source buffer 7 (BENDER audio)
+    std::memcpy(engine->warps_source_buffers[7], out_audio, num_frames * sizeof(float));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1558,6 +1577,11 @@ void unit_process_per_string_bender(GraphUnit* u, OrpheusEngine* engine, int num
         for (int v = 0; v < kNumMainVoices; v++) {
             engine->voice_bend_cv[v] += slide_hz;
         }
+    }
+
+    // Populate Warps source buffer 8 (STRINGS audio, mono mix)
+    for (int i = 0; i < num_frames; i++) {
+        engine->warps_source_buffers[8][i] = (out_l[i] + out_r[i]) * 0.5f;
     }
 }
 

@@ -673,9 +673,17 @@ class DspSynthEngine(
     override fun setLooperRecord(recording: Boolean) = pluginProvider.looperPlugin.setRecording(recording)
     override fun setLooperPlay(playing: Boolean) = pluginProvider.looperPlugin.setPlaying(playing)
     override fun setLooperOverdub(overdub: Boolean) {}
+    override fun setLooperQuantize(enabled: Boolean) =
+        pluginProvider.looperPlugin.setQuantize(enabled)
+    override fun setLooperLevel(level: Float) =
+        pluginProvider.looperPlugin.setLevel(level)
     override fun clearLooper() = pluginProvider.looperPlugin.clear()
-    override fun getLooperPosition(): Float = pluginProvider.looperPlugin.getPosition()
-    override fun getLooperDuration(): Double = pluginProvider.looperPlugin.getLoopDuration()
+    override fun getLooperPosition(): Float =
+        if (nativeBridge != null) audioEngine.getPort(LOOPER_URI, "position")
+        else pluginProvider.looperPlugin.getPosition()
+    override fun getLooperDuration(): Double =
+        if (nativeBridge != null) audioEngine.getPort(LOOPER_URI, "duration").toDouble()
+        else pluginProvider.looperPlugin.getLoopDuration()
 
     // HyperLFO delegations (DuoLFO)
     override fun setHyperLfoFreq(index: Int, frequency: Float) {
@@ -1174,22 +1182,30 @@ class DspSynthEngine(
 
     private fun setWarpsCarrierSource(source: Int) {
         _warpsCarrierSource = source
-        pluginProvider.warpsPlugin.disconnectCarrier()
-        pluginProvider.warpsPlugin.setCarrierSource(source)
-        getWarpsSourceOutput(source)?.first?.connect(pluginProvider.warpsPlugin.carrierRouteInput)
-        pluginProvider.warpsPlugin.disconnectDry()
-        getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(pluginProvider.warpsPlugin.dryInputLeft)
-        getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(pluginProvider.warpsPlugin.dryInputRight)
+        if (nativeBridge != null) {
+            audioEngine.setPort(WarpsSymbol.CARRIER_SOURCE.uri, "carrier_source", source.toFloat())
+        } else {
+            pluginProvider.warpsPlugin.disconnectCarrier()
+            pluginProvider.warpsPlugin.setCarrierSource(source)
+            getWarpsSourceOutput(source)?.first?.connect(pluginProvider.warpsPlugin.carrierRouteInput)
+            pluginProvider.warpsPlugin.disconnectDry()
+            getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(pluginProvider.warpsPlugin.dryInputLeft)
+            getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(pluginProvider.warpsPlugin.dryInputRight)
+        }
     }
 
     private fun setWarpsModulatorSource(source: Int) {
         _warpsModulatorSource = source
-        pluginProvider.warpsPlugin.disconnectModulator()
-        pluginProvider.warpsPlugin.setModulatorSource(source)
-        getWarpsSourceOutput(source)?.second?.connect(pluginProvider.warpsPlugin.modulatorRouteInput)
-        pluginProvider.warpsPlugin.disconnectDry()
-        getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(pluginProvider.warpsPlugin.dryInputLeft)
-        getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(pluginProvider.warpsPlugin.dryInputRight)
+        if (nativeBridge != null) {
+            audioEngine.setPort(WarpsSymbol.MODULATOR_SOURCE.uri, "modulator_source", source.toFloat())
+        } else {
+            pluginProvider.warpsPlugin.disconnectModulator()
+            pluginProvider.warpsPlugin.setModulatorSource(source)
+            getWarpsSourceOutput(source)?.second?.connect(pluginProvider.warpsPlugin.modulatorRouteInput)
+            pluginProvider.warpsPlugin.disconnectDry()
+            getWarpsSourceOutput(_warpsCarrierSource)?.first?.connect(pluginProvider.warpsPlugin.dryInputLeft)
+            getWarpsSourceOutput(_warpsModulatorSource)?.second?.connect(pluginProvider.warpsPlugin.dryInputRight)
+        }
     }
 
     private fun getWarpsSourceOutput(source: Int): Pair<AudioOutput, AudioOutput>? {
@@ -1201,6 +1217,8 @@ class DspSynthEngine(
             4 -> pluginProvider.resonatorPlugin.outputs["outputLeft"]?.let { l -> pluginProvider.resonatorPlugin.outputs["outputRight"]?.let { r -> Pair(l, r) } }
             5 -> pluginProvider.warpsPlugin.outputs["output"]?.let { l -> pluginProvider.warpsPlugin.outputs["outputRight"]?.let { r -> Pair(l, r) } }
             6 -> pluginProvider.fluxPlugin.outputs["outputX1"]?.let { l -> pluginProvider.fluxPlugin.outputs["outputX3"]?.let { r -> Pair(l, r) } }
+            7 -> pluginProvider.benderPlugin.outputs["audioOutput"]?.let { Pair(it, it) }
+            8 -> pluginProvider.perStringBenderPlugin.outputs["audioOutput"]?.let { Pair(it, it) }
             else -> null
         }
     }
@@ -1223,6 +1241,7 @@ class DspSynthEngine(
 
     companion object {
         private const val MONITOR_POLL_INTERVAL_MS = 200L
+        private const val LOOPER_URI = "org.balch.orpheus.plugins.looper"
         /** VoicePlugin engineOrdinal for SPEECH (PlaitsEngineId.SPEECH.ordinal + 1). */
         private const val SPEECH_ENGINE_ORDINAL = 17
 

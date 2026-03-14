@@ -3,7 +3,6 @@ package org.balch.orpheus.features.looper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -19,9 +18,10 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
 
 @Immutable
@@ -29,20 +29,26 @@ data class LooperUiState(
     val isRecording: Boolean = false,
     val isPlaying: Boolean = false,
     val position: Float = 0f,
-    val loopDuration: Double = 0.0
+    val loopDuration: Double = 0.0,
+    val quantize: Boolean = false,
+    val level: Float = 0.7f
 )
 
 @Immutable
 data class LooperActions(
     val setRecord: (Boolean) -> Unit,
     val setPlay: (Boolean) -> Unit,
-    val clear: () -> Unit
+    val clear: () -> Unit,
+    val setQuantize: (Boolean) -> Unit,
+    val setLevel: (Float) -> Unit
 ) {
     companion object {
         val EMPTY = LooperActions(
             setRecord = {},
             setPlay = {},
-            clear = {}
+            clear = {},
+            setQuantize = {},
+            setLevel = {}
         )
     }
 }
@@ -51,6 +57,8 @@ private sealed interface LooperIntent {
     data class Record(val recording: Boolean) : LooperIntent
     data class Play(val playing: Boolean) : LooperIntent
     object Clear : LooperIntent
+    data class Quantize(val enabled: Boolean) : LooperIntent
+    data class Level(val value: Float) : LooperIntent
     object Tick : LooperIntent
     data class UpdateProgress(val position: Float, val duration: Double) : LooperIntent
 }
@@ -78,7 +86,9 @@ class LooperViewModel(
     override val actions = LooperActions(
         setRecord = ::setRecording,
         setPlay = ::setPlaying,
-        clear = ::clearLoop
+        clear = ::clearLoop,
+        setQuantize = ::setQuantize,
+        setLevel = ::setLevel
     )
 
     private val heartbeat = flow {
@@ -119,7 +129,9 @@ class LooperViewModel(
                 state.copy(isPlaying = intent.playing)
             }
         }
-        is LooperIntent.Clear -> LooperUiState()
+        is LooperIntent.Clear -> LooperUiState(quantize = state.quantize, level = state.level)
+        is LooperIntent.Quantize -> state.copy(quantize = intent.enabled)
+        is LooperIntent.Level -> state.copy(level = intent.value)
         is LooperIntent.Tick -> {
             if (state.isPlaying || state.isRecording) {
                 state.copy(position = synth.getLooperPosition(), loopDuration = synth.getLooperDuration())
@@ -153,6 +165,13 @@ class LooperViewModel(
                 log.debug { "clearLoop" }
                 synth.clearLooper()
             }
+            is LooperIntent.Quantize -> {
+                log.debug { "setQuantize: ${intent.enabled}" }
+                synth.setLooperQuantize(intent.enabled)
+            }
+            is LooperIntent.Level -> {
+                synth.setLooperLevel(intent.value)
+            }
             is LooperIntent.Tick -> {}
             is LooperIntent.UpdateProgress -> {}
         }
@@ -168,6 +187,14 @@ class LooperViewModel(
 
     private fun clearLoop() {
         _userIntents.tryEmit(LooperIntent.Clear)
+    }
+
+    private fun setQuantize(enabled: Boolean) {
+        _userIntents.tryEmit(LooperIntent.Quantize(enabled))
+    }
+
+    private fun setLevel(value: Float) {
+        _userIntents.tryEmit(LooperIntent.Level(value))
     }
 
     companion object {

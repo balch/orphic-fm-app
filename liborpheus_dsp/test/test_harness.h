@@ -477,6 +477,7 @@ bool run_drums_graph_tests();
 bool run_lfo_tests();
 bool run_control_routing_tests();
 bool run_headroom_tests();
+bool run_warps_tests();
 bool run_chain_compare_tests();
 bool run_fm_compare_tests();
 bool run_benchmark_tests();

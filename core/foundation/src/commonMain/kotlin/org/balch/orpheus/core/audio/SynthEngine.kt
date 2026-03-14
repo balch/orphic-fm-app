@@ -222,6 +222,8 @@ interface SynthEngine {
     fun setLooperRecord(recording: Boolean)
     fun setLooperPlay(playing: Boolean)
     fun setLooperOverdub(overdub: Boolean) // Optionally later
+    fun setLooperQuantize(enabled: Boolean)
+    fun setLooperLevel(level: Float)
     fun clearLooper()
     fun getLooperPosition(): Float
     fun getLooperDuration(): Double

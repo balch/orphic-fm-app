@@ -211,4 +211,32 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeClearAutomation(
     sEngine.clearAutomation(target, voiceIndex);
 }
 
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeLoadTtsAudio(
+        JNIEnv *env, jobject thiz,
+        jfloatArray jsamples, jint sampleRate) {
+    jint count = env->GetArrayLength(jsamples);
+    jfloat* samples = env->GetFloatArrayElements(jsamples, nullptr);
+    sEngine.loadTtsAudio(samples, count, sampleRate);
+    env->ReleaseFloatArrayElements(jsamples, samples, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativePlayTts(
+        JNIEnv *env, jobject thiz) {
+    sEngine.playTts();
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeStopTts(
+        JNIEnv *env, jobject thiz) {
+    sEngine.stopTts();
+}
+
+JNIEXPORT jint JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeIsTtsPlaying(
+        JNIEnv *env, jobject thiz) {
+    return sEngine.isTtsPlaying();
+}
+
 } // extern "C"

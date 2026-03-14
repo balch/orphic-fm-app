@@ -40,12 +40,13 @@ class JvmTtsGenerator(
                     return@withContext emptyList()
                 }
                 // Each line: "VoiceName     language  # description"
-                val voices = output.lines()
+                val allVoices = output.lines()
                     .filter { it.isNotBlank() }
                     .mapNotNull { line ->
                         line.trim().split("\\s+".toRegex()).firstOrNull()
                     }
                     .distinct()
+                val voices = curateVoices(allVoices)
                 cachedVoices = voices
                 log.d { "Found ${voices.size} TTS voices" }
                 voices
@@ -54,6 +55,45 @@ class JvmTtsGenerator(
                 emptyList()
             }
         }
+    }
+
+    companion object {
+        private const val MAX_VOICES = 10
+
+        // Preferred voices ranked by dramatic/interesting quality.
+        // These tend to have distinctive character for speech synthesis music.
+        private val PREFERRED_VOICES = listOf(
+            "Daniel",       // deep British male — closest to "One of These Days"
+            "Tom",          // deep American male
+            "Alex",         // natural American male
+            "Fred",         // classic robotic
+            "Whisper",      // breathy
+            "Zarvox",       // alien/robotic
+            "Trinoids",     // sci-fi harmonic
+            "Bad News",     // ominous
+            "Good News",    // bright contrast
+            "Cellos",       // musical
+            "Organ",        // organ-like
+            "Boing",        // percussive
+            "Albert",       // old-style
+            "Ralph",        // nasal character
+            "Samantha",     // clear female
+            "Karen",        // Australian female
+            "Moira",        // Irish female
+            "Tessa",        // South African female
+        )
+    }
+
+    private fun curateVoices(allVoices: List<String>): List<String> {
+        if (allVoices.size <= MAX_VOICES) return allVoices
+
+        // Pick preferred voices that exist on this system, in rank order
+        val preferred = PREFERRED_VOICES.filter { it in allVoices }.take(MAX_VOICES)
+        if (preferred.size >= MAX_VOICES) return preferred
+
+        // Fill remaining slots with alphabetically sorted voices not already selected
+        val remaining = allVoices.filter { it !in preferred }.sorted()
+        return preferred + remaining.take(MAX_VOICES - preferred.size)
     }
 
     override suspend fun generate(text: String, voice: String?, speakingRate: Int?): TtsAudioResult? {

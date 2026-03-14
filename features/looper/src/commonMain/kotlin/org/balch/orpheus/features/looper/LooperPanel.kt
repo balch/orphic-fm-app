@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
@@ -44,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.compositeOver
+import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -152,6 +154,27 @@ fun LooperPanel(
                 active = false,
                 activeColor = OrpheusColors.looperBurnt,
                 onClick = { actions.clear() },
+            )
+
+            // Quantize Toggle — snap record/play transitions to beat boundaries
+            LooperActionButton(
+                icon = Icons.Default.Lock,
+                label = "SNAP",
+                active = state.quantize,
+                activeColor = LooperColor,
+                onClick = { actions.setQuantize(!state.quantize) },
+            )
+
+            // Level knob (0–1 UI, scaled 2x to C++ for headroom)
+            RotaryKnob(
+                value = state.level,
+                onValueChange = { actions.setLevel(it) },
+                label = "LEVEL",
+                size = 38.dp,
+                trackColor = OrpheusColors.looperCoal,
+                progressColor = LooperColor,
+                knobColor = OrpheusColors.looperAsh,
+                indicatorColor = LooperColor,
             )
         }
     }

@@ -178,6 +178,8 @@ open class TestSynthEngine : SynthEngine {
     override fun setLooperRecord(recording: Boolean) {}
     override fun setLooperPlay(playing: Boolean) {}
     override fun setLooperOverdub(overdub: Boolean) {}
+    override fun setLooperQuantize(enabled: Boolean) {}
+    override fun setLooperLevel(level: Float) {}
     override fun clearLooper() {}
     override fun getLooperPosition(): Float = 0f
     override fun getLooperDuration(): Double = 0.0

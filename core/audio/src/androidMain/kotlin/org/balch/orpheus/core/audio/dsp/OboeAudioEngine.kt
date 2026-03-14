@@ -105,6 +105,11 @@ class OboeAudioEngine() : AudioEngine, NativeDspBridge {
         bridge.nativeSetAutomation(target, voiceIndex, times, values, count)
     override fun nativeClearAutomation(target: Int, voiceIndex: Int) =
         bridge.nativeClearAutomation(target, voiceIndex)
+    override fun nativeLoadTtsAudio(samples: FloatArray, sampleRate: Int) =
+        bridge.nativeLoadTtsAudio(samples, sampleRate)
+    override fun nativePlayTts() = bridge.nativePlayTts()
+    override fun nativeStopTts() = bridge.nativeStopTts()
+    override fun nativeIsTtsPlaying(): Int = bridge.nativeIsTtsPlaying()
 
     companion object {
         private val log = logging("OboeAudioEngine")

@@ -48,4 +48,8 @@ class OboeAudioBridge {
     external fun nativeLoadGraph(serialized: ByteArray): Int
     external fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int)
     external fun nativeClearAutomation(target: Int, voiceIndex: Int)
+    external fun nativeLoadTtsAudio(samples: FloatArray, sampleRate: Int)
+    external fun nativePlayTts()
+    external fun nativeStopTts()
+    external fun nativeIsTtsPlaying(): Int
 }

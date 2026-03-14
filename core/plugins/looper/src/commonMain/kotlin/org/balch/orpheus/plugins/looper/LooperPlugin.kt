@@ -11,6 +11,7 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.dsp.NativeDspBridge
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.ports
@@ -40,10 +41,6 @@ class LooperPlugin(
         name = "Looper",
         author = "Balch"
     )
-
-    companion object {
-        const val URI = "org.balch.orpheus.plugins.looper"
-    }
 
     private val audioPorts = ports {
         audioPort { index = 0; symbol = "in_l"; name = "Input Left"; isInput = true }
@@ -81,21 +78,59 @@ class LooperPlugin(
 
     override fun initialize() {
         looper.allocate(60.0)
-        
+
         inputLeftProxy.output.connect(looper.inputLeft)
         inputRightProxy.output.connect(looper.inputRight)
-        
+
         audioUnits.forEach { audioEngine.addUnit(it) }
+        audioEngine.setPort(URI, "level", DEFAULT_LEVEL * LEVEL_SCALE)
+    }
+
+    companion object {
+        const val URI = "org.balch.orpheus.plugins.looper"
+        const val DEFAULT_LEVEL = 0.7f
+        private const val LEVEL_SCALE = 2f
     }
     
     override fun onStart() {}
     override fun connectPort(index: Int, data: Any) {}
     override fun run(nFrames: Int) {}
     
-    fun allocate(seconds: Double) { looper.allocate(seconds) }
-    fun clear() { looper.clear() }
-    fun setRecording(active: Boolean) { looper.setRecording(active) }
-    fun setPlaying(active: Boolean) { looper.setPlaying(active) }
+    // In native mode, C++ handles all audio — skip Kotlin looper unit calls
+    // (JsynLooperUnit crashes without a running JSyn synthesisEngine).
+    private val isNative = audioEngine is NativeDspBridge
+
+    fun allocate(seconds: Double) { if (!isNative) looper.allocate(seconds) }
+
+    fun clear() {
+        if (!isNative) looper.clear()
+        audioEngine.setPort(URI, "state", 0f)
+    }
+
+    fun setRecording(active: Boolean) {
+        if (isNative) {
+            audioEngine.setPort(URI, "state", if (active) 1f else 2f)
+        } else {
+            looper.setRecording(active)
+        }
+    }
+
+    fun setPlaying(active: Boolean) {
+        if (isNative) {
+            audioEngine.setPort(URI, "state", if (active) 2f else 0f)
+        } else {
+            looper.setPlaying(active)
+        }
+    }
+
+    fun setQuantize(enabled: Boolean) {
+        audioEngine.setPort(URI, "quantize", if (enabled) 1f else 0f)
+    }
+
+    fun setLevel(level: Float) {
+        audioEngine.setPort(URI, "level", level * LEVEL_SCALE)
+    }
+
     fun getLoopDuration(): Double = looper.getLoopDuration()
     fun getPosition(): Float = looper.getPosition()
 }

@@ -25,6 +25,7 @@ import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
 class TtsPlugin(
+    private val audioEngine: AudioEngine,
     private val dspFactory: DspFactory
 ) : DspPlugin {
 
@@ -41,6 +42,9 @@ class TtsPlugin(
     internal val ttsPlayer = dspFactory.createTtsPlayerUnit()
     internal val speechEffects = dspFactory.createSpeechEffectsUnit()
 
+    // In native mode, C++ handles TTS playback — skip JSyn unit calls
+    private val isNative = audioEngine is NativeDspBridge
+
     private var _rate = 0.5f
     private var _speed = 0.5f
     private var _volume = 0.5f
@@ -55,7 +59,11 @@ class TtsPlugin(
                 min = 0.25f
                 max = 2f
                 get { _rate }
-                set { _rate = it; ttsPlayer.setRate(it) }
+                set {
+                    _rate = it
+                    if (isNative) audioEngine.setPort(URI, "rate", it)
+                    else ttsPlayer.setRate(it)
+                }
             }
         }
 
@@ -71,7 +79,11 @@ class TtsPlugin(
             floatType {
                 default = 0.5f
                 get { _volume }
-                set { _volume = it; ttsPlayer.setVolume(it * 7f) }
+                set {
+                    _volume = it
+                    if (isNative) audioEngine.setPort(URI, "volume", it * 7f)
+                    else ttsPlayer.setVolume(it * 7f)
+                }
             }
         }
 
@@ -79,7 +91,11 @@ class TtsPlugin(
             floatType {
                 default = 0f
                 get { _reverb }
-                set { _reverb = it; speechEffects.setReverbAmount(it) }
+                set {
+                    _reverb = it
+                    if (isNative) audioEngine.setPort(URI, "reverb", it)
+                    else speechEffects.setReverbAmount(it)
+                }
             }
         }
 
@@ -87,7 +103,11 @@ class TtsPlugin(
             floatType {
                 default = 0f
                 get { _phaser }
-                set { _phaser = it; speechEffects.setPhaserIntensity(it) }
+                set {
+                    _phaser = it
+                    if (isNative) audioEngine.setPort(URI, "phaser", it)
+                    else speechEffects.setPhaserIntensity(it)
+                }
             }
         }
 
@@ -95,7 +115,11 @@ class TtsPlugin(
             floatType {
                 default = 0f
                 get { _feedback }
-                set { _feedback = it; speechEffects.setFeedbackAmount(it) }
+                set {
+                    _feedback = it
+                    if (isNative) audioEngine.setPort(URI, "feedback", it)
+                    else speechEffects.setFeedbackAmount(it)
+                }
             }
         }
     }
@@ -118,12 +142,14 @@ class TtsPlugin(
     )
 
     override fun initialize() {
-        ttsPlayer.setRate(_rate)
-        ttsPlayer.setVolume(_volume * 3f)
+        if (!isNative) {
+            ttsPlayer.setRate(_rate)
+            ttsPlayer.setVolume(_volume * 3f)
 
-        // Internal wiring: TTS player → speech effects chain
-        ttsPlayer.output.connect(speechEffects.inputLeft)
-        ttsPlayer.outputRight.connect(speechEffects.inputRight)
+            // Internal wiring: TTS player → speech effects chain
+            ttsPlayer.output.connect(speechEffects.inputLeft)
+            ttsPlayer.outputRight.connect(speechEffects.inputRight)
+        }
     }
 
     override fun onStart() {}
@@ -140,8 +166,26 @@ class TtsPlugin(
     }
 
     // Direct access for SynthEngine
-    fun loadAudio(samples: FloatArray, sampleRate: Int) = ttsPlayer.loadAudio(samples, sampleRate)
-    fun play() = ttsPlayer.play()
-    fun stopPlayback() = ttsPlayer.stop()
-    fun isPlaying(): Boolean = ttsPlayer.isPlaying()
+    fun loadAudio(samples: FloatArray, sampleRate: Int) {
+        if (isNative) {
+            (audioEngine as NativeDspBridge).nativeLoadTtsAudio(samples, sampleRate)
+        } else {
+            ttsPlayer.loadAudio(samples, sampleRate)
+        }
+    }
+
+    fun play() {
+        if (isNative) (audioEngine as NativeDspBridge).nativePlayTts()
+        else ttsPlayer.play()
+    }
+
+    fun stopPlayback() {
+        if (isNative) (audioEngine as NativeDspBridge).nativeStopTts()
+        else ttsPlayer.stop()
+    }
+
+    fun isPlaying(): Boolean {
+        return if (isNative) (audioEngine as NativeDspBridge).nativeIsTtsPlaying() != 0
+        else ttsPlayer.isPlaying()
+    }
 }

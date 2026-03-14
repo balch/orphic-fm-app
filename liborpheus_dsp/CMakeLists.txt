@@ -134,6 +134,7 @@ if(BUILD_TESTS)
         test/test_control_routing.cpp
         test/test_snapshots.cpp
         test/test_headroom.cpp
+        test/test_warps.cpp
         test/test_chain_compare.cpp
         test/test_fm_compare.cpp
         test/test_benchmark.cpp

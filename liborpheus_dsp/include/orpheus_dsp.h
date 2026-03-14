@@ -94,6 +94,14 @@ void orpheus_engine_set_automation(OrpheusEngine* engine,
 void orpheus_engine_clear_automation(OrpheusEngine* engine,
                                       int target, int voice_index);
 
+// ── TTS sample playback ─────────────────────────
+void orpheus_engine_load_tts_audio(OrpheusEngine* engine,
+                                    const float* samples, int count,
+                                    int sample_rate);
+void orpheus_engine_play_tts(OrpheusEngine* engine);
+void orpheus_engine_stop_tts(OrpheusEngine* engine);
+int  orpheus_engine_is_tts_playing(OrpheusEngine* engine);
+
 #ifdef __cplusplus
 }
 #endif

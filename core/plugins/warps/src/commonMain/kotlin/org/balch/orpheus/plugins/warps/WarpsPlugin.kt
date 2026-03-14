@@ -11,13 +11,14 @@ import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
+import org.balch.orpheus.core.audio.dsp.NativeDspBridge
 import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
 import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.WARPS_URI
 import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
 
@@ -69,6 +70,9 @@ class WarpsPlugin(
     private val dryPassLeft = dspFactory.createPassThrough()
     private val dryPassRight = dspFactory.createPassThrough()
     
+    // In native mode, C++ handles all Warps processing — skip JSyn unit calls
+    private val isNative = audioEngine is NativeDspBridge
+
     // Internal state
     private var _algorithm = 0f
     private var _timbre = 0.5f
@@ -77,38 +81,50 @@ class WarpsPlugin(
     private var _mix = 0f
     private var _carrierSource = 0 // WarpsSource.SYNTH
     private var _modulatorSource = 1 // WarpsSource.DRUMS
-    
+
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 4) {
         controlPort(WarpsSymbol.ALGORITHM) {
             floatType {
                 default = 0f; min = 0f; max = 8f
                 get { _algorithm }
-                set { _algorithm = it; warps.algorithm.set(it.toDouble()) }
+                set {
+                    _algorithm = it
+                    if (!isNative) warps.algorithm.set(it.toDouble())
+                }
             }
         }
-        
+
         controlPort(WarpsSymbol.TIMBRE) {
             floatType {
                 get { _timbre }
-                set { _timbre = it; warps.timbre.set(it.toDouble()) }
+                set {
+                    _timbre = it
+                    if (!isNative) warps.timbre.set(it.toDouble())
+                }
             }
         }
-        
+
         controlPort(WarpsSymbol.LEVEL1) {
             floatType {
                 get { _level1 }
-                set { _level1 = it; warps.level1.set(it.toDouble()) }
+                set {
+                    _level1 = it
+                    if (!isNative) warps.level1.set(it.toDouble())
+                }
             }
         }
-        
+
         controlPort(WarpsSymbol.LEVEL2) {
             floatType {
                 get { _level2 }
-                set { _level2 = it; warps.level2.set(it.toDouble()) }
+                set {
+                    _level2 = it
+                    if (!isNative) warps.level2.set(it.toDouble())
+                }
             }
         }
-        
+
         controlPort(WarpsSymbol.MIX) {
             floatType {
                 default = 0f
@@ -116,9 +132,9 @@ class WarpsPlugin(
                 set {
                     val wasDisabled = _mix <= PLUGIN_DISABLE_THRESHOLD
                     _mix = it
+                    if (isNative) return@set  // C++ receives mix via SynthController setPort path
                     val shouldDisable = _mix <= PLUGIN_DISABLE_THRESHOLD
                     if (wasDisabled && _mix > PLUGIN_ENABLE_THRESHOLD) {
-                        // Zero wet gains before enabling to prevent blowout
                         wetGainLeft.inputB.set(0.0)
                         wetGainRight.inputB.set(0.0)
                         warps.setBypass(false)
@@ -174,24 +190,26 @@ class WarpsPlugin(
     )
     
     override fun initialize() {
+        if (isNative) return  // C++ handles all audio routing via graph
+
         carrierInput.output.connect(warps.inputLeft)
         modulatorInput.output.connect(warps.inputRight)
-        
+
         warps.output.connect(wetGainLeft.inputA)
         warps.outputRight.connect(wetGainRight.inputA)
         wetGainLeft.output.connect(mixSumLeft.input)
         wetGainRight.output.connect(mixSumRight.input)
-        
+
         dryPassLeft.output.connect(dryGainLeft.inputA)
         dryPassRight.output.connect(dryGainRight.inputA)
         dryGainLeft.output.connect(mixSumLeft.input)
         dryGainRight.output.connect(mixSumRight.input)
-        
+
         warps.algorithm.set(0.0)
         warps.timbre.set(0.5)
         warps.level1.set(0.5)
         warps.level2.set(0.5)
-        
+
         setPortValue("mix", PortValue.FloatValue(0.5f))
 
         audioUnits.forEach { audioEngine.addUnit(it) }

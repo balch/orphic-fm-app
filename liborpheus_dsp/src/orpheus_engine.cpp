@@ -75,6 +75,19 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     engine->looper_buffer_l = new float[OrpheusEngine::kMaxLoopSamples]();
     engine->looper_buffer_r = new float[OrpheusEngine::kMaxLoopSamples]();
 
+    // Allocate TTS effects delay buffer (TTS sample buffer is lazily allocated on first load)
+    engine->tts_delay_buffer = new float[OrpheusEngine::kTtsDelayMaxSamples]();
+    engine->tts_delay_len = static_cast<int>(sample_rate * 0.375f); // 375ms delay
+    // Scale reverb comb/AP lengths for actual sample rate
+    for (int i = 0; i < 4; i++)
+        engine->tts_comb_len[i] = std::min(
+            static_cast<int>(OrpheusEngine::kTtsCombRef[i] * sample_rate),
+            OrpheusEngine::kTtsCombMaxLen - 1);
+    for (int i = 0; i < 2; i++)
+        engine->tts_ap_len[i] = std::min(
+            static_cast<int>(OrpheusEngine::kTtsApRef[i] * sample_rate),
+            OrpheusEngine::kTtsApMaxLen - 1);
+
     // Default per-voice pans (matches Kotlin StereoPlugin defaults)
     // Voices 0-3: Quad 0
     engine->voice_pan[0].store(0.0f);
@@ -139,6 +152,8 @@ void orpheus_engine_destroy(OrpheusEngine* engine) {
         orpheus_graph_free(engine->graph.load(std::memory_order_relaxed));
         delete[] engine->looper_buffer_l;
         delete[] engine->looper_buffer_r;
+        delete[] engine->tts_buffer;
+        delete[] engine->tts_delay_buffer;
         delete engine;
     }
 }
@@ -224,6 +239,110 @@ static void orpheus_automation_process(OrpheusEngine* engine, int num_frames) {
     engine->sample_counter += num_frames;
 }
 
+// TTS speech effects: phaser → feedback delay → Schroeder reverb
+// Tuned for dramatic "One of These Days" character:
+//   - Slow deep phaser sweep (0.1–1Hz, wide 100–5000Hz range)
+//   - Longer feedback delay (375ms, higher feedback ceiling)
+//   - Richer reverb (higher comb feedback for ~2s decay)
+// All buffer lengths are sample-rate-scaled (initialized in create()).
+// Per-block cached TTS effect parameters (loaded once from atomics, used per-sample)
+struct TtsEffectParams {
+    float phaser_amt;
+    float fb_amt;
+    float reverb_amt;
+    float phaser_g;  // precomputed all-pass coefficient
+};
+
+static TtsEffectParams tts_load_effect_params(OrpheusEngine* e) {
+    TtsEffectParams p;
+    p.phaser_amt = e->tts_phaser.load(std::memory_order_relaxed);
+    p.fb_amt = e->tts_feedback.load(std::memory_order_relaxed);
+    p.reverb_amt = e->tts_reverb.load(std::memory_order_relaxed);
+
+    // Precompute phaser coefficient once per block (avoids per-sample tan())
+    p.phaser_g = 0.0f;
+    if (p.phaser_amt > 0.001f) {
+        float sr = e->sample_rate;
+        double lfo_rate = 0.1 + p.phaser_amt * 0.9;
+        e->tts_phaser_lfo_phase += lfo_rate / sr;
+        if (e->tts_phaser_lfo_phase >= 1.0) e->tts_phaser_lfo_phase -= 1.0;
+
+        float tri = (e->tts_phaser_lfo_phase < 0.5)
+            ? static_cast<float>(e->tts_phaser_lfo_phase * 2.0)
+            : static_cast<float>(2.0 - e->tts_phaser_lfo_phase * 2.0);
+
+        float fc = 100.0f + tri * p.phaser_amt * 4900.0f;
+        float w = std::tan(3.14159265f * fc / sr);
+        p.phaser_g = (1.0f - w) / (1.0f + w);
+    }
+    return p;
+}
+
+static float tts_process_effects(OrpheusEngine* e, float sample,
+                                  const TtsEffectParams& p) {
+    // 1. 6-stage all-pass phaser — slow deep sweep
+    if (p.phaser_amt > 0.001f) {
+        float g = p.phaser_g;
+        float x = sample;
+        for (int s = 0; s < OrpheusEngine::kTtsPhaserStages; s++) {
+            float y = -g * x + e->tts_phaser_buf[s];
+            e->tts_phaser_buf[s] = g * y + x;
+            x = y;
+        }
+        sample = sample + x * p.phaser_amt;
+    }
+
+    // 2. Feedback delay (375ms, higher feedback for more repeats)
+    if (p.fb_amt > 0.001f) {
+        int delay_len = e->tts_delay_len;
+        float fb_gain = p.fb_amt * 0.75f;
+        if (fb_gain > 0.92f) fb_gain = 0.92f;
+        float wet = e->tts_delay_buffer[e->tts_delay_write_pos];
+        e->tts_delay_buffer[e->tts_delay_write_pos] = sample + e->tts_delay_fb_sample * fb_gain;
+        e->tts_delay_fb_sample = wet;
+        e->tts_delay_write_pos++;
+        if (e->tts_delay_write_pos >= delay_len) e->tts_delay_write_pos = 0;
+
+        sample = sample * (1.0f - p.fb_amt * 0.4f) + wet * p.fb_amt;
+    }
+
+    // 3. Schroeder reverb — richer decay (~2s)
+    if (p.reverb_amt > 0.001f) {
+        constexpr float COMB_FB = 0.88f;
+        constexpr float AP_GAIN = 0.5f;
+        constexpr float LP_COEFF = 0.6f;
+
+        e->tts_reverb_lp += LP_COEFF * (sample - e->tts_reverb_lp);
+        float damped = e->tts_reverb_lp;
+
+        float comb_sum = 0.0f;
+        for (int c = 0; c < 4; c++) {
+            int len = e->tts_comb_len[c];
+            int pos = e->tts_comb_pos[c];
+            float delayed = e->tts_comb_bufs[c][pos];
+            e->tts_comb_bufs[c][pos] = damped + delayed * COMB_FB;
+            e->tts_comb_pos[c] = (pos + 1) % len;
+            comb_sum += delayed;
+        }
+        comb_sum *= 0.25f;
+
+        float ap_out = comb_sum;
+        for (int a = 0; a < 2; a++) {
+            int len = e->tts_ap_len[a];
+            int pos = e->tts_ap_pos[a];
+            float delayed = e->tts_ap_bufs[a][pos];
+            float y = -AP_GAIN * ap_out + delayed;
+            e->tts_ap_bufs[a][pos] = ap_out + AP_GAIN * y;
+            e->tts_ap_pos[a] = (pos + 1) % len;
+            ap_out = y;
+        }
+
+        sample = sample * (1.0f - p.reverb_amt * 0.5f) + ap_out * p.reverb_amt;
+    }
+
+    return sample;
+}
+
 void orpheus_engine_process(OrpheusEngine* engine,
                             float* output_buffer, int num_frames) {
     if (!engine || !output_buffer || num_frames <= 0) return;
@@ -246,6 +365,49 @@ void orpheus_engine_process(OrpheusEngine* engine,
 
     // Peak monitoring is handled inside unit_process_master_out (pre-clip, matching JSyn).
     // If no graph is loaded, peaks remain at 0.
+
+    // TTS sample playback — mix into output after graph
+    {
+        // Handle play trigger (atomic flag from UI thread)
+        if (engine->tts_trigger.exchange(0, std::memory_order_relaxed)) {
+            engine->tts_position = 0.0;
+            engine->tts_playing.store(1, std::memory_order_relaxed);
+        }
+
+        int tts_len = engine->tts_buffer_length.load(std::memory_order_acquire);
+        if (engine->tts_playing.load(std::memory_order_relaxed) &&
+            tts_len > 0 && engine->tts_buffer) {
+            float rate = engine->tts_rate.load(std::memory_order_relaxed);
+            float vol = engine->tts_volume.load(std::memory_order_relaxed);
+            // Adjust rate for sample rate difference (source vs engine)
+            int src_rate = engine->tts_source_rate.load(std::memory_order_relaxed);
+            double rate_ratio = static_cast<double>(src_rate) / engine->sample_rate;
+            double step = rate * rate_ratio;
+            int len = tts_len;
+
+            // Load effect params once per block (avoids per-sample atomic loads + tan())
+            TtsEffectParams fx = tts_load_effect_params(engine);
+
+            for (int i = 0; i < num_frames; i++) {
+                int intPos = static_cast<int>(engine->tts_position);
+                if (intPos >= len - 1) {
+                    engine->tts_playing.store(0, std::memory_order_relaxed);
+                    break;
+                }
+                // Linear interpolation
+                float frac = static_cast<float>(engine->tts_position - intPos);
+                float sample = engine->tts_buffer[intPos] * (1.0f - frac)
+                             + engine->tts_buffer[intPos + 1] * frac;
+                float scaled = sample * vol;
+                // Apply speech effects (phaser → feedback delay → reverb)
+                scaled = tts_process_effects(engine, scaled, fx);
+                // Mix into stereo interleaved output
+                output_buffer[i * 2]     += scaled;
+                output_buffer[i * 2 + 1] += scaled;
+                engine->tts_position += step;
+            }
+        }
+    }
 
     // CPU load: elapsed time / audio buffer duration
     auto t1 = std::chrono::steady_clock::now();
@@ -462,8 +624,10 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->warps_level1.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "level2") == 0)
             engine->warps_level2.store(value, std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "bypass") == 0)
-            engine->warps_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mix") == 0) {
+            engine->warps_mix.store(value, std::memory_order_relaxed);
+            engine->warps_bypass.store(value <= 0.001f ? 1 : 0, std::memory_order_relaxed);
+        }
         else if (std::strcmp(symbol, "carrier_source") == 0)
             engine->warps_carrier_source.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "modulator_source") == 0)
@@ -682,6 +846,18 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "quantize") == 0)
             engine->looper_quantize.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.tts") == 0) {
+        if (std::strcmp(symbol, "rate") == 0)
+            engine->tts_rate.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "volume") == 0)
+            engine->tts_volume.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "phaser") == 0)
+            engine->tts_phaser.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "feedback") == 0)
+            engine->tts_feedback.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "reverb") == 0)
+            engine->tts_reverb.store(value, std::memory_order_relaxed);
+    }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.tempo") == 0) {
         if (std::strcmp(symbol, "bpm") == 0)
             engine->clock_bpm.store(value, std::memory_order_relaxed);
@@ -706,6 +882,32 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
 float orpheus_engine_get_port(OrpheusEngine* engine,
                               const char* plugin_uri,
                               const char* symbol) {
+    if (!engine) return 0.0f;
+
+    if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.looper") == 0) {
+        if (std::strcmp(symbol, "position") == 0) {
+            // Normalized position: write position / max during record, read / length during play
+            int state = engine->looper_current_state;
+            int pos = engine->looper_position;
+            if (state == 1) { // recording
+                return static_cast<float>(pos) / OrpheusEngine::kMaxLoopSamples;
+            } else if ((state == 2 || state == 3) && engine->looper_length > 0) {
+                return static_cast<float>(pos) / engine->looper_length;
+            }
+            return 0.0f;
+        }
+        if (std::strcmp(symbol, "duration") == 0) {
+            return static_cast<float>(engine->looper_length) / engine->sample_rate;
+        }
+        if (std::strcmp(symbol, "state") == 0) {
+            return static_cast<float>(engine->looper_current_state);
+        }
+    }
+    if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.tts") == 0) {
+        if (std::strcmp(symbol, "playing") == 0) {
+            return static_cast<float>(engine->tts_playing.load(std::memory_order_relaxed));
+        }
+    }
     return 0.0f;
 }
 
@@ -900,6 +1102,46 @@ void orpheus_engine_clear_automation(OrpheusEngine* engine,
     int write_buf = (slot.active_path.load(std::memory_order_relaxed) == 0) ? 1 : 0;
     slot.paths[write_buf].count = 0;
     slot.pending_path.store(write_buf, std::memory_order_release);
+}
+
+// ── TTS sample playback API ──────────────────────
+void orpheus_engine_load_tts_audio(OrpheusEngine* engine,
+                                    const float* samples, int count,
+                                    int sample_rate) {
+    if (!engine || !samples || count <= 0) return;
+
+    // Stop playback first so audio thread won't read during copy
+    engine->tts_playing.store(0, std::memory_order_relaxed);
+    // Set length to 0 so audio thread skips even if it reads between these stores
+    engine->tts_buffer_length.store(0, std::memory_order_release);
+
+    // Lazy-allocate buffer on first load (~11.5MB)
+    if (!engine->tts_buffer) {
+        engine->tts_buffer = new float[OrpheusEngine::kMaxTtsSamples]();
+    }
+
+    int clamped = (count > OrpheusEngine::kMaxTtsSamples)
+                ? OrpheusEngine::kMaxTtsSamples : count;
+    std::memcpy(engine->tts_buffer, samples, clamped * sizeof(float));
+    engine->tts_source_rate.store(sample_rate > 0 ? sample_rate : 48000,
+                                   std::memory_order_relaxed);
+    // Store length last with release — audio thread acquires to see completed buffer
+    engine->tts_buffer_length.store(clamped, std::memory_order_release);
+}
+
+void orpheus_engine_play_tts(OrpheusEngine* engine) {
+    if (!engine) return;
+    engine->tts_trigger.store(1, std::memory_order_relaxed);
+}
+
+void orpheus_engine_stop_tts(OrpheusEngine* engine) {
+    if (!engine) return;
+    engine->tts_playing.store(0, std::memory_order_relaxed);
+}
+
+int orpheus_engine_is_tts_playing(OrpheusEngine* engine) {
+    if (!engine) return 0;
+    return engine->tts_playing.load(std::memory_order_relaxed);
 }
 
 }  // extern "C"

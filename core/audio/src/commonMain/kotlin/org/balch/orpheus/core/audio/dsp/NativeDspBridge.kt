@@ -29,4 +29,8 @@ interface NativeDspBridge {
     fun nativeLoadGraph(data: ByteArray): Int
     fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int)
     fun nativeClearAutomation(target: Int, voiceIndex: Int)
+    fun nativeLoadTtsAudio(samples: FloatArray, sampleRate: Int)
+    fun nativePlayTts()
+    fun nativeStopTts()
+    fun nativeIsTtsPlaying(): Int
 }

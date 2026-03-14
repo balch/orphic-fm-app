@@ -20,6 +20,7 @@ kotlin {
         commonMain.dependencies {
              implementation(project(":features:visualizations")) // For LiquidPreview
              implementation(project(":features:voice")) // ModTweaks likely references voice?
+             implementation(project(":features:beats")) // BPM + drum mix in center panel
         }
     }
 }
