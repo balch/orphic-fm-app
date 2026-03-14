@@ -5,8 +5,6 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
 import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
@@ -79,8 +77,6 @@ class BeatsPlugin : DspPlugin {
 
     override val ports: List<Port> = portDefs.ports
     override val audioUnits: List<AudioUnit> = emptyList()
-    override val inputs: Map<String, AudioInput> = emptyMap()
-    override val outputs: Map<String, AudioOutput> = emptyMap()
 
     override fun initialize() {}
     override fun onStart() {}
