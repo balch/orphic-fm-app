@@ -7,20 +7,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.ClockUnit
-import org.balch.orpheus.core.audio.dsp.DspFactory
 
 /**
  * Centralized global tempo management for all time-synced modules.
- * 
+ *
  * Provides BPM as a shared state that TidalScheduler, DrumBeatsViewModel,
  * and FluxViewModel all subscribe to, ensuring synchronized playback.
- * 
- * Also provides a hardware-accurate ClockUnit that generates audio-rate
- * clock pulses for driving drum sequencers and other timing-critical modules.
+ *
+ * BPM changes are forwarded to the C++ engine via [AudioEngine.setPort]
+ * using the tempo plugin URI.
  *
  * Synchronization Strategy:
- * 1. DSP Modules: Connect directly to [getClockOutput] for sample-accurate pulsing.
+ * 1. DSP Modules: C++ engine handles audio-rate clock generation internally.
  * 2. CPU Modules (REPL/Drums):
  *    polls [AudioEngine.getCurrentTime] in a tight loop to align with the
  *    audio frame rate. The [bpm] property here drives the logic for both.
@@ -29,33 +27,15 @@ import org.balch.orpheus.core.audio.dsp.DspFactory
 @Inject
 class GlobalTempo(
     private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
 ) {
 
     private val _bpm = MutableStateFlow(120.0)
     val bpm: StateFlow<Double> = _bpm.asStateFlow()
 
-    // Clock generator for audio-rate timing (24 PPQN standard)
-    private val clockUnit: ClockUnit = dspFactory.createClockUnit().also { clock ->
-        audioEngine.addUnit(clock)
-        // Initialize clock frequency based on default BPM (120)
-        // 120 BPM = 2 beats/sec, 24 PPQN = 48 Hz
-        // Manually set initial freq to avoid accessing 'clockUnit' property before it is assigned
-        val ppqn = 24
-        val frequency = (120.0 / 60.0) * ppqn
-        clock.frequency.set(frequency)
-    }
-
-    // Quarter-note clock for Flux (1 pulse per beat, not 24 PPQN)
-    private val beatClock: ClockUnit = dspFactory.createClockUnit().also { clock ->
-        audioEngine.addUnit(clock)
-        clock.frequency.set(120.0 / 60.0) // 2 Hz at 120 BPM
-    }
-
     /**
      * Set the global tempo in BPM (beats per minute).
      * Valid range: 60-200 BPM
-     * Updates both the StateFlow and the ClockUnit frequency.
+     * Updates both the StateFlow and forwards the BPM to the C++ engine.
      */
     fun setBpm(bpm: Double) {
         val coercedBpm = bpm.coerceIn(60.0, 200.0)
@@ -64,43 +44,16 @@ class GlobalTempo(
     }
 
     /**
-     * Update the ClockUnit frequency based on BPM.
-     * Clock runs at 24 PPQN (pulses per quarter note).
+     * Forward BPM to C++ engine clock.
      */
     private fun updateClockFrequency(bpm: Double) {
-        // Formula: (BPM / 60) * PPQN
-        // Example: 120 BPM = 2 beats/sec * 24 PPQN = 48 Hz
-        val ppqn = 24
-        val frequency = (bpm / 60.0) * ppqn
-        clockUnit.frequency.set(frequency)
-        beatClock.frequency.set(bpm / 60.0) // Quarter-note rate
+        audioEngine.setPort(TEMPO_URI, "bpm", bpm.toFloat())
     }
 
     /**
      * Get current BPM value.
      */
     fun getBpm(): Double = _bpm.value
-
-    /**
-     * Get the master clock unit output.
-     * Connect this to drum sequencers, REPL timing, or other modules
-     * that need sample-accurate synchronization.
-     */
-    fun getClockOutput() = clockUnit.output
-
-    /**
-     * Get a quarter-note clock output (1 pulse per beat).
-     * Use for modules like Flux that expect beat-rate clocking, not 24 PPQN.
-     */
-    fun getBeatClockOutput() = beatClock.output
-
-    /**
-     * Set the clock pulse width (duty cycle).
-     * @param width 0.01 - 0.99, where 0.5 = 50% duty cycle
-     */
-    fun setClockPulseWidth(width: Double) {
-        clockUnit.pulseWidth.set(width.coerceIn(0.01, 0.99))
-    }
 
     /**
      * Get cycles per second for TidalScheduler.
@@ -128,4 +81,8 @@ class GlobalTempo(
      * Useful for external synchronization.
      */
     val clockFrequencyHz: Double get() = (_bpm.value / 60.0) * 24.0
+
+    companion object {
+        const val TEMPO_URI = "org.balch.orpheus.plugins.tempo"
+    }
 }
