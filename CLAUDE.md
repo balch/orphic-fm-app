@@ -33,12 +33,28 @@ class *ViewModel` — takes `SynthController`, `DispatcherProvider`, `FeatureCor
 - Single plugin: `./gradlew :core:plugins:<name>:build`
 - Feature module: `./gradlew :features:<name>:build`
 - JVM compile check: `./gradlew compileKotlinJvm`
+- WASM production build: `./gradlew :apps:composeApp:wasmJsBrowserDistribution`
 - WASM dev server: `./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun` (serves on localhost:8080)
+
+## WASM Deploy & Dev
+
+### Local dev with orphic.fm site
+- `./scripts/dev-site.sh` — build WASM + copy to `~/Source/orphic-fm/synth/` + serve Jekyll on localhost:4001
+- `./scripts/dev-site.sh --skip-build` — use existing build output
+- `./scripts/dev-site.sh --copy-only` — build + copy without starting server
+- Test at http://localhost:4001/synth/
+- Set `ORPHIC_FM_SITE` env var if the site repo is not at `~/Source/orphic-fm`
+
+### Deploy to GitHub Pages
+- CI: pushes to `main` auto-deploy via `.github/workflows/deploy-wasm.yml`
+- Manual: `./scripts/deploy-gh-pages.sh` (or `--dry-run` to preview)
+- Both scripts strip API keys from `local.properties` during build
+- Deploys to `balch/orphic-fm` repo via SSH deploy key
 
 ## Debugging WASM
 
-Use Playwright MCP to debug the running WASM app at `http://localhost:8080/`:
-1. `browser_navigate` to `http://localhost:8080/`
+Use Playwright MCP to debug the running WASM app at `http://localhost:4001/synth/` (or `http://localhost:8080/` if using the raw dev server):
+1. `browser_navigate` to the app URL
 2. `browser_console_messages` with `level: "info"` to read all console output
 3. `browser_take_screenshot` to see current UI state
 4. `browser_snapshot` for accessibility tree (useful for finding interactive elements)

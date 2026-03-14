@@ -119,8 +119,14 @@ The **WASM** target compiles the C++ DSP engine to WebAssembly via Emscripten. A
 # Android
 ./gradlew :apps:androidApp:installDebugRelease
 
-# WASM (opens browser at localhost:8080)
+# WASM dev server (opens browser at localhost:8080)
 ./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun
+
+# WASM in orphic.fm site (serves at localhost:4001/synth/)
+./scripts/dev-site.sh
+
+# Deploy WASM to GitHub Pages
+./scripts/deploy-gh-pages.sh
 
 # Desktop release (dmg/msi/deb depending on OS)
 ./gradlew :apps:composeApp:packageReleaseDistributionForCurrentOS

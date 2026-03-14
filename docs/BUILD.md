@@ -50,8 +50,11 @@ Add `source ~/emsdk/emsdk_env.sh` to your shell profile for convenience.
 # Android
 ./gradlew :apps:androidApp:installDebugRelease
 
-# WASM (opens browser at localhost:8080)
+# WASM dev server (opens browser at localhost:8080)
 ./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun
+
+# WASM in orphic.fm site (serves at localhost:4001/synth/)
+./scripts/dev-site.sh
 ```
 
 ## Platform Details
@@ -114,6 +117,42 @@ The Gradle build has a `copyWasmDsp` task that copies WASM artifacts from the Em
 
 **URL flags:**
 - `?noworker` — Run Kotlin DSP on main thread instead of C++ WASM Worker (fallback mode)
+
+### Local Dev with orphic.fm Site
+
+Build the WASM synth and serve it inside the full Jekyll site at `localhost:4001/synth/`:
+
+```bash
+# Full build + copy + serve
+./scripts/dev-site.sh
+
+# Use existing build output (faster iteration)
+./scripts/dev-site.sh --skip-build
+
+# Build + copy only (start Jekyll yourself)
+./scripts/dev-site.sh --copy-only
+```
+
+Requires the `orphic-fm` site repo at `~/Source/orphic-fm` (override with `ORPHIC_FM_SITE` env var) and Jekyll/Bundler installed. API keys in `local.properties` are automatically stripped during the build.
+
+### Deploy to GitHub Pages
+
+**CI (automatic):** Pushes to `main` trigger `.github/workflows/deploy-wasm.yml`, which builds the WASM distribution and pushes it to `balch/orphic-fm` via SSH deploy key.
+
+**Manual:**
+
+```bash
+# Full build + deploy
+./scripts/deploy-gh-pages.sh
+
+# Preview what would be deployed
+./scripts/deploy-gh-pages.sh --dry-run
+
+# Deploy existing build output
+./scripts/deploy-gh-pages.sh --skip-build
+```
+
+Both CI and manual deploy strip API keys from `local.properties` before building. See the script header for deploy key setup instructions.
 
 ## C++ DSP Library (`liborpheus_dsp/`)
 
