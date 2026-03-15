@@ -5,6 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
+import org.balch.orpheus.core.audio.WarpsSource
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.BEATS_URI
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
@@ -22,8 +23,6 @@ import org.balch.orpheus.core.plugin.symbols.REVERB_URI
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 import org.balch.orpheus.core.plugin.symbols.STEREO_URI
-import org.balch.orpheus.core.plugin.symbols.TTS_URI
-import org.balch.orpheus.core.plugin.symbols.TtsSymbol
 import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.core.plugin.symbols.WARPS_URI
@@ -33,21 +32,24 @@ import org.balch.orpheus.core.presets.SynthPreset
 import org.balch.orpheus.plugins.duolfo.DuoLfoPlugin
 
 /**
- * Pink — Dark psychedelic soundscape inspired by Pink Floyd's "One of These Days" / "Echoes".
+ * Pink — "Another Brick in the Wall" — Dm at 104 BPM.
  *
- * Quad 0 (voices 0-1): Deep ominous bass — STRING engine detuned low, slow FM, "The Wall" rumble
- * Quad 1 (voices 2-3): Soaring lead — FM engine with LFO modulation, Gilmour-like sustain
- * Quad 2 (voices 4-5): Texture/effects bank — GRAIN + PARTICLE for ambient swells, Flux-driven
- * Quad 3 (voices 6-7): Pad/atmosphere — CHORD + WAVETABLE for wide stereo shimmer
- * REPL (voices 8-11): User-controlled, tuned for experimentation
+ * Duo 0 (voices 0-1): Floyd bass — STRING engine, D2+A2, hard left
+ * Duo 1 (voices 2-3): Rhythm chords — Engine 0, D3+F3, center-left
+ * Duo 2 (voices 4-5): Atmospheric textures — ADDITIVE, A3+C4, wide stereo
+ * Duo 3 (voices 6-7): Gilmour lead — FM engine, D4+A4, center-right
+ * Duo 4 (voices 8-9): REPL — Engine 0, D3+A3, centered
+ * Duo 5 (voices 10-11): REPL — Engine 0, F3+D4, centered
  *
- * Cross-quad FM structure: Quad 2 modulates Quad 0, Quad 3 modulates Quad 1
- * Warps: Synth × Drums ring mod at low mix for metallic undertone
- * Grains: Frozen shimmer with long position sweep
- * Delay: Pink Floyd-style rhythmic dotted-eighth with long feedback tail
- * Reverb: Cavernous hall — dark, long, diffuse
- * Drums: Slow hypnotic beat with deep kick and metallic hat
- * TTS: "One of These Days" voice through phaser/delay/reverb
+ * All effect mixes OFF by default. User dials in:
+ *   - Warps: carrier=SYNTH, modulator=LFO → drone sweep when mix > 0
+ *   - Flux: slow evolving random pitch variation
+ *   - Resonator: sympathetic shimmer
+ *   - Grains: frozen ambient textures
+ *
+ * LFO: glacial sweep (0.03/0.07 Hz) for atmospheric drone modulation.
+ * Delay: shorter feedback (0.42) to prevent Warps harmonic buildup.
+ * Reverb: dark hall, moderate tail.
  */
 @Inject
 @ContributesIntoSet(AppScope::class)
@@ -60,61 +62,61 @@ class PinkPatch : SynthPatch {
             val v = VOICE_URI
 
             // ═══ VOICE TUNES ═══
-            // Quad 0: deep bass, detuned pair (low octave)
-            // Quad 1: lead, slight detune for chorus (mid octave)
-            // Quad 2: textures, spread wide for granular interest
-            // Quad 3: pad, tight detuning for shimmer
+            // All in D minor: D, F, A, C, Bb
+            // tune = (midiNote - 33 - pitchMult) / 48
+            // pitchMult = [-12,-12, 0,0, 0,0, 12,12, 0,0, 0,0]
             val tunes = listOf(
-                0.30f, 0.31f,   // Q0: deep bass pair, barely detuned
-                0.48f, 0.49f,   // Q1: lead pair, slight chorus
-                0.42f, 0.55f,   // Q2: textures, spread wide
-                0.46f, 0.47f,   // Q3: pad pair, tight shimmer
-                0.5f, 0.5f, 0.5f, 0.5f  // REPL: centered
+                0.354f, 0.500f, // Duo 0: D2(38), A2(45) — bass root+5th
+                0.354f, 0.417f, // Duo 1: D3(50), F3(53) — minor chord
+                0.500f, 0.563f, // Duo 2: A3(57), C4(60) — 5th+7th tension
+                0.354f, 0.500f, // Duo 3: D4(62), A4(69) — high octave root+5th
+                0.354f, 0.500f, // REPL: D3, A3
+                0.417f, 0.604f  // REPL: F3, D4
             )
             tunes.forEachIndexed { i, t -> put("$v:tune_$i", PortValue.FloatValue(t)) }
 
             // ═══ DUO ENGINES ═══
-            // 10=STRING, 4=FM, 9=GRAIN, 12=PARTICLE, 14=CHORD, 15=WAVETABLE
-            val engines = listOf(10, 4, 9, 12, 14, 15)
+            // 0=Engine0, 4=FM, 10=STRING, 12=ADDITIVE
+            val engines = listOf(10, 0, 12, 4, 0, 0)
             engines.forEachIndexed { i, e -> put("$v:duo_engine_$i", PortValue.IntValue(e)) }
 
-            // ═══ DUO SHARPNESS (waveform character) ═══
+            // ═══ DUO SHARPNESS ═══
             val sharpness = listOf(
-                0.20f,  // Q0: smooth string attack
-                0.55f,  // Q1: bright FM carrier
-                0.35f,  // Q2: soft grain windows
-                0.70f,  // Q3: rhythmic chord attack
-                0.45f, 0.50f  // REPL pairs
+                0.15f,  // Duo 0: round bass attack
+                0.40f,  // Duo 1: medium rhythm bite
+                0.30f,  // Duo 2: soft texture onset
+                0.55f,  // Duo 3: bright lead attack
+                0.40f, 0.40f
             )
             sharpness.forEachIndexed { i, s -> put("$v:duo_sharpness_$i", PortValue.FloatValue(s)) }
 
             // ═══ DUO HARMONICS ═══
             val harmonics = listOf(
-                0.15f,  // Q0: fundamental-heavy bass
-                0.40f,  // Q1: mid-harmonic lead
-                0.72f,  // Q2: rich grain texture
-                0.25f,  // Q3: warm chord voicing
+                0.20f,  // Duo 0: fundamental-heavy bass
+                0.35f,  // Duo 1: mid warmth
+                0.60f,  // Duo 2: rich overtones
+                0.45f,  // Duo 3: singing FM tone
                 0.50f, 0.50f
             )
             harmonics.forEachIndexed { i, h -> put("$v:duo_harmonics_$i", PortValue.FloatValue(h)) }
 
             // ═══ DUO MORPH ═══
             val morphs = listOf(
-                0.75f,  // Q0: bowed string sustain (high morph = bow)
-                0.60f,  // Q1: FM feedback (medium for singing tone)
-                0.82f,  // Q2: dense granular cloud
-                0.45f,  // Q3: chord inversion sweep midpoint
+                0.70f,  // Duo 0: bowed sustain (STRING morph)
+                0.30f,  // Duo 1: clean triangle/square blend
+                0.65f,  // Duo 2: dense additive partials
+                0.55f,  // Duo 3: FM modulation index
                 0.50f, 0.50f
             )
             morphs.forEachIndexed { i, m -> put("$v:duo_morph_$i", PortValue.FloatValue(m)) }
 
             // ═══ MODULATION SOURCES ═══
-            // Q0: Voice FM (cross-quad from Q2 textures)
-            // Q1: LFO (slow Gilmour vibrato)
-            // Q2: Flux (random evolving textures)
-            // Q3: LFO (shimmer pulse)
+            // Duo 0: LFO for slow bass vibrato
+            // Duo 1: OFF (clean rhythm)
+            // Duo 2: FLUX (evolving textures when Flux enabled)
+            // Duo 3: LFO (Gilmour vibrato)
             val modSources = listOf(
-                ModSource.VOICE_FM, ModSource.LFO,
+                ModSource.LFO, ModSource.OFF,
                 ModSource.FLUX, ModSource.LFO,
                 ModSource.OFF, ModSource.OFF
             )
@@ -124,156 +126,142 @@ class PinkPatch : SynthPatch {
 
             // ═══ MOD DEPTHS ═══
             val modDepths = listOf(
-                0.35f, 0.35f,   // Q0: subtle FM rumble from Q2
-                0.12f, 0.12f,   // Q1: gentle LFO vibrato
-                0.55f, 0.55f,   // Q2: Flux-driven texture evolution
-                0.20f, 0.20f,   // Q3: LFO shimmer pulse
+                0.08f, 0.08f,   // Duo 0: subtle bass vibrato
+                0.0f, 0.0f,     // Duo 1: off
+                0.40f, 0.40f,   // Duo 2: Flux-driven when enabled
+                0.15f, 0.15f,   // Duo 3: gentle Gilmour vibrato
                 0.0f, 0.0f, 0.0f, 0.0f
             )
             modDepths.forEachIndexed { i, d -> put("$v:mod_depth_$i", PortValue.FloatValue(d)) }
 
             // ═══ MOD SOURCE LEVELS ═══
-            val modLevels = listOf(0.80f, 0.45f, 0.70f, 0.55f, 0.0f, 0.0f)
+            val modLevels = listOf(0.50f, 0.0f, 0.55f, 0.45f, 0.0f, 0.0f)
             modLevels.forEachIndexed { i, l ->
                 put("$v:duo_mod_source_level_$i", PortValue.FloatValue(l))
             }
 
             // ═══ ENVELOPE SPEEDS ═══
-            // Q0: slow attack for bass swell, Q1: medium for lead, Q2: very slow ambient
             val envSpeeds = listOf(
-                0.6f, 0.6f,     // Q0: slow bass swell
-                0.25f, 0.25f,   // Q1: medium lead attack
-                0.85f, 0.85f,   // Q2: very slow ambient fade
-                0.45f, 0.45f,   // Q3: medium pad
+                0.50f, 0.50f,   // Duo 0: medium bass swell
+                0.15f, 0.15f,   // Duo 1: snappy rhythm
+                0.75f, 0.75f,   // Duo 2: slow ambient fade-in
+                0.30f, 0.30f,   // Duo 3: medium lead
                 0.0f, 0.0f, 0.0f, 0.0f
             )
             envSpeeds.forEachIndexed { i, e -> put("$v:env_speed_$i", PortValue.FloatValue(e)) }
 
-            // ═══ VOICE HOLDS (quad hold targets — start at 0, user cranks up) ═══
-            // Small non-zero bias on Q0 so bass drones gently even without keys
+            // ═══ VOICE HOLDS ═══
             for (i in 0..11) put("$v:voice_hold_$i", PortValue.FloatValue(0f))
 
             // ═══ GLOBAL VOICE ═══
-            put("$v:${VoiceSymbol.FM_STRUCTURE_CROSS_QUAD.symbol}", PortValue.BoolValue(true))
-            put("$v:${VoiceSymbol.TOTAL_FEEDBACK.symbol}", PortValue.FloatValue(0.012f))
-            put("$v:${VoiceSymbol.VIBRATO.symbol}", PortValue.FloatValue(0.08f))
-            put("$v:${VoiceSymbol.COUPLING.symbol}", PortValue.FloatValue(0.15f))
+            put("$v:${VoiceSymbol.FM_STRUCTURE_CROSS_QUAD.symbol}", PortValue.BoolValue(false))
+            put("$v:${VoiceSymbol.TOTAL_FEEDBACK.symbol}", PortValue.FloatValue(0.008f))
+            put("$v:${VoiceSymbol.VIBRATO.symbol}", PortValue.FloatValue(0.06f))
+            put("$v:${VoiceSymbol.COUPLING.symbol}", PortValue.FloatValue(0.10f))
 
             // ═══ LFO ═══
-            // Slow asymmetric triangle for that breathing Pink Floyd modulation
+            // Glacial sweep — designed for Warps drone modulation
+            // When LFO is selected as Warps modulator, these rates create
+            // slow atmospheric sweeps across the synth carrier
             val lfoUri = DuoLfoPlugin.URI
-            put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.18f))  // very slow A
-            put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.31f))  // slightly faster B
-            put("$lfoUri:${DuoLfoSymbol.MODE.symbol}", PortValue.IntValue(HyperLfoMode.OR.ordinal))
+            put("$lfoUri:${DuoLfoSymbol.FREQ_A.symbol}", PortValue.FloatValue(0.03f))
+            put("$lfoUri:${DuoLfoSymbol.FREQ_B.symbol}", PortValue.FloatValue(0.07f))
+            put("$lfoUri:${DuoLfoSymbol.MODE.symbol}", PortValue.IntValue(HyperLfoMode.AND.ordinal))
             put("$lfoUri:${DuoLfoSymbol.LINK.symbol}", PortValue.BoolValue(false))
-            put("$lfoUri:${DuoLfoSymbol.SHAPE.symbol}", PortValue.FloatValue(0.8f))     // mostly triangle
+            put("$lfoUri:${DuoLfoSymbol.SHAPE.symbol}", PortValue.FloatValue(0.9f))  // nearly pure triangle
 
-            // ═══ FLUX (Marbles-style random sequencer) ═══
-            // Slow evolving random voltages feeding Q2 textures
+            // ═══ FLUX ═══
+            // Slow evolving random — ready for when user enables it
             val fluxUri = FLUX_URI
-            put("$fluxUri:${FluxSymbol.RATE.symbol}", PortValue.FloatValue(0.25f))
-            put("$fluxUri:${FluxSymbol.SPREAD.symbol}", PortValue.FloatValue(0.65f))
+            put("$fluxUri:${FluxSymbol.RATE.symbol}", PortValue.FloatValue(0.20f))
+            put("$fluxUri:${FluxSymbol.SPREAD.symbol}", PortValue.FloatValue(0.55f))
             put("$fluxUri:${FluxSymbol.BIAS.symbol}", PortValue.FloatValue(0.50f))
-            put("$fluxUri:${FluxSymbol.STEPS.symbol}", PortValue.FloatValue(0.40f))
-            put("$fluxUri:${FluxSymbol.JITTER.symbol}", PortValue.FloatValue(0.30f))
-            put("$fluxUri:${FluxSymbol.DEJAVU.symbol}", PortValue.FloatValue(0.55f))
-            put("$fluxUri:${FluxSymbol.MIX.symbol}", PortValue.FloatValue(0.0f))  // off by default, user dials in
+            put("$fluxUri:${FluxSymbol.STEPS.symbol}", PortValue.FloatValue(0.35f))
+            put("$fluxUri:${FluxSymbol.JITTER.symbol}", PortValue.FloatValue(0.20f))
+            put("$fluxUri:${FluxSymbol.DEJAVU.symbol}", PortValue.FloatValue(0.60f))
+            put("$fluxUri:${FluxSymbol.MIX.symbol}", PortValue.FloatValue(0.0f))
 
-            // ═══ GRAINS (Clouds-style granular) ═══
-            // Frozen shimmer — long grains, slow position drift, heavy reverb
+            // ═══ GRAINS ═══
             val grainsUri = GRAINS_URI
-            put("$grainsUri:${GrainsSymbol.POSITION.symbol}", PortValue.FloatValue(0.35f))
-            put("$grainsUri:${GrainsSymbol.SIZE.symbol}", PortValue.FloatValue(0.72f))     // large grains
-            put("$grainsUri:${GrainsSymbol.PITCH.symbol}", PortValue.FloatValue(0.50f))     // unity pitch
-            put("$grainsUri:${GrainsSymbol.DENSITY.symbol}", PortValue.FloatValue(0.60f))   // medium density
-            put("$grainsUri:${GrainsSymbol.TEXTURE.symbol}", PortValue.FloatValue(0.80f))   // smooth crossfade
-            put("$grainsUri:${GrainsSymbol.DRY_WET.symbol}", PortValue.FloatValue(0.0f))    // off, user dials in
-            put("$grainsUri:${GrainsSymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.45f))  // moderate feedback
-            put("$grainsUri:${GrainsSymbol.REVERB.symbol}", PortValue.FloatValue(0.70f))    // internal reverb
+            put("$grainsUri:${GrainsSymbol.POSITION.symbol}", PortValue.FloatValue(0.40f))
+            put("$grainsUri:${GrainsSymbol.SIZE.symbol}", PortValue.FloatValue(0.65f))
+            put("$grainsUri:${GrainsSymbol.PITCH.symbol}", PortValue.FloatValue(0.50f))
+            put("$grainsUri:${GrainsSymbol.DENSITY.symbol}", PortValue.FloatValue(0.55f))
+            put("$grainsUri:${GrainsSymbol.TEXTURE.symbol}", PortValue.FloatValue(0.75f))
+            put("$grainsUri:${GrainsSymbol.DRY_WET.symbol}", PortValue.FloatValue(0.0f))
+            put("$grainsUri:${GrainsSymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.35f))
+            put("$grainsUri:${GrainsSymbol.REVERB.symbol}", PortValue.FloatValue(0.60f))
 
-            // ═══ WARPS (Meta-Modulator) ═══
-            // Synth × Drums through analog ring mod — metallic Pink Floyd undertone
+            // ═══ WARPS ═══
+            // Carrier=SYNTH, Modulator=LFO — the drone sweep setup
+            // At mix=0 (default), Warps is silent. User dials mix up to hear
+            // the LFO slowly sweeping the synth through the wavefolder.
             val warpsUri = WARPS_URI
-            put("$warpsUri:${WarpsSymbol.ALGORITHM.symbol}", PortValue.FloatValue(0.25f))   // analog ring mod zone
-            put("$warpsUri:${WarpsSymbol.TIMBRE.symbol}", PortValue.FloatValue(0.62f))      // warm modulation depth
-            put("$warpsUri:${WarpsSymbol.LEVEL1.symbol}", PortValue.FloatValue(0.55f))      // carrier drive
-            put("$warpsUri:${WarpsSymbol.LEVEL2.symbol}", PortValue.FloatValue(0.50f))      // modulator drive
-            put("$warpsUri:${WarpsSymbol.MIX.symbol}", PortValue.FloatValue(0.0f))          // off, user dials in
-            put("$warpsUri:${WarpsSymbol.CARRIER_SOURCE.symbol}", PortValue.IntValue(0))     // SYNTH
-            put("$warpsUri:${WarpsSymbol.MODULATOR_SOURCE.symbol}", PortValue.IntValue(1))   // DRUMS
+            put("$warpsUri:${WarpsSymbol.ALGORITHM.symbol}", PortValue.FloatValue(1.5f))  // wavefolder
+            put("$warpsUri:${WarpsSymbol.TIMBRE.symbol}", PortValue.FloatValue(0.45f))
+            put("$warpsUri:${WarpsSymbol.LEVEL1.symbol}", PortValue.FloatValue(0.45f))     // carrier (synth)
+            put("$warpsUri:${WarpsSymbol.LEVEL2.symbol}", PortValue.FloatValue(0.35f))     // modulator (LFO) — lower to balance 7x level mismatch
+            put("$warpsUri:${WarpsSymbol.MIX.symbol}", PortValue.FloatValue(0.0f))
+            put("$warpsUri:${WarpsSymbol.CARRIER_SOURCE.symbol}", PortValue.IntValue(WarpsSource.SYNTH.ordinal))
+            put("$warpsUri:${WarpsSymbol.MODULATOR_SOURCE.symbol}", PortValue.IntValue(WarpsSource.LFO.ordinal))
 
             // ═══ RESONATOR ═══
-            // Metallic sympathetic resonance — cowbell shimmer on drum hits
             val resoUri = RESONATOR_URI
-            put("$resoUri:${ResonatorSymbol.STRUCTURE.symbol}", PortValue.FloatValue(0.45f))
-            put("$resoUri:${ResonatorSymbol.BRIGHTNESS.symbol}", PortValue.FloatValue(0.55f))
-            put("$resoUri:${ResonatorSymbol.DAMPING.symbol}", PortValue.FloatValue(0.40f))
-            put("$resoUri:${ResonatorSymbol.POSITION.symbol}", PortValue.FloatValue(0.30f))
-            put("$resoUri:${ResonatorSymbol.MIX.symbol}", PortValue.FloatValue(0.0f))  // off, user dials in
+            put("$resoUri:${ResonatorSymbol.STRUCTURE.symbol}", PortValue.FloatValue(0.40f))
+            put("$resoUri:${ResonatorSymbol.BRIGHTNESS.symbol}", PortValue.FloatValue(0.50f))
+            put("$resoUri:${ResonatorSymbol.DAMPING.symbol}", PortValue.FloatValue(0.45f))
+            put("$resoUri:${ResonatorSymbol.POSITION.symbol}", PortValue.FloatValue(0.35f))
+            put("$resoUri:${ResonatorSymbol.MIX.symbol}", PortValue.FloatValue(0.0f))
 
             // ═══ DELAY ═══
-            // Pink Floyd dotted-eighth — "Run Like Hell" / "Another Brick" rhythmic delay
+            // Rhythmic dotted-eighth at 104 BPM. Lower feedback (0.42) to
+            // prevent harmonic buildup when Warps is adding harmonics.
             val delayUri = DELAY_URI
-            put("$delayUri:${DelaySymbol.TIME_1.symbol}", PortValue.FloatValue(0.19f))      // dotted eighth
-            put("$delayUri:${DelaySymbol.TIME_2.symbol}", PortValue.FloatValue(0.375f))     // dotted quarter
-            put("$delayUri:${DelaySymbol.MOD_DEPTH_1.symbol}", PortValue.FloatValue(0.08f)) // subtle warble
-            put("$delayUri:${DelaySymbol.MOD_DEPTH_2.symbol}", PortValue.FloatValue(0.15f))
-            put("$delayUri:${DelaySymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.68f))    // long tail
-            put("$delayUri:${DelaySymbol.MIX.symbol}", PortValue.FloatValue(0.35f))         // present but not drowning
+            put("$delayUri:${DelaySymbol.TIME_1.symbol}", PortValue.FloatValue(0.18f))
+            put("$delayUri:${DelaySymbol.TIME_2.symbol}", PortValue.FloatValue(0.36f))
+            put("$delayUri:${DelaySymbol.MOD_DEPTH_1.symbol}", PortValue.FloatValue(0.05f))
+            put("$delayUri:${DelaySymbol.MOD_DEPTH_2.symbol}", PortValue.FloatValue(0.10f))
+            put("$delayUri:${DelaySymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.42f))
+            put("$delayUri:${DelaySymbol.MIX.symbol}", PortValue.FloatValue(0.30f))
 
             // ═══ REVERB ═══
-            // Cavernous dark hall — "Echoes" in an empty cathedral
+            // Dark hall — moderate tail, not cavernous
             val reverbUri = REVERB_URI
-            put("$reverbUri:${ReverbSymbol.AMOUNT.symbol}", PortValue.FloatValue(0.72f))
-            put("$reverbUri:${ReverbSymbol.TIME.symbol}", PortValue.FloatValue(0.90f))      // very long tail
-            put("$reverbUri:${ReverbSymbol.DAMPING.symbol}", PortValue.FloatValue(0.70f))   // dark, rolled-off highs
-            put("$reverbUri:${ReverbSymbol.DIFFUSION.symbol}", PortValue.FloatValue(0.55f)) // dense diffusion
+            put("$reverbUri:${ReverbSymbol.AMOUNT.symbol}", PortValue.FloatValue(0.55f))
+            put("$reverbUri:${ReverbSymbol.TIME.symbol}", PortValue.FloatValue(0.70f))
+            put("$reverbUri:${ReverbSymbol.DAMPING.symbol}", PortValue.FloatValue(0.65f))
+            put("$reverbUri:${ReverbSymbol.DIFFUSION.symbol}", PortValue.FloatValue(0.50f))
 
             // ═══ DISTORTION ═══
-            // Warm tube saturation — just enough to thicken, not harsh
+            // Light warmth — just enough edge
             val distUri = DISTORTION_URI
-            put("$distUri:${DistortionSymbol.DRIVE.symbol}", PortValue.FloatValue(0.35f))
-            put("$distUri:${DistortionSymbol.MIX.symbol}", PortValue.FloatValue(0.25f))
+            put("$distUri:${DistortionSymbol.DRIVE.symbol}", PortValue.FloatValue(0.25f))
+            put("$distUri:${DistortionSymbol.MIX.symbol}", PortValue.FloatValue(0.15f))
 
             // ═══ TEMPO ═══
-            // Slow Pink Floyd groove — "One of These Days" ~90 BPM
-            put("org.balch.orpheus.plugins.tempo:bpm", PortValue.FloatValue(88f))
+            put("org.balch.orpheus.plugins.tempo:bpm", PortValue.FloatValue(104f))
 
-            // ═══ DRUMS (Grids pattern + synthesis) ═══
-            // Slow hypnotic beat: deep 808 kick, metallic hat, snare accent
+            // ═══ DRUMS ═══
+            // "Another Brick" groove — steady kick, sparse snare
             val beatsUri = BEATS_URI
-            put("$beatsUri:${BeatsSymbol.X.symbol}", PortValue.FloatValue(0.35f))
-            put("$beatsUri:${BeatsSymbol.Y.symbol}", PortValue.FloatValue(0.50f))
-            put("$beatsUri:${BeatsSymbol.RANDOMNESS.symbol}", PortValue.FloatValue(0.15f))
-            put("$beatsUri:${BeatsSymbol.DENSITY_0.symbol}", PortValue.FloatValue(0.45f))  // kick: steady
-            put("$beatsUri:${BeatsSymbol.DENSITY_1.symbol}", PortValue.FloatValue(0.25f))  // snare: sparse accent
-            put("$beatsUri:${BeatsSymbol.DENSITY_2.symbol}", PortValue.FloatValue(0.55f))  // hat: ticking clock
+            put("$beatsUri:${BeatsSymbol.X.symbol}", PortValue.FloatValue(0.40f))
+            put("$beatsUri:${BeatsSymbol.Y.symbol}", PortValue.FloatValue(0.45f))
+            put("$beatsUri:${BeatsSymbol.RANDOMNESS.symbol}", PortValue.FloatValue(0.10f))
+            put("$beatsUri:${BeatsSymbol.DENSITY_0.symbol}", PortValue.FloatValue(0.50f))
+            put("$beatsUri:${BeatsSymbol.DENSITY_1.symbol}", PortValue.FloatValue(0.30f))
+            put("$beatsUri:${BeatsSymbol.DENSITY_2.symbol}", PortValue.FloatValue(0.45f))
 
             // ═══ STEREO PANNING ═══
-            // Q0: center (bass anchored), Q1: slight spread, Q2: wide stereo, Q3: extreme spread
+            // Bass hard left, rhythm center-left, textures wide, lead center-right
             val stereoUri = STEREO_URI
             val pans = listOf(
-                0.0f, 0.0f,     // Q0: center bass
-                -0.25f, 0.25f,  // Q1: lead spread
-                -0.65f, 0.65f,  // Q2: wide textures
-                -0.85f, 0.85f,  // Q3: extreme pad spread
-                -0.4f, 0.4f, -0.2f, 0.2f  // REPL: moderate spread
+                -0.70f, -0.50f, // Duo 0: bass LEFT
+                -0.20f, -0.10f, // Duo 1: rhythm center-left
+                -0.60f, 0.60f,  // Duo 2: textures wide
+                0.15f, 0.30f,   // Duo 3: lead center-right
+                -0.3f, 0.3f, -0.15f, 0.15f  // REPL: moderate spread
             )
             pans.forEachIndexed { i, p -> put("$stereoUri:voice_pan_$i", PortValue.FloatValue(p)) }
-
-            // ═══ TTS ═══
-            // "One of These Days" — deep menacing voice through the void
-            val ttsUri = TTS_URI
-            put("$ttsUri:text_input", PortValue.StringValue(
-                "One of these days I'm going to cut you a piece of ice cream cake"
-            ))
-            put("$ttsUri:selected_voice", PortValue.StringValue("Daniel"))
-            put("$ttsUri:${TtsSymbol.RATE.symbol}", PortValue.FloatValue(0.35f))
-            put("$ttsUri:${TtsSymbol.SPEED.symbol}", PortValue.FloatValue(0.25f))
-            put("$ttsUri:${TtsSymbol.VOLUME.symbol}", PortValue.FloatValue(0.6f))
-            put("$ttsUri:${TtsSymbol.PHASER.symbol}", PortValue.FloatValue(0.7f))
-            put("$ttsUri:${TtsSymbol.FEEDBACK.symbol}", PortValue.FloatValue(0.65f))
-            put("$ttsUri:${TtsSymbol.REVERB.symbol}", PortValue.FloatValue(0.8f))
         },
         createdAt = 0L
     )

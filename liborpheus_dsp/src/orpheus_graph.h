@@ -184,6 +184,9 @@ struct OrpheusGraph {
 int  orpheus_graph_load(OrpheusGraph* graph, const uint8_t* data,
                         size_t length, float sample_rate);
 
+// Dump execution order to stdout (for debugging graph topology).
+void orpheus_graph_dump_exec_order(OrpheusGraph* graph);
+
 // Process all units in topological order, write to interleaved stereo output.
 void orpheus_graph_process(OrpheusGraph* graph, struct OrpheusEngine* engine,
                            float* output_buffer, int num_frames);

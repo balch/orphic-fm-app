@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.presets
 
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -28,6 +29,8 @@ class PresetLoader(
     private val synthController: SynthController,
 ) {
 
+    private val log = logging("PresetLoader")
+
     // Shared flow to broadcast preset changes to ViewModels
     private val _presetFlow =
         MutableSharedFlow<SynthPreset>(
@@ -50,6 +53,13 @@ class PresetLoader(
      * from a silent state and can bring things up intentionally.
      */
     fun applyPreset(preset: SynthPreset) {
+        log.info { "══ Applying preset: ${preset.name} (${preset.portValues.size} ports) ══" }
+        preset.portValues.entries
+            .sortedBy { it.key }
+            .forEach { (key, value) ->
+                log.debug { "  $key = $value" }
+            }
+
         // Update global tempo immediately
         globalTempo.setBpm(preset.bpm.toDouble())
 

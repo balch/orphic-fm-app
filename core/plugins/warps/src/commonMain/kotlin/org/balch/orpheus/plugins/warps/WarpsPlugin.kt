@@ -81,6 +81,22 @@ class WarpsPlugin : DspPlugin {
                 set { _mix = it }
             }
         }
+
+        controlPort(WarpsSymbol.CARRIER_SOURCE) {
+            intType {
+                default = 0; min = 0; max = 8
+                get { _carrierSource }
+                set { _carrierSource = it }
+            }
+        }
+
+        controlPort(WarpsSymbol.MODULATOR_SOURCE) {
+            intType {
+                default = 0; min = 0; max = 8
+                get { _modulatorSource }
+                set { _modulatorSource = it }
+            }
+        }
     }
 
     private val audioPorts = ports {

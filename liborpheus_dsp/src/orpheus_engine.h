@@ -133,6 +133,7 @@ struct OrpheusEngine {
     std::atomic<float> warps_level1{0.5f};
     std::atomic<float> warps_level2{0.5f};
     std::atomic<float> warps_mix{0.0f};          // dry/wet mix (0=dry, 1=wet)
+    float warps_smooth_mix{0.0f};               // smoothed mix (audio thread only, no clicks)
     std::atomic<int>   warps_bypass{1};         // bypassed by default
 
     // ── Warps Source Routing ────────────────────────────
@@ -141,8 +142,8 @@ struct OrpheusEngine {
     float warps_source_buffers[kNumWarpsSources][kMaxFrames] = {};
     float warps_feedback_l[kMaxFrames] = {};
     float warps_feedback_r[kMaxFrames] = {};
-    std::atomic<int> warps_carrier_source{0};     // 0-6 enum
-    std::atomic<int> warps_modulator_source{0};   // 0-6 enum
+    std::atomic<int> warps_carrier_source{0};     // 0-8 WarpsSource enum
+    std::atomic<int> warps_modulator_source{0};   // 0-8 WarpsSource enum
 
     // ── Per-voice Engine 0 (OSC mode) state ─────────
     // Used when engine_index == -1 (OSC mode): triangle+square with ADSR + hold
@@ -269,6 +270,10 @@ struct OrpheusEngine {
     float smooth_delay_mix{0.0f};
     float smooth_delay_feedback{0.3f};
     float smooth_master_pan{0.0f};
+    float smooth_drum_mix{0.7f};
+    float smooth_marbles_mix{0.0f};
+    float smooth_looper_level{0.0f};
+    float smooth_looper_feedback{0.0f};
     float smooth_master_volume{0.7f};
     float smooth_vibrato_depth{0.0f};
     float smooth_coupling_depth{0.0f};
@@ -461,4 +466,11 @@ struct OrpheusEngine {
     // audio thread steps through them per-block.
     int64_t sample_counter{0};  // monotonic, incremented by num_frames each process()
     AutomationSlot automation_slots[kMaxAutomationSlots];
+
+    // ── Warps double-buffer (at end to avoid shifting field offsets) ──
+    // Warps reads previous frame's completed SYNTH/REPL data while
+    // voices fill the current frame's buffers.
+    float warps_synth_read[kMaxFrames] = {};
+    float warps_drums_read[kMaxFrames] = {};
+    float warps_repl_read[kMaxFrames] = {};
 };

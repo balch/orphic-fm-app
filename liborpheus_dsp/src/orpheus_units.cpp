@@ -40,6 +40,25 @@ static inline void release_ext_gate(OrpheusEngine::VoiceParams& vp) {
     }
 }
 
+// ── Helper: Warps carrier dry-path attenuation ──
+// Only the CARRIER source is attenuated — the modulator passes through
+// at full level, matching hardware Warps behaviour. Warps wet output
+// replaces the carrier in the mix; the modulator is merely used to
+// shape the carrier inside the effect.
+// At mix=1: carrier dry is silenced, wet fills the gap at matching level.
+static inline float warps_dry_scale(OrpheusEngine* engine, int voice_idx) {
+    if (engine->warps_bypass.load(std::memory_order_relaxed)) return 1.0f;
+    float mix = engine->warps_smooth_mix;  // use smoothed value (no clicks)
+    if (mix <= 0.001f) return 1.0f;
+    int carrier = engine->warps_carrier_source.load(std::memory_order_relaxed);
+    // SYNTH(0) = voices 0-7, DRUMS(1) = via drum voices, REPL(2) = voices 8-11
+    bool is_carrier = false;
+    if (carrier == 0 && voice_idx < 8) is_carrier = true;
+    if (carrier == 1 && voice_idx >= kDrumVoiceStart) is_carrier = true;
+    if (carrier == 2 && voice_idx >= 8 && voice_idx < kDrumVoiceStart) is_carrier = true;
+    return is_carrier ? (1.0f - mix) : 1.0f;
+}
+
 // ── Helper: resolve Marbles T buffer from trigger source index ──
 // Returns pointer to T1/T2/T3 buffer, or nullptr if trig_src is not 1-3.
 static inline float* resolve_marbles_t(OrpheusEngine* engine, int trig_src) {
@@ -898,26 +917,39 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Apply drum_mix gain to output buffer (matching Kotlin DrumPlugin: baseGain=1.6 * mix).
         // This scales the graph output so downstream units (pan, resonator, master) see the gain.
         if (idx >= kDrumVoiceStart) {
-            float drum_gain = 3.2f * engine->drum_mix.load(std::memory_order_relaxed);
+            float dm_target = 3.2f * engine->drum_mix.load(std::memory_order_relaxed);
+            float dm_coeff = smooth_coeff(sr);
             for (int i = 0; i < num_frames; i++) {
-                out[i] *= drum_gain;
+                engine->smooth_drum_mix += dm_coeff * (dm_target - engine->smooth_drum_mix);
+                out[i] *= engine->smooth_drum_mix;
             }
         }
     }
 
-    // Populate warps source buffers (normalized by voice count to prevent saturation)
-    // Main voices (0-7) → SYNTH (source 0), REPL voices (8-11) → REPL (source 2)
-    // Drum voices (12-14) are handled by unit_process_drum_sum → source 1
+    // Populate warps source buffers BEFORE dry attenuation (Warps needs full signal)
     if (idx < 8) {
         constexpr float kSynthNorm = 1.0f / 8.0f;
-        for (int i = 0; i < num_frames; i++) {
+        for (int i = 0; i < num_frames; i++)
             engine->warps_source_buffers[0][i] += out[i] * kSynthNorm;
-        }
     } else if (idx >= 8 && idx < kDrumVoiceStart) {
         constexpr float kReplNorm = 1.0f / 4.0f;
-        for (int i = 0; i < num_frames; i++) {
+        for (int i = 0; i < num_frames; i++)
             engine->warps_source_buffers[2][i] += out[i] * kReplNorm;
-        }
+    } else if (idx >= kDrumVoiceStart) {
+        // DRUMS source (1): accumulate drum voices directly
+        // (Clouds may not receive drums depending on graph routing)
+        constexpr float kDrumNorm = 1.0f / 3.0f;  // 3 drum voices
+        for (int i = 0; i < num_frames; i++)
+            engine->warps_source_buffers[1][i] += out[i] * kDrumNorm;
+    }
+
+    // Attenuate dry path when this voice is the Warps carrier source.
+    // Warps wet output replaces the carrier, so we fade out the dry carrier
+    // proportional to mix: at mix=1 the carrier is fully replaced by Warps.
+    float dry_scale = warps_dry_scale(engine, idx);
+    if (dry_scale < 0.999f) {
+        for (int i = 0; i < num_frames; i++)
+            out[i] *= dry_scale;
     }
 }
 
@@ -987,9 +1019,21 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         frames_done += block;
     }
 
-    // DRUMS source (1) for warps routing
-    for (int i = 0; i < num_frames; i++) {
-        engine->warps_source_buffers[1][i] = (out_l[i] + out_r[i]) * 0.5f;
+    // Attenuate Clouds dry path only when DRUMS is the Warps CARRIER.
+    // Clouds processes synth audio (not drums), but its output feeds into
+    // the same master mix — attenuate so Warps wet can replace the carrier.
+    if (!engine->warps_bypass.load(std::memory_order_relaxed)) {
+        float mix = engine->warps_smooth_mix;
+        if (mix > 0.001f) {
+            int c = engine->warps_carrier_source.load(std::memory_order_relaxed);
+            if (c == 1) {  // DRUMS is carrier
+                float scale = 1.0f - mix;
+                for (int i = 0; i < num_frames; i++) {
+                    out_l[i] *= scale;
+                    out_r[i] *= scale;
+                }
+            }
+        }
     }
 }
 
@@ -1011,6 +1055,8 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         if (engine->rings_bypass.load(std::memory_order_relaxed)) {
             std::memcpy(out_l, in, num_frames * sizeof(float));
             std::memcpy(out_r, in, num_frames * sizeof(float));
+            // Still populate RESONATOR Warps source even when bypassed
+            std::memcpy(engine->warps_source_buffers[4], out_r, num_frames * sizeof(float));
             return;
         }
     }
@@ -1074,8 +1120,9 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
 
-    if (engine->warps_bypass.load(std::memory_order_relaxed)) {
-        // Warps is a parallel processor — when bypassed, output silence
+    // warps_smooth_mix is updated in orpheus_graph_process (before any unit runs)
+    // so warps_dry_scale() and this function see the same consistent value.
+    if (engine->warps_smooth_mix < 0.0001f) {
         std::memset(out_l, 0, num_frames * sizeof(float));
         std::memset(out_r, 0, num_frames * sizeof(float));
         return;
@@ -1091,6 +1138,15 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     auto select_source = [&](int src, float* dest) {
         if (src == 5) { // WARPS feedback
             std::memcpy(dest, engine->warps_feedback_l, num_frames * sizeof(float));
+        } else if (src == 0) {
+            // SYNTH uses double-buffered read (previous frame, avoids execution order)
+            std::memcpy(dest, engine->warps_synth_read, num_frames * sizeof(float));
+        } else if (src == 1) {
+            // DRUMS uses double-buffered read
+            std::memcpy(dest, engine->warps_drums_read, num_frames * sizeof(float));
+        } else if (src == 2) {
+            // REPL uses double-buffered read
+            std::memcpy(dest, engine->warps_repl_read, num_frames * sizeof(float));
         } else if (src >= 0 && src < OrpheusEngine::kNumWarpsSources) {
             std::memcpy(dest, engine->warps_source_buffers[src], num_frames * sizeof(float));
         } else {
@@ -1104,33 +1160,37 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     float* in_l = carrier_buf;
     float* in_r = mod_buf;
 
-    float drive1 = engine->warps_level1.load(std::memory_order_relaxed);
-    float drive2 = engine->warps_level2.load(std::memory_order_relaxed);
-
     auto* wp = engine->warps_modulator.mutable_parameters();
     // UI sends 0-8 (SegmentedAlgoKnob range), MI Warps expects 0-1 (internally * 8)
     wp->modulation_algorithm = engine->warps_algorithm.load(std::memory_order_relaxed) / 8.0f;
     wp->modulation_parameter = engine->warps_timbre.load(std::memory_order_relaxed);
-    // Drive applied as pre-gain below; MI internal drive set to neutral
-    wp->channel_drive[0] = 0.5f;
-    wp->channel_drive[1] = 0.5f;
+    // Level knobs drive MI Warps' SaturatingAmplifier directly — its nonlinear
+    // gain curve handles everything from noise-gating (0) to heavy overdrive (1).
+    // Signal enters at full scale (no external pre-gain) to maximize int16 precision.
+    wp->channel_drive[0] = engine->warps_level1.load(std::memory_order_relaxed);
+    wp->channel_drive[1] = engine->warps_level2.load(std::memory_order_relaxed);
     wp->carrier_shape = 0;
+
+    // Use block size 64 (not kMaxBlockSize=96) to ensure the MI Warps SRC
+    // downsampler always takes the same code path. At 96-sample blocks with
+    // 512-sample callbacks, the last block is 32 samples which switches the
+    // SRC to a circular-buffer path with incompatible state → crackling.
+    // At 64 samples: 64*6=384 = 8*48 (filter_size), always using the fast path.
+    // 512/64 = 8 blocks, no remainder.
+    constexpr int kWarpsBlockSize = 64;
 
     int frames_done = 0;
     while (frames_done < num_frames) {
-        int block = std::min(static_cast<int>(warps::kMaxBlockSize),
-                             num_frames - frames_done);
+        int block = std::min(kWarpsBlockSize, num_frames - frames_done);
 
         warps::ShortFrame in_frames[warps::kMaxBlockSize];
         warps::ShortFrame out_frames[warps::kMaxBlockSize];
 
         for (int i = 0; i < block; i++) {
-            // Apply drive as pre-gain, then soft-clip to avoid int16 hard clipping
-            float l = in_l[frames_done + i] * drive1;
-            float r = in_r[frames_done + i] * drive2;
-            // Soft clip: tanh-style saturation keeps signal musical
-            l = l / (1.0f + std::fabs(l));
-            r = r / (1.0f + std::fabs(r));
+            float l = in_l[frames_done + i];
+            float r = in_r[frames_done + i];
+            l = std::fmax(-1.0f, std::fmin(1.0f, l));
+            r = std::fmax(-1.0f, std::fmin(1.0f, r));
             in_frames[i].l = static_cast<short>(l * 32767.0f);
             in_frames[i].r = static_cast<short>(r * 32767.0f);
         }
@@ -1146,13 +1206,22 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         frames_done += block;
     }
 
-    // Mix controls wet output level (dry signal already in master from normal voice path)
-    float mix = engine->warps_mix.load(std::memory_order_relaxed);
-    if (mix < 1.0f) {
-        for (int i = 0; i < num_frames; i++) {
-            out_l[i] *= mix;
-            out_r[i] *= mix;
-        }
+    // Scale wet output: boost to match the full-level carrier removed from dry.
+    // Source buffers are normalized (SYNTH=1/8, REPL=1/4). The MI SaturatingAmplifier
+    // processes this quiet signal and outputs at a similar level. We boost the wet
+    // by the inverse normalization so it replaces the carrier at matching volume.
+    // Compensate for source normalization but account for MI SaturatingAmplifier
+    // internal gain (~0.375x at drive=0.5). Boost 4x gives unity at mid-drive;
+    // higher drive values add overdrive (intended).
+    float wet_boost = 1.0f;
+    if (c_src == 0) wet_boost = 4.0f;       // SYNTH (1/8 norm, hotter)
+    else if (c_src == 1) wet_boost = 2.0f;  // DRUMS (1/3 norm)
+    else if (c_src == 2) wet_boost = 2.0f;  // REPL (1/4 norm)
+
+    float gain = engine->warps_smooth_mix * wet_boost;
+    for (int i = 0; i < num_frames; i++) {
+        out_l[i] *= gain;
+        out_r[i] *= gain;
     }
 
     // Store output as feedback source (source 5)
@@ -2069,6 +2138,10 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
         std::memset(out_gate, 0, num_frames * sizeof(float));
         std::memset(out_cv1,  0, num_frames * sizeof(float));
         std::memset(out_cv2,  0, num_frames * sizeof(float));
+        // Zero Warps FLUX source and cached CV to avoid stale data
+        std::memset(engine->warps_source_buffers[6], 0, num_frames * sizeof(float));
+        engine->marbles_cv_output[0] = 0.0f;
+        engine->marbles_cv_output[1] = 0.0f;
         return;
     }
 
@@ -2203,16 +2276,23 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     }
 
     // CV outputs: scale voltage by mix before exp conversion for perceptually linear control.
-    // 2^(V * mix) - 1 → at mix=0.5, a 3-octave range becomes 1.5 octaves.
-    // Matches Kotlin FluxProcessor.kt output path.
+    // Raw XY voltage is scaled by 0.4 to keep pitch shifts musically useful:
+    //   POSITIVE (0-5V): 0-2 octaves up at full mix  (was 0-4 octaves)
+    //   NARROW   (0-2V): 0-0.8 octaves              (subtle)
+    //   FULL   (-5-+5V): ±2 octaves                  (symmetric)
+    // Also prevents Warps saturation — Flux signal stays in a usable drive range.
+    constexpr float kFluxVoltageScale = 0.4f;
+    float mx_coeff = smooth_coeff(sample_rate);
     for (int i = 0; i < num_frames; i++) {
-        float v1 = xy_output[i * 4 + 0] * mix;
-        float v2 = xy_output[i * 4 + 1] * mix;
-        float v3 = xy_output[i * 4 + 2] * mix;
-        // Clamp to [-1, 4] octaves before exp to prevent blowout (2^4 = 16x max)
-        v1 = std::fmin(std::fmax(v1, -1.0f), 4.0f);
-        v2 = std::fmin(std::fmax(v2, -1.0f), 4.0f);
-        v3 = std::fmin(std::fmax(v3, -1.0f), 4.0f);
+        engine->smooth_marbles_mix += mx_coeff * (mix - engine->smooth_marbles_mix);
+        float sm = engine->smooth_marbles_mix;
+        float v1 = xy_output[i * 4 + 0] * sm * kFluxVoltageScale;
+        float v2 = xy_output[i * 4 + 1] * sm * kFluxVoltageScale;
+        float v3 = xy_output[i * 4 + 2] * sm * kFluxVoltageScale;
+        // Clamp to [-2, 2] octaves before exp to prevent blowout
+        v1 = std::fmin(std::fmax(v1, -2.0f), 2.0f);
+        v2 = std::fmin(std::fmax(v2, -2.0f), 2.0f);
+        v3 = std::fmin(std::fmax(v3, -2.0f), 2.0f);
         out_cv1[i] = std::exp2f(v1) - 1.0f;
         out_cv2[i] = std::exp2f(v2) - 1.0f;
         engine->marbles_x3_buffer[i] = std::exp2f(v3) - 1.0f;
@@ -2245,8 +2325,8 @@ void unit_process_looper(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
 
-    float level = engine->looper_level.load(std::memory_order_relaxed);
-    float feedback = engine->looper_feedback.load(std::memory_order_relaxed);
+    float level_target = engine->looper_level.load(std::memory_order_relaxed);
+    float feedback_target = engine->looper_feedback.load(std::memory_order_relaxed);
     bool quantize = engine->looper_quantize.load(std::memory_order_relaxed) != 0;
     int requested = engine->looper_requested_state.load(std::memory_order_relaxed);
 
@@ -2266,8 +2346,14 @@ void unit_process_looper(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
     int state = engine->looper_current_state;
     int max_samples = OrpheusEngine::kMaxLoopSamples;
+    float lp_coeff = smooth_coeff(sample_rate);
 
     for (int i = 0; i < num_frames; i++) {
+        // Smooth level and feedback to prevent clicks
+        engine->smooth_looper_level += lp_coeff * (level_target - engine->smooth_looper_level);
+        engine->smooth_looper_feedback += lp_coeff * (feedback_target - engine->smooth_looper_feedback);
+        float level = engine->smooth_looper_level;
+        float feedback = engine->smooth_looper_feedback;
         // Check for beat boundary (quantized state transitions)
         if (engine->looper_pending_transition && in_beat[i] > 0.5f) {
             engine->looper_pending_transition = false;
@@ -2790,4 +2876,30 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     // Store per-sample envelope (already tracked in the loop with 150ms half-life)
     engine->voice_envelope[idxA] = envA;
     engine->voice_envelope[idxB] = envB;
+
+    // Accumulate into Warps source buffers (matching unit_process_plaits)
+    // Voices 0-7 → SYNTH (source 0), voices 8-11 → REPL (source 2)
+    auto accumulate_warps = [&](int idx, float* buf) {
+        if (idx < 8) {
+            constexpr float kSynthNorm = 1.0f / 8.0f;
+            for (int i = 0; i < num_frames; i++)
+                engine->warps_source_buffers[0][i] += buf[i] * kSynthNorm;
+        } else if (idx < kDrumVoiceStart) {
+            constexpr float kReplNorm = 1.0f / 4.0f;
+            for (int i = 0; i < num_frames; i++)
+                engine->warps_source_buffers[2][i] += buf[i] * kReplNorm;
+        }
+    };
+    accumulate_warps(idxA, outA);
+    accumulate_warps(idxB, outB);
+
+    // Attenuate dry path when voices are the Warps carrier source
+    float dry_A = warps_dry_scale(engine, idxA);
+    float dry_B = warps_dry_scale(engine, idxB);
+    if (dry_A < 0.999f) {
+        for (int i = 0; i < num_frames; i++) outA[i] *= dry_A;
+    }
+    if (dry_B < 0.999f) {
+        for (int i = 0; i < num_frames; i++) outB[i] *= dry_B;
+    }
 }

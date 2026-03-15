@@ -22,6 +22,9 @@ int orpheus_engine_load_patch(OrpheusEngine* engine,
 void orpheus_engine_process(OrpheusEngine* engine,
                             float* output_buffer, int num_frames);
 
+// ── Diagnostics ────
+void  orpheus_engine_dump_state(OrpheusEngine* engine);
+
 // ── Parameter control (called from UI thread) ────
 void  orpheus_engine_set_port(OrpheusEngine* engine,
                               const char* plugin_uri,

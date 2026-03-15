@@ -167,14 +167,69 @@ int orpheus_engine_load_patch(OrpheusEngine* engine,
         orpheus_graph_free(new_graph);
         return result;
     }
-    // Atomic swap: audio thread sees new graph after release
+    // Dump graph topology on load
+    orpheus_graph_dump_exec_order(new_graph);
+
+    // Atomic swap: audio thread sees new graph after release.
+    // WARNING: immediate free of old graph is only safe when called before
+    // audio processing starts (e.g., at startup or during nativeLoadGraph).
+    // If hot-swapping while audio is running, defer the free to avoid a
+    // use-after-free race with the audio callback.
     auto* old = engine->graph.exchange(new_graph, std::memory_order_acq_rel);
-    // Defer free: old graph may still be in use for current audio callback.
-    // Store for deferred cleanup on next load or destroy.
-    // For now, delete immediately — loadGraph is only called at startup
-    // before audio is flowing, so this is safe in practice.
     orpheus_graph_free(old);
     return 0;
+}
+
+void orpheus_engine_dump_state(OrpheusEngine* e) {
+    printf("\n═══ Engine State ═══\n");
+    printf("  sample_rate=%.0f\n", e->sample_rate);
+
+    // Voices
+    printf("  Voices:\n");
+    for (int i = 0; i < kNumVoices; i++) {
+        auto& vp = e->voice_params[i];
+        if (!vp.ever_triggered.load()) continue;
+        printf("    [%2d] engine=%d tune=%.2f gate=%d hold=%.2f decay=%.2f\n",
+               i, vp.engine_index.load(), vp.tune.load(),
+               vp.gate.load(), e->voice_hold_level[i].load(),
+               vp.decay.load());
+    }
+
+    // Warps
+    printf("  Warps: bypass=%d algo=%.2f timbre=%.2f drv=%.2f/%.2f mix=%.2f carrier=%d mod=%d\n",
+           e->warps_bypass.load(), e->warps_algorithm.load(),
+           e->warps_timbre.load(), e->warps_level1.load(),
+           e->warps_level2.load(), e->warps_mix.load(),
+           e->warps_carrier_source.load(), e->warps_modulator_source.load());
+
+    // LFO
+    printf("  LFO: freqA=%.3f freqB=%.3f shape=%.2f mode=%d\n",
+           e->lfo_freq_a.load(), e->lfo_freq_b.load(),
+           e->lfo_shape.load(), e->lfo_mode.load());
+
+    // Delay
+    printf("  Delay: t1=%.3f t2=%.3f fb=%.2f mix=%.2f\n",
+           e->delay_time_1.load(), e->delay_time_2.load(),
+           e->delay_feedback.load(), e->delay_mix.load());
+
+    // Reverb
+    printf("  Reverb: amt=%.2f time=%.2f damp=%.2f diff=%.2f\n",
+           e->reverb_amount.load(), e->reverb_time.load(),
+           e->reverb_damping.load(), e->reverb_diffusion.load());
+
+    // Drums
+    printf("  Drums: mix=%.2f grids_bypass=%d\n",
+           e->drum_mix.load(), e->grids_bypass.load());
+
+    // Flux
+    printf("  Flux: mix=%.2f rate=%.2f spread=%.2f\n",
+           e->marbles_mix.load(), e->marbles_t_rate.load(),
+           e->marbles_x_spread.load());
+
+    // Master
+    printf("  Master: vol=%.2f pan=%.2f\n",
+           e->master_volume.load(), e->master_pan.load());
+    printf("═══════════════════\n\n");
 }
 
 // Step through automation paths at block boundaries (called from audio thread)

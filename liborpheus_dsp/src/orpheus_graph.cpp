@@ -292,6 +292,31 @@ static void orpheus_graph_sort(OrpheusGraph* graph) {
     }
 }
 
+// -- Dump execution order for debugging ----
+void orpheus_graph_dump_exec_order(OrpheusGraph* graph) {
+    static const char* type_names[] = {
+        "TRI_OSC", "SQ_OSC", "MULTIPLY", "ADD", "MUL_ADD",
+        "ENV", "LIN_RAMP", "PASS", "PEAK_FOLLOW", "HARD_CLIP",
+        "LIMITER", "DELAY_LINE", "CLOUDS", "RINGS", "WARPS",
+        "DUAL_DELAY", "REVERB", "LFO", "MASTER_OUT", "PLAITS",
+        "CLOCK", "GRIDS", "MARBLES", "LOOPER", "BENDER",
+        "PER_STR_BEND", "DUO_VOICE"
+    };
+    static_assert(sizeof(type_names) / sizeof(type_names[0]) == UNIT_TYPE_COUNT,
+                  "type_names[] out of sync with UnitType enum");
+    printf("  Graph execution order (%d units):\n", graph->exec_count);
+    for (int ei = 0; ei < graph->exec_count; ei++) {
+        int idx = graph->exec_order[ei];
+        GraphUnit* u = &graph->units[idx];
+        const char* name = (u->type >= 0 && u->type < UNIT_TYPE_COUNT)
+            ? type_names[u->type] : "???";
+        printf("    [%2d] unit %2d  %-14s  %s  (module.index=%d)\n",
+               ei, idx, name,
+               u->enabled ? "ON " : "off",
+               u->state.module.index);
+    }
+}
+
 // -- Graph process: run all units in topological order ----
 
 void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
@@ -299,9 +324,30 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     if (num_frames > kMaxFrames) num_frames = kMaxFrames;
     float sr = graph->sample_rate;
 
-    // Zero warps source buffers that are accumulated by individual units
+    // Double-buffer for Warps: copy PREVIOUS frame's completed source data
+    // to read buffers BEFORE zeroing for the current frame's accumulation.
+    // This ensures Warps always reads a full buffer regardless of execution order.
+    std::memcpy(engine->warps_synth_read, engine->warps_source_buffers[0],
+                num_frames * sizeof(float));
+    std::memcpy(engine->warps_drums_read, engine->warps_source_buffers[1],
+                num_frames * sizeof(float));
+    std::memcpy(engine->warps_repl_read, engine->warps_source_buffers[2],
+                num_frames * sizeof(float));
+
+    // Now zero for this frame's voice accumulation
     std::memset(engine->warps_source_buffers[0], 0, num_frames * sizeof(float)); // SYNTH
+    std::memset(engine->warps_source_buffers[1], 0, num_frames * sizeof(float)); // DRUMS
     std::memset(engine->warps_source_buffers[2], 0, num_frames * sizeof(float)); // REPL
+
+    // Smooth warps_mix here (before any voice runs) so warps_dry_scale()
+    // reads a consistent value regardless of execution order.
+    {
+        float mix_target = engine->warps_bypass.load(std::memory_order_relaxed)
+            ? 0.0f : engine->warps_mix.load(std::memory_order_relaxed);
+        float sc = 1.0f - std::exp(-1.0f / (0.005f * sr));  // ~5ms ramp
+        engine->warps_smooth_mix += sc * (mix_target - engine->warps_smooth_mix);
+        if (engine->warps_smooth_mix < 0.0001f) engine->warps_smooth_mix = 0.0f;
+    }
 
     for (int ei = 0; ei < graph->exec_count; ei++) {
         int idx = graph->exec_order[ei];
@@ -376,6 +422,7 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
             default: break;
         }
     }
+
 }
 
 // -- Port routing via hash table --------------------------
