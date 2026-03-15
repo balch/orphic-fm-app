@@ -1,6 +1,6 @@
 package org.balch.orpheus.core.audio.dsp
 
-import org.balch.orpheus.plugins.drum.engine.DrumBeatsGenerator
+import org.balch.orpheus.plugins.drum.DrumBeatsGenerator
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

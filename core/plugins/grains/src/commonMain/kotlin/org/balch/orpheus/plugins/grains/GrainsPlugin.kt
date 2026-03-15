@@ -5,14 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
-import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.PortValue
@@ -23,35 +16,23 @@ import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
 
 /**
  * Grains Texture Synthesizer Plugin.
- * 
- * Port Map:
- * 0: Left Input (Audio)
- * 1: Right Input (Audio)
- * 2: Output Left (Audio)
- * 3: Output Right (Audio)
- * 
- * Controls (via DSL):
- * - position, size, pitch, density, texture, dry_wet, freeze, mode
+ *
+ * Pure state container — C++ handles all audio processing.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
-class GrainsPlugin(
-    private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
-) : DspPlugin {
+class GrainsPlugin : DspPlugin {
 
     override val info = PluginInfo(
         uri = URI,
         name = "Grains",
         author = "Balch"
     )
-    
+
     companion object {
         const val URI = GRAINS_URI
     }
-
-    private val grains = dspFactory.createGrainsUnit()
 
     // Internal state
     private var _position = 0.2f
@@ -72,73 +53,58 @@ class GrainsPlugin(
             floatType {
                 default = 0.2f
                 get { _position }
-                set { _position = it; grains.position.set(it.toDouble()) }
+                set { _position = it }
             }
         }
-        
+
         controlPort(GrainsSymbol.SIZE) {
             floatType {
                 get { _size }
-                set { _size = it; grains.size.set(it.toDouble()) }
+                set { _size = it }
             }
         }
-        
+
         controlPort(GrainsSymbol.PITCH) {
             floatType {
                 default = 0.0f; min = -1f; max = 1f
                 get { _pitch }
-                set { _pitch = it; grains.pitch.set(it.toDouble()) }
+                set { _pitch = it }
             }
         }
-        
+
         controlPort(GrainsSymbol.DENSITY) {
             floatType {
                 get { _density }
-                set { _density = it; grains.density.set(it.toDouble()) }
+                set { _density = it }
             }
         }
-        
+
         controlPort(GrainsSymbol.TEXTURE) {
             floatType {
                 get { _texture }
-                set { _texture = it; grains.texture.set(it.toDouble()) }
+                set { _texture = it }
             }
         }
-        
+
         controlPort(GrainsSymbol.DRY_WET) {
             floatType {
                 default = 0f
                 get { _dryWet }
-                set {
-                    val wasDisabled = _dryWet <= PLUGIN_DISABLE_THRESHOLD
-                    _dryWet = it
-                    val shouldDisable = _dryWet <= PLUGIN_DISABLE_THRESHOLD
-                    if (wasDisabled && _dryWet > PLUGIN_ENABLE_THRESHOLD) {
-                        // Zero output before enabling to prevent blowout
-                        grains.dryWet.set(0.0)
-                        grains.setBypass(false)
-                        setPluginEnabled(true, audioEngine)
-                    }
-                    grains.dryWet.set(it.toDouble())
-                    grains.setBypass(shouldDisable)
-                    if (shouldDisable) {
-                        setPluginEnabled(false, audioEngine)
-                    }
-                }
+                set { _dryWet = it }
             }
         }
-        
+
         controlPort(GrainsSymbol.FREEZE) {
             boolType {
                 get { _freeze }
-                set { _freeze = it; grains.freeze.set(if (it) 1.0 else 0.0) }
+                set { _freeze = it }
             }
         }
-        
+
         controlPort(GrainsSymbol.TRIGGER) {
             boolType {
                 get { _trigger }
-                set { _trigger = it; grains.trigger.set(if (it) 1.0 else 0.0) }
+                set { _trigger = it }
             }
         }
 
@@ -147,7 +113,7 @@ class GrainsPlugin(
                 min = 0; max = 3
                 options = listOf("Granular", "Stretch", "Loop", "Spectral")
                 get { _mode }
-                set { _mode = it; grains.setMode(it) }
+                set { _mode = it }
             }
         }
 
@@ -155,7 +121,7 @@ class GrainsPlugin(
             floatType {
                 default = 0f
                 get { _feedback }
-                set { _feedback = it; grains.feedback.set(it.toDouble()) }
+                set { _feedback = it }
             }
         }
 
@@ -177,43 +143,8 @@ class GrainsPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = listOf(grains)
-
-    override val inputs: Map<String, AudioInput> = mapOf(
-        "inputLeft" to grains.inputLeft,
-        "inputRight" to grains.inputRight,
-        "position" to grains.position,
-        "size" to grains.size,
-        "pitch" to grains.pitch,
-        "density" to grains.density,
-        "texture" to grains.texture,
-        "dryWet" to grains.dryWet,
-        "freeze" to grains.freeze,
-        "trigger" to grains.trigger,
-        "feedback" to grains.feedback
-    )
-
-    override val outputs: Map<String, AudioOutput> = mapOf(
-        "output" to grains.output,
-        "outputRight" to grains.outputRight
-    )
-
-    override fun initialize() {
-        grains.setMode(0) 
-        grains.dryWet.set(0.5)
-        grains.density.set(0.5)
-        grains.position.set(0.2)
-
-        audioUnits.forEach { audioEngine.addUnit(it) }
-    }
-
-    override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_dryWet > PLUGIN_ENABLE_THRESHOLD, audioEngine)
-    }
 
     override fun onStart() {}
-    override fun connectPort(index: Int, data: Any) {}
-    override fun run(nFrames: Int) {}
 
     // Generic port value accessors delegating to DSL builder
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)

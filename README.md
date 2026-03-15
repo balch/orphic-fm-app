@@ -10,7 +10,7 @@ Orphic-FM is an 8-oscillator Synthesizer Emulator combining sounds and harmonics
 
 This instrument is inspired by the [Lyra-8 Orgasmic Synthesizer](https://somasynths.com/lyra-organismic-synthesizer/) and adds additional synthesis engines ported from the awesome OSS [Mutable Instruments' Eurorack firmware](https://github.com/pichenettes/eurorack) repository – FM, virtual analog, granular, physical modeling strings, modal resonators, additive, waveshaping, speech synthesis, and four drum voices.
 
-Under the hood, a shared **C++ DSP engine** (`liborpheus_dsp/`) ports the Eurorack firmware and provides a graph-based audio routing system. On **Android**, it runs natively via [Oboe](https://github.com/google/oboe) (Google's C++ low-latency audio library) at 48kHz. On **WASM**, the same C++ code is compiled to WebAssembly via [Emscripten](https://emscripten.org/) and runs in a Web Worker. **Desktop** uses [JSyn](http://www.softsynth.com/jsyn/) for real-time audio synthesis, with an optional C++ engine mode (`-Dorpheus.engine=cpp`) via JNI.
+Under the hood, a shared **C++ DSP engine** (`liborpheus_dsp/`) ports the Eurorack firmware and provides a graph-based audio routing system. On **Android**, it runs natively via [Oboe](https://github.com/google/oboe) (Google's C++ low-latency audio library) at 48kHz. On **WASM**, the same C++ code is compiled to WebAssembly via [Emscripten](https://emscripten.org/) and runs in a Web Worker. On **Desktop (JVM)**, it loads `liborpheus_desktop.dylib` via JNI using [miniaudio](https://miniaud.io/) for low-latency playback.
 
 I had multiple motivations for building this project, but I mainly did it because I've always wanted to build some kind of instrument, and now AI agents make that possible. AI played a big part in the development, and it will be interesting to see what happens as Orpheus learns to master the synth. 
 
@@ -100,21 +100,18 @@ The fusion algorithm boosts confidence when both classifiers agree and penalizes
 
 | Platform | Audio | Status |
 |----------|-------|--------|
-| Desktop (JVM) | JSyn (default) or C++ via JNI | Primary target |
+| Desktop (JVM) | C++ via JNI + miniaudio | Primary target |
 | Android | Oboe (C++ / JNI) at 48kHz | Full support |
 | wasmJs | C++ DSP → Emscripten WASM → AudioWorklet | Functional ([orphic.fm](https://orphic.fm/)) |
 | iOS | -- | Skeleton |
 
-The **WASM** target compiles the C++ DSP engine to WebAssembly via Emscripten. Audio runs in a Web Worker that renders 128-frame buffers and posts them to an `AudioWorkletNode` for gapless playback. The main thread keeps a local shadow of engine state for UI reads while forwarding parameter changes to the Worker via `postMessage`. A fallback Kotlin DSP mode is available with `?noworker`.
+The **WASM** target compiles the C++ DSP engine to WebAssembly via Emscripten. Audio runs in a Web Worker that renders 128-frame buffers and posts them to an `AudioWorkletNode` for gapless playback. The main thread keeps a local shadow of engine state for UI reads while forwarding parameter changes to the Worker via `postMessage`.
 
 ## Build & Run
 
 ```bash
-# Desktop (JSyn audio)
-./gradlew :apps:composeApp:run
-
-# Desktop with C++ DSP engine
-./gradlew buildDesktopNative && ./gradlew :apps:composeApp:run -Dorpheus.engine=cpp
+# Desktop (C++ DSP engine via JNI + miniaudio)
+./gradlew buildDesktopNative && ./gradlew :apps:composeApp:run
 
 # Android
 ./gradlew :apps:androidApp:installDebugRelease
@@ -184,13 +181,13 @@ curl -L -o core/mediapipe/src/jvmMain/resources/models/hand_landmarker.task \
 | [Material3](https://developer.android.com/jetpack/compose/designsystems/material3) | Material Design 3 components and adaptive layouts                                                                |
 | [Liquid](https://github.com/FletchMcKee/liquid)                                    | Glassmorphism blur effects for Compose                                                                           |
 | [Metro](https://github.com/ZacSweers/metro)                                        | Compile-time dependency injection for Kotlin by Zac Sweers                                                       |
-| [JSyn](http://www.softsynth.com/jsyn/)                                             | Real-time audio synthesis library by Phil Burk (Desktop)                                                         |
+| [miniaudio](https://miniaud.io/)                                                   | C audio I/O library for Desktop JNI engine                                                                       |
 | [Oboe](https://github.com/google/oboe)                                            | Google's C++ low-latency audio library for Android                                                               |
 | [Tidal Cycles](https://tidalcycles.org/)                                           | A REPL (Read-Eval-Print Loop) language for Live Coding Musical patterns                                          |
 | [Strudel](https://strudel.cc/)                                                     | JS Live Coding Music Editor used for inspiration                                                                 |
 | [ktmidi](https://github.com/atsushieno/ktmidi)                                     | Kotlin Multiplatform MIDI I/O                                                                                    |
 | [CoreMIDI4J](https://github.com/DerekCook/CoreMidi4J)                              | macOS CoreMIDI access for JVM                                                                                    |
-| [Mutable Instruments Eurorack](https://github.com/pichenettes/eurorack)            | Emilie Gillet's open-source module firmware -- Plaits engines, Rings reverb, and drum synthesis ported to Kotlin |
+| [Mutable Instruments Eurorack](https://github.com/pichenettes/eurorack)            | Emilie Gillet's open-source module firmware -- Plaits engines, Rings reverb, and drum synthesis ported to C++    |
 | [Koog](https://github.com/JetBrains/koog)                                          | AI agent framework with Gemini integration                                                                       |
 | [Ktor](https://ktor.io/)                                                           | Kotlin async HTTP client                                                                                         |
 | [KmLogging](https://github.com/DiamondEdge1/KmLogging)                             | Kotlin Multiplatform structured logging                                                                          |

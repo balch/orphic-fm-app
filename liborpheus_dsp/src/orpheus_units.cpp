@@ -263,7 +263,7 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
 
-    // Matches JSyn StereoPlugin chain: pan → volume → peak (pre-clip) → hard clip → output
+    // Signal chain: pan → volume → peak measurement → soft saturation → output
     float pan_target = engine->master_pan.load(std::memory_order_relaxed);
     float vol_target = engine->master_volume.load(std::memory_order_relaxed);
     float coeff = smooth_coeff(sr);
@@ -288,12 +288,12 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
         if (al > pk_l) pk_l = al;
         if (ar > pk_r) pk_r = ar;
 
-        // Hard clip (matching JSyn DspWiringGraph.masterClipL/R)
-        output_buffer[i * 2]     = std::max(-1.0f, std::min(1.0f, l));
-        output_buffer[i * 2 + 1] = std::max(-1.0f, std::min(1.0f, r));
+        // Soft saturation — prevents digital clipping when multiple sources sum above ±1.0
+        output_buffer[i * 2]     = std::tanh(l);
+        output_buffer[i * 2 + 1] = std::tanh(r);
     }
 
-    // Store pre-clip peaks for monitoring (JSyn measures before clip too)
+    // Store pre-saturation peaks for monitoring
     engine->peak_left.store(pk_l, std::memory_order_relaxed);
     engine->peak_right.store(pk_r, std::memory_order_relaxed);
 }

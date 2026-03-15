@@ -33,7 +33,7 @@ import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.BeatsSymbol
 import org.balch.orpheus.core.plugin.symbols.DrumSymbol
 import org.balch.orpheus.core.tempo.GlobalTempo
-import org.balch.orpheus.plugins.drum.engine.DrumBeatsGenerator
+import org.balch.orpheus.plugins.drum.DrumBeatsGenerator
 
 @Immutable
 data class BeatsUiState(

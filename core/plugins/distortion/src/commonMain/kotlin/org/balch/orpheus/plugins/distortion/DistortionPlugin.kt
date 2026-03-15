@@ -5,14 +5,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
-import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.Symbol
@@ -22,24 +15,14 @@ import org.balch.orpheus.core.plugin.symbols.DISTORTION_URI
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 
 /**
- * LV2-style Distortion Plugin.
- * 
- * Port Map:
- * 0: Audio In Left (Input)
- * 1: Audio In Right (Input)
- * 2: Audio Out Left (Output)
- * 3: Audio Out Right (Output)
- * 
- * Controls (via DSL):
- * - drive, mix, dry_level
+ * Distortion Plugin.
+ *
+ * Pure state container — C++ handles all audio processing.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
-class DistortionPlugin(
-    private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
-) : DspPlugin {
+class DistortionPlugin : DspPlugin {
 
     override val info = PluginInfo(
         uri = URI,
@@ -52,78 +35,34 @@ class DistortionPlugin(
         const val URI = DISTORTION_URI
     }
 
-    // Internal DSP Units
-    private val drySumLeft = dspFactory.createPassThrough()
-    private val drySumRight = dspFactory.createPassThrough()
-    private val dryGainLeft = dspFactory.createMultiply()
-    private val dryGainRight = dspFactory.createMultiply()
-    private val driveGainLeft = dspFactory.createMultiply()
-    private val driveGainRight = dspFactory.createMultiply()
-    private val limiterLeft = dspFactory.createLimiter()
-    private val limiterRight = dspFactory.createLimiter()
-    private val cleanPathGainLeft = dspFactory.createMultiply()
-    private val cleanPathGainRight = dspFactory.createMultiply()
-    private val distortedPathGainLeft = dspFactory.createMultiply()
-    private val distortedPathGainRight = dspFactory.createMultiply()
-    private val postMixSummerLeft = dspFactory.createAdd()
-    private val postMixSummerRight = dspFactory.createAdd()
-
     // Internal state
     private var _drive = 0.0f
     private var _mix = 0f
     private var _dryLevel = 1.0f
 
-    // Type-safe DSL port definitions  
+    // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 4) {
         controlPort(DistortionSymbol.DRIVE) {
             floatType {
                 default = 0.0f
                 get { _drive }
-                set {
-                    _drive = it
-                    val driveVal = 1.0 + (it * 14.0)
-                    limiterLeft.drive.set(driveVal)
-                    limiterRight.drive.set(driveVal)
-                }
+                set { _drive = it }
             }
         }
-        
+
         controlPort(DistortionSymbol.MIX) {
             floatType {
                 default = 0f
                 get { _mix }
-                set {
-                    val wasDisabled = _mix <= PLUGIN_DISABLE_THRESHOLD
-                    _mix = it
-                    val distortedLevel = it
-                    val cleanLevel = 1.0f - it
-                    if (wasDisabled && _mix > PLUGIN_ENABLE_THRESHOLD) {
-                        // Zero distorted path gains before enabling to prevent blowout
-                        distortedPathGainLeft.inputB.set(0.0)
-                        distortedPathGainRight.inputB.set(0.0)
-                        setPluginEnabled(true, audioEngine)
-                    }
-                    cleanPathGainLeft.inputB.set(cleanLevel.toDouble())
-                    cleanPathGainRight.inputB.set(cleanLevel.toDouble())
-                    distortedPathGainLeft.inputB.set(distortedLevel.toDouble())
-                    distortedPathGainRight.inputB.set(distortedLevel.toDouble())
-                    if (_mix <= PLUGIN_DISABLE_THRESHOLD) {
-                        setPluginEnabled(false, audioEngine)
-                    }
-                }
+                set { _mix = it }
             }
         }
-        
+
         controlPort(DistortionSymbol.DRY_LEVEL) {
             floatType {
                 default = 1.0f
                 get { _dryLevel }
-                set {
-                    _dryLevel = it
-                    val level = it.toDouble()
-                    dryGainLeft.inputB.set(level)
-                    dryGainRight.inputB.set(level)
-                }
+                set { _dryLevel = it }
             }
         }
     }
@@ -137,110 +76,10 @@ class DistortionPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = listOf(
-        drySumLeft, drySumRight,
-        dryGainLeft, dryGainRight,
-        driveGainLeft, driveGainRight,
-        limiterLeft, limiterRight,
-        cleanPathGainLeft, cleanPathGainRight,
-        distortedPathGainLeft, distortedPathGainRight,
-        postMixSummerLeft, postMixSummerRight
-    )
 
-    // Only disable distortion processing path — keep dry passthrough alive
-    // since Distortion is in the series path: Resonator → Distortion → StereoSum
-    private val distortionPathUnits: List<AudioUnit> = listOf(
-        driveGainLeft, driveGainRight,
-        limiterLeft, limiterRight,
-        distortedPathGainLeft, distortedPathGainRight
-    )
-
-    override fun setPluginEnabled(enabled: Boolean, audioEngine: AudioEngine) {
-        for (unit in distortionPathUnits) {
-            audioEngine.setUnitEnabled(unit, enabled)
-        }
-    }
-
-    // DspPlugin compatibility
-    override val inputs: Map<String, AudioInput> = mapOf(
-        "inputLeft" to drySumLeft.input,
-        "inputRight" to drySumRight.input
-    )
-
-    override val outputs: Map<String, AudioOutput> = mapOf(
-        "outputLeft" to postMixSummerLeft.output,
-        "outputRight" to postMixSummerRight.output
-    )
-
-    // Automation compatibility
-    val limiterLeftDrive: AudioInput get() = limiterLeft.drive
-    val limiterRightDrive: AudioInput get() = limiterRight.drive
-    val cleanPathLeftGain: AudioInput get() = cleanPathGainLeft.inputB
-    val cleanPathRightGain: AudioInput get() = cleanPathGainRight.inputB
-    val distortedPathLeftGain: AudioInput get() = distortedPathGainLeft.inputB
-    val distortedPathRightGain: AudioInput get() = distortedPathGainRight.inputB
-    val dryGainLeftInput: AudioInput get() = dryGainLeft.inputB
-    val dryGainRightInput: AudioInput get() = dryGainRight.inputB
-
-    override fun initialize() {
-        // Default drive
-        driveGainLeft.inputB.set(1.0)
-        driveGainRight.inputB.set(1.0)
-
-        // Default clean/distorted mix (all clean, no distortion)
-        cleanPathGainLeft.inputB.set(1.0)
-        cleanPathGainRight.inputB.set(1.0)
-        distortedPathGainLeft.inputB.set(0.0)
-        distortedPathGainRight.inputB.set(0.0)
-
-        // Dry level defaults (full dry)
-        dryGainLeft.inputB.set(1.0)
-        dryGainRight.inputB.set(1.0)
-
-        // LEFT CHANNEL wiring
-        drySumLeft.output.connect(dryGainLeft.inputA)
-        dryGainLeft.output.connect(cleanPathGainLeft.inputA)
-        cleanPathGainLeft.output.connect(postMixSummerLeft.inputA)
-
-        dryGainLeft.output.connect(driveGainLeft.inputA)
-        driveGainLeft.output.connect(limiterLeft.input)
-        limiterLeft.output.connect(distortedPathGainLeft.inputA)
-        distortedPathGainLeft.output.connect(postMixSummerLeft.inputB)
-
-        // RIGHT CHANNEL wiring
-        drySumRight.output.connect(dryGainRight.inputA)
-        dryGainRight.output.connect(cleanPathGainRight.inputA)
-        cleanPathGainRight.output.connect(postMixSummerRight.inputA)
-
-        dryGainRight.output.connect(driveGainRight.inputA)
-        driveGainRight.output.connect(limiterRight.input)
-        limiterRight.output.connect(distortedPathGainRight.inputA)
-        distortedPathGainRight.output.connect(postMixSummerRight.inputB)
-
-        // Register with engine
-        audioUnits.forEach { audioEngine.addUnit(it) }
-    }
-
-    override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_mix > PLUGIN_ENABLE_THRESHOLD, audioEngine)
-    }
-
-    override fun onStart() {
-        // No-op for now
-    }
-
-    override fun connectPort(index: Int, data: Any) {
-        // In this implementation, we mostly use internal graph wiring.
-        // External connections will eventually use these ports.
-    }
-
-    override fun run(nFrames: Int) {
-        // Update control parameters if they are driven by Float data instead of Audio-Rate signals
-    }
+    override fun onStart() {}
 
     // Generic port value accessors delegating to DSL builder
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
-
-
 }

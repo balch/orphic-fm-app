@@ -5,11 +5,6 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
-import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
@@ -21,14 +16,13 @@ import org.balch.orpheus.core.plugin.symbols.VibratoSymbol
 
 /**
  * Vibrato Plugin (Global pitch wobble).
+ *
+ * Pure state container — C++ handles all audio processing.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
-class VibratoPlugin(
-    private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
-) : DspPlugin {
+class VibratoPlugin : DspPlugin {
 
     override val info = PluginInfo(
         uri = URI,
@@ -40,9 +34,6 @@ class VibratoPlugin(
         const val URI = VIBRATO_URI
     }
 
-    private val lfo = dspFactory.createSineOscillator()
-    private val depthGain = dspFactory.createMultiply()
-
     // Internal state
     private var _depth = 0.0f
     private var _rate = 5.0f
@@ -53,22 +44,15 @@ class VibratoPlugin(
             floatType {
                 default = 0f
                 get { _depth }
-                set {
-                    _depth = it
-                    val depthHz = it * 20.0
-                    depthGain.inputB.set(depthHz)
-                }
+                set { _depth = it }
             }
         }
-        
+
         controlPort(VibratoSymbol.RATE) {
             floatType {
                 default = 5.0f; min = 0.1f; max = 20.0f
                 get { _rate }
-                set {
-                    _rate = it
-                    lfo.frequency.set(it.toDouble())
-                }
+                set { _rate = it }
             }
         }
     }
@@ -79,31 +63,10 @@ class VibratoPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = listOf(
-        lfo, depthGain
-    )
-
-    override val outputs: Map<String, AudioOutput> = mapOf(
-        "output" to depthGain.output
-    )
-
-    override val inputs: Map<String, AudioInput> = emptyMap()
-
-    override fun initialize() {
-        lfo.frequency.set(5.0)
-        lfo.amplitude.set(1.0)
-        lfo.output.connect(depthGain.inputA)
-        depthGain.inputB.set(0.0)
-
-        audioUnits.forEach { audioEngine.addUnit(it) }
-    }
 
     override fun onStart() {}
-    override fun connectPort(index: Int, data: Any) {}
-    override fun run(nFrames: Int) {}
 
     // Generic port value accessors delegating to DSL builder
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
-
 }

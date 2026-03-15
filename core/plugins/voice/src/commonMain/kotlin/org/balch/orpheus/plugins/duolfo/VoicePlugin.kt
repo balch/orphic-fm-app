@@ -7,9 +7,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
@@ -315,14 +312,9 @@ class VoicePlugin(
     }
 
     override val ports: List<Port> = portDefs.ports
-    override val audioUnits: List<AudioUnit> = emptyList() // Managed by DspSynthEngine
-    override val inputs: Map<String, AudioInput> = emptyMap()
-    override val outputs: Map<String, AudioOutput> = emptyMap()
 
     override fun initialize() {}
     override fun onStart() {}
-    override fun connectPort(index: Int, data: Any) {}
-    override fun run(nFrames: Int) {}
     
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
@@ -357,7 +349,7 @@ class VoicePlugin(
     fun setQuadPitchSource(i: Int, v: Int) { _quadPitchSource[i] = v }
     fun setQuadEnvTriggerMode(i: Int, v: Boolean) { _quadEnvTriggerMode[i] = v }
 
-    // Native forwarding — no-op on JSyn, forwards on native engine
+    // Forward to C++ engine via audio engine port
     fun setDuoModSource(duoIndex: Int, modSourceOrdinal: Int) {
         _duoModSource[duoIndex] = modSourceOrdinal
         audioEngine.setPort(URI, "duo_mod_source_$duoIndex", modSourceOrdinal.toFloat())

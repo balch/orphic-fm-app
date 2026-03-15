@@ -41,11 +41,8 @@ Add `source ~/emsdk/emsdk_env.sh` to your shell profile for convenience.
 ## Quick Start
 
 ```bash
-# Desktop (JSyn audio)
-./gradlew :apps:composeApp:run
-
-# Desktop with C++ DSP engine
-./gradlew buildDesktopNative && ./gradlew :apps:composeApp:run -Dorpheus.engine=cpp
+# Desktop (C++ DSP engine via JNI + miniaudio)
+./gradlew buildDesktopNative && ./gradlew :apps:composeApp:run
 
 # Android
 ./gradlew :apps:androidApp:installDebugRelease
@@ -61,14 +58,14 @@ Add `source ~/emsdk/emsdk_env.sh` to your shell profile for convenience.
 
 ### Desktop (JVM)
 
-The default audio engine is [JSyn](http://www.softsynth.com/jsyn/). A C++ DSP engine is available via `-Dorpheus.engine=cpp`, which loads `liborpheus_desktop.dylib` (macOS) via JNI.
+The audio engine is the C++ DSP library (`liborpheus_desktop.dylib` on macOS) loaded via JNI, with [miniaudio](https://miniaud.io/) for low-latency audio output.
 
 ```bash
 # Build the native library
 ./gradlew buildDesktopNative
 
-# Run with C++ engine
-./gradlew :apps:composeApp:run -Dorpheus.engine=cpp
+# Run desktop app
+./gradlew :apps:composeApp:run
 
 # Package for distribution (requires full JDK with jpackage)
 ./gradlew :apps:composeApp:packageReleaseDistributionForCurrentOS
@@ -114,9 +111,6 @@ cp orpheus_dsp.js orpheus_dsp.wasm \
 ```
 
 The Gradle build has a `copyWasmDsp` task that copies WASM artifacts from the Emscripten build output to the processed resources directory automatically.
-
-**URL flags:**
-- `?noworker` — Run Kotlin DSP on main thread instead of C++ WASM Worker (fallback mode)
 
 ### Local Dev with orphic.fm Site
 

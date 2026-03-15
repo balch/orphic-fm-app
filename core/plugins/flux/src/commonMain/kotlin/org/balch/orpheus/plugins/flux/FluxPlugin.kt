@@ -6,13 +6,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioInput
-import org.balch.orpheus.core.audio.dsp.AudioOutput
-import org.balch.orpheus.core.audio.dsp.AudioUnit
-import org.balch.orpheus.core.audio.dsp.DspFactory
 import org.balch.orpheus.core.audio.dsp.DspPlugin
-import org.balch.orpheus.core.audio.dsp.PLUGIN_DISABLE_THRESHOLD
-import org.balch.orpheus.core.audio.dsp.PLUGIN_ENABLE_THRESHOLD
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
 import org.balch.orpheus.core.plugin.PortValue
@@ -23,27 +17,15 @@ import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 
 /**
  * Flux Generative Sequencer Plugin.
- * Wraps the FluxUnit.
- * 
- * Port Map:
- * 0: Clock Input (Audio)
- * 1: Output Gate (Audio)
- * 2: Output CV (Audio)
- * 3: Output CV X1 (Audio)
- * 4: Output CV X3 (Audio)
- * 5: Output Trig T1 (Audio)
- * 6: Output Trig T2 (Audio)
- * 7: Output Trig T3 (Audio)
- * 
- * Controls (via DSL):
- * - spread, bias, steps, dejavu, length, scale, rate, jitter, probability, pulse_width
+ *
+ * Pure state container — C++ handles all audio processing.
+ * Keeps `audioEngine` for native forwarding methods.
  */
 @Inject
 @SingleIn(AppScope::class)
 @ContributesIntoSet(AppScope::class, binding = binding<DspPlugin>())
 class FluxPlugin(
-    private val audioEngine: AudioEngine,
-    private val dspFactory: DspFactory
+    private val audioEngine: AudioEngine
 ) : DspPlugin {
 
     override val info = PluginInfo(
@@ -51,12 +33,10 @@ class FluxPlugin(
         name = "Flux",
         author = "Balch"
     )
-    
+
     companion object {
         const val URI = FLUX_URI
     }
-
-    val flux = dspFactory.createFluxUnit()
 
     // Internal state tracking
     private var _spread = 0.5f
@@ -72,7 +52,7 @@ class FluxPlugin(
     private var _tRange = 1
     private var _pulseWidth = 0.5f
     private var _pulseWidthStd = 0.0f
-    private var _dejaVuMode = 0  // 0=T+X, 1=T only, 2=X only
+    private var _dejaVuMode = 0
     private var _controlMode = 0
     private var _voltageRange = 2
     private var _mix = 0.0f
@@ -83,77 +63,77 @@ class FluxPlugin(
             floatType {
                 default = 0.5f
                 get { _spread }
-                set { _spread = it; flux.spread.set(it.toDouble()) }
+                set { _spread = it }
             }
         }
-        
+
         controlPort(FluxSymbol.BIAS) {
             floatType {
                 get { _bias }
-                set { _bias = it; flux.bias.set(it.toDouble()) }
+                set { _bias = it }
             }
         }
-        
+
         controlPort(FluxSymbol.STEPS) {
             floatType {
                 get { _steps }
-                set { _steps = it; flux.steps.set(it.toDouble()) }
+                set { _steps = it }
             }
         }
-        
+
         controlPort(FluxSymbol.DEJAVU) {
             floatType {
                 default = 0f
                 get { _dejaVu }
-                set { _dejaVu = it; flux.dejaVu.set(it.toDouble()) }
+                set { _dejaVu = it }
             }
         }
-        
+
         controlPort(FluxSymbol.LENGTH) {
             intType {
                 default = 8; min = 1; max = 16
                 get { _length }
-                set { _length = it; flux.length.set(it.toDouble()) }
+                set { _length = it }
             }
         }
-        
+
         controlPort(FluxSymbol.SCALE) {
             intType {
                 min = 0; max = 5
                 options = listOf("Major", "Minor", "Pentatonic", "Phrygian", "Dorian", "Chromatic")
                 get { _scale }
-                set { _scale = it; flux.setScale(it) }
+                set { _scale = it }
             }
         }
-        
+
         controlPort(FluxSymbol.RATE) {
             floatType {
                 get { _rate }
-                set { _rate = it; flux.rate.set(it.toDouble()) }
+                set { _rate = it }
             }
         }
-        
+
         controlPort(FluxSymbol.JITTER) {
             floatType {
                 default = 0f
                 get { _jitter }
-                set { _jitter = it; flux.jitter.set(it.toDouble()) }
+                set { _jitter = it }
             }
         }
-        
+
         controlPort(FluxSymbol.PROBABILITY) {
             floatType {
                 get { _probability }
-                set { _probability = it; flux.probability.set(it.toDouble()) }
+                set { _probability = it }
             }
         }
-        
+
         controlPort(FluxSymbol.T_MODEL) {
             intType {
                 min = 0; max = 6
                 options = listOf("Bernoulli", "Clusters", "Drums", "Ind.Bernoulli", "Divider", "3-State", "Markov")
                 get { _tModel }
-                set { _tModel = it; flux.setTModel(it) }
+                set { _tModel = it }
             }
         }
 
@@ -162,7 +142,7 @@ class FluxPlugin(
                 default = 1; min = 0; max = 2
                 options = listOf("0.25x", "1x", "4x")
                 get { _tRange }
-                set { _tRange = it; flux.setTRange(it) }
+                set { _tRange = it }
             }
         }
 
@@ -170,7 +150,7 @@ class FluxPlugin(
             floatType {
                 default = 0.5f
                 get { _pulseWidth }
-                set { _pulseWidth = it; flux.pulseWidth.set(it.toDouble()) }
+                set { _pulseWidth = it }
             }
         }
 
@@ -178,7 +158,7 @@ class FluxPlugin(
             floatType {
                 default = 0.0f
                 get { _pulseWidthStd }
-                set { _pulseWidthStd = it; flux.setPulseWidthStd(it) }
+                set { _pulseWidthStd = it }
             }
         }
 
@@ -187,7 +167,7 @@ class FluxPlugin(
                 min = 0; max = 2
                 options = listOf("T+X", "T Only", "X Only")
                 get { _dejaVuMode }
-                set { _dejaVuMode = it; flux.setDejaVuMode(it) }
+                set { _dejaVuMode = it }
             }
         }
 
@@ -196,7 +176,7 @@ class FluxPlugin(
                 min = 0; max = 2
                 options = listOf("Identical", "Bump", "Tilt")
                 get { _controlMode }
-                set { _controlMode = it; flux.setControlMode(it) }
+                set { _controlMode = it }
             }
         }
 
@@ -205,7 +185,7 @@ class FluxPlugin(
                 default = 2; min = 0; max = 2
                 options = listOf("Narrow", "Positive", "Full")
                 get { _voltageRange }
-                set { _voltageRange = it; flux.setVoltageRange(it) }
+                set { _voltageRange = it }
             }
         }
 
@@ -213,19 +193,7 @@ class FluxPlugin(
             floatType {
                 default = 0.0f
                 get { _mix }
-                set {
-                    val wasDisabled = _mix <= PLUGIN_DISABLE_THRESHOLD
-                    _mix = it
-                    if (wasDisabled && _mix > PLUGIN_ENABLE_THRESHOLD) {
-                        // Zero mix before enabling to prevent blowout
-                        flux.setMix(0f)
-                        setPluginEnabled(true, audioEngine)
-                    }
-                    flux.setMix(it)
-                    if (_mix <= PLUGIN_DISABLE_THRESHOLD) {
-                        setPluginEnabled(false, audioEngine)
-                    }
-                }
+                set { _mix = it }
             }
         }
     }
@@ -243,66 +211,14 @@ class FluxPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = listOf(flux)
-
-    override val inputs: Map<String, AudioInput> = mapOf(
-        "clock" to flux.clock,
-        "spread" to flux.spread,
-        "bias" to flux.bias,
-        "steps" to flux.steps,
-        "dejaVu" to flux.dejaVu,
-        "length" to flux.length,
-        "rate" to flux.rate,
-        "jitter" to flux.jitter,
-        "probability" to flux.probability,
-        "pulseWidth" to flux.pulseWidth
-    )
-
-    override val outputs: Map<String, AudioOutput> = mapOf(
-        "output" to flux.output,
-        "outputX1" to flux.outputX1,
-        "outputX3" to flux.outputX3,
-        "outputT1" to flux.outputT1,
-        "outputT2" to flux.outputT2,
-        "outputT3" to flux.outputT3
-    )
-
-    override fun initialize() {
-        // Initialize default values via port API
-        setPortValue("spread", PortValue.FloatValue(0.5f))
-        setPortValue("x_bias", PortValue.FloatValue(0.5f))
-        setPortValue("steps", PortValue.FloatValue(0.5f))
-        setPortValue("deja_vu", PortValue.FloatValue(0.0f))
-        setPortValue("deja_vu_length", PortValue.IntValue(8))
-        setPortValue("x_scale", PortValue.IntValue(0))
-        setPortValue("rate", PortValue.FloatValue(0.5f))
-        setPortValue("jitter", PortValue.FloatValue(0.0f))
-        setPortValue("probability", PortValue.FloatValue(0.5f))
-        setPortValue("t_model", PortValue.IntValue(0))
-        setPortValue("t_range", PortValue.IntValue(1))
-        setPortValue("pulse_width", PortValue.FloatValue(0.5f))
-        setPortValue("pulse_width_std", PortValue.FloatValue(0.0f))
-        setPortValue("deja_vu_mode", PortValue.IntValue(0))
-        setPortValue("x_control_mode", PortValue.IntValue(0))
-        setPortValue("x_range", PortValue.IntValue(2))
-        setPortValue("mix", PortValue.FloatValue(0.0f))
-
-        audioUnits.forEach { audioEngine.addUnit(it) }
-    }
-    
-    override fun applyInitialBypassState(audioEngine: AudioEngine) {
-        setPluginEnabled(_mix > PLUGIN_ENABLE_THRESHOLD, audioEngine)
-    }
 
     override fun onStart() {}
-    override fun connectPort(index: Int, data: Any) {}
-    override fun run(nFrames: Int) {}
-    
+
     // Generic port value accessors delegating to DSL builder
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
 
-    // Native forwarding — no-op on JSyn, forwards on native engine
+    // Native forwarding methods
     fun setQuadTriggerMode(quadIndex: Int, enabled: Boolean) {
         audioEngine.setPort(URI, "quad_trigger_mode_$quadIndex", if (enabled) 1f else 0f)
     }

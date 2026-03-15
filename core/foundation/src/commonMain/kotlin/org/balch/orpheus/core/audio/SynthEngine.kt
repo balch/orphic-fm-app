@@ -43,7 +43,7 @@ interface SynthEngine {
 
     /**
      * Smoothly fade a quad's volume to a target level over a specified duration.
-     * Uses JSyn's LinearRamp for sample-accurate, click-free transitions.
+     * Sample-accurate, click-free transition.
      *
      * @param quadIndex 0-2 (Quad 1-3)
      * @param targetVolume Target volume level (0.0 to 1.0)
