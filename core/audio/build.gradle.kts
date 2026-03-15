@@ -21,7 +21,6 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation(libs.jsyn)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }

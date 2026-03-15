@@ -36,7 +36,6 @@ kotlin {
         }
         val jvmMain by getting {
             dependencies {
-                implementation(libs.jsyn)
                 implementation(libs.slf4j.api)
             }
         }

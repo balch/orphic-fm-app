@@ -120,7 +120,6 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
-            implementation(libs.jsyn)
             implementation(libs.ktmidi.jvm.desktop)
             implementation(libs.coremidi4j)
             implementation(libs.ktor.client.okhttp)
@@ -167,7 +166,7 @@ compose.desktop {
         // Forward debug flags and engine selection from Gradle to the App
         jvmArgs += listOf(
             "-Dorpheus.debug.gc=${System.getProperty("orpheus.debug.gc", "false")}",
-            "-Dorpheus.engine=${System.getProperty("orpheus.engine", "jsyn")}"
+            "-Dorpheus.engine=cpp"
         )
         // When using C++ engine, add native library path
         val nativePath = System.getProperty("orpheus.native.path", "")

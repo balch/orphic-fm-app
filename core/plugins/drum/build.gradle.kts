@@ -18,8 +18,5 @@ kotlin {
             api(project(":core:plugins:plaits"))
             implementation(libs.kotlinx.serialization.json)
         }
-        jvmMain.dependencies {
-            implementation(libs.jsyn)
-        }
     }
 }
