@@ -4,13 +4,6 @@ import kotlin.concurrent.Volatile
 import kotlin.math.exp
 
 /**
- * Global sample rate for all DSP processing.
- * Set by the platform AudioEngine before [DspGraphScheduler.allocate] is called.
- * Default is 48kHz; overwritten at runtime with the actual hardware rate.
- */
-@Volatile var dspSampleRate = 48000f
-
-/**
  * Float-native audio input port for the DSP backend.
  * Supports multiple connected sources (summed during prepare).
  * Falls back to constant value when no sources are connected.

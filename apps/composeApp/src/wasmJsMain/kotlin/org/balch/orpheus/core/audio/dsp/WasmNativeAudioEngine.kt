@@ -45,14 +45,6 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
 
     override val sampleRate: Int get() = workerProxy.sampleRate
 
-    // C++ engine owns its graph — no Kotlin units to add
-    override fun addUnit(unit: AudioUnit) {}
-
-    override fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {}
-
-    override val lineOutLeft: AudioInput get() = NoOpAudioInput
-    override val lineOutRight: AudioInput get() = NoOpAudioInput
-
     override fun getCpuLoad(): Float = workerProxy.getCpuLoad()
 
     override fun getCurrentTime(): Double = jsPerformanceNow() / 1000.0
@@ -154,10 +146,4 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
     companion object {
         private val log = logging("WasmNativeAudioEngine")
     }
-}
-
-/** Placeholder AudioInput — C++ Worker handles all audio routing internally. */
-private object NoOpAudioInput : AudioInput {
-    override fun set(value: Double) {}
-    override fun disconnectAll() {}
 }

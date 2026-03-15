@@ -138,10 +138,8 @@ class DspVoice(
     )
 
     fun setIdle(idle: Boolean, audioEngine: AudioEngine) {
-        val enabled = !idle
-        for (unit in allUnits) {
-            audioEngine.setUnitEnabled(unit, enabled)
-        }
+        // No-op: C++ engine manages unit lifecycle.
+        // DspVoice is dead code — will be deleted in Task 12.
     }
 
     /**
@@ -202,45 +200,8 @@ class DspVoice(
 
 
     init {
-        // Register all units with audio engine
-        audioEngine.addUnit(triangleOsc)
-        audioEngine.addUnit(squareOsc)
-        audioEngine.addUnit(sharpnessProxy)
-        audioEngine.addUnit(triangleGain)
-        audioEngine.addUnit(squareGain)
-        audioEngine.addUnit(oscMixer)
-        audioEngine.addUnit(sharpnessInverter)
-        audioEngine.addUnit(ampEnv)
-        audioEngine.addUnit(vca)
-        audioEngine.addUnit(wobbleRamp)
-        audioEngine.addUnit(wobbleGain)
-        audioEngine.addUnit(volumeRamp)
-        audioEngine.addUnit(volumeGain)
-        audioEngine.addUnit(envelopeFollower)
-        audioEngine.addUnit(couplingScaler)
-        audioEngine.addUnit(couplingMixer)
-        audioEngine.addUnit(fmDepthControl)
-        audioEngine.addUnit(fmFreqMixer)
-        audioEngine.addUnit(pitchScaler)
-        audioEngine.addUnit(feedbackScaler)
-        audioEngine.addUnit(feedbackRamp)
-        audioEngine.addUnit(fmSignalMixer)
-        audioEngine.addUnit(cvPitchScaler)
-        audioEngine.addUnit(cvPitchMixer)
-        audioEngine.addUnit(directFreqMixer)
-        audioEngine.addUnit(vibratoScaler)
-        audioEngine.addUnit(vibratoMixer)
-        audioEngine.addUnit(benderScaler)
-        audioEngine.addUnit(benderMixer)
-        audioEngine.addUnit(holdRamp)
-        audioEngine.addUnit(vcaControlMixer)
-        audioEngine.addUnit(plaitsUnit)
-        audioEngine.addUnit(timbreModDepth)
-        audioEngine.addUnit(morphModDepth)
-        audioEngine.addUnit(oscGain)
-        audioEngine.addUnit(plaitsGain)
-        audioEngine.addUnit(sourceSelector)
-        audioEngine.addUnit(gateFanout)
+        // Unit registration removed — C++ engine manages its own graph.
+        // DspVoice is dead code — will be deleted in Task 12.
 
         // Envelope follower setup - longer halflife for better hold/sustain detection
         envelopeFollower.setHalfLife(0.15) // 150ms response time for sustained signals

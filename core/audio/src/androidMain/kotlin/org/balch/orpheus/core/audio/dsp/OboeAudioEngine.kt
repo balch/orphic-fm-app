@@ -54,20 +54,6 @@ class OboeAudioEngine() : AudioEngine, NativeDspBridge {
     override val sampleRate: Int
         get() = bridge.nativeGetSampleRate().let { if (it > 0) it else 48000 }
 
-    override fun addUnit(unit: AudioUnit) {
-        // No-op: C++ engine manages its own units
-    }
-
-    override fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {
-        // No-op: C++ engine manages its own units
-    }
-
-    override val lineOutLeft: AudioInput
-        get() = NoOpAudioInput
-
-    override val lineOutRight: AudioInput
-        get() = NoOpAudioInput
-
     override fun getCpuLoad(): Float = (bridge.nativeGetCpuLoad() * 100f).toFloat()
 
     override fun getCurrentTime(): Double = System.nanoTime() / 1_000_000_000.0
@@ -114,10 +100,4 @@ class OboeAudioEngine() : AudioEngine, NativeDspBridge {
     companion object {
         private val log = logging("OboeAudioEngine")
     }
-}
-
-/** Placeholder AudioInput — C++ handles all routing internally. */
-private object NoOpAudioInput : AudioInput {
-    override fun set(value: Double) {}
-    override fun disconnectAll() {}
 }

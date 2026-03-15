@@ -6,7 +6,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
@@ -41,7 +40,6 @@ class LooperPlugin(
 
     override val ports: List<Port> = audioPorts.ports
 
-    override val audioUnits: List<AudioUnit> = emptyList()
 
     override fun initialize() {
         audioEngine.setPort(URI, "level", DEFAULT_LEVEL * LEVEL_SCALE)
@@ -54,8 +52,6 @@ class LooperPlugin(
     }
 
     override fun onStart() {}
-    override fun connectPort(index: Int, data: Any) {}
-    override fun run(nFrames: Int) {}
 
     fun clear() {
         audioEngine.setPort(URI, "state", 0f)

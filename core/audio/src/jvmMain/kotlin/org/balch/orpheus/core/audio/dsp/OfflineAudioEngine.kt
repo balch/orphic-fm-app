@@ -58,7 +58,7 @@ class OfflineAudioEngine(override val sampleRate: Int = 44100) : AudioEngine {
 
     override val isRunning: Boolean get() = synth.isRunning
 
-    override fun addUnit(unit: AudioUnit) {
+    fun addUnit(unit: AudioUnit) {
         when (unit) {
             is JsynEnvelope -> synth.add(unit.jsEnv)
             is JsynDelayLine -> synth.add(unit.jsDelay)
@@ -93,7 +93,7 @@ class OfflineAudioEngine(override val sampleRate: Int = 44100) : AudioEngine {
         }
     }
 
-    override fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {
+    fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {
         val ug: UnitGenerator? = when (unit) {
             is JsynMultiplyWrapper -> unit.jsUnit
             is JsynAddWrapper -> unit.jsUnit
@@ -129,8 +129,8 @@ class OfflineAudioEngine(override val sampleRate: Int = 44100) : AudioEngine {
         }
     }
 
-    override val lineOutLeft: AudioInput get() = JsynAudioInput(lineOutLeftProxy.input)
-    override val lineOutRight: AudioInput get() = JsynAudioInput(lineOutRightProxy.input)
+    val lineOutLeft: AudioInput get() = JsynAudioInput(lineOutLeftProxy.input)
+    val lineOutRight: AudioInput get() = JsynAudioInput(lineOutRightProxy.input)
 
     override fun getCpuLoad(): Float = 0f
     override fun getCurrentTime(): Double = synth.currentTime

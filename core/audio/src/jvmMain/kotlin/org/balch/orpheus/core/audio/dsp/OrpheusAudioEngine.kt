@@ -47,7 +47,7 @@ class OrpheusAudioEngine() : AudioEngine {
     override val sampleRate: Int
         get() = synth.frameRate.toInt()
 
-    override fun addUnit(unit: AudioUnit) {
+    fun addUnit(unit: AudioUnit) {
         // Extract the underlying JSyn unit and add to synth
         when (unit) {
             is JsynEnvelope -> synth.add(unit.jsEnv)
@@ -85,7 +85,7 @@ class OrpheusAudioEngine() : AudioEngine {
         }
     }
 
-    override fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {
+    fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {
         val ug: com.jsyn.unitgen.UnitGenerator? = when (unit) {
             is JsynMultiplyWrapper -> unit.jsUnit
             is JsynAddWrapper -> unit.jsUnit
@@ -123,10 +123,10 @@ class OrpheusAudioEngine() : AudioEngine {
         }
     }
 
-    override val lineOutLeft: AudioInput
+    val lineOutLeft: AudioInput
         get() = JsynAudioInput(lineOutLeftProxy.input)
 
-    override val lineOutRight: AudioInput
+    val lineOutRight: AudioInput
         get() = JsynAudioInput(lineOutRightProxy.input)
 
     override fun getCpuLoad(): Float = (synth.usage * 100f).toFloat()

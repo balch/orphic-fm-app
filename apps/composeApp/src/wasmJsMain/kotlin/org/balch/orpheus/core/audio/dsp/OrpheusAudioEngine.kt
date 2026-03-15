@@ -157,20 +157,20 @@ class OrpheusAudioEngine: AudioEngine, NativeDspBridge {
     override val isRunning: Boolean get() = _isRunning
     override val sampleRate: Int get() = audioContext?.sampleRate?.toInt() ?: 48000
 
-    override fun addUnit(unit: AudioUnit) {
+    fun addUnit(unit: AudioUnit) {
         if (unit is DspProcessable) {
             scheduler.addUnit(unit)
         }
     }
 
-    override fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {
+    fun setUnitEnabled(unit: AudioUnit, enabled: Boolean) {
         if (unit is DspProcessable) {
             unit.enabled = enabled
         }
     }
 
-    override val lineOutLeft: AudioInput get() = scheduler.masterLeft
-    override val lineOutRight: AudioInput get() = scheduler.masterRight
+    val lineOutLeft: AudioInput get() = scheduler.masterLeft
+    val lineOutRight: AudioInput get() = scheduler.masterRight
 
     override fun getCpuLoad(): Float = cpuLoadAvg
     override fun getCurrentTime(): Double = audioContext?.currentTime ?: 0.0

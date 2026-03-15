@@ -45,8 +45,8 @@ class DspAutomationManager(
         
         val setup = AutomationSetup(player, scaler, targets, restoreManualValue, prepareForAutomation)
         automationSetups[id] = setup
-        audioEngine.addUnit(player)
-        audioEngine.addUnit(scaler)
+        // Unit registration removed — C++ engine manages its own graph.
+        // DspAutomationManager is dead code — will be deleted in Task 12.
     }
     
     /**

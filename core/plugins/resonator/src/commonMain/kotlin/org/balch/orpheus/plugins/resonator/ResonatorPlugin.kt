@@ -6,7 +6,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
@@ -127,11 +126,8 @@ class ResonatorPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = emptyList()
 
     override fun onStart() {}
-    override fun connectPort(index: Int, data: Any) {}
-    override fun run(nFrames: Int) {}
 
     // Generic port value accessors delegating to DSL builder
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)

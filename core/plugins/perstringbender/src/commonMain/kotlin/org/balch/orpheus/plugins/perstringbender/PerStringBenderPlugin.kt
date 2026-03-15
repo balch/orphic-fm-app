@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.datetime.Clock
 import org.balch.orpheus.core.audio.dsp.AudioEngine
-import org.balch.orpheus.core.audio.dsp.AudioUnit
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
@@ -87,11 +86,8 @@ class PerStringBenderPlugin(
     private val _springPositionFlow = MutableStateFlow(FloatArray(NUM_STRINGS))
     val springPositionFlow: StateFlow<FloatArray> = _springPositionFlow.asStateFlow()
 
-    override val audioUnits: List<AudioUnit> = emptyList()
 
     override fun onStart() {}
-    override fun connectPort(index: Int, data: Any) {}
-    override fun run(nFrames: Int) {}
 
     private fun applyDirectionForString(stringIndex: Int, rawDeflection: Float): Float {
         return if (stringIndex < 2) rawDeflection else -rawDeflection

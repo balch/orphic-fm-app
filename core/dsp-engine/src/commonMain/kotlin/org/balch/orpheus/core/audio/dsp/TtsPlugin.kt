@@ -102,11 +102,8 @@ class TtsPlugin(
 
     override val ports: List<Port> = audioPorts.ports + portDefs.controlPorts
 
-    override val audioUnits: List<AudioUnit> = emptyList()
 
     override fun onStart() {}
-    override fun connectPort(index: Int, data: Any) {}
-    override fun run(nFrames: Int) {}
 
     override fun setPortValue(symbol: Symbol, value: PortValue) = portDefs.setValue(symbol, value)
     override fun getPortValue(symbol: Symbol) = portDefs.getValue(symbol)
