@@ -1,8 +1,8 @@
 # Orphic FM App
 
-Kotlin Multiplatform synthesizer app porting Mutable Instruments DSP engines to Kotlin/JSyn. Targets Android, JVM desktop, and WASM.
+Kotlin Multiplatform synthesizer app with a shared C++ DSP engine (`liborpheus_dsp/`) porting Mutable Instruments firmware. Targets Android, JVM desktop, and WASM.
 
-Key domains: JSyn audio graph, Plaits voice engines, MIDI CC routing, AI agent configs, Compose UI panels/ViewModels.
+Key domains: C++ DSP graph, Plaits voice engines, MIDI CC routing, AI agent configs, Compose UI panels/ViewModels.
 
 ## Bug Fixing
 

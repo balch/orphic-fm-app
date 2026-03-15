@@ -283,7 +283,7 @@ class AiOptionsViewModel(
         _soloAgent.value = newAgent
         
         scope.launch(dispatcherProvider.io) {
-            // Fade in using JSyn's LinearRamp
+            // Fade in (sample-accurate, click-free)
             val fadeDuration = 2.0f
             synthEngine.fadeQuadVolume(0, 1f, fadeDuration)
             synthEngine.fadeQuadVolume(1, 1f, fadeDuration)
@@ -422,7 +422,7 @@ class AiOptionsViewModel(
                 // Set Quad 3 volume to 0 before starting, then fade in
                 synthEngine.setQuadVolume(2, 0f)
                 
-                // Fade in only Quad 3 using JSyn's LinearRamp
+                // Fade in only Quad 3 (sample-accurate, click-free)
                 val fadeDuration = 2.0f  // seconds
                 log.debug { "Fading in Quad 3 for drone over ${fadeDuration}s" }
                 synthEngine.fadeQuadVolume(2, 1f, fadeDuration)
@@ -517,7 +517,7 @@ class AiOptionsViewModel(
                 presetLoader.applyPreset(presetWithZeroQuadVol)
                 log.debug { "Applied solo preset: ${soloPreset.name} (fading in)" }
                 
-                // Fade in using JSyn's LinearRamp for sample-accurate, click-free transitions
+                // Fade in (sample-accurate, click-free)
                 val fadeDuration = 2.0f  // seconds
                 log.debug { "Fading in quad volumes over ${fadeDuration}s" }
                 synthEngine.fadeQuadVolume(0, 1f, fadeDuration)
@@ -744,7 +744,7 @@ class AiOptionsViewModel(
                     val vol1 = synthEngine.getQuadVolume(1)
                     val vol2 = synthEngine.getQuadVolume(2)
 
-                    // Fade out using JSyn's LinearRamp for sample-accurate, click-free transitions
+                    // Fade out (sample-accurate, click-free)
                     val fadeDuration = 2.0f  // seconds
                     log.debug { "REPL stop: Fading out quad volumes over ${fadeDuration}s" }
                     synthEngine.fadeQuadVolume(0, 0f, fadeDuration)

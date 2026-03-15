@@ -349,7 +349,7 @@ class VoicePlugin(
     fun setQuadPitchSource(i: Int, v: Int) { _quadPitchSource[i] = v }
     fun setQuadEnvTriggerMode(i: Int, v: Boolean) { _quadEnvTriggerMode[i] = v }
 
-    // Native forwarding — no-op on JSyn, forwards on native engine
+    // Forward to C++ engine via audio engine port
     fun setDuoModSource(duoIndex: Int, modSourceOrdinal: Int) {
         _duoModSource[duoIndex] = modSourceOrdinal
         audioEngine.setPort(URI, "duo_mod_source_$duoIndex", modSourceOrdinal.toFloat())

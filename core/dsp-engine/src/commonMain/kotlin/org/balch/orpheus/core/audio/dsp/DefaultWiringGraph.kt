@@ -112,8 +112,8 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val sumL = buildSumTree("sumL", voiceOutsL)
     val sumR = buildSumTree("sumR", voiceOutsR)
 
-    // Master volume pass-through (volume is applied in masterOut after pan,
-    // matching JSyn's StereoPlugin: pan → volume → peak → clip → output)
+    // Master volume pass-through (volume is applied in masterOut after pan:
+    // pan → volume → peak → clip → output)
     val mvL = multiply("mvL") { inputB = 1.0f }
     val mvR = multiply("mvR") { inputB = 1.0f }
     sumL.out to mvL.inputA
@@ -211,7 +211,7 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     dryGainR.out to resoOutR.input
     bypassSumR.out to resoOutR.input
 
-    // Drive / limiter (stereo) - after resonator, matching JSyn chain order
+    // Drive / limiter (stereo) - after resonator
     val driveL = limiter("driveL") { driveAmount = 1.0f }
     val driveR = limiter("driveR") { driveAmount = 1.0f }
     resoOutL.out to driveL.input
@@ -222,7 +222,7 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // No fixed input connections — unit_process_warps reads from source buffers
 
     // Dual Delay (stereo in/out) - bypassed by default via engine atomics
-    // JSyn sends grains+distortion+warps all to delay (summed at input)
+    // grains+distortion+warps all feed delay (summed at input)
     val delay = dualDelay("delay")
     grains.out to delay.inputA
     grains.outRight to delay.inputB
@@ -271,7 +271,7 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     driveL.out to reverb.inputA
     driveR.out to reverb.inputB
 
-    // Master output (no hard clip — matches JSyn path which has no clip stage)
+    // Master output (no hard clip)
     val master = masterOut("master")
 
     // ── Drum MAIN path routing ──

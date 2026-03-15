@@ -584,7 +584,7 @@ class DspSynthEngine(
     // Per-String Bender delegation
     override fun setStringBend(stringIndex: Int, bendAmount: Float, voiceMix: Float) {
         val shouldTriggerVoice = pluginProvider.perStringBenderPlugin.setStringBend(stringIndex, bendAmount, voiceMix)
-        // Always forward bend to C++ engine (JSyn return value only indicates voice trigger, not bend success)
+        // Always forward bend to C++ engine — plugin return value only indicates voice trigger, not bend success
         audioEngine.setPort(BENDER_URI, "string_bend_$stringIndex", bendAmount)
         audioEngine.setPort(BENDER_URI, "string_mix_$stringIndex", voiceMix)
         audioEngine.setPort(BENDER_URI, "string_active_$stringIndex", 1f)
@@ -624,8 +624,8 @@ class DspSynthEngine(
     // Voice Delegation
 
     /**
-     * Convert JSyn tune (0..1) to MIDI note for C++ engine.
-     * JSyn: freq = 55 * 2^(tune*4) * pitchMult * 2^((quadPitch-0.5)*2)
+     * Convert tune (0..1) to MIDI note for C++ engine.
+     * Tune: freq = 55 * 2^(tune*4) * pitchMult * 2^((quadPitch-0.5)*2)
      * MIDI: freq = 440 * 2^((note-69)/12)
      * Solving: note = 33 + 48*tune + pitchMultSemitones + 24*(quadPitch-0.5)
      */

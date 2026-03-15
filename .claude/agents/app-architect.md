@@ -111,7 +111,7 @@ Audit `build-logic/convention/` for:
 
 When checking for library updates:
 - Review `gradle/libs.versions.toml` for current versions
-- Check for updates to key dependencies: Kotlin, Compose Multiplatform, Gradle, KSP, Metro, JSyn, kotlinx.serialization, kotlinx.coroutines
+- Check for updates to key dependencies: Kotlin, Compose Multiplatform, Gradle, KSP, Metro, kotlinx.serialization, kotlinx.coroutines
 - Note any breaking changes or migration requirements
 - Verify compatibility between interdependent libraries (e.g., Kotlin version ↔ Compose version ↔ KSP version)
 - Flag any dependencies with known security vulnerabilities

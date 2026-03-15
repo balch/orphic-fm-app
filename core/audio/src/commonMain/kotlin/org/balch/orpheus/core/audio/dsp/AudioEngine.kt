@@ -30,8 +30,7 @@ interface AudioEngine {
     /** Get current audio time in seconds */
     fun getCurrentTime(): Double
 
-    // Plugin port forwarding — no-op on JSyn (plugins handle their own audio graph),
-    // overridden by native engines to forward to C++.
+    // Plugin port forwarding — overridden by native engines to forward to C++.
     /** Set a plugin control port value */
     fun setPort(uri: String, symbol: String, value: Float) {}
     /** Get a plugin control port value */
