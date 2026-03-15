@@ -38,3 +38,4 @@ liborpheus_dsp/test/output/
 
 # Root-level test output (symlinked from C++ build)
 /test/output
+.superpowers/
