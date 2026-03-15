@@ -23,7 +23,6 @@ kotlinx-serialization = "1.10.0"
 kotlinx-datetime = "0.7.1-0.6.x-compat"
 kotlinx-collections-immutable = "0.4.0"
 liquid = "1.1.1"
-jsyn = "v17.2.0"
 kmlogging = "2.1.0"
 material3Version = "1.9.0"
 media = "1.7.1"
@@ -61,7 +60,6 @@ ksp-gradle-plugin = { module = "com.google.devtools.ksp:com.google.devtools.ksp.
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3Version" }
 metro-gradle-plugin = { module = "dev.zacsweers.metro:metro-gradle-plugin", version.ref = "metro" }
 liquid = { module = "io.github.fletchmckee.liquid:liquid", version.ref = "liquid" }
-jsyn = { module = "com.github.philburk:jsyn", version.ref = "jsyn" }
 kmlogging = { module = "com.diamondedge:logging", version.ref = "kmlogging" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeGradlePlugin" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4jApi" }
