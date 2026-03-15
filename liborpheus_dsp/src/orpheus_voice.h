@@ -117,6 +117,13 @@ struct OrpheusVoice {
     float out_buffer_[plaits::kMaxBlockSize];
     float aux_buffer_[plaits::kMaxBlockSize];
 
+    // Remainder buffer: when num_frames isn't divisible by kOrpheusBlockSize,
+    // the engine renders a full 24-sample block but only some samples are
+    // consumed. The leftovers are stored here and drained on the next call,
+    // preventing phase/state discontinuities that cause crackling.
+    float remainder_buffer_[kOrpheusBlockSize];
+    int   remainder_count_;  // number of valid samples in remainder_buffer_
+
     // State for engine switching and trigger detection.
     int previous_engine_index_;
     bool trigger_state_;
@@ -164,6 +171,7 @@ struct OrpheusVoice {
 
         previous_engine_index_ = -1;
         trigger_state_ = false;
+        remainder_count_ = 0;
     }
 
     // Render audio using the specified engine.
@@ -207,26 +215,38 @@ struct OrpheusVoice {
             e->LoadUserData(user_data);
             e->Reset();
             previous_engine_index_ = engine_index;
+            remainder_count_ = 0;  // discard stale remainder on engine switch
         }
 
         float gain = kOrpheusOutGain[engine_index];
 
         // Render in fixed blocks of kOrpheusBlockSize (24), matching Kotlin.
-        // Always render full blocks even when fewer frames remain — SixOpEngine's
-        // staggered rendering uses acc_buffer_ across calls and breaks if block
-        // sizes vary (produces crackling from stale look-ahead samples).
+        // Always render full blocks — SixOpEngine's staggered rendering uses
+        // acc_buffer_ across calls and breaks if block sizes vary.
+        // Leftover samples from the last block are buffered in remainder_buffer_
+        // and drained at the start of the next call to prevent discontinuities.
         int frames_rendered = 0;
-        while (frames_rendered < num_frames) {
-            int frames_needed = num_frames - frames_rendered;
 
+        // ── Drain remainder from previous call ──
+        if (remainder_count_ > 0) {
+            int drain = (remainder_count_ < num_frames)
+                ? remainder_count_ : num_frames;
+            std::memcpy(out, remainder_buffer_, drain * sizeof(float));
+            // Shift any undrained remainder forward
+            remainder_count_ -= drain;
+            if (remainder_count_ > 0) {
+                std::memmove(remainder_buffer_, remainder_buffer_ + drain,
+                             remainder_count_ * sizeof(float));
+            }
+            frames_rendered = drain;
+        }
+
+        // ── Render fresh blocks ──
+        while (frames_rendered < num_frames) {
             // Trigger edge detection (Schmitt trigger).
             bool gate_on = (gate != 0);
             bool rising_edge = gate_on && !trigger_state_;
-            if (gate_on) {
-                trigger_state_ = true;
-            } else {
-                trigger_state_ = false;
-            }
+            trigger_state_ = gate_on;
 
             // Build engine parameters.
             plaits::EngineParameters p;
@@ -242,14 +262,24 @@ struct OrpheusVoice {
             bool already_enveloped = false;
             e->Render(p, out_buffer_, aux_buffer_, kOrpheusBlockSize, &already_enveloped);
 
-            // Copy only the frames we need (may be < kOrpheusBlockSize for final block).
-            int copy_count = (frames_needed < kOrpheusBlockSize)
-                ? frames_needed : kOrpheusBlockSize;
-            for (int i = 0; i < copy_count; i++) {
-                out[frames_rendered + i] = soft_limit(out_buffer_[i] * gain);
+            int frames_needed = num_frames - frames_rendered;
+            if (frames_needed >= kOrpheusBlockSize) {
+                // Full block fits — copy all 24 samples directly
+                for (int i = 0; i < kOrpheusBlockSize; i++) {
+                    out[frames_rendered + i] = soft_limit(out_buffer_[i] * gain);
+                }
+                frames_rendered += kOrpheusBlockSize;
+            } else {
+                // Partial block — copy what we need, buffer the rest
+                for (int i = 0; i < frames_needed; i++) {
+                    out[frames_rendered + i] = soft_limit(out_buffer_[i] * gain);
+                }
+                remainder_count_ = kOrpheusBlockSize - frames_needed;
+                for (int i = 0; i < remainder_count_; i++) {
+                    remainder_buffer_[i] = soft_limit(out_buffer_[frames_needed + i] * gain);
+                }
+                frames_rendered += frames_needed;
             }
-
-            frames_rendered += copy_count;
         }
     }
 };

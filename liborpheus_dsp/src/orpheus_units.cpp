@@ -225,7 +225,7 @@ void unit_process_hard_clip(GraphUnit* u, int n) {
     float* in  = u->inputs[IPORT_INPUT].buffer;
     float* out = u->output_buffers[OPORT_OUT];
     for (int i = 0; i < n; i++)
-        out[i] = std::max(-1.0f, std::min(1.0f, in[i]));
+        out[i] = std::tanh(in[i]);
 }
 
 void unit_process_limiter(GraphUnit* u, OrpheusEngine* engine, int n, float sr) {
