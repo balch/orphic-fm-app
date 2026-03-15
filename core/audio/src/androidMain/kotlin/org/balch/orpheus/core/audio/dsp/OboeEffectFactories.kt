@@ -1,6 +1,0 @@
-package org.balch.orpheus.core.audio.dsp
-
-typealias OboeDelayLineFactory = DspDelayLineFactory
-typealias OboeLooperUnitFactory = DspLooperUnitFactory
-typealias OboeTtsPlayerUnitFactory = DspTtsPlayerUnitFactory
-typealias OboeSpeechEffectsUnitFactory = DspSpeechEffectsUnitFactory

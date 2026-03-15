@@ -1,6 +1,0 @@
-package org.balch.orpheus.core.audio.dsp
-
-typealias OboeSineOscillatorFactory = DspSineOscillatorFactory
-typealias OboeTriangleOscillatorFactory = DspTriangleOscillatorFactory
-typealias OboeSquareOscillatorFactory = DspSquareOscillatorFactory
-typealias OboeSawtoothOscillatorFactory = DspSawtoothOscillatorFactory

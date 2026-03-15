@@ -39,24 +39,3 @@ kotlin {
         }
     }
 }
-
-// ── Export production ODWG graph for C++ tests ──────────────────────
-// Usage: ./gradlew :core:dsp-engine:exportDefaultGraph
-// Output: liborpheus_dsp/test/data/default_graph.odwg
-tasks.register<JavaExec>("exportDefaultGraph") {
-    description = "Serialize the production ODWG graph descriptor for C++ tests"
-    group = "verification"
-
-    dependsOn("jvmMainClasses")
-
-    mainClass.set("org.balch.orpheus.core.audio.dsp.ExportDefaultGraphKt")
-    val jvmMain = kotlin.targets.getByName("jvm").compilations.getByName("main")
-    classpath = files(jvmMain.output.allOutputs) + (jvmMain.runtimeDependencyFiles ?: files())
-
-    val outputFile = rootProject.file("liborpheus_dsp/test/data/default_graph.odwg")
-    args = listOf(outputFile.absolutePath)
-
-    doFirst {
-        outputFile.parentFile.mkdirs()
-    }
-}

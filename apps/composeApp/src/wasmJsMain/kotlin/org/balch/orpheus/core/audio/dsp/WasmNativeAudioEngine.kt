@@ -15,12 +15,11 @@ import dev.zacsweers.metro.binding
  * Audio rendering happens entirely in the Worker thread (C++ compiled to WASM).
  * The main thread only handles AudioContext/AudioWorklet setup and command forwarding.
  *
- * This replaces [OrpheusAudioEngine] (Kotlin DSP on main thread) with the
- * C++ Worker path as the default WASM audio engine.
+ * Uses the C++ Worker path as the default WASM audio engine.
  */
 @Inject
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, binding = binding<AudioEngine>(), replaces = [OrpheusAudioEngine::class])
+@ContributesBinding(AppScope::class, binding = binding<AudioEngine>())
 class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
 
     private val workerProxy = DspWorkerProxy()

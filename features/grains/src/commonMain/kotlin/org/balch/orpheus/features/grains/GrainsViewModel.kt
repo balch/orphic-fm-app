@@ -26,7 +26,7 @@ import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.BoolValue
 import org.balch.orpheus.core.plugin.symbols.GrainsSymbol
-import org.balch.orpheus.plugins.grains.engine.GrainsMode
+import org.balch.orpheus.plugins.grains.GrainsMode
 
 @Immutable
 data class GrainsUiState(
