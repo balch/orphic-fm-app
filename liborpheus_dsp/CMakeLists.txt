@@ -75,9 +75,22 @@ set(MARBLES_SRC
 # ── Orpheus engine sources ────────────────────────
 set(ORPHEUS_SRC
     "src/orpheus_engine.cpp"
+    "src/orpheus_engine_routing.cpp"
+    "src/orpheus_engine_voice.cpp"
     "src/orpheus_graph.cpp"
     "src/orpheus_monitor.cpp"
-    "src/orpheus_units.cpp"
+    "src/orpheus_unit_basic.cpp"
+    "src/orpheus_unit_bender.cpp"
+    "src/orpheus_unit_clouds.cpp"
+    "src/orpheus_unit_delay.cpp"
+    "src/orpheus_unit_grids.cpp"
+    "src/orpheus_unit_lfo.cpp"
+    "src/orpheus_unit_looper.cpp"
+    "src/orpheus_unit_marbles.cpp"
+    "src/orpheus_unit_plaits.cpp"
+    "src/orpheus_unit_reverb.cpp"
+    "src/orpheus_unit_rings.cpp"
+    "src/orpheus_unit_warps.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
 )

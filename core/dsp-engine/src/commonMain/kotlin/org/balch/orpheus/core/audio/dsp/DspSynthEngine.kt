@@ -5,16 +5,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
@@ -70,65 +61,33 @@ class DspSynthEngine(
         getPluginPort(ps.uri, ps.symbol)
 
     // State
-    private var fluxClockSource = 0 // 0=Internal, 1=LFO
-    private var _drumsBypass = true
     private var _stereoMode = StereoMode.VOICE_PAN
 
-    // Drum Sources
-    private val drumTriggerSources = IntArray(3) { 0 }
-    private val drumPitchSources = IntArray(3) { 0 }
+    // Composed delegates
+    val monitor = SynthEngineMonitor(nativeBridge, dispatcherProvider)
+    val routing = SynthEngineRouting(audioEngine, nativeBridge, pluginProvider)
 
-    // Reactive monitoring flows
-    private val _peakFlow = MutableStateFlow(0f)
-    override val peakFlow: StateFlow<Float> = _peakFlow.asStateFlow()
-
-    private val _cpuLoadFlow = MutableStateFlow(0f)
-    override val cpuLoadFlow: StateFlow<Float> = _cpuLoadFlow.asStateFlow()
-
-    private val _voiceLevelsFlow = MutableStateFlow(FloatArray(12))
-    override val voiceLevelsFlow: StateFlow<FloatArray> = _voiceLevelsFlow.asStateFlow()
-
-    private val _lfoOutputFlow = MutableStateFlow(0f)
-    override val lfoOutputFlow: StateFlow<Float> = _lfoOutputFlow.asStateFlow()
-    private val _lfoAOutputFlow = MutableStateFlow(0f)
-    override val lfoAOutputFlow: StateFlow<Float> = _lfoAOutputFlow.asStateFlow()
-    private val _lfoBOutputFlow = MutableStateFlow(0f)
-    override val lfoBOutputFlow: StateFlow<Float> = _lfoBOutputFlow.asStateFlow()
-
-    private val _masterLevelFlow = MutableStateFlow(0f)
-    override val masterLevelFlow: StateFlow<Float> = _masterLevelFlow.asStateFlow()
-
-    private val _bendFlow = MutableStateFlow(0f)
-    override val bendFlow: StateFlow<Float> = _bendFlow.asStateFlow()
-
-    // Signal visualization flows (60fps oscilloscope data)
-    private val _lfoVizFlow = MutableStateFlow(FloatArray(0))
-    override val lfoVizFlow: StateFlow<FloatArray> = _lfoVizFlow.asStateFlow()
-    private val _warpsCarrierVizFlow = MutableStateFlow(FloatArray(0))
-    override val warpsCarrierVizFlow: StateFlow<FloatArray> = _warpsCarrierVizFlow.asStateFlow()
-    private val _warpsModVizFlow = MutableStateFlow(FloatArray(0))
-    override val warpsModVizFlow: StateFlow<FloatArray> = _warpsModVizFlow.asStateFlow()
-    private val _warpsOutVizFlow = MutableStateFlow(FloatArray(0))
-    override val warpsOutVizFlow: StateFlow<FloatArray> = _warpsOutVizFlow.asStateFlow()
-    private val _delayInVizFlow = MutableStateFlow(FloatArray(0))
-    override val delayInVizFlow: StateFlow<FloatArray> = _delayInVizFlow.asStateFlow()
-    private val _delayFbVizFlow = MutableStateFlow(FloatArray(0))
-    override val delayFbVizFlow: StateFlow<FloatArray> = _delayFbVizFlow.asStateFlow()
-    private val _delayOutVizFlow = MutableStateFlow(FloatArray(0))
-    override val delayOutVizFlow: StateFlow<FloatArray> = _delayOutVizFlow.asStateFlow()
-    private val _reverbInVizFlow = MutableStateFlow(FloatArray(0))
-    override val reverbInVizFlow: StateFlow<FloatArray> = _reverbInVizFlow.asStateFlow()
-    private val _reverbOutVizFlow = MutableStateFlow(FloatArray(0))
-    override val reverbOutVizFlow: StateFlow<FloatArray> = _reverbOutVizFlow.asStateFlow()
-    private val _fluxCvVizFlow = MutableStateFlow(FloatArray(0))
-    override val fluxCvVizFlow: StateFlow<FloatArray> = _fluxCvVizFlow.asStateFlow()
-    private val _resoInVizFlow = MutableStateFlow(FloatArray(0))
-    override val resoInVizFlow: StateFlow<FloatArray> = _resoInVizFlow.asStateFlow()
-    private val _resoOutVizFlow = MutableStateFlow(FloatArray(0))
-    override val resoOutVizFlow: StateFlow<FloatArray> = _resoOutVizFlow.asStateFlow()
-
-    // Monitoring
-    private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    // Delegate SynthEngine interface StateFlow properties to monitor
+    override val peakFlow: StateFlow<Float> get() = monitor.peakFlow
+    override val cpuLoadFlow: StateFlow<Float> get() = monitor.cpuLoadFlow
+    override val voiceLevelsFlow: StateFlow<FloatArray> get() = monitor.voiceLevelsFlow
+    override val lfoOutputFlow: StateFlow<Float> get() = monitor.lfoOutputFlow
+    override val lfoAOutputFlow: StateFlow<Float> get() = monitor.lfoAOutputFlow
+    override val lfoBOutputFlow: StateFlow<Float> get() = monitor.lfoBOutputFlow
+    override val masterLevelFlow: StateFlow<Float> get() = monitor.masterLevelFlow
+    override val bendFlow: StateFlow<Float> get() = monitor.bendFlow
+    override val lfoVizFlow: StateFlow<FloatArray> get() = monitor.lfoVizFlow
+    override val warpsCarrierVizFlow: StateFlow<FloatArray> get() = monitor.warpsCarrierVizFlow
+    override val warpsModVizFlow: StateFlow<FloatArray> get() = monitor.warpsModVizFlow
+    override val warpsOutVizFlow: StateFlow<FloatArray> get() = monitor.warpsOutVizFlow
+    override val delayInVizFlow: StateFlow<FloatArray> get() = monitor.delayInVizFlow
+    override val delayFbVizFlow: StateFlow<FloatArray> get() = monitor.delayFbVizFlow
+    override val delayOutVizFlow: StateFlow<FloatArray> get() = monitor.delayOutVizFlow
+    override val reverbInVizFlow: StateFlow<FloatArray> get() = monitor.reverbInVizFlow
+    override val reverbOutVizFlow: StateFlow<FloatArray> get() = monitor.reverbOutVizFlow
+    override val fluxCvVizFlow: StateFlow<FloatArray> get() = monitor.fluxCvVizFlow
+    override val resoInVizFlow: StateFlow<FloatArray> get() = monitor.resoInVizFlow
+    override val resoOutVizFlow: StateFlow<FloatArray> get() = monitor.resoOutVizFlow
 
 
     init {
@@ -150,12 +109,12 @@ class DspSynthEngine(
                     ResonatorSymbol.BRIGHTNESS.controlId -> { setResonatorBrightness(value.asFloat()); true }
                     ResonatorSymbol.DAMPING.controlId -> { setResonatorDamping(value.asFloat()); true }
                     ResonatorSymbol.POSITION.controlId -> { setResonatorPosition(value.asFloat()); true }
-                    ResonatorSymbol.MIX.controlId -> { setResonatorMix(value.asFloat()); true }
-                    ResonatorSymbol.TARGET_MIX.controlId -> { setResonatorTargetMix(value.asFloat()); true }
-                    DrumSymbol.BYPASS.controlId -> { setDrumsBypass(value.asBoolean()); true }
-                    FluxSymbol.CLOCK_SOURCE.controlId -> { setFluxClockSource(value.asInt()); true }
-                    WarpsSymbol.CARRIER_SOURCE.controlId -> { setWarpsCarrierSource(value.asInt()); true }
-                    WarpsSymbol.MODULATOR_SOURCE.controlId -> { setWarpsModulatorSource(value.asInt()); true }
+                    ResonatorSymbol.MIX.controlId -> { routing.setResonatorMix(value.asFloat()); true }
+                    ResonatorSymbol.TARGET_MIX.controlId -> { routing.setResonatorTargetMix(value.asFloat()); true }
+                    DrumSymbol.BYPASS.controlId -> { routing.setDrumsBypass(value.asBoolean()); true }
+                    FluxSymbol.CLOCK_SOURCE.controlId -> { routing.setFluxClockSource(value.asInt()); true }
+                    WarpsSymbol.CARRIER_SOURCE.controlId -> { routing.setWarpsCarrierSource(value.asInt()); true }
+                    WarpsSymbol.MODULATOR_SOURCE.controlId -> { routing.setWarpsModulatorSource(value.asInt()); true }
                     else -> setPluginPort(id.uri, id.symbol, value)
                 }
             },
@@ -170,10 +129,10 @@ class DspSynthEngine(
 
         // Initial defaults
         setDelayMix(0f)
-        setDrumsBypass(true)
-        setDrumTriggerSource(0, 0) // Kick -> Internal (manual only)
-        setDrumTriggerSource(1, 0) // Snare -> Internal (manual only)
-        setDrumTriggerSource(2, 0) // HiHat -> Internal (manual only)
+        routing.setDrumsBypass(true)
+        routing.setDrumTriggerSource(0, 0) // Kick -> Internal (manual only)
+        routing.setDrumTriggerSource(1, 0) // Snare -> Internal (manual only)
+        routing.setDrumTriggerSource(2, 0) // HiHat -> Internal (manual only)
     }
 
     override fun syncToNative() = syncNativeBridgeState()
@@ -250,10 +209,10 @@ class DspSynthEngine(
         nativeBridge.nativeSetMasterVolume(getMasterVolume())
         // Sync resonator state (mix=0 → bypassed, target_mix=0.5 → both sources)
         val resoUri = ResonatorSymbol.MIX.uri
-        val mix = _resoMix
+        val mix = routing.resoMix
         audioEngine.setPort(resoUri, "mix", mix)
         pluginProvider.resonatorPlugin.setMixGains(mix, 1f - mix)
-        val tm = _resoTargetMix
+        val tm = routing.resoTargetMix
         val drumEx = if (tm <= 0.5f) 1f else (1f - (tm - 0.5f) * 2f).coerceIn(0f, 1f)
         val synthEx = if (tm >= 0.5f) 1f else (tm * 2f).coerceIn(0f, 1f)
         pluginProvider.resonatorPlugin.setTargetMixGains(drumEx, synthEx)
@@ -262,14 +221,14 @@ class DspSynthEngine(
         pluginProvider.voicePlugin.setTotalFeedback(voiceManager.getTotalFeedback())
         pluginProvider.voicePlugin.setFmCrossQuad(voiceManager.getFmStructureCrossQuad())
         // Sync Flux clock source (not a control port, so generic loop won't catch it)
-        pluginProvider.fluxPlugin.setClockSource(fluxClockSource)
+        pluginProvider.fluxPlugin.setClockSource(routing.fluxClockSource)
         // Sync trigger router source selectors
         for (i in 0..2) {
-            pluginProvider.fluxPlugin.setDrumTriggerSource(i, drumTriggerSources[i])
+            pluginProvider.fluxPlugin.setDrumTriggerSource(i, routing.drumTriggerSources[i])
             // Map DrumTriggerSource pitch ordinals to X output index (1=X1, 2=X2, 3=X3)
-            pluginProvider.fluxPlugin.setDrumPitchSource(i, drumPitchSources[i] - DrumTriggerSource.FLUX_X1.ordinal + 1)
+            pluginProvider.fluxPlugin.setDrumPitchSource(i, routing.drumPitchSources[i] - DrumTriggerSource.FLUX_X1.ordinal + 1)
             // Activate drum voice in C++ if it has an external trigger source
-            if (drumTriggerSources[i] != 0) {
+            if (routing.drumTriggerSources[i] != 0) {
                 nativeBridge.nativeSetVoiceActive(12 + i, true) // kDrumVoiceStart=12
             }
             pluginProvider.fluxPlugin.setQuadTriggerSource(i, voiceManager.getQuadTriggerSource(i))
@@ -400,11 +359,11 @@ class DspSynthEngine(
         // Register Drum Plugin Listener
         pluginProvider.drumPlugin.setListener(object : DrumPlugin.Listener {
             override fun onRoutingChange(drumIndex: Int, type: String, value: Int) {
-                if (type == "trigger") setDrumTriggerSource(drumIndex, value)
-                if (type == "pitch") setDrumPitchSource(drumIndex, value)
+                if (type == "trigger") routing.setDrumTriggerSource(drumIndex, value)
+                if (type == "pitch") routing.setDrumPitchSource(drumIndex, value)
             }
             override fun onBypassChange(bypass: Boolean) {
-                setDrumsBypass(bypass)
+                routing.setDrumsBypass(bypass)
             }
         })
     }
@@ -413,44 +372,9 @@ class DspSynthEngine(
     // SynthEngine Implementation
     // ═══════════════════════════════════════════════════════════
 
-    private var monitoringJob: Job? = null
-    private var vizJob: Job? = null
-    private var startRequested = false
-
-    // Reusable IntArray(1) for JNI read position — avoids allocation per channel per poll
-    private val vizReadPosBuf = IntArray(1)
-
-    private fun pollVizChannel(
-        channel: Int, readPositions: IntArray, vizBuf: FloatArray,
-        flow: MutableStateFlow<FloatArray>
-    ) {
-        vizReadPosBuf[0] = readPositions[channel]
-        val count = nativeBridge.nativeGetViz(channel, vizBuf, vizReadPosBuf)
-        readPositions[channel] = vizReadPosBuf[0]
-        if (count > 0) {
-            flow.value = appendToVizRing(flow.value, vizBuf, count)
-        }
-    }
-
-    private fun appendToVizRing(ring: FloatArray, src: FloatArray, count: Int): FloatArray {
-        val maxSize = VIZ_BUF_SIZE
-        val total = ring.size + count
-        val result = FloatArray(minOf(total, maxSize))
-        val keepFromOld = result.size - count
-        if (keepFromOld > 0 && ring.size >= keepFromOld) {
-            ring.copyInto(result, 0, ring.size - keepFromOld, ring.size)
-        }
-        // When count > maxSize, keep the most recent samples (tail of src)
-        val srcStart = maxOf(0, count - result.size)
-        val srcCount = minOf(count, result.size)
-        val destOffset = maxOf(0, result.size - srcCount)
-        src.copyInto(result, destOffset, srcStart, srcStart + srcCount)
-        return result
-    }
-
     override fun start() {
-        if (startRequested || audioEngine.isRunning) return
-        startRequested = true
+        if (monitor.startRequested || audioEngine.isRunning) return
+        monitor.startRequested = true
         log.debug { "Starting Shared Audio Engine..." }
         audioEngine.start()
         syncNativeBridgeState() // Re-sync after C++ engine is created
@@ -464,67 +388,20 @@ class DspSynthEngine(
         syncNativeBridgeState()
 
         // Poll monitor data from C++ via native bridge
-        monitoringJob = monitoringScope.launch(dispatcherProvider.io) {
-            val monitorBuf = FloatArray(20) // OrpheusMonitorData: peak_l, peak_r, cpu, voice_levels[12], lfo, master, bend, lfo_a, lfo_b
-            while (isActive) {
-                nativeBridge.nativeGetMonitor(monitorBuf)
-                _peakFlow.value = maxOf(monitorBuf[0], monitorBuf[1])
-                _cpuLoadFlow.value = monitorBuf[2] * 100f
-                // voice_levels[0..11] at indices 3..14
-                val levels = FloatArray(12) { monitorBuf[3 + it] }
-                _voiceLevelsFlow.value = levels
-                _lfoOutputFlow.value = monitorBuf[15]
-                _masterLevelFlow.value = monitorBuf[16]
-                _bendFlow.value = monitorBuf[17]
-                _lfoAOutputFlow.value = monitorBuf[18]
-                _lfoBOutputFlow.value = monitorBuf[19]
-                delay(MONITOR_POLL_INTERVAL_MS)
-            }
-        }
+        monitor.startMonitoring()
         // Viz polling starts lazily via setVizEnabled() — no 60fps overhead when not needed
         log.debug { "Audio Engine Started" }
     }
 
     override fun setVizEnabled(enabled: Boolean) {
-        if (enabled && vizJob == null && audioEngine.isRunning) {
-            vizJob = monitoringScope.launch(dispatcherProvider.io) {
-                val vizBuf = FloatArray(VIZ_BUF_SIZE)
-                val readPositions = IntArray(VIZ_CHANNEL_COUNT)
-                while (isActive) {
-                    pollVizChannel(VIZ_LFO, readPositions, vizBuf, _lfoVizFlow)
-                    pollVizChannel(VIZ_WARPS_C, readPositions, vizBuf, _warpsCarrierVizFlow)
-                    pollVizChannel(VIZ_WARPS_M, readPositions, vizBuf, _warpsModVizFlow)
-                    pollVizChannel(VIZ_WARPS_O, readPositions, vizBuf, _warpsOutVizFlow)
-                    pollVizChannel(VIZ_DELAY_IN, readPositions, vizBuf, _delayInVizFlow)
-                    pollVizChannel(VIZ_DELAY_FB, readPositions, vizBuf, _delayFbVizFlow)
-                    pollVizChannel(VIZ_DELAY_OUT, readPositions, vizBuf, _delayOutVizFlow)
-                    pollVizChannel(VIZ_REVERB_IN, readPositions, vizBuf, _reverbInVizFlow)
-                    pollVizChannel(VIZ_REVERB_OUT, readPositions, vizBuf, _reverbOutVizFlow)
-                    pollVizChannel(VIZ_FLUX_CV, readPositions, vizBuf, _fluxCvVizFlow)
-                    pollVizChannel(VIZ_RESO_IN, readPositions, vizBuf, _resoInVizFlow)
-                    pollVizChannel(VIZ_RESO_OUT, readPositions, vizBuf, _resoOutVizFlow)
-                    delay(VIZ_POLL_INTERVAL_MS)
-                }
-            }
-        } else if (!enabled && vizJob != null) {
-            vizJob?.cancel()
-            vizJob = null
-            // Clear all flows
-            listOf(_lfoVizFlow, _warpsCarrierVizFlow, _warpsModVizFlow, _warpsOutVizFlow,
-                   _delayInVizFlow, _delayFbVizFlow, _delayOutVizFlow,
-                   _reverbInVizFlow, _reverbOutVizFlow, _fluxCvVizFlow,
-                   _resoInVizFlow, _resoOutVizFlow).forEach { it.value = FloatArray(0) }
-        }
+        monitor.setVizEnabled(enabled, audioEngine.isRunning)
     }
 
     override fun getCurrentTime(): Double = audioEngine.getCurrentTime()
 
     override fun stop() {
         log.debug { "Stopping Audio Engine..." }
-        vizJob?.cancel()
-        vizJob = null
-        monitoringJob?.cancel()
-        monitoringJob = null
+        monitor.stopMonitoring()
         audioEngine.stop()
         log.debug { "Audio Engine Stopped" }
     }
@@ -564,16 +441,6 @@ class DspSynthEngine(
     override fun getDelayModDepth(index: Int): Float {
         val ps = if (index == 0) DelaySymbol.MOD_DEPTH_1 else DelaySymbol.MOD_DEPTH_2
         return getPort(ps)?.asFloat() ?: 0f
-    }
-
-    // Drums bypass (side effects: rewires drum routing path)
-    private fun setDrumsBypass(bypass: Boolean) {
-        _drumsBypass = bypass
-        pluginProvider.drumPlugin.setBypass(bypass)
-        val chainGain = if (bypass) 0.0f else 1.0f
-        val directGain = if (bypass) 1.0f else 0.0f
-        // Forward to C++ ODWG graph
-        pluginProvider.drumPlugin.setRouting(chainGain, directGain)
     }
 
     // TTS delegations
@@ -669,7 +536,7 @@ class DspSynthEngine(
     override fun setBend(amount: Float) {
         nativeBridge.nativeSetBend(amount)
         setPort(BenderSymbol.BEND, PortValue.FloatValue(amount))
-        _bendFlow.value = amount
+        monitor.updateBend(amount)
     }
     override fun getBend(): Float =
         getPort(BenderSymbol.BEND)?.asFloat() ?: 0f
@@ -813,7 +680,7 @@ class DspSynthEngine(
         val result = pluginProvider.getPlugin(pluginUri)?.setPortValue(symbol, value) ?: false
         // Keep bendFlow in sync when Bender BEND is set externally (gesture, MIDI, AI)
         if (result && pluginUri == BENDER_URI && symbol == BenderSymbol.BEND.symbol) {
-            _bendFlow.value = value.asFloat()
+            monitor.updateBend(value.asFloat())
         }
         return result
     }
@@ -875,7 +742,7 @@ class DspSynthEngine(
     }
 
     // State Getters (Delegated)
-    override fun getPeak(): Float = _peakFlow.value
+    override fun getPeak(): Float = monitor.getPeak()
     override fun getCpuLoad(): Float = audioEngine.getCpuLoad()
 
     override fun getVoiceTune(index: Int) = voiceManager.getVoiceTune(index)
@@ -895,19 +762,6 @@ class DspSynthEngine(
         setPort(ResonatorSymbol.MODE, PortValue.IntValue(mode))
     }
 
-    private var _resoTargetMix = 0.0f // Must match ResonatorPlugin default (0=drum)
-    private var _resoMix = 0.0f
-
-    private fun setResonatorTargetMix(targetMix: Float) {
-        _resoTargetMix = targetMix
-        setPort(ResonatorSymbol.TARGET_MIX, PortValue.FloatValue(targetMix))
-        // Forward excitation/bypass gains to C++ graph port map
-        val drumExcite = if (targetMix <= 0.5f) 1f else (1f - (targetMix - 0.5f) * 2f).coerceIn(0f, 1f)
-        val synthExcite = if (targetMix >= 0.5f) 1f else (targetMix * 2f).coerceIn(0f, 1f)
-        pluginProvider.resonatorPlugin.setTargetMixGains(drumExcite, synthExcite)
-        updateDirectResonatorGains()
-    }
-
     private fun setResonatorStructure(value: Float) {
         setPort(ResonatorSymbol.STRUCTURE, PortValue.FloatValue(value))
     }
@@ -924,28 +778,6 @@ class DspSynthEngine(
         setPort(ResonatorSymbol.POSITION, PortValue.FloatValue(value))
     }
 
-    private fun setResonatorMix(value: Float) {
-        _resoMix = value
-        setPort(ResonatorSymbol.MIX, PortValue.FloatValue(value))
-        // Forward synth resonator wet/dry gains to C++ graph port map
-        val wet = value.coerceIn(0f, 1f)
-        val dry = 1f - wet
-        pluginProvider.resonatorPlugin.setMixGains(wet, dry)
-        updateDirectResonatorGains()
-    }
-
-    private fun updateDirectResonatorGains() {
-        val drumExcite = if (_resoTargetMix <= 0.5f) 1.0f else (1.0f - (_resoTargetMix - 0.5f) * 2.0f).coerceIn(0.0f, 1.0f)
-        val mixWet = _resoMix.coerceIn(0.0f, 1.0f)
-        val mixDry = 1.0f - mixWet
-
-        val finalWet = (mixWet * drumExcite)
-        val finalDry = ((mixDry * drumExcite) + (1.0f - drumExcite))
-
-        // Forward to C++ engine
-        pluginProvider.drumPlugin.setDirectResonatorGains(finalWet, finalDry)
-    }
-
     private fun strumResonator(frequency: Float) {
         pluginProvider.resonatorPlugin.strum(frequency)
     }
@@ -956,33 +788,6 @@ class DspSynthEngine(
     override fun getDrumDecay(type: Int): Float = pluginProvider.drumPlugin.getDecay(type)
     override fun getDrumP4(type: Int): Float = pluginProvider.drumPlugin.getP4(type)
     override fun getDrumP5(type: Int): Float = pluginProvider.drumPlugin.getP5(type)
-
-    // Drum Sources (side effects: rewires audio inputs + forwards to C++)
-    private fun setDrumTriggerSource(drumIndex: Int, sourceIndex: Int) {
-        if (drumIndex !in 0..2) return
-        drumTriggerSources[drumIndex] = sourceIndex
-
-        // Forward to C++ native bridge
-        pluginProvider.fluxPlugin.setDrumTriggerSource(drumIndex, sourceIndex)
-        // Activate drum voice in C++ so the gate routing code runs.
-        // Drum voices start inactive (active=0) and only get activated by pad hits.
-        // Without this, the active check returns before external gates are read.
-        if (sourceIndex != 0) {
-            val voiceIndex = 12 + drumIndex // kDrumVoiceStart=12
-            nativeBridge.nativeSetVoiceActive(voiceIndex, true)
-        }
-    }
-
-    private fun setDrumPitchSource(drumIndex: Int, sourceIndex: Int) {
-        if (drumIndex !in 0..2) return
-        drumPitchSources[drumIndex] = sourceIndex
-
-        // Map DrumTriggerSource pitch ordinals to X output index (1=X1, 2=X2, 3=X3)
-        val xIndex = sourceIndex - DrumTriggerSource.FLUX_X1.ordinal + 1
-
-        // Forward mapped index to C++ native bridge
-        pluginProvider.fluxPlugin.setDrumPitchSource(drumIndex, xIndex)
-    }
 
     // Quad delegations (with C++ forwarding)
     override fun setQuadPitchSource(quadIndex: Int, sourceIndex: Int) {
@@ -999,26 +804,6 @@ class DspSynthEngine(
     override fun getQuadPitchSource(quadIndex: Int) = voiceManager.getQuadPitchSource(quadIndex)
     override fun getQuadTriggerSource(quadIndex: Int) = voiceManager.getQuadTriggerSource(quadIndex)
     override fun getQuadEnvelopeTriggerMode(quadIndex: Int) = voiceManager.getQuadEnvelopeTriggerMode(quadIndex)
-
-    private fun setFluxClockSource(sourceIndex: Int) {
-        fluxClockSource = sourceIndex
-        // Forward to C++ native bridge
-        pluginProvider.fluxPlugin.setClockSource(sourceIndex)
-    }
-
-    // Warps source routing (side effects: rewires audio graph)
-    private var _warpsCarrierSource = 0
-    private var _warpsModulatorSource = 1
-
-    private fun setWarpsCarrierSource(source: Int) {
-        _warpsCarrierSource = source
-        audioEngine.setPort(WarpsSymbol.CARRIER_SOURCE.uri, "carrier_source", source.toFloat())
-    }
-
-    private fun setWarpsModulatorSource(source: Int) {
-        _warpsModulatorSource = source
-        audioEngine.setPort(WarpsSymbol.MODULATOR_SOURCE.uri, "modulator_source", source.toFloat())
-    }
 
     /**
      * Maps Kotlin PlaitsEngineId ordinal+1 (1-based engineOrdinal) to
@@ -1037,23 +822,6 @@ class DspSynthEngine(
     }
 
     companion object {
-        private const val MONITOR_POLL_INTERVAL_MS = 200L
-        private const val VIZ_POLL_INTERVAL_MS = 16L  // ~60fps
-        private const val VIZ_BUF_SIZE = 480           // matches C++ VizRing::kVizBufSize
-        // VizChannel IDs (must match C++ VizChannel enum)
-        private const val VIZ_LFO = 0
-        private const val VIZ_WARPS_C = 1
-        private const val VIZ_WARPS_M = 2
-        private const val VIZ_WARPS_O = 3
-        private const val VIZ_DELAY_IN = 4
-        private const val VIZ_DELAY_FB = 5
-        private const val VIZ_DELAY_OUT = 6
-        private const val VIZ_REVERB_IN = 7
-        private const val VIZ_REVERB_OUT = 8
-        private const val VIZ_FLUX_CV = 9
-        private const val VIZ_RESO_IN = 10
-        private const val VIZ_RESO_OUT = 11
-        private const val VIZ_CHANNEL_COUNT = 12
         private const val LOOPER_URI = "org.balch.orpheus.plugins.looper"
         /** VoicePlugin engineOrdinal for SPEECH (PlaitsEngineId.SPEECH.ordinal + 1). */
         private const val SPEECH_ENGINE_ORDINAL = 17
