@@ -25,6 +25,7 @@ interface NativeDspBridge {
     fun nativeSetPort(uri: String, symbol: String, value: Float)
     fun nativeGetPort(uri: String, symbol: String): Float
     fun nativeGetMonitor(out: FloatArray)
+    fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int
     fun nativeTriggerDrum(drumIndex: Int, accent: Float)
     fun nativeLoadGraph(data: ByteArray): Int
     fun nativeSetAutomation(target: Int, voiceIndex: Int, times: FloatArray, values: FloatArray, count: Int)

@@ -1121,6 +1121,28 @@ void orpheus_engine_get_waveform(OrpheusEngine* engine,
     std::memset(buffer, 0, max_frames * sizeof(float));
 }
 
+int orpheus_engine_get_viz(OrpheusEngine* engine, int channel,
+                           float* out_buf, int max_samples, int* last_read_pos) {
+    if (!engine || channel < 0 || channel >= VIZ_CHANNEL_COUNT || !out_buf || !last_read_pos)
+        return 0;
+    auto& ring = engine->viz_rings[channel];
+    uint32_t wc = ring.write_count.load(std::memory_order_acquire);
+    uint32_t rc = static_cast<uint32_t>(*last_read_pos);
+    uint32_t avail = wc - rc;  // unsigned wrapping: correct even after overflow
+    if (avail == 0) return 0;
+    // Writer lapped reader — snap to most recent kVizBufSize-1 samples
+    if (avail > static_cast<uint32_t>(VizRing::kVizBufSize - 1)) {
+        rc = wc - (VizRing::kVizBufSize - 1);
+        avail = VizRing::kVizBufSize - 1;
+    }
+    int count = std::min(static_cast<int>(avail), max_samples);
+    for (int i = 0; i < count; i++) {
+        out_buf[i] = ring.buf[(rc + i) % VizRing::kVizBufSize];
+    }
+    *last_read_pos = static_cast<int>(rc + count);
+    return count;
+}
+
 // ── Automation API (called from UI thread) ─────────────────────────────
 
 void orpheus_engine_set_automation(OrpheusEngine* engine,

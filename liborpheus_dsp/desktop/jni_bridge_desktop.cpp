@@ -179,6 +179,19 @@ JNI_FN(nativeGetMonitor)(JNIEnv *env, jobject thiz, jfloatArray out) {
                              reinterpret_cast<float*>(&mon));
 }
 
+// -- Visualization ------------------------------------------------------------
+
+JNIEXPORT jint JNICALL
+JNI_FN(nativeGetViz)(JNIEnv *env, jobject thiz,
+                     jint channel, jfloatArray outBuf, jintArray lastReadPos) {
+    jint* rp = env->GetIntArrayElements(lastReadPos, nullptr);
+    jfloat* buf = env->GetFloatArrayElements(outBuf, nullptr);
+    int count = sEngine.getViz(channel, buf, env->GetArrayLength(outBuf), rp);
+    env->ReleaseFloatArrayElements(outBuf, buf, 0);
+    env->ReleaseIntArrayElements(lastReadPos, rp, 0);
+    return count;
+}
+
 // -- Automation ---------------------------------------------------------------
 
 JNIEXPORT void JNICALL

@@ -32,10 +32,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.WarpsSource
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.SegmentedAlgoKnob
 
@@ -49,6 +52,9 @@ private data class WarpsColors(
 @Composable
 fun WarpsPanel(
     feature: WarpsFeature = WarpsViewModel.feature(),
+    carrierVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
+    modulatorVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
+    outputVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -58,6 +64,9 @@ fun WarpsPanel(
 
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
+    val carrierViz by carrierVizFlow.collectAsState()
+    val modulatorViz by modulatorVizFlow.collectAsState()
+    val outputViz by outputVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "BLEND",
@@ -67,7 +76,12 @@ fun WarpsPanel(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         modifier = modifier,
-        showCollapsedHeader = showCollapsedHeader
+        showCollapsedHeader = showCollapsedHeader,
+        backgroundContent = {
+            SignalTrace(data = carrierViz, color = Color(0xFF4488FF))    // blue
+            SignalTrace(data = modulatorViz, color = Color(0xFF00FF88))  // green
+            SignalTrace(data = outputViz, color = Color(0xFFFF8844))     // orange
+        }
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

@@ -62,6 +62,7 @@ fun CollapsibleColumnPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     initialExpanded: Boolean = false,
     showCollapsedHeader: Boolean = true,
+    backgroundContent: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     var internalExpanded by remember { mutableStateOf(initialExpanded) }
@@ -101,6 +102,11 @@ fun CollapsibleColumnPanel(
                 shape = shape
             )
     ) {
+        // Signal visualization layer — renders behind content, inside liquid glass
+        if (effectiveExpanded && backgroundContent != null) {
+            backgroundContent()
+        }
+
         Row {
             // [LEFT] Vertical Header Strip (Visible if enabled)
             if (effectiveShowCollapsedHeader) {

@@ -1,0 +1,38 @@
+#pragma once
+#include <atomic>
+#include <cstdint>
+
+// Lock-free ring buffer for signal visualization.
+// Audio thread writes one sample per block via write().
+// UI thread reads via orpheus_engine_get_viz() (lock-free, acquire/release).
+// Uses uint32_t for write_count so unsigned wrapping arithmetic keeps
+// the (wc - rc) difference correct even after overflow (~529 days at 94 writes/sec).
+struct VizRing {
+    static constexpr int kVizBufSize = 480;  // ~5 sec at 94 writes/sec (48000/512)
+    float buf[kVizBufSize] = {};
+    std::atomic<uint32_t> write_count{0};  // monotonic counter, unsigned wrapping
+
+    inline void write(float value) {
+        uint32_t wc = write_count.load(std::memory_order_relaxed);
+        buf[wc % kVizBufSize] = value;
+        write_count.store(wc + 1, std::memory_order_release);
+    }
+};
+
+// Visualization channel IDs — one ring buffer per channel.
+// Add new channels at the end to avoid breaking existing code.
+enum VizChannel {
+    VIZ_LFO_OUTPUT = 0,
+    VIZ_WARPS_CARRIER = 1,
+    VIZ_WARPS_MOD = 2,
+    VIZ_WARPS_OUT = 3,
+    VIZ_DELAY_IN = 4,
+    VIZ_DELAY_FB = 5,
+    VIZ_DELAY_OUT = 6,
+    VIZ_REVERB_IN = 7,
+    VIZ_REVERB_OUT = 8,
+    VIZ_FLUX_CV = 9,
+    VIZ_RESO_IN = 10,
+    VIZ_RESO_OUT = 11,
+    VIZ_CHANNEL_COUNT
+};

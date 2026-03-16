@@ -10,10 +10,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.plugin.symbols.DuoLfoSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.HorizontalMiniSlider
 import org.balch.orpheus.ui.widgets.HorizontalSwitch3Way
 import org.balch.orpheus.ui.widgets.HorizontalToggle
@@ -28,6 +31,7 @@ import org.balch.orpheus.ui.widgets.learnable
 @Composable
 fun DuoLfoPanel(
     feature: LfoFeature = LfoViewModel.feature(),
+    vizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -35,6 +39,7 @@ fun DuoLfoPanel(
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
+    val vizData by vizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "LFO",
@@ -44,9 +49,14 @@ fun DuoLfoPanel(
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
         modifier = modifier,
-        showCollapsedHeader = showCollapsedHeader
+        showCollapsedHeader = showCollapsedHeader,
+        backgroundContent = {
+            SignalTrace(
+                data = vizData,
+                color = OrpheusColors.neonCyan,
+            )
+        }
     ) {
-
         val learnState = LocalLearnModeState.current
         val isActive = uiState.mode != HyperLfoMode.OFF
 

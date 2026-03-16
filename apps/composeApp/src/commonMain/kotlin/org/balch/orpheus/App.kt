@@ -31,6 +31,7 @@ import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
 import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.LocalSignalVizEnabled
 import org.balch.orpheus.ui.widgets.VizBackground
 
 @Composable
@@ -62,11 +63,18 @@ fun App(
             val dialogPosition = aiState.dialogPosition
             val dialogSize = aiState.dialogSize
 
+            // Enable/disable viz polling based on active visualization
+            val isSignalMonitor = vizState.selectedViz.id == "signal-monitor"
+            androidx.compose.runtime.LaunchedEffect(isSignalMonitor) {
+                graph.synthEngine.setVizEnabled(isSignalMonitor)
+            }
+
             OrpheusTheme {
                 CompositionLocalProvider(
                     LocalLiquidState provides liquidState,
                     LocalDialogLiquidState provides dialogLiquidState,
                     LocalLiquidEffects provides liquidEffects,
+                    LocalSignalVizEnabled provides (vizState.selectedViz.id == "signal-monitor"),
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         // Wrap main content in a liquefiable box for the dialog to "see" through

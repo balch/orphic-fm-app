@@ -137,6 +137,7 @@ if(BUILD_TESTS)
         test/test_warps.cpp
         test/test_bridge_audit.cpp
         test/test_presets.cpp
+        test/test_viz.cpp
         test/test_chain_compare.cpp
         test/test_fm_compare.cpp
         test/test_benchmark.cpp

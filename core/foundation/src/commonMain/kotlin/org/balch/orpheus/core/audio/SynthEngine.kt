@@ -1,7 +1,10 @@
 package org.balch.orpheus.core.audio
 
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.PortValue
+
+private val emptyVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0))
 
 interface SynthEngine {
     fun start()
@@ -151,6 +154,23 @@ interface SynthEngine {
 
     // Bender position flow (monitoring, not a port)
     val bendFlow: StateFlow<Float>              // -1 to +1 range, bender position
+
+    // Signal visualization flows (60fps oscilloscope data)
+    val lfoVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val warpsCarrierVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val warpsModVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val warpsOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val delayInVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val delayFbVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val delayOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val reverbInVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val reverbOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val fluxCvVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val resoInVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val resoOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+
+    /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
+    fun setVizEnabled(enabled: Boolean) {}
 
     // ═══════════════════════════════════════════════════════════
     // Generic Plugin Port Access

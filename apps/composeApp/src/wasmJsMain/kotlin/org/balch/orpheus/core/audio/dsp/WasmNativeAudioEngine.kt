@@ -141,6 +141,7 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
     override fun nativeStopTts() = jsSendStopTtsCmd()
 
     override fun nativeIsTtsPlaying(): Int = jsGetTtsPlaying()
+    override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int = 0
 
     companion object {
         private val log = logging("WasmNativeAudioEngine")

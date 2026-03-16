@@ -1113,6 +1113,17 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     // RESONATOR aux source (4) for warps routing (main resonator only)
     if (!is_drum) {
         std::memcpy(engine->warps_source_buffers[4], out_r, num_frames * sizeof(float));
+
+        // Viz: resonator excitation input and output peaks
+        float rin_pk = 0, rout_pk = 0;
+        for (int i = 0; i < num_frames; i++) {
+            float ai = std::fabs(in[i]);
+            float ao = std::fabs(out_l[i]);
+            if (ai > rin_pk) rin_pk = ai;
+            if (ao > rout_pk) rout_pk = ao;
+        }
+        engine->viz_rings[VIZ_RESO_IN].write(rin_pk);
+        engine->viz_rings[VIZ_RESO_OUT].write(rout_pk);
     }
 }
 
@@ -1125,6 +1136,10 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
     if (engine->warps_smooth_mix < 0.0001f) {
         std::memset(out_l, 0, num_frames * sizeof(float));
         std::memset(out_r, 0, num_frames * sizeof(float));
+        // Viz: write zeros when bypassed (flat line, not frozen stale data)
+        engine->viz_rings[VIZ_WARPS_CARRIER].write(0.0f);
+        engine->viz_rings[VIZ_WARPS_MOD].write(0.0f);
+        engine->viz_rings[VIZ_WARPS_OUT].write(0.0f);
         return;
     }
 
@@ -1224,6 +1239,22 @@ void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         out_r[i] *= gain;
     }
 
+    // Viz: write per-block peaks for carrier, modulator, output (post-gain)
+    {
+        float c_pk = 0, m_pk = 0, o_pk = 0;
+        for (int i = 0; i < num_frames; i++) {
+            float ac = std::fabs(carrier_buf[i]);
+            float am = std::fabs(mod_buf[i]);
+            float ao = std::fabs(out_l[i]);
+            if (ac > c_pk) c_pk = ac;
+            if (am > m_pk) m_pk = am;
+            if (ao > o_pk) o_pk = ao;
+        }
+        engine->viz_rings[VIZ_WARPS_CARRIER].write(c_pk);
+        engine->viz_rings[VIZ_WARPS_MOD].write(m_pk);
+        engine->viz_rings[VIZ_WARPS_OUT].write(o_pk);
+    }
+
     // Store output as feedback source (source 5)
     std::memcpy(engine->warps_feedback_l, out_l, num_frames * sizeof(float));
     std::memcpy(engine->warps_feedback_r, out_r, num_frames * sizeof(float));
@@ -1307,6 +1338,27 @@ void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames
 
         engine->delay_write_pos = (wp + 1) % max_d;
     }
+
+    // Viz: delay input peak, feedback signal peak, output peak
+    {
+        float in_pk = 0, fb_pk = 0, out_pk = 0;
+        float fb = engine->smooth_delay_feedback;
+        int wp = engine->delay_write_pos;
+        for (int i = 0; i < num_frames; i++) {
+            float ai = std::fabs(in_l[i]);
+            float ao = std::fabs(out_l[i]);
+            // Read the delayed+attenuated signal being fed back (wet * fb)
+            float wet = std::fabs(out_l[i] - in_l[i]);  // approximate wet component
+            if (ai > in_pk) in_pk = ai;
+            if (ao > out_pk) out_pk = ao;
+            if (wet > fb_pk) fb_pk = wet;
+        }
+        // Scale by feedback amount to show actual feedback energy
+        fb_pk *= std::fabs(fb);
+        engine->viz_rings[VIZ_DELAY_IN].write(in_pk);
+        engine->viz_rings[VIZ_DELAY_FB].write(fb_pk);
+        engine->viz_rings[VIZ_DELAY_OUT].write(out_pk);
+    }
 }
 
 // -- HyperLFO graph unit ----------------------------------
@@ -1382,6 +1434,12 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
 
     // LFO source (3) for warps routing
     std::memcpy(engine->warps_source_buffers[3], out, num_frames * sizeof(float));
+
+    // Viz: LFO writes the instantaneous combined waveform value (not peak).
+    // This preserves waveform shape (including negative values) since LFO is
+    // a slow oscillator where shape matters, unlike audio-rate channels that
+    // write peak-per-block for envelope display.
+    engine->viz_rings[VIZ_LFO_OUTPUT].write(output);
 
     // ── Dedicated vibrato sine oscillator ──────────────────────
     // Separate from HyperLFO (matches JSyn VibratoPlugin architecture).
@@ -1816,6 +1874,18 @@ void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine,
     engine->reverb_lfo1_value = lfo_val0;
     engine->reverb_lfo2_value = lfo_val1;
 
+    // Viz: reverb input and output peaks
+    {
+        float in_pk = 0, out_pk = 0;
+        for (int i = 0; i < num_frames; i++) {
+            float ai = std::fabs(in_l[i]);
+            float ao = std::fabs(out_l[i]);
+            if (ai > in_pk) in_pk = ai;
+            if (ao > out_pk) out_pk = ao;
+        }
+        engine->viz_rings[VIZ_REVERB_IN].write(in_pk);
+        engine->viz_rings[VIZ_REVERB_OUT].write(out_pk);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2310,6 +2380,16 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     // FLUX source (6) for warps routing (post-mix/exp)
     std::memcpy(engine->warps_source_buffers[6],
                 out_cv1, num_frames * sizeof(float));
+
+    // Viz: Flux CV output peak
+    {
+        float cv_pk = 0;
+        for (int i = 0; i < num_frames; i++) {
+            float a = std::fabs(out_cv1[i]);
+            if (a > cv_pk) cv_pk = a;
+        }
+        engine->viz_rings[VIZ_FLUX_CV].write(cv_pk);
+    }
 }
 
 // ── UNIT_LOOPER: Beat-quantized audio looper ────────────────

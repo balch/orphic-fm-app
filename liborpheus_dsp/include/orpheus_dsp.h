@@ -83,6 +83,13 @@ void orpheus_engine_get_monitor(OrpheusEngine* engine,
 void orpheus_engine_get_waveform(OrpheusEngine* engine,
                                  float* buffer, int max_frames);
 
+// ── Signal visualization (polled at ~60fps from UI thread) ──
+// Reads new samples from a viz ring buffer since last_read_pos.
+// Returns count of samples written to out_buf. Updates *last_read_pos.
+// Lock-free: safe to call from any thread while audio thread writes.
+int  orpheus_engine_get_viz(OrpheusEngine* engine, int channel,
+                            float* out_buf, int max_samples, int* last_read_pos);
+
 // ── Automation (called from UI thread) ──────────
 // target: 0=VOICE_GATE, 1=VOICE_FREQ
 // voice_index: 0-11

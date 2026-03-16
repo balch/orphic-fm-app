@@ -6,6 +6,7 @@
 
 // OrpheusVoice: direct Engine::Render() without LPG/limiter/int16
 #include "orpheus_voice.h"
+#include "orpheus_viz.h"
 
 // Include MI Clouds granular processor
 #include "clouds/dsp/granular_processor.h"
@@ -473,4 +474,8 @@ struct OrpheusEngine {
     float warps_synth_read[kMaxFrames] = {};
     float warps_drums_read[kMaxFrames] = {};
     float warps_repl_read[kMaxFrames] = {};
+
+    // ── Signal visualization ring buffers ──
+    // Written by audio thread (one sample per block), read by UI at ~60fps.
+    VizRing viz_rings[VIZ_CHANNEL_COUNT];
 };

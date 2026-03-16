@@ -98,6 +98,8 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
     override fun nativePlayTts() = bridge.nativePlayTts()
     override fun nativeStopTts() = bridge.nativeStopTts()
     override fun nativeIsTtsPlaying(): Int = bridge.nativeIsTtsPlaying()
+    override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int =
+        bridge.nativeGetViz(channel, outBuf, lastReadPos)
 
     companion object {
         private val log = logging("NativeDspAudioEngine")

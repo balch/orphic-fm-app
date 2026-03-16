@@ -101,6 +101,32 @@ class DspSynthEngine(
     private val _bendFlow = MutableStateFlow(0f)
     override val bendFlow: StateFlow<Float> = _bendFlow.asStateFlow()
 
+    // Signal visualization flows (60fps oscilloscope data)
+    private val _lfoVizFlow = MutableStateFlow(FloatArray(0))
+    override val lfoVizFlow: StateFlow<FloatArray> = _lfoVizFlow.asStateFlow()
+    private val _warpsCarrierVizFlow = MutableStateFlow(FloatArray(0))
+    override val warpsCarrierVizFlow: StateFlow<FloatArray> = _warpsCarrierVizFlow.asStateFlow()
+    private val _warpsModVizFlow = MutableStateFlow(FloatArray(0))
+    override val warpsModVizFlow: StateFlow<FloatArray> = _warpsModVizFlow.asStateFlow()
+    private val _warpsOutVizFlow = MutableStateFlow(FloatArray(0))
+    override val warpsOutVizFlow: StateFlow<FloatArray> = _warpsOutVizFlow.asStateFlow()
+    private val _delayInVizFlow = MutableStateFlow(FloatArray(0))
+    override val delayInVizFlow: StateFlow<FloatArray> = _delayInVizFlow.asStateFlow()
+    private val _delayFbVizFlow = MutableStateFlow(FloatArray(0))
+    override val delayFbVizFlow: StateFlow<FloatArray> = _delayFbVizFlow.asStateFlow()
+    private val _delayOutVizFlow = MutableStateFlow(FloatArray(0))
+    override val delayOutVizFlow: StateFlow<FloatArray> = _delayOutVizFlow.asStateFlow()
+    private val _reverbInVizFlow = MutableStateFlow(FloatArray(0))
+    override val reverbInVizFlow: StateFlow<FloatArray> = _reverbInVizFlow.asStateFlow()
+    private val _reverbOutVizFlow = MutableStateFlow(FloatArray(0))
+    override val reverbOutVizFlow: StateFlow<FloatArray> = _reverbOutVizFlow.asStateFlow()
+    private val _fluxCvVizFlow = MutableStateFlow(FloatArray(0))
+    override val fluxCvVizFlow: StateFlow<FloatArray> = _fluxCvVizFlow.asStateFlow()
+    private val _resoInVizFlow = MutableStateFlow(FloatArray(0))
+    override val resoInVizFlow: StateFlow<FloatArray> = _resoInVizFlow.asStateFlow()
+    private val _resoOutVizFlow = MutableStateFlow(FloatArray(0))
+    override val resoOutVizFlow: StateFlow<FloatArray> = _resoOutVizFlow.asStateFlow()
+
     // Monitoring
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -388,7 +414,39 @@ class DspSynthEngine(
     // ═══════════════════════════════════════════════════════════
 
     private var monitoringJob: Job? = null
+    private var vizJob: Job? = null
     private var startRequested = false
+
+    // Reusable IntArray(1) for JNI read position — avoids allocation per channel per poll
+    private val vizReadPosBuf = IntArray(1)
+
+    private fun pollVizChannel(
+        channel: Int, readPositions: IntArray, vizBuf: FloatArray,
+        flow: MutableStateFlow<FloatArray>
+    ) {
+        vizReadPosBuf[0] = readPositions[channel]
+        val count = nativeBridge.nativeGetViz(channel, vizBuf, vizReadPosBuf)
+        readPositions[channel] = vizReadPosBuf[0]
+        if (count > 0) {
+            flow.value = appendToVizRing(flow.value, vizBuf, count)
+        }
+    }
+
+    private fun appendToVizRing(ring: FloatArray, src: FloatArray, count: Int): FloatArray {
+        val maxSize = VIZ_BUF_SIZE
+        val total = ring.size + count
+        val result = FloatArray(minOf(total, maxSize))
+        val keepFromOld = result.size - count
+        if (keepFromOld > 0 && ring.size >= keepFromOld) {
+            ring.copyInto(result, 0, ring.size - keepFromOld, ring.size)
+        }
+        // When count > maxSize, keep the most recent samples (tail of src)
+        val srcStart = maxOf(0, count - result.size)
+        val srcCount = minOf(count, result.size)
+        val destOffset = maxOf(0, result.size - srcCount)
+        src.copyInto(result, destOffset, srcStart, srcStart + srcCount)
+        return result
+    }
 
     override fun start() {
         if (startRequested || audioEngine.isRunning) return
@@ -423,13 +481,48 @@ class DspSynthEngine(
                 delay(MONITOR_POLL_INTERVAL_MS)
             }
         }
+        // Viz polling starts lazily via setVizEnabled() — no 60fps overhead when not needed
         log.debug { "Audio Engine Started" }
+    }
+
+    override fun setVizEnabled(enabled: Boolean) {
+        if (enabled && vizJob == null && audioEngine.isRunning) {
+            vizJob = monitoringScope.launch(dispatcherProvider.io) {
+                val vizBuf = FloatArray(VIZ_BUF_SIZE)
+                val readPositions = IntArray(VIZ_CHANNEL_COUNT)
+                while (isActive) {
+                    pollVizChannel(VIZ_LFO, readPositions, vizBuf, _lfoVizFlow)
+                    pollVizChannel(VIZ_WARPS_C, readPositions, vizBuf, _warpsCarrierVizFlow)
+                    pollVizChannel(VIZ_WARPS_M, readPositions, vizBuf, _warpsModVizFlow)
+                    pollVizChannel(VIZ_WARPS_O, readPositions, vizBuf, _warpsOutVizFlow)
+                    pollVizChannel(VIZ_DELAY_IN, readPositions, vizBuf, _delayInVizFlow)
+                    pollVizChannel(VIZ_DELAY_FB, readPositions, vizBuf, _delayFbVizFlow)
+                    pollVizChannel(VIZ_DELAY_OUT, readPositions, vizBuf, _delayOutVizFlow)
+                    pollVizChannel(VIZ_REVERB_IN, readPositions, vizBuf, _reverbInVizFlow)
+                    pollVizChannel(VIZ_REVERB_OUT, readPositions, vizBuf, _reverbOutVizFlow)
+                    pollVizChannel(VIZ_FLUX_CV, readPositions, vizBuf, _fluxCvVizFlow)
+                    pollVizChannel(VIZ_RESO_IN, readPositions, vizBuf, _resoInVizFlow)
+                    pollVizChannel(VIZ_RESO_OUT, readPositions, vizBuf, _resoOutVizFlow)
+                    delay(VIZ_POLL_INTERVAL_MS)
+                }
+            }
+        } else if (!enabled && vizJob != null) {
+            vizJob?.cancel()
+            vizJob = null
+            // Clear all flows
+            listOf(_lfoVizFlow, _warpsCarrierVizFlow, _warpsModVizFlow, _warpsOutVizFlow,
+                   _delayInVizFlow, _delayFbVizFlow, _delayOutVizFlow,
+                   _reverbInVizFlow, _reverbOutVizFlow, _fluxCvVizFlow,
+                   _resoInVizFlow, _resoOutVizFlow).forEach { it.value = FloatArray(0) }
+        }
     }
 
     override fun getCurrentTime(): Double = audioEngine.getCurrentTime()
 
     override fun stop() {
         log.debug { "Stopping Audio Engine..." }
+        vizJob?.cancel()
+        vizJob = null
         monitoringJob?.cancel()
         monitoringJob = null
         audioEngine.stop()
@@ -945,6 +1038,22 @@ class DspSynthEngine(
 
     companion object {
         private const val MONITOR_POLL_INTERVAL_MS = 200L
+        private const val VIZ_POLL_INTERVAL_MS = 16L  // ~60fps
+        private const val VIZ_BUF_SIZE = 480           // matches C++ VizRing::kVizBufSize
+        // VizChannel IDs (must match C++ VizChannel enum)
+        private const val VIZ_LFO = 0
+        private const val VIZ_WARPS_C = 1
+        private const val VIZ_WARPS_M = 2
+        private const val VIZ_WARPS_O = 3
+        private const val VIZ_DELAY_IN = 4
+        private const val VIZ_DELAY_FB = 5
+        private const val VIZ_DELAY_OUT = 6
+        private const val VIZ_REVERB_IN = 7
+        private const val VIZ_REVERB_OUT = 8
+        private const val VIZ_FLUX_CV = 9
+        private const val VIZ_RESO_IN = 10
+        private const val VIZ_RESO_OUT = 11
+        private const val VIZ_CHANNEL_COUNT = 12
         private const val LOOPER_URI = "org.balch.orpheus.plugins.looper"
         /** VoicePlugin engineOrdinal for SPEECH (PlaitsEngineId.SPEECH.ordinal + 1). */
         private const val SPEECH_ENGINE_ORDINAL = 17
