@@ -102,8 +102,8 @@ struct GraphPort {
     float smoothed;            // current smoothed value
     bool  is_smoothed;         // whether this port applies smoothing
     int   num_sources;         // how many outputs connected
-    // Source buffer pointers (up to 4 sources per input)
-    float* sources[4];
+    // Source buffer pointers (up to 8 sources per input)
+    float* sources[8];
 };
 
 // ── Unit state (union of all possible states) ───

@@ -138,7 +138,7 @@ int orpheus_graph_load(OrpheusGraph* graph, const uint8_t* data,
         GraphUnit* dst = &graph->units[dst_id];
         GraphPort* inp = &dst->inputs[dst_port];
 
-        if (inp->num_sources < 4) {
+        if (inp->num_sources < 8) {
             inp->sources[inp->num_sources] = src->output_buffers[src_port];
             inp->num_sources++;
         }
