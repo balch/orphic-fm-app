@@ -88,7 +88,12 @@ class DspSynthEngine(
     override val fluxCvVizFlow: StateFlow<FloatArray> get() = monitor.fluxCvVizFlow
     override val resoInVizFlow: StateFlow<FloatArray> get() = monitor.resoInVizFlow
     override val resoOutVizFlow: StateFlow<FloatArray> get() = monitor.resoOutVizFlow
-
+    override val drumOutVizFlow: StateFlow<FloatArray> get() = monitor.drumOutVizFlow
+    override val grainsInVizFlow: StateFlow<FloatArray> get() = monitor.grainsInVizFlow
+    override val grainsOutVizFlow: StateFlow<FloatArray> get() = monitor.grainsOutVizFlow
+    override val lfoCh1VizFlow: StateFlow<FloatArray> get() = monitor.lfoCh1VizFlow
+    override val lfoCh2VizFlow: StateFlow<FloatArray> get() = monitor.lfoCh2VizFlow
+    override val lfoCh3VizFlow: StateFlow<FloatArray> get() = monitor.lfoCh3VizFlow
 
     init {
         voiceManager.initialize()
@@ -203,7 +208,6 @@ class DspSynthEngine(
         audioEngine.setPort(BENDER_URI, BenderSymbol.MAX_BEND.symbol, getPort(BenderSymbol.MAX_BEND)?.asFloat() ?: 24f)
         audioEngine.setPort(BENDER_URI, BenderSymbol.RANDOM_DEPTH.symbol, getPort(BenderSymbol.RANDOM_DEPTH)?.asFloat() ?: 0.1f)
         audioEngine.setPort(BENDER_URI, BenderSymbol.TIMBRE_MOD.symbol, getPort(BenderSymbol.TIMBRE_MOD)?.asFloat() ?: 0.3f)
-        audioEngine.setPort(BENDER_URI, BenderSymbol.SPRING_VOL.symbol, getPort(BenderSymbol.SPRING_VOL)?.asFloat() ?: 0.4f)
         audioEngine.setPort(BENDER_URI, BenderSymbol.TENSION_VOL.symbol, getPort(BenderSymbol.TENSION_VOL)?.asFloat() ?: 0.015f)
         // Sync master volume (default 0.7)
         nativeBridge.nativeSetMasterVolume(getMasterVolume())

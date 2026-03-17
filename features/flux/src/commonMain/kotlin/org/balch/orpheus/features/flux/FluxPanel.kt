@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.flux
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -11,12 +12,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.ValueCycleButton
 import org.balch.orpheus.ui.widgets.Vertical3WaySwitch
+import org.balch.orpheus.ui.widgets.VerticalRangeTrimSlider
 
 private val TModelNames = listOf("BERN", "CLST", "DRUM", "IND", "DIV", "3ST", "MRKV")
 private val TRangeNames = listOf("1/4x", "1x", "4x")
@@ -35,11 +40,13 @@ private val ScaleNames = listOf("MAJ", "MIN", "PEN", "PHR", "WHO", "CHR")
 @Composable
 fun FluxPanel(
     flux: FluxFeature,
+    cvVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
 ) {
+    val cvViz by cvVizFlow.collectAsState()
     CollapsibleColumnPanel(
         modifier = modifier,
         title = "FLUX",
@@ -49,6 +56,9 @@ fun FluxPanel(
         initialExpanded = true,
         expandedTitle = "Warbles",
         showCollapsedHeader = showCollapsedHeader,
+        backgroundContent = {
+            SignalTrace(data = cvViz, color = OrpheusColors.metallicBlueLight)
+        }
     ) {
         val state by flux.stateFlow.collectAsState()
         val actions = flux.actions
@@ -116,139 +126,141 @@ fun FluxPanel(
 
         }
 
-        // Row 2: Primary knobs — the controls you reach for most
+        // Knob rows + attenuator spanning both
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom
         ) {
-
-            RotaryKnob(
-                value = state.steps,
-                onValueChange = actions.setSteps,
-                label = "STEPS",
-                controlId = FluxSymbol.STEPS.controlId.key,
-                size = 48.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-
-            RotaryKnob(
-                value = state.spread,
-                onValueChange = actions.setSpread,
-                label = "SPREAD",
-                controlId = FluxSymbol.SPREAD.controlId.key,
-                size = 44.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-
-            RotaryKnob(
-                value = state.bias,
-                onValueChange = actions.setBias,
-                label = "BIAS",
-                controlId = FluxSymbol.BIAS.controlId.key,
-                size = 44.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-
-            RotaryKnob(
-                value = state.dejaVu,
-                onValueChange = actions.setDejaVu,
-                label = "DÉJÀ VU",
-                controlId = FluxSymbol.DEJAVU.controlId.key,
-                size = 36.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-
-            // 3-way switch: top=T only, middle=T+X both, bottom=X only
-            // Map mode (0=T+X, 1=T, 2=X) ↔ position (0=top/T, 1=mid/T+X, 2=bot/X)
-            Vertical3WaySwitch(
-                topLabel = "T",
-                bottomLabel = "X",
-                position = when (state.dejaVuMode) {
-                    1 -> 0   // T only → top
-                    2 -> 2   // X only → bottom
-                    else -> 1 // T+X → middle
-                },
-                onPositionChange = { pos ->
-                    actions.setDejaVuMode(
-                        when (pos) {
-                            0 -> 1   // top → T only
-                            2 -> 2   // bottom → X only
-                            else -> 0 // middle → T+X
-                        }
+            // Left: two rows of knobs stacked
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // Row 2: Primary knobs
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    RotaryKnob(
+                        value = state.steps,
+                        onValueChange = actions.setSteps,
+                        label = "STEPS",
+                        controlId = FluxSymbol.STEPS.controlId.key,
+                        size = 48.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
                     )
+                    RotaryKnob(
+                        value = state.spread,
+                        onValueChange = actions.setSpread,
+                        label = "SPREAD",
+                        controlId = FluxSymbol.SPREAD.controlId.key,
+                        size = 44.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                    RotaryKnob(
+                        value = state.bias,
+                        onValueChange = actions.setBias,
+                        label = "BIAS",
+                        controlId = FluxSymbol.BIAS.controlId.key,
+                        size = 44.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                    RotaryKnob(
+                        value = state.dejaVu,
+                        onValueChange = actions.setDejaVu,
+                        label = "DÉJÀ VU",
+                        controlId = FluxSymbol.DEJAVU.controlId.key,
+                        size = 36.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                    Vertical3WaySwitch(
+                        topLabel = "T",
+                        bottomLabel = "X",
+                        position = when (state.dejaVuMode) {
+                            1 -> 0; 2 -> 2; else -> 1
+                        },
+                        onPositionChange = { pos ->
+                            actions.setDejaVuMode(when (pos) { 0 -> 1; 2 -> 2; else -> 0 })
+                        },
+                        color = OrpheusColors.metallicBlueLight
+                    )
+                    RotaryKnob(
+                        value = state.length.toFloat(),
+                        onValueChange = { actions.setLength(it.toInt()) },
+                        label = "LENGTH",
+                        range = 1f..16f,
+                        size = 30.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                }
+
+                // Row 3: Secondary knobs + MIX
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    RotaryKnob(
+                        value = state.rate,
+                        onValueChange = actions.setRate,
+                        label = "RATE",
+                        controlId = FluxSymbol.RATE.controlId.key,
+                        size = 30.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                    RotaryKnob(
+                        value = state.probability,
+                        onValueChange = actions.setProbability,
+                        label = "PROB",
+                        controlId = FluxSymbol.PROBABILITY.controlId.key,
+                        size = 30.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                    RotaryKnob(
+                        value = state.jitter,
+                        onValueChange = actions.setJitter,
+                        label = "JITTER",
+                        controlId = FluxSymbol.JITTER.controlId.key,
+                        size = 30.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                    RotaryKnob(
+                        value = state.pulseWidth,
+                        onValueChange = actions.setPulseWidth,
+                        label = "PW",
+                        controlId = FluxSymbol.PULSE_WIDTH.controlId.key,
+                        size = 26.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                    RotaryKnob(
+                        value = state.pulseWidthStd,
+                        onValueChange = actions.setPulseWidthStd,
+                        label = "PW RND",
+                        controlId = FluxSymbol.PULSE_WIDTH_STD.controlId.key,
+                        size = 26.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    RotaryKnob(
+                        value = state.mix,
+                        onValueChange = actions.setMix,
+                        label = "MIX",
+                        controlId = FluxSymbol.MIX.controlId.key,
+                        size = 30.dp,
+                        progressColor = OrpheusColors.metallicBlueLight
+                    )
+                }
+            }
+
+            // Right: attenuator spanning both rows
+            VerticalRangeTrimSlider(
+                min = state.rangeMin,
+                max = state.rangeMax,
+                onRangeChange = { newMin, newMax ->
+                    actions.setRangeMin(newMin)
+                    actions.setRangeMax(newMax)
                 },
-                color = OrpheusColors.metallicBlueLight
-            )
-
-            RotaryKnob(
-                value = state.length.toFloat(),
-                onValueChange = { actions.setLength(it.toInt()) },
-                label = "LENGTH",
-                range = 1f..16f,
-                size = 30.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-        }
-
-        // Row 3: Secondary knobs + MIX at bottom-right
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            RotaryKnob(
-                value = state.rate,
-                onValueChange = actions.setRate,
-                label = "RATE",
-                controlId = FluxSymbol.RATE.controlId.key,
-                size = 30.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-
-            RotaryKnob(
-                value = state.probability,
-                onValueChange = actions.setProbability,
-                label = "PROB",
-                controlId = FluxSymbol.PROBABILITY.controlId.key,
-                size = 30.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-
-            RotaryKnob(
-                value = state.jitter,
-                onValueChange = actions.setJitter,
-                label = "JITTER",
-                controlId = FluxSymbol.JITTER.controlId.key,
-                size = 30.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-
-            RotaryKnob(
-                value = state.pulseWidth,
-                onValueChange = actions.setPulseWidth,
-                label = "PW",
-                controlId = FluxSymbol.PULSE_WIDTH.controlId.key,
-                size = 26.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-
-            RotaryKnob(
-                value = state.pulseWidthStd,
-                onValueChange = actions.setPulseWidthStd,
-                label = "PW RND",
-                controlId = FluxSymbol.PULSE_WIDTH_STD.controlId.key,
-                size = 26.dp,
-                progressColor = OrpheusColors.metallicBlueLight
-            )
-
-            Spacer(modifier = Modifier.width(4.dp))
-
-            RotaryKnob(
-                value = state.mix,
-                onValueChange = actions.setMix,
-                label = "MIX",
-                controlId = FluxSymbol.MIX.controlId.key,
-                size = 30.dp,
-                progressColor = OrpheusColors.metallicBlueLight
+                color = OrpheusColors.metallicBlueLight,
+                trackHeight = 120,
+                topLabel = "H",
+                bottomLabel = "L",
             )
         }
     }

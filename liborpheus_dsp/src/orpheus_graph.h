@@ -32,6 +32,8 @@ enum OrpheusUnitType : uint16_t {
     UNIT_BENDER = 24,
     UNIT_PER_STRING_BENDER = 25,
     UNIT_DUO_VOICE = 26,
+    UNIT_LORENZ = 27,
+    UNIT_POLY_LFO = 28,
     UNIT_TYPE_COUNT
 };
 

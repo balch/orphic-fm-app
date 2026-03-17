@@ -12,7 +12,6 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
@@ -47,8 +46,12 @@ class SignalMonitorViz(
         frostMedium = 2f,
         frostLarge = 3f,
         tintAlpha = 0.01f,
-        top = VisualizationLiquidScope(),
-        bottom = VisualizationLiquidScope(),
+        top = VisualizationLiquidScope(
+            saturation = 3.0f,
+        ),
+        bottom = VisualizationLiquidScope(
+            saturation = 3.0f,
+        ),
         title = CenterPanelStyle(
             scope = VisualizationLiquidScope(
                 refraction = .75f,
@@ -77,17 +80,20 @@ class SignalMonitorViz(
 
     private val channels = listOf(
         Channel("LFO", OrpheusColors.neonCyan),
-        Channel("W-CARRIER", Color(0xFF4488FF)),
-        Channel("W-MOD", Color(0xFF00FF88)),
-        Channel("W-OUT", Color(0xFFFF8844)),
-        Channel("DLY-IN", Color(0xFF6688CC)),
-        Channel("DLY-FB", Color(0xFFCC6688)),
-        Channel("DLY-OUT", Color(0xFF88CC66)),
-        Channel("REV-IN", Color(0xFF8866CC)),
-        Channel("REV-OUT", Color(0xFFCC88FF)),
-        Channel("FLUX", Color(0xFFFFCC44)),
-        Channel("RESO-IN", Color(0xFF44CCCC)),
-        Channel("RESO-OUT", Color(0xFFCC4488)),
+        Channel("W-CARRIER", OrpheusColors.warpsGreen.copy(alpha = 0.5f)),
+        Channel("W-MOD", OrpheusColors.warpsGreen.copy(alpha = 0.7f)),
+        Channel("W-OUT", OrpheusColors.warpsGreen),
+        Channel("DLY-IN", OrpheusColors.warmGlow.copy(alpha = 0.6f)),
+        Channel("DLY-FB", OrpheusColors.warmGlow.copy(alpha = 0.4f)),
+        Channel("DLY-OUT", OrpheusColors.warmGlow),
+        Channel("REV-IN", OrpheusColors.echoPeriwinkle),
+        Channel("REV-OUT", OrpheusColors.echoLavender),
+        Channel("FLUX", OrpheusColors.metallicBlueLight),
+        Channel("RESO-IN", OrpheusColors.lakersGold.copy(alpha = 0.5f)),
+        Channel("RESO-OUT", OrpheusColors.lakersGold),
+        Channel("DRUM", OrpheusColors.ninersRed),
+        Channel("GRN-IN", OrpheusColors.grainsRed.copy(alpha = 0.5f)),
+        Channel("GRN-OUT", OrpheusColors.grainsRed),
     )
 
     @Composable
@@ -104,15 +110,18 @@ class SignalMonitorViz(
         val fluxData by engine.fluxCvVizFlow.collectAsState()
         val resoInData by engine.resoInVizFlow.collectAsState()
         val resoOutData by engine.resoOutVizFlow.collectAsState()
+        val drumOutData by engine.drumOutVizFlow.collectAsState()
+        val grainsInData by engine.grainsInVizFlow.collectAsState()
+        val grainsOutData by engine.grainsOutVizFlow.collectAsState()
 
         val allData = listOf(
             lfoData, carrierData, modData, outData,
             delayInData, delayFbData, delayOutData,
             reverbInData, reverbOutData,
-            fluxData, resoInData, resoOutData
+            fluxData, resoInData, resoOutData,
+            drumOutData, grainsInData, grainsOutData
         )
         val paths = remember { Array(channels.size) { Path() } }
-        val textMeasurer = rememberTextMeasurer()
 
         Canvas(modifier = modifier.fillMaxSize()) {
             val w = size.width
@@ -122,7 +131,7 @@ class SignalMonitorViz(
             val amplitude = h * 0.4f  // all traces share full height, centered
 
             // Dark background
-            drawRect(Color(0xFF050510))
+            drawRect(OrpheusColors.fireworksBackground)
 
             // Center reference line
             drawLine(

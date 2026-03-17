@@ -6,6 +6,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
@@ -13,7 +14,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
-class ResonatorPanelRegistration : FeaturePanel {
+class ResonatorPanelRegistration(
+    private val synthEngine: SynthEngine,
+) : FeaturePanel {
     override val panelId = PanelId.RESONATOR
     override val description = "Add texture to sounds"
     override val weight = 1.0f
@@ -29,6 +32,8 @@ class ResonatorPanelRegistration : FeaturePanel {
     ) {
         ResonatorPanel(
             feature = ResonatorViewModel.feature(),
+            inVizFlow = synthEngine.resoInVizFlow,
+            outVizFlow = synthEngine.resoOutVizFlow,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

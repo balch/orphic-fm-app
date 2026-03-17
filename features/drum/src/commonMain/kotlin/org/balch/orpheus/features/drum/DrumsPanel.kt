@@ -21,9 +21,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.DRUM_V2_PICKER_CONFIG
 import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.HorizontalToggle
@@ -35,6 +38,7 @@ import org.balch.orpheus.ui.widgets.drumEngineLabel
 @Composable
 fun DrumsPanel(
     drumFeature: DrumFeature = DrumViewModel.feature(),
+    drumOutVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -42,6 +46,7 @@ fun DrumsPanel(
 ) {
     val state by drumFeature.stateFlow.collectAsState()
     val actions = drumFeature.actions
+    val drumOutViz by drumOutVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "808",
@@ -51,7 +56,10 @@ fun DrumsPanel(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         modifier = modifier,
-        showCollapsedHeader = showCollapsedHeader
+        showCollapsedHeader = showCollapsedHeader,
+        backgroundContent = {
+            SignalTrace(data = drumOutViz, color = OrpheusColors.ninersRed)
+        }
     ) {
         Column(
             modifier = Modifier

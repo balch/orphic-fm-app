@@ -71,19 +71,14 @@ void unit_process_hyper_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames,
 
     engine->lfo_phase_a = phase_a;
     engine->lfo_phase_b = phase_b;
+
     engine->lfo_output_value = output; // last sample for monitoring
     engine->lfo_output_value_a = last_a;
     engine->lfo_output_value_b = last_b;
     std::memcpy(engine->lfo_output_buffer, out, num_frames * sizeof(float));
 
-    // LFO source (3) for warps routing
-    std::memcpy(engine->warps_source_buffers[3], out, num_frames * sizeof(float));
-
-    // Viz: LFO writes the instantaneous combined waveform value (not peak).
-    // This preserves waveform shape (including negative values) since LFO is
-    // a slow oscillator where shape matters, unlike audio-rate channels that
-    // write peak-per-block for envelope display.
-    engine->viz_rings[VIZ_LFO_OUTPUT].write(output);
+    // Note: range attenuation, viz write, and warps source copy are handled
+    // in the graph mux (orpheus_graph_process) after all LFO sources have run.
 
     // ── Dedicated vibrato sine oscillator ──────────────────────
     // Separate from HyperLFO (matches JSyn VibratoPlugin architecture).

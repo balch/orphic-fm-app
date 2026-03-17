@@ -6,6 +6,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
@@ -58,7 +59,9 @@ class TriggerRouterPanelRegistration : FeaturePanel {
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
-class FluxPanelRegistration : FeaturePanel {
+class FluxPanelRegistration(
+    private val synthEngine: SynthEngine,
+) : FeaturePanel {
     override val panelId = PanelId.FLUX
     override val description = "Random music generator"
     override val weight = 1.0f
@@ -74,6 +77,7 @@ class FluxPanelRegistration : FeaturePanel {
     ) {
         FluxPanel(
             flux = FluxViewModel.feature(),
+            cvVizFlow = synthEngine.fluxCvVizFlow,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

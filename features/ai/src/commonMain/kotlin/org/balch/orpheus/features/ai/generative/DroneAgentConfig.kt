@@ -29,6 +29,7 @@ data object DroneAgentConfig : SynthControlAgentConfig {
         - voice_quad_pitch_2: Pitch of the drone layers (0.5 = unity).
         - voice_quad_hold_2: Sustain level. (Note: Only effective when env_speed is high/slow).
         - voice_vibrato: LFO modulation depth (0.2-0.7).
+        - duolfo_source: Modulation source (0=DuoLFO, 1=PolyLFO/Drift, 2=Lorenz/Chaos). Try source=1 with polylfo_coupling=0.7 for evolving drones, or source=2 for chaotic drift.
         - delay_feedback: Echo repeats (0.3-0.8).
         - voice_coupling: FM modulation brightness (0.1-0.5).
 

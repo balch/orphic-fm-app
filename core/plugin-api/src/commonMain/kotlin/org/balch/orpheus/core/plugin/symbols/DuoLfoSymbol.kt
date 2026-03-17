@@ -23,5 +23,8 @@ enum class DuoLfoSymbol(
     LINK("link", displayName = "Link"),
     SHAPE("shape", displayName = "Shape"),
     FREQ_A("freq_a", displayName = "Frequency A"),
-    FREQ_B("freq_b", displayName = "Frequency B")
+    FREQ_B("freq_b", displayName = "Frequency B"),
+    RANGE_MIN("range_min", displayName = "Range Min"),
+    RANGE_MAX("range_max", displayName = "Range Max"),
+    SOURCE("source", displayName = "Source")
 }

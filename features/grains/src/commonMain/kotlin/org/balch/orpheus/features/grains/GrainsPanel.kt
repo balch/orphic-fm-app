@@ -31,10 +31,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.plugins.grains.GrainsMode
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.Learnable
 import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -43,6 +46,8 @@ import org.balch.orpheus.ui.widgets.learnable
 @Composable
 fun GrainsPanel(
     feature: GrainsFeature = GrainsViewModel.feature(),
+    inVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
+    outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -50,6 +55,8 @@ fun GrainsPanel(
 ) {
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
+    val inViz by inVizFlow.collectAsState()
+    val outViz by outVizFlow.collectAsState()
 
     val panelColor = OrpheusColors.grainsRed
 
@@ -61,7 +68,11 @@ fun GrainsPanel(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         modifier = modifier,
-        showCollapsedHeader = showCollapsedHeader
+        showCollapsedHeader = showCollapsedHeader,
+        backgroundContent = {
+            SignalTrace(data = inViz, color = OrpheusColors.grainsRed.copy(alpha = 0.5f))
+            SignalTrace(data = outViz, color = OrpheusColors.grainsRed)
+        }
     ) {
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Column(

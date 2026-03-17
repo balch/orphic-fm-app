@@ -111,11 +111,18 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - voice_duo_sharpness_0 through voice_duo_sharpness_3: Waveform (0=soft triangle, 1=sharp square)
         - voice_duo_engine_0 through voice_duo_engine_3: Synthesis engine selection (integer engine ID)
 
-        ### LFO
-        - duolfo_freq_a: LFO A speed (0.0-1.0)
-        - duolfo_freq_b: LFO B speed (0.0-1.0)
-        - duolfo_mode: Combine mode (0.0=AND, 0.5=OFF, 1.0=OR)
-        - duolfo_link: Link LFOs together (0=independent, 1=linked)
+        ### LFO / MODULATION SOURCE
+        - duolfo_source: Modulation source (0=DuoLFO, 1=PolyLFO/Drift, 2=Lorenz/Chaos)
+        - duolfo_freq_a: DuoLFO A speed (0.0-1.0, only when source=0)
+        - duolfo_freq_b: DuoLFO B speed (0.0-1.0, only when source=0)
+        - duolfo_mode: DuoLFO combine mode (0.0=AND, 0.5=OFF, 1.0=OR, only when source=0)
+        - duolfo_link: Link DuoLFOs together (0=independent, 1=linked, only when source=0)
+        - polylfo_rate: PolyLFO speed (0.0-1.0, only when source=1)
+        - polylfo_shape: PolyLFO waveform morph (0.0-1.0, only when source=1)
+        - polylfo_coupling: PolyLFO inter-channel coupling (0.0-1.0, 0.5=off, only when source=1)
+        - polylfo_spread: PolyLFO phase spread (0.0-1.0, 0.5=none, only when source=1)
+        - lorenz_rate: Lorenz chaos speed (0.0-1.0, only when source=2)
+        - lorenz_balance: Lorenz X/Z blend (0.0-1.0, only when source=2)
 
         ### DELAY
         - delay_time_1, delay_time_2: Use DIFFERENT values for ping-pong stereo echo!

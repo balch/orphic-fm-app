@@ -56,6 +56,8 @@ class FluxPlugin(
     private var _controlMode = 0
     private var _voltageRange = 2
     private var _mix = 0.0f
+    private var _rangeMin = 0.0f
+    private var _rangeMax = 1.0f
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 8) {
@@ -194,6 +196,22 @@ class FluxPlugin(
                 default = 0.0f
                 get { _mix }
                 set { _mix = it }
+            }
+        }
+
+        controlPort(FluxSymbol.RANGE_MIN) {
+            floatType {
+                default = 0f; min = 0f; max = 1f
+                get { _rangeMin }
+                set { _rangeMin = it }
+            }
+        }
+
+        controlPort(FluxSymbol.RANGE_MAX) {
+            floatType {
+                default = 1f; min = 0f; max = 1f
+                get { _rangeMax }
+                set { _rangeMax = it }
             }
         }
     }

@@ -15,7 +15,7 @@ import org.balch.orpheus.core.plugin.symbols.BENDER_URI
 import org.balch.orpheus.core.plugin.symbols.BenderSymbol
 
 /**
- * Bender Plugin (Pitch and timbre bending with spring/tension effects).
+ * Bender Plugin (Pitch and timbre bending with tension effects).
  *
  * Pure state container — C++ handles all audio processing.
  */
@@ -39,7 +39,6 @@ class BenderPlugin : DspPlugin {
     private var _maxBendSemitones = 24.0f
     private var _randomDepth = 0.1f
     private var _timbreModulation = 0.3f
-    private var _springVolume = 0.4f
     private var _tensionVolume = 0.015f
 
     // Type-safe DSL port definitions
@@ -73,14 +72,6 @@ class BenderPlugin : DspPlugin {
                 default = 0.3f
                 get { _timbreModulation }
                 set { _timbreModulation = it }
-            }
-        }
-
-        controlPort(BenderSymbol.SPRING_VOL) {
-            floatType {
-                default = 0.4f
-                get { _springVolume }
-                set { _springVolume = it }
             }
         }
 

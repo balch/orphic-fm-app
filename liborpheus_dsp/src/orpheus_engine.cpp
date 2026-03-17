@@ -48,6 +48,13 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->marbles_xy_generator.LoadScale(1, chromatic);
     }
 
+    // Initialize Frames PolyLFO
+    engine->poly_lfo.Init();
+
+    // Initialize Lorenz attractor (chaotic modulation)
+    engine->lorenz_generator.Init();
+    engine->lorenz_generator.set_index(0);
+
     // Initialize per-string bender defaults
     engine->string_base_freq[0].store(400.0f, std::memory_order_relaxed);
     engine->string_base_freq[1].store(550.0f, std::memory_order_relaxed);
@@ -209,6 +216,12 @@ void orpheus_engine_dump_state(OrpheusEngine* e) {
     // Drums
     printf("  Drums: mix=%.2f grids_bypass=%d\n",
            e->drum_mix.load(), e->grids_bypass.load());
+
+    // PolyLFO
+    printf("  PolyLFO: bypass=%d rate=%.2f shape=%.2f spread=%.2f coupling=%.2f\n",
+           e->poly_lfo_bypass.load(), e->poly_lfo_rate.load(),
+           e->poly_lfo_shape.load(), e->poly_lfo_spread.load(),
+           e->poly_lfo_coupling.load());
 
     // Flux
     printf("  Flux: mix=%.2f rate=%.2f spread=%.2f\n",

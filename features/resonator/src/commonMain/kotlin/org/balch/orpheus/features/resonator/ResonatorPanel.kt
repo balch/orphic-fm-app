@@ -46,10 +46,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
+import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.Learnable
 import org.balch.orpheus.ui.widgets.LocalLearnModeState
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -61,6 +64,8 @@ private val RingsPanelColor = OrpheusColors.lakersGold
 @Composable
 fun ResonatorPanel(
     feature: ResonatorFeature = ResonatorViewModel.feature(),
+    inVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
+    outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -68,6 +73,8 @@ fun ResonatorPanel(
 ) {
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
+    val inViz by inVizFlow.collectAsState()
+    val outViz by outVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "REZO",
@@ -77,7 +84,11 @@ fun ResonatorPanel(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         modifier = modifier,
-        showCollapsedHeader = showCollapsedHeader
+        showCollapsedHeader = showCollapsedHeader,
+        backgroundContent = {
+            SignalTrace(data = inViz, color = OrpheusColors.lakersGold.copy(alpha = 0.5f))
+            SignalTrace(data = outViz, color = OrpheusColors.lakersGold)
+        }
     ) {
         // Combined Enable/Mode selector Row
         val segColors = SegmentedButtonDefaults.colors(

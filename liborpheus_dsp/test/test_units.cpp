@@ -324,22 +324,8 @@ static bool test_bender() {
     bool pass = max_pitch > 0.01f && max_audio > 0.0001f;
     printf("Bender test: %s\n", pass ? "PASS" : "FAIL");
 
-    engine->bend_amount.store(0.0f);
-    float max_spring = 0.0f;
-    for (int offset = 0; offset < 24000; offset += 128) {
-        int chunk = std::min(128, 24000 - offset);
-        unit_process_bender(&bender_unit, engine, chunk, 48000.0f);
-        for (int i = 0; i < chunk; i++) {
-            float a = std::fabs(bender_unit.output_buffers[OPORT_AUX][i]);
-            if (a > max_spring) max_spring = a;
-        }
-    }
-    printf("Max spring audio after release: %.4f\n", max_spring);
-    bool spring_pass = max_spring > 0.0001f;
-    printf("Spring test: %s\n", spring_pass ? "PASS" : "FAIL");
-
     orpheus_engine_destroy(engine);
-    return pass && spring_pass;
+    return pass;
 }
 
 static bool test_per_string_bender() {

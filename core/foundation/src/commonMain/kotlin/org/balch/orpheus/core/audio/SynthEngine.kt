@@ -168,6 +168,12 @@ interface SynthEngine {
     val fluxCvVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val resoInVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val resoOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val drumOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val grainsInVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val grainsOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val lfoCh1VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val lfoCh2VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val lfoCh3VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
     fun setVizEnabled(enabled: Boolean) {}

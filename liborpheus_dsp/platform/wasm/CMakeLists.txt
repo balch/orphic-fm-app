@@ -75,6 +75,19 @@ set(MARBLES_SRC
     "${EURORACK_DIR}/marbles/resources.cc"
 )
 
+# ── Streams sources (Lorenz attractor) ────────────
+set(STREAMS_SRC
+    "${EURORACK_DIR}/streams/lorenz_generator.cc"
+    "${EURORACK_DIR}/streams/resources.cc"
+)
+
+# ── Frames sources (PolyLFO) ─────────────────────
+set(FRAMES_SRC
+    "${EURORACK_DIR}/frames/poly_lfo.cc"
+    "${EURORACK_DIR}/frames/resources.cc"
+    "${LIB_SRC}/orpheus_frames_stub.cpp"
+)
+
 # ── Orpheus engine sources ────────────────────────
 set(ORPHEUS_SRC
     "${LIB_SRC}/orpheus_engine.cpp"
@@ -94,6 +107,8 @@ set(ORPHEUS_SRC
     "${LIB_SRC}/orpheus_unit_reverb.cpp"
     "${LIB_SRC}/orpheus_unit_rings.cpp"
     "${LIB_SRC}/orpheus_unit_warps.cpp"
+    "${LIB_SRC}/orpheus_unit_lorenz.cpp"
+    "${LIB_SRC}/orpheus_unit_poly_lfo.cpp"
     "${LIB_SRC}/orpheus_patch.cpp"
     "${LIB_SRC}/orpheus_resonator.cpp"
 )
@@ -113,6 +128,8 @@ add_executable(orpheus_dsp
     ${RINGS_SRC}
     ${WARPS_SRC}
     ${MARBLES_SRC}
+    ${STREAMS_SRC}
+    ${FRAMES_SRC}
 )
 
 target_include_directories(orpheus_dsp PRIVATE

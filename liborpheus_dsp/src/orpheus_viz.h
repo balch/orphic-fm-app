@@ -34,5 +34,11 @@ enum VizChannel {
     VIZ_FLUX_CV = 9,
     VIZ_RESO_IN = 10,
     VIZ_RESO_OUT = 11,
+    VIZ_DRUM_OUT = 12,
+    VIZ_GRAINS_IN = 13,
+    VIZ_GRAINS_OUT = 14,
+    VIZ_LFO_CH1 = 15,
+    VIZ_LFO_CH2 = 16,
+    VIZ_LFO_CH3 = 17,
     VIZ_CHANNEL_COUNT
 };

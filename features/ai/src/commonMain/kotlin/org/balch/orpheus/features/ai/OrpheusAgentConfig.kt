@@ -82,11 +82,17 @@ class OrpheusAgentConfig(
         - voice_vibrato (0.0-1.0): LFO modulation depth
         - voice_coupling (0.0-1.0): FM coupling between voices
 
-        ### LFO
-        - duolfo_freq_a (0.0-1.0): LFO A speed
-        - duolfo_freq_b (0.0-1.0): LFO B speed
-        - duolfo_mode (0.0/0.5/1.0): LFO combine mode (0.0=AND, 0.5=OFF, 1.0=OR)
-        - duolfo_link (0/1): Link LFOs (0=independent, 1=linked)
+        ### LFO / MODULATION SOURCE
+        - duolfo_source (0/1/2): Modulation source (0=DuoLFO, 1=PolyLFO/Drift, 2=Lorenz/Chaos)
+        - duolfo_freq_a (0.0-1.0): DuoLFO A speed (source=0)
+        - duolfo_freq_b (0.0-1.0): DuoLFO B speed (source=0)
+        - duolfo_mode (0.0/0.5/1.0): DuoLFO combine mode (0.0=AND, 0.5=OFF, 1.0=OR, source=0)
+        - duolfo_link (0/1): Link DuoLFOs (0=independent, 1=linked, source=0)
+        - polylfo_rate (0.0-1.0): PolyLFO speed (source=1)
+        - polylfo_shape (0.0-1.0): PolyLFO waveform morph (source=1)
+        - polylfo_coupling (0.0-1.0): PolyLFO inter-channel coupling, 0.5=off (source=1)
+        - lorenz_rate (0.0-1.0): Lorenz chaos speed (source=2)
+        - lorenz_balance (0.0-1.0): Lorenz X/Z output blend (source=2)
 
         ### DELAY
         - delay_time_1 / delay_time_2 (0.0-1.0): Delay times

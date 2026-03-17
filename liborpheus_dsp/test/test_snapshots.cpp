@@ -57,7 +57,7 @@ bool run_snapshot_tests() {
         orpheus_engine_destroy(engine);
     }
 
-    // Scenario 3: Bender — bend up and release (pitch CV + spring audio)
+    // Scenario 3: Bender — bend up and release (pitch CV + tension audio)
     {
         printf("  Scenario: bender_sweep\n");
         OrpheusEngine* engine = orpheus_engine_create(sr);
@@ -65,7 +65,7 @@ bool run_snapshot_tests() {
         u.type = UNIT_BENDER; u.enabled = true;
         unit_init(&u, 48000.0f);
         engine->bend_max_semitones.store(12.0f);
-        engine->bend_spring_vol.store(0.4f);
+        // spring oscillator removed
         engine->bend_tension_vol.store(0.02f);
         const int total = sr * 3;
         std::vector<float> buf(total * 2, 0.0f);

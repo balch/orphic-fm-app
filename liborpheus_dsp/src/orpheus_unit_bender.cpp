@@ -41,8 +41,6 @@ void unit_process_bender(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     float random_depth = engine->bend_random_depth.load(std::memory_order_relaxed);
     float timbre_mod = engine->bend_timbre_mod.load(std::memory_order_relaxed);
     float tension_vol = engine->bend_tension_vol.load(std::memory_order_relaxed);
-    float spring_vol = engine->bend_spring_vol.load(std::memory_order_relaxed);
-
     bool active = std::fabs(amount) > 0.05f;
 
     // State transitions
@@ -51,7 +49,6 @@ void unit_process_bender(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     }
     if (!active && engine->bend_was_active) {
         engine->bend_tension_env_stage = 4; // tension release
-        engine->bend_spring_env_stage = 1;  // trigger spring attack
     }
     engine->bend_was_active = active;
 
@@ -93,20 +90,7 @@ void unit_process_bender(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float tension = std::sin(engine->bend_tension_phase * TWO_PI)
                        * tension_env * tension_vol;
 
-        // Spring oscillator (wobble frequency, triggered on release)
-        float spring_env = bender_advance_env(
-            engine->bend_spring_env, engine->bend_spring_env_stage,
-            sr, 0.003f, 0.4f, 0.0f, 0.3f);
-        engine->bend_wobble_phase += 8.0f / sr;
-        engine->bend_wobble_phase -= std::floor(engine->bend_wobble_phase);
-        float wobble = std::sin(engine->bend_wobble_phase * TWO_PI) * 80.0f;
-        float spring_freq = 350.0f + wobble + spring_env * 200.0f;
-        engine->bend_spring_phase += spring_freq / sr;
-        engine->bend_spring_phase -= std::floor(engine->bend_spring_phase);
-        float spring = std::sin(engine->bend_spring_phase * TWO_PI)
-                      * spring_env * spring_vol;
-
-        out_audio[i] = tension + spring;
+        out_audio[i] = tension;
     }
 
     // Populate Warps source buffer 7 (BENDER audio)
@@ -190,19 +174,6 @@ void unit_process_per_string_bender(GraphUnit* u, OrpheusEngine* engine, int num
             st.tension_phase -= std::floor(st.tension_phase);
             sample += std::sin(st.tension_phase * TWO_PI)
                      * tension_env * 0.015f;
-
-            // Spring (wobble + envelope-modulated freq)
-            float spring_env = bender_advance_env(
-                st.spring_env, st.spring_env_stage,
-                sr, 0.002f, 0.5f, 0.0f, 0.3f);
-            st.wobble_phase += 8.0f / sr;
-            st.wobble_phase -= std::floor(st.wobble_phase);
-            float wobble = std::sin(st.wobble_phase * TWO_PI) * 80.0f;
-            float spring_freq = 350.0f + wobble + spring_env * 200.0f;
-            st.spring_phase += spring_freq / sr;
-            st.spring_phase -= std::floor(st.spring_phase);
-            sample += std::sin(st.spring_phase * TWO_PI)
-                     * spring_env * 0.5f * 0.4f;
 
             // Pluck (short burst at base_freq)
             float pluck_env = bender_advance_env(

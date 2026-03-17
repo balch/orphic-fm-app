@@ -300,7 +300,7 @@ void orpheus_graph_dump_exec_order(OrpheusGraph* graph) {
         "LIMITER", "DELAY_LINE", "CLOUDS", "RINGS", "WARPS",
         "DUAL_DELAY", "REVERB", "LFO", "MASTER_OUT", "PLAITS",
         "CLOCK", "GRIDS", "MARBLES", "LOOPER", "BENDER",
-        "PER_STR_BEND", "DUO_VOICE"
+        "PER_STR_BEND", "DUO_VOICE", "LORENZ", "POLY_LFO"
     };
     static_assert(sizeof(type_names) / sizeof(type_names[0]) == UNIT_TYPE_COUNT,
                   "type_names[] out of sync with UnitType enum");
@@ -331,6 +331,15 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 num_frames * sizeof(float));
     std::memcpy(engine->warps_drums_read, engine->warps_source_buffers[1],
                 num_frames * sizeof(float));
+    // Viz: drum bus peak (from previous frame's completed buffer)
+    {
+        float peak = 0.0f;
+        for (int i = 0; i < num_frames; i++) {
+            float a = std::fabs(engine->warps_drums_read[i]);
+            if (a > peak) peak = a;
+        }
+        engine->viz_rings[VIZ_DRUM_OUT].write(peak);
+    }
     std::memcpy(engine->warps_repl_read, engine->warps_source_buffers[2],
                 num_frames * sizeof(float));
 
@@ -419,10 +428,96 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_per_string_bender(u, engine, num_frames, sr); break;
             case UNIT_DUO_VOICE:
                 unit_process_duo_voice(u, engine, num_frames, sr); break;
+            case UNIT_LORENZ:
+                unit_process_lorenz(u, engine, num_frames, sr); break;
+            case UNIT_POLY_LFO:
+                unit_process_poly_lfo(u, engine, num_frames, sr); break;
             default: break;
         }
     }
 
+    // ── LFO source mux: copy active modulation source into lfo_output_buffer ──
+    // Voices always read from lfo_output_buffer regardless of which source generated it.
+    int lfo_src = engine->lfo_source.load(std::memory_order_relaxed);
+    if (lfo_src == 1) {
+        // PolyLFO: ch0→timbre, ch1→morph, ch2→harmonics, ch3→pitch
+        std::memcpy(engine->lfo_output_buffer, engine->poly_lfo_output[0],
+                     num_frames * sizeof(float));
+        std::memcpy(engine->lfo_morph_buffer, engine->poly_lfo_output[1],
+                     num_frames * sizeof(float));
+        std::memcpy(engine->lfo_harmonics_buffer, engine->poly_lfo_output[2],
+                     num_frames * sizeof(float));
+        std::memcpy(engine->lfo_pitch_buffer, engine->poly_lfo_output[3],
+                     num_frames * sizeof(float));
+        engine->lfo_output_value = engine->poly_lfo_value[0];
+    } else if (lfo_src == 2) {
+        // Lorenz: use blended X/Z output
+        std::memcpy(engine->lfo_output_buffer, engine->lorenz_x_buffer,
+                     num_frames * sizeof(float));
+        // Remap from 0..1 to -1..+1 for bipolar modulation
+        for (int i = 0; i < num_frames; i++) {
+            engine->lfo_output_buffer[i] = engine->lfo_output_buffer[i] * 2.0f - 1.0f;
+        }
+        engine->lfo_output_value = engine->lfo_output_buffer[num_frames - 1];
+        // Zero extra channels — Lorenz only uses ch0
+        std::memset(engine->lfo_morph_buffer, 0, num_frames * sizeof(float));
+        std::memset(engine->lfo_harmonics_buffer, 0, num_frames * sizeof(float));
+        std::memset(engine->lfo_pitch_buffer, 0, num_frames * sizeof(float));
+    } else {
+        // DuoLFO: already wrote to lfo_output_buffer, zero extra channels
+        std::memset(engine->lfo_morph_buffer, 0, num_frames * sizeof(float));
+        std::memset(engine->lfo_harmonics_buffer, 0, num_frames * sizeof(float));
+        std::memset(engine->lfo_pitch_buffer, 0, num_frames * sizeof(float));
+    }
+
+    // Apply feedback AM for PolyLFO/Lorenz (DuoLFO handles its own feedback FM internally).
+    // Master peak × feedback amount scales the LFO output — louder sound = stronger modulation.
+    if (lfo_src != 0) {
+        float fb_target = engine->total_feedback.load(std::memory_order_relaxed);
+        engine->smooth_total_feedback += (1.0f - std::exp(-1.0f / (0.005f * sr)))
+            * (fb_target - engine->smooth_total_feedback);
+        float fb = engine->smooth_total_feedback;
+        if (fb > 0.001f) {
+            float master_peak = std::max(
+                engine->peak_left.load(std::memory_order_relaxed),
+                engine->peak_right.load(std::memory_order_relaxed));
+            float am = 1.0f + master_peak * fb * 3.0f;  // boost up to 4x when loud
+            for (int i = 0; i < num_frames; i++) {
+                engine->lfo_output_buffer[i] *= am;
+            }
+            engine->lfo_output_value *= am;
+        }
+    }
+
+    // Skip attenuation when DuoLFO is OFF — output is zero, don't add offset
+    bool lfo_off = (lfo_src == 0 && engine->lfo_mode.load(std::memory_order_relaxed) == 1);
+
+    // Apply range min/max attenuation (shared across all sources)
+    {
+        float rng_min = engine->lfo_range_min.load(std::memory_order_relaxed);
+        float rng_max = engine->lfo_range_max.load(std::memory_order_relaxed);
+        if (!lfo_off && (rng_min != -1.0f || rng_max != 1.0f)) {
+            float half_range = (rng_max - rng_min) * 0.5f;
+            float center = (rng_max + rng_min) * 0.5f;
+            for (int i = 0; i < num_frames; i++) {
+                engine->lfo_output_buffer[i] =
+                    engine->lfo_output_buffer[i] * half_range + center;
+            }
+            engine->lfo_output_value =
+                engine->lfo_output_value * half_range + center;
+        }
+    }
+
+    // Warps LFO source (3): copy final muxed+attenuated output
+    std::memcpy(engine->warps_source_buffers[3], engine->lfo_output_buffer,
+                num_frames * sizeof(float));
+
+    // Viz: write final LFO output (after mux + range)
+    engine->viz_rings[VIZ_LFO_OUTPUT].write(engine->lfo_output_value);
+    // Viz: PolyLFO ch1-3 (write last sample; zero when not in DRIFT mode)
+    engine->viz_rings[VIZ_LFO_CH1].write(engine->lfo_morph_buffer[num_frames - 1]);
+    engine->viz_rings[VIZ_LFO_CH2].write(engine->lfo_harmonics_buffer[num_frames - 1]);
+    engine->viz_rings[VIZ_LFO_CH3].write(engine->lfo_pitch_buffer[num_frames - 1]);
 }
 
 // -- Port routing via hash table --------------------------

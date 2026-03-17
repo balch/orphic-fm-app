@@ -301,12 +301,28 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         //         here we use it as a subtle frequency spread: morph * 50 cents)
         float feedback_amount = vp.harmonics.load(std::memory_order_relaxed);
         float morph_val = vp.morph.load(std::memory_order_relaxed);
+
+        // PolyLFO ch1-3 modulation for Engine 0 (scaled by mod_depth)
+        // NOTE: These buffers are zeroed by the graph mux when lfo_source != PolyLFO.
+        // If graph execution order changes, consider gating on lfo_source explicitly.
+        {
+            float md = fm_depth_smoothed;
+            float morph_mod = engine->lfo_morph_buffer[num_frames / 2] * md * 0.5f;
+            float harm_mod = engine->lfo_harmonics_buffer[num_frames / 2] * md * 0.5f;
+            morph_val = std::max(0.0f, std::min(1.0f, morph_val + morph_mod));
+            feedback_amount = std::max(0.0f, std::min(1.0f, feedback_amount + harm_mod));
+        }
+
         // Detune: ±morph × 25 cents (matching JSyn: MAX_DETUNE=50 cents, split ±half)
         // Voice A (even idx) gets positive detune, Voice B (odd) gets negative
         float detune_sign = (idx % 2 == 0) ? 1.0f : -1.0f;
         float detune_semitones = detune_sign * morph_val * (25.0f / 100.0f);
 
         float base_note = vp.tune.load(std::memory_order_relaxed) + detune_semitones;
+        // PolyLFO ch3: subtle pitch wander (±0.5 semitone max)
+        base_note += engine->lfo_pitch_buffer[num_frames / 2] * fm_depth_smoothed * 0.5f;
+        base_note = std::max(20.0f, std::min(127.0f, base_note));
+
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
 
         // Compute ADSR parameters from envSpeed
@@ -472,11 +488,23 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         } else {
             note = note_raw;
         }
+        // PolyLFO ch3: subtle pitch wander (±0.5 semitone max, scaled by mod_depth)
+        note += engine->lfo_pitch_buffer[num_frames / 2] * fm_depth_smoothed * 0.5f;
+        note = std::max(20.0f, std::min(127.0f, note));  // clamp to safe MIDI range
         float harmonics = vp.harmonics.load(std::memory_order_relaxed);
         float timbre = std::max(0.0f, std::min(1.0f,
             vp.timbre.load(std::memory_order_relaxed) + timbre_mod_offset));
         float morph = vp.morph.load(std::memory_order_relaxed);
         float accent = vp.accent.load(std::memory_order_relaxed);
+
+        // PolyLFO ch1-3 modulation (scaled by mod_depth)
+        {
+            float md = fm_depth_smoothed;  // reuse the smoothed mod depth
+            float morph_mod = engine->lfo_morph_buffer[num_frames / 2] * md;
+            float harm_mod = engine->lfo_harmonics_buffer[num_frames / 2] * md;
+            morph = std::max(0.0f, std::min(1.0f, morph + morph_mod * 0.5f));
+            harmonics = std::max(0.0f, std::min(1.0f, harmonics + harm_mod * 0.5f));
+        }
 
         // Render via OrpheusVoice (handles engine selection, outGain, soft_limit)
         voice.Render(engine_index, plaits_gate, note, harmonics, timbre, morph, accent,
@@ -793,9 +821,19 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     float scaled_holdA = compute_scaled_hold(raw_holdA, env_speedA);
     float feedbackA = vpA.harmonics.load(std::memory_order_relaxed);
     float morph_valA = vpA.morph.load(std::memory_order_relaxed);
+    // PolyLFO ch1-3 for Engine 0 duo voice A
+    {
+        float md = engine->smooth_fm_depth[duo];
+        float morph_mod = engine->lfo_morph_buffer[num_frames / 2] * md * 0.5f;
+        float harm_mod = engine->lfo_harmonics_buffer[num_frames / 2] * md * 0.5f;
+        morph_valA = std::max(0.0f, std::min(1.0f, morph_valA + morph_mod));
+        feedbackA = std::max(0.0f, std::min(1.0f, feedbackA + harm_mod));
+    }
     // Voice A: positive detune (+morph × 25 cents, matching JSyn ±split)
     float detune_semiA = morph_valA * (25.0f / 100.0f);
-    float base_noteA = vpA.tune.load(std::memory_order_relaxed) + detune_semiA;
+    float base_noteA = vpA.tune.load(std::memory_order_relaxed) + detune_semiA
+        + engine->lfo_pitch_buffer[num_frames / 2] * engine->smooth_fm_depth[duo] * 0.5f;
+    base_noteA = std::max(20.0f, std::min(127.0f, base_noteA));
     float sharpnessA = vpA.timbre.load(std::memory_order_relaxed);
     float bend_hzA = engine->voice_bend_cv[idxA];
     float bend_volA = engine->voice_mix_cv[idxA];
@@ -811,9 +849,19 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     float scaled_holdB = compute_scaled_hold(raw_holdB, env_speedB);
     float feedbackB = vpB.harmonics.load(std::memory_order_relaxed);
     float morph_valB = vpB.morph.load(std::memory_order_relaxed);
+    // PolyLFO ch1-3 for Engine 0 duo voice B
+    {
+        float md = engine->smooth_fm_depth[duo];
+        float morph_mod = engine->lfo_morph_buffer[num_frames / 2] * md * 0.5f;
+        float harm_mod = engine->lfo_harmonics_buffer[num_frames / 2] * md * 0.5f;
+        morph_valB = std::max(0.0f, std::min(1.0f, morph_valB + morph_mod));
+        feedbackB = std::max(0.0f, std::min(1.0f, feedbackB + harm_mod));
+    }
     // Voice B: negative detune (-morph × 25 cents, matching JSyn ±split)
     float detune_semiB = -morph_valB * (25.0f / 100.0f);
-    float base_noteB = vpB.tune.load(std::memory_order_relaxed) + detune_semiB;
+    float base_noteB = vpB.tune.load(std::memory_order_relaxed) + detune_semiB
+        + engine->lfo_pitch_buffer[num_frames / 2] * engine->smooth_fm_depth[duo] * 0.5f;
+    base_noteB = std::max(20.0f, std::min(127.0f, base_noteB));
     float sharpnessB = vpB.timbre.load(std::memory_order_relaxed);
     float bend_hzB = engine->voice_bend_cv[idxB];
     float bend_volB = engine->voice_mix_cv[idxB];

@@ -43,7 +43,9 @@ data class FluxUiState(
     val controlMode: Int = 0,
     val voltageRange: Int = 2,
     val mix: Float = 0.0f,
-    val dejaVuMode: Int = 0
+    val dejaVuMode: Int = 0,
+    val rangeMin: Float = 0.0f,
+    val rangeMax: Float = 1.0f,
 )
 
 @Immutable
@@ -65,10 +67,12 @@ data class FluxPanelActions(
     val setControlMode: (Int) -> Unit,
     val setVoltageRange: (Int) -> Unit,
     val setMix: (Float) -> Unit,
-    val setDejaVuMode: (Int) -> Unit
+    val setDejaVuMode: (Int) -> Unit,
+    val setRangeMin: (Float) -> Unit,
+    val setRangeMax: (Float) -> Unit,
 ) {
     companion object {
-        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = FluxPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -91,6 +95,8 @@ private sealed interface FluxIntent {
     data class VoltageRange(val value: Int) : FluxIntent
     data class Mix(val value: Float) : FluxIntent
     data class DejaVuMode(val value: Int) : FluxIntent
+    data class RangeMin(val value: Float) : FluxIntent
+    data class RangeMax(val value: Float) : FluxIntent
 }
 
 interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
@@ -202,6 +208,8 @@ class FluxViewModel(
     private val voltageRangeId = synthController.controlFlow(FluxSymbol.VOLTAGE_RANGE.controlId)
     private val mixId = synthController.controlFlow(FluxSymbol.MIX.controlId)
     private val dejaVuModeId = synthController.controlFlow(FluxSymbol.DEJAVU_MODE.controlId)
+    private val rangeMinId = synthController.controlFlow(FluxSymbol.RANGE_MIN.controlId)
+    private val rangeMaxId = synthController.controlFlow(FluxSymbol.RANGE_MAX.controlId)
 
     override val actions = FluxPanelActions(
         setSpread = spreadId.floatSetter(),
@@ -221,7 +229,9 @@ class FluxViewModel(
         setControlMode = controlModeId.intSetter(),
         setVoltageRange = voltageRangeId.intSetter(),
         setMix = mixId.floatSetter(),
-        setDejaVuMode = dejaVuModeId.intSetter()
+        setDejaVuMode = dejaVuModeId.intSetter(),
+        setRangeMin = rangeMinId.floatSetter(),
+        setRangeMax = rangeMaxId.floatSetter(),
     )
 
     // Control changes -> FluxIntent
@@ -243,7 +253,9 @@ class FluxViewModel(
         controlModeId.map { FluxIntent.ControlMode(it.asInt()) },
         voltageRangeId.map { FluxIntent.VoltageRange(it.asInt()) },
         mixId.map { FluxIntent.Mix(it.asFloat()) },
-        dejaVuModeId.map { FluxIntent.DejaVuMode(it.asInt()) }
+        dejaVuModeId.map { FluxIntent.DejaVuMode(it.asInt()) },
+        rangeMinId.map { FluxIntent.RangeMin(it.asFloat()) },
+        rangeMaxId.map { FluxIntent.RangeMax(it.asFloat()) },
     )
 
     override val stateFlow: StateFlow<FluxUiState> =
@@ -277,6 +289,8 @@ class FluxViewModel(
         is FluxIntent.VoltageRange -> state.copy(voltageRange = intent.value)
         is FluxIntent.Mix -> state.copy(mix = intent.value)
         is FluxIntent.DejaVuMode -> state.copy(dejaVuMode = intent.value)
+        is FluxIntent.RangeMin -> state.copy(rangeMin = intent.value)
+        is FluxIntent.RangeMax -> state.copy(rangeMax = intent.value)
     }
 
     companion object {

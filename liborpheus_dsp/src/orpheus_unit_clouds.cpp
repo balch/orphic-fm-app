@@ -16,6 +16,16 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         return;
     }
 
+    // Viz: grains input peak
+    {
+        float peak = 0.0f;
+        for (int i = 0; i < num_frames; i++) {
+            float a = std::fabs(in_l[i]);
+            if (a > peak) peak = a;
+        }
+        engine->viz_rings[VIZ_GRAINS_IN].write(peak);
+    }
+
     auto* p = engine->clouds_processor.mutable_parameters();
     p->position = engine->clouds_position.load(std::memory_order_relaxed);
     p->size = engine->clouds_size.load(std::memory_order_relaxed);
@@ -68,6 +78,16 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         frames_done += block;
+    }
+
+    // Viz: grains output peak
+    {
+        float peak = 0.0f;
+        for (int i = 0; i < num_frames; i++) {
+            float a = std::fabs(out_l[i]);
+            if (a > peak) peak = a;
+        }
+        engine->viz_rings[VIZ_GRAINS_OUT].write(peak);
     }
 
     // Attenuate Clouds dry path only when DRUMS is the Warps CARRIER.

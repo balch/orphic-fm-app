@@ -168,6 +168,10 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     //   FULL   (-5-+5V): ±2 octaves                  (symmetric)
     // Also prevents Warps saturation — Flux signal stays in a usable drive range.
     constexpr float kFluxVoltageScale = 0.4f;
+    float rng_min = engine->marbles_range_min.load(std::memory_order_relaxed);
+    float rng_max = engine->marbles_range_max.load(std::memory_order_relaxed);
+    float rng_scale = (rng_max - rng_min);
+    float rng_offset = rng_min;
     float mx_coeff = smooth_coeff(sample_rate);
     for (int i = 0; i < num_frames; i++) {
         engine->smooth_marbles_mix += mx_coeff * (mix - engine->smooth_marbles_mix);
@@ -175,6 +179,10 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
         float v1 = xy_output[i * 4 + 0] * sm * kFluxVoltageScale;
         float v2 = xy_output[i * 4 + 1] * sm * kFluxVoltageScale;
         float v3 = xy_output[i * 4 + 2] * sm * kFluxVoltageScale;
+        // Attenuator: remap voltage range (acts like a hardware attenuator knob)
+        v1 = v1 * rng_scale + rng_offset;
+        v2 = v2 * rng_scale + rng_offset;
+        v3 = v3 * rng_scale + rng_offset;
         // Clamp to [-2, 2] octaves before exp to prevent blowout
         v1 = std::fmin(std::fmax(v1, -2.0f), 2.0f);
         v2 = std::fmin(std::fmax(v2, -2.0f), 2.0f);

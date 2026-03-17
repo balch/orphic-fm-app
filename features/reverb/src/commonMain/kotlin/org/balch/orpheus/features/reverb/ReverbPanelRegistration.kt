@@ -6,6 +6,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
@@ -13,7 +14,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
-class ReverbPanelRegistration : FeaturePanel {
+class ReverbPanelRegistration(
+    private val synthEngine: SynthEngine,
+) : FeaturePanel {
     override val panelId = PanelId.REVERB
     override val description = "Add spatial reverb effect"
     override val weight = 0.5f
@@ -29,6 +32,8 @@ class ReverbPanelRegistration : FeaturePanel {
     ) {
         ReverbPanel(
             feature = ReverbViewModel.feature(),
+            inVizFlow = synthEngine.reverbInVizFlow,
+            outVizFlow = synthEngine.reverbOutVizFlow,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

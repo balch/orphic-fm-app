@@ -72,6 +72,21 @@ set(MARBLES_SRC
     "${EURORACK_DIR}/marbles/resources.cc"
 )
 
+# ── Frames sources (PolyLFO) ─────────────────────
+# keyframer.cc is excluded — it depends on STM32 flash storage.
+# We provide a stub for ConvertToDacCode (used by poly_lfo but not needed).
+set(FRAMES_SRC
+    "${EURORACK_DIR}/frames/poly_lfo.cc"
+    "${EURORACK_DIR}/frames/resources.cc"
+    "src/orpheus_frames_stub.cpp"
+)
+
+# ── Streams sources (Lorenz attractor) ────────────
+set(STREAMS_SRC
+    "${EURORACK_DIR}/streams/lorenz_generator.cc"
+    "${EURORACK_DIR}/streams/resources.cc"
+)
+
 # ── Orpheus engine sources ────────────────────────
 set(ORPHEUS_SRC
     "src/orpheus_engine.cpp"
@@ -91,6 +106,8 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_reverb.cpp"
     "src/orpheus_unit_rings.cpp"
     "src/orpheus_unit_warps.cpp"
+    "src/orpheus_unit_lorenz.cpp"
+    "src/orpheus_unit_poly_lfo.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
 )
@@ -103,6 +120,8 @@ add_library(orpheus_dsp STATIC
     ${CLOUDS_SRC}
     ${WARPS_SRC}
     ${MARBLES_SRC}
+    ${STREAMS_SRC}
+    ${FRAMES_SRC}
 )
 
 target_include_directories(orpheus_dsp PUBLIC

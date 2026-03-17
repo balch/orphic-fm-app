@@ -68,6 +68,18 @@ class SynthEngineMonitor(
     val resoInVizFlow: StateFlow<FloatArray> = _resoInVizFlow.asStateFlow()
     private val _resoOutVizFlow = MutableStateFlow(FloatArray(0))
     val resoOutVizFlow: StateFlow<FloatArray> = _resoOutVizFlow.asStateFlow()
+    private val _drumOutVizFlow = MutableStateFlow(FloatArray(0))
+    val drumOutVizFlow: StateFlow<FloatArray> = _drumOutVizFlow.asStateFlow()
+    private val _grainsInVizFlow = MutableStateFlow(FloatArray(0))
+    val grainsInVizFlow: StateFlow<FloatArray> = _grainsInVizFlow.asStateFlow()
+    private val _grainsOutVizFlow = MutableStateFlow(FloatArray(0))
+    val grainsOutVizFlow: StateFlow<FloatArray> = _grainsOutVizFlow.asStateFlow()
+    private val _lfoCh1VizFlow = MutableStateFlow(FloatArray(0))
+    val lfoCh1VizFlow: StateFlow<FloatArray> = _lfoCh1VizFlow.asStateFlow()
+    private val _lfoCh2VizFlow = MutableStateFlow(FloatArray(0))
+    val lfoCh2VizFlow: StateFlow<FloatArray> = _lfoCh2VizFlow.asStateFlow()
+    private val _lfoCh3VizFlow = MutableStateFlow(FloatArray(0))
+    val lfoCh3VizFlow: StateFlow<FloatArray> = _lfoCh3VizFlow.asStateFlow()
 
     // Monitoring
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -156,6 +168,12 @@ class SynthEngineMonitor(
                     pollVizChannel(VIZ_FLUX_CV, readPositions, vizBuf, _fluxCvVizFlow)
                     pollVizChannel(VIZ_RESO_IN, readPositions, vizBuf, _resoInVizFlow)
                     pollVizChannel(VIZ_RESO_OUT, readPositions, vizBuf, _resoOutVizFlow)
+                    pollVizChannel(VIZ_DRUM_OUT, readPositions, vizBuf, _drumOutVizFlow)
+                    pollVizChannel(VIZ_GRAINS_IN, readPositions, vizBuf, _grainsInVizFlow)
+                    pollVizChannel(VIZ_GRAINS_OUT, readPositions, vizBuf, _grainsOutVizFlow)
+                    pollVizChannel(VIZ_LFO_CH1, readPositions, vizBuf, _lfoCh1VizFlow)
+                    pollVizChannel(VIZ_LFO_CH2, readPositions, vizBuf, _lfoCh2VizFlow)
+                    pollVizChannel(VIZ_LFO_CH3, readPositions, vizBuf, _lfoCh3VizFlow)
                     delay(VIZ_POLL_INTERVAL_MS)
                 }
             }
@@ -166,7 +184,9 @@ class SynthEngineMonitor(
             listOf(_lfoVizFlow, _warpsCarrierVizFlow, _warpsModVizFlow, _warpsOutVizFlow,
                    _delayInVizFlow, _delayFbVizFlow, _delayOutVizFlow,
                    _reverbInVizFlow, _reverbOutVizFlow, _fluxCvVizFlow,
-                   _resoInVizFlow, _resoOutVizFlow).forEach { it.value = FloatArray(0) }
+                   _resoInVizFlow, _resoOutVizFlow,
+                   _drumOutVizFlow, _grainsInVizFlow, _grainsOutVizFlow,
+                   _lfoCh1VizFlow, _lfoCh2VizFlow, _lfoCh3VizFlow).forEach { it.value = FloatArray(0) }
         }
     }
 
@@ -195,6 +215,12 @@ class SynthEngineMonitor(
         private const val VIZ_FLUX_CV = 9
         private const val VIZ_RESO_IN = 10
         private const val VIZ_RESO_OUT = 11
-        private const val VIZ_CHANNEL_COUNT = 12
+        private const val VIZ_DRUM_OUT = 12
+        private const val VIZ_GRAINS_IN = 13
+        private const val VIZ_GRAINS_OUT = 14
+        private const val VIZ_LFO_CH1 = 15
+        private const val VIZ_LFO_CH2 = 16
+        private const val VIZ_LFO_CH3 = 17
+        private const val VIZ_CHANNEL_COUNT = 18
     }
 }

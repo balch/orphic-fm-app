@@ -11,9 +11,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VerticalToggle
 
@@ -23,6 +26,9 @@ import org.balch.orpheus.ui.widgets.VerticalToggle
 @Composable
 fun DelayFeedbackPanel(
     feature: DelayFeature = DelayViewModel.feature(),
+    inVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
+    fbVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
+    outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -30,6 +36,9 @@ fun DelayFeedbackPanel(
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
+    val inViz by inVizFlow.collectAsState()
+    val fbViz by fbVizFlow.collectAsState()
+    val outViz by outVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "DELAY",
@@ -39,7 +48,12 @@ fun DelayFeedbackPanel(
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
         modifier = modifier,
-        showCollapsedHeader = showCollapsedHeader
+        showCollapsedHeader = showCollapsedHeader,
+        backgroundContent = {
+            SignalTrace(data = inViz, color = OrpheusColors.warmGlow.copy(alpha = 0.6f))
+            SignalTrace(data = fbViz, color = OrpheusColors.warmGlow.copy(alpha = 0.4f))
+            SignalTrace(data = outViz, color = OrpheusColors.warmGlow)
+        }
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(24.dp),

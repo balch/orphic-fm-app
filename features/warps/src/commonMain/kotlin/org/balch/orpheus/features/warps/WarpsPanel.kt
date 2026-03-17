@@ -78,9 +78,9 @@ fun WarpsPanel(
         modifier = modifier,
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
-            SignalTrace(data = carrierViz, color = Color(0xFF4488FF))    // blue
-            SignalTrace(data = modulatorViz, color = Color(0xFF00FF88))  // green
-            SignalTrace(data = outputViz, color = Color(0xFFFF8844))     // orange
+            SignalTrace(data = carrierViz, color = OrpheusColors.warpsGreen.copy(alpha = 0.5f))
+            SignalTrace(data = modulatorViz, color = OrpheusColors.warpsGreen.copy(alpha = 0.7f))
+            SignalTrace(data = outputViz, color = OrpheusColors.warpsGreen)
         }
     ) {
         Column(

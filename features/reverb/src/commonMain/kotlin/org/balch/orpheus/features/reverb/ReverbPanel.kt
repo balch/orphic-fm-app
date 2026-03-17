@@ -10,20 +10,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
 @Composable
 fun ReverbPanel(
     feature: ReverbFeature = ReverbViewModel.feature(),
+    inVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
+    outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
+    val inViz by inVizFlow.collectAsState()
+    val outViz by outVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "VERB",
@@ -33,6 +40,10 @@ fun ReverbPanel(
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         modifier = modifier,
+        backgroundContent = {
+            SignalTrace(data = inViz, color = OrpheusColors.echoPeriwinkle)
+            SignalTrace(data = outViz, color = OrpheusColors.echoLavender)
+        }
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),

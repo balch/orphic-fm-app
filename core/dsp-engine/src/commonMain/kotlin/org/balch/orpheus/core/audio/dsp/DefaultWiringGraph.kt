@@ -235,6 +235,15 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val lfo = hyperLfo("lfo")
     lfo.out to delay.inputC
 
+    // PolyLFO (MI Frames) — muxed into lfo_output_buffer by C++ when lfo_source=1
+    // No graph connections needed: C++ reads from engine atomics and writes to lfo_output_buffer internally
+    @Suppress("UNUSED_VARIABLE")
+    val polyLfoUnit = polyLfo("polyLfo")
+
+    // Lorenz attractor (MI Streams) — muxed into lfo_output_buffer by C++ when lfo_source=2
+    @Suppress("UNUSED_VARIABLE")
+    val lorenzUnit = lorenz("lorenz")
+
     // Master clock (sample-accurate tempo generator)
     val clock = clock("clock")
 

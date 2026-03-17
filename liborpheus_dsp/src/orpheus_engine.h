@@ -17,6 +17,9 @@
 // Include MI Warps modulator
 #include "warps/dsp/modulator.h"
 
+// Include MI Frames PolyLFO
+#include "frames/poly_lfo.h"
+
 // Include MI Marbles random sequencer
 #include "marbles/random/t_generator.h"
 #include "marbles/random/x_y_generator.h"
@@ -25,6 +28,9 @@
 #include "stmlib/utils/gate_flags.h"
 
 #include "orpheus_automation.h"
+
+// Include MI Streams Lorenz generator
+#include "streams/lorenz_generator.h"
 
 #include <atomic>
 #include <cstring>
@@ -214,6 +220,8 @@ struct OrpheusEngine {
     std::atomic<float> marbles_deja_vu{0.0f};        // 0..1 deja vu amount
     std::atomic<int>   marbles_deja_vu_length{8};    // loop length (1-16)
     std::atomic<float> marbles_mix{0.0f};            // 0..1 output scaling (self-bypass at 0)
+    std::atomic<float> marbles_range_min{0.0f};     // CV output floor (0..1 UI, maps to voltage attenuation)
+    std::atomic<float> marbles_range_max{1.0f};     // CV output ceiling (0..1 UI)
     std::atomic<int>   marbles_deja_vu_mode{0};     // 0=T+X, 1=T only, 2=X only
     std::atomic<float> marbles_pulse_width{0.5f};    // 0..1 pulse width mean
     std::atomic<float> marbles_pulse_width_std{0.0f};// 0..1 pulse width randomization
@@ -295,12 +303,30 @@ struct OrpheusEngine {
     float lfo_output_value{0.0f};              // latest combined output for monitoring
     float lfo_output_value_a{0.0f};            // latest oscillator A output (-1..1)
     float lfo_output_value_b{0.0f};            // latest oscillator B output (-1..1)
-    float lfo_output_buffer[kMaxFrames]{};     // per-sample LFO output for modulation
+    float lfo_output_buffer[kMaxFrames]{};     // ch0: per-sample LFO output for timbre modulation
+    float lfo_morph_buffer[kMaxFrames]{};      // ch1: morph modulation (PolyLFO only, zero otherwise)
+    float lfo_harmonics_buffer[kMaxFrames]{};  // ch2: harmonics modulation (PolyLFO only)
+    float lfo_pitch_buffer[kMaxFrames]{};      // ch3: subtle pitch modulation (PolyLFO only)
 
     std::atomic<float> lfo_freq_a{1.0f};       // Hz
     std::atomic<float> lfo_freq_b{1.0f};       // Hz
     std::atomic<float> lfo_shape{1.0f};        // 0=square, 1=triangle (default: triangle, matches Kotlin)
     std::atomic<int>   lfo_mode{1};            // 0=AND, 1=OFF (independent), 2=OR
+    std::atomic<float> lfo_range_min{-1.0f};   // output floor (-1..+1)
+    std::atomic<float> lfo_range_max{1.0f};    // output ceiling (-1..+1)
+    std::atomic<int>   lfo_source{0};          // 0=DuoLFO, 1=PolyLFO, 2=Lorenz
+
+    // ── PolyLFO (MI Frames, 4-channel morphing LFO) ──
+    frames::PolyLfo poly_lfo;
+    float poly_lfo_output[4][kMaxFrames] = {};     // 4-channel output buffers (-1..+1)
+    float poly_lfo_value[4] = {};                   // last sample per channel (monitoring)
+
+    std::atomic<float> poly_lfo_shape{0.0f};        // 0..1 waveform shape morph
+    std::atomic<float> poly_lfo_shape_spread{0.5f}; // 0..1 shape spread across channels (0.5=center/none)
+    std::atomic<float> poly_lfo_spread{0.5f};       // 0..1 phase spread (0.5=center/none)
+    std::atomic<float> poly_lfo_coupling{0.5f};     // 0..1 inter-channel coupling (0.5=center/none)
+    std::atomic<float> poly_lfo_rate{0.5f};         // 0..1 LFO rate
+    std::atomic<int>   poly_lfo_bypass{1};          // bypassed by default
 
     // ── Dattorro Plate Reverb ─────────────────────────
     static constexpr int kReverbBufferSize = 32768;
@@ -365,17 +391,12 @@ struct OrpheusEngine {
     std::atomic<float> bend_max_semitones{24.0f};
     std::atomic<float> bend_random_depth{0.1f};        // random LFO modulation depth (matches JSyn default)
     std::atomic<float> bend_timbre_mod{0.3f};
-    std::atomic<float> bend_spring_vol{0.4f};
     std::atomic<float> bend_tension_vol{0.015f};
 
     // Internal bender state (audio thread only)
     float bend_tension_phase{0.0f};
     float bend_tension_env{0.0f};
     int   bend_tension_env_stage{0};          // 0=off, 1=attack, 2=decay, 3=sustain, 4=release
-    float bend_spring_phase{0.0f};
-    float bend_spring_env{0.0f};
-    int   bend_spring_env_stage{0};
-    float bend_wobble_phase{0.0f};
     float bend_random_lfo_phase{0.0f};
     bool  bend_was_active{false};
 
@@ -388,10 +409,6 @@ struct OrpheusEngine {
         float tension_phase{0.0f};
         float tension_env{0.0f};
         int   tension_env_stage{0};
-        float spring_phase{0.0f};
-        float spring_env{0.0f};
-        int   spring_env_stage{0};
-        float wobble_phase{0.0f};
         float pluck_phase{0.0f};
         float pluck_env{0.0f};
         int   pluck_env_stage{0};
@@ -474,6 +491,16 @@ struct OrpheusEngine {
     float warps_synth_read[kMaxFrames] = {};
     float warps_drums_read[kMaxFrames] = {};
     float warps_repl_read[kMaxFrames] = {};
+
+    // ── Lorenz Attractor (chaotic modulation source) ──
+    streams::LorenzGenerator lorenz_generator;
+    std::atomic<float> lorenz_rate{0.5f};      // 0..1, speed of attractor evolution
+    std::atomic<float> lorenz_balance{0.5f};   // 0..1, slew amount (0=raw, 1=max smooth)
+    std::atomic<int>   lorenz_bypass{1};       // bypassed by default
+    float lorenz_x_buffer[kMaxFrames] = {};    // normalised X attractor output (0..1)
+    float lorenz_z_buffer[kMaxFrames] = {};    // normalised Z attractor output (0..1)
+    float lorenz_slew_x = 0.5f;               // one-pole filter state for X
+    float lorenz_slew_z = 0.5f;               // one-pole filter state for Z
 
     // ── Signal visualization ring buffers ──
     // Written by audio thread (one sample per block), read by UI at ~60fps.

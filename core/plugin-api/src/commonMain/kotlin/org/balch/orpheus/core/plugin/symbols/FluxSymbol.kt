@@ -27,5 +27,7 @@ enum class FluxSymbol(
     DEJAVU_MODE("deja_vu_mode", displayName = "Déjà Vu Mode"),
     CONTROL_MODE("x_control_mode", displayName = "Control Mode"),
     VOLTAGE_RANGE("x_range", displayName = "Voltage Range"),
-    MIX("mix", displayName = "Mix")
+    MIX("mix", displayName = "Mix"),
+    RANGE_MIN("range_min", displayName = "Range Min"),
+    RANGE_MAX("range_max", displayName = "Range Max")
 }

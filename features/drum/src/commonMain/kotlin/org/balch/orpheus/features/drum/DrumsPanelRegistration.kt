@@ -6,6 +6,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
@@ -13,7 +14,9 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
-class DrumsPanelRegistration : FeaturePanel {
+class DrumsPanelRegistration(
+    private val synthEngine: SynthEngine,
+) : FeaturePanel {
     override val panelId = PanelId.DRUMS
     override val description = "Drum Tuning Panel"
     override val weight = 1.15f
@@ -29,6 +32,7 @@ class DrumsPanelRegistration : FeaturePanel {
     ) {
         DrumsPanel(
             drumFeature = DrumViewModel.feature(),
+            drumOutVizFlow = synthEngine.drumOutVizFlow,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

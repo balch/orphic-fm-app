@@ -41,6 +41,9 @@ class DuoLfoPlugin : DspPlugin {
     private var _shape = 1.0f
     private var _freqA = 0.0f
     private var _freqB = 0.0f
+    private var _rangeMin = 0.0f   // 0..1 UI knob (0 = -1 in C++)
+    private var _rangeMax = 1.0f   // 0..1 UI knob (1 = +1 in C++)
+    private var _source = 0        // 0=DuoLFO, 1=PolyLFO, 2=Lorenz
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 6) {
@@ -81,6 +84,31 @@ class DuoLfoPlugin : DspPlugin {
                 default = 0f
                 get { _freqB }
                 set { _freqB = it }
+            }
+        }
+
+        controlPort(DuoLfoSymbol.RANGE_MIN) {
+            floatType {
+                default = 0f; min = 0f; max = 1f
+                get { _rangeMin }
+                set { _rangeMin = it }
+            }
+        }
+
+        controlPort(DuoLfoSymbol.RANGE_MAX) {
+            floatType {
+                default = 1f; min = 0f; max = 1f
+                get { _rangeMax }
+                set { _rangeMax = it }
+            }
+        }
+
+        controlPort(DuoLfoSymbol.SOURCE) {
+            intType {
+                default = 0; min = 0; max = 2
+                options = listOf("DuoLFO", "PolyLFO", "Lorenz")
+                get { _source }
+                set { _source = it }
             }
         }
     }

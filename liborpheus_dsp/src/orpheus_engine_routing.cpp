@@ -132,13 +132,11 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             static uint16_t h_max_semi = engine_hash16("max_bend");
             static uint16_t h_random = engine_hash16("random_depth");
             static uint16_t h_timbre = engine_hash16("timbre_mod");
-            static uint16_t h_spring = engine_hash16("spring_vol");
             static uint16_t h_tension = engine_hash16("tension_vol");
             if (symbol_hash == h_bend) { engine->bend_amount.store(value, std::memory_order_relaxed); return; }
             if (symbol_hash == h_max_semi) { engine->bend_max_semitones.store(value, std::memory_order_relaxed); return; }
             if (symbol_hash == h_random) { engine->bend_random_depth.store(value, std::memory_order_relaxed); return; }
             if (symbol_hash == h_timbre) { engine->bend_timbre_mod.store(value, std::memory_order_relaxed); return; }
-            if (symbol_hash == h_spring) { engine->bend_spring_vol.store(value, std::memory_order_relaxed); return; }
             if (symbol_hash == h_tension) { engine->bend_tension_vol.store(value, std::memory_order_relaxed); return; }
             // Per-string parameters
             static uint16_t s_bend_hashes[] = {
@@ -257,6 +255,12 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->lfo_shape.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "mode") == 0)
             engine->lfo_mode.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "range_min") == 0)
+            engine->lfo_range_min.store(value * 2.0f - 1.0f, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "range_max") == 0)
+            engine->lfo_range_max.store(value * 2.0f - 1.0f, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "source") == 0)
+            engine->lfo_source.store(static_cast<int>(value), std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.flux") == 0
           || std::strcmp(plugin_uri, "marbles") == 0) {
@@ -293,6 +297,10 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->marbles_mix.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "pulse_width") == 0)
             engine->marbles_pulse_width.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "range_min") == 0)
+            engine->marbles_range_min.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "range_max") == 0)
+            engine->marbles_range_max.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "pulse_width_std") == 0)
             engine->marbles_pulse_width_std.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "clock_source") == 0)
@@ -461,6 +469,28 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->tts_feedback.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "reverb") == 0)
             engine->tts_reverb.store(value, std::memory_order_relaxed);
+    }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.lorenz") == 0) {
+        if (std::strcmp(symbol, "rate") == 0)
+            engine->lorenz_rate.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "balance") == 0)
+            engine->lorenz_balance.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bypass") == 0)
+            engine->lorenz_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.polylfo") == 0) {
+        if (std::strcmp(symbol, "shape") == 0)
+            engine->poly_lfo_shape.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "shape_spread") == 0)
+            engine->poly_lfo_shape_spread.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "spread") == 0)
+            engine->poly_lfo_spread.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "coupling") == 0)
+            engine->poly_lfo_coupling.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "rate") == 0)
+            engine->poly_lfo_rate.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bypass") == 0)
+            engine->poly_lfo_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.tempo") == 0) {
         if (std::strcmp(symbol, "bpm") == 0)

@@ -29,6 +29,8 @@ const val UNIT_LOOPER = 23
 const val UNIT_BENDER = 24
 const val UNIT_PER_STRING_BENDER = 25
 const val UNIT_DUO_VOICE = 26
+const val UNIT_LORENZ = 27
+const val UNIT_POLY_LFO = 28
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -308,6 +310,12 @@ class WiringGraphBuilder {
 
     fun duoVoice(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_DUO_VOICE, name, init)
+
+    fun lorenz(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_LORENZ, name, init)
+
+    fun polyLfo(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_POLY_LFO, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

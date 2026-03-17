@@ -33,6 +33,9 @@ class LfoPanelRegistration(
         DuoLfoPanel(
             feature = LfoViewModel.feature(),
             vizFlow = synthEngine.lfoVizFlow,
+            vizCh1Flow = synthEngine.lfoCh1VizFlow,
+            vizCh2Flow = synthEngine.lfoCh2VizFlow,
+            vizCh3Flow = synthEngine.lfoCh3VizFlow,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

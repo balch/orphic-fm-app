@@ -14,6 +14,5 @@ enum class BenderSymbol(
     MAX_BEND("max_bend", displayName = "Max Bend Semitones"),
     RANDOM_DEPTH("random_depth", displayName = "Random Depth"),
     TIMBRE_MOD("timbre_mod", displayName = "Timbre Modulation"),
-    SPRING_VOL("spring_vol", displayName = "Spring Volume"),
     TENSION_VOL("tension_vol", displayName = "Tension Volume")
 }
