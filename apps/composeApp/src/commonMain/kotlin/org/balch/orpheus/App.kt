@@ -32,6 +32,7 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidEffects
 import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.LocalSignalVizEnabled
+import org.balch.orpheus.ui.viz.LocalSignalVizGlow
 import org.balch.orpheus.ui.widgets.VizBackground
 
 @Composable
@@ -75,6 +76,7 @@ fun App(
                     LocalDialogLiquidState provides dialogLiquidState,
                     LocalLiquidEffects provides liquidEffects,
                     LocalSignalVizEnabled provides (vizState.selectedViz.id == "signal-monitor"),
+                    LocalSignalVizGlow provides (1f - vizState.knob2Value),
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         // Wrap main content in a liquefiable box for the dialog to "see" through

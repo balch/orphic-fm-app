@@ -17,6 +17,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 val LocalSignalVizEnabled = staticCompositionLocalOf { false }
 
 /**
+ * Glow intensity for panel-level SignalTraces (0..1).
+ * Inverse of the main Orphoscope GLOW knob: CCW = bright panels, CW = dim panels.
+ */
+val LocalSignalVizGlow = staticCompositionLocalOf { 0.5f }
+
+/**
  * Oscilloscope-style signal trace drawn on a Canvas.
  * Renders a glowing line path from a FloatArray of samples (-1..+1 range).
  * Designed to sit behind panel knobs at low opacity.
@@ -40,6 +46,7 @@ fun SignalTrace(
 ) {
     val path = remember { Path() }
     val enabled = LocalSignalVizEnabled.current
+    val glow = LocalSignalVizGlow.current
 
     Canvas(modifier = modifier.fillMaxSize()) {
         if (!enabled || data.isEmpty()) return@Canvas
@@ -55,9 +62,13 @@ fun SignalTrace(
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
 
+        // Scale alpha by panel glow (0..1 from LocalSignalVizGlow), 1.5x base boost
+        val effectiveGlowAlpha = glowAlpha * 1.5f * (0.5f + glow)
+        val effectiveAlpha = alpha * 1.5f * (0.5f + glow)
+
         // Glow layer (wider, dimmer)
-        drawPath(path, color.copy(alpha = glowAlpha), style = Stroke(glowWidth))
+        drawPath(path, color.copy(alpha = effectiveGlowAlpha), style = Stroke(glowWidth))
         // Main trace
-        drawPath(path, color.copy(alpha = alpha), style = Stroke(strokeWidth))
+        drawPath(path, color.copy(alpha = effectiveAlpha), style = Stroke(strokeWidth))
     }
 }
