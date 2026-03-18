@@ -35,6 +35,13 @@ kotlin {
         binaries.executable()
     }
 
+    listOf(iosArm64(), iosSimulatorArm64(), iosX64()).forEach { target ->
+        target.binaries.framework {
+            baseName = "OrpheusShared"
+            isStatic = true
+        }
+    }
+
     sourceSets {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
@@ -129,6 +136,9 @@ kotlin {
         wasmJsMain.dependencies {
             // ktmidi provides WebMidiAccess for browser MIDI
             // Web Audio API used directly via Kotlin/JS interop
+        }
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
         }
     }
 }

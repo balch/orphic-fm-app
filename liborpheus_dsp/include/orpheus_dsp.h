@@ -22,6 +22,12 @@ int orpheus_engine_load_patch(OrpheusEngine* engine,
 void orpheus_engine_process(OrpheusEngine* engine,
                             float* output_buffer, int num_frames);
 
+// Deinterleaved variant for CoreAudio (separate L/R buffers).
+// Renders interleaved internally, then splits into left/right.
+void orpheus_engine_process_deinterleaved(OrpheusEngine* engine,
+                                          float* left, float* right,
+                                          int num_frames);
+
 // ── Diagnostics ────
 void  orpheus_engine_dump_state(OrpheusEngine* engine);
 

@@ -10,7 +10,7 @@ Orphic-FM is an 8-oscillator Synthesizer Emulator combining sounds and harmonics
 
 This instrument is inspired by the [Lyra-8 Orgasmic Synthesizer](https://somasynths.com/lyra-organismic-synthesizer/) and adds additional synthesis engines ported from the awesome OSS [Mutable Instruments' Eurorack firmware](https://github.com/pichenettes/eurorack) repository – FM, virtual analog, granular, physical modeling strings, modal resonators, additive, waveshaping, speech synthesis, and four drum voices.
 
-Under the hood, a shared **C++ DSP engine** (`liborpheus_dsp/`) ports the Eurorack firmware and provides a graph-based audio routing system. On **Android**, it runs natively via [Oboe](https://github.com/google/oboe) (Google's C++ low-latency audio library) at 48kHz. On **WASM**, the same C++ code is compiled to WebAssembly via [Emscripten](https://emscripten.org/) and runs in a Web Worker. On **Desktop (JVM)**, it loads `liborpheus_desktop.dylib` via JNI using [miniaudio](https://miniaud.io/) for low-latency playback.
+Under the hood, a shared **C++ DSP engine** (`liborpheus_dsp/`) ports the Eurorack firmware and provides a graph-based audio routing system. On **Android**, it runs natively via [Oboe](https://github.com/google/oboe) (Google's C++ low-latency audio library) at 48kHz. On **iOS**, the C++ engine is linked as a static library via cinterop and renders through `AVAudioEngine` with an `AVAudioSourceNode` callback. On **WASM**, the same C++ code is compiled to WebAssembly via [Emscripten](https://emscripten.org/) and runs in a Web Worker. On **Desktop (JVM)**, it loads `liborpheus_desktop.dylib` via JNI using [miniaudio](https://miniaud.io/) for low-latency playback.
 
 I had multiple motivations for building this project, but I mainly did it because I've always wanted to build some kind of instrument, and now AI agents make that possible. AI played a big part in the development, and it will be interesting to see what happens as Orpheus learns to master the synth. 
 
@@ -103,9 +103,11 @@ The fusion algorithm boosts confidence when both classifiers agree and penalizes
 | Desktop (JVM) | C++ via JNI + miniaudio | Primary target |
 | Android | Oboe (C++ / JNI) at 48kHz | Full support |
 | wasmJs | C++ DSP → Emscripten WASM → AudioWorklet | Functional ([orphic.fm](https://orphic.fm/)) |
-| iOS | -- | Skeleton |
+| iOS | C++ static lib via cinterop → AVAudioEngine | In development |
 
 The **WASM** target compiles the C++ DSP engine to WebAssembly via Emscripten. Audio runs in a Web Worker that renders 128-frame buffers and posts them to an `AudioWorkletNode` for gapless playback. The main thread keeps a local shadow of engine state for UI reads while forwarding parameter changes to the Worker via `postMessage`.
+
+The **iOS** target links the C++ DSP engine as a static library via Kotlin/Native cinterop. Audio renders through `AVAudioEngine` with an `AVAudioSourceNode` callback. The C++ engine outputs interleaved stereo which is deinterleaved in C++ (`orpheus_engine_process_deinterleaved`) to match CoreAudio's non-interleaved buffer format — keeping the entire audio path in native code with zero GC pressure.
 
 ## Build & Run
 
@@ -115,6 +117,11 @@ The **WASM** target compiles the C++ DSP engine to WebAssembly via Emscripten. A
 
 # Android
 ./gradlew :apps:androidApp:installDebugRelease
+
+# iOS (build framework, then open Xcode project)
+./gradlew :apps:composeApp:linkDebugFrameworkIosSimulatorArm64
+cd apps/iosApp && xcodegen generate
+open OrpheusApp.xcodeproj
 
 # WASM dev server (opens browser at localhost:8080)
 ./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun

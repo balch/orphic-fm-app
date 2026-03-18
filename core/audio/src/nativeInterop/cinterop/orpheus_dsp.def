@@ -1,0 +1,4 @@
+headers = orpheus_dsp.h
+headerFilter = orpheus_dsp.h
+staticLibraries = liborpheus_dsp.a
+# libraryPaths are set in build.gradle.kts via compilerOpts for correct absolute paths

@@ -3,7 +3,7 @@ agp = "9.1.0"
 android-compileSdk = "36"
 android-minSdk = "26"
 android-targetSdk = "36"
-androidx-activity = "1.12.4"
+androidx-activity = "1.13.0"
 androidx-appcompat = "1.7.1"
 androidx-core = "1.17.0"
 androidx-espresso = "3.7.0"
@@ -15,7 +15,7 @@ composeHotReload = "1.0.0"
 composeMultiplatform = "1.10.2"
 gradle = "9.1.0"
 junit = "4.13.2"
-kotlin = "2.3.20-RC2"
+kotlin = "2.3.20"
 ksp = "2.3.6"
 kotlinx-atomicfu = "0.31.0"
 kotlinx-coroutines = "1.10.2"
@@ -28,13 +28,13 @@ material3Version = "1.9.0"
 media = "1.7.1"
 slf4jApi = "2.0.17"
 logback = "1.5.32"
-metro = "0.11.2"
+metro = "0.11.4"
 ktmidi = "0.11.2"
 coremidi4j = "1.6"
 navigation3 = "1.0.1"
 adaptiveNavigation3 = "1.2.0"
 material3 = "1.5.0-alpha15"
-koog = "0.6.4"
+koog = "0.7.1"
 ktor = "3.4.1"
 buildkonfig = "0.17.1"
 markdown = "0.39.2"
@@ -103,6 +103,7 @@ ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 
 # Markdown
 markdown = { module = "com.mikepenz:multiplatform-markdown-renderer", version.ref = "markdown" }

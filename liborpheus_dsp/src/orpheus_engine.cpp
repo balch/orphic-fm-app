@@ -473,4 +473,27 @@ void orpheus_engine_process(OrpheusEngine* engine,
     engine->cpu_load.store(elapsed_us / buffer_us, std::memory_order_relaxed);
 }
 
+// Max frames per callback — CoreAudio typically uses 512 or 1024.
+// 4096 covers all reasonable buffer sizes with no dynamic allocation.
+static constexpr int kMaxDeinterleavedFrames = 4096;
+
+void orpheus_engine_process_deinterleaved(OrpheusEngine* engine,
+                                          float* left, float* right,
+                                          int num_frames) {
+    if (!engine || !left || !right || num_frames <= 0) return;
+    if (num_frames > kMaxDeinterleavedFrames) num_frames = kMaxDeinterleavedFrames;
+
+    // Thread-local static avoids 32KB stack pressure on CoreAudio's
+    // real-time thread (which may have only 64KB stack on iOS).
+    static thread_local float scratch[kMaxDeinterleavedFrames * 2];
+
+    orpheus_engine_process(engine, scratch, num_frames);
+
+    // Deinterleave: L0,R0,L1,R1,... → separate L[],R[]
+    for (int i = 0; i < num_frames; i++) {
+        left[i]  = scratch[i * 2];
+        right[i] = scratch[i * 2 + 1];
+    }
+}
+
 }  // extern "C"
