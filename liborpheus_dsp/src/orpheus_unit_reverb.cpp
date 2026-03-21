@@ -17,6 +17,8 @@ void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine,
     if (engine->reverb_bypass.load(std::memory_order_relaxed)) {
         std::memset(out_l, 0, num_frames * sizeof(float));
         std::memset(out_r, 0, num_frames * sizeof(float));
+        engine->viz_rings[VIZ_REVERB_IN].write(0.0f);
+        engine->viz_rings[VIZ_REVERB_OUT].write(0.0f);
         return;
     }
 

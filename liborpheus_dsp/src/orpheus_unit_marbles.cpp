@@ -28,6 +28,7 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
         std::memset(engine->warps_source_buffers[6], 0, num_frames * sizeof(float));
         engine->marbles_cv_output[0] = 0.0f;
         engine->marbles_cv_output[1] = 0.0f;
+        engine->viz_rings[VIZ_FLUX_CV].write(0.0f);
         return;
     }
 

@@ -18,6 +18,9 @@ void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames
     if (engine->delay_bypass.load(std::memory_order_relaxed)) {
         std::memcpy(out_l, in_l, num_frames * sizeof(float));
         std::memcpy(out_r, in_r, num_frames * sizeof(float));
+        engine->viz_rings[VIZ_DELAY_IN].write(0.0f);
+        engine->viz_rings[VIZ_DELAY_FB].write(0.0f);
+        engine->viz_rings[VIZ_DELAY_OUT].write(0.0f);
         return;
     }
 

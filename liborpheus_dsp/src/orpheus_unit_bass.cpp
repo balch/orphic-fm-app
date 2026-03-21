@@ -215,6 +215,7 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     if (bypassed) {
         std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
         engine->bass_smooth_mix = 0.0f;
+        engine->viz_rings[VIZ_BASS_OUT].write(0.0f);
         return;
     }
 

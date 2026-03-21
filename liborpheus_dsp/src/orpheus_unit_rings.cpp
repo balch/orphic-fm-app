@@ -23,6 +23,8 @@ void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
             std::memcpy(out_r, in, num_frames * sizeof(float));
             // Still populate RESONATOR Warps source even when bypassed
             std::memcpy(engine->warps_source_buffers[4], out_r, num_frames * sizeof(float));
+            engine->viz_rings[VIZ_RESO_IN].write(0.0f);
+            engine->viz_rings[VIZ_RESO_OUT].write(0.0f);
             return;
         }
     }

@@ -13,6 +13,8 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     if (engine->clouds_bypass.load(std::memory_order_relaxed)) {
         std::memcpy(out_l, in_l, num_frames * sizeof(float));
         std::memcpy(out_r, in_r, num_frames * sizeof(float));
+        engine->viz_rings[VIZ_GRAINS_IN].write(0.0f);
+        engine->viz_rings[VIZ_GRAINS_OUT].write(0.0f);
         return;
     }
 
