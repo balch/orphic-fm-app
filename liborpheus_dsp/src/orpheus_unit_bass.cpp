@@ -138,6 +138,11 @@ static float process_envelope(BassSequencerState& seq, bool gate, float envelope
     float attack_coeff = (attack_samples > 1.0f) ? (1.0f - std::exp(-1.0f / (attack_samples * 0.3f))) : 1.0f;
     float decay_coeff = (decay_samples > 1.0f) ? (1.0f - std::exp(-1.0f / (decay_samples * 0.3f))) : 1.0f;
 
+    // Sustain floor while gate is held: low envelope = high sustain (full bass),
+    // high envelope = no sustain (percussive AD). This keeps the note alive
+    // through slide transitions so portamento has signal to glide.
+    float sustain_level = gate ? 0.6f * (1.0f - envelope_param) : 0.0f;
+
     switch (seq.env_stage) {
         case 1: // attack
             seq.env_level += attack_coeff * (1.1f - seq.env_level);
@@ -147,8 +152,9 @@ static float process_envelope(BassSequencerState& seq, bool gate, float envelope
             }
             break;
         case 2: // decay
-            seq.env_level -= decay_coeff * seq.env_level;
-            if (seq.env_level < 0.001f) {
+            // Decay toward sustain floor (0 when gate off, up to 0.6 when gate on)
+            seq.env_level += decay_coeff * (sustain_level - seq.env_level);
+            if (!gate && seq.env_level < 0.001f) {
                 seq.env_level = 0.0f;
                 seq.env_stage = 0;  // idle
             }
@@ -291,9 +297,12 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     if (samples_per_step < 1) samples_per_step = 1;
 
     // Current step state — read from seq, updated when a step fires
+    // Three-tier gate: <=0.3 rest, 0.3-0.7 slide (legato+portamento), >0.7 normal trigger
     int step = seq.current_step % step_count;
     float pitch_value = seq.mutation_buffer[step];
-    bool  step_gate   = seq.gate_buffer[step]   > 0.3f;  // ~70% chance of gate
+    float gate_val    = seq.gate_buffer[step];
+    bool  step_gate   = gate_val > 0.3f;
+    bool  step_slide  = gate_val > 0.3f && gate_val <= 0.7f;
     bool  step_accent = seq.accent_buffer[step] > 0.7f;  // ~30% chance of accent
 
     // Detect whether a new step fired this block (for rising-edge trigger)
@@ -311,7 +320,9 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
                 step = advance_step(seq, step_count, mutation);
 
                 pitch_value = seq.mutation_buffer[step];
-                step_gate   = seq.gate_buffer[step]   > 0.3f;
+                gate_val    = seq.gate_buffer[step];
+                step_gate   = gate_val > 0.3f;
+                step_slide  = gate_val > 0.3f && gate_val <= 0.7f;
                 step_accent = seq.accent_buffer[step] > 0.7f;
                 new_step_fired = true;
             } else {
@@ -321,15 +332,32 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
         }
     }
 
-    // ── Compute note for active step ──
-    float note;
+    // ── Compute note for active step (with portamento on slide steps) ──
+    float target_note;
     if (key_override) {
-        note = key_pitch;
+        target_note = key_pitch;
         step_gate = true;   // keyboard always gates
+        step_slide = false; // keyboard always snaps
         step_accent = false;
     } else {
-        note = quantize_to_scale(pitch_value, root_note, scale_idx);
+        target_note = quantize_to_scale(pitch_value, root_note, scale_idx);
     }
+
+    // Portamento: slide steps glide toward target, normal steps snap
+    // Glide time shaped by envelope knob: low=80ms (rubbery), high=10ms (zippy)
+    if (seq.smooth_note == 0.0f) {
+        seq.smooth_note = target_note;  // init on first render
+    }
+    if (step_slide && step_gate) {
+        float glide_ms = 80.0f * std::exp(-2.1f * envelope_param);
+        float glide_samples = glide_ms * 0.001f * sample_rate;
+        float glide_coeff = (glide_samples > 1.0f) ? (1.0f - std::exp(-1.0f / (glide_samples * 0.3f))) : 1.0f;
+        // Apply per-block smoothing (block-rate is sufficient for pitch glide)
+        seq.smooth_note += glide_coeff * num_frames * (target_note - seq.smooth_note);
+    } else {
+        seq.smooth_note = target_note;
+    }
+    float note = seq.smooth_note;
 
     // ── Set accent drive boost for downstream overdrive ──
     engine->bass_accent_drive_boost = step_accent ? (0.3f * accent_amount) : 0.0f;
@@ -401,10 +429,12 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
             engine->bass_voice.trigger_state_ = false;
             seq.env_gate_prev = false;
         }
-    } else if (new_step_fired && step_gate) {
+    } else if (new_step_fired && step_gate && !step_slide) {
+        // Normal trigger: retrigger voice + envelope for fresh attack
         engine->bass_voice.trigger_state_ = false;
-        seq.env_gate_prev = false;  // force envelope retrigger too
+        seq.env_gate_prev = false;
     }
+    // Slide steps: no retrigger — envelope continues (legato), pitch glides
 
     // Apply cutoff/resonance modulation to voice params
     float timbre_val = std::max(0.0f, std::min(1.0f,

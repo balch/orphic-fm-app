@@ -56,4 +56,5 @@ struct BassSequencerState {
     float env_level;
     int   env_stage;       // 0=idle, 1=attack, 2=decay
     bool  env_gate_prev;
+    float smooth_note;     // portamento-smoothed pitch (MIDI note)
 };

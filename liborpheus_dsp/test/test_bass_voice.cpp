@@ -433,6 +433,108 @@ static bool test_bass_flux_t_gating() {
     return pass;
 }
 
+// Test: slide steps (gate_buffer 0.3-0.7) produce pitch portamento and legato envelope,
+// while normal trigger steps (gate_buffer > 0.7) snap pitch instantly.
+static bool test_bass_slide_portamento() {
+    printf("\n=== Test: Bass slide portamento and legato ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    engine->bass_mix.store(1.0f);
+    engine->bass_bypass.store(0);
+    engine->bass_root_note.store(36);
+    engine->bass_scale.store(0);  // chromatic — full range
+    engine->bass_step_count.store(4);
+    engine->bass_mutation.store(0.0f);  // no mutation — we control gates directly
+    engine->bass_envelope.store(0.2f);  // low envelope → slow glide (~60ms)
+    engine->bass_engine.store(0);
+    engine->bass_clock_div.store(2);    // 1x (16th notes)
+    engine->clock_running.store(1);
+    engine->clock_bpm.store(120.0f);
+
+    const int CHUNK = 128;
+
+    GraphUnit u;
+    std::memset(&u, 0, sizeof(u));
+    u.type = UNIT_BASS_VOICE;
+    u.enabled = true;
+    unit_init(&u, 48000.0f);
+
+    // Run a few blocks to initialize the sequencer
+    for (int i = 0; i < 5; i++) {
+        unit_process_bass_voice(&u, engine, CHUNK, 48000.0f);
+    }
+
+    // Set up a pattern: step 0 = normal trigger (high C), step 1 = slide (high G)
+    // step 2 = normal trigger (low C), step 3 = rest
+    BassSequencerState& seq = engine->bass_seq_state;
+    // pitch values: mapped by quantize_to_scale, chromatic over 2 octaves (24 semitones)
+    // value 0.5 = degree 12 = octave up from root
+    seq.mutation_buffer[0] = 0.0f;   // root (C2 = MIDI 36)
+    seq.mutation_buffer[1] = 0.5f;   // octave up (C3 = MIDI 48)
+    seq.mutation_buffer[2] = 0.25f;  // ~6 semitones up
+    seq.mutation_buffer[3] = 0.0f;
+
+    seq.gate_buffer[0] = 0.9f;  // normal trigger (>0.7)
+    seq.gate_buffer[1] = 0.5f;  // slide (0.3-0.7)
+    seq.gate_buffer[2] = 0.9f;  // normal trigger
+    seq.gate_buffer[3] = 0.1f;  // rest (<0.3)
+
+    seq.accent_buffer[0] = 0.0f;
+    seq.accent_buffer[1] = 0.0f;
+    seq.accent_buffer[2] = 0.0f;
+    seq.accent_buffer[3] = 0.0f;
+
+    // Reset to step 0
+    seq.current_step = 0;
+    seq.tick_counter = 0;
+
+    // Run through enough blocks to cover 2 steps at 120 BPM, 16th notes
+    // samples_per_step at 120 BPM, clock_div=2 (6 ticks): 48000*60*6/(120*24) = 6000
+    int samples_per_step = 6000;
+    int blocks_per_step = samples_per_step / CHUNK;
+
+    // Advance through step 0 (normal trigger)
+    for (int i = 0; i < blocks_per_step; i++) {
+        unit_process_bass_voice(&u, engine, CHUNK, 48000.0f);
+    }
+    float note_after_step0 = seq.smooth_note;
+
+    // Now step 1 fires (slide) — capture smooth_note over several blocks
+    // On the first block after step fires, smooth_note should NOT equal target yet
+    unit_process_bass_voice(&u, engine, CHUNK, 48000.0f);
+    float note_early_slide = seq.smooth_note;
+
+    // Run most of the remaining step
+    for (int i = 1; i < blocks_per_step - 1; i++) {
+        unit_process_bass_voice(&u, engine, CHUNK, 48000.0f);
+    }
+    float note_late_slide = seq.smooth_note;
+
+    // Target note for step 1: quantize_to_scale(0.5, 36, 0) = 36 + 12 = 48
+    float target_step1 = 48.0f;
+
+    printf("  Step 0 note (root, normal): %.2f\n", note_after_step0);
+    printf("  Step 1 early slide: %.2f (target: %.2f)\n", note_early_slide, target_step1);
+    printf("  Step 1 late slide:  %.2f (target: %.2f)\n", note_late_slide, target_step1);
+
+    // Early slide should be between step 0 note and target (not yet arrived)
+    bool slide_in_progress = (note_early_slide > note_after_step0 + 0.5f) &&
+                             (note_early_slide < target_step1 - 0.5f);
+    // Late slide should be closer to target than early slide
+    bool slide_converging = std::fabs(note_late_slide - target_step1) <
+                            std::fabs(note_early_slide - target_step1);
+
+    printf("  Slide in progress (between start and target): %s\n",
+           slide_in_progress ? "yes" : "no");
+    printf("  Slide converging (late closer than early): %s\n",
+           slide_converging ? "yes" : "no");
+
+    bool pass = slide_in_progress && slide_converging;
+    printf("Bass slide portamento: %s\n", pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 bool run_bass_voice_tests() {
     bool all_pass = true;
     all_pass &= test_overdrive_passthrough();
@@ -445,5 +547,6 @@ bool run_bass_voice_tests() {
     all_pass &= test_bass_writes_to_warps_source_buffer();
     all_pass &= test_bass_grains_send_mixes_into_clouds();
     all_pass &= test_bass_flux_t_gating();
+    all_pass &= test_bass_slide_portamento();
     return all_pass;
 }
