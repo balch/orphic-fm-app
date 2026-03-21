@@ -5,6 +5,24 @@
 #include <cmath>
 #include <algorithm>
 
+static inline float* resolve_flux_t(OrpheusEngine* engine, int src) {
+    switch (src) {
+        case 1: return engine->marbles_t1_buffer;
+        case 2: return engine->marbles_t2_buffer;
+        case 3: return engine->marbles_t3_buffer;
+        default: return nullptr;
+    }
+}
+
+static inline float* resolve_flux_x(OrpheusEngine* engine, int src) {
+    switch (src) {
+        case 1: return engine->marbles_x1_buffer;
+        case 2: return engine->marbles_x2_buffer;
+        case 3: return engine->marbles_x3_buffer;
+        default: return nullptr;
+    }
+}
+
 // ── Sequencer helpers ───────────────────────────────────────────────
 
 static void init_sequencer(BassSequencerState& seq) {
@@ -91,7 +109,7 @@ static float quantize_to_scale(float value, int root_note, int scale_idx) {
 // ── Envelope (Peaks-inspired) ───────────────────────────────────────
 
 static float process_envelope(BassSequencerState& seq, bool gate, float envelope_param,
-                              bool accent, float sample_rate) {
+                              bool accent, float accent_amount, float sample_rate) {
     // Detect rising edge
     bool rising = gate && !seq.env_gate_prev;
     seq.env_gate_prev = gate;
@@ -106,10 +124,11 @@ static float process_envelope(BassSequencerState& seq, bool gate, float envelope
     // decay_ms: 500ms at 0.0 -> 50ms at 1.0
     float decay_ms = 500.0f * std::exp(-2.3f * envelope_param);  // ~500 -> ~50
 
-    // Accent: faster times
+    // Accent: faster times scaled by accent_amount
     if (accent) {
-        attack_ms *= 0.67f;
-        decay_ms *= 0.67f;
+        float speed_factor = 1.0f - 0.33f * accent_amount;
+        attack_ms *= speed_factor;
+        decay_ms *= speed_factor;
     }
 
     float attack_samples = attack_ms * 0.001f * sample_rate;
@@ -148,9 +167,9 @@ static float process_envelope(BassSequencerState& seq, bool gate, float envelope
         level = level * (1.0f - blend) + quartic * blend;
     }
 
-    // Accent: boost output
+    // Accent: boost output scaled by accent_amount
     if (accent) {
-        level *= 1.5f;
+        level *= 1.0f + 0.5f * accent_amount;
         if (level > 1.0f) level = 1.0f;
     }
 
@@ -235,6 +254,10 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     float key_pitch   = engine->bass_key_pitch.load(std::memory_order_relaxed);
     int clock_div     = engine->bass_clock_div.load(std::memory_order_relaxed);
     bool clock_running = engine->clock_running.load(std::memory_order_relaxed) != 0;
+    int trigger_src = engine->bass_trigger_source.load(std::memory_order_relaxed);
+    int pitch_src   = engine->bass_pitch_source.load(std::memory_order_relaxed);
+    int timbre_src  = engine->bass_timbre_source.load(std::memory_order_relaxed);
+    float accent_amount = engine->bass_accent_amount.load(std::memory_order_relaxed);
     float bpm = engine->clock_bpm.load(std::memory_order_relaxed);
 
     if (step_count < 1) step_count = 1;
@@ -309,26 +332,23 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     }
 
     // ── Set accent drive boost for downstream overdrive ──
-    engine->bass_accent_drive_boost = step_accent ? 0.3f : 0.0f;
+    engine->bass_accent_drive_boost = step_accent ? (0.3f * accent_amount) : 0.0f;
 
-    // ── Determine gate to pass to voice ──────────────────────────────
-    // OrpheusVoice::Render() performs internal rising-edge detection.
-    // We pass gate=1 on a new-step-with-gate or keyboard press, gate=0 otherwise.
-    // This means Render() will see a rising edge on the block where a step fires,
-    // triggering the voice even if the previous block also had gate=1 (legato).
-    //
-    // For accurate triggering: pass gate=1 only when step_gate is true AND a new
-    // step just fired (or key_override is active). When clock is stopped or gate
-    // is false, pass gate=0 so the voice releases.
+    // ── Determine gate to pass to voice ──
     int render_gate;
+    float* ext_t = resolve_flux_t(engine, trigger_src);
+
     if (key_override) {
         render_gate = 1;
     } else if (!clock_running) {
         render_gate = 0;
+    } else if (ext_t != nullptr) {
+        // External Flux T gates the envelope — sequencer still advances for pitch
+        int mid = num_frames / 2;
+        render_gate = (ext_t[mid] > 0.5f) ? 1 : 0;
     } else if (new_step_fired && step_gate) {
         render_gate = 1;
     } else if (step_gate) {
-        // Same step continuing — hold gate (sustain until next step)
         render_gate = 1;
     } else {
         render_gate = 0;
@@ -354,14 +374,34 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     // Apply pitch modulation
     note += mod_pitch;
 
+    // ── Flux X pitch modulation ──
+    float* ext_x = resolve_flux_x(engine, pitch_src);
+    if (ext_x != nullptr) {
+        // X buffer contains exp2(v)-1 values (frequency ratio offset).
+        // Convert back to semitones: 12 * log2(1 + x_val)
+        int mid = num_frames / 2;
+        float x_val = ext_x[mid];
+        if (x_val > -0.99f) {
+            float semitones = 12.0f * std::log2f(1.0f + x_val);
+            note += semitones;
+        }
+    }
+
     // Apply envelope modulation
     float modulated_envelope = std::max(0.0f, std::min(1.0f, envelope_param + mod_envelope));
 
     // ── Render voice ──
-    // Force retrigger on new step: reset both OrpheusVoice's Schmitt trigger
-    // AND the envelope's gate state so both see a fresh rising edge.
+    // Force retrigger on new step (or Flux T rising edge): reset both OrpheusVoice's
+    // Schmitt trigger AND the envelope's gate state so both see a fresh rising edge.
     // Without this, all-gates-on patterns never retrigger after the first note.
-    if (new_step_fired && step_gate) {
+    if (ext_t != nullptr) {
+        // Detect rising edge in T buffer for retrigger
+        bool t_rising = (ext_t[num_frames / 2] > 0.5f) && (ext_t[0] <= 0.5f);
+        if (t_rising) {
+            engine->bass_voice.trigger_state_ = false;
+            seq.env_gate_prev = false;
+        }
+    } else if (new_step_fired && step_gate) {
         engine->bass_voice.trigger_state_ = false;
         seq.env_gate_prev = false;  // force envelope retrigger too
     }
@@ -371,6 +411,15 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
         bp.timbre.load(std::memory_order_relaxed) + mod_timbre));
     float harmonics_val = std::max(0.0f, std::min(1.0f,
         bp.harmonics.load(std::memory_order_relaxed) + mod_harmonics));
+
+    // ── Flux Y timbre modulation ──
+    if (timbre_src > 0) {
+        // Y buffer is clamped [-1, +1] by unit_process_marbles.
+        // Scale to ±0.3 for subtle tonal variation without extreme jumps.
+        int mid = num_frames / 2;
+        float y_val = engine->marbles_y_buffer[mid];
+        timbre_val = std::max(0.0f, std::min(1.0f, timbre_val + y_val * 0.3f));
+    }
 
     float raw_out[kMaxFrames];
     engine->bass_voice.Render(
@@ -388,8 +437,8 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     // ── Apply envelope, output gain, and mix ──
     // Bass voice needs headroom boost: Plaits output is soft-limited to ~±1,
     // envelope scales 0-1, so raw output is quiet relative to the 12 main voices
-    // which get summed in the duo mixer. 4x (~12dB) brings bass to parity.
-    static constexpr float kBassOutputGain = 2.5f;
+    // which get summed in the duo mixer. 1.5x (~3.5dB) brings bass to parity.
+    static constexpr float kBassOutputGain = 1.5f;
 
     float* out = u->output_buffers[OPORT_OUT];
 
@@ -400,7 +449,7 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
 
         if (use_external_envelope) {
             bool gate_for_env = (render_gate != 0);
-            float env = process_envelope(seq, gate_for_env, modulated_envelope, step_accent, sample_rate);
+            float env = process_envelope(seq, gate_for_env, modulated_envelope, step_accent, accent_amount, sample_rate);
             sample *= env;
         }
 
@@ -408,6 +457,10 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     }
 
     engine->bass_smooth_mix = smooth_mix;
+
+    // Write to Warps source buffer (slot 9 = BASS)
+    // Uses post-envelope output (before overdrive/compressor graph units)
+    std::memcpy(engine->warps_source_buffers[9], out, num_frames * sizeof(float));
 
     // Write visualization data (one peak per block)
     float viz_peak = 0.0f;

@@ -440,6 +440,16 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
         else if (std::strcmp(symbol, "lfo_mix") == 0)
             engine->bass_lfo_mix.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "trigger_source") == 0)
+            engine->bass_trigger_source.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "pitch_source") == 0)
+            engine->bass_pitch_source.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "timbre_source") == 0)
+            engine->bass_timbre_source.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "accent_amount") == 0)
+            engine->bass_accent_amount.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "grains_send") == 0)
+            engine->bass_grains_send.store(value, std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.stereo") == 0) {
         if (std::strcmp(symbol, "master_pan") == 0)

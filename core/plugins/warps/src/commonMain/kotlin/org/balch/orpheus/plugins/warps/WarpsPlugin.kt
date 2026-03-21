@@ -84,7 +84,7 @@ class WarpsPlugin : DspPlugin {
 
         controlPort(WarpsSymbol.CARRIER_SOURCE) {
             intType {
-                default = 0; min = 0; max = 8
+                default = 0; min = 0; max = 9
                 get { _carrierSource }
                 set { _carrierSource = it }
             }
@@ -92,7 +92,7 @@ class WarpsPlugin : DspPlugin {
 
         controlPort(WarpsSymbol.MODULATOR_SOURCE) {
             intType {
-                default = 0; min = 0; max = 8
+                default = 0; min = 0; max = 9
                 get { _modulatorSource }
                 set { _modulatorSource = it }
             }

@@ -19,6 +19,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(projects.core.pluginApi)
+            implementation(projects.features.bass)
             implementation(projects.features.drum)
             implementation(projects.features.voice)
         }

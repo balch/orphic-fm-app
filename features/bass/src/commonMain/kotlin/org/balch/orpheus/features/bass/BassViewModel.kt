@@ -43,9 +43,14 @@ data class BassPanelActions(
     val setCompressor: (Float) -> Unit,
     val setMix: (Float) -> Unit,
     val setLfoMix: (Float) -> Unit,
+    val setAccentAmount: (Float) -> Unit,
+    val setGrainsSend: (Float) -> Unit,
+    val setTriggerSource: (Int) -> Unit,
+    val setPitchSource: (Int) -> Unit,
+    val setTimbreSource: (Int) -> Unit,
 ) {
     companion object {
-        val EMPTY = BassPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = BassPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -64,6 +69,11 @@ private sealed interface BassIntent {
     data class SetCompressor(val value: Float) : BassIntent
     data class SetMix(val value: Float) : BassIntent
     data class SetLfoMix(val value: Float) : BassIntent
+    data class SetAccentAmount(val value: Float) : BassIntent
+    data class SetGrainsSend(val value: Float) : BassIntent
+    data class SetTriggerSource(val value: Int) : BassIntent
+    data class SetPitchSource(val value: Int) : BassIntent
+    data class SetTimbreSource(val value: Int) : BassIntent
 }
 
 interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
@@ -127,6 +137,8 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
                 BassSymbol.COMPRESSOR.controlId.key to "Compressor amount (0=off, 1=squashed)",
                 BassSymbol.MIX.controlId.key to "Output level / on-off (0=bypassed, 1=full volume)",
                 BassSymbol.LFO_MIX.controlId.key to "LFO modulation depth (0=none, 1=full — modulates cutoff, resonance, pitch, envelope)",
+                BassSymbol.ACCENT_AMOUNT.controlId.key to "Accent intensity (0=no accent, 0.5=default, 1=maximum accent)",
+                BassSymbol.GRAINS_SEND.controlId.key to "Send level to grains/granular processor (0=off, 1=full send)",
             )
         }
     }
@@ -160,6 +172,11 @@ class BassViewModel(
     private val compressorId = synthController.controlFlow(BassSymbol.COMPRESSOR.controlId)
     private val mixId = synthController.controlFlow(BassSymbol.MIX.controlId)
     private val lfoMixId = synthController.controlFlow(BassSymbol.LFO_MIX.controlId)
+    private val accentAmountId = synthController.controlFlow(BassSymbol.ACCENT_AMOUNT.controlId)
+    private val grainsSendId = synthController.controlFlow(BassSymbol.GRAINS_SEND.controlId)
+    private val triggerSourceId = synthController.controlFlow(BassSymbol.TRIGGER_SOURCE.controlId)
+    private val pitchSourceId = synthController.controlFlow(BassSymbol.PITCH_SOURCE.controlId)
+    private val timbreSourceId = synthController.controlFlow(BassSymbol.TIMBRE_SOURCE.controlId)
 
     override val actions = BassPanelActions(
         setEngine = engineId.enumSetter(),
@@ -175,6 +192,11 @@ class BassViewModel(
         setCompressor = compressorId.floatSetter(),
         setMix = mixId.floatSetter(),
         setLfoMix = lfoMixId.floatSetter(),
+        setAccentAmount = accentAmountId.floatSetter(),
+        setGrainsSend = grainsSendId.floatSetter(),
+        setTriggerSource = triggerSourceId.intSetter(),
+        setPitchSource = pitchSourceId.intSetter(),
+        setTimbreSource = timbreSourceId.intSetter(),
     )
 
     // Control changes -> BassIntent
@@ -204,6 +226,11 @@ class BassViewModel(
         compressorId.map { BassIntent.SetCompressor(it.asFloat()) },
         mixId.map { BassIntent.SetMix(it.asFloat()) },
         lfoMixId.map { BassIntent.SetLfoMix(it.asFloat()) },
+        accentAmountId.map { BassIntent.SetAccentAmount(it.asFloat()) },
+        grainsSendId.map { BassIntent.SetGrainsSend(it.asFloat()) },
+        triggerSourceId.map { BassIntent.SetTriggerSource(it.asInt()) },
+        pitchSourceId.map { BassIntent.SetPitchSource(it.asInt()) },
+        timbreSourceId.map { BassIntent.SetTimbreSource(it.asInt()) },
     )
 
     override val stateFlow: StateFlow<BassUiState> =
@@ -237,6 +264,11 @@ class BassViewModel(
             is BassIntent.SetCompressor -> state.copy(compressor = intent.value)
             is BassIntent.SetMix -> state.copy(mix = intent.value)
             is BassIntent.SetLfoMix -> state.copy(lfoMix = intent.value)
+            is BassIntent.SetAccentAmount -> state.copy(accentAmount = intent.value)
+            is BassIntent.SetGrainsSend -> state.copy(grainsSend = intent.value)
+            is BassIntent.SetTriggerSource -> state.copy(triggerSource = intent.value)
+            is BassIntent.SetPitchSource -> state.copy(pitchSource = intent.value)
+            is BassIntent.SetTimbreSource -> state.copy(timbreSource = intent.value)
         }
 
     companion object {

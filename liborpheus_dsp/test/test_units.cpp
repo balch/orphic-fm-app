@@ -165,6 +165,48 @@ static bool test_marbles() {
     return pass;
 }
 
+static bool test_marbles_y_output() {
+    printf("\n=== Test: Marbles Y output populated ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    engine->marbles_mix.store(1.0f, std::memory_order_relaxed);
+    engine->marbles_t_rate.store(20.0f, std::memory_order_relaxed);
+    engine->clock_running.store(1, std::memory_order_relaxed);
+    engine->clock_bpm.store(120.0f, std::memory_order_relaxed);
+
+    GraphUnit clock_unit = {};
+    clock_unit.type = UNIT_CLOCK;
+    clock_unit.enabled = true;
+    unit_init(&clock_unit, 48000.0f);
+
+    GraphUnit marbles_unit = {};
+    marbles_unit.type = UNIT_MARBLES;
+    marbles_unit.enabled = true;
+    unit_init(&marbles_unit, 48000.0f);
+
+    marbles_unit.inputs[IPORT_INPUT_A].sources[0] = clock_unit.output_buffers[OPORT_OUT];
+    marbles_unit.inputs[IPORT_INPUT_A].num_sources = 1;
+
+    // Run enough blocks for T generator to produce clocks that drive XY
+    for (int i = 0; i < 20; i++) {
+        unit_process_clock(&clock_unit, engine, 128, 48000.0f);
+        port_prepare(&marbles_unit.inputs[IPORT_INPUT_A], 128, 48000.0f);
+        unit_process_marbles(&marbles_unit, engine, 128, 48000.0f);
+    }
+
+    bool has_nonzero = false;
+    for (int i = 0; i < 128; i++) {
+        if (std::fabs(engine->marbles_y_buffer[i]) > 1e-6f) {
+            has_nonzero = true;
+            break;
+        }
+    }
+
+    printf("Y buffer non-zero: %s\n", has_nonzero ? "YES" : "NO");
+    printf("Marbles Y output test: %s\n", has_nonzero ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return has_nonzero;
+}
+
 static bool test_looper() {
     printf("\n=== Test: Looper record/play ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
@@ -452,6 +494,7 @@ bool run_unit_tests() {
     all_pass &= test_clock();
     all_pass &= test_grids();
     all_pass &= test_marbles();
+    all_pass &= test_marbles_y_output();
     all_pass &= test_looper();
     all_pass &= test_bender();
     all_pass &= test_per_string_bender();

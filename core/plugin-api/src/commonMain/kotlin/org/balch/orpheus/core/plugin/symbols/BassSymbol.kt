@@ -23,4 +23,9 @@ enum class BassSymbol(
     COMPRESSOR("compressor", displayName = "Compressor"),
     MIX("mix", displayName = "Mix"),
     LFO_MIX("lfo_mix", displayName = "LFO Mix"),
+    TRIGGER_SOURCE("trigger_source", displayName = "Trigger Source"),
+    PITCH_SOURCE("pitch_source", displayName = "Pitch Source"),
+    TIMBRE_SOURCE("timbre_source", displayName = "Timbre Source"),
+    ACCENT_AMOUNT("accent_amount", displayName = "Accent"),
+    GRAINS_SEND("grains_send", displayName = "Grains Send"),
 }

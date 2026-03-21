@@ -15,12 +15,20 @@
 #include "orpheus_resonator.h"
 
 // Include MI Warps modulator
+// Undefine Clouds resource macros that collide with Warps
+#undef LUT_XFADE_IN
+#undef LUT_XFADE_IN_SIZE
+#undef LUT_XFADE_OUT
+#undef LUT_XFADE_OUT_SIZE
 #include "warps/dsp/modulator.h"
 
 // Include MI Frames PolyLFO
 #include "frames/poly_lfo.h"
 
 // Include MI Marbles random sequencer
+// Undefine Plaits resource macros that collide with Marbles
+#undef LUT_SINE
+#undef LUT_SINE_SIZE
 #include "marbles/random/t_generator.h"
 #include "marbles/random/x_y_generator.h"
 #include "marbles/random/random_stream.h"
@@ -146,13 +154,13 @@ struct OrpheusEngine {
     std::atomic<int>   warps_bypass{1};         // bypassed by default
 
     // ── Warps Source Routing ────────────────────────────
-    static constexpr int kNumWarpsSources = 9;
-    // 0=SYNTH, 1=DRUMS, 2=REPL, 3=LFO, 4=RESONATOR, 5=WARPS(feedback), 6=FLUX, 7=BENDER, 8=STRINGS
+    static constexpr int kNumWarpsSources = 10;
+    // 0=SYNTH, 1=DRUMS, 2=REPL, 3=LFO, 4=RESONATOR, 5=WARPS(feedback), 6=FLUX, 7=BENDER, 8=STRINGS, 9=BASS
     float warps_source_buffers[kNumWarpsSources][kMaxFrames] = {};
     float warps_feedback_l[kMaxFrames] = {};
     float warps_feedback_r[kMaxFrames] = {};
-    std::atomic<int> warps_carrier_source{0};     // 0-8 WarpsSource enum
-    std::atomic<int> warps_modulator_source{0};   // 0-8 WarpsSource enum
+    std::atomic<int> warps_carrier_source{0};     // 0-9 WarpsSource enum
+    std::atomic<int> warps_modulator_source{0};   // 0-9 WarpsSource enum
 
     // ── Bass Voice (standalone, not in voices_dsp[]) ─────────
     OrpheusVoice bass_voice;
@@ -177,6 +185,18 @@ struct OrpheusEngine {
     std::atomic<float> bass_compressor{0.0f};    // 0..1
     std::atomic<float> bass_mix{0.0f};           // 0..1 (0=bypass)
     std::atomic<float> bass_lfo_mix{0.0f};       // 0..1 LFO mod depth
+
+    // Bass Connect routing (0=off, 1=T1/X1, 2=T2/X2, 3=T3/X3)
+    std::atomic<int>   bass_trigger_source{0};    // which Flux T gates the envelope
+    std::atomic<int>   bass_pitch_source{0};      // which Flux X modulates pitch
+    std::atomic<int>   bass_timbre_source{0};     // 0=off, 1=Y on (boolean, only one Y channel)
+
+    // Bass accent amount (0-1, scales envelope boost + drive boost)
+    std::atomic<float> bass_accent_amount{0.5f};
+
+    // Bass → Grains send level (0-1)
+    std::atomic<float> bass_grains_send{0.0f};
+
     float bass_smooth_mix{0.0f};                 // audio thread only
     std::atomic<int>   bass_bypass{1};           // bypass when mix=0
     std::atomic<int>   bass_root_note{36};       // MIDI note (C2)
@@ -284,6 +304,7 @@ struct OrpheusEngine {
     float marbles_x1_buffer[kMaxFrames] = {};  // X1 CV (post mix+exp)
     float marbles_x2_buffer[kMaxFrames] = {};  // X2 CV (post mix+exp)
     float marbles_x3_buffer[kMaxFrames] = {};  // X3 CV (post mix+exp)
+    float marbles_y_buffer[kMaxFrames] = {};   // Y output (smooth random CV)
 
     // ── Trigger Router: source selection atomics ─────
     // Written from Kotlin UI, read by unit_process_plaits.
@@ -332,6 +353,7 @@ struct OrpheusEngine {
     float smooth_looper_level{0.0f};
     float smooth_looper_feedback{0.0f};
     float smooth_master_volume{0.7f};
+    float master_limiter_env{0.0f};   // peak envelope for master bus limiter
     float smooth_vibrato_depth{0.0f};
     float smooth_coupling_depth{0.0f};
     float smooth_total_feedback{0.0f};

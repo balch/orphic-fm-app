@@ -191,6 +191,9 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
         out_cv1[i] = std::exp2f(v1) - 1.0f;
         out_cv2[i] = std::exp2f(v2) - 1.0f;
         engine->marbles_x3_buffer[i] = std::exp2f(v3) - 1.0f;
+        // Y channel: smooth random CV, clamped to [-1, +1] for modulation use
+        float y_raw = xy_output[i * 4 + 3] * sm;  // scale by mix like X channels
+        engine->marbles_y_buffer[i] = std::fmax(-1.0f, std::fmin(1.0f, y_raw));
     }
 
     // Copy to shared engine buffers for trigger router consumers

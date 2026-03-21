@@ -348,6 +348,7 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     std::memset(engine->warps_source_buffers[0], 0, num_frames * sizeof(float)); // SYNTH
     std::memset(engine->warps_source_buffers[1], 0, num_frames * sizeof(float)); // DRUMS
     std::memset(engine->warps_source_buffers[2], 0, num_frames * sizeof(float)); // REPL
+    std::memset(engine->warps_source_buffers[9], 0, num_frames * sizeof(float)); // BASS
 
     // Smooth warps_mix here (before any voice runs) so warps_dry_scale()
     // reads a consistent value regardless of execution order.

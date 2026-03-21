@@ -10,6 +10,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
+import org.balch.orpheus.features.bass.BassViewModel
 import org.balch.orpheus.features.drum.DrumViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -33,6 +34,7 @@ class TriggerRouterPanelRegistration : FeaturePanel {
         TriggerRouterPanel(
             drumFeature = DrumViewModel.feature(),
             voiceFeature = VoiceViewModel.feature(),
+            bassFeature = BassViewModel.feature(),
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,
@@ -49,6 +51,7 @@ class TriggerRouterPanelRegistration : FeaturePanel {
             TriggerRouterPanel(
                 drumFeature = DrumViewModel.previewFeature(),
                 voiceFeature = VoiceViewModel.previewFeature(),
+                bassFeature = BassViewModel.previewFeature(),
                 modifier = modifier,
                 isExpanded = isExpanded,
                 onExpandedChange = onExpandedChange,

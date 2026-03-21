@@ -32,6 +32,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.triggers.DrumTriggerSource
+import org.balch.orpheus.features.bass.BassFeature
+import org.balch.orpheus.features.bass.BassViewModel
 import org.balch.orpheus.features.drum.DrumFeature
 import org.balch.orpheus.features.drum.DrumViewModel
 import org.balch.orpheus.features.voice.VoiceViewModel
@@ -45,14 +47,17 @@ fun TriggerRouterPanel(
     modifier: Modifier = Modifier,
     drumFeature: DrumFeature = DrumViewModel.feature(),
     voiceFeature: VoicesFeature = VoiceViewModel.feature(),
+    bassFeature: BassFeature = BassViewModel.feature(),
     isExpanded: Boolean,
     onExpandedChange: (Boolean) -> Unit
 ) {
     val drumState by drumFeature.stateFlow.collectAsState()
     val voiceState by voiceFeature.stateFlow.collectAsState()
-    
+    val bassState by bassFeature.stateFlow.collectAsState()
+
     val drumActions = drumFeature.actions
     val voiceActions = voiceFeature.actions
+    val bassActions = bassFeature.actions
 
     // Using OrpheusColors.metallicBlue for a lighter look as requested
     CollapsibleColumnPanel(
@@ -90,10 +95,14 @@ fun TriggerRouterPanel(
 
                 // T Headers (Trigger)
                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    listOf("T1", "T2", "T3").forEach { 
-                        Text(it, style = MaterialTheme.typography.labelSmall, color = OrpheusColors.electricBlue, fontSize = 10.sp) 
+                    listOf("T1", "T2", "T3").forEach {
+                        Text(it, style = MaterialTheme.typography.labelSmall, color = OrpheusColors.electricBlue, fontSize = 10.sp)
                     }
                 }
+
+                // Y Header (Timbre)
+                Spacer(Modifier.width(8.dp))
+                Text("Y", style = MaterialTheme.typography.labelSmall, color = OrpheusColors.synthGreen, fontSize = 10.sp)
             }
 
             // BD
@@ -173,13 +182,36 @@ fun TriggerRouterPanel(
                 isActive = voiceState.voiceStates.drop(8).take(4).any { it.pulse },
                 selectedX = voiceState.quadPitchSources.getOrElse(2) { 0 },
                 selectedT = voiceState.quadTriggerSources.getOrElse(2) { 0 },
-                onXSelect = { idx -> 
+                onXSelect = { idx ->
                     val current = voiceState.quadPitchSources.getOrElse(2) { 0 }
                     voiceActions.setQuadPitchSource(2, if (current == idx) 0 else idx)
                 },
                 onTSelect = { idx ->
                     val current = voiceState.quadTriggerSources.getOrElse(2) { 0 }
                     voiceActions.setQuadTriggerSource(2, if (current == idx) 0 else idx)
+                }
+            )
+
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.1f)))
+
+            // Bass
+            TriggerMatrixRow(
+                label = "Bass",
+                color = OrpheusColors.warmGlow,
+                isActive = bassState.mix > 0.01f,
+                selectedX = bassState.pitchSource,
+                selectedT = bassState.triggerSource,
+                onXSelect = { idx ->
+                    val current = bassState.pitchSource
+                    bassActions.setPitchSource(if (current == idx) 0 else idx)
+                },
+                onTSelect = { idx ->
+                    val current = bassState.triggerSource
+                    bassActions.setTriggerSource(if (current == idx) 0 else idx)
+                },
+                selectedY = bassState.timbreSource,
+                onYSelect = {
+                    bassActions.setTimbreSource(if (bassState.timbreSource > 0) 0 else 1)
                 }
             )
         }
@@ -252,7 +284,9 @@ private fun TriggerMatrixRow(
     selectedX: Int?,
     selectedT: Int,
     onXSelect: ((Int) -> Unit)? = null,
-    onTSelect: (Int) -> Unit
+    onTSelect: (Int) -> Unit,
+    selectedY: Int? = null,
+    onYSelect: (() -> Unit)? = null
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -316,6 +350,19 @@ private fun TriggerMatrixRow(
                 )
             }
         }
+
+        // Y Column (Timbre) - optional
+        if (selectedY != null && onYSelect != null) {
+            Spacer(Modifier.width(8.dp))
+            Connect4Cell(
+                selected = selectedY > 0,
+                activeColor = OrpheusColors.synthGreen,
+                onClick = onYSelect
+            )
+        } else {
+            // Match Y column width: 8.dp spacer + 20.dp Connect4Cell
+            Spacer(Modifier.width(28.dp))
+        }
     }
 }
 
@@ -347,6 +394,7 @@ private fun TriggerRouterPanelPreview() {
         TriggerRouterPanel(
             drumFeature = DrumViewModel.previewFeature(),
             voiceFeature = VoiceViewModel.previewFeature(),
+            bassFeature = BassViewModel.previewFeature(),
             isExpanded = true,
             onExpandedChange = {}
         )

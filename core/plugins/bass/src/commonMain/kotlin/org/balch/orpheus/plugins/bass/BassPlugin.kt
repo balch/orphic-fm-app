@@ -51,6 +51,11 @@ class BassPlugin(
     private var _compressor = 0.0f
     private var _mix = 0.0f
     private var _lfoMix = 0.0f
+    private var _triggerSource: Int = 0
+    private var _pitchSource: Int = 0
+    private var _timbreSource: Int = 0
+    private var _accentAmount: Float = 0.5f
+    private var _grainsSend: Float = 0.0f
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 2) {
@@ -158,6 +163,49 @@ class BassPlugin(
                 default = 0.0f
                 get { _lfoMix }
                 set { _lfoMix = it }
+            }
+        }
+
+        controlPort(BassSymbol.TRIGGER_SOURCE) {
+            intType {
+                default = 0; min = 0; max = 3
+                options = listOf("Off", "T1", "T2", "T3")
+                get { _triggerSource }
+                set { _triggerSource = it }
+            }
+        }
+
+        controlPort(BassSymbol.PITCH_SOURCE) {
+            intType {
+                default = 0; min = 0; max = 3
+                options = listOf("Off", "X1", "X2", "X3")
+                get { _pitchSource }
+                set { _pitchSource = it }
+            }
+        }
+
+        controlPort(BassSymbol.TIMBRE_SOURCE) {
+            intType {
+                default = 0; min = 0; max = 1
+                options = listOf("Off", "Y")
+                get { _timbreSource }
+                set { _timbreSource = it }
+            }
+        }
+
+        controlPort(BassSymbol.ACCENT_AMOUNT) {
+            floatType {
+                default = 0.5f; min = 0.0f; max = 1.0f
+                get { _accentAmount }
+                set { _accentAmount = it }
+            }
+        }
+
+        controlPort(BassSymbol.GRAINS_SEND) {
+            floatType {
+                default = 0.0f; min = 0.0f; max = 1.0f
+                get { _grainsSend }
+                set { _grainsSend = it }
             }
         }
     }

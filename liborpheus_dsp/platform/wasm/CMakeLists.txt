@@ -109,6 +109,9 @@ set(ORPHEUS_SRC
     "${LIB_SRC}/orpheus_unit_warps.cpp"
     "${LIB_SRC}/orpheus_unit_lorenz.cpp"
     "${LIB_SRC}/orpheus_unit_poly_lfo.cpp"
+    "${LIB_SRC}/orpheus_unit_bass.cpp"
+    "${LIB_SRC}/orpheus_unit_overdrive.cpp"
+    "${LIB_SRC}/orpheus_unit_compressor.cpp"
     "${LIB_SRC}/orpheus_patch.cpp"
     "${LIB_SRC}/orpheus_resonator.cpp"
 )

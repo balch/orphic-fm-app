@@ -188,13 +188,19 @@ compose.desktop {
     }
 }
 
+// ── Native C++ DSP builds ───────────────────────────────────────────
+// These tasks compile liborpheus_dsp for each platform target.
+// They run automatically when the corresponding Kotlin target builds.
+
+val eurorackDir = File(System.getProperty("user.home"), "Source/eurorack").absolutePath
+val emsdkDir = File(System.getProperty("user.home"), "emsdk")
+
 // Build native liborpheus_desktop for JVM desktop C++ DSP engine
-tasks.register<Exec>("buildDesktopNative") {
+val buildDesktopNative by tasks.registering(Exec::class) {
     group = "build"
     description = "Build liborpheus_desktop native library for JVM desktop"
 
     val desktopDir = rootProject.file("liborpheus_dsp/desktop")
-    val eurorackDir = File(System.getProperty("user.home"), "Source/eurorack").absolutePath
     val arch = System.getProperty("os.arch").let {
         if (it == "aarch64" || it == "arm64") "aarch64" else "x86_64"
     }
@@ -215,9 +221,28 @@ tasks.register<Exec>("buildDesktopNative") {
     )
 }
 
+// Build WASM DSP module via Emscripten
+val buildWasmNative by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Build orpheus_dsp WASM module via Emscripten"
+
+    val wasmDir = rootProject.file("liborpheus_dsp/platform/wasm")
+    val emcmake = File(emsdkDir, "upstream/emscripten/emcmake")
+
+    // Only run if Emscripten is installed
+    onlyIf { emcmake.exists() }
+
+    workingDir = wasmDir
+    commandLine("bash", "-c",
+        "${emcmake.absolutePath} cmake -B build -DCMAKE_BUILD_TYPE=Release -DEURORACK_DIR=$eurorackDir && " +
+        "cmake --build build --config Release"
+    )
+}
+
 // Copy Emscripten WASM DSP module to app resources for serving alongside the app.
 // The worker script (orpheus-dsp-worker.js) loads orpheus_dsp.js which loads orpheus_dsp.wasm.
 val copyWasmDsp by tasks.registering(Copy::class) {
+    dependsOn(buildWasmNative)
     from("${rootProject.projectDir}/liborpheus_dsp/platform/wasm/build") {
         include("orpheus_dsp.js", "orpheus_dsp.wasm")
     }
@@ -226,6 +251,11 @@ val copyWasmDsp by tasks.registering(Copy::class) {
 
 tasks.named("wasmJsProcessResources") {
     dependsOn(copyWasmDsp)
+}
+
+// Desktop: ensure native library is built before JVM resources are processed
+tasks.matching { it.name == "jvmProcessResources" }.configureEach {
+    dependsOn(buildDesktopNative)
 }
 
 // BuildKonfig configuration for cross-platform BuildConfig

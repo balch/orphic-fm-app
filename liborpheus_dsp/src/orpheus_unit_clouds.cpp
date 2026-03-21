@@ -18,6 +18,16 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         return;
     }
 
+    // Mix bass send into Grains input (bass is mono → both L and R)
+    float bass_send = engine->bass_grains_send.load(std::memory_order_relaxed);
+    if (bass_send > 0.001f) {
+        float* bass = engine->warps_source_buffers[9];  // bass voice output
+        for (int i = 0; i < num_frames; i++) {
+            in_l[i] += bass[i] * bass_send;
+            in_r[i] += bass[i] * bass_send;
+        }
+    }
+
     // Viz: grains input peak
     {
         float peak = 0.0f;

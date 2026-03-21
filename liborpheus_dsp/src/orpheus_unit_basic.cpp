@@ -204,11 +204,20 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
 
-    // Signal chain: pan → volume → peak measurement → soft saturation → output
+    // Signal chain: pan → volume → peak measurement → limiter → output
     float pan_target = engine->master_pan.load(std::memory_order_relaxed);
     float vol_target = engine->master_volume.load(std::memory_order_relaxed);
     float coeff = smooth_coeff(sr);
 
+    // Feed-forward limiter coefficients
+    // Threshold: 0.9 (starts limiting before hard clip)
+    // Attack: ~0.1ms (catches transients)
+    // Release: ~100ms (smooth recovery, avoids pumping)
+    constexpr float kLimiterThreshold = 0.9f;
+    float attack_coeff  = 1.0f - std::exp(-1.0f / (0.0001f * sr));  // ~0.1ms
+    float release_coeff = 1.0f - std::exp(-1.0f / (0.100f * sr));   // ~100ms
+
+    float env = engine->master_limiter_env;
     float pk_l = 0.0f, pk_r = 0.0f;
 
     for (int i = 0; i < n; i++) {
@@ -223,18 +232,45 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
         l *= engine->smooth_master_volume;
         r *= engine->smooth_master_volume;
 
-        // Peak measurement (pre-clip, matching JSyn peakFollower position)
+        // Peak measurement (pre-limiter)
         float al = std::fabs(l);
         float ar = std::fabs(r);
         if (al > pk_l) pk_l = al;
         if (ar > pk_r) pk_r = ar;
 
-        // Soft saturation — prevents digital clipping when multiple sources sum above ±1.0
-        output_buffer[i * 2]     = std::tanh(l);
-        output_buffer[i * 2 + 1] = std::tanh(r);
+        // Feed-forward limiter: track peak, compute gain reduction
+        float peak = std::max(al, ar);
+        float over = peak - kLimiterThreshold;
+
+        // Envelope follower (fast attack, slow release)
+        if (over > env) {
+            env += attack_coeff * (over - env);
+        } else {
+            env += release_coeff * (0.0f - env);
+        }
+
+        // Compute gain: reduce by the amount we're over threshold
+        // Soft knee: blend between unity and limited in the knee region
+        float gain = 1.0f;
+        if (env > 0.0f) {
+            gain = kLimiterThreshold / (kLimiterThreshold + env);
+        }
+
+        l *= gain;
+        r *= gain;
+
+        // Safety net: soft clip anything still above ±1.0
+        // (shouldn't happen often with the limiter, but prevents digital overs)
+        if (l >  1.0f) l =  1.0f; else if (l < -1.0f) l = -1.0f;
+        if (r >  1.0f) r =  1.0f; else if (r < -1.0f) r = -1.0f;
+
+        output_buffer[i * 2]     = l;
+        output_buffer[i * 2 + 1] = r;
     }
 
-    // Store pre-saturation peaks for monitoring
+    engine->master_limiter_env = env;
+
+    // Store pre-limiter peaks for monitoring
     engine->peak_left.store(pk_l, std::memory_order_relaxed);
     engine->peak_right.store(pk_r, std::memory_order_relaxed);
 

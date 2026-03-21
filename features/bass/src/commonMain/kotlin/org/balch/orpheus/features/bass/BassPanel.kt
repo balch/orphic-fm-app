@@ -32,11 +32,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.BassEngine
 import org.balch.orpheus.core.audio.BassScale
 import org.balch.orpheus.core.audio.ClockDivision
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
@@ -93,7 +93,7 @@ fun BassPanel(
     ) {
         // ── Row 1: Source & Sequencer ─────────────────────────────────
         Row(
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // Engine dropdown
@@ -129,10 +129,9 @@ fun BassPanel(
 
         // ── Row 2: Clock & Sequencer Controls ────────────────────────
         Row(
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Clock division dropdown
             EnumDropdown(
                 label = "CLOCK",
                 selectedDisplay = state.clockDivision.displayName,
@@ -140,6 +139,7 @@ fun BassPanel(
                 displayName = { it.displayName },
                 onSelected = actions.setClockDivision,
                 color = bassColors.panelColor,
+                modifier = Modifier.align(Alignment.Top),
             )
 
             // Step count segmented selector
@@ -147,6 +147,31 @@ fun BassPanel(
                 stepCount = state.stepCount,
                 onStepCountChange = actions.setStepCount,
                 color = bassColors.panelColor,
+                modifier = Modifier.align(Alignment.Top),
+            )
+
+            RotaryKnob(
+                value = state.accentAmount,
+                onValueChange = actions.setAccentAmount,
+                label = "ACCENT",
+                size = 30.dp,
+                trackColor = bassColors.knobTrackColor,
+                progressColor = bassColors.knobProgressColor,
+                knobColor = bassColors.knobColor,
+                labelColor = bassColors.labelColor,
+                controlId = "bass_accent_amount",
+            )
+
+            RotaryKnob(
+                value = state.lfoMix,
+                onValueChange = actions.setLfoMix,
+                label = "LFO",
+                size = 30.dp,
+                trackColor = bassColors.knobTrackColor,
+                progressColor = bassColors.knobProgressColor,
+                knobColor = bassColors.knobColor,
+                labelColor = bassColors.labelColor,
+                controlId = "bass_lfo_mix",
             )
 
             // Mutation knob
@@ -154,29 +179,18 @@ fun BassPanel(
                 value = state.mutation,
                 onValueChange = actions.setMutation,
                 label = "MUTATE",
-                size = 40.dp,
+                size = 38.dp,
                 trackColor = bassColors.knobTrackColor,
                 progressColor = bassColors.knobProgressColor,
                 knobColor = bassColors.knobColor,
                 labelColor = bassColors.labelColor,
                 controlId = "bass_mutation",
             )
-            RotaryKnob(
-                value = state.lfoMix,
-                onValueChange = actions.setLfoMix,
-                label = "LFO",
-                size = 38.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_lfo_mix",
-            )
         }
 
         // ── Row 3: Sound + Output ──────────────────────────────────────
         Row(
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             RotaryKnob(
@@ -227,12 +241,23 @@ fun BassPanel(
                 value = state.compressor,
                 onValueChange = actions.setCompressor,
                 label = "COMP",
-                size = 38.dp,
+                size = 30.dp,
                 trackColor = bassColors.knobTrackColor,
                 progressColor = bassColors.knobProgressColor,
                 knobColor = bassColors.knobColor,
                 labelColor = bassColors.labelColor,
                 controlId = "bass_compressor",
+            )
+            RotaryKnob(
+                value = state.grainsSend,
+                onValueChange = actions.setGrainsSend,
+                label = "GRAINS",
+                size = 30.dp,
+                trackColor = bassColors.knobTrackColor,
+                progressColor = bassColors.knobProgressColor,
+                knobColor = bassColors.knobColor,
+                labelColor = bassColors.labelColor,
+                controlId = "bass_grains_send",
             )
             RotaryKnob(
                 value = state.mix,
