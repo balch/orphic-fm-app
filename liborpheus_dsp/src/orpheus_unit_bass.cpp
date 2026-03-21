@@ -333,6 +333,29 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
         render_gate = 0;
     }
 
+    // ── LFO modulation ──
+    // Bass repurposes the global LFO buffers for its own parameter mapping:
+    //   lfo_output_buffer    → cutoff (timbre)
+    //   lfo_morph_buffer     → resonance (harmonics)
+    //   lfo_pitch_buffer     → pitch
+    //   lfo_harmonics_buffer → envelope (reduced depth to avoid clicks)
+    float lfo_depth = engine->bass_lfo_mix.load(std::memory_order_relaxed);
+    float mod_timbre = 0.0f, mod_harmonics = 0.0f, mod_pitch = 0.0f, mod_envelope = 0.0f;
+    if (lfo_depth > 0.001f) {
+        // Sample LFO at block midpoint (block-rate modulation, matching Plaits pattern)
+        int mid = num_frames / 2;
+        mod_timbre    = engine->lfo_output_buffer[mid]     * lfo_depth * 0.5f;
+        mod_harmonics = engine->lfo_morph_buffer[mid]      * lfo_depth * 0.5f;
+        mod_pitch     = engine->lfo_pitch_buffer[mid]      * lfo_depth * 0.5f;  // ±0.5 semitone
+        mod_envelope  = engine->lfo_harmonics_buffer[mid]  * lfo_depth * 0.3f;  // reduced to avoid envelope pop
+    }
+
+    // Apply pitch modulation
+    note += mod_pitch;
+
+    // Apply envelope modulation
+    float modulated_envelope = std::max(0.0f, std::min(1.0f, envelope_param + mod_envelope));
+
     // ── Render voice ──
     // Force retrigger on new step: reset both OrpheusVoice's Schmitt trigger
     // AND the envelope's gate state so both see a fresh rising edge.
@@ -342,13 +365,19 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
         seq.env_gate_prev = false;  // force envelope retrigger too
     }
 
+    // Apply cutoff/resonance modulation to voice params
+    float timbre_val = std::max(0.0f, std::min(1.0f,
+        bp.timbre.load(std::memory_order_relaxed) + mod_timbre));
+    float harmonics_val = std::max(0.0f, std::min(1.0f,
+        bp.harmonics.load(std::memory_order_relaxed) + mod_harmonics));
+
     float raw_out[kMaxFrames];
     engine->bass_voice.Render(
         plaits_engine_index,
         render_gate,
         note,
-        bp.harmonics.load(std::memory_order_relaxed),
-        bp.timbre.load(std::memory_order_relaxed),
+        harmonics_val,
+        timbre_val,
         bp.morph.load(std::memory_order_relaxed),
         bp.accent.load(std::memory_order_relaxed),
         raw_out,
@@ -370,7 +399,7 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
 
         if (use_external_envelope) {
             bool gate_for_env = (render_gate != 0);
-            float env = process_envelope(seq, gate_for_env, envelope_param, step_accent, sample_rate);
+            float env = process_envelope(seq, gate_for_env, modulated_envelope, step_accent, sample_rate);
             sample *= env;
         }
 

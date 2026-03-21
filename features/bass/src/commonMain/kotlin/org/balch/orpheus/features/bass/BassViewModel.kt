@@ -42,9 +42,10 @@ data class BassPanelActions(
     val setOverdrive: (Float) -> Unit,
     val setCompressor: (Float) -> Unit,
     val setMix: (Float) -> Unit,
+    val setLfoMix: (Float) -> Unit,
 ) {
     companion object {
-        val EMPTY = BassPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = BassPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -62,6 +63,7 @@ private sealed interface BassIntent {
     data class SetOverdrive(val value: Float) : BassIntent
     data class SetCompressor(val value: Float) : BassIntent
     data class SetMix(val value: Float) : BassIntent
+    data class SetLfoMix(val value: Float) : BassIntent
 }
 
 interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
@@ -99,6 +101,7 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
         - **DRIVE** (bass_overdrive): Overdrive saturation 0-1. 0=clean passthrough, 0.3-0.5=warm, 0.7+=heavy distortion.
         - **COMP** (bass_compressor): Compressor amount 0-1. Auto-threshold, adds body and sustain. 0=off, 0.5=punchy, 1=squashed.
         - **MIX** (bass_mix): Output level 0-1. 0=fully bypassed (zero CPU), controls bass volume in the master mix.
+        - **LFO MIX** (bass_lfo_mix): LFO modulation depth 0-1. Scales how much the active LFO source modulates bass parameters. ch0→cutoff, ch1→resonance, ch2→pitch (±0.5 semitone), ch3→envelope.
 
         ## Tips for AI
         - Start beats FIRST (beats_run=1), then set bass_mix to 0.5-0.8 to bring in the bassline.
@@ -123,6 +126,7 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
                 BassSymbol.OVERDRIVE.controlId.key to "Overdrive saturation (0=clean, 1=heavy distortion)",
                 BassSymbol.COMPRESSOR.controlId.key to "Compressor amount (0=off, 1=squashed)",
                 BassSymbol.MIX.controlId.key to "Output level / on-off (0=bypassed, 1=full volume)",
+                BassSymbol.LFO_MIX.controlId.key to "LFO modulation depth (0=none, 1=full — modulates cutoff, resonance, pitch, envelope)",
             )
         }
     }
@@ -155,6 +159,7 @@ class BassViewModel(
     private val overdriveId = synthController.controlFlow(BassSymbol.OVERDRIVE.controlId)
     private val compressorId = synthController.controlFlow(BassSymbol.COMPRESSOR.controlId)
     private val mixId = synthController.controlFlow(BassSymbol.MIX.controlId)
+    private val lfoMixId = synthController.controlFlow(BassSymbol.LFO_MIX.controlId)
 
     override val actions = BassPanelActions(
         setEngine = engineId.enumSetter(),
@@ -169,6 +174,7 @@ class BassViewModel(
         setOverdrive = overdriveId.floatSetter(),
         setCompressor = compressorId.floatSetter(),
         setMix = mixId.floatSetter(),
+        setLfoMix = lfoMixId.floatSetter(),
     )
 
     // Control changes -> BassIntent
@@ -197,6 +203,7 @@ class BassViewModel(
         overdriveId.map { BassIntent.SetOverdrive(it.asFloat()) },
         compressorId.map { BassIntent.SetCompressor(it.asFloat()) },
         mixId.map { BassIntent.SetMix(it.asFloat()) },
+        lfoMixId.map { BassIntent.SetLfoMix(it.asFloat()) },
     )
 
     override val stateFlow: StateFlow<BassUiState> =
@@ -229,6 +236,7 @@ class BassViewModel(
             is BassIntent.SetOverdrive -> state.copy(overdrive = intent.value)
             is BassIntent.SetCompressor -> state.copy(compressor = intent.value)
             is BassIntent.SetMix -> state.copy(mix = intent.value)
+            is BassIntent.SetLfoMix -> state.copy(lfoMix = intent.value)
         }
 
     companion object {

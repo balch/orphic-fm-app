@@ -161,6 +161,17 @@ fun BassPanel(
                 labelColor = bassColors.labelColor,
                 controlId = "bass_mutation",
             )
+            RotaryKnob(
+                value = state.lfoMix,
+                onValueChange = actions.setLfoMix,
+                label = "LFO",
+                size = 38.dp,
+                trackColor = bassColors.knobTrackColor,
+                progressColor = bassColors.knobProgressColor,
+                knobColor = bassColors.knobColor,
+                labelColor = bassColors.labelColor,
+                controlId = "bass_lfo_mix",
+            )
         }
 
         // ── Row 3: Sound + Output ──────────────────────────────────────
@@ -412,6 +423,7 @@ fun BassPanelActivePreview() {
                     overdrive = 0.2f,
                     compressor = 0.5f,
                     mix = 0.9f,
+                    lfoMix = 0.35f,
                 )
             ),
             isExpanded = true,

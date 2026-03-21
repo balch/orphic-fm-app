@@ -19,4 +19,5 @@ data class BassUiState(
     val overdrive: Float = 0.0f,
     val compressor: Float = 0.0f,
     val mix: Float = 0.0f,
+    val lfoMix: Float = 0.0f,
 )

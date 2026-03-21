@@ -438,6 +438,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "mix") == 0) {
             engine->bass_mix.store(value, std::memory_order_relaxed);
         }
+        else if (std::strcmp(symbol, "lfo_mix") == 0)
+            engine->bass_lfo_mix.store(value, std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.stereo") == 0) {
         if (std::strcmp(symbol, "master_pan") == 0)

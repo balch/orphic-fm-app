@@ -50,6 +50,7 @@ class BassPlugin(
     private var _overdrive = 0.0f
     private var _compressor = 0.0f
     private var _mix = 0.0f
+    private var _lfoMix = 0.0f
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 2) {
@@ -149,6 +150,14 @@ class BassPlugin(
                 default = 0.0f
                 get { _mix }
                 set { _mix = it }
+            }
+        }
+
+        controlPort(BassSymbol.LFO_MIX) {
+            floatType {
+                default = 0.0f
+                get { _lfoMix }
+                set { _lfoMix = it }
             }
         }
     }

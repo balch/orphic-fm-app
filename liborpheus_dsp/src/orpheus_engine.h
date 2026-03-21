@@ -176,6 +176,7 @@ struct OrpheusEngine {
     std::atomic<float> bass_overdrive{0.0f};     // 0..1
     std::atomic<float> bass_compressor{0.0f};    // 0..1
     std::atomic<float> bass_mix{0.0f};           // 0..1 (0=bypass)
+    std::atomic<float> bass_lfo_mix{0.0f};       // 0..1 LFO mod depth
     float bass_smooth_mix{0.0f};                 // audio thread only
     std::atomic<int>   bass_bypass{1};           // bypass when mix=0
     std::atomic<int>   bass_root_note{36};       // MIDI note (C2)

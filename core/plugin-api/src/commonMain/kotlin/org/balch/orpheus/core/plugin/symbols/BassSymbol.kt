@@ -22,4 +22,5 @@ enum class BassSymbol(
     OVERDRIVE("overdrive", displayName = "Overdrive"),
     COMPRESSOR("compressor", displayName = "Compressor"),
     MIX("mix", displayName = "Mix"),
+    LFO_MIX("lfo_mix", displayName = "LFO Mix"),
 }
