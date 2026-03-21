@@ -32,6 +32,8 @@
 // Include MI Streams Lorenz generator
 #include "streams/lorenz_generator.h"
 
+#include "orpheus_unit_bass.h"
+
 #include <atomic>
 #include <cstring>
 
@@ -151,6 +153,51 @@ struct OrpheusEngine {
     float warps_feedback_r[kMaxFrames] = {};
     std::atomic<int> warps_carrier_source{0};     // 0-8 WarpsSource enum
     std::atomic<int> warps_modulator_source{0};   // 0-8 WarpsSource enum
+
+    // ── Bass Voice (standalone, not in voices_dsp[]) ─────────
+    OrpheusVoice bass_voice;
+    uint8_t bass_voice_alloc_buffer[kVoiceAllocBytes];
+
+    struct BassVoiceParams {
+        std::atomic<float> tune{36.0f};       // MIDI note (C2 default)
+        std::atomic<int> gate{0};
+        std::atomic<float> harmonics{0.0f};   // resonance
+        std::atomic<float> timbre{0.5f};      // cutoff
+        std::atomic<float> morph{0.5f};
+        std::atomic<float> accent{0.8f};
+        std::atomic<int> engine_index{0};     // 0=VCF, 1=PD, 10=FM, 21=BassDrum
+    };
+    // Note: no prev_gate needed — OrpheusVoice::Render() handles trigger edge detection internally
+    BassVoiceParams bass_params;
+
+    // Bass sequencer atomics (written from UI, read from audio thread)
+    std::atomic<float> bass_mutation{0.0f};      // 0..1
+    std::atomic<float> bass_envelope{0.7f};      // 0..1 (snap/decay shape)
+    std::atomic<float> bass_overdrive{0.0f};     // 0..1
+    std::atomic<float> bass_compressor{0.0f};    // 0..1
+    std::atomic<float> bass_mix{0.0f};           // 0..1 (0=bypass)
+    float bass_smooth_mix{0.0f};                 // audio thread only
+    std::atomic<int>   bass_bypass{1};           // bypass when mix=0
+    std::atomic<int>   bass_root_note{36};       // MIDI note (C2)
+    std::atomic<int>   bass_scale{1};            // 0=chrom, 1=min_pent, 2=minor, 3=major, 4=dorian, 5=whole
+    std::atomic<int>   bass_step_count{16};      // 4, 8, 12, or 16
+    std::atomic<int>   bass_clock_div{2};        // 0=1/4, 1=1/2, 2=1x, 3=2x, 4=4x
+    std::atomic<int>   bass_engine{0};           // BassEngine enum
+
+    // Bass keyboard override (set from MIDI/keyboard, cleared on release)
+    std::atomic<int>   bass_key_override{0};     // 0=off, 1=active
+    std::atomic<float> bass_key_pitch{36.0f};    // override pitch (MIDI note)
+
+    // Bass step sequencer state (audio thread only — too large for UnitState union)
+    BassSequencerState bass_seq_state;
+
+    // Bass accent state for overdrive boost (audio thread only)
+    float bass_accent_drive_boost{0.0f};  // +0.3 when accent active, 0 otherwise
+
+    // Bass output buffer (written by bass voice unit, read by overdrive)
+    float bass_output_buffer[kMaxFrames] = {};
+    // Bass voice level monitor
+    std::atomic<float> bass_voice_level{0.0f};
 
     // ── Per-voice Engine 0 (OSC mode) state ─────────
     // Used when engine_index == -1 (OSC mode): triangle+square with ADSR + hold

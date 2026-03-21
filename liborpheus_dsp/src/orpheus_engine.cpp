@@ -16,6 +16,13 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
         engine->voices_dsp[i].Init(&allocator);
     }
 
+    // Initialize bass voice
+    {
+        stmlib::BufferAllocator bass_allocator(engine->bass_voice_alloc_buffer, kVoiceAllocBytes);
+        engine->bass_voice.Init(&bass_allocator);
+    }
+    engine->bass_seq_state.initialized = false;
+
     // Initialize Clouds granular processor
     engine->clouds_processor.Init(
         engine->clouds_large_buffer, sizeof(engine->clouds_large_buffer),

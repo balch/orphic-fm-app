@@ -80,6 +80,10 @@ class SynthEngineMonitor(
     val lfoCh2VizFlow: StateFlow<FloatArray> = _lfoCh2VizFlow.asStateFlow()
     private val _lfoCh3VizFlow = MutableStateFlow(FloatArray(0))
     val lfoCh3VizFlow: StateFlow<FloatArray> = _lfoCh3VizFlow.asStateFlow()
+    private val _bassOutVizFlow = MutableStateFlow(FloatArray(0))
+    val bassOutVizFlow: StateFlow<FloatArray> = _bassOutVizFlow.asStateFlow()
+    private val _masterOutVizFlow = MutableStateFlow(FloatArray(0))
+    val masterOutVizFlow: StateFlow<FloatArray> = _masterOutVizFlow.asStateFlow()
 
     // Monitoring
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -174,6 +178,8 @@ class SynthEngineMonitor(
                     pollVizChannel(VIZ_LFO_CH1, readPositions, vizBuf, _lfoCh1VizFlow)
                     pollVizChannel(VIZ_LFO_CH2, readPositions, vizBuf, _lfoCh2VizFlow)
                     pollVizChannel(VIZ_LFO_CH3, readPositions, vizBuf, _lfoCh3VizFlow)
+                    pollVizChannel(VIZ_BASS_OUT, readPositions, vizBuf, _bassOutVizFlow)
+                    pollVizChannel(VIZ_MASTER_OUT, readPositions, vizBuf, _masterOutVizFlow)
                     delay(VIZ_POLL_INTERVAL_MS)
                 }
             }
@@ -186,7 +192,8 @@ class SynthEngineMonitor(
                    _reverbInVizFlow, _reverbOutVizFlow, _fluxCvVizFlow,
                    _resoInVizFlow, _resoOutVizFlow,
                    _drumOutVizFlow, _grainsInVizFlow, _grainsOutVizFlow,
-                   _lfoCh1VizFlow, _lfoCh2VizFlow, _lfoCh3VizFlow).forEach { it.value = FloatArray(0) }
+                   _lfoCh1VizFlow, _lfoCh2VizFlow, _lfoCh3VizFlow,
+                   _bassOutVizFlow, _masterOutVizFlow).forEach { it.value = FloatArray(0) }
         }
     }
 
@@ -221,6 +228,8 @@ class SynthEngineMonitor(
         private const val VIZ_LFO_CH1 = 15
         private const val VIZ_LFO_CH2 = 16
         private const val VIZ_LFO_CH3 = 17
-        private const val VIZ_CHANNEL_COUNT = 18
+        private const val VIZ_BASS_OUT = 18
+        private const val VIZ_MASTER_OUT = 19
+        private const val VIZ_CHANNEL_COUNT = 20
     }
 }

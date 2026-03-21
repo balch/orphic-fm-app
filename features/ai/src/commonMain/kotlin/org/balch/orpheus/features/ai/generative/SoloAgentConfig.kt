@@ -243,6 +243,45 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - Increase beats_randomness during chaotic/breakdown sections
         - Set beats_swing to 0.4-0.5 for funky, human feel
         
+        ### BASS (Generative Bassline Sequencer)
+        Independent monophonic bass voice with built-in step sequencer, synced to master clock.
+        Starts with a driving pattern (all gates ON, root on downbeats). Feeds delay + reverb.
+
+        **BASS CONTROLS (use synth_control tool):**
+        - bass_engine: Synthesis engine (integer: 0=VCF Acid, 1=Phase Dist, 2=FM, 3=Bass Drum)
+        - bass_root_note: Root note (integer MIDI: 24=C1 to 47=B2, default 36=C2). MATCH TO YOUR KEY!
+        - bass_scale: Scale quantization (integer: 0=Chromatic, 1=Minor Pent, 2=Minor, 3=Major, 4=Dorian, 5=Whole Tone)
+        - bass_clock_div: Clock division (integer: 0=1/4, 1=1/2, 2=1x(16ths), 3=2x, 4=4x)
+        - bass_step_count: Steps (integer: 4, 8, 12, or 16)
+        - bass_mutation: Pattern evolution (0=locked, 0.3=subtle drift, 0.7=chaotic, 1=full random)
+        - bass_cutoff: Filter brightness (0=dark, 0.5=balanced, 1=bright)
+        - bass_resonance: Filter squelch (0=clean, 0.5=biting, 1=screaming)
+        - bass_envelope: Punch (0=slow/pad-like, 0.7=punchy, 1=snappy percussive)
+        - bass_overdrive: Saturation (0=clean, 0.3=warm, 0.7+=heavy)
+        - bass_compressor: Dynamics (0=off, 0.5=punchy, 1=squashed)
+        - bass_mix: Volume/on-off (0=silent, 0.5=present, 0.8=dominant)
+
+        **HOW TO USE BASS:**
+        1. Set bass_root_note to match your key (e.g., 36=C2, 33=A1)
+        2. Set bass_mix to 0.5-0.8 to bring it in
+        3. The sequencer auto-starts with the clock — no separate run command needed
+        4. Use bass_mutation to evolve the pattern over time (ramp 0→0.3 gradually)
+
+        **BASS RECIPES:**
+        - Acid: engine=0, cutoff=0.3→0.8 (sweep!), resonance=0.7, envelope=0.8, drive=0.3
+        - EDM Punch: engine=0, envelope=0.9, compressor=0.5, drive=0.2, clock_div=2(16ths)
+        - Sub Bass: engine=2(FM), cutoff=0.2, resonance=0.1, envelope=0.3, drive=0
+        - Dubstep Wobble: engine=0, cutoff swept by LFO (use bass_cutoff ramp), resonance=0.6
+        - Generative Ambient: engine=2, mutation=0.6, scale=1, envelope=0.2, clock_div=0(quarter)
+
+        **WHEN TO USE BASS:**
+        ✓ Use for driving, rhythmic pieces — bass adds energy and movement
+        ✓ Great paired with beats (start beats first, then bring in bass)
+        ✓ Match root note to your voice tuning key
+        ✓ Bass feeds delay/reverb — use delay for rhythmic echo, reverb for depth
+        ✗ Don't use for pure ambient drone pieces (it's rhythmic by nature)
+        ✗ Don't set bass_mix AND voice_quad_volume both high — balance levels!
+
         ### MATRIX (Meta-Modulator) - EXPERIMENTAL SOUND DESIGN
         Cross-modulates carrier and modulator signals using 8 algorithms. Perfect for creating WEIRD, experimental patterns!
 

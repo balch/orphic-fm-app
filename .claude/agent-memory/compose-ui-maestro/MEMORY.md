@@ -34,6 +34,15 @@ CollapsibleColumnPanel(...) {
 - `OrpheusColors.synthGreen` - MediaPipe gesture panel
 - `OrpheusColors.echoLavender` - Reverb panel
 - `OrpheusColors.vizGreen` - VizPanel
+- `OrpheusColors.bassAmber` - Bass Voice panel (`bassDarkAmber` for knob track, `bassKnobCap` for knob cap)
+- `OrpheusColors.warpsGreen` - Warps cross-modulator panel
+
+## Panel Registration Pattern
+Every panel needs a `*PanelRegistration` class with `@Inject @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())`.
+- The registration class provides `panelId`, `description`, `weight`, `label`, `color`, and a `Content` composable.
+- Canonical reference: `features/warps/.../WarpsPanelRegistration.kt`
+- New panels: create `*PanelRegistration.kt` in the same package as the panel composable.
+- `FactoryPanelSets.kt` only needs `PanelId.BASS` entries (already there) — the DI set handles rendering.
 
 ## Gesture Pad Overlay Design (Piano Key Aesthetic)
 

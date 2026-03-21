@@ -1,6 +1,7 @@
 #include "orpheus_units.h"
 #include "orpheus_units_common.h"
 #include "orpheus_engine.h"
+#include "orpheus_viz.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -236,6 +237,10 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
     // Store pre-saturation peaks for monitoring
     engine->peak_left.store(pk_l, std::memory_order_relaxed);
     engine->peak_right.store(pk_r, std::memory_order_relaxed);
+
+    // Write master output visualization (mono peak of L+R)
+    float master_viz = std::max(pk_l, pk_r);
+    engine->viz_rings[VIZ_MASTER_OUT].write(master_viz);
 }
 
 // -- Unit initialization from descriptor params --

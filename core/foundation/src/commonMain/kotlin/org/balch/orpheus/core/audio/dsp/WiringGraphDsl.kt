@@ -31,6 +31,9 @@ const val UNIT_PER_STRING_BENDER = 25
 const val UNIT_DUO_VOICE = 26
 const val UNIT_LORENZ = 27
 const val UNIT_POLY_LFO = 28
+const val UNIT_BASS_VOICE = 29
+const val UNIT_OVERDRIVE = 30
+const val UNIT_COMPRESSOR = 31
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -316,6 +319,15 @@ class WiringGraphBuilder {
 
     fun polyLfo(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_POLY_LFO, name, init)
+
+    fun bassVoice(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_BASS_VOICE, name, init)
+
+    fun overdrive(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_OVERDRIVE, name, init)
+
+    fun compressor(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_COMPRESSOR, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

@@ -35,6 +35,11 @@ class *ViewModel` — takes `SynthController`, `DispatcherProvider`, `FeatureCor
 - JVM compile check: `./gradlew compileKotlinJvm`
 - WASM production build: `./gradlew :apps:composeApp:wasmJsBrowserDistribution`
 - WASM dev server: `./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun` (serves on localhost:8080)
+- C++ tests: `cmake -S liborpheus_dsp -B liborpheus_dsp/build-desktop -DEURORACK_DIR=/Users/balch/Source/eurorack -DBUILD_TESTS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && cmake --build liborpheus_dsp/build-desktop --target orpheus_dsp_test && liborpheus_dsp/build-desktop/orpheus_dsp_test`
+
+## C++ Clang Diagnostics
+
+IDE clang errors in `liborpheus_dsp/` (e.g. "orpheus_dsp.h not found", "undeclared identifier stmlib") are **false positives** from the editor's built-in clang not having CMake include paths. The actual cmake build always succeeds. To fix these diagnostics, ensure `compile_commands.json` exists at the project root (symlinked from the cmake build directory). The `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` flag in the C++ test command above generates it automatically. **Do not treat these IDE diagnostics as build failures.**
 
 ## WASM Deploy & Dev
 

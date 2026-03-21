@@ -412,6 +412,33 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "bypass") == 0)
             engine->grids_bypass.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.bass") == 0) {
+        if (std::strcmp(symbol, "engine") == 0)
+            engine->bass_engine.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "root_note") == 0)
+            engine->bass_root_note.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "scale") == 0)
+            engine->bass_scale.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "clock_div") == 0)
+            engine->bass_clock_div.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "step_count") == 0)
+            engine->bass_step_count.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mutation") == 0)
+            engine->bass_mutation.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "cutoff") == 0)
+            engine->bass_params.timbre.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "resonance") == 0)
+            engine->bass_params.harmonics.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "envelope") == 0)
+            engine->bass_envelope.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "overdrive") == 0)
+            engine->bass_overdrive.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "compressor") == 0)
+            engine->bass_compressor.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mix") == 0) {
+            engine->bass_mix.store(value, std::memory_order_relaxed);
+        }
+    }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.stereo") == 0) {
         if (std::strcmp(symbol, "master_pan") == 0)
             engine->master_pan.store(value, std::memory_order_relaxed);

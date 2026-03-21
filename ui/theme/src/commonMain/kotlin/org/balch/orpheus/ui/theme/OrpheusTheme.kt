@@ -249,6 +249,11 @@ object OrpheusColors {
     val looperCoal = Color(0xFF3D2B1F)           // Dark coal brown for backgrounds
     val looperAsh = Color(0xFF4A3728)            // Ash brown surface
     
+    // Bass Voice Palette — warm amber, earthy, distinct from warps/echo
+    val bassAmber = Color(0xFFFFAB40)            // Primary bass amber
+    val bassDarkAmber = Color(0xFF4A3010)        // Dark amber shadow for knob tracks
+    val bassKnobCap = Color(0xFFFFCC70)          // Lighter amber cap highlight
+
     // Warps Meta-Modulator Palette
     val warpsGreen = Color(0xFF90EE90)           // Primary Warps Green
     val warpsYellow = Color(0xFFFFFF00)          // Bright Yellow for accents

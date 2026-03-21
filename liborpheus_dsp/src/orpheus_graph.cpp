@@ -300,7 +300,8 @@ void orpheus_graph_dump_exec_order(OrpheusGraph* graph) {
         "LIMITER", "DELAY_LINE", "CLOUDS", "RINGS", "WARPS",
         "DUAL_DELAY", "REVERB", "LFO", "MASTER_OUT", "PLAITS",
         "CLOCK", "GRIDS", "MARBLES", "LOOPER", "BENDER",
-        "PER_STR_BEND", "DUO_VOICE", "LORENZ", "POLY_LFO"
+        "PER_STR_BEND", "DUO_VOICE", "LORENZ", "POLY_LFO",
+        "BASS_VOICE", "OVERDRIVE", "COMPRESSOR"
     };
     static_assert(sizeof(type_names) / sizeof(type_names[0]) == UNIT_TYPE_COUNT,
                   "type_names[] out of sync with UnitType enum");
@@ -432,6 +433,12 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_lorenz(u, engine, num_frames, sr); break;
             case UNIT_POLY_LFO:
                 unit_process_poly_lfo(u, engine, num_frames, sr); break;
+            case UNIT_BASS_VOICE:
+                unit_process_bass_voice(u, engine, num_frames, sr); break;
+            case UNIT_OVERDRIVE:
+                unit_process_overdrive(u, engine, num_frames, sr); break;
+            case UNIT_COMPRESSOR:
+                unit_process_compressor(u, engine, num_frames, sr); break;
             default: break;
         }
     }

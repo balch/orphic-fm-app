@@ -36,6 +36,9 @@ void unit_process_per_string_bender(GraphUnit* u, OrpheusEngine* engine, int num
 void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_lorenz(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_poly_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+void unit_process_overdrive(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+void unit_process_compressor(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 
 // Initialize unit state from descriptor params
 void unit_init(GraphUnit* u, float sample_rate);

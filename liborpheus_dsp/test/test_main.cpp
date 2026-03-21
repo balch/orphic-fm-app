@@ -21,6 +21,7 @@ int main() {
     all_pass &= run_viz_tests();
     run_chain_compare_tests(); // comparison WAVs (no pass/fail, just output)
     run_fm_compare_tests();    // FM comparison WAVs
+    all_pass &= run_bass_voice_tests();
     all_pass &= run_benchmark_tests(); // always last — timing
 
     if (!all_pass) {

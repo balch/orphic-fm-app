@@ -40,5 +40,7 @@ enum VizChannel {
     VIZ_LFO_CH1 = 15,
     VIZ_LFO_CH2 = 16,
     VIZ_LFO_CH3 = 17,
+    VIZ_BASS_OUT = 18,
+    VIZ_MASTER_OUT = 19,
     VIZ_CHANNEL_COUNT
 };

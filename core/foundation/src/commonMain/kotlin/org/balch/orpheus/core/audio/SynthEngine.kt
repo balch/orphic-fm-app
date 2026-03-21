@@ -174,6 +174,8 @@ interface SynthEngine {
     val lfoCh1VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val lfoCh2VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val lfoCh3VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val bassOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val masterOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
     fun setVizEnabled(enabled: Boolean) {}

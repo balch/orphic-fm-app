@@ -51,6 +51,24 @@ Dynamics processor. Key DSP mode: LorenzGenerator — Lorenz chaotic attractor i
 5. **Stages** — COMPLEX: hardware-specific design, less standalone utility
 6. **Kinks** — NOT PORTABLE (analog-only hardware)
 
+## Orpheus C++ Engine Architecture (2026-03-19)
+- ALL audio is C++ only. No Kotlin DSP units active.
+- 24 Plaits engines in `orpheus_voice.h` via `kOrpheusOutGain[24]`. Indices 0–7=engine2/ (v1.2), 8–23=engine/ (v1.1).
+- Index map: 0=VirtualAnalogVCF, 1=PD, 2-4=SixOpFM, 5=WaveTerrain, 6=StringMachine, 7=Chiptune, 8=VirtualAnalog, 9=Waveshaping, 10=FM, 11=Grain, 12=Additive, 13=Wavetable, 14=Chord, 15=Speech, 16=Swarm, 17=Noise, 18=Particle, 19=String, 20=Modal, 21=BassDrum, 22=SnareDrum, 23=HiHat
+- Other C++ units: Warps, Marbles, Grids, Rings, Clouds, Delay, Reverb, LFO, Lorenz, PolyLFO
+- Warps algorithms (0–7): 0=xfade, 1=fold, 2=analog_ring_mod, 3=digital_ring_mod, 4=XOR, 5=comparator, 6=NOP
+
+## Bass-Relevant Engines (already in C++)
+- **Engine 0 (VCF)**: Saw/square + sub + dual SVF LP. Best acid bass. Harmonics=resonance, Timbre=cutoff, Morph=waveshape. outGain=0.55f
+- **Engine 1 (PD)**: CZ-style phase distortion. Punchy harmonics. outGain=0.38f
+- **Engine 10 (FM)**: 2-op FM. Plucky/gritty. outGain=0.45f
+- **Engine 21 (BassDrum)**: 808+909 kick with overdrive. already_enveloped=true. outGain=1.0f
+
+## Modules NOT Yet Ported (bass-relevant)
+- **Peaks MultistageEnvelope** — AD/ADSR with 3 shapes (linear/exp/quartic). Simple, fast to port.
+- **Streams Compressor** — log-domain compressor: attack/decay/threshold/ratio/soft knee (~150 LOC C++, fixed-point).
+- **Tides2 PolySlopeGenerator** — float AD/AR/looping, 4 outputs, 9 shapes. Moderate complexity.
+
 ## Key MI Modules in Eurorack Folder
 - **Plaits** - Macro oscillator (24 engines total)
 - **Rings** - Modal/string/FM resonator
@@ -80,3 +98,12 @@ Dynamics processor. Key DSP mode: LorenzGenerator — Lorenz chaotic attractor i
 - Engine parameters: note, timbre, morph, harmonics, accent, trigger
 - Audio-rate modulation: timbreInput/morphInput with depth controls
 - Dual audio paths: MUST test both direct and effect/bus routing
+
+## Bass Sequencer Clock Sync Pattern (2026-03-20)
+- `seq.tick_counter` is a sample sub-counter (repurposed from tick-based to sample-based).
+- Formula: `samples_per_step = round(sample_rate * 60 * ticks_per_step / (bpm * 24))`.
+- At 24 PPQN: kTicksPerStep = {24, 12, 6, 3, 1} for clock_div 0-4 (quarter→64th notes).
+- Clock advance loop: subtract `until_next = samples_per_step - tick_counter` each iteration, call `advance_step()` when the boundary fires, continue consuming remaining samples.
+- This matches master clock timing without reading clock_phase (which belongs to unit_process_clock).
+- On cycle wrap, apply mutation to ALL steps (not just the new step).
+- Gate logic: pass render_gate=1 only when new_step_fired && step_gate, OR sustaining same gated step. Pass 0 when clock stopped or step has no gate.

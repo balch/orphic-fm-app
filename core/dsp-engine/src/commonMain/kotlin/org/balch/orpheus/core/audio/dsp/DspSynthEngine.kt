@@ -94,6 +94,8 @@ class DspSynthEngine(
     override val lfoCh1VizFlow: StateFlow<FloatArray> get() = monitor.lfoCh1VizFlow
     override val lfoCh2VizFlow: StateFlow<FloatArray> get() = monitor.lfoCh2VizFlow
     override val lfoCh3VizFlow: StateFlow<FloatArray> get() = monitor.lfoCh3VizFlow
+    override val bassOutVizFlow: StateFlow<FloatArray> get() = monitor.bassOutVizFlow
+    override val masterOutVizFlow: StateFlow<FloatArray> get() = monitor.masterOutVizFlow
 
     init {
         voiceManager.initialize()

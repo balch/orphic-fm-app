@@ -20,11 +20,14 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.StereoSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VerticalToggle
 import kotlin.math.roundToInt
@@ -35,6 +38,7 @@ import kotlin.math.roundToInt
 @Composable
 fun DistortionPanel(
     feature: DistortionFeature = DistortionViewModel.feature(),
+    outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -42,6 +46,7 @@ fun DistortionPanel(
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
+    val outViz by outVizFlow.collectAsState()
 
     CollapsibleColumnPanel(
         title = "VOL",
@@ -51,7 +56,10 @@ fun DistortionPanel(
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
         modifier = modifier,
-        showCollapsedHeader = showCollapsedHeader
+        showCollapsedHeader = showCollapsedHeader,
+        backgroundContent = {
+            SignalTrace(data = outViz, color = OrpheusColors.neonMagenta.copy(alpha = 0.3f))
+        },
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(24.dp),

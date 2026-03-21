@@ -94,6 +94,8 @@ class SignalMonitorViz(
         Channel("DRUM", OrpheusColors.ninersRed),
         Channel("GRN-IN", OrpheusColors.grainsRed.copy(alpha = 0.5f)),
         Channel("GRN-OUT", OrpheusColors.grainsRed),
+        Channel("BASS", OrpheusColors.bassAmber),
+        Channel("MASTER", OrpheusColors.neonMagenta),
     )
 
     @Composable
@@ -113,13 +115,17 @@ class SignalMonitorViz(
         val drumOutData by engine.drumOutVizFlow.collectAsState()
         val grainsInData by engine.grainsInVizFlow.collectAsState()
         val grainsOutData by engine.grainsOutVizFlow.collectAsState()
+        val bassOutData by engine.bassOutVizFlow.collectAsState()
+        val masterOutData by engine.masterOutVizFlow.collectAsState()
 
         val allData = listOf(
             lfoData, carrierData, modData, outData,
             delayInData, delayFbData, delayOutData,
             reverbInData, reverbOutData,
             fluxData, resoInData, resoOutData,
-            drumOutData, grainsInData, grainsOutData
+            drumOutData, grainsInData, grainsOutData,
+            bassOutData,
+            masterOutData
         )
         val paths = remember { Array(channels.size) { Path() } }
 

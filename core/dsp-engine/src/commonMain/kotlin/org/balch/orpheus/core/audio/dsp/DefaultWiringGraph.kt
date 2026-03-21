@@ -280,6 +280,20 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     driveL.out to reverb.inputA
     driveR.out to reverb.inputB
 
+    // ── Bass voice chain ──
+    // bass_voice → overdrive → compressor → master bus + delay/reverb sends
+    val bassVoiceUnit = bassVoice("bass_voice")
+    val bassOverdrive = overdrive("bass_overdrive")
+    val bassCompressor = compressor("bass_compressor")
+    bassVoiceUnit.out to bassOverdrive.input
+    bassOverdrive.out to bassCompressor.input
+    // Bass → delay send (shared bus with synth/warps/looper)
+    bassCompressor.out to delay.inputA
+    bassCompressor.out to delay.inputB
+    // Bass → reverb send (shared bus)
+    bassCompressor.out to reverb.inputA
+    bassCompressor.out to reverb.inputB
+
     // Master output (no hard clip)
     val master = masterOut("master")
 
@@ -330,6 +344,10 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // MAIN path output → master (direct to output, no hard clip)
     drumDirectLimiterL.out to master.inputA
     drumDirectLimiterR.out to master.inputB
+
+    // Bass compressor output → master (mono → both L and R)
+    bassCompressor.out to master.inputA
+    bassCompressor.out to master.inputB
 
     // Per-String Bender (4 strings × 2 voices + audio)
     val psb = perStringBender("psb")

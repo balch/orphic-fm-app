@@ -1,8 +1,10 @@
 *.iml
+.cache
 .kotlin
 .gradle
 **/build/
 xcuserdata
+compile_commands.json
 !src/**/build/
 local.properties
 .idea
