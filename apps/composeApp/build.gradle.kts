@@ -62,6 +62,7 @@ kotlin {
             api(project(":core:plugins:voice"))
             api(project(":core:plugins:delay"))
             api(project(":core:plugins:distortion"))
+            api(project(":core:plugins:horn"))
             api(project(":core:plugins:resonator"))
             api(project(":core:plugins:reverb"))
             api(project(":core:plugins:bender"))
