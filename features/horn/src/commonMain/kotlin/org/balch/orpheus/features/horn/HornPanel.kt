@@ -1,12 +1,5 @@
 package org.balch.orpheus.features.horn
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -25,8 +17,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,12 +32,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -64,12 +58,14 @@ private val CrimsonWoofer = Color(0xFF881111)
 private val CrimsonBorder = Color(0xFF1A0808)
 private val CrimsonKnob = Color(0xFFAA2222)
 
-// Minimum rotation period in ms when speed = 1.0 (fastest)
-private const val MIN_HORN_PERIOD_MS = 500
-// Maximum rotation period in ms when speed = 0.0 (slowest, near-stop)
-private const val MAX_HORN_PERIOD_MS = 8000
-// Classic Leslie ratio: horn spins ~8x faster than woofer
+// Physics: horn target velocity in degrees/sec at speed=1.0
+private const val MAX_HORN_DEG_PER_SEC = 720f   // 2 rotations/sec at full speed
+private const val MIN_HORN_DEG_PER_SEC = 20f    // barely moving at speed≈0
+// Classic Leslie ratio: woofer spins slower than horn
 private const val LESLIE_RATIO = 8f
+// Inertia: time constants for acceleration/deceleration (seconds)
+private const val RAMP_UP_TAU = 1.0f    // ~1s to reach target speed
+private const val RAMP_DOWN_TAU = 3.0f  // ~3s to coast to stop (brake feel)
 
 @Composable
 fun HornPanel(
@@ -85,53 +81,51 @@ fun HornPanel(
     val inViz by inVizFlow.collectAsState()
     val outViz by outVizFlow.collectAsState()
 
-    // Compute rotation speed multiplier (0 = stopped, 1 = full speed).
-    // When brake is engaged, animate toward 0 with a slow 3s coast-down.
-    val targetSpeedMult = if (uiState.brake) 0f else uiState.speed
-    val animatedSpeedMult by animateFloatAsState(
-        targetValue = targetSpeedMult,
-        animationSpec = tween(
-            durationMillis = if (targetSpeedMult > 0f) 1000 else 3000,
-            easing = LinearEasing,
-        ),
-        label = "speedMult"
-    )
+    // ── Physics-based rotor animation ──────────────────────────────────────
+    // Each rotor has a current velocity (deg/sec) that accelerates/decelerates
+    // toward a target velocity with realistic inertia. Angle accumulates each
+    // frame based on current velocity × dt.
 
-    // Derive horn period from animated speed multiplier
-    val hornPeriodMs = lerp(MAX_HORN_PERIOD_MS.toFloat(), MIN_HORN_PERIOD_MS.toFloat(), animatedSpeedMult).toInt()
-
-    // Woofer spins at hornSpeed / ratio (where ratio=0 → LESLIE_RATIO, ratio=1 → 1:1)
+    // Target velocities derived from knobs
+    val hornTargetDps = if (uiState.brake) 0f
+        else lerp(MIN_HORN_DEG_PER_SEC, MAX_HORN_DEG_PER_SEC, uiState.speed)
     val ratioFactor = lerp(LESLIE_RATIO, 1f, uiState.ratio)
-    val wooferPeriodMs = (hornPeriodMs * ratioFactor).toInt().coerceAtLeast(MIN_HORN_PERIOD_MS)
+    val wooferTargetDps = hornTargetDps / ratioFactor
 
-    // Infinite rotation transitions — one per rotor
-    // When speed reaches near-zero (<0.01), rotors fully stop
-    val hornTransition = rememberInfiniteTransition(label = "hornRotor")
-    val wooferTransition = rememberInfiniteTransition(label = "wooferRotor")
+    // Mutable state for physics simulation
+    var hornAngle by remember { mutableFloatStateOf(0f) }
+    var wooferAngle by remember { mutableFloatStateOf(0f) }
+    var hornVelocity by remember { mutableFloatStateOf(0f) }
+    var wooferVelocity by remember { mutableFloatStateOf(0f) }
 
-    val hornAngleRaw by hornTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = hornPeriodMs.coerceAtLeast(50), easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "hornAngle"
-    )
+    // Frame-by-frame physics loop
+    LaunchedEffect(Unit) {
+        var lastNanos = 0L
+        while (true) {
+            withFrameNanos { frameNanos ->
+                if (lastNanos == 0L) { lastNanos = frameNanos; return@withFrameNanos }
+                val dt = (frameNanos - lastNanos) / 1_000_000_000f  // seconds
+                lastNanos = frameNanos
 
-    val wooferAngleRaw by wooferTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = wooferPeriodMs.coerceAtLeast(50), easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "wooferAngle"
-    )
+                // Exponential slew toward target velocity (different time constants for up/down)
+                val hornTau = if (hornTargetDps > hornVelocity) RAMP_UP_TAU else RAMP_DOWN_TAU
+                val wooferTau = if (wooferTargetDps > wooferVelocity) RAMP_UP_TAU else RAMP_DOWN_TAU
+                val hornAlpha = 1f - kotlin.math.exp(-dt / hornTau)
+                val wooferAlpha = 1f - kotlin.math.exp(-dt / wooferTau)
 
-    // Freeze angles when speed is near zero (brake fully engaged)
-    val hornAngle = if (animatedSpeedMult < 0.01f) 0f else hornAngleRaw
-    val wooferAngle = if (animatedSpeedMult < 0.01f) 0f else wooferAngleRaw
+                hornVelocity += hornAlpha * (hornTargetDps - hornVelocity)
+                wooferVelocity += wooferAlpha * (wooferTargetDps - wooferVelocity)
+
+                // Stop completely when velocity is negligible
+                if (hornVelocity < 0.5f && hornTargetDps == 0f) hornVelocity = 0f
+                if (wooferVelocity < 0.5f && wooferTargetDps == 0f) wooferVelocity = 0f
+
+                // Accumulate angle
+                hornAngle = (hornAngle + hornVelocity * dt) % 360f
+                wooferAngle = (wooferAngle + wooferVelocity * dt) % 360f
+            }
+        }
+    }
 
     CollapsibleColumnPanel(
         title = "HORN",

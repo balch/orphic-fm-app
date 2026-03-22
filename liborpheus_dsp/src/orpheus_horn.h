@@ -201,14 +201,15 @@ struct OrpheusHorn {
                 read_interp(delay_r, center + mod_2) * 0.33f +
                 read_interp(delay_l, center + mod_3) * 0.33f;
 
-            // ── Dry/wet mix ──
-            float in_dry_l = in_l[i];
-            float in_dry_r = in_r[i];
-            float mixed_l = wet_l * wet_scale + in_dry_l * dry_scale;
-            float mixed_r = wet_r * wet_scale + in_dry_r * dry_scale;
+            // ── Dry/wet crossfade ──
+            // wet_effect = chorus output shaped by amount
+            // mix=0 → pure dry (passthrough), mix=1 → full effect
+            float effect_l = wet_l * wet_scale + in_l[i] * dry_scale;
+            float effect_r = wet_r * wet_scale + in_r[i] * dry_scale;
+            float dry_mix = 1.0f - smooth_mix;
 
-            out_l[i] = mixed_l * smooth_mix;
-            out_r[i] = mixed_r * smooth_mix;
+            out_l[i] = in_l[i] * dry_mix + effect_l * smooth_mix;
+            out_r[i] = in_r[i] * dry_mix + effect_r * smooth_mix;
 
             // ── Advance write pointer ──
             write_pos = (write_pos + 1) & kBufMask;
