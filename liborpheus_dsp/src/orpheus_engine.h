@@ -572,6 +572,26 @@ struct OrpheusEngine {
     float lorenz_slew_x = 0.5f;               // one-pole filter state for X
     float lorenz_slew_z = 0.5f;               // one-pole filter state for Z
 
+    // ── Horn (Leslie Speaker) ─────────────────────────────────────
+    static constexpr int kHornBufferSize = 2048;   // delay line for chorus (~42ms @ 48kHz)
+    static constexpr int kHornMask = kHornBufferSize - 1;
+    float horn_delay_l[kHornBufferSize] = {};
+    float horn_delay_r[kHornBufferSize] = {};
+    int horn_write_pos = 0;
+    float horn_slow_phase = 0.0f;    // horn rotor phase 0..1
+    float horn_fast_phase = 0.0f;    // woofer rotor phase 0..1
+    float smooth_horn_mix = 0.0f;
+    float smooth_horn_speed = 0.5f;  // smoothed speed for inertia
+
+    // Horn parameter atomics
+    std::atomic<float> horn_speed{0.5f};        // base rotor speed 0..1
+    std::atomic<float> horn_ratio{0.5f};        // horn:woofer ratio 0..1
+    std::atomic<float> horn_depth{0.5f};        // Doppler delay depth 0..1
+    std::atomic<float> horn_amount{0.5f};       // modulation amount 0..1
+    std::atomic<float> horn_mix{0.0f};          // dry/wet 0..1
+    std::atomic<int>   horn_brake{0};           // 0=off, 1=braking
+    std::atomic<int>   horn_bypass{1};          // 1=bypassed (mix<=0.001)
+
     // ── Signal visualization ring buffers ──
     // Written by audio thread (one sample per block), read by UI at ~60fps.
     VizRing viz_rings[VIZ_CHANNEL_COUNT];

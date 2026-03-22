@@ -11,8 +11,9 @@ import kotlin.math.sin
  * Graph structure:
  *   12x Plaits voices -> per-voice volume + pan -> summing tree ->
  *   master volume -> clouds -> rings -> drive -> warps ->
- *   delay (sends: grains+drive+warps, LFO mod) ->
- *   reverb (parallel send from drive) ->
+ *   horn (Leslie rotary) ->
+ *   delay (sends: grains+horn+warps, LFO mod) ->
+ *   reverb (parallel send from horn) ->
  *   hard clip -> master out (interleaved stereo)
  *
  *   3x Dedicated drum voices (slots 12-14) -> drum sum ->
@@ -221,13 +222,18 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val warp = warps("warps")
     // No fixed input connections — unit_process_warps reads from source buffers
 
+    // Horn (Leslie rotary speaker) — inline after drive, before delay/reverb
+    val horn = horn("horn")
+    driveL.out to horn.inputA
+    driveR.out to horn.inputB
+
     // Dual Delay (stereo in/out) - bypassed by default via engine atomics
-    // grains+distortion+warps all feed delay (summed at input)
+    // grains+horn+warps all feed delay (summed at input)
     val delay = dualDelay("delay")
     grains.out to delay.inputA
     grains.outRight to delay.inputB
-    driveL.out to delay.inputA
-    driveR.out to delay.inputB
+    horn.out to delay.inputA
+    horn.outRight to delay.inputB
     warp.out to delay.inputA
     warp.outRight to delay.inputB
 
@@ -274,11 +280,11 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     benderUnit.aux to delay.inputA       // bender audio → delay send
     benderUnit.aux to delay.inputB
 
-    // Reverb (Dattorro plate) — parallel send from drive output
+    // Reverb (Dattorro plate) — parallel send from horn output
     // Wet-only output sums into clip inputs alongside delay output
     val reverb = reverb("reverb")
-    driveL.out to reverb.inputA
-    driveR.out to reverb.inputB
+    horn.out to reverb.inputA
+    horn.outRight to reverb.inputB
 
     // ── Bass voice chain ──
     // bass_voice → overdrive → compressor → master bus + delay/reverb sends

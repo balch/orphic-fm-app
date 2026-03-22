@@ -34,6 +34,7 @@ const val UNIT_POLY_LFO = 28
 const val UNIT_BASS_VOICE = 29
 const val UNIT_OVERDRIVE = 30
 const val UNIT_COMPRESSOR = 31
+const val UNIT_HORN = 32
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -328,6 +329,9 @@ class WiringGraphBuilder {
 
     fun compressor(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_COMPRESSOR, name, init)
+
+    fun horn(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_HORN, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

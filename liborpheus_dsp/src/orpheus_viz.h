@@ -42,5 +42,9 @@ enum VizChannel {
     VIZ_LFO_CH3 = 17,
     VIZ_BASS_OUT = 18,
     VIZ_MASTER_OUT = 19,
+    VIZ_HORN_IN = 20,       // audio peak into Leslie effect
+    VIZ_HORN_OUT = 21,      // audio peak out of Leslie effect
+    VIZ_HORN_PHASE = 22,    // normalized horn rotor phase 0..1 (for animation)
+    VIZ_WOOFER_PHASE = 23,  // normalized woofer rotor phase 0..1 (for animation)
     VIZ_CHANNEL_COUNT
 };

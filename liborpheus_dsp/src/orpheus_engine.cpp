@@ -5,6 +5,10 @@
 #include <cstring>
 extern "C" {
 
+// Reset static DSP state for units that use singletons.
+// Defined in orpheus_unit_horn.cpp.
+void horn_reset_static();
+
 OrpheusEngine* orpheus_engine_create(float sample_rate) {
     auto* engine = new OrpheusEngine();
     engine->sample_rate = sample_rate;
@@ -152,6 +156,7 @@ static void orpheus_graph_free(OrpheusGraph* graph) {
 
 void orpheus_engine_destroy(OrpheusEngine* engine) {
     if (engine) {
+        horn_reset_static();
         orpheus_graph_free(engine->graph.load(std::memory_order_relaxed));
         delete[] engine->looper_buffer_l;
         delete[] engine->looper_buffer_r;

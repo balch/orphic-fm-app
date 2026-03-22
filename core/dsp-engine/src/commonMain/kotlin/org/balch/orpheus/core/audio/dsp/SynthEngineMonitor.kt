@@ -84,6 +84,14 @@ class SynthEngineMonitor(
     val bassOutVizFlow: StateFlow<FloatArray> = _bassOutVizFlow.asStateFlow()
     private val _masterOutVizFlow = MutableStateFlow(FloatArray(0))
     val masterOutVizFlow: StateFlow<FloatArray> = _masterOutVizFlow.asStateFlow()
+    private val _hornInVizFlow = MutableStateFlow(FloatArray(0))
+    val hornInVizFlow: StateFlow<FloatArray> = _hornInVizFlow.asStateFlow()
+    private val _hornOutVizFlow = MutableStateFlow(FloatArray(0))
+    val hornOutVizFlow: StateFlow<FloatArray> = _hornOutVizFlow.asStateFlow()
+    private val _hornPhaseVizFlow = MutableStateFlow(FloatArray(0))
+    val hornPhaseVizFlow: StateFlow<FloatArray> = _hornPhaseVizFlow.asStateFlow()
+    private val _wooferPhaseVizFlow = MutableStateFlow(FloatArray(0))
+    val wooferPhaseVizFlow: StateFlow<FloatArray> = _wooferPhaseVizFlow.asStateFlow()
 
     // Monitoring
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -180,6 +188,10 @@ class SynthEngineMonitor(
                     pollVizChannel(VIZ_LFO_CH3, readPositions, vizBuf, _lfoCh3VizFlow)
                     pollVizChannel(VIZ_BASS_OUT, readPositions, vizBuf, _bassOutVizFlow)
                     pollVizChannel(VIZ_MASTER_OUT, readPositions, vizBuf, _masterOutVizFlow)
+                    pollVizChannel(VIZ_HORN_IN, readPositions, vizBuf, _hornInVizFlow)
+                    pollVizChannel(VIZ_HORN_OUT, readPositions, vizBuf, _hornOutVizFlow)
+                    pollVizChannel(VIZ_HORN_PHASE, readPositions, vizBuf, _hornPhaseVizFlow)
+                    pollVizChannel(VIZ_WOOFER_PHASE, readPositions, vizBuf, _wooferPhaseVizFlow)
                     delay(VIZ_POLL_INTERVAL_MS)
                 }
             }
@@ -193,7 +205,8 @@ class SynthEngineMonitor(
                    _resoInVizFlow, _resoOutVizFlow,
                    _drumOutVizFlow, _grainsInVizFlow, _grainsOutVizFlow,
                    _lfoCh1VizFlow, _lfoCh2VizFlow, _lfoCh3VizFlow,
-                   _bassOutVizFlow, _masterOutVizFlow).forEach { it.value = FloatArray(0) }
+                   _bassOutVizFlow, _masterOutVizFlow,
+                   _hornInVizFlow, _hornOutVizFlow, _hornPhaseVizFlow, _wooferPhaseVizFlow).forEach { it.value = FloatArray(0) }
         }
     }
 
@@ -230,6 +243,10 @@ class SynthEngineMonitor(
         private const val VIZ_LFO_CH3 = 17
         private const val VIZ_BASS_OUT = 18
         private const val VIZ_MASTER_OUT = 19
-        private const val VIZ_CHANNEL_COUNT = 20
+        private const val VIZ_HORN_IN = 20
+        private const val VIZ_HORN_OUT = 21
+        private const val VIZ_HORN_PHASE = 22
+        private const val VIZ_WOOFER_PHASE = 23
+        private const val VIZ_CHANNEL_COUNT = 24
     }
 }
