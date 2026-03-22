@@ -178,6 +178,7 @@ if(BUILD_TESTS)
         test/test_fm_compare.cpp
         test/test_benchmark.cpp
         test/test_bass_voice.cpp
+        test/test_horn.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE

@@ -485,3 +485,4 @@ bool run_chain_compare_tests();
 bool run_fm_compare_tests();
 bool run_benchmark_tests();
 bool run_bass_voice_tests();
+bool run_horn_tests();
