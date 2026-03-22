@@ -2,7 +2,6 @@ package org.balch.orpheus.features.horn
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -11,6 +10,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
+import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
@@ -21,7 +21,7 @@ class HornPanelRegistration(
     override val description = "Rotating speaker cabinet effect"
     override val weight = 0.65f
     override val label = "Horn"
-    override val color = Color(0xFFCC2222) // Blackout Crimson accent
+    override val color = OrpheusColors.hornCrimson // Blackout Crimson accent
 
     @Composable
     override fun Content(
@@ -45,7 +45,7 @@ class HornPanelRegistration(
             panelId = PanelId.HORN,
             weight = 0.65f,
             label = "Horn",
-            color = Color(0xFFCC2222),
+            color = OrpheusColors.hornCrimson,
         ) { modifier, isExpanded, onExpandedChange, _ ->
             HornPanel(
                 feature = HornViewModel.previewFeature(),

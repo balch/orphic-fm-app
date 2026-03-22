@@ -95,8 +95,8 @@ class SignalMonitorViz(
         Channel("GRN-IN", OrpheusColors.grainsRed.copy(alpha = 0.5f)),
         Channel("GRN-OUT", OrpheusColors.grainsRed),
         Channel("BASS", OrpheusColors.bassAmber),
-        Channel("HORN-IN", Color(0xFF881111)),
-        Channel("HORN-OUT", Color(0xFFCC2222)),
+        Channel("HORN-IN", OrpheusColors.hornWoofer),
+        Channel("HORN-OUT", OrpheusColors.hornCrimson),
         Channel("MASTER", OrpheusColors.neonMagenta),
     )
 

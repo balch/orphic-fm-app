@@ -254,6 +254,13 @@ object OrpheusColors {
     val bassDarkAmber = Color(0xFF4A3010)        // Dark amber shadow for knob tracks
     val bassKnobCap = Color(0xFFFFCC70)          // Lighter amber cap highlight
 
+    // Horn (Leslie) Palette — blackout crimson, embers in darkness
+    val hornCrimson = Color(0xFFCC2222)              // Primary horn accent (bright crimson)
+    val hornWoofer = Color(0xFF881111)               // Secondary woofer accent (dark crimson)
+    val hornBg = Color(0xFF080808)                   // Near-black background
+    val hornBorder = Color(0xFF1A0808)               // Subtle crimson border
+    val hornKnob = Color(0xFFAA2222)                 // Knob ring crimson
+
     // Warps Meta-Modulator Palette
     val warpsGreen = Color(0xFF90EE90)           // Primary Warps Green
     val warpsYellow = Color(0xFFFFFF00)          // Bright Yellow for accents

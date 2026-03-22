@@ -44,6 +44,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
+import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -52,12 +53,12 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
-// Blackout Crimson palette — dark, aggressive, evokes the heat of spinning speaker magnets
-private val CrimsonBg = Color(0xFF080808)
-private val CrimsonHorn = Color(0xFFCC2222)
-private val CrimsonWoofer = Color(0xFF881111)
-private val CrimsonBorder = Color(0xFF1A0808)
-private val CrimsonKnob = Color(0xFFAA2222)
+// Blackout Crimson palette — sourced from OrpheusColors
+private val CrimsonBg = OrpheusColors.hornBg
+private val CrimsonHorn = OrpheusColors.hornCrimson
+private val CrimsonWoofer = OrpheusColors.hornWoofer
+private val CrimsonBorder = OrpheusColors.hornBorder
+private val CrimsonKnob = OrpheusColors.hornKnob
 
 // Physics: horn target velocity in degrees/sec at speed=1.0
 private const val MAX_HORN_DEG_PER_SEC = 720f   // 2 rotations/sec at full speed
