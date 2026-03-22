@@ -1,5 +1,13 @@
 package org.balch.orpheus.features.horn
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,6 +15,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -19,7 +29,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -28,10 +48,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
-import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 
 // Blackout Crimson palette — dark, aggressive, evokes the heat of spinning speaker magnets
 private val CrimsonBg = Color(0xFF080808)
@@ -39,6 +62,13 @@ private val CrimsonHorn = Color(0xFFCC2222)
 private val CrimsonWoofer = Color(0xFF881111)
 private val CrimsonBorder = Color(0xFF1A0808)
 private val CrimsonKnob = Color(0xFFAA2222)
+
+// Minimum rotation period in ms when speed = 1.0 (fastest)
+private const val MIN_HORN_PERIOD_MS = 500
+// Maximum rotation period in ms when speed = 0.0 (slowest, near-stop)
+private const val MAX_HORN_PERIOD_MS = 8000
+// Classic Leslie ratio: horn spins ~8x faster than woofer
+private const val LESLIE_RATIO = 8f
 
 @Composable
 fun HornPanel(
@@ -54,6 +84,50 @@ fun HornPanel(
     val inViz by inVizFlow.collectAsState()
     val outViz by outVizFlow.collectAsState()
 
+    // Compute target rotation speed (as period in ms) from uiState.speed and brake state.
+    // When brake is engaged, both rotors coast toward a very slow near-stop.
+    val targetSpeed = if (uiState.brake) 0f else uiState.speed
+    val hornPeriodMs = lerp(MAX_HORN_PERIOD_MS.toFloat(), MIN_HORN_PERIOD_MS.toFloat(), targetSpeed).toInt()
+
+    // Animate the period with inertia: fast ramp-up, slow ramp-down (brake feel)
+    val animatedHornPeriodMs by animateFloatAsState(
+        targetValue = hornPeriodMs.toFloat(),
+        animationSpec = tween(
+            durationMillis = if (hornPeriodMs < (MAX_HORN_PERIOD_MS + MIN_HORN_PERIOD_MS) / 2) 1000 else 3000,
+            easing = LinearEasing,
+        ),
+        label = "hornPeriod"
+    )
+
+    // Woofer spins at hornSpeed / ratio (where ratio=0 → LESLIE_RATIO, ratio=1 → 1:1)
+    // ratio=0.5 is the classic Leslie midpoint
+    val ratioFactor = lerp(LESLIE_RATIO, 1f, uiState.ratio)
+    val wooferPeriodMs = (animatedHornPeriodMs * ratioFactor).toInt().coerceAtLeast(MIN_HORN_PERIOD_MS)
+
+    // Infinite rotation transitions — one per rotor
+    val hornTransition = rememberInfiniteTransition(label = "hornRotor")
+    val wooferTransition = rememberInfiniteTransition(label = "wooferRotor")
+
+    val hornAngle by hornTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = animatedHornPeriodMs.toInt().coerceAtLeast(50), easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "hornAngle"
+    )
+
+    val wooferAngle by wooferTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = wooferPeriodMs.coerceAtLeast(50), easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "wooferAngle"
+    )
+
     CollapsibleColumnPanel(
         title = "HORN",
         expandedTitle = "Leslie",
@@ -67,21 +141,33 @@ fun HornPanel(
             SignalTrace(data = outViz, color = CrimsonHorn.copy(alpha = 0.6f))
         }
     ) {
-        // TODO: Dual rotor animation (Task 10)
-        Box(
+        // Dual rotor animation area
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(160.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(CrimsonBg)
                 .border(1.dp, CrimsonBorder, RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "◎  ◎",
-                color = CrimsonWoofer.copy(alpha = 0.4f),
-                fontSize = 28.sp,
-                letterSpacing = 16.sp,
+            ConcentricRingsAnimation(
+                hornAngle = hornAngle,
+                wooferAngle = wooferAngle,
+                speed = uiState.speed,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(8.dp),
+            )
+            CabinetCrossSectionAnimation(
+                hornAngle = hornAngle,
+                wooferAngle = wooferAngle,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(8.dp),
             )
         }
 
@@ -162,6 +248,330 @@ fun HornPanel(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Concentric Rings Animation
+// Two glowing arcs (inner=horn, outer=woofer) with trailing fade, rotating at
+// their respective speeds. A center ember dot anchors the composition.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ConcentricRingsAnimation(
+    hornAngle: Float,
+    wooferAngle: Float,
+    speed: Float,
+    modifier: Modifier = Modifier,
+) {
+    // Trail length in degrees: 60° at slow, 150° at fast
+    val trailDegrees = lerp(60f, 150f, speed)
+
+    Canvas(modifier = modifier) {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val minDim = minOf(size.width, size.height)
+
+        val outerRadius = minDim * 0.42f  // woofer ring
+        val innerRadius = minDim * 0.25f  // horn ring
+        val strokeWidth = minDim * 0.045f
+
+        // --- Woofer ring (outer, darker crimson) ---
+        drawRotorRing(
+            cx = cx,
+            cy = cy,
+            radius = outerRadius,
+            angle = wooferAngle,
+            trailDegrees = trailDegrees * 0.75f,  // woofer trail slightly shorter
+            headColor = CrimsonWoofer,
+            strokeWidth = strokeWidth,
+        )
+
+        // --- Horn ring (inner, bright crimson) ---
+        drawRotorRing(
+            cx = cx,
+            cy = cy,
+            radius = innerRadius,
+            angle = hornAngle,
+            trailDegrees = trailDegrees,
+            headColor = CrimsonHorn,
+            strokeWidth = strokeWidth,
+        )
+
+        // --- Center ember dot ---
+        val dotRadius = minDim * 0.045f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(CrimsonHorn, CrimsonHorn.copy(alpha = 0.4f), Color.Transparent),
+                center = Offset(cx, cy),
+                radius = dotRadius * 2f,
+            ),
+            radius = dotRadius * 2f,
+            center = Offset(cx, cy),
+        )
+        drawCircle(
+            color = CrimsonHorn,
+            radius = dotRadius * 0.5f,
+            center = Offset(cx, cy),
+        )
+
+        // --- Ember glow at horn rotor head ---
+        val hornRadians = (hornAngle - 90f) * (PI / 180f).toFloat()
+        val hornHeadX = cx + innerRadius * cos(hornRadians)
+        val hornHeadY = cy + innerRadius * sin(hornRadians)
+        val glowRadius = strokeWidth * 2f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    CrimsonHorn.copy(alpha = 0.9f),
+                    CrimsonHorn.copy(alpha = 0.3f),
+                    Color.Transparent,
+                ),
+                center = Offset(hornHeadX, hornHeadY),
+                radius = glowRadius,
+            ),
+            radius = glowRadius,
+            center = Offset(hornHeadX, hornHeadY),
+        )
+
+        // --- Ember glow at woofer rotor head ---
+        val wooferRadians = (wooferAngle - 90f) * (PI / 180f).toFloat()
+        val wooferHeadX = cx + outerRadius * cos(wooferRadians)
+        val wooferHeadY = cy + outerRadius * sin(wooferRadians)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    CrimsonWoofer.copy(alpha = 0.8f),
+                    CrimsonWoofer.copy(alpha = 0.25f),
+                    Color.Transparent,
+                ),
+                center = Offset(wooferHeadX, wooferHeadY),
+                radius = glowRadius,
+            ),
+            radius = glowRadius,
+            center = Offset(wooferHeadX, wooferHeadY),
+        )
+    }
+}
+
+/**
+ * Draws a single rotor arc: a gradient trail that fades from [headColor] at the head to
+ * transparent 120° behind, plus a small cap at the head position.
+ */
+private fun DrawScope.drawRotorRing(
+    cx: Float,
+    cy: Float,
+    radius: Float,
+    angle: Float,
+    trailDegrees: Float,
+    headColor: Color,
+    strokeWidth: Float,
+) {
+    val sweepSteps = 12
+    val stepDegrees = trailDegrees / sweepSteps
+
+    // Draw multiple arc segments from tail (transparent) to head (opaque)
+    for (i in 0 until sweepSteps) {
+        val alpha = (i + 1f) / sweepSteps
+        val startAngle = angle - trailDegrees + i * stepDegrees - 90f
+        val segColor = headColor.copy(alpha = alpha * alpha)  // quadratic fade for more dramatic trail
+
+        val diameter = radius * 2f
+        val topLeft = Offset(cx - radius, cy - radius)
+        drawArc(
+            color = segColor,
+            startAngle = startAngle,
+            sweepAngle = stepDegrees + 0.5f,  // slight overlap to avoid gaps
+            useCenter = false,
+            topLeft = topLeft,
+            size = Size(diameter, diameter),
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Butt),
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cabinet Cross-Section Animation
+// A schematic cutaway of a Leslie cabinet: horn rotor (top) and woofer drum
+// (bottom) rendered with 3D foreshortening via scaleX = cos(phase).
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CabinetCrossSectionAnimation(
+    hornAngle: Float,
+    wooferAngle: Float,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        val cabinetPadding = 6f
+        val cornerRadius = 10f
+        val shelfY = h * 0.5f
+
+        // Cabinet outline
+        drawRoundRect(
+            color = CrimsonBorder,
+            topLeft = Offset(cabinetPadding, cabinetPadding),
+            size = Size(w - cabinetPadding * 2f, h - cabinetPadding * 2f),
+            cornerRadius = CornerRadius(cornerRadius),
+            style = Stroke(width = 1.5f),
+        )
+
+        // Louvered vent lines — left and right sides
+        val louverCount = 7
+        val louverAreaTop = cabinetPadding + cornerRadius
+        val louverAreaBottom = h - cabinetPadding - cornerRadius
+        val louverSpacing = (louverAreaBottom - louverAreaTop) / (louverCount + 1)
+        val louverLength = 10f
+        val louverColor = CrimsonBorder.copy(alpha = 0.8f)
+
+        for (i in 1..louverCount) {
+            val ly = louverAreaTop + i * louverSpacing
+            // Left vents
+            drawLine(
+                color = louverColor,
+                start = Offset(cabinetPadding + 1f, ly),
+                end = Offset(cabinetPadding + louverLength, ly),
+                strokeWidth = 1f,
+            )
+            // Right vents
+            drawLine(
+                color = louverColor,
+                start = Offset(w - cabinetPadding - louverLength, ly),
+                end = Offset(w - cabinetPadding - 1f, ly),
+                strokeWidth = 1f,
+            )
+        }
+
+        // Horizontal shelf divider
+        drawLine(
+            color = CrimsonBorder,
+            start = Offset(cabinetPadding + 4f, shelfY),
+            end = Offset(w - cabinetPadding - 4f, shelfY),
+            strokeWidth = 1f,
+        )
+
+        // Section label: HORN (top half)
+        val labelY = cabinetPadding + 10f
+        // We can't draw text on Canvas directly in common Compose; use the foreshortened rotor
+        // to visually identify the sections without text (text drawing requires platform APIs
+        // not available cross-platform in Canvas draw scope).
+
+        // ─── Horn rotor (top half) ───
+        // Foreshortening: rotor paddle appears to compress horizontally as it turns edge-on.
+        // cos(angle in radians) gives the visual width fraction: 1.0 = face-on, 0 = edge-on.
+        val hornRad = hornAngle * (PI / 180f).toFloat()
+        val hornScaleX = abs(cos(hornRad)).coerceAtLeast(0.05f)
+
+        val hornCx = w / 2f
+        val hornCy = (cabinetPadding + shelfY) / 2f
+        val hornPaddleW = (w - cabinetPadding * 2f - 16f) * 0.55f
+        val hornPaddleH = (shelfY - cabinetPadding) * 0.22f
+
+        // Glow halo behind horn paddle
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    CrimsonHorn.copy(alpha = 0.15f),
+                    Color.Transparent,
+                ),
+                center = Offset(hornCx, hornCy),
+                radius = hornPaddleW * 0.7f,
+            ),
+            radius = hornPaddleW * 0.7f,
+            center = Offset(hornCx, hornCy),
+        )
+
+        // The horn paddle — foreshortened pill shape
+        drawHornPaddle(
+            cx = hornCx,
+            cy = hornCy,
+            halfWidth = hornPaddleW / 2f * hornScaleX,
+            halfHeight = hornPaddleH / 2f,
+            color = CrimsonHorn,
+            glowAlpha = 0.6f,
+        )
+
+        // ─── Woofer drum (bottom half) ───
+        val wooferRad = wooferAngle * (PI / 180f).toFloat()
+        val wooferScaleX = abs(cos(wooferRad)).coerceAtLeast(0.05f)
+
+        val wooferCx = w / 2f
+        val wooferCy = (shelfY + h - cabinetPadding) / 2f
+        val wooferPaddleW = (w - cabinetPadding * 2f - 16f) * 0.70f  // woofer is wider
+        val wooferPaddleH = (h - cabinetPadding - shelfY) * 0.28f
+
+        // Glow halo behind woofer paddle
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    CrimsonWoofer.copy(alpha = 0.12f),
+                    Color.Transparent,
+                ),
+                center = Offset(wooferCx, wooferCy),
+                radius = wooferPaddleW * 0.65f,
+            ),
+            radius = wooferPaddleW * 0.65f,
+            center = Offset(wooferCx, wooferCy),
+        )
+
+        drawHornPaddle(
+            cx = wooferCx,
+            cy = wooferCy,
+            halfWidth = wooferPaddleW / 2f * wooferScaleX,
+            halfHeight = wooferPaddleH / 2f,
+            color = CrimsonWoofer,
+            glowAlpha = 0.5f,
+        )
+    }
+}
+
+/**
+ * Draws a foreshortened rotor paddle: a rounded rectangle with a gradient fill and soft edge glow.
+ * [halfWidth] is already pre-scaled by cos(phase) for the 3D foreshortening effect.
+ */
+private fun DrawScope.drawHornPaddle(
+    cx: Float,
+    cy: Float,
+    halfWidth: Float,
+    halfHeight: Float,
+    color: Color,
+    glowAlpha: Float,
+) {
+    val paddleW = halfWidth * 2f
+    val paddleH = halfHeight * 2f
+    val cornerR = minOf(halfWidth, halfHeight) * 0.6f
+
+    if (paddleW < 1f || paddleH < 1f) return
+
+    // Fill with vertical gradient: lighter center, darker edges
+    drawRoundRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(
+                color.copy(alpha = 0.9f),
+                color.copy(alpha = 0.5f),
+            ),
+            startY = cy - halfHeight,
+            endY = cy + halfHeight,
+        ),
+        topLeft = Offset(cx - halfWidth, cy - halfHeight),
+        size = Size(paddleW, paddleH),
+        cornerRadius = CornerRadius(cornerR),
+    )
+
+    // Edge glow / outline
+    drawRoundRect(
+        color = color.copy(alpha = glowAlpha),
+        topLeft = Offset(cx - halfWidth, cy - halfHeight),
+        size = Size(paddleW, paddleH),
+        cornerRadius = CornerRadius(cornerR),
+        style = Stroke(width = 1.5f),
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Brake Toggle
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * A tactile BRAKE toggle styled to match the Blackout Crimson panel palette.
  * When engaged, the button glows crimson — evoking the visual state of a motor being stopped.
@@ -213,6 +623,12 @@ private fun BrakeToggle(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Utility
+// ─────────────────────────────────────────────────────────────────────────────
+
+private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t.coerceIn(0f, 1f)
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Previews
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -250,6 +666,26 @@ fun HornPanelBrakeEngagedPreview() {
                     amount = 0.6f,
                     mix = 0.75f,
                     brake = true,
+                )
+            ),
+            isExpanded = true,
+        )
+    }
+}
+
+@Preview(name = "Horn Panel — Full Speed", widthDp = 400, heightDp = 500)
+@Composable
+fun HornPanelFullSpeedPreview() {
+    OrpheusTheme {
+        HornPanel(
+            feature = HornViewModel.previewFeature(
+                HornUiState(
+                    speed = 1.0f,
+                    ratio = 0.5f,
+                    depth = 1.0f,
+                    amount = 0.8f,
+                    mix = 1.0f,
+                    brake = false,
                 )
             ),
             isExpanded = true,
