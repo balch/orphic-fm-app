@@ -88,7 +88,6 @@ void unit_process_horn(GraphUnit* u, OrpheusEngine* engine,
     float speed_param  = engine->horn_speed.load(std::memory_order_relaxed);  // 0..1
     float ratio_param  = engine->horn_ratio.load(std::memory_order_relaxed);  // 0..1
     float depth_param  = engine->horn_depth.load(std::memory_order_relaxed);  // 0..1
-    float amount_param = engine->horn_amount.load(std::memory_order_relaxed); // 0..1
     int   brake        = engine->horn_brake.load(std::memory_order_relaxed);  // 0 or 1
 
     // ── Derive rotor speed targets ─────────────────────────────────────────
@@ -129,7 +128,6 @@ void unit_process_horn(GraphUnit* u, OrpheusEngine* engine,
         mix_target,
         horn_hz_target,
         woofer_hz_target,
-        amount_param,
         depth_param,
         crossover_coeff,
         sample_rate,

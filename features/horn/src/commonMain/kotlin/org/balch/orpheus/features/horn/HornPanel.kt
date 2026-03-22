@@ -224,17 +224,6 @@ fun HornPanel(
                 labelColor = CrimsonHorn,
             )
             RotaryKnob(
-                value = uiState.amount,
-                onValueChange = actions.setAmount,
-                label = "AMT",
-                controlId = HornSymbol.AMOUNT.controlId.key,
-                size = 38.dp,
-                trackColor = CrimsonBg,
-                progressColor = CrimsonHorn,
-                knobColor = CrimsonKnob,
-                labelColor = CrimsonHorn,
-            )
-            RotaryKnob(
                 value = uiState.mix,
                 onValueChange = actions.setMix,
                 label = "MIX",
@@ -668,7 +657,7 @@ fun HornPanelBrakeEngagedPreview() {
                     speed = 0.3f,
                     ratio = 0.7f,
                     depth = 0.8f,
-                    amount = 0.6f,
+
                     mix = 0.75f,
                     brake = true,
                 )
@@ -688,7 +677,7 @@ fun HornPanelFullSpeedPreview() {
                     speed = 1.0f,
                     ratio = 0.5f,
                     depth = 1.0f,
-                    amount = 0.8f,
+
                     mix = 1.0f,
                     brake = false,
                 )

@@ -580,8 +580,6 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->horn_ratio.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "depth") == 0)
             engine->horn_depth.store(value, std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "amount") == 0)
-            engine->horn_amount.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "mix") == 0) {
             engine->horn_mix.store(value, std::memory_order_relaxed);
             engine->horn_bypass.store(value <= 0.001f ? 1 : 0, std::memory_order_relaxed);

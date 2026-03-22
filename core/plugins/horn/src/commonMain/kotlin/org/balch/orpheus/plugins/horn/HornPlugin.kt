@@ -34,7 +34,6 @@ class HornPlugin : DspPlugin {
     private var _speed = 0.5f
     private var _ratio = 0.5f
     private var _depth = 0.5f
-    private var _amount = 0.5f
     private var _mix = 0.0f
     private var _brake = false
 
@@ -62,14 +61,6 @@ class HornPlugin : DspPlugin {
                 default = 0.5f
                 get { _depth }
                 set { _depth = it }
-            }
-        }
-
-        controlPort(HornSymbol.AMOUNT) {
-            floatType {
-                default = 0.5f
-                get { _amount }
-                set { _amount = it }
             }
         }
 

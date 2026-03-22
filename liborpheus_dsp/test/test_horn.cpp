@@ -48,7 +48,7 @@ static bool test_horn_active_processing() {
 
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     engine->horn_mix.store(0.5f);
-    engine->horn_amount.store(0.5f);
+
     engine->horn_speed.store(0.5f);
     engine->horn_ratio.store(0.5f);
     engine->horn_depth.store(0.5f);
@@ -110,7 +110,7 @@ static bool test_horn_phase_export() {
 
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     engine->horn_mix.store(1.0f);
-    engine->horn_amount.store(0.5f);
+
     engine->horn_speed.store(0.5f);
     engine->horn_ratio.store(0.5f);
     engine->horn_depth.store(0.5f);

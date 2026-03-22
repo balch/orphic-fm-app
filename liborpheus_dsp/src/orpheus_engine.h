@@ -608,7 +608,6 @@ struct OrpheusEngine {
     std::atomic<float> horn_speed{0.5f};        // base rotor speed 0..1
     std::atomic<float> horn_ratio{0.5f};        // horn:woofer ratio 0..1
     std::atomic<float> horn_depth{0.5f};        // Doppler delay depth 0..1
-    std::atomic<float> horn_amount{0.5f};       // modulation amount 0..1
     std::atomic<float> horn_mix{0.0f};          // dry/wet 0..1
     std::atomic<int>   horn_brake{0};           // 0=off, 1=braking
     std::atomic<int>   horn_bypass{1};          // 1=bypassed (mix<=0.001)

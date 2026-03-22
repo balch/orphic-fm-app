@@ -13,7 +13,6 @@ enum class HornSymbol(
     SPEED("speed", displayName = "Speed"),
     RATIO("ratio", displayName = "Ratio"),
     DEPTH("depth", displayName = "Depth"),
-    AMOUNT("amount", displayName = "Amount"),
     MIX("mix", displayName = "Mix"),
     BRAKE("brake", displayName = "Brake")
 }
