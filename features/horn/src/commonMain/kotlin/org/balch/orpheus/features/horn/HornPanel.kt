@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -84,41 +85,41 @@ fun HornPanel(
     val inViz by inVizFlow.collectAsState()
     val outViz by outVizFlow.collectAsState()
 
-    // Compute target rotation speed (as period in ms) from uiState.speed and brake state.
-    // When brake is engaged, both rotors coast toward a very slow near-stop.
-    val targetSpeed = if (uiState.brake) 0f else uiState.speed
-    val hornPeriodMs = lerp(MAX_HORN_PERIOD_MS.toFloat(), MIN_HORN_PERIOD_MS.toFloat(), targetSpeed).toInt()
-
-    // Animate the period with inertia: fast ramp-up, slow ramp-down (brake feel)
-    val animatedHornPeriodMs by animateFloatAsState(
-        targetValue = hornPeriodMs.toFloat(),
+    // Compute rotation speed multiplier (0 = stopped, 1 = full speed).
+    // When brake is engaged, animate toward 0 with a slow 3s coast-down.
+    val targetSpeedMult = if (uiState.brake) 0f else uiState.speed
+    val animatedSpeedMult by animateFloatAsState(
+        targetValue = targetSpeedMult,
         animationSpec = tween(
-            durationMillis = if (hornPeriodMs < (MAX_HORN_PERIOD_MS + MIN_HORN_PERIOD_MS) / 2) 1000 else 3000,
+            durationMillis = if (targetSpeedMult > 0f) 1000 else 3000,
             easing = LinearEasing,
         ),
-        label = "hornPeriod"
+        label = "speedMult"
     )
 
+    // Derive horn period from animated speed multiplier
+    val hornPeriodMs = lerp(MAX_HORN_PERIOD_MS.toFloat(), MIN_HORN_PERIOD_MS.toFloat(), animatedSpeedMult).toInt()
+
     // Woofer spins at hornSpeed / ratio (where ratio=0 → LESLIE_RATIO, ratio=1 → 1:1)
-    // ratio=0.5 is the classic Leslie midpoint
     val ratioFactor = lerp(LESLIE_RATIO, 1f, uiState.ratio)
-    val wooferPeriodMs = (animatedHornPeriodMs * ratioFactor).toInt().coerceAtLeast(MIN_HORN_PERIOD_MS)
+    val wooferPeriodMs = (hornPeriodMs * ratioFactor).toInt().coerceAtLeast(MIN_HORN_PERIOD_MS)
 
     // Infinite rotation transitions — one per rotor
+    // When speed reaches near-zero (<0.01), rotors fully stop
     val hornTransition = rememberInfiniteTransition(label = "hornRotor")
     val wooferTransition = rememberInfiniteTransition(label = "wooferRotor")
 
-    val hornAngle by hornTransition.animateFloat(
+    val hornAngleRaw by hornTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = animatedHornPeriodMs.toInt().coerceAtLeast(50), easing = LinearEasing),
+            animation = tween(durationMillis = hornPeriodMs.coerceAtLeast(50), easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "hornAngle"
     )
 
-    val wooferAngle by wooferTransition.animateFloat(
+    val wooferAngleRaw by wooferTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
@@ -127,6 +128,10 @@ fun HornPanel(
         ),
         label = "wooferAngle"
     )
+
+    // Freeze angles when speed is near zero (brake fully engaged)
+    val hornAngle = if (animatedSpeedMult < 0.01f) 0f else hornAngleRaw
+    val wooferAngle = if (animatedSpeedMult < 0.01f) 0f else wooferAngleRaw
 
     CollapsibleColumnPanel(
         title = "HORN",
@@ -141,10 +146,10 @@ fun HornPanel(
             SignalTrace(data = outViz, color = CrimsonHorn.copy(alpha = 0.6f))
         }
     ) {
-        // Dual rotor animation area
+        // Dual rotor animation area — fixed width, centered
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .widthIn(max = 420.dp)
                 .height(160.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(CrimsonBg)
