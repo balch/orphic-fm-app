@@ -111,6 +111,7 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_bass.cpp"
     "src/orpheus_unit_overdrive.cpp"
     "src/orpheus_unit_compressor.cpp"
+    "src/orpheus_unit_horn.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
 )
