@@ -171,9 +171,9 @@ fun HornPanel(
             )
         }
 
-        // Row 1: SPEED, RATIO, DEPTH, AMOUNT
+        // All controls in one row
         Row(
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             RotaryKnob(
@@ -181,7 +181,7 @@ fun HornPanel(
                 onValueChange = actions.setSpeed,
                 label = "SPEED",
                 controlId = HornSymbol.SPEED.controlId.key,
-                size = 44.dp,
+                size = 38.dp,
                 trackColor = CrimsonBg,
                 progressColor = CrimsonHorn,
                 knobColor = CrimsonKnob,
@@ -192,7 +192,7 @@ fun HornPanel(
                 onValueChange = actions.setRatio,
                 label = "RATIO",
                 controlId = HornSymbol.RATIO.controlId.key,
-                size = 44.dp,
+                size = 38.dp,
                 trackColor = CrimsonBg,
                 progressColor = CrimsonHorn,
                 knobColor = CrimsonKnob,
@@ -203,7 +203,7 @@ fun HornPanel(
                 onValueChange = actions.setDepth,
                 label = "DEPTH",
                 controlId = HornSymbol.DEPTH.controlId.key,
-                size = 44.dp,
+                size = 38.dp,
                 trackColor = CrimsonBg,
                 progressColor = CrimsonHorn,
                 knobColor = CrimsonKnob,
@@ -214,25 +214,18 @@ fun HornPanel(
                 onValueChange = actions.setAmount,
                 label = "AMT",
                 controlId = HornSymbol.AMOUNT.controlId.key,
-                size = 44.dp,
+                size = 38.dp,
                 trackColor = CrimsonBg,
                 progressColor = CrimsonHorn,
                 knobColor = CrimsonKnob,
                 labelColor = CrimsonHorn,
             )
-        }
-
-        // Row 2: MIX knob + BRAKE toggle
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
             RotaryKnob(
                 value = uiState.mix,
                 onValueChange = actions.setMix,
                 label = "MIX",
                 controlId = HornSymbol.MIX.controlId.key,
-                size = 44.dp,
+                size = 38.dp,
                 trackColor = CrimsonBg,
                 progressColor = CrimsonHorn,
                 knobColor = CrimsonKnob,
