@@ -550,6 +550,22 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "mix") == 0)
             engine->drive_mix.store(value, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.horn") == 0) {
+        if (std::strcmp(symbol, "speed") == 0)
+            engine->horn_speed.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "ratio") == 0)
+            engine->horn_ratio.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "depth") == 0)
+            engine->horn_depth.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "amount") == 0)
+            engine->horn_amount.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mix") == 0) {
+            engine->horn_mix.store(value, std::memory_order_relaxed);
+            engine->horn_bypass.store(value <= 0.001f ? 1 : 0, std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "brake") == 0)
+            engine->horn_brake.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
+    }
 }
 
 float orpheus_engine_get_port(OrpheusEngine* engine,
