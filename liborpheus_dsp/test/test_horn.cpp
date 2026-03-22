@@ -1,9 +1,9 @@
 // Horn (Leslie) DSP unit tests
 #include "test_harness.h"
 
-// ── Test 1: Self-bypass — mix=0 produces silence ────────────────────────────
+// ── Test 1: Self-bypass — mix=0 passes input through unchanged ──────────────
 static bool test_horn_self_bypass() {
-    printf("\n=== Test: Horn self-bypass ===\n");
+    printf("\n=== Test: Horn self-bypass (passthrough) ===\n");
 
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     engine->horn_mix.store(0.0f);
@@ -24,12 +24,19 @@ static bool test_horn_self_bypass() {
 
     unit_process_horn(&u, engine, num_frames, 48000.0f);
 
-    float peak_l = compute_peak(u.output_buffers[OPORT_OUT], num_frames);
-    float peak_r = compute_peak(u.output_buffers[OPORT_OUT_RIGHT], num_frames);
-    bool pass = peak_l < 0.001f && peak_r < 0.001f;
+    // Bypass should copy input to output (passthrough, not silence)
+    // because horn is wired inline in the signal chain
+    float max_diff = 0.0f;
+    for (int i = 0; i < num_frames; i++) {
+        float diff_l = std::fabs(u.output_buffers[OPORT_OUT][i] - u.inputs[IPORT_INPUT_A].buffer[i]);
+        float diff_r = std::fabs(u.output_buffers[OPORT_OUT_RIGHT][i] - u.inputs[IPORT_INPUT_B].buffer[i]);
+        if (diff_l > max_diff) max_diff = diff_l;
+        if (diff_r > max_diff) max_diff = diff_r;
+    }
+    bool pass = max_diff < 0.0001f;
 
-    printf("  mix=0 output: peak_l=%.6f peak_r=%.6f %s\n",
-           peak_l, peak_r, pass ? "OK (silent)" : "FAIL");
+    printf("  mix=0 passthrough: max_diff=%.6f %s\n",
+           max_diff, pass ? "OK (passthrough)" : "FAIL");
 
     orpheus_engine_destroy(engine);
     return pass;

@@ -49,11 +49,15 @@ void unit_process_horn(GraphUnit* u, OrpheusEngine* engine,
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
 
-    // ── Self-bypass when mix <= 0.001 ──────────────────────────────────────
+    // ── Self-bypass when mix <= 0.001: passthrough (not silence) ──────────
+    // Horn is wired inline (drive → horn → delay/reverb), so bypass must
+    // copy input to output to keep the voice signal flowing downstream.
     float mix_target = engine->horn_mix.load(std::memory_order_relaxed);
     if (mix_target <= 0.001f) {
-        std::memset(out_l, 0, num_frames * sizeof(float));
-        std::memset(out_r, 0, num_frames * sizeof(float));
+        float* in_l = u->inputs[IPORT_INPUT_A].buffer;
+        float* in_r = u->inputs[IPORT_INPUT_B].buffer;
+        std::memcpy(out_l, in_l, num_frames * sizeof(float));
+        std::memcpy(out_r, in_r, num_frames * sizeof(float));
         engine->viz_rings[VIZ_HORN_IN].write(0.0f);
         engine->viz_rings[VIZ_HORN_OUT].write(0.0f);
         engine->viz_rings[VIZ_HORN_PHASE].write(0.0f);
