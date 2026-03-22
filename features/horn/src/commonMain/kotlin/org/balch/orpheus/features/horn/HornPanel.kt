@@ -22,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -92,6 +93,10 @@ fun HornPanel(
     val ratioFactor = lerp(LESLIE_RATIO, 1f, uiState.ratio)
     val wooferTargetDps = hornTargetDps / ratioFactor
 
+    // rememberUpdatedState so the LaunchedEffect always sees current targets
+    val currentHornTarget by rememberUpdatedState(hornTargetDps)
+    val currentWooferTarget by rememberUpdatedState(wooferTargetDps)
+
     // Mutable state for physics simulation
     var hornAngle by remember { mutableFloatStateOf(0f) }
     var wooferAngle by remember { mutableFloatStateOf(0f) }
@@ -107,18 +112,22 @@ fun HornPanel(
                 val dt = (frameNanos - lastNanos) / 1_000_000_000f  // seconds
                 lastNanos = frameNanos
 
+                // Read current targets (updated via rememberUpdatedState)
+                val hornTarget = currentHornTarget
+                val wooferTarget = currentWooferTarget
+
                 // Exponential slew toward target velocity (different time constants for up/down)
-                val hornTau = if (hornTargetDps > hornVelocity) RAMP_UP_TAU else RAMP_DOWN_TAU
-                val wooferTau = if (wooferTargetDps > wooferVelocity) RAMP_UP_TAU else RAMP_DOWN_TAU
+                val hornTau = if (hornTarget > hornVelocity) RAMP_UP_TAU else RAMP_DOWN_TAU
+                val wooferTau = if (wooferTarget > wooferVelocity) RAMP_UP_TAU else RAMP_DOWN_TAU
                 val hornAlpha = 1f - kotlin.math.exp(-dt / hornTau)
                 val wooferAlpha = 1f - kotlin.math.exp(-dt / wooferTau)
 
-                hornVelocity += hornAlpha * (hornTargetDps - hornVelocity)
-                wooferVelocity += wooferAlpha * (wooferTargetDps - wooferVelocity)
+                hornVelocity += hornAlpha * (hornTarget - hornVelocity)
+                wooferVelocity += wooferAlpha * (wooferTarget - wooferVelocity)
 
                 // Stop completely when velocity is negligible
-                if (hornVelocity < 0.5f && hornTargetDps == 0f) hornVelocity = 0f
-                if (wooferVelocity < 0.5f && wooferTargetDps == 0f) wooferVelocity = 0f
+                if (hornVelocity < 0.5f && hornTarget == 0f) hornVelocity = 0f
+                if (wooferVelocity < 0.5f && wooferTarget == 0f) wooferVelocity = 0f
 
                 // Accumulate angle
                 hornAngle = (hornAngle + hornVelocity * dt) % 360f
