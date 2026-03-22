@@ -299,7 +299,7 @@ private fun TurntablePlatter(
                         onDrag = { change, _ ->
                             change.consume()
                             val deltaY = change.position.y - lastY
-                            val scratchVelocity = (deltaY * pxToVelocity).coerceIn(-3f, 3f)
+                            val scratchVelocity = (deltaY * pxToVelocity).coerceIn(-5f, 5f)
                             currentOnDrag(scratchVelocity)
                             lastY = change.position.y
                         },

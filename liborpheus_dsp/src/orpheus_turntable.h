@@ -9,7 +9,7 @@ struct GraphUnit;
 static constexpr int kTurntableBufSize = 192000;  // ~4 sec at 48kHz
 static constexpr int kTurntableVizSize = 128;      // downsampled waveform snapshot
 static constexpr float kTurntableBypassThreshold = 0.001f;
-static constexpr float kTurntableVelSmoothCoeff = 0.06f;  // ~5ms at 64-sample blocks
+static constexpr float kTurntableVelSmoothCoeff = 0.15f;  // snappy scratch response
 
 enum TurntableSource : int {
     TT_SOURCE_SYNTH  = 0,

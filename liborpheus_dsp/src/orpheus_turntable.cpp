@@ -59,11 +59,11 @@ static void playback_deck(TurntableDeck* deck, float target_velocity,
 // Source-dependent gain — source buffers are normalized low
 static float turntable_source_gain(int src) {
     switch (src) {
-        case TT_SOURCE_SYNTH:  return 4.0f;
-        case TT_SOURCE_DRUMS:  return 2.0f;
-        case TT_SOURCE_BASS:   return 2.0f;
-        case TT_SOURCE_MASTER: return 1.0f;
-        default:               return 4.0f;
+        case TT_SOURCE_SYNTH:  return 10.0f;
+        case TT_SOURCE_DRUMS:  return 4.0f;
+        case TT_SOURCE_BASS:   return 4.0f;
+        case TT_SOURCE_MASTER: return 2.0f;
+        default:               return 6.0f;
     }
 }
 
