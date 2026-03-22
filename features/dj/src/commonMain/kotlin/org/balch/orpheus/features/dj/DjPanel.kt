@@ -84,7 +84,7 @@ fun DjPanel(
     CollapsibleColumnPanel(
         title = "DJ",
         color = djColors.panelColor,
-        expandedTitle = "Scratchers",
+        expandedTitle = "Itchy & Scratchy",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
