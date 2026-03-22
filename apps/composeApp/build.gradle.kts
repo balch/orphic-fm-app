@@ -83,6 +83,7 @@ kotlin {
             api(project(":features:drum"))
             api(project(":features:flux"))
             api(project(":features:grains"))
+            api(project(":features:horn"))
             api(project(":features:resonator"))
             api(project(":features:reverb"))
             api(project(":features:lfo"))
