@@ -34,6 +34,8 @@ class HornPanelRegistration(
             feature = HornViewModel.feature(),
             inVizFlow = synthEngine.hornInVizFlow,
             outVizFlow = synthEngine.hornOutVizFlow,
+            hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
+            wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,

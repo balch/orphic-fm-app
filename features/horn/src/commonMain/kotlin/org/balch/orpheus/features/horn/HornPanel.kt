@@ -74,6 +74,8 @@ fun HornPanel(
     feature: HornFeature = HornViewModel.feature(),
     inVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     outVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
+    hornPhaseVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
+    wooferPhaseVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)),
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -82,6 +84,8 @@ fun HornPanel(
     val actions = feature.actions
     val inViz by inVizFlow.collectAsState()
     val outViz by outVizFlow.collectAsState()
+    val hornPhaseViz by hornPhaseVizFlow.collectAsState()
+    val wooferPhaseViz by wooferPhaseVizFlow.collectAsState()
 
     // ── Physics-based rotor animation ──────────────────────────────────────
     // Each rotor has a current velocity (deg/sec) that accelerates/decelerates
@@ -146,8 +150,10 @@ fun HornPanel(
         initialExpanded = false,
         modifier = modifier,
         backgroundContent = {
-            SignalTrace(data = inViz, color = Color(0xFFFF6644))   // bright orange-red for input
-            SignalTrace(data = outViz, color = Color(0xFFFF2222))  // bright red for output
+            SignalTrace(data = inViz, color = Color(0xFFFF6644))         // bright orange-red for input
+            SignalTrace(data = outViz, color = Color(0xFFFF2222))        // bright red for output
+            SignalTrace(data = hornPhaseViz, color = CrimsonHorn)        // horn rotor phase (fast sawtooth)
+            SignalTrace(data = wooferPhaseViz, color = CrimsonWoofer)    // woofer rotor phase (slow sawtooth)
         }
     ) {
         // Dual rotor animation area — fixed width, centered

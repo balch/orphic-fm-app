@@ -206,10 +206,13 @@ struct OrpheusHorn {
             // amplitude modulation that's opposite between channels.
             // L mic hears horn approach → louder, R mic hears it recede → softer.
             // Use horn phase for treble AM, woofer phase for bass AM.
-            float horn_am_l = 0.7f + 0.3f * slow_0;     // 0.4..1.0
-            float horn_am_r = 0.7f - 0.3f * slow_0;     // 1.0..0.4 (opposite)
-            float woof_am_l = 0.8f + 0.2f * fast_0;     // 0.6..1.0 (subtler)
-            float woof_am_r = 0.8f - 0.2f * fast_0;     // 1.0..0.6
+            // AM depth scales with depth_param: 0→subtle, 1→dramatic
+            float horn_am_depth = 0.15f + 0.35f * depth_param;  // 0.15..0.50
+            float woof_am_depth = 0.10f + 0.25f * depth_param;  // 0.10..0.35
+            float horn_am_l = 1.0f - horn_am_depth + horn_am_depth * (0.5f + 0.5f * slow_0);
+            float horn_am_r = 1.0f - horn_am_depth + horn_am_depth * (0.5f - 0.5f * slow_0);
+            float woof_am_l = 1.0f - woof_am_depth + woof_am_depth * (0.5f + 0.5f * fast_0);
+            float woof_am_r = 1.0f - woof_am_depth + woof_am_depth * (0.5f - 0.5f * fast_0);
 
             // Apply stereo AM: treble portion modulated by horn, bass by woofer
             // Blend with amount — at amount=0, no AM
