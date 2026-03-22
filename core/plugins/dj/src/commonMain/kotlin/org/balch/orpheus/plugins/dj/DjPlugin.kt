@@ -33,7 +33,8 @@ class DjPlugin(
         const val URI = DJ_URI
     }
 
-    private var _mix = 0f
+    private var _wetA = 0f
+    private var _wetB = 0f
     private var _sourceA = DjSource.SYNTH.index
     private var _sourceB = DjSource.BASS.index
     private var _velocityA = 1f
@@ -45,12 +46,20 @@ class DjPlugin(
     private var _reverbSend = 0f
 
     private val portDefs = ports(startIndex = 2) {
-        controlPort(DjSymbol.MIX) {
+        controlPort(DjSymbol.WET_A) {
             floatType {
                 min = 0f; max = 1f
                 default = 0f
-                get { _mix }
-                set { _mix = it }
+                get { _wetA }
+                set { _wetA = it }
+            }
+        }
+        controlPort(DjSymbol.WET_B) {
+            floatType {
+                min = 0f; max = 1f
+                default = 0f
+                get { _wetB }
+                set { _wetB = it }
             }
         }
         controlPort(DjSymbol.SOURCE_A) {

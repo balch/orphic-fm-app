@@ -10,7 +10,8 @@ enum class DjSymbol(
     override val uri: String = DJ_URI,
     override val displayName: String = symbol.replaceFirstChar { it.uppercase() }
 ) : PortSymbol {
-    MIX("mix", displayName = "Mix"),
+    WET_A("wet_a", displayName = "Wet A"),
+    WET_B("wet_b", displayName = "Wet B"),
     SOURCE_A("source_a", displayName = "Source A"),
     SOURCE_B("source_b", displayName = "Source B"),
     VELOCITY_A("velocity_a", displayName = "Velocity A"),

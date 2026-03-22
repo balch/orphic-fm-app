@@ -290,7 +290,7 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // bass_voice → overdrive → compressor → master bus + delay/reverb sends
     val bassVoiceUnit = bassVoice("bass_voice")
     val bassOverdrive = overdrive("bass_overdrive")
-    val bassCompressor = compressor("bass_compressor")
+    val bassCompressor = compressor("bass_compressor") { duckSource = 3f } // DUCK_BASS
     bassVoiceUnit.out to bassOverdrive.input
     bassOverdrive.out to bassCompressor.input
     // Bass → delay send (shared bus with synth/warps/looper)
@@ -358,8 +358,8 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     drumDirectResoWetGainR.out to drumDirectResoSumR.inputB
 
     // Limiter (drive=1.0)
-    val drumDirectLimiterL = limiter("drumDirectLimiterL") { driveAmount = 1.0f }
-    val drumDirectLimiterR = limiter("drumDirectLimiterR") { driveAmount = 1.0f }
+    val drumDirectLimiterL = limiter("drumDirectLimiterL") { driveAmount = 1.0f; duckSource = 2f } // DUCK_DRUMS
+    val drumDirectLimiterR = limiter("drumDirectLimiterR") { driveAmount = 1.0f; duckSource = 2f } // DUCK_DRUMS
     drumDirectResoSumL.out to drumDirectLimiterL.input
     drumDirectResoSumR.out to drumDirectLimiterR.input
 
@@ -372,7 +372,7 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     bassCompressor.out to master.inputB
 
     // Per-String Bender (4 strings × 2 voices + audio)
-    val psb = perStringBender("psb")
+    val psb = perStringBender("psb") { duckSource = 1f } // DUCK_SYNTH
     psb.out to master.inputA               // per-string audio → output
     psb.outRight to master.inputB
     turntableUnit.out to master.inputA      // Turntable direct to output (mono → both)

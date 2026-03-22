@@ -43,12 +43,33 @@ static void capture_source(TurntableDeck* deck, const float* source, int num_fra
 
 static void playback_deck(TurntableDeck* deck, float target_velocity,
                            float* out, int num_frames) {
+    // One-pole anti-alias filter state (persists across calls via static-like reuse
+    // of the deck's smoothed_velocity field — we add a separate filter state).
+    // At |velocity| > 1, the read head skips samples, causing aliasing.
+    // A simple one-pole LPF with cutoff ∝ 1/|velocity| tames it.
+    float lpf_state = 0.0f;
+    // Prime the filter with the first sample to avoid startup click
+    lpf_state = cubic_interp(deck->buffer, kTurntableBufSize, deck->read_pos);
+
     for (int i = 0; i < num_frames; i++) {
         // One-pole velocity smoothing (per-sample for smooth transitions)
         deck->smoothed_velocity += kTurntableVelSmoothCoeff *
             (target_velocity - deck->smoothed_velocity);
 
-        out[i] = cubic_interp(deck->buffer, kTurntableBufSize, deck->read_pos);
+        float raw = cubic_interp(deck->buffer, kTurntableBufSize, deck->read_pos);
+
+        // Anti-alias: stronger filtering at higher speeds
+        float abs_vel = std::fabs(deck->smoothed_velocity);
+        if (abs_vel > 1.0f) {
+            // Coefficient: 1/|vel| gives ~6dB/oct rolloff above Nyquist/vel
+            float alpha = 1.0f / abs_vel;
+            lpf_state += alpha * (raw - lpf_state);
+            out[i] = lpf_state;
+        } else {
+            lpf_state = raw;
+            out[i] = raw;
+        }
+
         deck->read_pos = wrap_pos(
             deck->read_pos + deck->smoothed_velocity,
             kTurntableBufSize
@@ -98,19 +119,18 @@ void turntable_get_viz(TurntableDeck* deck, float* out_buffer) {
 void unit_process_turntable(GraphUnit* u, OrpheusEngine* engine,
                             int num_frames, float sample_rate) {
     // Load control atomics
-    float target_mix = engine->turntable_mix.load(std::memory_order_relaxed);
+    float target_wet_a = engine->turntable_wet_a.load(std::memory_order_relaxed);
+    float target_wet_b = engine->turntable_wet_b.load(std::memory_order_relaxed);
     float vel_a = engine->turntable_velocity_a.load(std::memory_order_relaxed);
     float vel_b = engine->turntable_velocity_b.load(std::memory_order_relaxed);
     bool frozen_a = engine->turntable_frozen_a.load(std::memory_order_relaxed) != 0;
     bool frozen_b = engine->turntable_frozen_b.load(std::memory_order_relaxed) != 0;
     int src_a = engine->turntable_source_a.load(std::memory_order_relaxed);
     int src_b = engine->turntable_source_b.load(std::memory_order_relaxed);
-    float xfade = engine->turntable_crossfader.load(std::memory_order_relaxed);
 
     auto& deck_a = engine->turntable_decks[0];
     auto& deck_b = engine->turntable_decks[1];
 
-    // Update frozen state
     deck_a.frozen = frozen_a;
     deck_b.frozen = frozen_b;
     deck_a.source = src_a;
@@ -127,47 +147,56 @@ void unit_process_turntable(GraphUnit* u, OrpheusEngine* engine,
         }
     };
 
-    // Always capture — decks should be "recording" even when mix is down,
+    const float* dry_a = get_source(src_a);
+    const float* dry_b = get_source(src_b);
+
+    // Always capture — decks should be "recording" even when wet is down,
     // so there's material ready to play when the user brings the fader up.
-    if (!deck_a.frozen) capture_source(&deck_a, get_source(src_a), num_frames);
-    if (!deck_b.frozen) capture_source(&deck_b, get_source(src_b), num_frames);
+    if (!deck_a.frozen) capture_source(&deck_a, dry_a, num_frames);
+    if (!deck_b.frozen) capture_source(&deck_b, dry_b, num_frames);
 
     // Always update viz so platter waveforms show captured audio
     turntable_update_viz(&deck_a);
     turntable_update_viz(&deck_b);
 
-    // Output bypass — silence output but don't skip capture/viz
-    bool bypassed = target_mix <= kTurntableBypassThreshold;
+    // Bypass when both decks are fully dry
+    bool bypassed = target_wet_a <= kTurntableBypassThreshold
+                 && target_wet_b <= kTurntableBypassThreshold;
     if (bypassed) {
         std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
-        engine->turntable_smooth_mix = 0.0f;
+        engine->turntable_smooth_wet_a = 0.0f;
+        engine->turntable_smooth_wet_b = 0.0f;
         engine->viz_rings[VIZ_DJ_OUT].write(0.0f);
         return;
     }
 
-    // Smooth mix to avoid clicks
-    float mix = engine->turntable_smooth_mix;
-    float mix_inc = (target_mix - mix) / static_cast<float>(num_frames);
+    // Smooth per-deck wet levels to avoid clicks
+    float wet_a = engine->turntable_smooth_wet_a;
+    float wet_b = engine->turntable_smooth_wet_b;
+    float wet_a_inc = (target_wet_a - wet_a) / static_cast<float>(num_frames);
+    float wet_b_inc = (target_wet_b - wet_b) / static_cast<float>(num_frames);
 
     // Playback
-    float out_a[kMaxFrames];
-    float out_b[kMaxFrames];
-    playback_deck(&deck_a, vel_a, out_a, num_frames);
-    playback_deck(&deck_b, vel_b, out_b, num_frames);
+    float play_a[kMaxFrames];
+    float play_b[kMaxFrames];
+    playback_deck(&deck_a, vel_a, play_a, num_frames);
+    playback_deck(&deck_b, vel_b, play_b, num_frames);
 
     float boost_a = turntable_source_gain(src_a);
     float boost_b = turntable_source_gain(src_b);
 
-    // Crossfade (constant power)
-    float gain_a = std::cos(xfade * 1.5707963f) * boost_a;  // pi/2
-    float gain_b = std::sin(xfade * 1.5707963f) * boost_b;
-
+    // Each fader controls turntable playback level.  The dry source path is
+    // attenuated by duck_source tags on the graph units (bass compressor, drum
+    // limiter, PSB) computed at the start of graph_process.  This gives a clean
+    // crossfade: as wet goes up, dry goes down — works for both live and frozen.
     float* out = u->output_buffers[OPORT_OUT];
     for (int i = 0; i < num_frames; i++) {
-        mix += mix_inc;
-        out[i] = (out_a[i] * gain_a + out_b[i] * gain_b) * mix;
+        wet_a += wet_a_inc;
+        wet_b += wet_b_inc;
+        out[i] = play_a[i] * boost_a * wet_a + play_b[i] * boost_b * wet_b;
     }
-    engine->turntable_smooth_mix = mix;
+    engine->turntable_smooth_wet_a = wet_a;
+    engine->turntable_smooth_wet_b = wet_b;
 
     // Write peak to VizRing for Orphoscope time-series trace
     {

@@ -72,6 +72,7 @@ const val PARAM_INPUT_A = 10
 const val PARAM_INPUT_B = 11
 const val PARAM_INPUT_C = 12
 const val PARAM_MODULE_INDEX = 13
+const val PARAM_DUCK_SOURCE = 14   // DuckSource enum: 0=none, 1=synth, 2=drums, 3=bass
 
 // ── DSL types ───────────────────────────────────────────────────────────────
 
@@ -162,6 +163,9 @@ class UnitParamBuilder internal constructor() {
     var moduleIndex: Float
         get() = error("Write-only")
         set(v) { params.add(PARAM_MODULE_INDEX to v) }
+    var duckSource: Float
+        get() = error("Write-only")
+        set(v) { params.add(PARAM_DUCK_SOURCE to v) }
 }
 
 /**

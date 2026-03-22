@@ -30,11 +30,12 @@ import org.balch.orpheus.core.plugin.symbols.DjSymbol
 
 @Immutable
 data class DjUiState(
-    val mix: Float = 0f,
+    val wetA: Float = 0f,
+    val wetB: Float = 0f,
     val sourceA: DjSource = DjSource.SYNTH,
     val sourceB: DjSource = DjSource.BASS,
-    val velocityA: Float = 1f,
-    val velocityB: Float = 1f,
+    val velocityA: Float = 0f,
+    val velocityB: Float = 0f,
     val frozenA: Boolean = false,
     val frozenB: Boolean = false,
     val crossfader: Float = 0.5f,
@@ -44,7 +45,8 @@ data class DjUiState(
 
 @Immutable
 data class DjPanelActions(
-    val setMix: (Float) -> Unit,
+    val setWetA: (Float) -> Unit,
+    val setWetB: (Float) -> Unit,
     val setSourceA: (Int) -> Unit,
     val setSourceB: (Int) -> Unit,
     val setCrossfader: (Float) -> Unit,
@@ -54,13 +56,14 @@ data class DjPanelActions(
     val setPlatterRelease: (Int) -> Unit,
 ) {
     companion object {
-        val EMPTY = DjPanelActions({}, {}, {}, {}, {}, {}, { _, _ -> }, {})
+        val EMPTY = DjPanelActions({}, {}, {}, {}, {}, {}, {}, { _, _ -> }, {})
     }
 }
 
 /** User intents for the DJ panel. */
 private sealed interface DjIntent {
-    data class SetMix(val value: Float) : DjIntent
+    data class SetWetA(val value: Float) : DjIntent
+    data class SetWetB(val value: Float) : DjIntent
     data class SetSourceA(val source: DjSource) : DjIntent
     data class SetSourceB(val source: DjSource) : DjIntent
     data class SetCrossfader(val value: Float) : DjIntent
@@ -88,7 +91,8 @@ class DjViewModel(
 ) : DjFeature {
 
     // Control flows for DJ plugin ports
-    private val mixId = synthController.controlFlow(DjSymbol.MIX.controlId)
+    private val wetAId = synthController.controlFlow(DjSymbol.WET_A.controlId)
+    private val wetBId = synthController.controlFlow(DjSymbol.WET_B.controlId)
     private val sourceAId = synthController.controlFlow(DjSymbol.SOURCE_A.controlId)
     private val sourceBId = synthController.controlFlow(DjSymbol.SOURCE_B.controlId)
     private val velocityAId = synthController.controlFlow(DjSymbol.VELOCITY_A.controlId)
@@ -110,7 +114,8 @@ class DjViewModel(
     private var currentVelocityB = MOTOR_SPEED
 
     // Direct setters for physics-driven ports (send to C++ engine)
-    private val mixSetter = mixId.floatSetter()
+    private val wetASetter = wetAId.floatSetter()
+    private val wetBSetter = wetBId.floatSetter()
     private val setVelocityA = velocityAId.floatSetter()
     private val setVelocityB = velocityBId.floatSetter()
     private val setFrozenA = frozenAId.boolSetter()
@@ -120,7 +125,8 @@ class DjViewModel(
     private val physicsIntentFlow = MutableSharedFlow<DjIntent>(extraBufferCapacity = 1)
 
     override val actions = DjPanelActions(
-        setMix = { v -> currentMix = v; mixSetter(v) },
+        setWetA = { v -> currentWetA = v; wetASetter(v) },
+        setWetB = { v -> currentWetB = v; wetBSetter(v) },
         setSourceA = sourceAId.intSetter(),
         setSourceB = sourceBId.intSetter(),
         setCrossfader = crossfaderId.floatSetter(),
@@ -140,8 +146,9 @@ class DjViewModel(
         },
     )
 
-    // Track current mix for gating the physics loop
-    private var currentMix = 0f
+    // Track current wet levels for gating the physics loop
+    private var currentWetA = 0f
+    private var currentWetB = 0f
 
     init {
         // Physics simulation at ~60Hz — drives velocity/frozen to C++ engine.
@@ -150,34 +157,40 @@ class DjViewModel(
             while (true) {
                 delay(16)
 
-                // Skip physics when DJ is fully bypassed and nobody is touching
-                if (currentMix <= kMixBypassThreshold && !touchingA && !touchingB) continue
+                val deckAActive = currentWetA > kMixBypassThreshold || touchingA
+                val deckBActive = currentWetB > kMixBypassThreshold || touchingB
 
-                // Deck A
-                if (touchingA) {
-                    // While touching: smoothly follow drag velocity (responsive but not jerky)
-                    currentVelocityA = lerp(currentVelocityA, dragVelocityA, SCRATCH_RESPONSE)
-                } else {
-                    // Released: smoothly return to motor speed
-                    currentVelocityA = lerp(currentVelocityA, MOTOR_SPEED, MOTOR_DECAY)
-                }
-                setVelocityA(currentVelocityA)
-                setFrozenA(touchingA)
+                // Skip physics when both decks are fully dry and nobody is touching
+                if (!deckAActive && !deckBActive) continue
 
-                // Deck B
-                if (touchingB) {
-                    currentVelocityB = lerp(currentVelocityB, dragVelocityB, SCRATCH_RESPONSE)
-                } else {
-                    currentVelocityB = lerp(currentVelocityB, MOTOR_SPEED, MOTOR_DECAY)
+                // Deck A — only run physics when this deck is active
+                if (deckAActive) {
+                    if (touchingA) {
+                        currentVelocityA = lerp(currentVelocityA, dragVelocityA, SCRATCH_RESPONSE)
+                    } else {
+                        currentVelocityA = lerp(currentVelocityA, MOTOR_SPEED, MOTOR_DECAY)
+                    }
+                    setVelocityA(currentVelocityA)
+                    setFrozenA(touchingA)
                 }
-                setVelocityB(currentVelocityB)
-                setFrozenB(touchingB)
+
+                // Deck B — only run physics when this deck is active
+                if (deckBActive) {
+                    if (touchingB) {
+                        currentVelocityB = lerp(currentVelocityB, dragVelocityB, SCRATCH_RESPONSE)
+                    } else {
+                        currentVelocityB = lerp(currentVelocityB, MOTOR_SPEED, MOTOR_DECAY)
+                    }
+                    setVelocityB(currentVelocityB)
+                    setFrozenB(touchingB)
+                }
 
                 // Emit to MVI so UiState reflects velocity/frozen for UI display
+                // Inactive decks report 0 velocity so platters don't spin
                 physicsIntentFlow.tryEmit(
                     DjIntent.PhysicsTick(
-                        velocityA = currentVelocityA,
-                        velocityB = currentVelocityB,
+                        velocityA = if (deckAActive) currentVelocityA else 0f,
+                        velocityB = if (deckBActive) currentVelocityB else 0f,
                         frozenA = touchingA,
                         frozenB = touchingB,
                     )
@@ -189,7 +202,8 @@ class DjViewModel(
     // Control changes + physics -> DjIntent
     private val controlIntents = merge(
         physicsIntentFlow,
-        mixId.map { DjIntent.SetMix(it.asFloat()) },
+        wetAId.map { DjIntent.SetWetA(it.asFloat()) },
+        wetBId.map { DjIntent.SetWetB(it.asFloat()) },
         sourceAId.map {
             val sources = DjSource.entries
             val index = it.asInt().coerceIn(0, sources.size - 1)
@@ -223,7 +237,8 @@ class DjViewModel(
 
     private fun reduce(state: DjUiState, intent: DjIntent): DjUiState =
         when (intent) {
-            is DjIntent.SetMix -> state.copy(mix = intent.value)
+            is DjIntent.SetWetA -> state.copy(wetA = intent.value)
+            is DjIntent.SetWetB -> state.copy(wetB = intent.value)
             is DjIntent.SetSourceA -> state.copy(sourceA = intent.source)
             is DjIntent.SetSourceB -> state.copy(sourceB = intent.source)
             is DjIntent.SetCrossfader -> state.copy(crossfader = intent.value)

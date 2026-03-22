@@ -116,6 +116,9 @@ int orpheus_graph_load(OrpheusGraph* graph, const uint8_t* data,
                 case PARAM_MODULE_INDEX:
                     u->state.module.index = static_cast<int>(val);
                     break;
+                case PARAM_DUCK_SOURCE:
+                    u->duck_source = static_cast<uint8_t>(val);
+                    break;
             }
         }
 
@@ -363,6 +366,26 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
         if (engine->warps_smooth_mix < 0.0001f) engine->warps_smooth_mix = 0.0f;
     }
 
+    // Turntable duck gains: attenuate dry source paths when DJ faders are up.
+    // Each deck's wet level ducks its selected source.  Two decks on the same
+    // source multiply: duck = (1 - wet_a_if_src) * (1 - wet_b_if_src).
+    {
+        float wa = engine->turntable_wet_a.load(std::memory_order_relaxed);
+        float wb = engine->turntable_wet_b.load(std::memory_order_relaxed);
+        int sa = engine->turntable_source_a.load(std::memory_order_relaxed);
+        int sb = engine->turntable_source_b.load(std::memory_order_relaxed);
+        float ds = 1.0f, dd = 1.0f, db = 1.0f;
+        if (sa == TT_SOURCE_SYNTH)  ds *= (1.0f - wa);
+        if (sa == TT_SOURCE_DRUMS)  dd *= (1.0f - wa);
+        if (sa == TT_SOURCE_BASS)   db *= (1.0f - wa);
+        if (sb == TT_SOURCE_SYNTH)  ds *= (1.0f - wb);
+        if (sb == TT_SOURCE_DRUMS)  dd *= (1.0f - wb);
+        if (sb == TT_SOURCE_BASS)   db *= (1.0f - wb);
+        engine->turntable_duck_synth = ds;
+        engine->turntable_duck_drums = dd;
+        engine->turntable_duck_bass  = db;
+    }
+
     for (int ei = 0; ei < graph->exec_count; ei++) {
         int idx = graph->exec_order[ei];
         GraphUnit* u = &graph->units[idx];
@@ -448,6 +471,23 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
             case UNIT_TURNTABLE:
                 unit_process_turntable(u, engine, num_frames, sr); break;
             default: break;
+        }
+
+        // Turntable duck: attenuate this unit's output if tagged as a source
+        if (u->duck_source != DUCK_NONE) {
+            float duck = 1.0f;
+            switch (u->duck_source) {
+                case DUCK_SYNTH: duck = engine->turntable_duck_synth; break;
+                case DUCK_DRUMS: duck = engine->turntable_duck_drums; break;
+                case DUCK_BASS:  duck = engine->turntable_duck_bass;  break;
+                default: break;
+            }
+            if (duck < 0.999f) {
+                for (int p = 0; p < kMaxOutputPorts; p++) {
+                    for (int i = 0; i < num_frames; i++)
+                        u->output_buffers[p][i] *= duck;
+                }
+            }
         }
     }
 

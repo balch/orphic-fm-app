@@ -8,7 +8,8 @@
 static bool test_turntable_bypass_at_zero_mix() {
     printf("\n=== Test: Turntable bypass at zero mix ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
-    engine->turntable_mix.store(0.0f);
+    engine->turntable_wet_a.store(0.0f);
+    engine->turntable_wet_b.store(0.0f);
 
     GraphUnit u;
     std::memset(&u, 0, sizeof(u));
@@ -31,7 +32,8 @@ static bool test_turntable_bypass_at_zero_mix() {
 static bool test_turntable_captures_source() {
     printf("\n=== Test: Turntable captures source into buffer ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
-    engine->turntable_mix.store(1.0f);
+    engine->turntable_wet_a.store(1.0f);
+    engine->turntable_wet_b.store(1.0f);
     engine->turntable_source_a.store(TT_SOURCE_SYNTH);
     engine->turntable_crossfader.store(0.0f);
 
@@ -60,7 +62,8 @@ static bool test_turntable_captures_source() {
 static bool test_turntable_freeze_stops_capture() {
     printf("\n=== Test: Freeze stops buffer capture ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
-    engine->turntable_mix.store(1.0f);
+    engine->turntable_wet_a.store(1.0f);
+    engine->turntable_wet_b.store(1.0f);
     engine->turntable_source_a.store(TT_SOURCE_SYNTH);
     engine->turntable_frozen_a.store(0);
     engine->turntable_crossfader.store(0.0f);
@@ -91,7 +94,8 @@ static bool test_turntable_freeze_stops_capture() {
 static bool test_turntable_crossfader() {
     printf("\n=== Test: Crossfader blends decks ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
-    engine->turntable_mix.store(1.0f);
+    engine->turntable_wet_a.store(1.0f);
+    engine->turntable_wet_b.store(1.0f);
     // Explicitly set both decks to the same source so the equal-gain
     // assumption (both use TT_SOURCE_SYNTH gain) is visible in the test.
     engine->turntable_source_a.store(TT_SOURCE_SYNTH);
@@ -132,7 +136,8 @@ static bool test_turntable_viz_snapshot() {
 
     // Freeze deck A so buffer data is preserved, then process one block
     // to trigger turntable_update_viz which populates the snapshot.
-    engine->turntable_mix.store(1.0f);
+    engine->turntable_wet_a.store(1.0f);
+    engine->turntable_wet_b.store(1.0f);
     engine->turntable_frozen_a.store(1);
     engine->turntable_frozen_b.store(1);
     engine->turntable_crossfader.store(0.0f);

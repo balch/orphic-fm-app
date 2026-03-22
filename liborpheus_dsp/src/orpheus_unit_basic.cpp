@@ -293,6 +293,7 @@ void unit_init(GraphUnit* u, float sr) {
         std::memset(u->output_buffers[p], 0, sizeof(u->output_buffers[p]));
 
     u->enabled = true;
+    u->duck_source = DUCK_NONE;
 
     switch (u->type) {
         case UNIT_TRIANGLE_OSC:

@@ -81,6 +81,7 @@ enum OrpheusParamKey : uint16_t {
     PARAM_INPUT_B = 11,
     PARAM_INPUT_C = 12,
     PARAM_MODULE_INDEX = 13,
+    PARAM_DUCK_SOURCE = 14,  // DuckSource enum value
 };
 
 // ── Port map entry (URI+symbol hash → unit+port) ─
@@ -158,10 +159,19 @@ union UnitState {
 };
 
 // ── Graph unit ──────────────────────────────────
+// Turntable duck source tag — applied after unit processes
+enum DuckSource : uint8_t {
+    DUCK_NONE  = 0,
+    DUCK_SYNTH = 1,
+    DUCK_DRUMS = 2,
+    DUCK_BASS  = 3,
+};
+
 struct GraphUnit {
     uint16_t type;
     uint16_t id;
     bool     enabled;
+    uint8_t  duck_source;  // DuckSource — turntable ducks this unit's output
     GraphPort inputs[kMaxInputPorts];
     float     output_buffers[kMaxOutputPorts][kMaxFrames];
     UnitState state;

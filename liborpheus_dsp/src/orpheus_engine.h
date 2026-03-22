@@ -558,7 +558,8 @@ struct OrpheusEngine {
 
     // ── DJ Turntable ──
     TurntableDeck turntable_decks[2];
-    std::atomic<float> turntable_mix{0.0f};
+    std::atomic<float> turntable_wet_a{0.0f};    // per-deck dry/wet (0=dry source, 1=turntable)
+    std::atomic<float> turntable_wet_b{0.0f};
     std::atomic<float> turntable_velocity_a{1.0f};
     std::atomic<float> turntable_velocity_b{1.0f};
     std::atomic<int>   turntable_frozen_a{0};
@@ -568,7 +569,14 @@ struct OrpheusEngine {
     std::atomic<float> turntable_crossfader{0.5f};
     std::atomic<float> turntable_delay_send{0.0f};
     std::atomic<float> turntable_reverb_send{0.0f};
-    float turntable_smooth_mix = 0.0f;
+    float turntable_smooth_wet_a = 0.0f;
+    float turntable_smooth_wet_b = 0.0f;
+
+    // Per-source duck gains — computed at start of graph_process from turntable
+    // wet levels. Applied in compressor (bass), limiter (drums), PSB (synth).
+    float turntable_duck_synth = 1.0f;
+    float turntable_duck_drums = 1.0f;
+    float turntable_duck_bass  = 1.0f;
 
     // Bass double-buffer read (new, for turntable + future use)
     float warps_bass_read[kMaxFrames] = {};
