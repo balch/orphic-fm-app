@@ -97,6 +97,7 @@ class SignalMonitorViz(
         Channel("BASS", OrpheusColors.bassAmber),
         Channel("HORN-IN", OrpheusColors.hornWoofer),
         Channel("HORN-OUT", OrpheusColors.hornCrimson),
+        Channel("DJ", OrpheusColors.djRed),
         Channel("MASTER", OrpheusColors.neonMagenta),
     )
 
@@ -120,6 +121,7 @@ class SignalMonitorViz(
         val bassOutData by engine.bassOutVizFlow.collectAsState()
         val hornInData by engine.hornInVizFlow.collectAsState()
         val hornOutData by engine.hornOutVizFlow.collectAsState()
+        val djOutData by engine.djOutVizFlow.collectAsState()
         val masterOutData by engine.masterOutVizFlow.collectAsState()
 
         val allData = listOf(
@@ -130,6 +132,7 @@ class SignalMonitorViz(
             drumOutData, grainsInData, grainsOutData,
             bassOutData,
             hornInData, hornOutData,
+            djOutData,
             masterOutData
         )
         val paths = remember { Array(channels.size) { Path() } }

@@ -203,6 +203,15 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetViz(
     return count;
 }
 
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetTurntableViz(
+        JNIEnv *env, jobject thiz,
+        jint deck, jfloatArray outBuf) {
+    jfloat* buf = env->GetFloatArrayElements(outBuf, nullptr);
+    sEngine.getTurntableViz(deck, buf);
+    env->ReleaseFloatArrayElements(outBuf, buf, 0);
+}
+
 // -- Automation ---------------------------------------------------------------
 
 JNIEXPORT void JNICALL

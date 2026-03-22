@@ -37,6 +37,7 @@ value class PanelId(val id: String) {
         val ASL_MAESTRO = PanelId("mediapipe")
         val BASS = PanelId("bass")
         val HORN = PanelId("horn")
+        val DJ = PanelId("dj")
     }
 }
 

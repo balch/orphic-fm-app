@@ -112,6 +112,7 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_overdrive.cpp"
     "src/orpheus_unit_compressor.cpp"
     "src/orpheus_unit_horn.cpp"
+    "src/orpheus_turntable.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
 )
@@ -179,6 +180,7 @@ if(BUILD_TESTS)
         test/test_benchmark.cpp
         test/test_bass_voice.cpp
         test/test_horn.cpp
+        test/test_turntable.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE

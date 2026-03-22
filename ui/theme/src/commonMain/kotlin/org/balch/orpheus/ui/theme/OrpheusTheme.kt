@@ -261,6 +261,12 @@ object OrpheusColors {
     val hornBorder = Color(0xFF1A0808)               // Subtle crimson border
     val hornKnob = Color(0xFFAA2222)                 // Knob ring crimson
 
+    // DJ Turntable Palette — Cleveland Guardians
+    val djNavy = Color(0xFF0C2340)                   // Midnight Navy (panel bg, track)
+    val djRed = Color(0xFFE31937)                    // Fastball Red (primary accent)
+    val djRedLight = Color(0xFFFF4D5E)               // Lighter red (knob, progress)
+    val djCream = Color(0xFFF5F0E1)                  // Cream (labels, frozen indicator)
+
     // Warps Meta-Modulator Palette
     val warpsGreen = Color(0xFF90EE90)           // Primary Warps Green
     val warpsYellow = Color(0xFFFFFF00)          // Bright Yellow for accents

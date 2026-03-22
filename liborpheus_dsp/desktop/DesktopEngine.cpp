@@ -157,6 +157,10 @@ void DesktopEngine::getMonitor(OrpheusMonitorData* out) {
 int DesktopEngine::getViz(int channel, float* outBuf, int maxSamples, int* lastReadPos) {
     return dsp_engine_ ? orpheus_engine_get_viz(dsp_engine_, channel, outBuf, maxSamples, lastReadPos) : 0;
 }
+void DesktopEngine::getTurntableViz(int deck, float* outBuf) {
+    if (dsp_engine_) orpheus_engine_get_turntable_viz(dsp_engine_, deck, outBuf);
+    else memset(outBuf, 0, 129 * sizeof(float));
+}
 void DesktopEngine::setAutomation(int target, int voiceIndex, const float* times, const float* values, int count) {
     if (dsp_engine_) orpheus_engine_set_automation(dsp_engine_, target, voiceIndex, times, values, count);
 }

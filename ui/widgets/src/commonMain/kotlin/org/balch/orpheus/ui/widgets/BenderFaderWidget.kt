@@ -71,7 +71,8 @@ fun BenderFaderWidget(
     thumbWidth: Int = 52, // Wider thumb
     thumbHeight: Int = 28, // Slightly taller thumb
     accentColor: Color = OrpheusColors.neonCyan,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    springBack: Boolean = true, // When false, fader stays where released (e.g. crossfader)
 ) {
     val density = LocalDensity.current
     val trackHeightPx = with(density) { trackHeight.dp.toPx() }
@@ -114,13 +115,15 @@ fun BenderFaderWidget(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // Direction indicator: up arrow when pulling up
-        Text(
-            text = if (animatedOffset.value < -10) "↑" else "",
-            fontSize = 10.sp,
-            color = tensionColor.copy(alpha = tension),
-            fontWeight = FontWeight.Bold
-        )
+        // Direction indicator: up arrow when pulling up (bender mode only)
+        if (springBack) {
+            Text(
+                text = if (animatedOffset.value < -10) "↑" else "",
+                fontSize = 10.sp,
+                color = tensionColor.copy(alpha = tension),
+                fontWeight = FontWeight.Bold
+            )
+        }
         
         // Wide touch target containing narrow track and wide thumb
         Box(
@@ -150,21 +153,27 @@ fun BenderFaderWidget(
                             currentOnValueChange(newValue.coerceIn(-1f, 1f))
                         },
                         onDragEnd = {
+                            if (!springBack) {
+                                // Stay where released
+                                isLocallyAnimating = 0f
+                                currentOnRelease()
+                                return@detectDragGestures
+                            }
                             // Keep isLocallyAnimating = 1f during the spring-back animation
                             // to prevent external value syncing from interrupting
-                            
+
                             // Calculate spring duration based on how far back it was pulled
                             // ~1.2s at full extension, shorter for smaller pulls
                             val pullDistance = animatedOffset.value.absoluteValue / usableRange
                             val springDuration = (400 + (pullDistance * 800)).toInt() // 400ms to 1200ms
-                            
+
                             // Spring back to center with exaggerated oscillation
                             coroutineScope.launch {
                                 // Use a custom animation with overshoot for "unnatural" spring feel
                                 // Overshoot the target, then settle back
                                 val startValue = animatedOffset.value
                                 val overshootAmount = -startValue * 0.3f // 30% overshoot in opposite direction
-                                
+
                                 // First: animate past center (overshoot)
                                 animatedOffset.animateTo(
                                     targetValue = overshootAmount,
@@ -176,7 +185,7 @@ fun BenderFaderWidget(
                                 // Update value during overshoot
                                 val overshootValue = -(animatedOffset.value / usableRange)
                                 currentOnValueChange(overshootValue.coerceIn(-1f, 1f))
-                                
+
                                 // Second: bounce back past center again (smaller)
                                 animatedOffset.animateTo(
                                     targetValue = -overshootAmount * 0.4f,
@@ -186,7 +195,7 @@ fun BenderFaderWidget(
                                     )
                                 )
                                 currentOnValueChange(-(animatedOffset.value / usableRange).coerceIn(-1f, 1f))
-                                
+
                                 // Third: settle to center
                                 animatedOffset.animateTo(
                                     targetValue = 0f,
@@ -195,15 +204,20 @@ fun BenderFaderWidget(
                                         easing = { t -> t * (2 - t) }
                                     )
                                 )
-                                
+
                                 currentOnRelease()
                                 currentOnValueChange(0f) // Ensure final value is zero
-                                
+
                                 // NOW we're done with local animation, allow external sync again
                                 isLocallyAnimating = 0f
                             }
                         },
                         onDragCancel = {
+                            if (!springBack) {
+                                isLocallyAnimating = 0f
+                                currentOnRelease()
+                                return@detectDragGestures
+                            }
                             coroutineScope.launch {
                                 animatedOffset.animateTo(0f, tween(300))
                                 currentOnRelease()
@@ -332,13 +346,15 @@ fun BenderFaderWidget(
             )
         }
         
-        // Direction indicator: down arrow when pulling down  
-        Text(
-            text = if (animatedOffset.value > 10) "↓" else "",
-            fontSize = 10.sp,
-            color = tensionColor.copy(alpha = tension),
-            fontWeight = FontWeight.Bold
-        )
+        // Direction indicator: down arrow when pulling down (bender mode only)
+        if (springBack) {
+            Text(
+                text = if (animatedOffset.value > 10) "↓" else "",
+                fontSize = 10.sp,
+                color = tensionColor.copy(alpha = tension),
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 

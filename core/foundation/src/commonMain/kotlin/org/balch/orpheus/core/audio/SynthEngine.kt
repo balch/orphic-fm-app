@@ -175,6 +175,9 @@ interface SynthEngine {
     val lfoCh2VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val lfoCh3VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val bassOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val djVizFlowA: StateFlow<FloatArray> get() = emptyVizFlow
+    val djVizFlowB: StateFlow<FloatArray> get() = emptyVizFlow
+    val djOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val masterOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val hornInVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val hornOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
@@ -183,6 +186,9 @@ interface SynthEngine {
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
     fun setVizEnabled(enabled: Boolean) {}
+
+    /** Enable/disable turntable viz polling (DJ platter waveforms). */
+    fun setTurntableVizEnabled(enabled: Boolean) {}
 
     // ═══════════════════════════════════════════════════════════
     // Generic Plugin Port Access

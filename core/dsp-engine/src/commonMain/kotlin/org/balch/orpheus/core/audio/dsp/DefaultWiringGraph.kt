@@ -300,6 +300,22 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     bassCompressor.out to reverb.inputA
     bassCompressor.out to reverb.inputB
 
+    // ── DJ Turntable ──
+    // Turntable captures from source buffers internally, crossfades decks, outputs stereo.
+    // Output → master bus + optional delay/reverb sends (send levels controlled via port map).
+    val turntableUnit = turntable("turntable")
+    // Turntable send gains (controlled via DJ plugin delay_send / reverb_send ports)
+    val ttDelaySend = multiply("ttDelaySend") { inputB = 0.0f }
+    val ttReverbSend = multiply("ttReverbSend") { inputB = 0.0f }
+    turntableUnit.out to ttDelaySend.inputA
+    turntableUnit.out to ttReverbSend.inputA
+    // Turntable → delay send (mono sum to both channels)
+    ttDelaySend.out to delay.inputA
+    ttDelaySend.out to delay.inputB
+    // Turntable → reverb send
+    ttReverbSend.out to reverb.inputA
+    ttReverbSend.out to reverb.inputB
+
     // Master output (no hard clip)
     val master = masterOut("master")
 
@@ -359,6 +375,8 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val psb = perStringBender("psb")
     psb.out to master.inputA               // per-string audio → output
     psb.outRight to master.inputB
+    turntableUnit.out to master.inputA      // Turntable direct to output (mono → both)
+    turntableUnit.out to master.inputB
     warp.out to master.inputA              // Warps direct to output
     warp.outRight to master.inputB
     delay.out to master.inputA
@@ -418,5 +436,8 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
         // Drum direct limiter drive
         map("org.balch.orpheus.plugins.distortion", "drum_drive", "drumDirectLimiterL", IPORT_DRIVE)
         map("org.balch.orpheus.plugins.distortion", "drum_drive", "drumDirectLimiterR", IPORT_DRIVE)
+        // DJ Turntable send levels
+        map("org.balch.orpheus.plugins.dj", "delay_send", "ttDelaySend", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.dj", "reverb_send", "ttReverbSend", IPORT_INPUT_B)
     }
 }

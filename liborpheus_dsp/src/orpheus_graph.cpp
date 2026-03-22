@@ -1,6 +1,7 @@
 #include "orpheus_graph.h"
 #include "orpheus_units.h"
 #include "orpheus_engine.h"
+#include "orpheus_turntable.h"
 #include <cstring>
 #include <cmath>
 #include <algorithm>
@@ -301,7 +302,7 @@ void orpheus_graph_dump_exec_order(OrpheusGraph* graph) {
         "DUAL_DELAY", "REVERB", "LFO", "MASTER_OUT", "PLAITS",
         "CLOCK", "GRIDS", "MARBLES", "LOOPER", "BENDER",
         "PER_STR_BEND", "DUO_VOICE", "LORENZ", "POLY_LFO",
-        "BASS_VOICE", "OVERDRIVE", "COMPRESSOR", "HORN"
+        "BASS_VOICE", "OVERDRIVE", "COMPRESSOR", "HORN", "TURNTABLE"
     };
     static_assert(sizeof(type_names) / sizeof(type_names[0]) == UNIT_TYPE_COUNT,
                   "type_names[] out of sync with UnitType enum");
@@ -342,6 +343,8 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
         engine->viz_rings[VIZ_DRUM_OUT].write(peak);
     }
     std::memcpy(engine->warps_repl_read, engine->warps_source_buffers[2],
+                num_frames * sizeof(float));
+    std::memcpy(engine->warps_bass_read, engine->warps_source_buffers[9],
                 num_frames * sizeof(float));
 
     // Now zero for this frame's voice accumulation
@@ -442,6 +445,8 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_compressor(u, engine, num_frames, sr); break;
             case UNIT_HORN:
                 unit_process_horn(u, engine, num_frames, sr); break;
+            case UNIT_TURNTABLE:
+                unit_process_turntable(u, engine, num_frames, sr); break;
             default: break;
         }
     }

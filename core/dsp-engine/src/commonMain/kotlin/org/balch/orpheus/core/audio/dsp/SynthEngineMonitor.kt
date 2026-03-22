@@ -82,6 +82,12 @@ class SynthEngineMonitor(
     val lfoCh3VizFlow: StateFlow<FloatArray> = _lfoCh3VizFlow.asStateFlow()
     private val _bassOutVizFlow = MutableStateFlow(FloatArray(0))
     val bassOutVizFlow: StateFlow<FloatArray> = _bassOutVizFlow.asStateFlow()
+    private val _djVizFlowA = MutableStateFlow(FloatArray(0))
+    val djVizFlowA: StateFlow<FloatArray> = _djVizFlowA.asStateFlow()
+    private val _djVizFlowB = MutableStateFlow(FloatArray(0))
+    val djVizFlowB: StateFlow<FloatArray> = _djVizFlowB.asStateFlow()
+    private val _djOutVizFlow = MutableStateFlow(FloatArray(0))
+    val djOutVizFlow: StateFlow<FloatArray> = _djOutVizFlow.asStateFlow()
     private val _masterOutVizFlow = MutableStateFlow(FloatArray(0))
     val masterOutVizFlow: StateFlow<FloatArray> = _masterOutVizFlow.asStateFlow()
     private val _hornInVizFlow = MutableStateFlow(FloatArray(0))
@@ -98,7 +104,10 @@ class SynthEngineMonitor(
 
     private var monitoringJob: Job? = null
     private var vizJob: Job? = null
+    private var turntableVizJob: Job? = null
     var startRequested = false
+    var vizRequested = false
+        private set
 
     // Reusable IntArray(1) for JNI read position — avoids allocation per channel per poll
     private val vizReadPosBuf = IntArray(1)
@@ -113,6 +122,15 @@ class SynthEngineMonitor(
         if (count > 0) {
             flow.value = appendToVizRing(flow.value, vizBuf, count)
         }
+    }
+
+    private fun pollTurntableViz(
+        deck: Int, buf: FloatArray,
+        flow: MutableStateFlow<FloatArray>
+    ) {
+        nativeBridge.nativeGetTurntableViz(deck, buf)
+        // Only emit if there's actual data (check if any sample is non-zero)
+        flow.value = buf.copyOf()
     }
 
     private fun appendToVizRing(ring: FloatArray, src: FloatArray, count: Int): FloatArray {
@@ -153,16 +171,43 @@ class SynthEngineMonitor(
         }
     }
 
-    /** Cancel both monitor and viz polling jobs. */
+    /** Start turntable viz polling (lightweight: 2x memcpy of 129 floats at 60fps). */
+    fun startTurntableViz() {
+        if (turntableVizJob != null) return
+        turntableVizJob = monitoringScope.launch(dispatcherProvider.io) {
+            val ttBuf = FloatArray(TURNTABLE_VIZ_SIZE)
+            val vizBuf = FloatArray(VIZ_BUF_SIZE)
+            val readPositions = IntArray(VIZ_CHANNEL_COUNT)
+            while (isActive) {
+                pollTurntableViz(0, ttBuf, _djVizFlowA)
+                pollTurntableViz(1, ttBuf, _djVizFlowB)
+                pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow)
+                delay(VIZ_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    /** Stop turntable viz polling. */
+    fun stopTurntableViz() {
+        turntableVizJob?.cancel()
+        turntableVizJob = null
+        _djVizFlowA.value = FloatArray(0)
+        _djVizFlowB.value = FloatArray(0)
+    }
+
+    /** Cancel all polling jobs. */
     fun stopMonitoring() {
         vizJob?.cancel()
         vizJob = null
+        turntableVizJob?.cancel()
+        turntableVizJob = null
         monitoringJob?.cancel()
         monitoringJob = null
     }
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
     fun setVizEnabled(enabled: Boolean, isRunning: Boolean) {
+        vizRequested = enabled
         if (enabled && vizJob == null && isRunning) {
             vizJob = monitoringScope.launch(dispatcherProvider.io) {
                 val vizBuf = FloatArray(VIZ_BUF_SIZE)
@@ -192,6 +237,7 @@ class SynthEngineMonitor(
                     pollVizChannel(VIZ_HORN_OUT, readPositions, vizBuf, _hornOutVizFlow)
                     pollVizChannel(VIZ_HORN_PHASE, readPositions, vizBuf, _hornPhaseVizFlow)
                     pollVizChannel(VIZ_WOOFER_PHASE, readPositions, vizBuf, _wooferPhaseVizFlow)
+                    pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow)
                     delay(VIZ_POLL_INTERVAL_MS)
                 }
             }
@@ -206,7 +252,8 @@ class SynthEngineMonitor(
                    _drumOutVizFlow, _grainsInVizFlow, _grainsOutVizFlow,
                    _lfoCh1VizFlow, _lfoCh2VizFlow, _lfoCh3VizFlow,
                    _bassOutVizFlow, _masterOutVizFlow,
-                   _hornInVizFlow, _hornOutVizFlow, _hornPhaseVizFlow, _wooferPhaseVizFlow).forEach { it.value = FloatArray(0) }
+                   _hornInVizFlow, _hornOutVizFlow, _hornPhaseVizFlow, _wooferPhaseVizFlow,
+                   _djOutVizFlow).forEach { it.value = FloatArray(0) }
         }
     }
 
@@ -247,6 +294,8 @@ class SynthEngineMonitor(
         private const val VIZ_HORN_OUT = 21
         private const val VIZ_HORN_PHASE = 22
         private const val VIZ_WOOFER_PHASE = 23
-        private const val VIZ_CHANNEL_COUNT = 24
+        private const val VIZ_DJ_OUT = 24
+        private const val VIZ_CHANNEL_COUNT = 25
+        private const val TURNTABLE_VIZ_SIZE = 129  // 128 waveform + 1 playhead
     }
 }

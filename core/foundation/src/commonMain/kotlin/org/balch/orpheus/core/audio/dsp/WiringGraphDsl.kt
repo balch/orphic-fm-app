@@ -35,6 +35,7 @@ const val UNIT_BASS_VOICE = 29
 const val UNIT_OVERDRIVE = 30
 const val UNIT_COMPRESSOR = 31
 const val UNIT_HORN = 32
+const val UNIT_TURNTABLE = 33
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -332,6 +333,9 @@ class WiringGraphBuilder {
 
     fun horn(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_HORN, name, init)
+
+    fun turntable(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_TURNTABLE, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

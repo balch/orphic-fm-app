@@ -25,6 +25,7 @@ import orpheus_dsp.orpheus_engine_create
 import orpheus_dsp.orpheus_engine_destroy
 import orpheus_dsp.orpheus_engine_get_monitor
 import orpheus_dsp.orpheus_engine_get_port
+import orpheus_dsp.orpheus_engine_get_turntable_viz
 import orpheus_dsp.orpheus_engine_get_viz
 import orpheus_dsp.orpheus_engine_is_tts_playing
 import orpheus_dsp.orpheus_engine_load_patch
@@ -406,6 +407,15 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
                 }
             }
         } ?: 0
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray) {
+        engine?.let { eng ->
+            outBuf.usePinned { pinnedBuf ->
+                orpheus_engine_get_turntable_viz(eng, deck, pinnedBuf.addressOf(0))
+            }
+        }
     }
 
     override fun nativeTriggerDrum(drumIndex: Int, accent: Float) {

@@ -467,8 +467,8 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     // ── Apply envelope, output gain, and mix ──
     // Bass voice needs headroom boost: Plaits output is soft-limited to ~±1,
     // envelope scales 0-1, so raw output is quiet relative to the 12 main voices
-    // which get summed in the duo mixer. 1.5x (~3.5dB) brings bass to parity.
-    static constexpr float kBassOutputGain = 1.5f;
+    // which get summed in the duo mixer. 3.5x (~11dB) brings bass to parity.
+    static constexpr float kBassOutputGain = 3.5f;
 
     float* out = u->output_buffers[OPORT_OUT];
 

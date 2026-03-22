@@ -478,6 +478,11 @@ void orpheus_engine_process(OrpheusEngine* engine,
         }
     }
 
+    // Save this frame's master output (mono downmix) for turntable "master" source next frame
+    for (int i = 0; i < num_frames; i++) {
+        engine->turntable_prev_master[i] = (output_buffer[i * 2] + output_buffer[i * 2 + 1]) * 0.5f;
+    }
+
     // CPU load: elapsed time / audio buffer duration
     auto t1 = std::chrono::steady_clock::now();
     float elapsed_us = std::chrono::duration<float, std::micro>(t1 - t0).count();

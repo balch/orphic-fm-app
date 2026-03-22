@@ -38,6 +38,7 @@ enum OrpheusUnitType : uint16_t {
     UNIT_OVERDRIVE = 30,
     UNIT_COMPRESSOR = 31,
     UNIT_HORN = 32,
+    UNIT_TURNTABLE = 33,
     UNIT_TYPE_COUNT
 };
 

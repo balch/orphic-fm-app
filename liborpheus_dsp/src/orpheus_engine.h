@@ -41,6 +41,7 @@
 #include "streams/lorenz_generator.h"
 
 #include "orpheus_unit_bass.h"
+#include "orpheus_turntable.h"
 
 #include <atomic>
 #include <cstring>
@@ -554,6 +555,26 @@ struct OrpheusEngine {
     // audio thread steps through them per-block.
     int64_t sample_counter{0};  // monotonic, incremented by num_frames each process()
     AutomationSlot automation_slots[kMaxAutomationSlots];
+
+    // ── DJ Turntable ──
+    TurntableDeck turntable_decks[2];
+    std::atomic<float> turntable_mix{0.0f};
+    std::atomic<float> turntable_velocity_a{1.0f};
+    std::atomic<float> turntable_velocity_b{1.0f};
+    std::atomic<int>   turntable_frozen_a{0};
+    std::atomic<int>   turntable_frozen_b{0};
+    std::atomic<int>   turntable_source_a{0};   // TurntableSource enum
+    std::atomic<int>   turntable_source_b{1};   // default drums
+    std::atomic<float> turntable_crossfader{0.5f};
+    std::atomic<float> turntable_delay_send{0.0f};
+    std::atomic<float> turntable_reverb_send{0.0f};
+    float turntable_smooth_mix = 0.0f;
+
+    // Bass double-buffer read (new, for turntable + future use)
+    float warps_bass_read[kMaxFrames] = {};
+
+    // Previous frame's master output for turntable "master" source
+    float turntable_prev_master[kMaxFrames] = {};
 
     // ── Warps double-buffer (at end to avoid shifting field offsets) ──
     // Warps reads previous frame's completed SYNTH/REPL data while

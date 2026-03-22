@@ -142,6 +142,7 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
 
     override fun nativeIsTtsPlaying(): Int = jsGetTtsPlaying()
     override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int = 0
+    override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray) { /* WASM: not yet implemented */ }
 
     companion object {
         private val log = logging("WasmNativeAudioEngine")

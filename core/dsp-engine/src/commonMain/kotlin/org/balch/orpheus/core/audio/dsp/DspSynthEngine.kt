@@ -95,6 +95,9 @@ class DspSynthEngine(
     override val lfoCh2VizFlow: StateFlow<FloatArray> get() = monitor.lfoCh2VizFlow
     override val lfoCh3VizFlow: StateFlow<FloatArray> get() = monitor.lfoCh3VizFlow
     override val bassOutVizFlow: StateFlow<FloatArray> get() = monitor.bassOutVizFlow
+    override val djVizFlowA: StateFlow<FloatArray> get() = monitor.djVizFlowA
+    override val djVizFlowB: StateFlow<FloatArray> get() = monitor.djVizFlowB
+    override val djOutVizFlow: StateFlow<FloatArray> get() = monitor.djOutVizFlow
     override val masterOutVizFlow: StateFlow<FloatArray> get() = monitor.masterOutVizFlow
     override val hornInVizFlow: StateFlow<FloatArray> get() = monitor.hornInVizFlow
     override val hornOutVizFlow: StateFlow<FloatArray> get() = monitor.hornOutVizFlow
@@ -399,12 +402,19 @@ class DspSynthEngine(
 
         // Poll monitor data from C++ via native bridge
         monitor.startMonitoring()
-        // Viz polling starts lazily via setVizEnabled() — no 60fps overhead when not needed
+        // Start viz polling if it was requested before the engine was running
+        if (monitor.vizRequested) {
+            monitor.setVizEnabled(true, true)
+        }
         log.debug { "Audio Engine Started" }
     }
 
     override fun setVizEnabled(enabled: Boolean) {
         monitor.setVizEnabled(enabled, audioEngine.isRunning)
+    }
+
+    override fun setTurntableVizEnabled(enabled: Boolean) {
+        if (enabled) monitor.startTurntableViz() else monitor.stopTurntableViz()
     }
 
     override fun getCurrentTime(): Double = audioEngine.getCurrentTime()

@@ -1,5 +1,6 @@
 #include "orpheus_engine.h"
 #include "orpheus_viz.h"
+#include "orpheus_turntable.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -259,6 +260,11 @@ void orpheus_engine_stop_tts(OrpheusEngine* engine) {
 int orpheus_engine_is_tts_playing(OrpheusEngine* engine) {
     if (!engine) return 0;
     return engine->tts_playing.load(std::memory_order_relaxed);
+}
+
+void orpheus_engine_get_turntable_viz(OrpheusEngine* engine, int deck, float* out_buffer) {
+    if (!engine || deck < 0 || deck > 1 || !out_buffer) return;
+    turntable_get_viz(&engine->turntable_decks[deck], out_buffer);
 }
 
 }  // extern "C"

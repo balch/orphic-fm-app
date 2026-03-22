@@ -192,6 +192,14 @@ JNI_FN(nativeGetViz)(JNIEnv *env, jobject thiz,
     return count;
 }
 
+JNIEXPORT void JNICALL
+JNI_FN(nativeGetTurntableViz)(JNIEnv *env, jobject thiz,
+                               jint deck, jfloatArray outBuf) {
+    jfloat* buf = env->GetFloatArrayElements(outBuf, nullptr);
+    sEngine.getTurntableViz(deck, buf);
+    env->ReleaseFloatArrayElements(outBuf, buf, 0);
+}
+
 // -- Automation ---------------------------------------------------------------
 
 JNIEXPORT void JNICALL

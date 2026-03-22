@@ -118,6 +118,11 @@ void orpheus_engine_play_tts(OrpheusEngine* engine);
 void orpheus_engine_stop_tts(OrpheusEngine* engine);
 int  orpheus_engine_is_tts_playing(OrpheusEngine* engine);
 
+// ── DJ Turntable visualization (polled at ~30fps from UI thread) ──
+// Returns 128 downsampled waveform samples + 1 playhead position (129 floats).
+// Thread-safe: uses double-buffered snapshot.
+void orpheus_engine_get_turntable_viz(OrpheusEngine* engine, int deck, float* out_buffer);
+
 #ifdef __cplusplus
 }
 #endif

@@ -98,6 +98,8 @@ class OboeAudioEngine() : AudioEngine, NativeDspBridge {
     override fun nativeIsTtsPlaying(): Int = bridge.nativeIsTtsPlaying()
     override fun nativeGetViz(channel: Int, outBuf: FloatArray, lastReadPos: IntArray): Int =
         bridge.nativeGetViz(channel, outBuf, lastReadPos)
+    override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray) =
+        bridge.nativeGetTurntableViz(deck, outBuf)
 
     companion object {
         private val log = logging("OboeAudioEngine")

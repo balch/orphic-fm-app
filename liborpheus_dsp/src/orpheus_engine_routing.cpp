@@ -451,6 +451,29 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "grains_send") == 0)
             engine->bass_grains_send.store(value, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.dj") == 0) {
+        if (std::strcmp(symbol, "mix") == 0) {
+            engine->turntable_mix.store(value, std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "velocity_a") == 0) {
+            engine->turntable_velocity_a.store(value, std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "velocity_b") == 0) {
+            engine->turntable_velocity_b.store(value, std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "frozen_a") == 0) {
+            engine->turntable_frozen_a.store(static_cast<int>(value), std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "frozen_b") == 0) {
+            engine->turntable_frozen_b.store(static_cast<int>(value), std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "source_a") == 0) {
+            engine->turntable_source_a.store(static_cast<int>(value), std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "source_b") == 0) {
+            engine->turntable_source_b.store(static_cast<int>(value), std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "crossfader") == 0) {
+            engine->turntable_crossfader.store(value, std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "delay_send") == 0) {
+            engine->turntable_delay_send.store(value, std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "reverb_send") == 0) {
+            engine->turntable_reverb_send.store(value, std::memory_order_relaxed);
+        }
+    }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.stereo") == 0) {
         if (std::strcmp(symbol, "master_pan") == 0)
             engine->master_pan.store(value, std::memory_order_relaxed);
