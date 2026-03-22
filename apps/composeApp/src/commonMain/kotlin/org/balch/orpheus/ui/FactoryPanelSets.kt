@@ -27,6 +27,7 @@ object FactoryPanelSets {
         collapse(PanelId.GRAINS)
         collapse(PanelId.WARPS)
         collapse(PanelId.BASS)
+        collapse(PanelId.HORN)
         collapse(PanelId.TWEAKS)
         collapse(PanelId.CODE)
         collapse(PanelId.LOOPER)
@@ -71,6 +72,7 @@ object FactoryPanelSets {
         expand(PanelId.RESONATOR)
         expand(PanelId.WARPS)
         expand(PanelId.GRAINS)
+        expand(PanelId.HORN)
     }
 
     /** Sequencer-focused layout. */
