@@ -156,7 +156,7 @@ fun HornPanel(
                 .widthIn(max = 420.dp)
                 .height(160.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(CrimsonBg)
+                .background(CrimsonBg.copy(alpha = 0.7f))
                 .border(1.dp, CrimsonBorder, RoundedCornerShape(8.dp)),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,

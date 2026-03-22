@@ -185,7 +185,7 @@ struct OrpheusHorn {
             float mod_3 = slow_240 * a + fast_240 * b;
 
             // ── Write current frame to both delay lines ──
-            delay_l[write_pos] = treble_l + bass_l;  // full signal for delay history
+            delay_l[write_pos] = treble_l + bass_l;
             delay_r[write_pos] = treble_r + bass_r;
 
             // ── Three-tap chorus read (MI Ensemble pattern) ──
@@ -201,8 +201,24 @@ struct OrpheusHorn {
                 read_interp(delay_r, center + mod_2) * 0.33f +
                 read_interp(delay_l, center + mod_3) * 0.33f;
 
+            // ── Leslie stereo tremolo ──
+            // Real Leslie: horn horn points L/R as it rotates, creating
+            // amplitude modulation that's opposite between channels.
+            // L mic hears horn approach → louder, R mic hears it recede → softer.
+            // Use horn phase for treble AM, woofer phase for bass AM.
+            float horn_am_l = 0.7f + 0.3f * slow_0;     // 0.4..1.0
+            float horn_am_r = 0.7f - 0.3f * slow_0;     // 1.0..0.4 (opposite)
+            float woof_am_l = 0.8f + 0.2f * fast_0;     // 0.6..1.0 (subtler)
+            float woof_am_r = 0.8f - 0.2f * fast_0;     // 1.0..0.6
+
+            // Apply stereo AM: treble portion modulated by horn, bass by woofer
+            // Blend with amount — at amount=0, no AM
+            float am_l = 1.0f + (horn_am_l * woof_am_l - 1.0f) * wet_scale;
+            float am_r = 1.0f + (horn_am_r * woof_am_r - 1.0f) * wet_scale;
+            wet_l *= am_l;
+            wet_r *= am_r;
+
             // ── Dry/wet crossfade ──
-            // wet_effect = chorus output shaped by amount
             // mix=0 → pure dry (passthrough), mix=1 → full effect
             float effect_l = wet_l * wet_scale + in_l[i] * dry_scale;
             float effect_r = wet_r * wet_scale + in_r[i] * dry_scale;
