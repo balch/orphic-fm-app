@@ -146,8 +146,8 @@ fun HornPanel(
         initialExpanded = false,
         modifier = modifier,
         backgroundContent = {
-            SignalTrace(data = inViz, color = CrimsonWoofer.copy(alpha = 0.5f))
-            SignalTrace(data = outViz, color = CrimsonHorn.copy(alpha = 0.6f))
+            SignalTrace(data = inViz, color = Color(0xFFFF6644))   // bright orange-red for input
+            SignalTrace(data = outViz, color = Color(0xFFFF2222))  // bright red for output
         }
     ) {
         // Dual rotor animation area — fixed width, centered
@@ -156,7 +156,7 @@ fun HornPanel(
                 .widthIn(max = 420.dp)
                 .height(160.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(CrimsonBg.copy(alpha = 0.7f))
+                .background(CrimsonBg.copy(alpha = 0.4f))
                 .border(1.dp, CrimsonBorder, RoundedCornerShape(8.dp)),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
