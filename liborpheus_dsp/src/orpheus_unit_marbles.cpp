@@ -133,6 +133,10 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     x_settings.ratio = { 1, 1 };
 
     marbles::GroupSettings y_settings = x_settings;
+    // Y channel (index 3) must use IDENTICAL mode — the TILT amount formula
+    // (2*i/(n-1) - 1) only covers X channels 0-2. Index 3 produces amount=2.0,
+    // pushing spread/bias out of [0,1] and causing an OOB table access crash.
+    y_settings.control_mode = marbles::CONTROL_MODE_IDENTICAL;
     y_settings.ratio = { 1, 1 };
 
     // ── Step 6: Process XYGenerator (random CV generation) ──
