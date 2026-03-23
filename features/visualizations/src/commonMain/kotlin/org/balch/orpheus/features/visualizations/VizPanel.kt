@@ -1,6 +1,7 @@
 package org.balch.orpheus.features.visualizations
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,55 +59,89 @@ fun VizPanel(
         showCollapsedHeader = showCollapsedHeader
     ) {
 
-        // Visualization Dropdown
+        // Visualization Dropdown + Signal Viz Toggle
         var expanded by remember { mutableStateOf(false) }
 
-        Box(
-            modifier = Modifier
-                .height(32.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
-                .clickable { expanded = true }
-                .padding(horizontal = 8.dp),
-            contentAlignment = Alignment.CenterStart
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            Box(
+                modifier = Modifier
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(OrpheusColors.darkVoid.copy(alpha = 0.3f))
+                    .clickable { expanded = true }
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
-                Text(
-                    text = uiState.selectedViz.name,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray
-                )
-                Text(
-                    text = "▼",
-                    fontSize = 12.sp,
-                    color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray,
-                )
-            }
-
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(OrpheusColors.softPurple) // Use explicit color
-            ) {
-                uiState.visualizations.forEach { viz ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                viz.name,
-                                color = if (viz.id == uiState.selectedViz.id) OrpheusColors.vizGreen else Color.White
-                            )
-                        },
-                        onClick = {
-                            actions.onSelectViz(viz)
-                            expanded = false
-                        }
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = uiState.selectedViz.name,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray
+                    )
+                    Text(
+                        text = "▼",
+                        fontSize = 12.sp,
+                        color = if (uiState.showKnobs) OrpheusColors.vizGreen else Color.Gray,
                     )
                 }
+
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(OrpheusColors.softPurple)
+                ) {
+                    uiState.visualizations.forEach { viz ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    viz.name,
+                                    color = if (viz.id == uiState.selectedViz.id) OrpheusColors.vizGreen else Color.White
+                                )
+                            },
+                            onClick = {
+                                actions.onSelectViz(viz)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Per-panel signal visualization toggle
+            val sigActive = uiState.signalVizEnabled
+            Box(
+                modifier = Modifier
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(
+                        if (sigActive) OrpheusColors.neonCyan.copy(alpha = 0.15f)
+                        else OrpheusColors.darkVoid.copy(alpha = 0.3f)
+                    )
+                    .then(
+                        if (sigActive) Modifier.border(
+                            1.dp,
+                            OrpheusColors.neonCyan.copy(alpha = 0.4f),
+                            RoundedCornerShape(6.dp)
+                        ) else Modifier
+                    )
+                    .clickable { actions.onToggleSignalViz(!sigActive) }
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "SIG",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (sigActive) OrpheusColors.neonCyan else Color.Gray,
+                )
             }
         }
 

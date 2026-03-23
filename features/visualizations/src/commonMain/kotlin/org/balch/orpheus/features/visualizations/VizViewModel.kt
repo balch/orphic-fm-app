@@ -34,19 +34,22 @@ data class VizUiState(
     val showKnobs: Boolean,
     val knob1Value: Float = 0.5f,
     val knob2Value: Float = 0.5f,
-    val liquidEffects: VisualizationLiquidEffects = selectedViz.liquidEffects
+    val liquidEffects: VisualizationLiquidEffects = selectedViz.liquidEffects,
+    val signalVizEnabled: Boolean = false,
 )
 
 data class VizPanelActions(
     val onSelectViz: (Visualization) -> Unit,
     val onKnob1Change: (Float) -> Unit,
-    val onKnob2Change: (Float) -> Unit
+    val onKnob2Change: (Float) -> Unit,
+    val onToggleSignalViz: (Boolean) -> Unit,
 ) {
     companion object {
         val EMPTY = VizPanelActions(
             onSelectViz = {},
             onKnob1Change = {},
-            onKnob2Change = {}
+            onKnob2Change = {},
+            onToggleSignalViz = {},
         )
     }
 }
@@ -74,7 +77,8 @@ class VizViewModel(
     override val actions = VizPanelActions(
         onSelectViz = { selectVisualization(it) },
         onKnob1Change = ::onKnob1Change,
-        onKnob2Change = ::onKnob2Change
+        onKnob2Change = ::onKnob2Change,
+        onToggleSignalViz = ::onToggleSignalViz,
     )
 
     // Sorted list: Off first, then alphabetical by name
@@ -105,6 +109,7 @@ class VizViewModel(
 
         scope.launch(dispatcherProvider.default) {
             val prefs = appPreferencesRepository.load()
+            _uiState.update { it.copy(signalVizEnabled = prefs.signalVizEnabled) }
             prefs.lastVizId?.let { id ->
                 sortedVisualizations.find { it.id == id }?.let { viz ->
                     selectVisualization(viz, save = false)
@@ -177,6 +182,14 @@ class VizViewModel(
     fun onKnob2Change(value: Float) {
         _currentViz.value.setKnob2(value)
         _uiState.update { it.copy(knob2Value = value) }
+    }
+
+    private fun onToggleSignalViz(enabled: Boolean) {
+        _uiState.update { it.copy(signalVizEnabled = enabled) }
+        scope.launch(dispatcherProvider.default) {
+            val prefs = appPreferencesRepository.load().copy(signalVizEnabled = enabled)
+            appPreferencesRepository.save(prefs)
+        }
     }
 
     private fun updateState() {

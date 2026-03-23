@@ -10,6 +10,8 @@ data class AppPreferences(
     val userApiKeys: Map<String, String> = emptyMap(),
     /** Selected AI model ID (e.g., "flash_25", "pro_25"). */
     val selectedAiModel: String? = null,
+    /** Per-panel signal visualization toggle (disabled by default). */
+    val signalVizEnabled: Boolean = false,
 )
 
 

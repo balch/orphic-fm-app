@@ -64,10 +64,11 @@ fun App(
             val dialogPosition = aiState.dialogPosition
             val dialogSize = aiState.dialogSize
 
-            // Enable/disable viz polling based on active visualization
+            // Enable viz polling when Orphoscope is active OR per-panel signal viz is toggled on
             val isSignalMonitor = vizState.selectedViz.id == "signal-monitor"
-            androidx.compose.runtime.LaunchedEffect(isSignalMonitor) {
-                graph.synthEngine.setVizEnabled(isSignalMonitor)
+            val signalVizEnabled = isSignalMonitor || vizState.signalVizEnabled
+            androidx.compose.runtime.LaunchedEffect(signalVizEnabled) {
+                graph.synthEngine.setVizEnabled(signalVizEnabled)
             }
 
             OrpheusTheme {
@@ -75,7 +76,7 @@ fun App(
                     LocalLiquidState provides liquidState,
                     LocalDialogLiquidState provides dialogLiquidState,
                     LocalLiquidEffects provides liquidEffects,
-                    LocalSignalVizEnabled provides (vizState.selectedViz.id == "signal-monitor"),
+                    LocalSignalVizEnabled provides signalVizEnabled,
                     LocalSignalVizGlow provides (1f - vizState.knob2Value),
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
