@@ -24,7 +24,9 @@ node_modules/
 
 # Python virtual environments
 tools/train-asl-model/.venv/
+
 .worktrees/
+.claude/worktrees/
 
 # Gradle generated files
 gradle/gradle-daemon-jvm.properties
