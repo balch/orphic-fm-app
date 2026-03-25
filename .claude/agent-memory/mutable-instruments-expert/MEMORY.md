@@ -69,6 +69,12 @@ Dynamics processor. Key DSP mode: LorenzGenerator — Lorenz chaotic attractor i
 - **Streams Compressor** — log-domain compressor: attack/decay/threshold/ratio/soft knee (~150 LOC C++, fixed-point).
 - **Tides2 PolySlopeGenerator** — float AD/AR/looping, 4 outputs, 9 shapes. Moderate complexity.
 
+## Rings / Resonator Implementation Status (2026-03-23)
+- Orpheus uses a CUSTOM C++ reimplementation (`orpheus_resonator.h/cpp`), NOT `rings::Part`
+- Only 3 of 6 MI models implemented: Modal, Sympathetic, String
+- Missing: FM Voice, Sympathetic Quantized, String+Reverb, polyphony, Plucker, NoteFilter, dispersion, ParameterInterpolator smoothing
+- Full detail in [rings_analysis.md](rings_analysis.md)
+
 ## Key MI Modules in Eurorack Folder
 - **Plaits** - Macro oscillator (24 engines total)
 - **Rings** - Modal/string/FM resonator

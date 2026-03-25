@@ -40,6 +40,7 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 import org.balch.orpheus.ui.widgets.VerticalRangeTrimSlider
 import org.balch.orpheus.ui.widgets.VerticalToggle
 import org.balch.orpheus.ui.widgets.learnable
+import kotlin.math.roundToInt
 
 /**
  * The 5 selectable LFO modes displayed in the segmented button row.
@@ -298,7 +299,8 @@ private fun PolyLfoControls(
                 label = "SHAPE",
                 controlId = PolyLfoSymbol.SHAPE.controlId.key,
                 size = 52.dp,
-                progressColor = activeColor
+                progressColor = activeColor,
+                valueFormatter = ::polyLfoShapeName
             )
             RotaryKnob(
                 value = uiState.polyCoupling,
@@ -367,6 +369,24 @@ private fun LorenzControls(
             trackWidth = 80,
             controlId = LorenzSymbol.BALANCE.controlId.key,
         )
+    }
+}
+
+private val polyLfoShapeNames = arrayOf(
+    "Bloom", "Ramp", "Tri", "Saw", "Plunge",
+    "Bump", "Square", "Thick", "Sine", "Rich",
+    "Odd", "Buzz", "Steps", "Fold", "Warp",
+    "Spike", "Dice"
+)
+
+private fun polyLfoShapeName(value: Float): String {
+    val position = (value * 16f).coerceIn(0f, 16f)
+    val lower = position.toInt().coerceAtMost(15)
+    val frac = position - lower
+    return if (frac in 0.25f..0.75f && lower + 1 <= 16) {
+        "${polyLfoShapeNames[lower]}+"
+    } else {
+        polyLfoShapeNames[position.roundToInt().coerceIn(0, 16)]
     }
 }
 
