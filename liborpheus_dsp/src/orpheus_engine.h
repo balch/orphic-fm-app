@@ -215,6 +215,8 @@ struct OrpheusEngine {
 
     // Bass accent state for overdrive boost (audio thread only)
     float bass_accent_drive_boost{0.0f};  // +0.3 when accent active, 0 otherwise
+    // Anti-click crossfade: last output sample from previous block
+    float bass_prev_output{0.0f};
 
     // Bass output buffer (written by bass voice unit, read by overdrive)
     float bass_output_buffer[kMaxFrames] = {};
@@ -359,6 +361,9 @@ struct OrpheusEngine {
     float smooth_coupling_depth{0.0f};
     float smooth_total_feedback{0.0f};
     float smooth_reverb_amount{0.0f};
+    float smooth_reverb_time{0.5f};
+    float smooth_reverb_damping{0.5f};
+    float smooth_reverb_diffusion{0.5f};
     float smooth_mod_depth[kNumDuos] = {};
     float smooth_fm_depth[kNumDuos] = {};
 

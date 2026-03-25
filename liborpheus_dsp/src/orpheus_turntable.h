@@ -23,6 +23,7 @@ struct TurntableDeck {
     float read_pos = 0.0f;           // fractional sample position
     int   write_pos = 0;             // integer write head
     float smoothed_velocity = 1.0f;  // after one-pole smoothing
+    float aa_lpf_state = 0.0f;      // anti-alias filter state (persists across blocks)
     bool  frozen = false;
     int   source = TT_SOURCE_SYNTH;
 

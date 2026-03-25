@@ -259,10 +259,19 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
         l *= gain;
         r *= gain;
 
-        // Safety net: soft clip anything still above ±1.0
-        // (shouldn't happen often with the limiter, but prevents digital overs)
-        if (l >  1.0f) l =  1.0f; else if (l < -1.0f) l = -1.0f;
-        if (r >  1.0f) r =  1.0f; else if (r < -1.0f) r = -1.0f;
+        // Safety net: soft-saturate anything still above the limiter threshold.
+        // Hard clip creates discontinuities (clicks) when fast transients
+        // punch through the limiter's 0.1ms attack. This is transparent
+        // below 0.9 (limiter catches everything else) and smoothly saturates
+        // toward ±1.0 above that — no derivative discontinuities.
+        auto soft_sat = [](float x) -> float {
+            float ax = std::fabs(x);
+            if (ax <= 0.9f) return x;
+            float s = (x >= 0.0f) ? 1.0f : -1.0f;
+            return s * (0.9f + 0.1f * std::tanh((ax - 0.9f) * 10.0f));
+        };
+        l = soft_sat(l);
+        r = soft_sat(r);
 
         output_buffer[i * 2]     = l;
         output_buffer[i * 2 + 1] = r;

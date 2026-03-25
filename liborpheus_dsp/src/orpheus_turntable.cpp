@@ -43,13 +43,9 @@ static void capture_source(TurntableDeck* deck, const float* source, int num_fra
 
 static void playback_deck(TurntableDeck* deck, float target_velocity,
                            float* out, int num_frames) {
-    // One-pole anti-alias filter state (persists across calls via static-like reuse
-    // of the deck's smoothed_velocity field — we add a separate filter state).
-    // At |velocity| > 1, the read head skips samples, causing aliasing.
-    // A simple one-pole LPF with cutoff ∝ 1/|velocity| tames it.
-    float lpf_state = 0.0f;
-    // Prime the filter with the first sample to avoid startup click
-    lpf_state = cubic_interp(deck->buffer, kTurntableBufSize, deck->read_pos);
+    // Anti-alias filter state persists across blocks to avoid clicks at
+    // block boundaries during high-speed scratch playback.
+    float lpf_state = deck->aa_lpf_state;
 
     for (int i = 0; i < num_frames; i++) {
         // One-pole velocity smoothing (per-sample for smooth transitions)
@@ -58,15 +54,17 @@ static void playback_deck(TurntableDeck* deck, float target_velocity,
 
         float raw = cubic_interp(deck->buffer, kTurntableBufSize, deck->read_pos);
 
-        // Anti-alias: stronger filtering at higher speeds
+        // Anti-alias: stronger filtering at higher speeds.
+        // At |velocity| > 1, the read head skips samples, causing aliasing.
+        // A one-pole LPF with cutoff ∝ 1/|velocity| tames it.
         float abs_vel = std::fabs(deck->smoothed_velocity);
         if (abs_vel > 1.0f) {
-            // Coefficient: 1/|vel| gives ~6dB/oct rolloff above Nyquist/vel
             float alpha = 1.0f / abs_vel;
             lpf_state += alpha * (raw - lpf_state);
             out[i] = lpf_state;
         } else {
-            lpf_state = raw;
+            // Blend toward raw to avoid a click when crossing the velocity threshold
+            lpf_state += 0.5f * (raw - lpf_state);
             out[i] = raw;
         }
 
@@ -75,6 +73,8 @@ static void playback_deck(TurntableDeck* deck, float target_velocity,
             kTurntableBufSize
         );
     }
+
+    deck->aa_lpf_state = lpf_state;
 }
 
 // Source-dependent gain — source buffers are normalized low
@@ -159,9 +159,15 @@ void unit_process_turntable(GraphUnit* u, OrpheusEngine* engine,
     turntable_update_viz(&deck_a);
     turntable_update_viz(&deck_b);
 
-    // Bypass when both decks are fully dry
+    // Bypass when both decks are fully dry AND smoothed values have settled.
+    // Without checking smooth values, the output snaps to zero while the
+    // previous block was still producing audio — a click.
+    float smooth_a = engine->turntable_smooth_wet_a;
+    float smooth_b = engine->turntable_smooth_wet_b;
     bool bypassed = target_wet_a <= kTurntableBypassThreshold
-                 && target_wet_b <= kTurntableBypassThreshold;
+                 && target_wet_b <= kTurntableBypassThreshold
+                 && smooth_a <= kTurntableBypassThreshold
+                 && smooth_b <= kTurntableBypassThreshold;
     if (bypassed) {
         std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
         engine->turntable_smooth_wet_a = 0.0f;

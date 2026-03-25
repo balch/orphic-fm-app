@@ -25,13 +25,27 @@ void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine,
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
 
-    // Load parameters
+    // Load and smooth parameters (~5ms ramp to avoid clicks from knob changes
+    // propagating through the reverb's feedback loop)
     float amount_target = engine->reverb_amount.load(std::memory_order_relaxed);
-    const float krt    = engine->reverb_time.load(std::memory_order_relaxed);
-    const float klp    = engine->reverb_damping.load(std::memory_order_relaxed);
-    const float kap    = engine->reverb_diffusion.load(std::memory_order_relaxed);
-    const float gain   = 0.5f;  // inputGain
+    float time_target   = engine->reverb_time.load(std::memory_order_relaxed);
+    float diff_target   = engine->reverb_diffusion.load(std::memory_order_relaxed);
+
+    // Remap DAMP knob: UI 0=no damping (bright), 1=heavy damping (dark).
+    // The lowpass coefficient klp needs to be inverted: klp=1 is bright (passthrough),
+    // klp→0 is dark (frozen). Floor at 0.05 to keep the feedback loop alive.
+    float damp_raw = engine->reverb_damping.load(std::memory_order_relaxed);
+    float damp_target = 1.0f - 0.95f * damp_raw;  // DAMP 0→1.0, DAMP 1→0.05
+
     float rv_coeff = smooth_coeff(sample_rate);
+    engine->smooth_reverb_time      += rv_coeff * (time_target - engine->smooth_reverb_time);
+    engine->smooth_reverb_damping   += rv_coeff * (damp_target - engine->smooth_reverb_damping);
+    engine->smooth_reverb_diffusion += rv_coeff * (diff_target - engine->smooth_reverb_diffusion);
+
+    const float krt  = engine->smooth_reverb_time;
+    const float klp  = engine->smooth_reverb_damping;
+    const float kap  = engine->smooth_reverb_diffusion;
+    const float gain = 0.5f;  // inputGain
 
     // Reference delay lengths at 48kHz, scaled to runtime sample rate
     const float rr = sample_rate / 48000.0f;

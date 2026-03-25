@@ -422,25 +422,46 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     // Force retrigger on new step (or Flux T rising edge): reset both OrpheusVoice's
     // Schmitt trigger AND the envelope's gate state so both see a fresh rising edge.
     // Without this, all-gates-on patterns never retrigger after the first note.
+    bool retrigger = false;
     if (ext_t != nullptr) {
         // Detect rising edge in T buffer for retrigger
         bool t_rising = (ext_t[num_frames / 2] > 0.5f) && (ext_t[0] <= 0.5f);
         if (t_rising) {
             engine->bass_voice.trigger_state_ = false;
+            engine->bass_voice.remainder_count_ = 0;  // discard stale pre-trigger samples
             seq.env_gate_prev = false;
+            retrigger = true;
         }
     } else if (new_step_fired && step_gate && !step_slide) {
-        // Normal trigger: retrigger voice + envelope for fresh attack
+        // Normal trigger: retrigger voice + envelope for fresh attack.
+        // Clear the remainder buffer to avoid a phase discontinuity:
+        // the remainder contains samples rendered at the OLD note's oscillator
+        // phase; draining them before the trigger fires creates a click.
         engine->bass_voice.trigger_state_ = false;
+        engine->bass_voice.remainder_count_ = 0;
         seq.env_gate_prev = false;
+        retrigger = true;
     }
     // Slide steps: no retrigger — envelope continues (legato), pitch glides
 
     // Apply cutoff/resonance modulation to voice params
     float timbre_val = std::max(0.0f, std::min(1.0f,
         bp.timbre.load(std::memory_order_relaxed) + mod_timbre));
-    float harmonics_val = std::max(0.0f, std::min(1.0f,
-        bp.harmonics.load(std::memory_order_relaxed) + mod_harmonics));
+
+    // Remap RESO knob for the VCF engine.
+    // The VCF engine's resonance is V-shaped: |harmonics - 0.5| controls Q,
+    // so harmonics=0.0 and 1.0 both give MAXIMUM resonance, while 0.5 gives
+    // zero. This is confusing for a bass RESO knob where 0 should mean "off".
+    // Remap: RESO 0→0.5 (no resonance), RESO 1→0.0 (max resonance).
+    float raw_reso = bp.harmonics.load(std::memory_order_relaxed);
+    float harmonics_val;
+    if (bass_engine == 0) {
+        // VCF Acid: remap so RESO 0=off, RESO 1=max
+        harmonics_val = 0.5f * (1.0f - raw_reso);
+    } else {
+        harmonics_val = raw_reso;
+    }
+    harmonics_val = std::max(0.0f, std::min(1.0f, harmonics_val + mod_harmonics));
 
     // ── Flux Y timbre modulation ──
     if (timbre_src > 0) {
@@ -467,10 +488,19 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     // ── Apply envelope, output gain, and mix ──
     // Bass voice needs headroom boost: Plaits output is soft-limited to ~±1,
     // envelope scales 0-1, so raw output is quiet relative to the 12 main voices
-    // which get summed in the duo mixer. 3.5x (~11dB) brings bass to parity.
-    static constexpr float kBassOutputGain = 3.5f;
+    // which get summed in the duo mixer. The master limiter handles peaks, so
+    // this gain just sets the bass-to-voice balance.
+    static constexpr float kBassOutputGain = 2.0f;
 
     float* out = u->output_buffers[OPORT_OUT];
+
+    // Anti-click crossfade length: ~8 samples (0.17ms at 48kHz).
+    // On retrigger, the previous block's last output sample and the new block's
+    // first output sample may differ sharply (frequency change + filter transient).
+    // Crossfading from the old tail value to the new signal over a few samples
+    // eliminates the discontinuity without audibly affecting the attack.
+    static constexpr int kAntiClickSamples = 8;
+    float prev_out = engine->bass_prev_output;
 
     for (int i = 0; i < num_frames; i++) {
         smooth_mix += mix_coeff * (target_mix - smooth_mix);
@@ -483,9 +513,18 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
             sample *= env;
         }
 
-        out[i] = sample * kBassOutputGain * smooth_mix;
+        float new_sample = sample * kBassOutputGain * smooth_mix;
+
+        // Crossfade from previous block's tail on retrigger
+        if (retrigger && i < kAntiClickSamples) {
+            float t = static_cast<float>(i + 1) / static_cast<float>(kAntiClickSamples + 1);
+            new_sample = prev_out * (1.0f - t) + new_sample * t;
+        }
+
+        out[i] = new_sample;
     }
 
+    engine->bass_prev_output = out[num_frames - 1];
     engine->bass_smooth_mix = smooth_mix;
 
     // Write to Warps source buffer (slot 9 = BASS)

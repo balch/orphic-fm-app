@@ -34,11 +34,15 @@ void unit_process_overdrive(GraphUnit* u, OrpheusEngine* engine, int num_frames,
                 + engine->bass_accent_drive_boost;
     drive = std::max(0.0f, std::min(1.0f, drive));
 
-    // Bypass: MI algorithm mutes at drive=0 (pre_gain=0), so pass through clean signal
+    // Bypass: MI algorithm mutes at drive=0 (pre_gain=0), so pass through clean signal.
+    // Keep pre_gain/post_gain at their last values so ParameterInterpolator
+    // fades smoothly when drive crosses the threshold (avoids click).
     if (drive < 0.001f) {
         std::memcpy(out, in, num_frames * sizeof(float));
-        s.pre_gain = 0.0f;
-        s.post_gain = 1.0f;
+        // Fade stored gains toward bypass values over successive blocks
+        // so re-activation starts from a smooth state
+        s.pre_gain *= 0.5f;
+        s.post_gain += (1.0f - s.post_gain) * 0.5f;
         return;
     }
 

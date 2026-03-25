@@ -3,6 +3,9 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#if defined(__SSE__)
+#include <xmmintrin.h>
+#endif
 extern "C" {
 
 // Reset static DSP state for units that use singletons.
@@ -412,9 +415,31 @@ static float tts_process_effects(OrpheusEngine* e, float sample,
     return sample;
 }
 
+// Flush denormals to zero on the audio thread.
+// Without this, tiny float values in filter feedback paths (SVF state,
+// compressor envelope, etc.) trigger microcode traps on many ARM cores,
+// causing 10-100x slowdown per operation → buffer underruns → clicking.
+static inline void enable_flush_to_zero() {
+#if defined(__aarch64__)
+    uint64_t fpcr;
+    __asm__ __volatile__("mrs %0, fpcr" : "=r"(fpcr));
+    fpcr |= (1ULL << 24);  // FZ bit
+    __asm__ __volatile__("msr fpcr, %0" :: "r"(fpcr));
+#elif defined(__arm__)
+    uint32_t fpscr;
+    __asm__ __volatile__("vmrs %0, fpscr" : "=r"(fpscr));
+    fpscr |= (1 << 24);  // FZ bit
+    __asm__ __volatile__("vmsr fpscr, %0" :: "r"(fpscr));
+#elif defined(__SSE__)
+    _mm_setcsr(_mm_getcsr() | 0x8040);  // FTZ + DAZ
+#endif
+}
+
 void orpheus_engine_process(OrpheusEngine* engine,
                             float* output_buffer, int num_frames) {
     if (!engine || !output_buffer || num_frames <= 0) return;
+
+    enable_flush_to_zero();
 
     auto t0 = std::chrono::steady_clock::now();
 
