@@ -54,27 +54,6 @@ fun ReverbPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 RotaryKnob(
-                    value = uiState.amount,
-                    onValueChange = actions.setAmount,
-                    label = "AMT",
-                    controlId = ReverbSymbol.AMOUNT.controlId.key,
-                    size = 48.dp,
-                    progressColor = OrpheusColors.echoLavender
-                )
-                RotaryKnob(
-                    value = uiState.time,
-                    onValueChange = actions.setTime,
-                    label = "TIME",
-                    controlId = ReverbSymbol.TIME.controlId.key,
-                    size = 48.dp,
-                    progressColor = OrpheusColors.echoLavender
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RotaryKnob(
                     value = uiState.damping,
                     onValueChange = actions.setDamping,
                     label = "DAMP",
@@ -91,6 +70,27 @@ fun ReverbPanel(
                     progressColor = OrpheusColors.echoLavender
                 )
             }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RotaryKnob(
+                    value = uiState.time,
+                    onValueChange = actions.setTime,
+                    label = "TIME",
+                    controlId = ReverbSymbol.TIME.controlId.key,
+                    size = 48.dp,
+                    progressColor = OrpheusColors.echoLavender
+                )
+                RotaryKnob(
+                    value = uiState.amount,
+                    onValueChange = actions.setAmount,
+                    label = "Mix",
+                    controlId = ReverbSymbol.AMOUNT.controlId.key,
+                    size = 48.dp,
+                    progressColor = OrpheusColors.echoLavender
+                )
+            }
         }
     }
 }
@@ -99,6 +99,7 @@ fun ReverbPanel(
 @Composable
 fun ReverbPanelPreview() {
     ReverbPanel(
-        feature = ReverbViewModel.previewFeature()
+        feature = ReverbViewModel.previewFeature(),
+        isExpanded = true,
     )
 }
