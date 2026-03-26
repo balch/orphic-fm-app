@@ -57,4 +57,8 @@ struct BassSequencerState {
     int   env_stage;       // 0=idle, 1=attack, 2=decay
     bool  env_gate_prev;
     float smooth_note;     // portamento-smoothed pitch (MIDI note)
+    // Jitter state: per-step randomized timing offset and gate hold duration
+    int   jitter_offset;          // sample offset for current step (±samples)
+    int   jitter_hold_samples;    // how many samples the gate stays on this step (0 = full step)
+    int   jitter_hold_counter;    // counts down from jitter_hold_samples
 };

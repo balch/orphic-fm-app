@@ -192,8 +192,10 @@ struct OrpheusEngine {
     std::atomic<int>   bass_pitch_source{0};      // which Flux X modulates pitch
     std::atomic<int>   bass_timbre_source{0};     // 0=off, 1=Y on (boolean, only one Y channel)
 
-    // Bass accent amount (0-1, scales envelope boost + drive boost)
+    // Bass accent amount (0-1, scales envelope boost + drive boost + cutoff flare)
     std::atomic<float> bass_accent_amount{0.5f};
+    // Bass jitter amount (0-1, time jitter + hold/gate-length jitter)
+    std::atomic<float> bass_jitter{0.0f};
 
     // Bass → effects send (0-1): feeds delay, reverb, and grains at same level
     std::atomic<float> bass_fx_send{0.0f};
@@ -217,8 +219,9 @@ struct OrpheusEngine {
     // Bass step sequencer state (audio thread only — too large for UnitState union)
     BassSequencerState bass_seq_state;
 
-    // Bass accent state for overdrive boost (audio thread only)
+    // Bass accent state (audio thread only)
     float bass_accent_drive_boost{0.0f};  // +0.3 when accent active, 0 otherwise
+    float bass_accent_timbre_boost{0.0f}; // smoothed cutoff boost for accent flare
     // Anti-click crossfade: last output sample from previous block
     float bass_prev_output{0.0f};
 

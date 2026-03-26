@@ -55,6 +55,7 @@ class BassPlugin(
     private var _pitchSource: Int = 0
     private var _timbreSource: Int = 0
     private var _accentAmount: Float = 0.5f
+    private var _jitter: Float = 0.0f
     private var _fxSend: Float = 0.0f
 
     // Type-safe DSL port definitions
@@ -198,6 +199,14 @@ class BassPlugin(
                 default = 0.5f; min = 0.0f; max = 1.0f
                 get { _accentAmount }
                 set { _accentAmount = it }
+            }
+        }
+
+        controlPort(BassSymbol.JITTER) {
+            floatType {
+                default = 0.0f; min = 0.0f; max = 1.0f
+                get { _jitter }
+                set { _jitter = it }
             }
         }
 

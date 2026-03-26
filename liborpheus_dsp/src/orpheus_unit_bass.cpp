@@ -57,6 +57,9 @@ static void init_sequencer(BassSequencerState& seq) {
     seq.env_level = 0.0f;
     seq.env_stage = 0;
     seq.env_gate_prev = false;
+    seq.jitter_offset = 0;
+    seq.jitter_hold_samples = 0;
+    seq.jitter_hold_counter = 0;
     seq.initialized = true;
 }
 
@@ -125,11 +128,12 @@ static float process_envelope(BassSequencerState& seq, bool gate, float envelope
     // decay_ms: 500ms at 0.0 -> 50ms at 1.0
     float decay_ms = 500.0f * std::exp(-2.3f * envelope_param);  // ~500 -> ~50
 
-    // Accent: faster times scaled by accent_amount
+    // Accent: snappier attack + extended decay for punchy "flare" transient
     if (accent) {
-        float speed_factor = 1.0f - 0.33f * accent_amount;
+        float speed_factor = 1.0f - 0.6f * accent_amount;  // up to 60% faster attack
         attack_ms *= speed_factor;
-        decay_ms *= speed_factor;
+        // Extend decay slightly so the accent ring is audible, not just a click
+        decay_ms *= 1.0f + 0.4f * accent_amount;
     }
 
     float attack_samples = attack_ms * 0.001f * sample_rate;
@@ -174,10 +178,13 @@ static float process_envelope(BassSequencerState& seq, bool gate, float envelope
         level = level * (1.0f - blend) + quartic * blend;
     }
 
-    // Accent: boost output scaled by accent_amount
+    // Accent: boost output with soft saturation (no hard clamp = no click)
     if (accent) {
-        level *= 1.0f + 0.5f * accent_amount;
-        if (level > 1.0f) level = 1.0f;
+        level *= 1.0f + 0.6f * accent_amount;
+        // Soft saturate instead of hard clamp — preserves envelope shape continuity
+        if (level > 1.0f) {
+            level = 1.0f + std::tanh(level - 1.0f) * 0.15f;  // gentle overshoot
+        }
     }
 
     return level;
@@ -208,7 +215,9 @@ static const int kTicksPerStep[5] = { 24, 12, 6, 3, 1 };
 // ── Step advance helper ──────────────────────────────────────────────
 // Called when the sequencer clock signals a step advance.
 // Updates seq.current_step, applies per-cycle mutation, returns new step index.
-static int advance_step(BassSequencerState& seq, int step_count, float mutation) {
+// When jitter > 0, computes a per-step timing offset and gate hold duration.
+static int advance_step(BassSequencerState& seq, int step_count, float mutation,
+                        float jitter, int samples_per_step) {
     seq.current_step++;
     bool cycle_wrap = (seq.current_step >= step_count);
     if (cycle_wrap) {
@@ -220,6 +229,29 @@ static int advance_step(BassSequencerState& seq, int step_count, float mutation)
             }
         }
     }
+
+    // ── Jitter: randomize timing offset and gate hold duration ──
+    if (jitter > 0.001f) {
+        // Time jitter: ±15% of step period at max jitter
+        seq.rng_state = bass_rng_next(seq.rng_state);
+        float r = bass_rng_float(seq.rng_state) * 2.0f - 1.0f;  // [-1, +1)
+        seq.jitter_offset = static_cast<int>(r * jitter * 0.15f * samples_per_step);
+
+        // Hold jitter: gate duration varies from 50% to 100% of step period.
+        // At jitter=0, hold = full step (no early gate-off).
+        // At jitter=1, hold ranges randomly from 50% to 100% of step.
+        seq.rng_state = bass_rng_next(seq.rng_state);
+        float hold_rand = bass_rng_float(seq.rng_state);  // [0, 1)
+        float min_hold = 1.0f - 0.5f * jitter;  // 1.0 at jitter=0, 0.5 at jitter=1
+        float hold_frac = min_hold + hold_rand * (1.0f - min_hold);
+        seq.jitter_hold_samples = static_cast<int>(hold_frac * samples_per_step);
+        seq.jitter_hold_counter = 0;
+    } else {
+        seq.jitter_offset = 0;
+        seq.jitter_hold_samples = 0;  // 0 = full step (no early cutoff)
+        seq.jitter_hold_counter = 0;
+    }
+
     return seq.current_step;
 }
 
@@ -265,6 +297,7 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     int pitch_src   = engine->bass_pitch_source.load(std::memory_order_relaxed);
     int timbre_src  = engine->bass_timbre_source.load(std::memory_order_relaxed);
     float accent_amount = engine->bass_accent_amount.load(std::memory_order_relaxed);
+    float jitter = engine->bass_jitter.load(std::memory_order_relaxed);
     float bpm = engine->clock_bpm.load(std::memory_order_relaxed);
 
     if (step_count < 1) step_count = 1;
@@ -312,13 +345,17 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     if (clock_running && !key_override) {
         int remaining = num_frames;
         while (remaining > 0) {
-            int until_next = samples_per_step - seq.tick_counter;
+            // Apply time jitter: shift the step boundary by jitter_offset samples
+            int effective_period = samples_per_step + seq.jitter_offset;
+            if (effective_period < 4) effective_period = 4;  // safety floor
+
+            int until_next = effective_period - seq.tick_counter;
             if (until_next <= remaining) {
                 // Step fires within this block
                 seq.tick_counter = 0;
                 remaining -= until_next;
 
-                step = advance_step(seq, step_count, mutation);
+                step = advance_step(seq, step_count, mutation, jitter, samples_per_step);
 
                 pitch_value = seq.mutation_buffer[step];
                 gate_val    = seq.gate_buffer[step];
@@ -329,6 +366,14 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
             } else {
                 seq.tick_counter += remaining;
                 remaining = 0;
+            }
+        }
+
+        // Hold jitter: count elapsed samples and turn gate off early if hold expired
+        if (seq.jitter_hold_samples > 0) {
+            seq.jitter_hold_counter += num_frames;
+            if (seq.jitter_hold_counter >= seq.jitter_hold_samples && !new_step_fired) {
+                step_gate = false;  // gate off early — note cuts short
             }
         }
     }
@@ -360,8 +405,18 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     }
     float note = seq.smooth_note;
 
-    // ── Set accent drive boost for downstream overdrive ──
+    // ── Set accent boosts ──
     engine->bass_accent_drive_boost = step_accent ? (0.3f * accent_amount) : 0.0f;
+
+    // Accent cutoff flare: target is +0.35 timbre boost on accented steps.
+    // Smoothed with fast attack (~2ms) / slow decay (~60ms) for the classic
+    // accent sweep — filter snaps open then slowly closes back down.
+    float accent_timbre_target = step_accent ? (0.35f * accent_amount) : 0.0f;
+    float flare_attack = 1.0f - std::exp(-1.0f / (0.002f * sample_rate));  // ~2ms
+    float flare_decay  = 1.0f - std::exp(-1.0f / (0.06f * sample_rate));   // ~60ms
+    float flare_coeff = (accent_timbre_target > engine->bass_accent_timbre_boost)
+                        ? flare_attack : flare_decay;
+    engine->bass_accent_timbre_boost += flare_coeff * (accent_timbre_target - engine->bass_accent_timbre_boost);
 
     // ── Determine gate to pass to voice ──
     int render_gate;
@@ -481,13 +536,17 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     engine->bass_smooth_timbre += tc * (timbre_val - engine->bass_smooth_timbre);
     engine->bass_smooth_harmonics += tc * (harmonics_val - engine->bass_smooth_harmonics);
 
+    // Apply accent cutoff flare on top of smoothed timbre (post-smooth so the
+    // flare envelope shape isn't smeared by the parameter smoother)
+    float render_timbre = std::min(1.0f, engine->bass_smooth_timbre + engine->bass_accent_timbre_boost);
+
     float raw_out[kMaxFrames];
     engine->bass_voice.Render(
         plaits_engine_index,
         render_gate,
         note,
         engine->bass_smooth_harmonics,
-        engine->bass_smooth_timbre,
+        render_timbre,
         bp.morph.load(std::memory_order_relaxed),
         bp.accent.load(std::memory_order_relaxed),
         raw_out,

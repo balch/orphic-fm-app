@@ -174,6 +174,18 @@ fun BassPanel(
                 controlId = "bass_lfo_mix",
             )
 
+            RotaryKnob(
+                value = state.jitter,
+                onValueChange = actions.setJitter,
+                label = "JITTER",
+                size = 30.dp,
+                trackColor = bassColors.knobTrackColor,
+                progressColor = bassColors.knobProgressColor,
+                knobColor = bassColors.knobColor,
+                labelColor = bassColors.labelColor,
+                controlId = "bass_jitter",
+            )
+
             // Mutation knob
             RotaryKnob(
                 value = state.mutation,

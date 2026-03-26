@@ -44,13 +44,14 @@ data class BassPanelActions(
     val setMix: (Float) -> Unit,
     val setLfoMix: (Float) -> Unit,
     val setAccentAmount: (Float) -> Unit,
+    val setJitter: (Float) -> Unit,
     val setFxSend: (Float) -> Unit,
     val setTriggerSource: (Int) -> Unit,
     val setPitchSource: (Int) -> Unit,
     val setTimbreSource: (Int) -> Unit,
 ) {
     companion object {
-        val EMPTY = BassPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+        val EMPTY = BassPanelActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -70,6 +71,7 @@ private sealed interface BassIntent {
     data class SetMix(val value: Float) : BassIntent
     data class SetLfoMix(val value: Float) : BassIntent
     data class SetAccentAmount(val value: Float) : BassIntent
+    data class SetJitter(val value: Float) : BassIntent
     data class SetFxSend(val value: Float) : BassIntent
     data class SetTriggerSource(val value: Int) : BassIntent
     data class SetPitchSource(val value: Int) : BassIntent
@@ -112,6 +114,8 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
         - **COMP** (bass_compressor): Compressor amount 0-1. Auto-threshold, adds body and sustain. 0=off, 0.5=punchy, 1=squashed.
         - **MIX** (bass_mix): Output level 0-1. 0=fully bypassed (zero CPU), controls bass volume in the master mix.
         - **LFO MIX** (bass_lfo_mix): LFO modulation depth 0-1. Scales how much the active LFO source modulates bass parameters. ch0→cutoff, ch1→resonance, ch2→pitch (±0.5 semitone), ch3→envelope.
+        - **ACCENT** (bass_accent_amount): Accent intensity 0-1. Boosts velocity, filter cutoff flare (fast attack/slow decay), envelope snap, and overdrive on accented steps.
+        - **JITTER** (bass_jitter): Timing humanization 0-1. Randomizes step timing ±15% and shortens gate hold duration (50-100%) for a looser, more human feel.
 
         ## Tips for AI
         - Start beats FIRST (beats_run=1), then set bass_mix to 0.5-0.8 to bring in the bassline.
@@ -137,7 +141,8 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
                 BassSymbol.COMPRESSOR.controlId.key to "Compressor amount (0=off, 1=squashed)",
                 BassSymbol.MIX.controlId.key to "Output level / on-off (0=bypassed, 1=full volume)",
                 BassSymbol.LFO_MIX.controlId.key to "LFO modulation depth (0=none, 1=full — modulates cutoff, resonance, pitch, envelope)",
-                BassSymbol.ACCENT_AMOUNT.controlId.key to "Accent intensity (0=no accent, 0.5=default, 1=maximum accent)",
+                BassSymbol.ACCENT_AMOUNT.controlId.key to "Accent intensity (0=no accent, 0.5=default, 1=maximum accent — boosts filter cutoff, envelope punch, and overdrive on accented steps)",
+                BassSymbol.JITTER.controlId.key to "Timing humanization (0=locked grid, 1=maximum jitter — randomizes step timing ±15% and gate hold duration 50-100%)",
                 BassSymbol.FX_SEND.controlId.key to "Effects send level — routes bass to delay, reverb, and grains (0=off, 1=full send)",
             )
         }
@@ -173,6 +178,7 @@ class BassViewModel(
     private val mixId = synthController.controlFlow(BassSymbol.MIX.controlId)
     private val lfoMixId = synthController.controlFlow(BassSymbol.LFO_MIX.controlId)
     private val accentAmountId = synthController.controlFlow(BassSymbol.ACCENT_AMOUNT.controlId)
+    private val jitterId = synthController.controlFlow(BassSymbol.JITTER.controlId)
     private val fxSendId = synthController.controlFlow(BassSymbol.FX_SEND.controlId)
     private val triggerSourceId = synthController.controlFlow(BassSymbol.TRIGGER_SOURCE.controlId)
     private val pitchSourceId = synthController.controlFlow(BassSymbol.PITCH_SOURCE.controlId)
@@ -193,6 +199,7 @@ class BassViewModel(
         setMix = mixId.floatSetter(),
         setLfoMix = lfoMixId.floatSetter(),
         setAccentAmount = accentAmountId.floatSetter(),
+        setJitter = jitterId.floatSetter(),
         setFxSend = fxSendId.floatSetter(),
         setTriggerSource = triggerSourceId.intSetter(),
         setPitchSource = pitchSourceId.intSetter(),
@@ -227,6 +234,7 @@ class BassViewModel(
         mixId.map { BassIntent.SetMix(it.asFloat()) },
         lfoMixId.map { BassIntent.SetLfoMix(it.asFloat()) },
         accentAmountId.map { BassIntent.SetAccentAmount(it.asFloat()) },
+        jitterId.map { BassIntent.SetJitter(it.asFloat()) },
         fxSendId.map { BassIntent.SetFxSend(it.asFloat()) },
         triggerSourceId.map { BassIntent.SetTriggerSource(it.asInt()) },
         pitchSourceId.map { BassIntent.SetPitchSource(it.asInt()) },
@@ -265,6 +273,7 @@ class BassViewModel(
             is BassIntent.SetMix -> state.copy(mix = intent.value)
             is BassIntent.SetLfoMix -> state.copy(lfoMix = intent.value)
             is BassIntent.SetAccentAmount -> state.copy(accentAmount = intent.value)
+            is BassIntent.SetJitter -> state.copy(jitter = intent.value)
             is BassIntent.SetFxSend -> state.copy(fxSend = intent.value)
             is BassIntent.SetTriggerSource -> state.copy(triggerSource = intent.value)
             is BassIntent.SetPitchSource -> state.copy(pitchSource = intent.value)

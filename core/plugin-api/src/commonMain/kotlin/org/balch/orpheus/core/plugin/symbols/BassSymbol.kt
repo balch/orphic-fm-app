@@ -27,5 +27,6 @@ enum class BassSymbol(
     PITCH_SOURCE("pitch_source", displayName = "Pitch Source"),
     TIMBRE_SOURCE("timbre_source", displayName = "Timbre Source"),
     ACCENT_AMOUNT("accent_amount", displayName = "Accent"),
+    JITTER("jitter", displayName = "Jitter"),
     FX_SEND("fx_send", displayName = "FX Send"),
 }
