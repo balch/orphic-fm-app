@@ -111,7 +111,16 @@ static float compute_scaled_hold(float hold, float speed) {
     return std::min(1.0f, eased_hold * scale_factor);
 }
 
-void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr) {
+// Block-level RMS of a float buffer — used for computing cross-mod energy
+// between duo voices when one or both use Plaits (block-rate) engines.
+static inline float buf_rms(const float* buf, int n) {
+    float sum_sq = 0.0f;
+    for (int i = 0; i < n; i++) sum_sq += buf[i] * buf[i];
+    return (n > 0) ? std::sqrt(sum_sq / n) : 0.0f;
+}
+
+void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr,
+                         float duo_mod_signal) {
     int idx = u->state.module.index;
     if (idx < 0 || idx >= kNumVoices) {
         std::memset(u->output_buffers[OPORT_OUT], 0, num_frames * sizeof(float));
@@ -245,8 +254,11 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 if (fm_source >= 0 && fm_source < kNumVoices) {
                     fm_mod_source = 0;
                     fm_voice_idx = fm_source;
-                    // For Plaits timbre mod, use mid-point of partner's buffer
-                    mod_signal = engine->voice_fm_buffer[fm_source][num_frames / 2];
+                    // For Plaits timbre mod: use duo override (RMS) if provided,
+                    // otherwise fall back to mid-point sample (standalone rendering)
+                    mod_signal = (duo_mod_signal >= 0.0f)
+                        ? duo_mod_signal
+                        : engine->voice_fm_buffer[fm_source][num_frames / 2];
                 }
             } else if (src == 2) { // LFO
                 fm_mod_source = 2;
@@ -723,15 +735,15 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
         return;
     }
 
-    // ── Plaits fallback: delegate to unit_process_plaits per voice ──
-    // UNIT_DUO_VOICE only implements Engine 0 sample-coherent rendering.
-    // If either voice uses a Plaits engine, fall back to independent rendering.
+    // ── Plaits rendering: delegate to unit_process_plaits with cross-mod ──
+    // Instead of bailing out entirely, we compute RMS-based cross-modulation
+    // signals so Plaits voices get meaningful timbre modulation from their
+    // partner, restoring JSyn-quality FM interaction.
     int engineA = vpA.engine_index.load(std::memory_order_relaxed);
     int engineB = vpB.engine_index.load(std::memory_order_relaxed);
     if (engineA >= 0 || engineB >= 0) {
         // Pre-smooth coupling/FM/mod once per block, then save+restore around
         // the two unit_process_plaits calls to prevent double-smoothing.
-        // (unit_process_plaits applies the same smoothing internally)
         float sc = smooth_coeff(sr);
         float cp_target = engine->coupling_depth.load(std::memory_order_relaxed);
         engine->smooth_coupling_depth += sc * (cp_target - engine->smooth_coupling_depth);
@@ -745,28 +757,79 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
         float saved_mod = engine->smooth_mod_depth[duo];
 
         auto& tmp = engine->plaits_fallback_unit;
-        std::memset(&tmp, 0, sizeof(tmp));
-        tmp.type = UNIT_PLAITS;
-        tmp.enabled = true;
 
-        tmp.state.module.index = idxA;
-        unit_process_plaits(&tmp, engine, num_frames, sr);
-        std::memcpy(outA, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
+        int src = engine->mod_source[duo].load(std::memory_order_relaxed);
+        bool is_voice_fm = (src == 0);  // VOICE_FM
 
-        // Restore smoothed state so B sees the same once-smoothed values
-        engine->smooth_coupling_depth = saved_coupling;
-        engine->smooth_fm_depth[duo] = saved_fm;
-        engine->smooth_mod_depth[duo] = saved_mod;
+        if (engineA >= 0 && engineB >= 0) {
+            // ── Both Plaits: RMS cross-mod ──
+            // A gets timbre mod from RMS of B's previous block
+            // B gets timbre mod from RMS of A's current block (just rendered)
+            float mod_for_A = is_voice_fm ? buf_rms(engine->voice_fm_buffer[idxB], num_frames) : -1.0f;
 
-        tmp.state.module.index = idxB;
-        std::memset(tmp.output_buffers, 0, sizeof(tmp.output_buffers));
-        unit_process_plaits(&tmp, engine, num_frames, sr);
-        std::memcpy(outB, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
+            std::memset(&tmp, 0, sizeof(tmp));
+            tmp.type = UNIT_PLAITS;
+            tmp.enabled = true;
+            tmp.state.module.index = idxA;
+            unit_process_plaits(&tmp, engine, num_frames, sr, mod_for_A);
+            std::memcpy(outA, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
 
-        // Restore final correct state (smoothed exactly once this block)
-        engine->smooth_coupling_depth = saved_coupling;
-        engine->smooth_fm_depth[duo] = saved_fm;
-        engine->smooth_mod_depth[duo] = saved_mod;
+            engine->smooth_coupling_depth = saved_coupling;
+            engine->smooth_fm_depth[duo] = saved_fm;
+            engine->smooth_mod_depth[duo] = saved_mod;
+
+            // B reads A's current output (just rendered, now in voice_fm_buffer[idxA])
+            float mod_for_B = is_voice_fm ? buf_rms(engine->voice_fm_buffer[idxA], num_frames) : -1.0f;
+
+            tmp.state.module.index = idxB;
+            std::memset(tmp.output_buffers, 0, sizeof(tmp.output_buffers));
+            unit_process_plaits(&tmp, engine, num_frames, sr, mod_for_B);
+            std::memcpy(outB, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
+
+            engine->smooth_coupling_depth = saved_coupling;
+            engine->smooth_fm_depth[duo] = saved_fm;
+            engine->smooth_mod_depth[duo] = saved_mod;
+
+        } else {
+            // ── Mixed duo: Engine 0 + Plaits ──
+            // Render Engine 0 first (gets per-sample FM from partner's prev buffer).
+            // Then render Plaits with RMS of Engine 0's current output.
+            int e0_idx, pl_idx;
+            float *e0_out, *pl_out;
+            if (engineA < 0) {
+                e0_idx = idxA; e0_out = outA;
+                pl_idx = idxB; pl_out = outB;
+            } else {
+                e0_idx = idxB; e0_out = outB;
+                pl_idx = idxA; pl_out = outA;
+            }
+
+            // Engine 0 voice renders first — unit_process_plaits handles
+            // per-sample FM from voice_fm_buffer internally for engine_index < 0
+            std::memset(&tmp, 0, sizeof(tmp));
+            tmp.type = UNIT_PLAITS;
+            tmp.enabled = true;
+            tmp.state.module.index = e0_idx;
+            unit_process_plaits(&tmp, engine, num_frames, sr);
+            std::memcpy(e0_out, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
+
+            engine->smooth_coupling_depth = saved_coupling;
+            engine->smooth_fm_depth[duo] = saved_fm;
+            engine->smooth_mod_depth[duo] = saved_mod;
+
+            // Plaits voice gets RMS of Engine 0's current output as timbre mod
+            float mod_for_plaits = is_voice_fm ? buf_rms(engine->voice_fm_buffer[e0_idx], num_frames) : -1.0f;
+
+            tmp.state.module.index = pl_idx;
+            std::memset(tmp.output_buffers, 0, sizeof(tmp.output_buffers));
+            unit_process_plaits(&tmp, engine, num_frames, sr, mod_for_plaits);
+            std::memcpy(pl_out, tmp.output_buffers[OPORT_OUT], num_frames * sizeof(float));
+
+            engine->smooth_coupling_depth = saved_coupling;
+            engine->smooth_fm_depth[duo] = saved_fm;
+            engine->smooth_mod_depth[duo] = saved_mod;
+        }
+
         return;
     }
 

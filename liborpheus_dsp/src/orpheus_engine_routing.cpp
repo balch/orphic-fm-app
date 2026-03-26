@@ -448,8 +448,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->bass_timbre_source.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "accent_amount") == 0)
             engine->bass_accent_amount.store(value, std::memory_order_relaxed);
-        else if (std::strcmp(symbol, "grains_send") == 0)
-            engine->bass_grains_send.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "fx_send") == 0)
+            engine->bass_fx_send.store(value, std::memory_order_relaxed);
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.dj") == 0) {
         if (std::strcmp(symbol, "wet_a") == 0) {

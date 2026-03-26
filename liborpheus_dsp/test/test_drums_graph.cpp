@@ -557,7 +557,7 @@ static bool test_graph_effects_bypass_parity() {
 // Main voices (0-11) → source 0 (SYNTH), drum voices (12-14) → source 2 (REPL)
 // ═══════════════════════════════════════════════════════════════════
 static bool test_warps_source_routing() {
-    printf("\n=== Test: Warps source routing (SYNTH vs REPL) ===\n");
+    printf("\n=== Test: Warps source routing (SYNTH vs DRUMS) ===\n");
     bool pass = true;
 
     const float sr = 48000.0f;
@@ -618,16 +618,16 @@ static bool test_warps_source_routing() {
     orpheus_graph_process(graph, engine, stereo, 128);
 
     float synth_rms = compute_rms(engine->warps_source_buffers[0], 128);
-    float repl_rms = compute_rms(engine->warps_source_buffers[2], 128);
+    float drums_rms = compute_rms(engine->warps_source_buffers[1], 128);
 
-    printf("  Main voice only: SYNTH_buf=%.4f REPL_buf=%.4f\n", synth_rms, repl_rms);
+    printf("  Main voice only: SYNTH_buf=%.4f DRUMS_buf=%.4f\n", synth_rms, drums_rms);
 
     if (synth_rms < 0.001f) {
         printf("  FAIL: SYNTH source buffer empty despite main voice active\n");
         pass = false;
     }
-    if (repl_rms > 0.001f) {
-        printf("  FAIL: REPL source buffer has signal despite no drum triggered\n");
+    if (drums_rms > 0.001f) {
+        printf("  FAIL: DRUMS source buffer has signal despite no drum triggered\n");
         pass = false;
     }
 
@@ -639,15 +639,15 @@ static bool test_warps_source_routing() {
     orpheus_graph_process(graph, engine, stereo, 128);
 
     synth_rms = compute_rms(engine->warps_source_buffers[0], 128);
-    repl_rms = compute_rms(engine->warps_source_buffers[2], 128);
-    float repl_peak = compute_peak(engine->warps_source_buffers[2], 128);
+    drums_rms = compute_rms(engine->warps_source_buffers[1], 128);
+    float drums_peak = compute_peak(engine->warps_source_buffers[1], 128);
 
-    printf("  After drum trigger: SYNTH_buf=%.4f REPL_peak=%.6f\n", synth_rms, repl_peak);
+    printf("  After drum trigger: SYNTH_buf=%.4f DRUMS_peak=%.6f\n", synth_rms, drums_peak);
 
-    // REPL buffer is scaled by 1/kNumDrumVoices (0.333).
+    // DRUMS buffer is scaled by 1/kNumDrumVoices (0.333).
     // With ADSR bypass for drums, the transient should be strong.
-    if (repl_peak < 0.001f) {
-        printf("  FAIL: REPL source buffer too quiet (%.6f)\n", repl_peak);
+    if (drums_peak < 0.001f) {
+        printf("  FAIL: DRUMS source buffer too quiet (%.6f)\n", drums_peak);
         pass = false;
     }
 
@@ -843,12 +843,12 @@ static bool test_drum_slot_gains() {
         auto r = render_engine(engine, 24000);
         peaks[d] = r.peak;
 
-        // Verify drum voice level at correct index
-        float level = engine->voice_levels[12 + d].load();
-        printf("  %s (v%d): peak=%.4f level=%.4f %s\n",
-               names[d], 12 + d, peaks[d], level,
-               level > 0.001f ? "OK" : "SILENT!");
-        if (level < 0.001f) pass = false;
+        // Verify drum produced output (use render peak, not voice_levels which
+        // only captures the last block — fast-decaying drums like hat may be silent by then)
+        printf("  %s (v%d): peak=%.4f %s\n",
+               names[d], 12 + d, peaks[d],
+               peaks[d] > 0.001f ? "OK" : "SILENT!");
+        if (peaks[d] < 0.001f) pass = false;
 
         // Verify main voices 8-11 are NOT affected
         for (int v = 8; v < 12; v++) {

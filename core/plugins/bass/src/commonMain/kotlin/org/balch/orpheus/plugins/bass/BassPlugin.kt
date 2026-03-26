@@ -55,7 +55,7 @@ class BassPlugin(
     private var _pitchSource: Int = 0
     private var _timbreSource: Int = 0
     private var _accentAmount: Float = 0.5f
-    private var _grainsSend: Float = 0.0f
+    private var _fxSend: Float = 0.0f
 
     // Type-safe DSL port definitions
     private val portDefs = ports(startIndex = 2) {
@@ -87,8 +87,8 @@ class BassPlugin(
 
         controlPort(BassSymbol.CLOCK_DIV) {
             intType {
-                default = 2; min = 0; max = 4
-                options = listOf("1/4", "1/2", "1x", "2x", "4x")
+                default = 0; min = 0; max = 4
+                options = listOf("1x", "2x", "4x", "8x", "16x")
                 get { _clockDiv }
                 set { _clockDiv = it }
             }
@@ -201,11 +201,11 @@ class BassPlugin(
             }
         }
 
-        controlPort(BassSymbol.GRAINS_SEND) {
+        controlPort(BassSymbol.FX_SEND) {
             floatType {
                 default = 0.0f; min = 0.0f; max = 1.0f
-                get { _grainsSend }
-                set { _grainsSend = it }
+                get { _fxSend }
+                set { _fxSend = it }
             }
         }
     }

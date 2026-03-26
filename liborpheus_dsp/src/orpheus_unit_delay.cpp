@@ -15,6 +15,16 @@ void unit_process_dual_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames
     float* out_l = u->output_buffers[OPORT_OUT];
     float* out_r = u->output_buffers[OPORT_OUT_RIGHT];
 
+    // Mix bass FX send into delay input (bass is mono → both L and R)
+    float bass_send = engine->bass_smooth_fx_send;
+    if (bass_send > 0.001f) {
+        float* bass = engine->warps_bass_read;  // double-buffered for order-independent read
+        for (int i = 0; i < num_frames; i++) {
+            in_l[i] += bass[i] * bass_send;
+            in_r[i] += bass[i] * bass_send;
+        }
+    }
+
     if (engine->delay_bypass.load(std::memory_order_relaxed)) {
         std::memcpy(out_l, in_l, num_frames * sizeof(float));
         std::memcpy(out_r, in_r, num_frames * sizeof(float));

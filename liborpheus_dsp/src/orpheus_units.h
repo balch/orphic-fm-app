@@ -20,7 +20,11 @@ void unit_process_delay_line(GraphUnit* u, int num_frames, float sample_rate);
 void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_buffer, int num_frames, float sample_rate);
 
 // MI module wrappers
-void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+// duo_mod_signal: pre-computed cross-mod signal for Plaits timbre mod in duo voice rendering.
+// Negative (<0) = use internal mid-point sample (default for standalone rendering).
+// Non-negative = use this value (RMS of partner's audio, supplied by unit_process_duo_voice).
+void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate,
+                         float duo_mod_signal = -1.0f);
 void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_rings(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_warps(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);

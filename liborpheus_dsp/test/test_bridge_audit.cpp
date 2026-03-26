@@ -35,8 +35,10 @@ static bool audit_warps_sources() {
     // Enable LFO
     engine->lfo_freq_a.store(2.0f);
     engine->lfo_mode.store(0);  // AND
-    // Enable Flux
+    // Enable Flux (needs clock running to generate triggers)
     engine->marbles_mix.store(0.5f);
+    engine->clock_running.store(1);
+    engine->clock_bpm.store(120.0f);
     // Enable reverb (so resonator has excitation)
     engine->reverb_amount.store(0.3f);
     // Warps bypass so sources aren't affected by dry attenuation
@@ -57,8 +59,8 @@ static bool audit_warps_sources() {
     // Check every source buffer
     const char* names[] = {"SYNTH","DRUMS","REPL","LFO","RESO","WARPS_FB","FLUX","BENDER","STRINGS"};
     // Which sources should have signal given our setup
-    // (WARPS_FB=5 won't have signal since Warps is bypassed, BENDER=7 needs bend input)
-    bool expect_signal[] = {true, true, false, true, false, false, true, false, false};
+    // WARPS_FB=5: bypassed; FLUX=6: no code writes to this slot; BENDER=7: needs bend input
+    bool expect_signal[] = {true, true, false, true, false, false, false, false, false};
 
     int n_sources = OrpheusEngine::kNumWarpsSources;
     printf("  Discovered %d Warps sources (from kNumWarpsSources)\n", n_sources);

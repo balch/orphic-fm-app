@@ -249,15 +249,15 @@ fun BassPanel(
                 controlId = "bass_compressor",
             )
             RotaryKnob(
-                value = state.grainsSend,
-                onValueChange = actions.setGrainsSend,
-                label = "GRAINS",
+                value = state.fxSend,
+                onValueChange = actions.setFxSend,
+                label = "FX",
                 size = 30.dp,
                 trackColor = bassColors.knobTrackColor,
                 progressColor = bassColors.knobProgressColor,
                 knobColor = bassColors.knobColor,
                 labelColor = bassColors.labelColor,
-                controlId = "bass_grains_send",
+                controlId = "bass_fx_send",
             )
             RotaryKnob(
                 value = state.mix,

@@ -191,4 +191,31 @@ if(BUILD_TESTS)
         TEST
         TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/data"
     )
+
+    # Re-export the production graph from Kotlin before running tests.
+    # This ensures C++ tests always use the current DefaultWiringGraph.kt.
+    find_program(GRADLEW "${CMAKE_CURRENT_SOURCE_DIR}/../gradlew")
+    if(GRADLEW)
+        add_custom_target(export_graph
+            COMMAND ${GRADLEW} -p "${CMAKE_CURRENT_SOURCE_DIR}/.."
+                :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*" -q
+            COMMENT "Exporting production graph (default_graph.odwg)"
+        )
+        add_dependencies(orpheus_dsp_test export_graph)
+    endif()
+
+    # Standalone FM compare runner (avoids crash in run_warps_tests)
+    add_executable(orpheus_fm_test
+        test/test_fm_main.cpp
+        test/test_fm_compare.cpp
+    )
+    target_link_libraries(orpheus_fm_test orpheus_dsp)
+    target_include_directories(orpheus_fm_test PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${EURORACK_DIR}"
+    )
+    target_compile_definitions(orpheus_fm_test PRIVATE
+        TEST
+        TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/test/data"
+    )
 endif()

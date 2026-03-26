@@ -18,10 +18,10 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         return;
     }
 
-    // Mix bass send into Grains input (bass is mono → both L and R)
-    float bass_send = engine->bass_grains_send.load(std::memory_order_relaxed);
+    // Mix bass FX send into Grains input (bass is mono → both L and R)
+    float bass_send = engine->bass_smooth_fx_send;
     if (bass_send > 0.001f) {
-        float* bass = engine->warps_source_buffers[9];  // bass voice output
+        float* bass = engine->warps_bass_read;  // double-buffered for order-independent read
         for (int i = 0; i < num_frames; i++) {
             in_l[i] += bass[i] * bass_send;
             in_r[i] += bass[i] * bass_send;
@@ -55,7 +55,9 @@ void unit_process_clouds(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
     }
     p->texture = engine->clouds_texture.load(std::memory_order_relaxed);
-    p->dry_wet = engine->clouds_dry_wet.load(std::memory_order_relaxed);
+    // Clamp to [0, 0.998] to prevent OOB in MI Interpolate(lut_xfade_in, dry_wet, 16)
+    // At dry_wet=1.0, index_integral=16 reads table[17] which is 1 past the 17-entry LUT
+    p->dry_wet = std::min(engine->clouds_dry_wet.load(std::memory_order_relaxed), 0.998f);
     p->feedback = engine->clouds_feedback.load(std::memory_order_relaxed);
     p->reverb = engine->clouds_reverb.load(std::memory_order_relaxed);
     p->freeze = engine->clouds_freeze.load(std::memory_order_relaxed) != 0;

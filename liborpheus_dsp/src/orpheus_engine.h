@@ -195,15 +195,19 @@ struct OrpheusEngine {
     // Bass accent amount (0-1, scales envelope boost + drive boost)
     std::atomic<float> bass_accent_amount{0.5f};
 
-    // Bass → Grains send level (0-1)
-    std::atomic<float> bass_grains_send{0.0f};
+    // Bass → effects send (0-1): feeds delay, reverb, and grains at same level
+    std::atomic<float> bass_fx_send{0.0f};
 
     float bass_smooth_mix{0.0f};                 // audio thread only
+    float bass_smooth_fx_send{0.0f};             // audio thread only
+    float bass_smooth_timbre{0.5f};              // audio thread only
+    float bass_smooth_harmonics{0.5f};           // audio thread only
+    float bass_lpf_state{0.0f};                  // one-pole LPF to catch retrigger clicks
     std::atomic<int>   bass_bypass{1};           // bypass when mix=0
     std::atomic<int>   bass_root_note{36};       // MIDI note (C2)
     std::atomic<int>   bass_scale{1};            // 0=chrom, 1=min_pent, 2=minor, 3=major, 4=dorian, 5=whole
     std::atomic<int>   bass_step_count{16};      // 4, 8, 12, or 16
-    std::atomic<int>   bass_clock_div{2};        // 0=1/4, 1=1/2, 2=1x, 3=2x, 4=4x
+    std::atomic<int>   bass_clock_div{0};        // 0=1x(quarter), 1=2x(8th), 2=4x(16th), 3=8x(32nd), 4=16x(64th)
     std::atomic<int>   bass_engine{0};           // BassEngine enum
 
     // Bass keyboard override (set from MIDI/keyboard, cleared on release)

@@ -734,6 +734,11 @@ static bool test_lfo_warps_routing() {
 
     unit_process_hyper_lfo(&lfo, engine, 128, sr);
 
+    // The warps source copy is handled by orpheus_graph_process, not the unit.
+    // Simulate it here since we're testing the unit directly.
+    std::memcpy(engine->warps_source_buffers[3], engine->lfo_output_buffer,
+                128 * sizeof(float));
+
     // Check warps_source_buffers[3] has non-zero content
     float warps_peak = 0.0f;
     for (int i = 0; i < 128; i++) {

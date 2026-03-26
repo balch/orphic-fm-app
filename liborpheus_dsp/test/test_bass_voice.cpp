@@ -293,7 +293,7 @@ static bool test_bass_writes_to_warps_source_buffer() {
     return pass;
 }
 
-static bool test_bass_grains_send_mixes_into_clouds() {
+static bool test_bass_fx_send_mixes_into_clouds() {
     printf("\n=== Test: Bass grains send mixes bass into Clouds input ===\n");
     OrpheusEngine* engine = orpheus_engine_create(48000.0f);
     if (!load_production_graph(engine)) {
@@ -330,7 +330,7 @@ static bool test_bass_grains_send_mixes_into_clouds() {
 
     // Now set grains_send > 0 and exercise the Clouds unit code path by
     // running unit_process_clouds directly with a manually prepared unit.
-    engine->bass_grains_send.store(0.5f, std::memory_order_relaxed);
+    engine->bass_fx_send.store(0.5f, std::memory_order_relaxed);
     engine->clouds_bypass.store(0, std::memory_order_relaxed);
 
     GraphUnit u;
@@ -535,6 +535,167 @@ static bool test_bass_slide_portamento() {
     return pass;
 }
 
+// ── Click detection test ──────────────────────────────────────────
+// Reproduces the user's scenario using the PRODUCTION GRAPH:
+// FM engine, low cutoff, drive=0, run at 4x clock then switch to 1/4x.
+// Uses orpheus_engine_process() for full signal chain fidelity.
+static bool test_bass_vcf_click_detection() {
+    printf("\n=== Test: Bass click detection (FM, production graph, 4x→1/4x) ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_production_graph(engine)) {
+        printf("SKIP: production graph not available (build app first)\n");
+        orpheus_engine_destroy(engine);
+        return true;
+    }
+
+    // Match the user's settings from screenshot (preset: "click")
+    engine->bass_mix.store(0.36f);
+    engine->bass_bypass.store(0);
+    engine->bass_root_note.store(36);     // C2
+    engine->bass_scale.store(2);          // Minor
+    engine->bass_step_count.store(8);
+    engine->bass_mutation.store(0.26f);
+    engine->bass_envelope.store(0.5f);
+    engine->bass_engine.store(2);         // FM
+    engine->bass_overdrive.store(0.0f);   // Drive = 0
+    engine->bass_compressor.store(0.0f);  // Comp = 0
+    engine->bass_params.timbre.store(0.33f);
+    engine->bass_params.harmonics.store(0.0f);
+    engine->bass_params.morph.store(0.0f);
+    engine->bass_params.accent.store(0.3f);
+    engine->bass_accent_amount.store(0.3f);
+    engine->bass_lfo_mix.store(0.0f);     // LFO off
+    engine->clock_running.store(1);
+    engine->clock_bpm.store(120.0f);
+
+    // Bass delay/reverb sends default to 0 — bass signal only reaches master
+    // via direct path, not tripled through delay/reverb dry passthrough.
+
+    const int CHUNK = 64;
+    const float SR = 48000.0f;
+
+    // Capture master output AND bass-only signal (warps_source_buffers[9])
+    std::vector<float> all_stereo;
+    std::vector<float> all_samples;      // master left channel
+    std::vector<float> bass_samples;     // bass voice direct output (pre-overdrive)
+
+    // Phase 1: Run at 4x clock for 1 second
+    engine->bass_clock_div.store(4);
+    int blocks_1s = static_cast<int>(SR / CHUNK);
+    for (int b = 0; b < blocks_1s; b++) {
+        float buf[CHUNK * 2];
+        orpheus_engine_process(engine, buf, CHUNK);
+        for (int i = 0; i < CHUNK * 2; i++)
+            all_stereo.push_back(buf[i]);
+        for (int i = 0; i < CHUNK; i++) {
+            all_samples.push_back(buf[i * 2]);
+            bass_samples.push_back(engine->warps_source_buffers[9][i]);
+        }
+    }
+    int phase1_end = static_cast<int>(all_samples.size());
+
+    // Phase 2: Switch to 1/4x clock for 2 seconds
+    engine->bass_clock_div.store(0);
+    for (int b = 0; b < blocks_1s * 2; b++) {
+        float buf[CHUNK * 2];
+        orpheus_engine_process(engine, buf, CHUNK);
+        for (int i = 0; i < CHUNK * 2; i++)
+            all_stereo.push_back(buf[i]);
+        for (int i = 0; i < CHUNK; i++) {
+            all_samples.push_back(buf[i * 2]);
+            bass_samples.push_back(engine->warps_source_buffers[9][i]);
+        }
+    }
+
+    // ── Analyze BASS-ONLY signal for clicks ──
+    float max_delta = 0.0f;
+    int max_delta_idx = 0;
+    float bass_rms = compute_rms(bass_samples.data() + phase1_end,
+                                  static_cast<int>(bass_samples.size()) - phase1_end);
+    float signal_rms = compute_rms(all_samples.data(), static_cast<int>(all_samples.size()));
+
+    printf("  Bass-only RMS (1/4x phase): %.6f\n", bass_rms);
+
+    // Find clicks in bass-only signal
+    float bass_max_delta = 0.0f;
+    int bass_max_idx = 0;
+    int bass_click_count = 0;
+    int bass_prev_click = -100;
+    for (int i = phase1_end + 1; i < static_cast<int>(bass_samples.size()); i++) {
+        float delta = std::fabs(bass_samples[i] - bass_samples[i - 1]);
+        if (delta > bass_max_delta) {
+            bass_max_delta = delta;
+            bass_max_idx = i;
+        }
+        if (delta > 0.05f && (i - bass_prev_click) > 100) {
+            bass_click_count++;
+            bass_prev_click = i;
+            if (bass_click_count <= 5) {
+                printf("  BASS click at sample %d (%.2f ms): delta=%.6f "
+                       "val[%d]=%.6f val[%d]=%.6f\n",
+                       i, i / SR * 1000.0f, delta,
+                       i-1, bass_samples[i-1], i, bass_samples[i]);
+            }
+        }
+    }
+    printf("  Bass-only max delta: %.6f at sample %d (%.2f ms)\n",
+           bass_max_delta, bass_max_idx, bass_max_idx / SR * 1000.0f);
+    printf("  Bass-only clicks: %d\n", bass_click_count);
+
+    // Write bass-only WAV
+    std::vector<float> bass_stereo(bass_samples.size() * 2);
+    for (size_t i = 0; i < bass_samples.size(); i++) {
+        bass_stereo[i * 2] = bass_samples[i];
+        bass_stereo[i * 2 + 1] = bass_samples[i];
+    }
+    write_wav("test/output/bass_click_isolated.wav", bass_stereo.data(),
+              static_cast<int>(bass_samples.size()), static_cast<int>(SR));
+
+    // Only look at phase 2 (after clock change) for clicks
+    for (int i = phase1_end + 1; i < static_cast<int>(all_samples.size()); i++) {
+        float delta = std::fabs(all_samples[i] - all_samples[i - 1]);
+        if (delta > max_delta) {
+            max_delta = delta;
+            max_delta_idx = i;
+        }
+    }
+
+    // Count clicks: sample-to-sample deltas exceeding a threshold.
+    // For a smooth bass signal, consecutive samples shouldn't jump more than
+    // ~0.05 (~-26dB). Anything above that is likely an audible click.
+    float click_threshold = 0.05f;
+    int click_count = 0;
+    int prev_click = -100;
+    for (int i = phase1_end + 1; i < static_cast<int>(all_samples.size()); i++) {
+        float delta = std::fabs(all_samples[i] - all_samples[i - 1]);
+        if (delta > click_threshold && (i - prev_click) > 100) {
+            click_count++;
+            prev_click = i;
+            if (click_count <= 5) {
+                printf("  Click at sample %d (%.2f ms): delta=%.6f val[%d]=%.6f val[%d]=%.6f\n",
+                       i, i / SR * 1000.0f, delta, i-1, all_samples[i-1], i, all_samples[i]);
+            }
+        }
+    }
+
+    // Write full stereo WAV for manual inspection
+    write_wav("test/output/bass_click_test.wav", all_stereo.data(),
+              static_cast<int>(all_samples.size()), static_cast<int>(SR));
+
+    printf("  Signal RMS: %.6f\n", signal_rms);
+    printf("  Click threshold: %.6f\n", click_threshold);
+    printf("  Max delta: %.6f at sample %d (%.2f ms, phase %s)\n",
+           max_delta, max_delta_idx, max_delta_idx / SR * 1000.0f,
+           max_delta_idx < phase1_end ? "4x" : "1/4x");
+    printf("  Clicks detected in 1/4x phase: %d\n", click_count);
+
+    // Pass if no clicks above 0.05 in the 1/4x phase
+    bool pass = (click_count == 0);
+    printf("Bass VCF click detection: %s\n", pass ? "PASS" : "FAIL");
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 bool run_bass_voice_tests() {
     bool all_pass = true;
     all_pass &= test_overdrive_passthrough();
@@ -545,8 +706,9 @@ bool run_bass_voice_tests() {
     all_pass &= test_bass_voice_silent_when_bypassed();
     all_pass &= test_bass_voice_full_graph();
     all_pass &= test_bass_writes_to_warps_source_buffer();
-    all_pass &= test_bass_grains_send_mixes_into_clouds();
+    all_pass &= test_bass_fx_send_mixes_into_clouds();
     all_pass &= test_bass_flux_t_gating();
     all_pass &= test_bass_slide_portamento();
+    all_pass &= test_bass_vcf_click_detection();
     return all_pass;
 }

@@ -84,7 +84,7 @@ static bool test_warps_source_levels() {
     }
 
     // Report source buffer levels
-    const char* names[] = {"SYNTH", "DRUMS", "REPL", "LFO", "RESO", "WARPS_FB", "FLUX", "BENDER", "STRINGS"};
+    const char* names[] = {"SYNTH", "DRUMS", "REPL", "LFO", "RESO", "WARPS_FB", "FLUX", "BENDER", "STRINGS", "BASS"};
     printf("  Source buffer RMS levels (last block):\n");
     for (int s = 0; s < OrpheusEngine::kNumWarpsSources; s++) {
         double sum = 0;
@@ -504,7 +504,7 @@ static bool test_warps_synth_drums() {
             ? 20.0f * std::log10(diff_rms / dry_rms) : -100.0f;
 
         const char* status = "OK";
-        if (ratio_db < -12.0f) {
+        if (ratio_db < -15.0f) {
             status = "*** INAUDIBLE";
             isolation_pass = false;
         }

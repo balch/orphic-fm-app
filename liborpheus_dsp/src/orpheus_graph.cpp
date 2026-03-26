@@ -364,6 +364,11 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
         float sc = 1.0f - std::exp(-1.0f / (0.005f * sr));  // ~5ms ramp
         engine->warps_smooth_mix += sc * (mix_target - engine->warps_smooth_mix);
         if (engine->warps_smooth_mix < 0.0001f) engine->warps_smooth_mix = 0.0f;
+
+        // Smooth bass FX send (~5ms) — read by delay, reverb, and clouds units
+        float fx_target = engine->bass_fx_send.load(std::memory_order_relaxed);
+        engine->bass_smooth_fx_send += sc * (fx_target - engine->bass_smooth_fx_send);
+        if (engine->bass_smooth_fx_send < 0.0001f) engine->bass_smooth_fx_send = 0.0f;
     }
 
     // Turntable duck gains: attenuate dry source paths when DJ faders are up.

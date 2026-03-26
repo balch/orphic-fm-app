@@ -25,6 +25,16 @@ void unit_process_reverb(GraphUnit* u, OrpheusEngine* engine,
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
 
+    // Mix bass FX send into reverb input (bass is mono → both L and R)
+    float bass_send = engine->bass_smooth_fx_send;
+    if (bass_send > 0.001f) {
+        float* bass = engine->warps_bass_read;  // double-buffered for order-independent read
+        for (int i = 0; i < num_frames; i++) {
+            in_l[i] += bass[i] * bass_send;
+            in_r[i] += bass[i] * bass_send;
+        }
+    }
+
     // Load and smooth parameters (~5ms ramp to avoid clicks from knob changes
     // propagating through the reverb's feedback loop)
     float amount_target = engine->reverb_amount.load(std::memory_order_relaxed);

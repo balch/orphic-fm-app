@@ -39,6 +39,8 @@ struct FmScenario {
     float vibrato_depth; // vibrato_depth atomic value (0-1)
     float lfo_freq_a;    // LFO frequency Hz
     float harmonics;     // self-feedback amount (voice harmonics)
+    int   engine_a;      // -1=Engine 0, 0+=Plaits engine index
+    int   engine_b;      // -1=Engine 0, 0+=Plaits engine index
 };
 
 // Create a minimal graph: LFO → DuoVoice → MasterOut
@@ -89,26 +91,27 @@ static std::vector<float> render_fm_scenario(const FmScenario& s) {
     // Voice A
     engine->voice_params[0].active.store(1);
     engine->voice_params[0].ever_triggered.store(1);
-    engine->voice_params[0].engine_index.store(-1);  // Engine 0
+    engine->voice_params[0].engine_index.store(s.engine_a);
     engine->voice_params[0].tune.store(NOTE_A);
-    engine->voice_params[0].timbre.store(0.0f);
-    engine->voice_params[0].morph.store(0.0f);
+    engine->voice_params[0].timbre.store(0.5f);
+    engine->voice_params[0].morph.store(0.5f);
     engine->voice_params[0].harmonics.store(s.harmonics);
     engine->voice_params[0].decay.store(ENV_SPEED);
 
     // Voice B
     engine->voice_params[1].active.store(1);
     engine->voice_params[1].ever_triggered.store(1);
-    engine->voice_params[1].engine_index.store(-1);  // Engine 0
+    engine->voice_params[1].engine_index.store(s.engine_b);
     engine->voice_params[1].tune.store(NOTE_B);
-    engine->voice_params[1].timbre.store(0.0f);
-    engine->voice_params[1].morph.store(0.0f);
+    engine->voice_params[1].timbre.store(0.5f);
+    engine->voice_params[1].morph.store(0.5f);
     engine->voice_params[1].harmonics.store(s.harmonics);
     engine->voice_params[1].decay.store(ENV_SPEED);
 
     // Mod source and FM depth (per-duo, duo 0)
     engine->mod_source[0].store(s.mod_source);
     engine->fm_depth[0].store(s.fm_depth);
+    engine->mod_depth[0].store(s.fm_depth);  // Plaits cross-mod uses mod_depth for RMS-based timbre modulation
     engine->fm_cross_quad.store(0);  // standard duo pairs
 
     // Coupling
@@ -164,13 +167,21 @@ bool run_fm_compare_tests() {
     // JSyn test previously used 88 Hz (vibratoDepthHz=88), updated to match C++ range.
 
     FmScenario scenarios[] = {
-        {"dry",          1, 0.0f, 0.0f, 0.0f,  5.0f, 0.0f},
-        {"voice_fm_lo",  0, 0.2f, 0.0f, 0.0f,  5.0f, 0.0f},
-        {"voice_fm_hi",  0, 0.8f, 0.0f, 0.0f,  5.0f, 0.0f},
-        {"lfo_fm",       2, 0.5f, 0.0f, 0.0f,  5.0f, 0.0f},
-        {"vibrato",      1, 0.0f, 0.0f, 1.0f,  5.0f, 0.0f},
-        {"coupling",     1, 0.0f, 0.5f, 0.0f,  5.0f, 0.0f},
-        {"feedback",     1, 0.0f, 0.0f, 0.0f,  5.0f, 0.5f},
+        {"dry",          1, 0.0f, 0.0f, 0.0f,  5.0f, 0.0f, -1, -1},
+        {"voice_fm_lo",  0, 0.2f, 0.0f, 0.0f,  5.0f, 0.0f, -1, -1},
+        {"voice_fm_hi",  0, 0.8f, 0.0f, 0.0f,  5.0f, 0.0f, -1, -1},
+        {"lfo_fm",       2, 0.5f, 0.0f, 0.0f,  5.0f, 0.0f, -1, -1},
+        {"vibrato",      1, 0.0f, 0.0f, 1.0f,  5.0f, 0.0f, -1, -1},
+        {"coupling",     1, 0.0f, 0.5f, 0.0f,  5.0f, 0.0f, -1, -1},
+        {"feedback",     1, 0.0f, 0.0f, 0.0f,  5.0f, 0.5f, -1, -1},
+        // ── Plaits duo FM scenarios (engine 8 = VA, reliable output) ──
+        {"plaits_dry",      1, 0.0f, 0.0f, 0.0f, 5.0f, 0.0f,  8,  8},
+        {"plaits_fm_lo",    0, 0.2f, 0.0f, 0.0f, 5.0f, 0.0f,  8,  8},
+        {"plaits_fm_hi",    0, 0.8f, 0.0f, 0.0f, 5.0f, 0.0f,  8,  8},
+        // ── Mixed duo FM scenarios (Engine 0 + Plaits VA) ──
+        {"mixed_dry",       1, 0.0f, 0.0f, 0.0f, 5.0f, 0.0f, -1,  8},
+        {"mixed_fm_lo",     0, 0.2f, 0.0f, 0.0f, 5.0f, 0.0f, -1,  8},
+        {"mixed_fm_hi",     0, 0.8f, 0.0f, 0.0f, 5.0f, 0.0f, -1,  8},
     };
 
     printf("%-20s | %8s %8s %8s %8s\n", "Scenario", "RMS_L", "Peak_L", "RMS_R", "Peak_R");
@@ -219,6 +230,67 @@ bool run_fm_compare_tests() {
     printf("  ./gradlew :core:dsp-engine:jvmTest --tests '*JsynFmCompareTest'\n");
     printf("Then compare:\n");
     printf("  python3 %s/compare_fm.py\n", output_dir);
+
+    // ── Plaits duo FM verification ──
+    // Plaits VOICE_FM should produce measurably different output from dry baseline
+    {
+        auto plaits_dry = render_fm_scenario({"plaits_dry", 1, 0.0f, 0.0f, 0.0f, 5.0f, 0.0f, 8, 8});
+        auto plaits_fm  = render_fm_scenario({"plaits_fm_hi", 0, 0.8f, 0.0f, 0.0f, 5.0f, 0.0f, 8, 8});
+        int n = (int)(SR * DURATION);
+        float dry_rms = compute_rms(plaits_dry.data(), n * 2);
+        float fm_rms  = compute_rms(plaits_fm.data(), n * 2);
+        float diff = std::fabs(fm_rms - dry_rms);
+        printf("\nPlaits duo FM check: dry_rms=%.4f fm_rms=%.4f diff=%.4f\n", dry_rms, fm_rms, diff);
+        if (diff < 0.001f) {
+            printf("  FAIL: Plaits VOICE_FM produced no timbral change vs dry\n");
+            all_pass = false;
+        } else {
+            printf("  PASS: Plaits VOICE_FM produces measurable timbral change\n");
+        }
+    }
+
+    // ── Mixed duo FM verification ──
+    // Only the Plaits voice (right channel, odd samples) receives cross-mod.
+    // Engine 0 (left channel) is largely unchanged, so compare right channel only.
+    {
+        auto mixed_dry = render_fm_scenario({"mixed_dry", 1, 0.0f, 0.0f, 0.0f, 5.0f, 0.0f, -1, 8});
+        auto mixed_fm  = render_fm_scenario({"mixed_fm_hi", 0, 0.8f, 0.0f, 0.0f, 5.0f, 0.0f, -1, 8});
+        int n = (int)(SR * DURATION);
+        // Extract right channel (Plaits voice B) from interleaved stereo
+        float dry_sum_sq = 0.0f, fm_sum_sq = 0.0f;
+        for (int i = 0; i < n; i++) {
+            float d = mixed_dry[i * 2 + 1];
+            float f = mixed_fm[i * 2 + 1];
+            dry_sum_sq += d * d;
+            fm_sum_sq += f * f;
+        }
+        float dry_rms = std::sqrt(dry_sum_sq / n);
+        float fm_rms  = std::sqrt(fm_sum_sq / n);
+        float diff = std::fabs(fm_rms - dry_rms);
+        printf("\nMixed duo FM check (R chan): dry_rms=%.4f fm_rms=%.4f diff=%.4f\n", dry_rms, fm_rms, diff);
+        if (diff < 0.001f) {
+            printf("  FAIL: Mixed duo VOICE_FM produced no timbral change vs dry\n");
+            all_pass = false;
+        } else {
+            printf("  PASS: Mixed duo VOICE_FM produces measurable timbral change\n");
+        }
+    }
+
+    // ── Engine 0 duo regression: output must be stable across runs ──
+    {
+        auto run1 = render_fm_scenario({"voice_fm_hi", 0, 0.8f, 0.0f, 0.0f, 5.0f, 0.0f, -1, -1});
+        auto run2 = render_fm_scenario({"voice_fm_hi", 0, 0.8f, 0.0f, 0.0f, 5.0f, 0.0f, -1, -1});
+        int n = (int)(SR * DURATION);
+        // Use RMS difference threshold rather than bitwise comparison,
+        // since floating-point non-determinism (memory alignment, etc.) can
+        // cause tiny differences unrelated to the code change.
+        float rms1 = compute_rms(run1.data(), n * 2);
+        float rms2 = compute_rms(run2.data(), n * 2);
+        float diff = std::fabs(rms1 - rms2);
+        printf("\nEngine 0 duo regression: rms1=%.6f rms2=%.6f diff=%.8f %s\n",
+               rms1, rms2, diff, diff < 0.0001f ? "PASS" : "FAIL");
+        if (diff >= 0.0001f) all_pass = false;
+    }
 
     return all_pass;
 }

@@ -21,7 +21,7 @@ data class BassUiState(
     val mix: Float = 0.0f,
     val lfoMix: Float = 0.0f,
     val accentAmount: Float = 0.5f,
-    val grainsSend: Float = 0.0f,
+    val fxSend: Float = 0.0f,
     val triggerSource: Int = 0,   // 0=off, 1=T1, 2=T2, 3=T3
     val pitchSource: Int = 0,     // 0=off, 1=X1, 2=X2, 3=X3
     val timbreSource: Int = 0,    // 0=off, 1=Y

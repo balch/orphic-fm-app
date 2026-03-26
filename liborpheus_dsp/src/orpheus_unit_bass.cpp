@@ -1,4 +1,5 @@
 #include "orpheus_units.h"
+#include "orpheus_units_common.h"
 #include "orpheus_engine.h"
 #include "orpheus_viz.h"
 #include <cstring>
@@ -195,13 +196,13 @@ static int bass_engine_to_plaits(int bass_engine) {
 }
 
 // ── Ticks per step for each clock_div setting ───────────────────────
-// Master clock runs at 24 PPQN. Grids advances every 6 ticks = 16th notes.
+// Master clock runs at 24 PPQN. 1x = quarter notes (1 step per beat).
 // Bass clock_div:
-//   0 = 1/4  → 1 step per beat    = 24 ticks (quarter notes)
-//   1 = 1/2  → 2 steps per beat   = 12 ticks (8th notes)
-//   2 = 1x   → 4 steps per beat   =  6 ticks (16th notes, matches Grids)
-//   3 = 2x   → 8 steps per beat   =  3 ticks (32nd notes)
-//   4 = 4x   → 16 steps per beat  =  1 tick  (64th notes, fastest)
+//   0 = 1x   → 1 step per beat    = 24 ticks (quarter notes)
+//   1 = 2x   → 2 steps per beat   = 12 ticks (8th notes)
+//   2 = 4x   → 4 steps per beat   =  6 ticks (16th notes, matches Grids)
+//   3 = 8x   → 8 steps per beat   =  3 ticks (32nd notes)
+//   4 = 16x  → 16 steps per beat  =  1 tick  (64th notes, fastest)
 static const int kTicksPerStep[5] = { 24, 12, 6, 3, 1 };
 
 // ── Step advance helper ──────────────────────────────────────────────
@@ -472,13 +473,21 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
         timbre_val = std::max(0.0f, std::min(1.0f, timbre_val + y_val * 0.3f));
     }
 
+    // Smooth timbre/harmonics to prevent filter coefficient clicks (~5ms).
+    // smooth_coeff() is per-sample; scale by num_frames for block-rate application
+    // (same approximation used by portamento's glide_coeff * num_frames).
+    float tc = smooth_coeff(sample_rate) * num_frames;
+    if (tc > 1.0f) tc = 1.0f;  // clamp for very large blocks
+    engine->bass_smooth_timbre += tc * (timbre_val - engine->bass_smooth_timbre);
+    engine->bass_smooth_harmonics += tc * (harmonics_val - engine->bass_smooth_harmonics);
+
     float raw_out[kMaxFrames];
     engine->bass_voice.Render(
         plaits_engine_index,
         render_gate,
         note,
-        harmonics_val,
-        timbre_val,
+        engine->bass_smooth_harmonics,
+        engine->bass_smooth_timbre,
         bp.morph.load(std::memory_order_relaxed),
         bp.accent.load(std::memory_order_relaxed),
         raw_out,
@@ -494,13 +503,13 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
 
     float* out = u->output_buffers[OPORT_OUT];
 
-    // Anti-click crossfade length: ~8 samples (0.17ms at 48kHz).
-    // On retrigger, the previous block's last output sample and the new block's
-    // first output sample may differ sharply (frequency change + filter transient).
-    // Crossfading from the old tail value to the new signal over a few samples
-    // eliminates the discontinuity without audibly affecting the attack.
-    static constexpr int kAntiClickSamples = 8;
-    float prev_out = engine->bass_prev_output;
+    // One-pole LPF to catch retrigger transients.
+    // OrpheusVoice bypasses Plaits' LPG, which normally filters the raw engine
+    // output on retrigger. Without it, oscillator phase resets produce ultrasonic
+    // click energy. A gentle lowpass (~12kHz) absorbs this without affecting
+    // the bass tone. Coefficient: 1 - e^(-2π·fc/fs) ≈ 0.79 at 12kHz/48kHz.
+    float lpf_coeff = 1.0f - std::exp(-2.0f * 3.14159265f * 12000.0f / sample_rate);
+    float lpf = engine->bass_lpf_state;
 
     for (int i = 0; i < num_frames; i++) {
         smooth_mix += mix_coeff * (target_mix - smooth_mix);
@@ -513,17 +522,14 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
             sample *= env;
         }
 
-        float new_sample = sample * kBassOutputGain * smooth_mix;
-
-        // Crossfade from previous block's tail on retrigger
-        if (retrigger && i < kAntiClickSamples) {
-            float t = static_cast<float>(i + 1) / static_cast<float>(kAntiClickSamples + 1);
-            new_sample = prev_out * (1.0f - t) + new_sample * t;
-        }
-
-        out[i] = new_sample;
+        // Apply one-pole LPF to raw sample (before gain/mix) to catch retrigger clicks
+        // at the source. Filtering after mix would cause the LPF state to lag during
+        // mix ramps (bypass transitions), producing brief volume swells.
+        lpf += lpf_coeff * (sample - lpf);
+        out[i] = lpf * kBassOutputGain * smooth_mix;
     }
 
+    engine->bass_lpf_state = lpf;
     engine->bass_prev_output = out[num_frames - 1];
     engine->bass_smooth_mix = smooth_mix;
 

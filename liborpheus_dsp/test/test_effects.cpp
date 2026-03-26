@@ -58,15 +58,19 @@ static bool test_effects_bypass_passthrough() {
         [](GraphUnit& u) { u.type = UNIT_RINGS; u.enabled = true; unit_init(&u, 48000.0f); }
     );
 
-    engine->warps_bypass.store(1);
-    all_pass &= check_bypass("Warps",
-        [&](GraphUnit& u, OrpheusEngine* e, int offset, int chunk) {
-            gen_sine(u.inputs[IPORT_INPUT_A], offset, chunk);
-            gen_sine(u.inputs[IPORT_INPUT_B], offset, chunk);
-            unit_process_warps(&u, e, chunk, 48000.0f);
-        },
-        [](GraphUnit& u) { u.type = UNIT_WARPS; u.enabled = true; unit_init(&u, 48000.0f); }
-    );
+    // Warps is a parallel mix effect (not inline) — bypass outputs silence, not passthrough.
+    // Verify it produces silence when warps_smooth_mix == 0 (default).
+    {
+        GraphUnit u = {};
+        u.type = UNIT_WARPS; u.enabled = true; unit_init(&u, 48000.0f);
+        gen_sine(u.inputs[IPORT_INPUT_A], 0, 128);
+        gen_sine(u.inputs[IPORT_INPUT_B], 0, 128);
+        unit_process_warps(&u, engine, 128, 48000.0f);
+        float out_peak = compute_peak(u.output_buffers[OPORT_OUT], 128);
+        bool pass = out_peak < 0.0001f;
+        printf("  Warps bypass (parallel mix → silence): peak=%.6f %s\n", out_peak, pass ? "OK" : "FAIL");
+        all_pass &= pass;
+    }
 
     engine->delay_bypass.store(1);
     all_pass &= check_bypass("Delay",

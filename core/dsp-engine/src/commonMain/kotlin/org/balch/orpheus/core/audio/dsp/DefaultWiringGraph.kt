@@ -293,12 +293,9 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val bassCompressor = compressor("bass_compressor") { duckSource = 3f } // DUCK_BASS
     bassVoiceUnit.out to bassOverdrive.input
     bassOverdrive.out to bassCompressor.input
-    // Bass → delay send (shared bus with synth/warps/looper)
-    bassCompressor.out to delay.inputA
-    bassCompressor.out to delay.inputB
-    // Bass → reverb send (shared bus)
-    bassCompressor.out to reverb.inputA
-    bassCompressor.out to reverb.inputB
+    // Bass → delay/reverb sends are handled in C++ via bass_delay_send / bass_reverb_send
+    // atomics reading from warps_source_buffers[9], not via graph wiring.
+    // This avoids the dry-path passthrough that triples the bass signal in the master.
 
     // ── DJ Turntable ──
     // Turntable captures from source buffers internally, crossfades decks, outputs stereo.
