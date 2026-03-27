@@ -24,6 +24,7 @@ int main() {
     all_pass &= run_bass_voice_tests();
     all_pass &= run_horn_tests();
     all_pass &= run_turntable_tests();
+    all_pass &= run_tides_tests();
     all_pass &= run_benchmark_tests(); // always last — timing
 
     if (!all_pass) {

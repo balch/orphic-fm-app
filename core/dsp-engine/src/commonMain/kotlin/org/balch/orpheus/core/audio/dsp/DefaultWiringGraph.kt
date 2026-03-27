@@ -262,6 +262,10 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val marblesUnit = marbles("marbles")
     clock.outRight to marblesUnit.inputA    // beat pulse (matches Kotlin's quarter-note clock)
 
+    // Tides polyphonic function generator — optionally clocked from master clock
+    val tidesUnit = tides("tides")
+    clock.outRight to tidesUnit.inputA      // beat pulse for clock sync
+
     // Wire Grids triggers to dedicated drum voices (slots 12, 13, 14)
     gridsUnit.out to drumPlaitsUnits[0].gate        // kick → drum voice 12
     gridsUnit.outRight to drumPlaitsUnits[1].gate   // snare → drum voice 13

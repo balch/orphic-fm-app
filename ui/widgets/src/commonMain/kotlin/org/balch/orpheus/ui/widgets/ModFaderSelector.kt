@@ -167,7 +167,8 @@ fun ModFaderSelector(
                             ModSource.OFF -> ModSource.LFO
                             ModSource.LFO -> ModSource.VOICE_FM
                             ModSource.VOICE_FM -> ModSource.FLUX
-                            ModSource.FLUX -> ModSource.OFF
+                            ModSource.FLUX -> ModSource.TIDES
+                            ModSource.TIDES -> ModSource.OFF
                         }
                         currentOnSourceChange(next)
                     }
@@ -214,6 +215,7 @@ fun ModFaderSelector(
                     ModSource.LFO -> "LFO"
                     ModSource.VOICE_FM -> "FM"
                     ModSource.FLUX -> "FLUX"
+                    ModSource.TIDES -> "WAVES"
                 }
                 Text(
                     text = label,

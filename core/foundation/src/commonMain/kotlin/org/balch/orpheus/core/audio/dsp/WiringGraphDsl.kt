@@ -36,6 +36,7 @@ const val UNIT_OVERDRIVE = 30
 const val UNIT_COMPRESSOR = 31
 const val UNIT_HORN = 32
 const val UNIT_TURNTABLE = 33
+const val UNIT_TIDES = 34
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -340,6 +341,9 @@ class WiringGraphBuilder {
 
     fun turntable(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_TURNTABLE, name, init)
+
+    fun tides(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_TIDES, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

@@ -455,6 +455,20 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
         mod_envelope  = engine->lfo_harmonics_buffer[mid]  * lfo_depth * 0.3f;  // reduced to avoid envelope pop
     }
 
+    // Tides modulation (additive, stacks on top of LFO, gated by bass LFO knob)
+    // Reads engine->tides_output_buffer directly (no graph wire). If tides hasn't
+    // run yet this frame, reads previous frame's data — inaudible at LFO rates.
+    //   ch0 → cutoff (timbre), ch1 → resonance (harmonics),
+    //   ch2 → envelope, ch3 → pitch
+    float tides_mix = engine->tides_mix.load(std::memory_order_relaxed);
+    if (tides_mix > 0.001f && lfo_depth > 0.001f) {
+        int mid = num_frames / 2;
+        mod_timbre    += engine->tides_output_buffer[0][mid] * lfo_depth * 0.5f;
+        mod_harmonics += engine->tides_output_buffer[1][mid] * lfo_depth * 0.5f;
+        mod_envelope  += engine->tides_output_buffer[2][mid] * lfo_depth * 0.3f;
+        mod_pitch     += engine->tides_output_buffer[3][mid] * lfo_depth * 0.5f;
+    }
+
     // Apply pitch modulation
     note += mod_pitch;
 

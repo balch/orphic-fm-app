@@ -35,6 +35,15 @@
 #include "marbles/random/random_generator.h"
 #include "stmlib/utils/gate_flags.h"
 
+// Include MI Tides2 poly slope generator
+// Undefine resource macros that collide with Tides2
+#undef LUT_SINE
+#undef LUT_SINE_SIZE
+#undef LUT_BIPOLAR_FOLD
+#undef LUT_BIPOLAR_FOLD_SIZE
+#include "tides2/poly_slope_generator.h"
+#include "tides2/ramp/ramp_extractor.h"
+
 #include "orpheus_automation.h"
 
 // Include MI Streams Lorenz generator
@@ -155,8 +164,8 @@ struct OrpheusEngine {
     std::atomic<int>   warps_bypass{1};         // bypassed by default
 
     // ── Warps Source Routing ────────────────────────────
-    static constexpr int kNumWarpsSources = 10;
-    // 0=SYNTH, 1=DRUMS, 2=REPL, 3=LFO, 4=RESONATOR, 5=WARPS(feedback), 6=FLUX, 7=BENDER, 8=STRINGS, 9=BASS
+    static constexpr int kNumWarpsSources = 14;
+    // 0=SYNTH, 1=DRUMS, 2=REPL, 3=LFO, 4=RESONATOR, 5=WARPS(feedback), 6=FLUX, 7=BENDER, 8=STRINGS, 9=BASS, 10=TIDES1, 11=TIDES2, 12=TIDES3, 13=TIDES4
     float warps_source_buffers[kNumWarpsSources][kMaxFrames] = {};
     float warps_feedback_l[kMaxFrames] = {};
     float warps_feedback_r[kMaxFrames] = {};
@@ -315,6 +324,37 @@ struct OrpheusEngine {
     float marbles_x2_buffer[kMaxFrames] = {};  // X2 CV (post mix+exp)
     float marbles_x3_buffer[kMaxFrames] = {};  // X3 CV (post mix+exp)
     float marbles_y_buffer[kMaxFrames] = {};   // Y output (smooth random CV)
+
+    // ── Tides2 Poly Slope Generator ("Waves") ───────
+    tides::PolySlopeGenerator tides_generator;
+    tides::RampExtractor tides_ramp_extractor;
+
+    // Parameter atomics (written from UI, read from audio thread)
+    // NOTE: tides_slope maps to the "pw" (pulse width) parameter in Render()
+    std::atomic<float> tides_frequency{0.5f};    // 0–1 knob position, mapped to Hz by range
+    std::atomic<float> tides_slope{0.5f};        // maps to Render(pw=...) — attack/decay balance
+    std::atomic<float> tides_shape{0.5f};
+    std::atomic<float> tides_smoothness{0.5f};
+    std::atomic<float> tides_shift{0.0f};
+    std::atomic<float> tides_mix{0.0f};          // default off (mix knob pattern)
+    std::atomic<float> tides_clock_offset{0.0f};
+    std::atomic<int>   tides_ramp_mode{1};       // RAMP_MODE_LOOPING (AD=0, LOOPING=1, AR=2)
+    std::atomic<int>   tides_output_mode{0};     // OUTPUT_MODE_GATES
+    std::atomic<int>   tides_range{0};           // RANGE_CONTROL
+    std::atomic<int>   tides_gate_source{0};     // 0=Voice Gate, 1=T1, 2=T2, 3=T3, 4=Free-run
+    std::atomic<int>   tides_clock_source{0};    // 0=Internal, 1=Master Clock
+
+    // Working buffers
+    stmlib::GateFlags tides_gate_flags[kMaxFrames] = {};
+    stmlib::GateFlags tides_prev_gate_flag{stmlib::GATE_FLAG_LOW};
+    stmlib::GateFlags tides_clock_prev_flag{stmlib::GATE_FLAG_LOW};
+    tides::PolySlopeGenerator::OutputSample tides_render_buffer[kMaxFrames];
+
+    // Deinterleaved output buffers (4 channels, for mod routing + Warps sources)
+    float tides_output_buffer[4][kMaxFrames] = {};
+
+    // Smoothed mix (audio thread only — matches warps_smooth_mix pattern)
+    float tides_smooth_mix{0.0f};
 
     // ── Trigger Router: source selection atomics ─────
     // Written from Kotlin UI, read by unit_process_plaits.

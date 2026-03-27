@@ -87,6 +87,13 @@ set(STREAMS_SRC
     "${EURORACK_DIR}/streams/resources.cc"
 )
 
+# ── Tides2 sources (PolySlopeGenerator + RampExtractor) ──
+set(TIDES2_SRC
+    "${EURORACK_DIR}/tides2/poly_slope_generator.cc"
+    "${EURORACK_DIR}/tides2/resources.cc"
+    "${EURORACK_DIR}/tides2/ramp/ramp_extractor.cc"
+)
+
 # ── Orpheus engine sources ────────────────────────
 set(ORPHEUS_SRC
     "src/orpheus_engine.cpp"
@@ -113,6 +120,7 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_compressor.cpp"
     "src/orpheus_unit_horn.cpp"
     "src/orpheus_turntable.cpp"
+    "src/orpheus_unit_tides.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
 )
@@ -127,6 +135,7 @@ add_library(orpheus_dsp STATIC
     ${MARBLES_SRC}
     ${STREAMS_SRC}
     ${FRAMES_SRC}
+    ${TIDES2_SRC}
 )
 
 target_include_directories(orpheus_dsp PUBLIC
@@ -181,6 +190,7 @@ if(BUILD_TESTS)
         test/test_bass_voice.cpp
         test/test_horn.cpp
         test/test_turntable.cpp
+        test/test_tides.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE

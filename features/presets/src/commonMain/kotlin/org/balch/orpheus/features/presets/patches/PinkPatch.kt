@@ -76,8 +76,8 @@ class PinkPatch : SynthPatch {
             tunes.forEachIndexed { i, t -> put("$v:tune_$i", PortValue.FloatValue(t)) }
 
             // ═══ DUO ENGINES ═══
-            // 0=Engine0, 4=FM, 10=STRING, 12=ADDITIVE
-            val engines = listOf(10, 0, 12, 4, 0, 0)
+            // UI picker ordinals: 0=OSC, 5=FM, 9=ADD, 11=STR, 12=MOD
+            val engines = listOf(11, 0, 9, 5, 0, 0)
             engines.forEachIndexed { i, e -> put("$v:duo_engine_$i", PortValue.IntValue(e)) }
 
             // ═══ DUO SHARPNESS ═══

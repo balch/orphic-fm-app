@@ -84,7 +84,12 @@ static bool test_warps_source_levels() {
     }
 
     // Report source buffer levels
-    const char* names[] = {"SYNTH", "DRUMS", "REPL", "LFO", "RESO", "WARPS_FB", "FLUX", "BENDER", "STRINGS", "BASS"};
+    const char* names[] = {
+        "SYNTH", "DRUMS", "REPL", "LFO", "RESO", "WARPS_FB",
+        "FLUX", "BENDER", "STRINGS", "BASS", "TIDES_0", "TIDES_1", "TIDES_2", "TIDES_3"
+    };
+    static_assert(sizeof(names)/sizeof(names[0]) >= OrpheusEngine::kNumWarpsSources,
+                  "names[] too short for kNumWarpsSources");
     printf("  Source buffer RMS levels (last block):\n");
     for (int s = 0; s < OrpheusEngine::kNumWarpsSources; s++) {
         double sum = 0;

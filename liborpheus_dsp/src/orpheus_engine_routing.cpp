@@ -591,6 +591,32 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "brake") == 0)
             engine->horn_brake.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.tides") == 0) {
+        if (std::strcmp(symbol, "frequency") == 0)
+            engine->tides_frequency.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "slope") == 0)
+            engine->tides_slope.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "shape") == 0)
+            engine->tides_shape.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "smoothness") == 0)
+            engine->tides_smoothness.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "shift") == 0)
+            engine->tides_shift.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mix") == 0)
+            engine->tides_mix.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "clock_offset") == 0)
+            engine->tides_clock_offset.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "ramp_mode") == 0)
+            engine->tides_ramp_mode.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "output_mode") == 0)
+            engine->tides_output_mode.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "range") == 0)
+            engine->tides_range.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "gate_source") == 0)
+            engine->tides_gate_source.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "clock_source") == 0)
+            engine->tides_clock_source.store(static_cast<int>(value), std::memory_order_relaxed);
+    }
 }
 
 float orpheus_engine_get_port(OrpheusEngine* engine,

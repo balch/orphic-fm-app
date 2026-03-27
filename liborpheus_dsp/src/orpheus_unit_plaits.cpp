@@ -267,6 +267,11 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 fm_mod_source = 3;
                 fm_flux_signal = engine->marbles_cv_output[duo % 2];
                 mod_signal = fm_flux_signal;
+            } else if (src == 4) { // TIDES (Waves envelope/LFO)
+                // Reads tides_output_buffer directly (no graph wire). May read
+                // previous frame's data if tides hasn't run yet — inaudible at LFO rates.
+                fm_mod_source = 4;
+                mod_signal = engine->tides_output_buffer[0][num_frames / 2];
             }
             // src == 1 (OFF) leaves fm_mod_source = -1
             float md_target = engine->mod_depth[duo].load(std::memory_order_relaxed);
@@ -314,15 +319,18 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float feedback_amount = vp.harmonics.load(std::memory_order_relaxed);
         float morph_val = vp.morph.load(std::memory_order_relaxed);
 
-        // PolyLFO ch1-3 modulation for Engine 0 (scaled by mod_depth)
-        // NOTE: These buffers are zeroed by the graph mux when lfo_source != PolyLFO.
-        // If graph execution order changes, consider gating on lfo_source explicitly.
+        // Multi-channel modulation: PolyLFO ch1-3 or Tides ch1-3 (scaled by mod_depth)
+        // NOTE: LFO buffers are zeroed by the graph mux when lfo_source != PolyLFO.
         {
             float md = fm_depth_smoothed;
-            float morph_mod = engine->lfo_morph_buffer[num_frames / 2] * md * 0.5f;
-            float harm_mod = engine->lfo_harmonics_buffer[num_frames / 2] * md * 0.5f;
-            morph_val = std::max(0.0f, std::min(1.0f, morph_val + morph_mod));
-            feedback_amount = std::max(0.0f, std::min(1.0f, feedback_amount + harm_mod));
+            float morph_src = (fm_mod_source == 4)
+                ? engine->tides_output_buffer[1][num_frames / 2]
+                : engine->lfo_morph_buffer[num_frames / 2];
+            float harm_src = (fm_mod_source == 4)
+                ? engine->tides_output_buffer[2][num_frames / 2]
+                : engine->lfo_harmonics_buffer[num_frames / 2];
+            morph_val = std::max(0.0f, std::min(1.0f, morph_val + morph_src * md * 0.5f));
+            feedback_amount = std::max(0.0f, std::min(1.0f, feedback_amount + harm_src * md * 0.5f));
         }
 
         // Detune: ±morph × 25 cents (matching JSyn: MAX_DETUNE=50 cents, split ±half)
@@ -331,8 +339,11 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float detune_semitones = detune_sign * morph_val * (25.0f / 100.0f);
 
         float base_note = vp.tune.load(std::memory_order_relaxed) + detune_semitones;
-        // PolyLFO ch3: subtle pitch wander (±0.5 semitone max)
-        base_note += engine->lfo_pitch_buffer[num_frames / 2] * fm_depth_smoothed * 0.5f;
+        // Ch3 pitch wander: PolyLFO or Tides (±0.5 semitone max)
+        float pitch_src = (fm_mod_source == 4)
+            ? engine->tides_output_buffer[3][num_frames / 2]
+            : engine->lfo_pitch_buffer[num_frames / 2];
+        base_note += pitch_src * fm_depth_smoothed * 0.5f;
         base_note = std::max(20.0f, std::min(127.0f, base_note));
 
         float sharpness = vp.timbre.load(std::memory_order_relaxed); // 0=triangle, 1=square
@@ -375,10 +386,17 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             } else if (fm_mod_source == 3) {
                 // FLUX: block-rate from marbles CV
                 freq += fm_flux_signal * fm_depth_smoothed * 200.0f;
+            } else if (fm_mod_source == 4) {
+                // TIDES: per-sample from tides_output_buffer[0]
+                freq += engine->tides_output_buffer[0][i] * fm_depth_smoothed * 200.0f;
             }
 
             // Self-feedback as FM (matches JSyn: oscOutput * feedbackAmount * 200Hz)
             freq += osc.prev_output * feedback_amount * 200.0f;
+
+            // Floor: prevent negative frequency from feedback FM at low pitches
+            // (causes phase reversal → harsh squeal artifacts)
+            if (freq < 1.0f) freq = 1.0f;
 
             // Triangle oscillator: 4×|phase-0.5| - 1
             float tri = 4.0f * std::fabs(osc.tri_phase - 0.5f) - 1.0f;
@@ -500,8 +518,13 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         } else {
             note = note_raw;
         }
-        // PolyLFO ch3: subtle pitch wander (±0.5 semitone max, scaled by mod_depth)
-        note += engine->lfo_pitch_buffer[num_frames / 2] * fm_depth_smoothed * 0.5f;
+        // Ch3 pitch wander: PolyLFO or Tides (±0.5 semitone max, scaled by mod_depth)
+        {
+            float ps = (fm_mod_source == 4)
+                ? engine->tides_output_buffer[3][num_frames / 2]
+                : engine->lfo_pitch_buffer[num_frames / 2];
+            note += ps * fm_depth_smoothed * 0.5f;
+        }
         note = std::max(20.0f, std::min(127.0f, note));  // clamp to safe MIDI range
         float harmonics = vp.harmonics.load(std::memory_order_relaxed);
         float timbre = std::max(0.0f, std::min(1.0f,
@@ -509,13 +532,17 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float morph = vp.morph.load(std::memory_order_relaxed);
         float accent = vp.accent.load(std::memory_order_relaxed);
 
-        // PolyLFO ch1-3 modulation (scaled by mod_depth)
+        // Multi-channel modulation: PolyLFO ch1-2 or Tides ch1-2 (scaled by mod_depth)
         {
-            float md = fm_depth_smoothed;  // reuse the smoothed mod depth
-            float morph_mod = engine->lfo_morph_buffer[num_frames / 2] * md;
-            float harm_mod = engine->lfo_harmonics_buffer[num_frames / 2] * md;
-            morph = std::max(0.0f, std::min(1.0f, morph + morph_mod * 0.5f));
-            harmonics = std::max(0.0f, std::min(1.0f, harmonics + harm_mod * 0.5f));
+            float md = fm_depth_smoothed;
+            float morph_src = (fm_mod_source == 4)
+                ? engine->tides_output_buffer[1][num_frames / 2]
+                : engine->lfo_morph_buffer[num_frames / 2];
+            float harm_src = (fm_mod_source == 4)
+                ? engine->tides_output_buffer[2][num_frames / 2]
+                : engine->lfo_harmonics_buffer[num_frames / 2];
+            morph = std::max(0.0f, std::min(1.0f, morph + morph_src * md * 0.5f));
+            harmonics = std::max(0.0f, std::min(1.0f, harmonics + harm_src * md * 0.5f));
         }
 
         // Render via OrpheusVoice (handles engine selection, outGain, soft_limit)
@@ -851,7 +878,7 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     float fm_depth_smoothed = engine->smooth_fm_depth[duo];
 
     // FM source routing
-    // Kotlin ModSource: 0=VOICE_FM, 1=OFF, 2=LFO, 3=FLUX
+    // Kotlin ModSource: 0=VOICE_FM, 1=OFF, 2=LFO, 3=FLUX, 4=TIDES
     int fm_mod_source = -1;
     float fm_flux_signal = 0.0f;
     // For VOICE_FM in duo mode, A reads from B and B reads from A (default)
@@ -874,6 +901,8 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     } else if (src == 3) { // FLUX
         fm_mod_source = 3;
         fm_flux_signal = engine->marbles_cv_output[duo % 2];
+    } else if (src == 4) { // TIDES (Waves envelope/LFO)
+        fm_mod_source = 4;
     }
 
     // ── Per-voice parameters ──────────────────────────────────────
@@ -884,18 +913,25 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     float scaled_holdA = compute_scaled_hold(raw_holdA, env_speedA);
     float feedbackA = vpA.harmonics.load(std::memory_order_relaxed);
     float morph_valA = vpA.morph.load(std::memory_order_relaxed);
-    // PolyLFO ch1-3 for Engine 0 duo voice A
+    // Multi-channel modulation for duo voice A (PolyLFO or Tides ch1-3)
     {
         float md = engine->smooth_fm_depth[duo];
-        float morph_mod = engine->lfo_morph_buffer[num_frames / 2] * md * 0.5f;
-        float harm_mod = engine->lfo_harmonics_buffer[num_frames / 2] * md * 0.5f;
-        morph_valA = std::max(0.0f, std::min(1.0f, morph_valA + morph_mod));
-        feedbackA = std::max(0.0f, std::min(1.0f, feedbackA + harm_mod));
+        float morph_src = (fm_mod_source == 4)
+            ? engine->tides_output_buffer[1][num_frames / 2]
+            : engine->lfo_morph_buffer[num_frames / 2];
+        float harm_src = (fm_mod_source == 4)
+            ? engine->tides_output_buffer[2][num_frames / 2]
+            : engine->lfo_harmonics_buffer[num_frames / 2];
+        morph_valA = std::max(0.0f, std::min(1.0f, morph_valA + morph_src * md * 0.5f));
+        feedbackA = std::max(0.0f, std::min(1.0f, feedbackA + harm_src * md * 0.5f));
     }
     // Voice A: positive detune (+morph × 25 cents, matching JSyn ±split)
     float detune_semiA = morph_valA * (25.0f / 100.0f);
+    float pitch_srcA = (fm_mod_source == 4)
+        ? engine->tides_output_buffer[3][num_frames / 2]
+        : engine->lfo_pitch_buffer[num_frames / 2];
     float base_noteA = vpA.tune.load(std::memory_order_relaxed) + detune_semiA
-        + engine->lfo_pitch_buffer[num_frames / 2] * engine->smooth_fm_depth[duo] * 0.5f;
+        + pitch_srcA * engine->smooth_fm_depth[duo] * 0.5f;
     base_noteA = std::max(20.0f, std::min(127.0f, base_noteA));
     float sharpnessA = vpA.timbre.load(std::memory_order_relaxed);
     float bend_hzA = engine->voice_bend_cv[idxA];
@@ -912,18 +948,25 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
     float scaled_holdB = compute_scaled_hold(raw_holdB, env_speedB);
     float feedbackB = vpB.harmonics.load(std::memory_order_relaxed);
     float morph_valB = vpB.morph.load(std::memory_order_relaxed);
-    // PolyLFO ch1-3 for Engine 0 duo voice B
+    // Multi-channel modulation for duo voice B (PolyLFO or Tides ch1-3)
     {
         float md = engine->smooth_fm_depth[duo];
-        float morph_mod = engine->lfo_morph_buffer[num_frames / 2] * md * 0.5f;
-        float harm_mod = engine->lfo_harmonics_buffer[num_frames / 2] * md * 0.5f;
-        morph_valB = std::max(0.0f, std::min(1.0f, morph_valB + morph_mod));
-        feedbackB = std::max(0.0f, std::min(1.0f, feedbackB + harm_mod));
+        float morph_src = (fm_mod_source == 4)
+            ? engine->tides_output_buffer[1][num_frames / 2]
+            : engine->lfo_morph_buffer[num_frames / 2];
+        float harm_src = (fm_mod_source == 4)
+            ? engine->tides_output_buffer[2][num_frames / 2]
+            : engine->lfo_harmonics_buffer[num_frames / 2];
+        morph_valB = std::max(0.0f, std::min(1.0f, morph_valB + morph_src * md * 0.5f));
+        feedbackB = std::max(0.0f, std::min(1.0f, feedbackB + harm_src * md * 0.5f));
     }
     // Voice B: negative detune (-morph × 25 cents, matching JSyn ±split)
     float detune_semiB = -morph_valB * (25.0f / 100.0f);
+    float pitch_srcB = (fm_mod_source == 4)
+        ? engine->tides_output_buffer[3][num_frames / 2]
+        : engine->lfo_pitch_buffer[num_frames / 2];
     float base_noteB = vpB.tune.load(std::memory_order_relaxed) + detune_semiB
-        + engine->lfo_pitch_buffer[num_frames / 2] * engine->smooth_fm_depth[duo] * 0.5f;
+        + pitch_srcB * engine->smooth_fm_depth[duo] * 0.5f;
     base_noteB = std::max(20.0f, std::min(127.0f, base_noteB));
     float sharpnessB = vpB.timbre.load(std::memory_order_relaxed);
     float bend_hzB = engine->voice_bend_cv[idxB];
@@ -1017,10 +1060,16 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
                 freqA += engine->lfo_output_buffer[i] * fm_depth_smoothed * 200.0f;
             } else if (fm_mod_source == 3) {
                 freqA += fm_flux_signal * fm_depth_smoothed * 200.0f;
+            } else if (fm_mod_source == 4) {
+                // TIDES: per-sample from tides_output_buffer[0]
+                freqA += engine->tides_output_buffer[0][i] * fm_depth_smoothed * 200.0f;
             }
 
             // Self-feedback as FM (matches JSyn: oscOutput * feedbackAmount * 200Hz)
             freqA += oscA.prev_output * feedbackA * 200.0f;
+
+            // Floor: prevent negative frequency from feedback FM at low pitches
+            if (freqA < 1.0f) freqA = 1.0f;
 
             // Triangle oscillator
             float triA = 4.0f * std::fabs(oscA.tri_phase - 0.5f) - 1.0f;
@@ -1121,10 +1170,16 @@ void unit_process_duo_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames,
                 freqB += engine->lfo_output_buffer[i] * fm_depth_smoothed * 200.0f;
             } else if (fm_mod_source == 3) {
                 freqB += fm_flux_signal * fm_depth_smoothed * 200.0f;
+            } else if (fm_mod_source == 4) {
+                // TIDES: per-sample from tides_output_buffer[0]
+                freqB += engine->tides_output_buffer[0][i] * fm_depth_smoothed * 200.0f;
             }
 
             // Self-feedback as FM (matches JSyn: oscOutput * feedbackAmount * 200Hz)
             freqB += oscB.prev_output * feedbackB * 200.0f;
+
+            // Floor: prevent negative frequency from feedback FM at low pitches
+            if (freqB < 1.0f) freqB = 1.0f;
 
             // Triangle oscillator
             float triB = 4.0f * std::fabs(oscB.tri_phase - 0.5f) - 1.0f;

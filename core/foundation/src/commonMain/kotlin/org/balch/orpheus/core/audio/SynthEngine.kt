@@ -183,6 +183,10 @@ interface SynthEngine {
     val hornOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val hornPhaseVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val wooferPhaseVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val tidesCh0VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val tidesCh1VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val tidesCh2VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val tidesCh3VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
     fun setVizEnabled(enabled: Boolean) {}
@@ -281,7 +285,8 @@ enum class ModSource {
     VOICE_FM,
     OFF,
     LFO,
-    FLUX
+    FLUX,
+    TIDES
 }
 
 enum class StereoMode {

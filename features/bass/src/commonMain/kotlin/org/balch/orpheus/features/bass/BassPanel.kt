@@ -42,6 +42,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.RotaryKnob
+import kotlin.math.roundToInt
 
 // Amber/orange palette for bass — warm, earthy, distinct from warps green and echo lavender
 private data class BassColors(
@@ -62,6 +63,8 @@ private fun midiNoteToName(noteNumber: Int): String {
 
 // Bass-friendly root notes: C1-B2 (MIDI 24-47), covering the bass sweet spot
 private val bassRootNotes = (24..47).toList()
+
+private val stepCountPresets = listOf(4, 8, 12, 16)
 
 @Composable
 fun BassPanel(
@@ -132,22 +135,52 @@ fun BassPanel(
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            EnumDropdown(
+            // Clock division knob — discrete snap to enum values
+            RotaryKnob(
+                value = state.clockDivision.ordinal.toFloat() / (ClockDivision.entries.size - 1).toFloat(),
+                onValueChange = { normalized ->
+                    val index = (normalized * (ClockDivision.entries.size - 1)).roundToInt()
+                        .coerceIn(0, ClockDivision.entries.size - 1)
+                    actions.setClockDivision(ClockDivision.entries[index])
+                },
                 label = "CLOCK",
-                selectedDisplay = state.clockDivision.displayName,
-                entries = ClockDivision.entries,
-                displayName = { it.displayName },
-                onSelected = actions.setClockDivision,
-                color = bassColors.panelColor,
-                modifier = Modifier.align(Alignment.Top),
+                size = 30.dp,
+                trackColor = bassColors.knobTrackColor,
+                progressColor = bassColors.knobProgressColor,
+                knobColor = bassColors.knobColor,
+                labelColor = bassColors.labelColor,
+                controlId = "bass_clock_division",
+                valueFormatter = { state.clockDivision.displayName },
             )
 
-            // Step count segmented selector
-            StepCountSelector(
-                stepCount = state.stepCount,
-                onStepCountChange = actions.setStepCount,
-                color = bassColors.panelColor,
-                modifier = Modifier.align(Alignment.Top),
+            // Step count knob — discrete snap to 4, 8, 12, 16
+            RotaryKnob(
+                value = stepCountPresets.indexOf(state.stepCount).coerceAtLeast(0).toFloat() / (stepCountPresets.size - 1).toFloat(),
+                onValueChange = { normalized ->
+                    val index = (normalized * (stepCountPresets.size - 1)).roundToInt()
+                        .coerceIn(0, stepCountPresets.size - 1)
+                    actions.setStepCount(stepCountPresets[index])
+                },
+                label = "STEPS",
+                size = 30.dp,
+                trackColor = bassColors.knobTrackColor,
+                progressColor = bassColors.knobProgressColor,
+                knobColor = bassColors.knobColor,
+                labelColor = bassColors.labelColor,
+                controlId = "bass_step_count",
+                valueFormatter = { state.stepCount.toString() },
+            )
+
+            RotaryKnob(
+                value = state.jitter,
+                onValueChange = actions.setJitter,
+                label = "JITTER",
+                size = 30.dp,
+                trackColor = bassColors.knobTrackColor,
+                progressColor = bassColors.knobProgressColor,
+                knobColor = bassColors.knobColor,
+                labelColor = bassColors.labelColor,
+                controlId = "bass_jitter",
             )
 
             RotaryKnob(
@@ -172,18 +205,6 @@ fun BassPanel(
                 knobColor = bassColors.knobColor,
                 labelColor = bassColors.labelColor,
                 controlId = "bass_lfo_mix",
-            )
-
-            RotaryKnob(
-                value = state.jitter,
-                onValueChange = actions.setJitter,
-                label = "JITTER",
-                size = 30.dp,
-                trackColor = bassColors.knobTrackColor,
-                progressColor = bassColors.knobProgressColor,
-                knobColor = bassColors.knobColor,
-                labelColor = bassColors.labelColor,
-                controlId = "bass_jitter",
             )
 
             // Mutation knob
@@ -371,60 +392,6 @@ private fun <T> EnumDropdown(
     }
 }
 
-/**
- * Compact segmented selector for the four step-count presets: 4, 8, 12, 16.
- */
-@Composable
-private fun StepCountSelector(
-    stepCount: Int,
-    onStepCountChange: (Int) -> Unit,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    val presets = listOf(4, 8, 12, 16)
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier,
-    ) {
-        Text(
-            text = "STEPS",
-            style = MaterialTheme.typography.labelSmall,
-            color = color.copy(alpha = 0.7f),
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium,
-        )
-
-        Spacer(Modifier.height(2.dp))
-
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            presets.forEach { preset ->
-                val isSelected = stepCount == preset
-                Box(
-                    modifier = Modifier
-                        .clickable { onStepCountChange(preset) }
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(
-                            if (isSelected) color.copy(alpha = 0.85f)
-                            else OrpheusColors.darkVoid.copy(alpha = 0.6f)
-                        )
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = preset.toString(),
-                        color = if (isSelected) OrpheusColors.darkVoid else color,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                    )
-                }
-            }
-        }
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Previews

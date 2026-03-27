@@ -69,6 +69,10 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     engine->lorenz_generator.Init();
     engine->lorenz_generator.set_index(0);
 
+    // Initialize Tides2 poly slope generator
+    engine->tides_generator.Init();
+    engine->tides_ramp_extractor.Init(sample_rate, sample_rate * 0.25f);
+
     // Initialize per-string bender defaults
     engine->string_base_freq[0].store(400.0f, std::memory_order_relaxed);
     engine->string_base_freq[1].store(550.0f, std::memory_order_relaxed);
