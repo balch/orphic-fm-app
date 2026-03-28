@@ -335,7 +335,7 @@ struct OrpheusEngine {
     std::atomic<float> tides_slope{0.5f};        // maps to Render(pw=...) — attack/decay balance
     std::atomic<float> tides_shape{0.5f};
     std::atomic<float> tides_smoothness{0.5f};
-    std::atomic<float> tides_shift{0.0f};
+    std::atomic<float> tides_shift{0.5f};  // center position (matches MI hardware knob default)
     std::atomic<float> tides_mix{0.0f};          // default off (mix knob pattern)
     std::atomic<float> tides_clock_offset{0.0f};
     std::atomic<int>   tides_ramp_mode{1};       // RAMP_MODE_LOOPING (AD=0, LOOPING=1, AR=2)

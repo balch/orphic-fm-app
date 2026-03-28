@@ -30,7 +30,7 @@ data class TidesUiState(
     val slope: Float = 0.5f,
     val shape: Float = 0.5f,
     val smoothness: Float = 0.5f,
-    val shift: Float = 0.0f,
+    val shift: Float = 0.5f,  // center position (matches MI hardware knob default)
     val mix: Float = 0.0f,
     val clockOffset: Float = 0.0f,
     val rampMode: Int = 1,       // LOOPING

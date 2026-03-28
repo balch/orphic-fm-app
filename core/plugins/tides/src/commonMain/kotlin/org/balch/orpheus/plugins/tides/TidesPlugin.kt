@@ -43,7 +43,7 @@ class TidesPlugin(
     private var _slope = 0.5f
     private var _shape = 0.5f
     private var _smoothness = 0.5f
-    private var _shift = 0.0f
+    private var _shift = 0.5f  // center position (matches MI hardware knob default)
     private var _mix = 0.0f
     private var _clockOffset = 0.0f
     private var _rampMode = 1   // LOOPING
@@ -88,7 +88,7 @@ class TidesPlugin(
 
         controlPort(TidesSymbol.SHIFT) {
             floatType {
-                default = 0.0f
+                default = 0.5f  // center position (matches MI hardware knob default)
                 get { _shift }
                 set { _shift = it }
             }
