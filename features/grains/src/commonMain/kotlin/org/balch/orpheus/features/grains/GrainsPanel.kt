@@ -61,9 +61,9 @@ fun GrainsPanel(
     val panelColor = OrpheusColors.grainsRed
 
     CollapsibleColumnPanel(
-        title = "GRAINS",
+        title = "GRAN",
         color = panelColor,
-        expandedTitle = "Cumulus",
+        expandedTitle = "Mist",
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,

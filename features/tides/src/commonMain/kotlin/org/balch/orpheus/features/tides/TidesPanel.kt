@@ -81,7 +81,7 @@ fun TidesPanel(
     CollapsibleColumnPanel(
         modifier = modifier,
         title = "Waves",
-        expandedTitle = "Lunar Pull",
+        expandedTitle = "Gravity",
         color = OrpheusColors.neonOrange,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
