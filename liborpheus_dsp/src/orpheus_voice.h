@@ -249,15 +249,28 @@ struct OrpheusVoice {
             trigger_state_ = gate_on;
 
             // Build engine parameters.
+            //
+            // Do NOT set TRIGGER_UNPATCHED — it means "no trigger jack
+            // connected" and puts engines into drone/sustain mode (String
+            // bows forever, Speech free-runs, Swarm loses gate response).
             plaits::EngineParameters p;
             p.trigger = rising_edge
                 ? (plaits::TRIGGER_RISING_EDGE | plaits::TRIGGER_HIGH)
                 : (gate_on ? plaits::TRIGGER_HIGH : plaits::TRIGGER_LOW);
             p.note = note;
-            p.harmonics = harmonics;
             p.timbre = timbre;
+            p.harmonics = harmonics;
             p.morph = morph;
             p.accent = accent;
+
+            // Remap Swarm (16) and Particle (18) knob curves.
+            // MI's internal scaling is very aggressive (exponential/cubic/squared),
+            // pushing toward noise quickly. Quadratic pre-curve compresses the
+            // upper range so ~70% of knob travel stays in the pitched zone.
+            if (engine_index == 16 || engine_index == 18) {
+                p.timbre = timbre * timbre;
+                p.harmonics = harmonics * harmonics;
+            }
 
             bool already_enveloped = false;
             e->Render(p, out_buffer_, aux_buffer_, kOrpheusBlockSize, &already_enveloped);
