@@ -925,6 +925,110 @@ static bool test_lfo_mod_depth_sweep() {
     return pass;
 }
 
+// ── Test: DuoLFO 4-channel output ──────────────────────────────────
+// All 4 mod channels should be populated, distinct, and within [-1,+1]
+// when DuoLFO is active (AND or OR mode). All should be zero in OFF mode.
+static bool test_lfo_4channel_output() {
+    printf("\n=== Test: DuoLFO 4-channel output ===\n");
+    bool all_pass = true;
+
+    const char* mode_names[] = { "AND", "OFF", "OR" };
+    for (int mode = 0; mode <= 2; mode++) {
+        OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+        if (!load_production_graph(engine)) return false;
+
+        engine->lfo_source.store(0);  // DuoLFO
+        engine->lfo_mode.store(mode);
+        engine->lfo_freq_a.store(2.0f);  // 2 Hz
+        engine->lfo_freq_b.store(3.0f);  // 3 Hz (distinct for channel separation)
+        engine->lfo_shape.store(1.0f);   // triangle
+        engine->lfo_range_min.store(-1.0f);
+        engine->lfo_range_max.store(1.0f);
+
+        auto* graph = engine->graph.load(std::memory_order_acquire);
+        float buf[128 * 2];
+
+        // Run enough blocks for several LFO cycles at 2-3 Hz
+        float pk[4] = {};
+        float sum[4] = {};
+        int total = 0;
+        for (int b = 0; b < 200; b++) {
+            orpheus_graph_process(graph, engine, buf, 64);
+            for (int i = 0; i < 64; i++) {
+                float ch[4] = {
+                    engine->lfo_output_buffer[i],
+                    engine->lfo_morph_buffer[i],
+                    engine->lfo_harmonics_buffer[i],
+                    engine->lfo_pitch_buffer[i],
+                };
+                for (int c = 0; c < 4; c++) {
+                    float a = std::fabs(ch[c]);
+                    if (a > pk[c]) pk[c] = a;
+                    sum[c] += ch[c];
+                }
+            }
+            total += 64;
+        }
+
+        float dc[4];
+        for (int c = 0; c < 4; c++) dc[c] = sum[c] / total;
+
+        bool is_off = (mode == 1);
+        if (is_off) {
+            // OFF mode: all channels should be zero
+            bool all_zero = true;
+            for (int c = 0; c < 4; c++) {
+                if (pk[c] > 0.001f) all_zero = false;
+            }
+            if (!all_zero) {
+                printf("  FAIL: %s mode should produce zero on all channels\n", mode_names[mode]);
+                all_pass = false;
+            } else {
+                printf("  %s: all zero — PASS\n", mode_names[mode]);
+            }
+        } else {
+            // Active mode: all 4 channels should have signal
+            printf("  %s: pk=[%.3f, %.3f, %.3f, %.3f] dc=[%+.3f, %+.3f, %+.3f, %+.3f]\n",
+                   mode_names[mode], pk[0], pk[1], pk[2], pk[3], dc[0], dc[1], dc[2], dc[3]);
+
+            for (int c = 0; c < 4; c++) {
+                if (pk[c] < 0.1f) {
+                    printf("  FAIL: %s ch%d peak=%.4f too low (no signal)\n",
+                           mode_names[mode], c, pk[c]);
+                    all_pass = false;
+                }
+                if (pk[c] > 1.1f) {
+                    printf("  FAIL: %s ch%d peak=%.4f exceeds [-1.1, +1.1]\n",
+                           mode_names[mode], c, pk[c]);
+                    all_pass = false;
+                }
+            }
+
+            // Channels should be distinct (not all identical)
+            // Compare ch0 vs ch1 (combined vs osc A)
+            float diff_01 = 0.0f, diff_02 = 0.0f, diff_03 = 0.0f;
+            orpheus_graph_process(graph, engine, buf, 64);
+            for (int i = 0; i < 64; i++) {
+                diff_01 += std::fabs(engine->lfo_output_buffer[i] - engine->lfo_morph_buffer[i]);
+                diff_02 += std::fabs(engine->lfo_output_buffer[i] - engine->lfo_harmonics_buffer[i]);
+                diff_03 += std::fabs(engine->lfo_output_buffer[i] - engine->lfo_pitch_buffer[i]);
+            }
+            diff_01 /= 64; diff_02 /= 64; diff_03 /= 64;
+            bool distinct = diff_01 > 0.01f && diff_02 > 0.01f && diff_03 > 0.01f;
+            if (!distinct) {
+                printf("  FAIL: %s channels not distinct (diffs: %.4f, %.4f, %.4f)\n",
+                       mode_names[mode], diff_01, diff_02, diff_03);
+                all_pass = false;
+            }
+        }
+
+        orpheus_engine_destroy(engine);
+    }
+
+    printf("DuoLFO 4-channel test: %s\n", all_pass ? "PASS" : "FAIL");
+    return all_pass;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Test runner
 // ═══════════════════════════════════════════════════════════════════
@@ -943,5 +1047,6 @@ bool run_lfo_tests() {
     all_pass &= test_lfo_warps_routing();
     all_pass &= test_lfo_mode_comparison();
     all_pass &= test_lfo_mod_depth_sweep();
+    all_pass &= test_lfo_4channel_output();
     return all_pass;
 }

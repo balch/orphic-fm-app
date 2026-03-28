@@ -526,10 +526,8 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
         std::memset(engine->lfo_harmonics_buffer, 0, num_frames * sizeof(float));
         std::memset(engine->lfo_pitch_buffer, 0, num_frames * sizeof(float));
     } else {
-        // DuoLFO: already wrote to lfo_output_buffer, zero extra channels
-        std::memset(engine->lfo_morph_buffer, 0, num_frames * sizeof(float));
-        std::memset(engine->lfo_harmonics_buffer, 0, num_frames * sizeof(float));
-        std::memset(engine->lfo_pitch_buffer, 0, num_frames * sizeof(float));
+        // DuoLFO: all 4 channels written by unit_process_hyper_lfo
+        // ch0=combined A⊕B, ch1=osc A, ch2=osc B, ch3=quadrature
     }
 
     // Apply feedback AM for PolyLFO/Lorenz (DuoLFO handles its own feedback FM internally).
