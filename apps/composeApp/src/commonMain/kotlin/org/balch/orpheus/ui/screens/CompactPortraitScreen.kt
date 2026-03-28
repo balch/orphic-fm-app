@@ -222,7 +222,7 @@ fun CompactPortraitLayout(
                                         actions = voiceFeature.actions,
                                         modifier = Modifier.fillMaxSize(),
                                         liquidState = liquidState,
-                                        effects = effects
+                                        effects = effects,
                                     )
                                 }
                                 CompactBottomPanelType.STRINGS -> {

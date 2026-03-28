@@ -2,6 +2,7 @@ package org.balch.orpheus.ui.panels.compact
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.fletchmckee.liquid.LiquidState
+import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.VoiceState
 import org.balch.orpheus.core.plugin.symbols.VoiceSymbol
 import org.balch.orpheus.features.voice.VoicePanelActions
@@ -36,6 +38,8 @@ import org.balch.orpheus.ui.widgets.BenderFaderWidget
 import org.balch.orpheus.ui.widgets.PulseButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
+private val MinHeightForDuoSettings = 350.dp
+
 /**
  * Compact Voice Pads panel for bottom panel navigation in portrait mode.
  *
@@ -45,6 +49,7 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
  *   - Right column: 8, 7, 6, 5 (top to bottom)
  * - Each voice has a pulse button and small tune knob
  * - Quad pitch/hold controls above each column
+ * - Per-duo settings cards shown based on topSectionHeight
  */
 @Composable
 fun CompactPortraitVoicePads(
@@ -74,72 +79,78 @@ fun CompactPortraitVoicePads(
         baseModifier.padding(8.dp)
     }
 
-    Row(
-        modifier = panelModifier,
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
-        // Left column: Voices 1-4 with Quad 0 controls
-        VoiceColumn(
-            isReversed = true,
-            voiceIndices = listOf(3, 2, 1, 0), // Voices 1, 2, 3, 4
-            quadIndex = 0,
-            voiceState = voiceState,
-            actions = actions,
-            colors = listOf(
-                OrpheusColors.electricBlue,
-                OrpheusColors.electricBlue,
-                OrpheusColors.neonMagenta,
-                OrpheusColors.neonMagenta,
-            ),
-            modifier = Modifier.weight(1f)
-        )
+    BoxWithConstraints(modifier = panelModifier) {
+        val showDuoSettings = maxHeight >= MinHeightForDuoSettings
 
-        // Center: Bender slider between columns
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(horizontal = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            BenderFaderWidget(
-                value = voiceState.bendPosition, // Reflects actual bend position (including AI control)
-                onValueChange = { actions.setBend(it) },
-                onRelease = { actions.releaseBend() },
-                trackHeight = 120, // Use defaults for other params (wider thumb, narrower track)
-                accentColor = OrpheusColors.softPurple
+            // Left column: Voices 1-4 with Duo 0/1 settings and Quad 0 controls
+            DuoVoiceColumn(
+                isReversed = true,
+                duoConfigs = listOf(
+                    DuoColumnConfig(duoIndex = 1, voiceIndices = listOf(3, 2), color = OrpheusColors.electricBlue),
+                    DuoColumnConfig(duoIndex = 0, voiceIndices = listOf(1, 0), color = OrpheusColors.neonMagenta),
+                ),
+                quadIndex = 0,
+                voiceState = voiceState,
+                actions = actions,
+                showDuoSettings = showDuoSettings,
+                modifier = Modifier.weight(1f),
+            )
+
+            // Center: Bender slider between columns
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .padding(horizontal = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                BenderFaderWidget(
+                    value = voiceState.bendPosition, // Reflects actual bend position (including AI control)
+                    onValueChange = { actions.setBend(it) },
+                    onRelease = { actions.releaseBend() },
+                    trackHeight = 120, // Use defaults for other params (wider thumb, narrower track)
+                    accentColor = OrpheusColors.softPurple
+                )
+            }
+
+            // Right column: Voices 5-8 with Duo 2/3 settings and Quad 1 controls
+            DuoVoiceColumn(
+                duoConfigs = listOf(
+                    DuoColumnConfig(duoIndex = 2, voiceIndices = listOf(4, 5), color = OrpheusColors.warmGlow),
+                    DuoColumnConfig(duoIndex = 3, voiceIndices = listOf(6, 7), color = OrpheusColors.synthGreen),
+                ),
+                quadIndex = 1,
+                voiceState = voiceState,
+                actions = actions,
+                showDuoSettings = showDuoSettings,
+                modifier = Modifier.weight(1f),
             )
         }
-
-        // Right column: Voices 8, 7, 6, 5 with Quad 1 controls
-        VoiceColumn(
-            voiceIndices = listOf(4, 5, 6, 7), // Voices 8, 7, 6, 5 (reversed)
-            quadIndex = 1,
-            voiceState = voiceState,
-            actions = actions,
-            colors = listOf(
-                OrpheusColors.warmGlow,
-                OrpheusColors.warmGlow,
-                OrpheusColors.synthGreen,
-                OrpheusColors.synthGreen,
-            ),
-            modifier = Modifier.weight(1f)
-        )
     }
 }
 
+private data class DuoColumnConfig(
+    val duoIndex: Int,
+    val voiceIndices: List<Int>,
+    val color: Color,
+)
+
 /**
- * A column of 4 voice pads with quad controls at top.
+ * A column containing quad controls at top, then for each duo: a settings card followed by its voice pads.
  */
 @Composable
-private fun VoiceColumn(
-    voiceIndices: List<Int>,
+private fun DuoVoiceColumn(
+    duoConfigs: List<DuoColumnConfig>,
     quadIndex: Int,
     voiceState: VoiceUiState,
     actions: VoicePanelActions,
-    colors: List<Color>,
+    showDuoSettings: Boolean,
     modifier: Modifier = Modifier,
-    isReversed: Boolean = false
+    isReversed: Boolean = false,
 ) {
     Column(
         modifier = modifier.fillMaxHeight(),
@@ -153,12 +164,12 @@ private fun VoiceColumn(
             hold = voiceState.quadGroupHolds.getOrElse(quadIndex) { 0f },
             onPitchChange = { actions.setQuadPitch(quadIndex, it) },
             onHoldChange = { actions.setQuadHold(quadIndex, it) },
-            color = colors.first()
+            color = duoConfigs.first().color,
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        // Voice pads stacked vertically
+        // Voice pads with per-duo settings cards
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -166,25 +177,46 @@ private fun VoiceColumn(
                     if (isReversed) Alignment.Start
                     else Alignment.End
                 )
-                .padding(horizontal = 8.dp)
-            ,
+                .padding(horizontal = 8.dp),
             verticalArrangement = Arrangement.SpaceEvenly,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            voiceIndices.forEachIndexed { index, voiceIndex ->
-                val voiceNumber = voiceIndex + 1
-                val voiceInfo = voiceState.voiceStates.getOrNull(voiceIndex)
-                MiniVoicePad(
-                    isReversed = isReversed,
-                    voiceNumber = voiceNumber,
-                    tune = voiceInfo?.tune ?: 0.5f,
-                    isActive = voiceInfo?.pulse == true,
-                    onTuneChange = { actions.setVoiceTune(voiceIndex, it) },
-                    onPulseStart = { actions.pulseStart(voiceIndex) },
-                    onPulseEnd = { actions.pulseEnd(voiceIndex) },
-                    color = colors.getOrElse(index) { OrpheusColors.neonCyan },
-                    controlId = VoiceSymbol.tune(voiceIndex).controlId.key
+            duoConfigs.forEach { config ->
+                // Settings card — uses intrinsic height, never squished
+                CompactDuoSettingsCard(
+                    duoIndex = config.duoIndex,
+                    color = config.color,
+                    engine = voiceState.duoEngines.getOrElse(config.duoIndex) { 0 },
+                    modSource = voiceState.duoModSources.getOrElse(config.duoIndex) { ModSource.OFF },
+                    modSourceLevel = voiceState.duoModSourceLevels.getOrElse(config.duoIndex) { 0f },
+                    morph = voiceState.duoMorphs.getOrElse(config.duoIndex) { 0f },
+                    harmonics = voiceState.duoHarmonics.getOrElse(config.duoIndex) { 0.5f },
+                    sharpness = voiceState.duoSharpness.getOrElse(config.duoIndex) { 0f },
+                    onEngineChange = { actions.setDuoEngine(config.duoIndex, it) },
+                    onModSourceChange = { actions.setDuoModSource(config.duoIndex, it) },
+                    onModSourceLevelChange = { actions.setDuoModSourceLevel(config.duoIndex, it) },
+                    onMorphChange = { actions.setDuoMorph(config.duoIndex, it) },
+                    onHarmonicsChange = { actions.setDuoHarmonics(config.duoIndex, it) },
+                    onSharpnessChange = { actions.setDuoSharpness(config.duoIndex, it) },
+                    showModRow = showDuoSettings,
                 )
+
+                // Voice pads — share remaining space equally
+                config.voiceIndices.forEach { voiceIndex ->
+                    val voiceNumber = voiceIndex + 1
+                    val voiceInfo = voiceState.voiceStates.getOrNull(voiceIndex)
+                    MiniVoicePad(
+                        isReversed = isReversed,
+                        voiceNumber = voiceNumber,
+                        tune = voiceInfo?.tune ?: 0.5f,
+                        isActive = voiceInfo?.pulse == true,
+                        onTuneChange = { actions.setVoiceTune(voiceIndex, it) },
+                        onPulseStart = { actions.pulseStart(voiceIndex) },
+                        onPulseEnd = { actions.pulseEnd(voiceIndex) },
+                        color = config.color,
+                        controlId = VoiceSymbol.tune(voiceIndex).controlId.key,
+                    )
+                }
             }
         }
     }
@@ -288,9 +320,9 @@ private fun MiniVoicePad(
 
 // ==================== PREVIEWS ====================
 
-@Preview(widthDp = 360, heightDp = 300)
+@Preview(widthDp = 360, heightDp = 400)
 @Composable
-private fun CompactPortraitVoicePadsPreview() {
+private fun CompactPortraitVoicePadsExpandedPreview() {
     OrpheusTheme {
         CompactPortraitVoicePads(
             voiceState = VoiceUiState(
@@ -298,7 +330,22 @@ private fun CompactPortraitVoicePadsPreview() {
                 quadGroupPitches = listOf(0.5f, 0.5f),
                 quadGroupHolds = listOf(0f, 0f)
             ),
-            actions = VoicePanelActions.EMPTY
+            actions = VoicePanelActions.EMPTY,
+        )
+    }
+}
+
+@Preview(widthDp = 360, heightDp = 250)
+@Composable
+private fun CompactPortraitVoicePadsCollapsedPreview() {
+    OrpheusTheme {
+        CompactPortraitVoicePads(
+            voiceState = VoiceUiState(
+                voiceStates = List(8) { index -> VoiceState(index = index) },
+                quadGroupPitches = listOf(0.5f, 0.5f),
+                quadGroupHolds = listOf(0f, 0f)
+            ),
+            actions = VoicePanelActions.EMPTY,
         )
     }
 }
