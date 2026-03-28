@@ -28,7 +28,9 @@ See `.claude/skills/dsp-implementation/` for C++ unit creation, engine atomics, 
 - JVM compile check: `./gradlew compileKotlinJvm`
 - WASM production build: `./gradlew :apps:composeApp:wasmJsBrowserDistribution`
 - WASM dev server: `./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun` (serves on localhost:8080)
-- C++ tests: `cmake -S liborpheus_dsp -B liborpheus_dsp/build-desktop -DEURORACK_DIR=/Users/balch/Source/eurorack -DBUILD_TESTS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && cmake --build liborpheus_dsp/build-desktop --target orpheus_dsp_test && liborpheus_dsp/build-desktop/orpheus_dsp_test`
+- C++ tests: `cmake -S liborpheus_dsp -B liborpheus_dsp/build-desktop -DEURORACK_DIR=$EURORACK_DIR -DBUILD_TESTS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON && cmake --build liborpheus_dsp/build-desktop --target orpheus_dsp_test && liborpheus_dsp/build-desktop/orpheus_dsp_test`
+  - Run specific suites: `liborpheus_dsp/build-desktop/orpheus_dsp_test tides bass warps`
+  - List suites: `liborpheus_dsp/build-desktop/orpheus_dsp_test --list`
 
 ## C++ Clang Diagnostics
 
