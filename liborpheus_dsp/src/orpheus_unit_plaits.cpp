@@ -556,6 +556,16 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         float voice_peak = 0.0f;
 
         if (idx < kNumMainVoices) {
+            // String and Modal engines have built-in decay (physical models) —
+            // skip external ADSR to avoid double-enveloping their output.
+            bool already_enveloped = (engine_index == 19 || engine_index == 20);
+
+            if (already_enveloped) {
+                for (int i = 0; i < num_frames; i++) {
+                    float abs_s = std::fabs(out[i]);
+                    if (abs_s > voice_peak) voice_peak = abs_s;
+                }
+            } else {
             // Main voices: full ADSR + hold VCA
             float attack_rate, decay_coeff, sustain_level, release_coeff;
             compute_adsr_from_speed(env_speed, sr, attack_rate, decay_coeff,
@@ -613,6 +623,7 @@ void unit_process_plaits(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 float abs_s = std::fabs(out[i]);
                 if (abs_s > voice_peak) voice_peak = abs_s;
             }
+            } // !already_enveloped
         } else {
             // Drum voices: external percussive envelope matching Kotlin's
             // setPercussiveMode(!engine.alreadyEnveloped).
