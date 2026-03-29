@@ -21,7 +21,7 @@ import kotlinx.coroutines.sync.withLock
 @Inject
 class PresetsRepository(
     private val synthPresetRepository: SynthPresetRepository,
-    factoryPatches: Set<SynthPatch>
+    private val factoryPatches: Set<SynthPatch>
 ) {
     private val log = logging("PresetsRepository")
 
@@ -29,19 +29,22 @@ class PresetsRepository(
         log.info { "PresetsRepository created with ${factoryPatches.size} factory patches: ${factoryPatches.map { it.name }}" }
     }
 
-    // Factory presets sorted by name
-    private val factoryPresets: List<SynthPreset> by lazy {
-        factoryPatches
-            .map { it.preset }
-            .sortedBy { it.name }
-    }
-    
-    private val _factoryPresetNames: Set<String> by lazy {
+    private val _factoryPresetNames: Set<String> =
         factoryPatches.map { it.name }.toSet()
+
+    // Loaded lazily on first refreshCache() call
+    private var factoryPresets: List<SynthPreset>? = null
+
+    private suspend fun getFactoryPresets(): List<SynthPreset> {
+        factoryPresets?.let { return it }
+        return factoryPatches
+            .map { it.loadPreset() }
+            .sortedBy { it.name }
+            .also { factoryPresets = it }
     }
-    
-    // Cached combined preset list
-    private val _allPresets = MutableStateFlow(factoryPresets)
+
+    // Cached combined preset list — starts empty, populated on first ensureLoaded()
+    private val _allPresets = MutableStateFlow<List<SynthPreset>>(emptyList())
     val allPresets: StateFlow<List<SynthPreset>> = _allPresets.asStateFlow()
     
     private val mutex = Mutex()
@@ -70,7 +73,7 @@ class PresetsRepository(
     suspend fun getDefault(): SynthPreset {
         ensureLoaded()
         return _allPresets.value.find { it.name == "Orpheus" }
-            ?: factoryPresets.first() // Fallback to first factory preset
+            ?: getFactoryPresets().first() // Fallback to first factory preset
     }
     
     /**
@@ -105,11 +108,11 @@ class PresetsRepository(
     suspend fun refreshCache() {
         mutex.withLock {
             // Filter out user presets that duplicate factory preset names
-            // (BundledPresets seeds localStorage with copies of factory presets)
+            val factory = getFactoryPresets()
             val userPresets = synthPresetRepository.list()
                 .filter { it.name !in _factoryPresetNames }
-            log.info { "refreshCache: ${factoryPresets.size} factory + ${userPresets.size} user = ${factoryPresets.size + userPresets.size} total" }
-            _allPresets.value = factoryPresets + userPresets
+            log.info { "refreshCache: ${factory.size} factory + ${userPresets.size} user = ${factory.size + userPresets.size} total" }
+            _allPresets.value = factory + userPresets
             isLoaded = true
         }
     }

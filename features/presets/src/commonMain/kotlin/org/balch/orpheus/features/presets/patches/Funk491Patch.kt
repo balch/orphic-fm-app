@@ -8,7 +8,7 @@ import org.balch.orpheus.core.presets.SynthPatch
 
 @Inject
 @ContributesIntoSet(AppScope::class, binding = binding<SynthPatch>())
-class SixSevenPatch : JsonSynthPatch(
-    id = "six_seven",
-    name = "6-7",
+class Funk491Patch : JsonSynthPatch(
+    id = "funk491",
+    name = "Funk 49.1",
 )

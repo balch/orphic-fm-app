@@ -10,7 +10,7 @@ import org.balch.orpheus.core.plugin.PortValue
  */
 @Serializable
 data class SynthPreset(
-    val name: String,
+    val name: String = "",
     val bpm: Float = 120f,
     val portValues: Map<String, PortValue> = emptyMap(),
     val createdAt: Long = Clock.System.now().toEpochMilliseconds()

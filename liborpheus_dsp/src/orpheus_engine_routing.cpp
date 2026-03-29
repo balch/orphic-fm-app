@@ -61,6 +61,104 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 if (symbol_hash == src_hashes[i]) { engine->mod_source[i].store(static_cast<int>(value), std::memory_order_relaxed); return; }
                 if (symbol_hash == lvl_hashes[i]) { engine->mod_depth[i].store(value, std::memory_order_relaxed); engine->fm_depth[i].store(value, std::memory_order_relaxed); return; }
             }
+
+            // Per-duo voice parameters: engine, sharpness→timbre, harmonics, morph.
+            // Maps Kotlin plugin ordinals to C++ voice_params atomics.
+            static uint16_t eng_hashes[] = {
+                engine_hash16("duo_engine_0"), engine_hash16("duo_engine_1"),
+                engine_hash16("duo_engine_2"), engine_hash16("duo_engine_3"),
+                engine_hash16("duo_engine_4"), engine_hash16("duo_engine_5")};
+            static uint16_t sharp_hashes[] = {
+                engine_hash16("duo_sharpness_0"), engine_hash16("duo_sharpness_1"),
+                engine_hash16("duo_sharpness_2"), engine_hash16("duo_sharpness_3"),
+                engine_hash16("duo_sharpness_4"), engine_hash16("duo_sharpness_5")};
+            static uint16_t harm_hashes[] = {
+                engine_hash16("duo_harmonics_0"), engine_hash16("duo_harmonics_1"),
+                engine_hash16("duo_harmonics_2"), engine_hash16("duo_harmonics_3"),
+                engine_hash16("duo_harmonics_4"), engine_hash16("duo_harmonics_5")};
+            static uint16_t morph_hashes[] = {
+                engine_hash16("duo_morph_0"), engine_hash16("duo_morph_1"),
+                engine_hash16("duo_morph_2"), engine_hash16("duo_morph_3"),
+                engine_hash16("duo_morph_4"), engine_hash16("duo_morph_5")};
+            // Kotlin PlaitsEngineId ordinals → C++ engine indices
+            // (matches DspSynthEngine.CPP_ENGINE_MAP)
+            static const int kEngineMap[] = {
+                21, 22, 23, 21, 10, 17, 9, 8, 12, 11, 19, 20, 18, 16, 14, 13, 15,
+                0, 1, 2, 5, 6, 7
+            };
+            static const int kEngineMapSize = sizeof(kEngineMap) / sizeof(kEngineMap[0]);
+            for (int i = 0; i < 6; i++) {
+                if (symbol_hash == eng_hashes[i]) {
+                    int ordinal = static_cast<int>(value);
+                    int cpp_idx;
+                    if (ordinal <= 0) {
+                        cpp_idx = -1;  // Engine 0 (OSC mode)
+                    } else {
+                        int map_idx = ordinal - 1;
+                        cpp_idx = (map_idx < kEngineMapSize) ? kEngineMap[map_idx] : 0;
+                    }
+                    int voiceA = i * 2;
+                    engine->voice_params[voiceA].engine_index.store(cpp_idx, std::memory_order_relaxed);
+                    engine->voice_params[voiceA + 1].engine_index.store(cpp_idx, std::memory_order_relaxed);
+                    engine->voice_params[voiceA].active.store(1, std::memory_order_relaxed);
+                    engine->voice_params[voiceA + 1].active.store(1, std::memory_order_relaxed);
+                    return;
+                }
+                if (symbol_hash == sharp_hashes[i]) {
+                    int voiceA = i * 2;
+                    engine->voice_params[voiceA].timbre.store(value, std::memory_order_relaxed);
+                    engine->voice_params[voiceA + 1].timbre.store(value, std::memory_order_relaxed);
+                    return;
+                }
+                if (symbol_hash == harm_hashes[i]) {
+                    int voiceA = i * 2;
+                    engine->voice_params[voiceA].harmonics.store(value, std::memory_order_relaxed);
+                    engine->voice_params[voiceA + 1].harmonics.store(value, std::memory_order_relaxed);
+                    return;
+                }
+                if (symbol_hash == morph_hashes[i]) {
+                    int voiceA = i * 2;
+                    engine->voice_params[voiceA].morph.store(value, std::memory_order_relaxed);
+                    engine->voice_params[voiceA + 1].morph.store(value, std::memory_order_relaxed);
+                    return;
+                }
+            }
+
+            // Per-voice parameters: tune_N, env_speed_N
+            static uint16_t tune_hashes[12], envspd_hashes[12];
+            static bool per_voice_init = false;
+            if (!per_voice_init) {
+                const char* tune_names[] = {
+                    "tune_0","tune_1","tune_2","tune_3","tune_4","tune_5",
+                    "tune_6","tune_7","tune_8","tune_9","tune_10","tune_11"};
+                const char* envspd_names[] = {
+                    "env_speed_0","env_speed_1","env_speed_2","env_speed_3",
+                    "env_speed_4","env_speed_5","env_speed_6","env_speed_7",
+                    "env_speed_8","env_speed_9","env_speed_10","env_speed_11"};
+                for (int j = 0; j < 12; j++) {
+                    tune_hashes[j] = engine_hash16(tune_names[j]);
+                    envspd_hashes[j] = engine_hash16(envspd_names[j]);
+                }
+                per_voice_init = true;
+            }
+            // Per-voice pitch multiplier in semitones (matches DspSynthEngine.VOICE_PITCH_MULT_SEMITONES)
+            static const float kVoicePitchSemi[12] = {
+                -12, -12, 0, 0, 0, 0, 12, 12, 0, 0, 0, 0
+            };
+            for (int j = 0; j < 12; j++) {
+                if (symbol_hash == tune_hashes[j]) {
+                    // Convert normalized knob (0-1) to MIDI note
+                    // Formula: 33 + tune*48 + voicePitchOffset
+                    // (quadPitch defaults to 0.5 → offset 0)
+                    float note = 33.0f + value * 48.0f + kVoicePitchSemi[j];
+                    engine->voice_params[j].tune.store(note, std::memory_order_relaxed);
+                    return;
+                }
+                if (symbol_hash == envspd_hashes[j]) {
+                    engine->voice_params[j].decay.store(value, std::memory_order_relaxed);
+                    return;
+                }
+            }
         }
     }
 

@@ -574,7 +574,7 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
 
     // Viz: write final LFO output (after mux + range)
     engine->viz_rings[VIZ_LFO_OUTPUT].write(engine->lfo_output_value);
-    // Viz: PolyLFO ch1-3 (write last sample; zero when not in DRIFT mode)
+    // Viz: ch1-3 (PolyLFO or DuoLFO per-oscillator outputs)
     engine->viz_rings[VIZ_LFO_CH1].write(engine->lfo_morph_buffer[num_frames - 1]);
     engine->viz_rings[VIZ_LFO_CH2].write(engine->lfo_harmonics_buffer[num_frames - 1]);
     engine->viz_rings[VIZ_LFO_CH3].write(engine->lfo_pitch_buffer[num_frames - 1]);

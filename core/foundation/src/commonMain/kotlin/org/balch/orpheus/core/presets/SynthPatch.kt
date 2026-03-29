@@ -11,13 +11,13 @@ package org.balch.orpheus.core.presets
 interface SynthPatch {
     /** Unique identifier for this patch */
     val id: String
-    
+
     /** Display name for the UI */
     val name: String
-    
-    /** The preset data containing all synth parameters */
-    val preset: SynthPreset
-    
+
+    /** Load the preset data. May read from resources asynchronously. */
+    suspend fun loadPreset(): SynthPreset
+
     /** Whether this is a factory preset (true) or user-created (false) */
     val isFactory: Boolean get() = true
 }

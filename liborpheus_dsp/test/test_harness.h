@@ -488,3 +488,4 @@ bool run_bass_voice_tests();
 bool run_horn_tests();
 bool run_turntable_tests();
 bool run_tides_tests();
+bool run_preset_voice_tests();

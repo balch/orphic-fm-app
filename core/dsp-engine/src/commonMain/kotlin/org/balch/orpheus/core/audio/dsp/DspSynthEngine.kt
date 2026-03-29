@@ -24,6 +24,7 @@ import org.balch.orpheus.core.plugin.symbols.FluxSymbol
 import org.balch.orpheus.core.plugin.symbols.ResonatorSymbol
 import org.balch.orpheus.core.plugin.symbols.STEREO_URI
 import org.balch.orpheus.core.plugin.symbols.StereoSymbol
+import org.balch.orpheus.core.plugin.symbols.VOICE_URI
 import org.balch.orpheus.core.plugin.symbols.VibratoSymbol
 import org.balch.orpheus.core.plugin.symbols.WarpsSymbol
 import org.balch.orpheus.core.tempo.GlobalTempo
@@ -256,8 +257,11 @@ class DspSynthEngine(
         // Generic sync: forward ALL plugin control port values to C++ native bridge.
         // This catches reverb, distortion, delay, warps, clouds, drums, grains, flux,
         // and any other plugins not explicitly synced above.
+        // Skip the voice plugin — its per-voice params (tune, engine, sharpness, etc.)
+        // require Kotlin-side conversions already done in the per-duo loop above.
         for (plugin in pluginProvider.plugins) {
             val uri = plugin.info.uri
+            if (uri == VOICE_URI) continue
             for (port in plugin.ports) {
                 if (port !is ControlPort || !port.isInput) continue
                 val value = plugin.getPortValue(port.symbol) ?: continue

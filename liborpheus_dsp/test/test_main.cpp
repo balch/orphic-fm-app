@@ -42,6 +42,7 @@ static TestSuite suites[] = {
     {"horn",            run_horn_tests,             true},
     {"turntable",       run_turntable_tests,       true},
     {"tides",           run_tides_tests,           true},
+    {"preset-voices",   run_preset_voice_tests,    true},
     {"benchmark",       run_benchmark_tests,       true},
 };
 

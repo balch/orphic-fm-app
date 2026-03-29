@@ -50,6 +50,7 @@ import org.balch.orpheus.ui.widgets.BenderFaderWidget
 import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 // Cleveland Guardians palette for DJ panel
@@ -369,7 +370,7 @@ private fun TurntablePlatter(
 
     // Velocity readout below platter
     Text(
-        text = "%.2f".format(velocity),
+        text = ((velocity * 100).roundToInt() / 100.0).toString(),
         color = deckColor.copy(alpha = 0.6f),
         fontSize = 9.sp,
         textAlign = TextAlign.Center,
