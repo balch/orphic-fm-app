@@ -439,6 +439,126 @@ static bool test_tides_amplitude_mode_with_shift() {
     return all_pass;
 }
 
+// ── Helper: count zero-crossings on ch0 of tides_output_buffer ─────────────
+// Returns the number of positive-going zero crossings, which equals the
+// number of complete cycles for a bipolar waveform.
+static int count_zero_crossings(OrpheusEngine* engine, GraphUnit* u,
+                                int blocks, int frames_per_block, float sr) {
+    int crossings = 0;
+    float prev = 0.0f;
+    for (int b = 0; b < blocks; b++) {
+        unit_process_tides(u, engine, frames_per_block, sr);
+        for (int i = 0; i < frames_per_block; i++) {
+            float v = engine->tides_output_buffer[0][i];
+            if (prev <= 0.0f && v > 0.0f) crossings++;
+            prev = v;
+        }
+    }
+    return crossings;
+}
+
+// ── Test 8: Rate knob changes cycle rate (targeted unit test) ──────────────
+// Renders Tides at a low and high frequency, counts zero crossings on ch0,
+// and asserts the higher frequency produces more cycles.
+static bool test_tides_rate_knob_unit() {
+    printf("\n=== Test: Tides2 rate knob changes cycle rate (unit) ===\n");
+
+    // CONTROL range: hz = 0.001 * pow(10000, freq)
+    //   0.75 → ~1 Hz, 0.85 → ~4 Hz, 0.95 → ~8 Hz
+    const float freqs[] = { 0.75f, 0.85f, 0.95f };
+    int crossings[3] = {};
+
+    for (int f = 0; f < 3; f++) {
+        OrpheusEngine* engine = orpheus_engine_create(SR);
+        engine->tides_mix.store(1.0f);
+        engine->tides_ramp_mode.store(1);     // LOOPING
+        engine->tides_output_mode.store(2);   // PHASE (bipolar, clean zero crossings)
+        engine->tides_frequency.store(freqs[f]);
+        engine->tides_slope.store(0.5f);
+        engine->tides_shape.store(0.5f);
+        engine->tides_smoothness.store(0.5f);
+        engine->tides_shift.store(0.5f);
+        engine->tides_gate_source.store(4);   // free-run
+        engine->tides_range.store(0);         // CONTROL
+        engine->tides_clock_source.store(0);
+
+        GraphUnit u = {};
+        u.type = UNIT_TIDES;
+        u.enabled = true;
+        unit_init(&u, SR);
+
+        // Warmup
+        for (int b = 0; b < 20; b++)
+            unit_process_tides(&u, engine, 64, SR);
+
+        // Measure over ~1 second (750 blocks × 64 frames = 48000 samples)
+        crossings[f] = count_zero_crossings(engine, &u, 750, 64, SR);
+        orpheus_engine_destroy(engine);
+
+        printf("  freq=%.2f: %d zero crossings in 1s\n", freqs[f], crossings[f]);
+    }
+
+    // Each higher frequency setting must produce strictly more crossings
+    bool pass = (crossings[0] > 0) && (crossings[1] > crossings[0]) && (crossings[2] > crossings[1]);
+    printf("  Monotonically increasing: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// ── Test 9: Rate knob changes cycle rate (production graph) ────────────────
+// Same principle as test 8, but renders through the full production graph
+// and measures zero crossings on the engine's tides_output_buffer.
+static bool test_tides_rate_knob_production_graph() {
+    printf("\n=== Test: Tides2 rate knob changes cycle rate (production graph) ===\n");
+
+    // CONTROL range: hz = 0.001 * pow(10000, freq)
+    const float freqs[] = { 0.75f, 0.85f, 0.95f };
+    int crossings[3] = {};
+
+    for (int f = 0; f < 3; f++) {
+        OrpheusEngine* engine = orpheus_engine_create(SR);
+        if (!load_production_graph(engine)) return false;
+
+        engine->tides_mix.store(1.0f);
+        engine->tides_ramp_mode.store(1);     // LOOPING
+        engine->tides_output_mode.store(2);   // PHASE (bipolar)
+        engine->tides_frequency.store(freqs[f]);
+        engine->tides_slope.store(0.5f);
+        engine->tides_shape.store(0.5f);
+        engine->tides_smoothness.store(0.5f);
+        engine->tides_shift.store(0.5f);
+        engine->tides_gate_source.store(4);   // free-run
+        engine->tides_range.store(0);         // CONTROL
+        engine->tides_clock_source.store(0);
+
+        auto* graph = engine->graph.load(std::memory_order_acquire);
+        float buf[128 * 2];
+
+        // Warmup
+        for (int b = 0; b < 20; b++)
+            orpheus_graph_process(graph, engine, buf, 64);
+
+        // Measure zero crossings on ch0 over ~1 second
+        int zc = 0;
+        float prev = 0.0f;
+        for (int b = 0; b < 750; b++) {
+            orpheus_graph_process(graph, engine, buf, 64);
+            for (int i = 0; i < 64; i++) {
+                float v = engine->tides_output_buffer[0][i];
+                if (prev <= 0.0f && v > 0.0f) zc++;
+                prev = v;
+            }
+        }
+        crossings[f] = zc;
+
+        orpheus_engine_destroy(engine);
+        printf("  freq=%.2f: %d zero crossings in 1s\n", freqs[f], crossings[f]);
+    }
+
+    bool pass = (crossings[0] > 0) && (crossings[1] > crossings[0]) && (crossings[2] > crossings[1]);
+    printf("  Monotonically increasing: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 // ── Test runner ─────────────────────────────────────────────────────────────
 bool run_tides_tests() {
     printf("\n========== TIDES2 TESTS ==========\n");
@@ -450,6 +570,8 @@ bool run_tides_tests() {
     all_pass &= test_bass_tides_routing_requires_selection();
     all_pass &= test_tides_amplitude_mode_with_shift();
     all_pass &= test_tides_dc_offset_on_pitch_channel();
+    all_pass &= test_tides_rate_knob_unit();
+    all_pass &= test_tides_rate_knob_production_graph();
     printf("\nTides2 tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
     return all_pass;
 }

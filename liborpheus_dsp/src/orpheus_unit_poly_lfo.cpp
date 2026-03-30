@@ -42,28 +42,18 @@ void unit_process_poly_lfo(GraphUnit* u, OrpheusEngine* engine, int num_frames, 
     engine->poly_lfo.set_coupling(to_u16(coupling_f));
 
     // Convert rate (0..1) to MI frequency parameter.
-    // MI PolyLFO frequency is an int32_t used by FrequencyToPhaseIncrement.
-    // The lookup table (lut_increments) has 159 entries accessed as (frequency/5040),
-    // with a shift-based octave mechanism. Rate 0 = very slow, rate 1 = fast.
-    // Reasonable range: ~0 to ~20000 covers sub-Hz to fast LFO rates.
-    // At the original Frames sample rate of ~4kHz (internal), frequency ~5040 = ~1Hz.
-    // But we're running at audio rate (48kHz), so phase increments are ~12x too fast.
-    // We scale the frequency value to compensate: multiply by (4000/sr) ratio.
+    // FrequencyToPhaseIncrement uses an octave-shifting LUT: every 5040 units
+    // of frequency = one octave (2x rate). The base LUT covers a single octave
+    // of phase increments (2403–4806). Values below 5040 all map to shifts=0,
+    // giving only ~25% rate variation — effectively no audible change.
     //
-    // Practical range mapping:
-    //   rate=0.0 -> frequency ~200  (very slow, ~0.04 Hz)
-    //   rate=0.5 -> frequency ~5040 (moderate, ~1 Hz at Frames rate)
-    //   rate=1.0 -> frequency ~20000 (fast, ~4 Hz)
-    //
-    // The Frames hardware runs Render() at ~4kHz (1ms timer interrupt).
-    // We run at audio rate (48kHz), so we need to scale the frequency down
-    // by the ratio 4000/sr to get equivalent LFO rates.
-    float frames_rate = 4000.0f;  // Frames internal update rate
-    float rate_scale = frames_rate / sr;
-    // Map rate 0..1 to a wide frequency range with exponential scaling
-    // for musical feel (low end is slow, high end is fast)
-    float freq_raw = 200.0f + std::pow(rate_f, 2.0f) * 19800.0f;  // 200..20000
-    int32_t frequency = static_cast<int32_t>(freq_raw * rate_scale);
+    // At 48kHz (Render called per-sample), useful LFO range (~0.03–15 Hz)
+    // needs frequency values spanning multiple octaves (~0 to ~55000).
+    // Cubic ease-in keeps most of the knob at slow/moderate rates with
+    // aggressive acceleration toward max. Combined with the LUT's octave
+    // structure, this gives fine control at the slow end.
+    float freq_raw = rate_f * rate_f * rate_f * 55000.0f;
+    int32_t frequency = static_cast<int32_t>(freq_raw);
     if (frequency < 0) frequency = 0;
 
     float* out = u->output_buffers[OPORT_OUT];

@@ -1,6 +1,8 @@
 // LFO waveform, mode logic, and mod-source integration tests
 #include "test_harness.h"
 
+static constexpr float SR = 48000.0f;
+
 // Fill lfo_output_buffer with a constant value (simulates steady LFO for unit tests)
 static void fill_lfo_buffer(OrpheusEngine* eng, float value) {
     eng->lfo_output_value = value;
@@ -1029,6 +1031,125 @@ static bool test_lfo_4channel_output() {
     return all_pass;
 }
 
+// ── Helper: count positive-going zero crossings on poly_lfo_output ch0 ──
+// Processes `blocks` blocks of `frames_per_block` frames each through
+// unit_process_poly_lfo and counts sign transitions from <=0 to >0.
+static int count_zero_crossings_poly_lfo(OrpheusEngine* engine, GraphUnit* u,
+                                         int blocks, int frames_per_block, float sr) {
+    int crossings = 0;
+    float prev = 0.0f;
+    for (int b = 0; b < blocks; b++) {
+        unit_process_poly_lfo(u, engine, frames_per_block, sr);
+        for (int i = 0; i < frames_per_block; i++) {
+            float v = engine->poly_lfo_output[0][i];
+            if (prev <= 0.0f && v > 0.0f) crossings++;
+            prev = v;
+        }
+    }
+    return crossings;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Test: PolyLFO rate knob changes cycle rate (direct unit test)
+//
+// Rate mapping: freq = rate^3 * 55000 (cubic ease-in).
+// At 48 kHz: rate=0.85 → ~3 Hz, rate=0.9 → ~7 Hz, rate=0.95 → ~15 Hz
+//
+// Three rate values should produce monotonically increasing zero
+// crossings over ~1 second (750 blocks × 64 frames = 48000 samples).
+// ═══════════════════════════════════════════════════════════════════
+static bool test_poly_lfo_rate_knob_unit() {
+    printf("\n=== Test: PolyLFO rate knob changes cycle rate (unit) ===\n");
+
+    // Cubic ease-in: most of the knob is slow, so use upper-range values
+    const float rates[] = { 0.85f, 0.9f, 0.95f };
+    int crossings[3] = {};
+
+    for (int r = 0; r < 3; r++) {
+        OrpheusEngine* engine = orpheus_engine_create(SR);
+        engine->poly_lfo_bypass.store(0);           // enable (default is bypassed!)
+        engine->poly_lfo_rate.store(rates[r]);
+        engine->poly_lfo_shape.store(0.5f);
+        engine->poly_lfo_spread.store(0.5f);
+        engine->poly_lfo_coupling.store(0.0f);
+        engine->poly_lfo_shape_spread.store(0.5f);
+
+        GraphUnit u = {};
+        u.type = UNIT_POLY_LFO;
+        u.enabled = true;
+        unit_init(&u, SR);
+
+        // Warmup — let internal state settle
+        for (int b = 0; b < 20; b++)
+            unit_process_poly_lfo(&u, engine, 64, SR);
+
+        // Measure over ~1 second (750 blocks × 64 frames = 48000 samples at 48 kHz)
+        crossings[r] = count_zero_crossings_poly_lfo(engine, &u, 750, 64, SR);
+        orpheus_engine_destroy(engine);
+
+        printf("  rate=%.2f: %d zero crossings in 1s\n", rates[r], crossings[r]);
+    }
+
+    // Each higher rate setting must produce strictly more crossings
+    bool pass = (crossings[0] > 0) && (crossings[1] > crossings[0]) && (crossings[2] > crossings[1]);
+    printf("  Monotonically increasing: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Test: PolyLFO rate knob changes cycle rate (production graph)
+//
+// Same test as above but renders through the full production graph
+// via orpheus_graph_process() and measures zero crossings on
+// engine->poly_lfo_output[0].
+// ═══════════════════════════════════════════════════════════════════
+static bool test_poly_lfo_rate_knob_production_graph() {
+    printf("\n=== Test: PolyLFO rate knob changes cycle rate (production graph) ===\n");
+
+    // Cubic ease-in: most of the knob is slow, so use upper-range values
+    const float rates[] = { 0.85f, 0.9f, 0.95f };
+    int crossings[3] = {};
+
+    for (int r = 0; r < 3; r++) {
+        OrpheusEngine* engine = orpheus_engine_create(SR);
+        if (!load_production_graph(engine)) return false;
+
+        engine->poly_lfo_bypass.store(0);           // enable
+        engine->poly_lfo_rate.store(rates[r]);
+        engine->poly_lfo_shape.store(0.5f);
+        engine->poly_lfo_spread.store(0.5f);
+        engine->poly_lfo_coupling.store(0.0f);
+        engine->poly_lfo_shape_spread.store(0.5f);
+
+        auto* graph = engine->graph.load(std::memory_order_acquire);
+        float buf[128 * 2] = {};
+
+        // Warmup
+        for (int b = 0; b < 20; b++)
+            orpheus_graph_process(graph, engine, buf, 64);
+
+        // Measure zero crossings on ch0 over ~1 second
+        int zc = 0;
+        float prev = 0.0f;
+        for (int b = 0; b < 750; b++) {
+            orpheus_graph_process(graph, engine, buf, 64);
+            for (int i = 0; i < 64; i++) {
+                float v = engine->poly_lfo_output[0][i];
+                if (prev <= 0.0f && v > 0.0f) zc++;
+                prev = v;
+            }
+        }
+        crossings[r] = zc;
+
+        orpheus_engine_destroy(engine);
+        printf("  rate=%.2f: %d zero crossings in 1s\n", rates[r], crossings[r]);
+    }
+
+    bool pass = (crossings[0] > 0) && (crossings[1] > crossings[0]) && (crossings[2] > crossings[1]);
+    printf("  Monotonically increasing: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Test runner
 // ═══════════════════════════════════════════════════════════════════
@@ -1048,5 +1169,7 @@ bool run_lfo_tests() {
     all_pass &= test_lfo_mode_comparison();
     all_pass &= test_lfo_mod_depth_sweep();
     all_pass &= test_lfo_4channel_output();
+    all_pass &= test_poly_lfo_rate_knob_unit();
+    all_pass &= test_poly_lfo_rate_knob_production_graph();
     return all_pass;
 }
