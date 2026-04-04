@@ -251,7 +251,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - bass_engine: Synthesis engine (integer: 0=VCF Acid, 1=Phase Dist, 2=FM, 3=Bass Drum)
         - bass_root_note: Root note (integer MIDI: 24=C1 to 47=B2, default 36=C2). MATCH TO YOUR KEY!
         - bass_scale: Scale quantization (integer: 0=Chromatic, 1=Minor Pent, 2=Minor, 3=Major, 4=Dorian, 5=Whole Tone)
-        - bass_clock_div: Clock division (integer: 0=1/4, 1=1/2, 2=1x(16ths), 3=2x, 4=4x)
+        - bass_clock_div: Clock division (integer: 0=1/4x, 1=1/2x, 2=1x(16ths), 3=2x, 4=4x)
         - bass_step_count: Steps (integer: 4, 8, 12, or 16)
         - bass_mutation: Pattern evolution (0=locked, 0.3=subtle drift, 0.7=chaotic, 1=full random)
         - bass_cutoff: Filter brightness (0=dark, 0.5=balanced, 1=bright)
@@ -272,7 +272,7 @@ data object SoloAgentConfig : SynthControlAgentConfig {
         - EDM Punch: engine=0, envelope=0.9, compressor=0.5, drive=0.2, clock_div=2(16ths)
         - Sub Bass: engine=2(FM), cutoff=0.2, resonance=0.1, envelope=0.3, drive=0
         - Dubstep Wobble: engine=0, cutoff swept by LFO (use bass_cutoff ramp), resonance=0.6
-        - Generative Ambient: engine=2, mutation=0.6, scale=1, envelope=0.2, clock_div=0(quarter)
+        - Generative Ambient: engine=2, mutation=0.6, scale=1, envelope=0.2, clock_div=0(1/4x quarter)
 
         **WHEN TO USE BASS:**
         ✓ Use for driving, rhythmic pieces — bass adds energy and movement

@@ -41,7 +41,7 @@ class BassPlugin(
     private var _engine = 0          // BassEngine.VCF_ACID.ordinal
     private var _rootNote = 36
     private var _scale = 1           // BassScale.MINOR_PENTATONIC.ordinal
-    private var _clockDiv = 2        // ClockDivision.X1.ordinal
+    private var _clockDiv = 2        // ClockDivision.X1.ordinal (16th notes)
     private var _stepCount = 16
     private var _mutation = 0.0f
     private var _cutoff = 0.5f
@@ -88,8 +88,8 @@ class BassPlugin(
 
         controlPort(BassSymbol.CLOCK_DIV) {
             intType {
-                default = 0; min = 0; max = 4
-                options = listOf("1x", "2x", "4x", "8x", "16x")
+                default = 2; min = 0; max = 4
+                options = listOf("1/4x", "1/2x", "1x", "2x", "4x")
                 get { _clockDiv }
                 set { _clockDiv = it }
             }

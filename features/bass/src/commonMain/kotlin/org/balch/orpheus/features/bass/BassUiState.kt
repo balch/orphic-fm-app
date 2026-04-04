@@ -10,7 +10,7 @@ data class BassUiState(
     val engine: BassEngine = BassEngine.VCF_ACID,
     val rootNote: Int = 36,
     val scale: BassScale = BassScale.MINOR_PENTATONIC,
-    val clockDivision: ClockDivision = ClockDivision.X1,
+    val clockDivision: ClockDivision = ClockDivision.X1,  // 16th notes
     val stepCount: Int = 16,
     val mutation: Float = 0.0f,
     val cutoff: Float = 0.5f,

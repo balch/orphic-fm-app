@@ -102,7 +102,7 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
         The bass has a built-in step sequencer that starts with a driving pattern (all gates ON, root on downbeats, random scale notes on off-beats, accents on 1 and 3).
         - **ROOT** (bass_root_note): Root note, MIDI 24-47 (C1-B2). Default C2 (36). Set to match your key.
         - **SCALE** (bass_scale): Quantization — 0=Chromatic, 1=Minor Pentatonic (default), 2=Minor, 3=Major, 4=Dorian, 5=Whole Tone.
-        - **CLOCK** (bass_clock_div): Clock division — 0=1/4 (quarter), 1=1/2 (8th), 2=1x (16th, default), 3=2x (32nd), 4=4x (64th).
+        - **CLOCK** (bass_clock_div): Clock division — 0=1/4x (quarter), 1=1/2x (8th), 2=1x (16th, default), 3=2x (32nd), 4=4x (64th).
         - **STEPS** (bass_step_count): Sequence length — 4, 8, 12, or 16 steps. Default 16.
         - **MUTATION** (bass_mutation): Pattern evolution 0-1. At 0 the pattern is locked. 0-0.5 mutates pitches only. 0.5-1.0 also mutates gates and accents. At 1.0 fully random each cycle (still scale-quantized).
 
@@ -131,7 +131,7 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
                 BassSymbol.ENGINE.controlId.key to "Synthesis engine (integer: 0=VCF Acid, 1=Phase Dist, 2=FM, 3=Bass Drum)",
                 BassSymbol.ROOT_NOTE.controlId.key to "Root note (integer MIDI note: 24=C1 to 47=B2, default 36=C2)",
                 BassSymbol.SCALE.controlId.key to "Scale (integer: 0=Chromatic, 1=Minor Pent, 2=Minor, 3=Major, 4=Dorian, 5=Whole Tone)",
-                BassSymbol.CLOCK_DIV.controlId.key to "Clock division (integer: 0=1/4, 1=1/2, 2=1x, 3=2x, 4=4x)",
+                BassSymbol.CLOCK_DIV.controlId.key to "Clock division (integer: 0=1/4x, 1=1/2x, 2=1x, 3=2x, 4=4x)",
                 BassSymbol.STEP_COUNT.controlId.key to "Sequence steps (integer: 4, 8, 12, or 16)",
                 BassSymbol.MUTATION.controlId.key to "Pattern mutation (0=locked, 0.5=pitch drift, 1=full random)",
                 BassSymbol.CUTOFF.controlId.key to "Filter cutoff (0=dark, 1=bright)",
