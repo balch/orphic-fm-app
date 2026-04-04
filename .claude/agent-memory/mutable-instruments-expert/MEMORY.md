@@ -12,6 +12,7 @@
 - **Clouds** → "Grains" (granular processor)
 - **Rings** → "Resonator" (physical modeling resonator)
 - **Warps** → "Blend" (cross-modulation)
+- **Tides v2** → `orpheus_unit_tides.cpp` — FULLY INTEGRATED in C++. `tides::PolySlopeGenerator` is live in `OrpheusEngine` (field `tides_generator`). Supports all 3 ramp modes (AD/AR/Looping) × 4 output modes × 2 ranges. Normalization: `kTidesNorm = 0.125f` (divides by 8V max). For Pulsar envelope use: `RAMP_MODE_AD` + `OUTPUT_MODE_AMPLITUDE` + `RANGE_CONTROL`. Key parameter mapping: `slope` (0–1) = pw = attack/decay balance; `shape` (0–1) = waveshape morphing across 12 shapes; `smoothness` (0–1) = below 0.5 adds lowpass filter, above 0.5 adds wavefolder. Frequency in control range: `hz = 0.001 * pow(10000, knob)` → 0.001–10 Hz.
 
 ## Plaits Engines NOT Yet Ported (5 remaining)
 1. **Chord** - Wavetable + divide-down organ/string machine (5 voices, chord quantizer)

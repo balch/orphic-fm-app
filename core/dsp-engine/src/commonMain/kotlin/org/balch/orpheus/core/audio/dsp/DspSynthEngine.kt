@@ -108,6 +108,8 @@ class DspSynthEngine(
     override val tidesCh1VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh1VizFlow
     override val tidesCh2VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh2VizFlow
     override val tidesCh3VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh3VizFlow
+    override val pulsarVizFlow get() = monitor.pulsarVizFlow
+    override val pulsarTrackVizFlows get() = monitor.pulsarTrackVizFlows
 
     init {
         voiceManager.initialize()

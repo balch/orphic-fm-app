@@ -123,6 +123,16 @@ int  orpheus_engine_is_tts_playing(OrpheusEngine* engine);
 // Thread-safe: uses double-buffered snapshot.
 void orpheus_engine_get_turntable_viz(OrpheusEngine* engine, int deck, float* out_buffer);
 
+// ── Pulsar step grid visualization (polled at ~60fps from UI thread) ──
+// Reads the current step grid state into flat arrays.
+// gates_out: int[8*32] flattened (track-major), velocities_out: float[8*32],
+// playheads_out: int[8], step_counts_out: int[8].
+void orpheus_engine_get_pulsar_viz(OrpheusEngine* engine,
+                                   int* gates_out,
+                                   float* velocities_out,
+                                   int* playheads_out,
+                                   int* step_counts_out);
+
 #ifdef __cplusplus
 }
 #endif

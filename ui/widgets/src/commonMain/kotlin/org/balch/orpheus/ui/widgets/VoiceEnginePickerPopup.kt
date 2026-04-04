@@ -232,6 +232,7 @@ fun EnginePickerButton(
         fontWeight = FontWeight.Bold,
     ),
     showExternalSelection: Boolean = false,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var showEnginePicker by remember { mutableStateOf(false) }
@@ -302,6 +303,7 @@ fun EnginePickerButton(
 
                         activeConfig = if (isDoubleClick) v2Config!! else config
                         showEnginePicker = true
+                        onExpandedChange?.invoke(true)
                         hoveredSegment = null
 
                         var anyPressed = true
@@ -329,6 +331,7 @@ fun EnginePickerButton(
                             }
                         }
                         showEnginePicker = false
+                        onExpandedChange?.invoke(false)
                         hoveredSegment = null
                     }
                 },

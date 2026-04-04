@@ -486,6 +486,11 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         return engine?.let { orpheus_engine_is_tts_playing(it) } ?: 0
     }
 
+    override fun nativeGetPulsarViz(
+        gatesOut: BooleanArray, velocitiesOut: FloatArray,
+        playheadsOut: IntArray, stepCountsOut: IntArray,
+    ) { /* iOS: not yet implemented */ }
+
     companion object {
         private val log = logging("IosAudioEngine")
     }

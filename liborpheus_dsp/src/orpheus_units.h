@@ -45,6 +45,7 @@ void unit_process_overdrive(GraphUnit* u, OrpheusEngine* engine, int num_frames,
 void unit_process_compressor(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_horn(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_tides(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 
 // Initialize unit state from descriptor params
 void unit_init(GraphUnit* u, float sample_rate);

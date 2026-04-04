@@ -35,4 +35,10 @@ interface NativeDspBridge {
     fun nativePlayTts()
     fun nativeStopTts()
     fun nativeIsTtsPlaying(): Int
+    fun nativeGetPulsarViz(
+        gatesOut: BooleanArray,
+        velocitiesOut: FloatArray,
+        playheadsOut: IntArray,
+        stepCountsOut: IntArray,
+    )
 }

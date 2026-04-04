@@ -204,6 +204,9 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
     float* in_l = u->inputs[IPORT_INPUT_A].buffer;
     float* in_r = u->inputs[IPORT_INPUT_B].buffer;
 
+    // Pulsar output is now routed through the graph (delay/reverb sends + master),
+    // not summed here. See DefaultWiringGraph.kt for wiring.
+
     // Signal chain: pan → volume → peak measurement → limiter → output
     float pan_target = engine->master_pan.load(std::memory_order_relaxed);
     float vol_target = engine->master_volume.load(std::memory_order_relaxed);

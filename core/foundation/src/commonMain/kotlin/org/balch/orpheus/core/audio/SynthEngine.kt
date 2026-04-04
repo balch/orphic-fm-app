@@ -3,8 +3,11 @@ package org.balch.orpheus.core.audio
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.viz.PulsarVizData
 
 private val emptyVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0))
+private val emptyPulsarTrackVizFlows: List<StateFlow<FloatArray>> = List(8) { emptyVizFlow }
+private val emptyPulsarVizFlow: StateFlow<PulsarVizData> = MutableStateFlow(PulsarVizData())
 
 interface SynthEngine {
     fun start()
@@ -187,6 +190,12 @@ interface SynthEngine {
     val tidesCh1VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val tidesCh2VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val tidesCh3VizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+
+    // Pulsar step grid visualization
+    val pulsarVizFlow: StateFlow<PulsarVizData> get() = emptyPulsarVizFlow
+
+    // Per-track audio waveform viz (8 tracks, each a FloatArray ring)
+    val pulsarTrackVizFlows: List<StateFlow<FloatArray>> get() = emptyPulsarTrackVizFlows
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
     fun setVizEnabled(enabled: Boolean) {}

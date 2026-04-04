@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.plugin.viz.PULSAR_MAX_STEPS
+import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
+import org.balch.orpheus.core.plugin.viz.PulsarVizData
 
 /**
  * Owns all monitoring StateFlows and signal visualization polling.
@@ -106,6 +109,18 @@ class SynthEngineMonitor(
     val tidesCh2VizFlow: StateFlow<FloatArray> = _tidesCh2VizFlow.asStateFlow()
     private val _tidesCh3VizFlow = MutableStateFlow(FloatArray(0))
     val tidesCh3VizFlow: StateFlow<FloatArray> = _tidesCh3VizFlow.asStateFlow()
+
+    // Pulsar step grid visualization
+    private val _pulsarVizFlow = MutableStateFlow(PulsarVizData())
+    val pulsarVizFlow: StateFlow<PulsarVizData> = _pulsarVizFlow.asStateFlow()
+    private val _pulsarTrackVizFlows = List(PULSAR_NUM_TRACKS) { MutableStateFlow(FloatArray(0)) }
+    val pulsarTrackVizFlows: List<StateFlow<FloatArray>> = _pulsarTrackVizFlows.map { it.asStateFlow() }
+
+    // Reusable buffers for Pulsar viz polling (avoid allocations)
+    private val pulsarGates = BooleanArray(PULSAR_NUM_TRACKS * PULSAR_MAX_STEPS)
+    private val pulsarVelocities = FloatArray(PULSAR_NUM_TRACKS * PULSAR_MAX_STEPS)
+    private val pulsarPlayheads = IntArray(PULSAR_NUM_TRACKS)
+    private val pulsarStepCounts = IntArray(PULSAR_NUM_TRACKS)
 
     // Monitoring
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -250,6 +265,27 @@ class SynthEngineMonitor(
                     pollVizChannel(VIZ_TIDES_CH1, readPositions, vizBuf, _tidesCh1VizFlow)
                     pollVizChannel(VIZ_TIDES_CH2, readPositions, vizBuf, _tidesCh2VizFlow)
                     pollVizChannel(VIZ_TIDES_CH3, readPositions, vizBuf, _tidesCh3VizFlow)
+
+                    // Poll Pulsar step grid viz (structured data, not a VizRing channel)
+                    nativeBridge.nativeGetPulsarViz(
+                        pulsarGates, pulsarVelocities, pulsarPlayheads, pulsarStepCounts
+                    )
+                    // Poll per-track audio waveform viz rings
+                    val levels = FloatArray(PULSAR_NUM_TRACKS)
+                    for (t in 0 until PULSAR_NUM_TRACKS) {
+                        pollVizChannel(VIZ_PULSAR_TRACK_0 + t, readPositions, vizBuf, _pulsarTrackVizFlows[t])
+                        // Also extract latest peak for PulsarVizData.trackLevels
+                        val data = _pulsarTrackVizFlows[t].value
+                        levels[t] = if (data.isNotEmpty()) data[data.size - 1] else 0f
+                    }
+                    _pulsarVizFlow.value = PulsarVizData(
+                        stepGates = Array(PULSAR_NUM_TRACKS) { t -> BooleanArray(PULSAR_MAX_STEPS) { s -> pulsarGates[t * PULSAR_MAX_STEPS + s] } },
+                        stepVelocities = Array(PULSAR_NUM_TRACKS) { t -> FloatArray(PULSAR_MAX_STEPS) { s -> pulsarVelocities[t * PULSAR_MAX_STEPS + s] } },
+                        playheads = pulsarPlayheads.copyOf(),
+                        stepCounts = pulsarStepCounts.copyOf(),
+                        trackLevels = levels,
+                    )
+
                     delay(VIZ_POLL_INTERVAL_MS)
                 }
             }
@@ -268,6 +304,7 @@ class SynthEngineMonitor(
                    _djOutVizFlow,
                    _tidesCh0VizFlow, _tidesCh1VizFlow, _tidesCh2VizFlow, _tidesCh3VizFlow,
             ).forEach { it.value = FloatArray(0) }
+            _pulsarVizFlow.value = PulsarVizData()
         }
     }
 
@@ -313,7 +350,8 @@ class SynthEngineMonitor(
         private const val VIZ_TIDES_CH1 = 26
         private const val VIZ_TIDES_CH2 = 27
         private const val VIZ_TIDES_CH3 = 28
-        private const val VIZ_CHANNEL_COUNT = 29
+        private const val VIZ_PULSAR_TRACK_0 = 29
+        private const val VIZ_CHANNEL_COUNT = 37  // 29 + 8 pulsar tracks
         private const val TURNTABLE_VIZ_SIZE = 129  // 128 waveform + 1 playhead
     }
 }

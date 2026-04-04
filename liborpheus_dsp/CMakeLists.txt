@@ -121,6 +121,7 @@ set(ORPHEUS_SRC
     "src/orpheus_unit_horn.cpp"
     "src/orpheus_turntable.cpp"
     "src/orpheus_unit_tides.cpp"
+    "src/orpheus_unit_pulsar.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
 )
@@ -192,6 +193,7 @@ if(BUILD_TESTS)
         test/test_horn.cpp
         test/test_turntable.cpp
         test/test_tides.cpp
+        test/test_pulsar.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE
@@ -212,7 +214,7 @@ if(BUILD_TESTS)
                 :core:dsp-engine:jvmTest --tests "*ExportOdwgTest*" -q
             COMMENT "Exporting production graph (default_graph.odwg)"
         )
-        add_dependencies(orpheus_dsp_test export_graph)
+        # add_dependencies(orpheus_dsp_test export_graph)  # Requires Android SDK; graph file in test/data/ suffices
     endif()
 
     # Standalone FM compare runner (avoids crash in run_warps_tests)

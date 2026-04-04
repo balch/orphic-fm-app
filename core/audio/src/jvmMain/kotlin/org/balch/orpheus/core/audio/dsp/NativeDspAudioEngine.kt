@@ -102,6 +102,10 @@ class NativeDspAudioEngine : AudioEngine, NativeDspBridge {
         bridge.nativeGetViz(channel, outBuf, lastReadPos)
     override fun nativeGetTurntableViz(deck: Int, outBuf: FloatArray) =
         bridge.nativeGetTurntableViz(deck, outBuf)
+    override fun nativeGetPulsarViz(
+        gatesOut: BooleanArray, velocitiesOut: FloatArray,
+        playheadsOut: IntArray, stepCountsOut: IntArray,
+    ) = bridge.nativeGetPulsarViz(gatesOut, velocitiesOut, playheadsOut, stepCountsOut)
 
     companion object {
         private val log = logging("NativeDspAudioEngine")

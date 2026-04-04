@@ -279,6 +279,25 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     looper.out to delay.inputA          // looper output → delay
     looper.outRight to delay.inputB
 
+    // Pulsar beat machine — outputs stereo via graph, routed through full effects chain.
+    // Parameters routed via engine atomics in orpheus_engine_routing.cpp.
+    val pulsarUnit = pulsar("pulsar")
+    // Feed Pulsar into Grains (Clouds) input so it goes through the full effects chain:
+    // Pulsar → Grains → Resonator → Drive → Horn → Delay/Reverb → Master
+    pulsarUnit.out to grains.inputA
+    pulsarUnit.outRight to grains.inputB
+    // Pulsar send gains for direct delay/reverb sends (in addition to chain)
+    val pulsarSendMix = add("pulsarSendMix")
+    val pulsarSendHalf = multiply("pulsarSendHalf") { inputB = 0.5f }
+    pulsarUnit.out to pulsarSendMix.inputA
+    pulsarUnit.outRight to pulsarSendMix.inputB
+    pulsarSendMix.out to pulsarSendHalf.inputA
+    val pulsarDelaySend = multiply("pulsarDelaySend") { inputB = 0.0f }
+    val pulsarReverbSend = multiply("pulsarReverbSend") { inputB = 0.0f }
+    pulsarSendHalf.out to pulsarDelaySend.inputA
+    pulsarSendHalf.out to pulsarReverbSend.inputA
+    // Pulsar → delay/reverb send wiring is below, after delay/reverb units are created.
+
     // Global Bender (pitch CV + timbre CV + audio)
     val benderUnit = bender("bender")
     benderUnit.aux to delay.inputA       // bender audio → delay send
@@ -316,6 +335,13 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // Turntable → reverb send
     ttReverbSend.out to reverb.inputA
     ttReverbSend.out to reverb.inputB
+
+    // Pulsar → delay send (mono sum to both channels)
+    pulsarDelaySend.out to delay.inputA
+    pulsarDelaySend.out to delay.inputB
+    // Pulsar → reverb send
+    pulsarReverbSend.out to reverb.inputA
+    pulsarReverbSend.out to reverb.inputB
 
     // Master output (no hard clip)
     val master = masterOut("master")
@@ -378,6 +404,8 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     psb.outRight to master.inputB
     turntableUnit.out to master.inputA      // Turntable direct to output (mono → both)
     turntableUnit.out to master.inputB
+    pulsarUnit.out to master.inputA        // Pulsar direct to output (stereo)
+    pulsarUnit.outRight to master.inputB
     warp.out to master.inputA              // Warps direct to output
     warp.outRight to master.inputB
     delay.out to master.inputA
@@ -440,5 +468,8 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
         // DJ Turntable send levels
         map("org.balch.orpheus.plugins.dj", "delay_send", "ttDelaySend", IPORT_INPUT_B)
         map("org.balch.orpheus.plugins.dj", "reverb_send", "ttReverbSend", IPORT_INPUT_B)
+        // Pulsar beat machine send levels
+        map("org.balch.orpheus.plugins.pulsar", "delay_send", "pulsarDelaySend", IPORT_INPUT_B)
+        map("org.balch.orpheus.plugins.pulsar", "reverb_send", "pulsarReverbSend", IPORT_INPUT_B)
     }
 }

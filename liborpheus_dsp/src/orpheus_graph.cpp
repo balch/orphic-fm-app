@@ -305,7 +305,8 @@ void orpheus_graph_dump_exec_order(OrpheusGraph* graph) {
         "DUAL_DELAY", "REVERB", "LFO", "MASTER_OUT", "PLAITS",
         "CLOCK", "GRIDS", "MARBLES", "LOOPER", "BENDER",
         "PER_STR_BEND", "DUO_VOICE", "LORENZ", "POLY_LFO",
-        "BASS_VOICE", "OVERDRIVE", "COMPRESSOR", "HORN", "TURNTABLE", "TIDES"
+        "BASS_VOICE", "OVERDRIVE", "COMPRESSOR", "HORN", "TURNTABLE", "TIDES",
+        "PULSAR"
     };
     static_assert(sizeof(type_names) / sizeof(type_names[0]) == UNIT_TYPE_COUNT,
                   "type_names[] out of sync with UnitType enum");
@@ -477,6 +478,8 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_turntable(u, engine, num_frames, sr); break;
             case UNIT_TIDES:
                 unit_process_tides(u, engine, num_frames, sr); break;
+            case UNIT_PULSAR:
+                unit_process_pulsar(u, engine, num_frames, sr); break;
             default: break;
         }
 

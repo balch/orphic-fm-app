@@ -332,4 +332,7 @@ object OrpheusColors {
     val antMagGlassBurn = Color(0xFFFF6600)           // Burn orange
     val antBootNeon = Color(0xFF00E5FF)               // Neon boot outline
     val antEmberYellow = Color(0xFFFFCC00)            // Ember particles
+
+    // Pulsar Beat Machine
+    val cosmicPurple = Color(0xFF7C4DFF)
 }

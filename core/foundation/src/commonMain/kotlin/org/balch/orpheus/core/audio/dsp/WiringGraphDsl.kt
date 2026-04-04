@@ -37,6 +37,7 @@ const val UNIT_COMPRESSOR = 31
 const val UNIT_HORN = 32
 const val UNIT_TURNTABLE = 33
 const val UNIT_TIDES = 34
+const val UNIT_PULSAR = 35
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -344,6 +345,9 @@ class WiringGraphBuilder {
 
     fun tides(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_TIDES, name, init)
+
+    fun pulsar(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_PULSAR, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

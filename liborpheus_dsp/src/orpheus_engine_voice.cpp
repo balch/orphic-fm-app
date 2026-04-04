@@ -267,4 +267,21 @@ void orpheus_engine_get_turntable_viz(OrpheusEngine* engine, int deck, float* ou
     turntable_get_viz(&engine->turntable_decks[deck], out_buffer);
 }
 
+void orpheus_engine_get_pulsar_viz(OrpheusEngine* engine,
+                                   int* gates_out,
+                                   float* velocities_out,
+                                   int* playheads_out,
+                                   int* step_counts_out) {
+    if (!engine) return;
+    const auto& viz = engine->pulsar_viz;
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        for (int s = 0; s < kMaxPulsarSteps; s++) {
+            gates_out[t * kMaxPulsarSteps + s] = viz.step_gates[t][s] ? 1 : 0;
+            velocities_out[t * kMaxPulsarSteps + s] = viz.step_velocities[t][s];
+        }
+        playheads_out[t] = viz.playheads[t];
+        step_counts_out[t] = viz.step_counts[t];
+    }
+}
+
 }  // extern "C"

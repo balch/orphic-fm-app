@@ -50,6 +50,7 @@
 #include "streams/lorenz_generator.h"
 
 #include "orpheus_unit_bass.h"
+#include "orpheus_unit_pulsar.h"
 #include "orpheus_turntable.h"
 
 #include <atomic>
@@ -671,6 +672,41 @@ struct OrpheusEngine {
     std::atomic<float> horn_mix{0.0f};          // dry/wet 0..1
     std::atomic<int>   horn_brake{0};           // 0=off, 1=braking
     std::atomic<int>   horn_bypass{1};          // 1=bypassed (mix<=0.001)
+
+    // ── Pulsar beat machine ──────────────────────────
+    struct PulsarViz {
+        bool step_gates[kNumPulsarTracks][kMaxPulsarSteps];
+        float step_velocities[kNumPulsarTracks][kMaxPulsarSteps];
+        int playheads[kNumPulsarTracks];
+        int step_counts[kNumPulsarTracks];
+    };
+
+    // Pulsar state (heap-allocated on first process call, freed in destroy)
+    ::PulsarState* pulsar_state = nullptr;
+
+    // Pulsar output buffers (stereo, summed into master)
+    float pulsar_out_l[kMaxFrames] = {};
+    float pulsar_out_r[kMaxFrames] = {};
+
+    // Pulsar visualization (written by audio thread, read by UI)
+    PulsarViz pulsar_viz = {};
+    std::atomic<int> pulsar_viz_version{0};
+
+    // Pulsar parameters (set by Kotlin via setPort)
+    std::atomic<int> pulsar_playing{0};
+    std::atomic<int> pulsar_scene{0};
+    std::atomic<float> pulsar_energy{0.5f};
+    std::atomic<float> pulsar_complexity{0.3f};
+    std::atomic<float> pulsar_space{0.4f};
+    std::atomic<float> pulsar_mood{0.5f};
+    std::atomic<float> pulsar_bpm_override{0.0f};  // 0 = follow global tempo
+    std::atomic<int> pulsar_root_note{0};      // 0=C, 11=B
+    std::atomic<int> pulsar_scale_index{0};    // 0-5 into kPulsarScales
+    std::atomic<float> pulsar_mix{0.0f};       // output level 0-1
+    std::atomic<float> pulsar_perc_mix{0.7f};  // percussion group volume 0-1
+    std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides
+    std::atomic<int> pulsar_track_engine_edm[8]{};
+    std::atomic<int> pulsar_track_engine_space[8]{};
 
     // ── Signal visualization ring buffers ──
     // Written by audio thread (one sample per block), read by UI at ~60fps.

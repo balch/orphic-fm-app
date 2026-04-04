@@ -40,6 +40,7 @@ enum OrpheusUnitType : uint16_t {
     UNIT_HORN = 32,
     UNIT_TURNTABLE = 33,
     UNIT_TIDES = 34,
+    UNIT_PULSAR = 35,
     UNIT_TYPE_COUNT
 };
 

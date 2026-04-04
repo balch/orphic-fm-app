@@ -54,4 +54,10 @@ class OboeAudioBridge {
     external fun nativePlayTts()
     external fun nativeStopTts()
     external fun nativeIsTtsPlaying(): Int
+    external fun nativeGetPulsarViz(
+        gatesOut: BooleanArray,
+        velocitiesOut: FloatArray,
+        playheadsOut: IntArray,
+        stepCountsOut: IntArray,
+    )
 }

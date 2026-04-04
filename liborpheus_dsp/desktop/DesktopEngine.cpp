@@ -179,3 +179,6 @@ void DesktopEngine::stopTts() {
 int DesktopEngine::isTtsPlaying() {
     return dsp_engine_ ? orpheus_engine_is_tts_playing(dsp_engine_) : 0;
 }
+void DesktopEngine::getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut) {
+    if (dsp_engine_) orpheus_engine_get_pulsar_viz(dsp_engine_, gatesOut, velocitiesOut, playheadsOut, stepCountsOut);
+}

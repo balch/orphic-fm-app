@@ -14,27 +14,30 @@ object FactoryPanelSets {
         collapse(PanelId.PRESETS)
         collapse(PanelId.MIDI)
         collapse(PanelId.EVO)
-        expand(PanelId.VIZ)
+        collapse(PanelId.VIZ)
         collapse(PanelId.LFO)
         collapse(PanelId.TIDES)
         collapse(PanelId.DELAY)
         collapse(PanelId.REVERB)
         expand(PanelId.DISTORTION)
         collapse(PanelId.HORN)
+        collapse(PanelId.RESONATOR)
+        collapse(PanelId.GRAINS)
+        collapse(PanelId.WARPS)
+        collapse(PanelId.DJ)
         collapse(PanelId.FLUX)
         collapse(PanelId.FLUX_TRIGGERS)
         collapse(PanelId.DRUMS)
         collapse(PanelId.BEATS)
-        collapse(PanelId.RESONATOR)
-        collapse(PanelId.GRAINS)
-        collapse(PanelId.WARPS)
         collapse(PanelId.BASS)
-        collapse(PanelId.DJ)
         collapse(PanelId.TWEAKS)
         collapse(PanelId.CODE)
         collapse(PanelId.LOOPER)
         collapse(PanelId.SPEECH)
         collapse(PanelId.ASL_MAESTRO)
+        expand(PanelId.PULSAR) {
+            weight = 1.5f
+        }
         collapse(PanelId.AI)
     }
 
@@ -65,6 +68,7 @@ object FactoryPanelSets {
         expand(PanelId.CODE)
         expand(PanelId.LOOPER)
 //                    expand(PanelId.SPEECH)
+        expand(PanelId.PULSAR)
         expand(PanelId.ASL_MAESTRO)
     }
 
@@ -88,6 +92,7 @@ object FactoryPanelSets {
         expand(PanelId.DRUMS)
         expand(PanelId.FLUX)
         expand(PanelId.FLUX_TRIGGERS)
+        expand(PanelId.PULSAR)
     }
 
     /** Performance-focused layout. */

@@ -55,6 +55,8 @@ public:
     void  stopTts();
     int   isTtsPlaying();
 
+    void  getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
+
 private:
     OrpheusEngine* dsp_engine_ = nullptr;
     float sample_rate_ = 0.0f;

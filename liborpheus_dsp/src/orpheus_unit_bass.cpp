@@ -563,7 +563,7 @@ void unit_process_bass_voice(GraphUnit* u, OrpheusEngine* engine, int num_frames
     // envelope scales 0-1, so raw output is quiet relative to the 12 main voices
     // which get summed in the duo mixer. The master limiter handles peaks, so
     // this gain just sets the bass-to-voice balance.
-    static constexpr float kBassOutputGain = 2.0f;
+    static constexpr float kBassOutputGain = 1.0f;
 
     float* out = u->output_buffers[OPORT_OUT];
 

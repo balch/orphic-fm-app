@@ -47,6 +47,7 @@ public:
     void setBend(float v);
     void getMonitor(OrpheusMonitorData* out);
     int  getViz(int channel, float* outBuf, int maxSamples, int* lastReadPos);
+    void getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
     void getTurntableViz(int deck, float* outBuf);
     void setAutomation(int target, int voiceIndex, const float* times, const float* values, int count);
     void clearAutomation(int target, int voiceIndex);

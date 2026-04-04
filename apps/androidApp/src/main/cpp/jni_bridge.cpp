@@ -204,6 +204,33 @@ Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetViz(
 }
 
 JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetPulsarViz(
+        JNIEnv *env, jobject thiz,
+        jbooleanArray gatesOut,
+        jfloatArray velocitiesOut,
+        jintArray playheadsOut,
+        jintArray stepCountsOut) {
+    // Must match kNumPulsarTracks and kMaxPulsarSteps in orpheus_unit_pulsar.h
+    constexpr int kTracks = 8;
+    constexpr int kSteps = 32;
+    constexpr int kTotal = kTracks * kSteps;
+
+    int gatesInt[kTotal] = {};
+    float velocities[kTotal] = {};
+    int playheads[kTracks] = {};
+    int stepCounts[kTracks] = {};
+    sEngine.getPulsarViz(gatesInt, velocities, playheads, stepCounts);
+
+    jboolean gates[kTotal];
+    for (int i = 0; i < kTotal; i++)
+        gates[i] = gatesInt[i] ? JNI_TRUE : JNI_FALSE;
+    env->SetBooleanArrayRegion(gatesOut, 0, kTotal, gates);
+    env->SetFloatArrayRegion(velocitiesOut, 0, kTotal, velocities);
+    env->SetIntArrayRegion(playheadsOut, 0, kTracks, reinterpret_cast<jint*>(playheads));
+    env->SetIntArrayRegion(stepCountsOut, 0, kTracks, reinterpret_cast<jint*>(stepCounts));
+}
+
+JNIEXPORT void JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeGetTurntableViz(
         JNIEnv *env, jobject thiz,
         jint deck, jfloatArray outBuf) {

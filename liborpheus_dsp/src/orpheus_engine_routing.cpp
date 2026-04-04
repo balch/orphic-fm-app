@@ -689,6 +689,64 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         else if (std::strcmp(symbol, "brake") == 0)
             engine->horn_brake.store(value > 0.5f ? 1 : 0, std::memory_order_relaxed);
     }
+    else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.pulsar") == 0) {
+        if (std::strcmp(symbol, "playing") == 0)
+            engine->pulsar_playing.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "scene") == 0)
+            engine->pulsar_scene.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "energy") == 0)
+            engine->pulsar_energy.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "complexity") == 0)
+            engine->pulsar_complexity.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "space") == 0)
+            engine->pulsar_space.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mood") == 0)
+            engine->pulsar_mood.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "bpm") == 0)
+            engine->pulsar_bpm_override.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "root_note") == 0)
+            engine->pulsar_root_note.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "scale") == 0)
+            engine->pulsar_scale_index.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "mix") == 0)
+            engine->pulsar_mix.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "perc_mix") == 0)
+            engine->pulsar_perc_mix.store(value, std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "envelope_mode") == 0)
+            engine->pulsar_envelope_mode.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_0_engine_edm") == 0)
+            engine->pulsar_track_engine_edm[0].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_0_engine_space") == 0)
+            engine->pulsar_track_engine_space[0].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_1_engine_edm") == 0)
+            engine->pulsar_track_engine_edm[1].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_1_engine_space") == 0)
+            engine->pulsar_track_engine_space[1].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_2_engine_edm") == 0)
+            engine->pulsar_track_engine_edm[2].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_2_engine_space") == 0)
+            engine->pulsar_track_engine_space[2].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_3_engine_edm") == 0)
+            engine->pulsar_track_engine_edm[3].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_3_engine_space") == 0)
+            engine->pulsar_track_engine_space[3].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_4_engine_edm") == 0)
+            engine->pulsar_track_engine_edm[4].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_4_engine_space") == 0)
+            engine->pulsar_track_engine_space[4].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_5_engine_edm") == 0)
+            engine->pulsar_track_engine_edm[5].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_5_engine_space") == 0)
+            engine->pulsar_track_engine_space[5].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_6_engine_edm") == 0)
+            engine->pulsar_track_engine_edm[6].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_6_engine_space") == 0)
+            engine->pulsar_track_engine_space[6].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_7_engine_edm") == 0)
+            engine->pulsar_track_engine_edm[7].store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "track_7_engine_space") == 0)
+            engine->pulsar_track_engine_space[7].store(static_cast<int>(value), std::memory_order_relaxed);
+    }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.tides") == 0) {
         if (std::strcmp(symbol, "frequency") == 0)
             engine->tides_frequency.store(value, std::memory_order_relaxed);
