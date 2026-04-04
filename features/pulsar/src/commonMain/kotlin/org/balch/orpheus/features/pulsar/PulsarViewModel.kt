@@ -44,7 +44,7 @@ data class PulsarUiState(
     val scaleIndex: Int = 0,
     val mix: Float = 0.0f,
     val percMix: Float = 0.7f,
-    val envelopeMode: Int = 0,  // 0=AD, 1=Tides
+    val envelopeMode: Int = 0,  // 0=AD, 1=Tides, 2=Blend (energy-driven)
     val selectedTrack: Int? = null,
     val trackEnginesEdm: List<Int> = listOf(20, 17, 23, 9, 6, 14, 11, 20),
     val trackEnginesSpace: List<Int> = listOf(20, 18, 23, 19, 6, 19, 13, 19),

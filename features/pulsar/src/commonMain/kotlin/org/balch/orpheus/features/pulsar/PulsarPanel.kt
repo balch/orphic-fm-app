@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
@@ -46,12 +45,13 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.EnginePickerButton
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
-private val KitNames = listOf(
-    "DOG HOUSE",
-    "COSMIC TECHNO",
-    "CHILLWAVE",
-    "ARTEMIS II",
-    "DEEP SPACE",
+// Display order (decoupled from C++ kPulsarScenes[] index)
+private val KitEntries = listOf(
+    "COSMIC TECHNO" to 2,
+    "DOG HOUSE" to 3,
+    "CHILLWAVE" to 1,
+    "ARTEMIS II" to 4,
+    "DEEP SPACE" to 0,
 )
 private val NoteNames = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 private val ScaleNames = listOf("Minor", "Major", "Pentatonic", "Phrygian", "Whole Tone", "Chromatic")
@@ -174,10 +174,10 @@ fun PulsarPanel(
         ) {
             EnumDropdown(
                 label = "KIT",
-                selectedDisplay = KitNames[state.sceneIndex],
-                entries = KitNames.indices.toList(),
-                displayName = { KitNames[it] },
-                onSelected = actions.setScene,
+                selectedDisplay = KitEntries.first { it.second == state.sceneIndex }.first,
+                entries = KitEntries,
+                displayName = { it.first },
+                onSelected = { actions.setScene(it.second) },
                 color = OrpheusColors.cosmicPurple,
             )
 
@@ -214,7 +214,7 @@ fun PulsarPanel(
                 Spacer(Modifier.height(2.dp))
                 Box(
                     modifier = Modifier
-                        .clickable { actions.setEnvelopeMode(if (state.envelopeMode == 0) 1 else 0) }
+                        .clickable { actions.setEnvelopeMode((state.envelopeMode + 1) % 3) }
                         .clip(RoundedCornerShape(6.dp))
                         .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
                         .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -222,7 +222,11 @@ fun PulsarPanel(
                 ) {
                     Text(
                         modifier = Modifier.widthIn(min = 40.dp),
-                        text = if (state.envelopeMode == 1) "WAVES" else "AD",
+                        text = when (state.envelopeMode) {
+                            1 -> "WAVES"
+                            2 -> "BLEND"
+                            else -> "AD"
+                        },
                         color = OrpheusColors.cosmicPurple,
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp,
@@ -236,19 +240,33 @@ fun PulsarPanel(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 8.dp),
         ) {
-            RotaryKnob(
-                value = state.bpm,
-                onValueChange = actions.setBpm,
-                label = "BPM",
-                controlId = PulsarSymbol.BPM.controlId.key,
-                range = 40f..300f,
-                size = 32.dp,
-                progressColor = OrpheusColors.cosmicPurple,
-                valueFormatter = { "${it.toInt()}" },
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                RotaryKnob(
+                    value = state.bpm,
+                    onValueChange = actions.setBpm,
+                    label = "BPM",
+                    controlId = PulsarSymbol.BPM.controlId.key,
+                    range = 40f..300f,
+                    size = 28.dp,
+                    progressColor = OrpheusColors.cosmicPurple,
+                    valueFormatter = { "${it.toInt()}" },
+                )
 
-            // Center: Step grid
+                RotaryKnob(
+                    value = state.reverbSend,
+                    onValueChange = actions.setReverbSend,
+                    label = "REVERB",
+                    controlId = PulsarSymbol.REVERB_SEND.controlId.key,
+                    size = 28.dp,
+                    progressColor = OrpheusColors.cosmicPurple,
+                )
+            }
+
+            // Center: Step grid — weight(1f) fills remaining Row space, max capped inside
             PulsarStepGrid(
                 vizData = vizData,
                 trackVizFlows = trackVizFlows,
@@ -258,15 +276,7 @@ fun PulsarPanel(
                 mood = state.mood,
                 selectedTrack = state.selectedTrack,
                 onTrackSelected = actions.selectTrack,
-            )
-
-            RotaryKnob(
-                value = state.reverbSend,
-                onValueChange = actions.setReverbSend,
-                label = "REVERB",
-                controlId = PulsarSymbol.REVERB_SEND.controlId.key,
-                size = 32.dp,
-                progressColor = OrpheusColors.cosmicPurple,
+                modifier = Modifier,
             )
         }
 

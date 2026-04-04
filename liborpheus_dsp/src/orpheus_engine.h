@@ -704,7 +704,7 @@ struct OrpheusEngine {
     std::atomic<int> pulsar_scale_index{0};    // 0-5 into kPulsarScales
     std::atomic<float> pulsar_mix{0.0f};       // output level 0-1
     std::atomic<float> pulsar_perc_mix{0.7f};  // percussion group volume 0-1
-    std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides
+    std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides, 2=Blend (AD at high energy, Tides at low)
     std::atomic<int> pulsar_track_engine_edm[8]{};
     std::atomic<int> pulsar_track_engine_space[8]{};
 

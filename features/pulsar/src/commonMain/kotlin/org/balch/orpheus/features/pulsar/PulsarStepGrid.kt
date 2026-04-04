@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -31,17 +32,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import kotlin.math.sin
-import kotlin.random.Random
+import io.github.fletchmckee.liquid.liquefiable
+import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
-import io.github.fletchmckee.liquid.liquefiable
-import io.github.fletchmckee.liquid.rememberLiquidState
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
-import org.balch.orpheus.ui.theme.OrpheusTheme
+import kotlin.random.Random
 
 /** Track colors: Kick, Perc, HiHat, Bass, Keys, Pad, Texture, FX */
 internal val TrackColors = listOf(
@@ -183,10 +182,10 @@ fun PulsarStepGrid(
         curve = 0.001f,          // lens curvature follows refraction
     )
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
-            .width(360.dp)
-            .height(100.dp)
+            .width(320.dp)
+            .height(120.dp)
             .graphicsLayer {
                 scaleX = beatPulse
                 scaleY = beatPulse
@@ -326,21 +325,6 @@ fun PulsarStepGrid(
                         )
                     }
 
-                    // Playhead afterglow trail (behind glass, the glass column adds the main effect)
-                    if (playhead >= 0) {
-                        val dist = (playhead - step + steps) % steps
-                        val trailAlpha = when (dist) {
-                            1 -> 0.08f; 2 -> 0.03f; else -> 0f
-                        }
-                        if (trailAlpha > 0f) {
-                            drawRoundRect(
-                                color = Color.White.copy(alpha = trailAlpha),
-                                topLeft = Offset(cellX, trackY),
-                                size = Size(cellWidth, trackHeight),
-                                cornerRadius = corner,
-                            )
-                        }
-                    }
                 }
             }
 
@@ -390,7 +374,8 @@ fun PulsarStepGrid(
             val steps = vizData.stepCounts[0].coerceAtMost(MAX_STEPS)
             val phPos = vizData.playheads[0].coerceIn(0, steps - 1)
             val totalCellGaps = (steps - 1) * cellGap
-            val cellW = (360f - totalCellGaps) / steps  // match grid width
+            val gridWidthDp = maxWidth.value  // actual rendered width from BoxWithConstraints
+            val cellW = (gridWidthDp - totalCellGaps) / steps
             val phX = phPos * (cellW + cellGap)
 
             val playheadScope = VisualizationLiquidScope(

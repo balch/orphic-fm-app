@@ -8,7 +8,8 @@ static constexpr int kNumPulsarTracks = 8;
 static constexpr int kMaxPulsarSteps = 32;
 
 struct PulsarStep {
-    uint8_t note;      // MIDI note number
+    uint8_t note;      // MIDI note number (quantized to current scale)
+    uint8_t raw_note;  // original unquantized note — re-quantize from this on scale change
     float velocity;    // 0.0-1.0
     bool gate;         // step active
     float duration;    // gate length as fraction of step (0.0-1.0)
@@ -162,6 +163,10 @@ struct PulsarState {
     // Drunk timing: per-step random offsets (in samples)
     float drunk_offsets[kNumPulsarTracks][kMaxPulsarSteps];
     float drunk_targets[kNumPulsarTracks][kMaxPulsarSteps];
+
+    // Live root/scale tracking — re-quantize melodic notes on change
+    int last_root_note;
+    int last_scale_index;
 
     // Elastic tempo: slow random walk
     float tempo_drift;           // current tempo offset (-0.15 to +0.15)

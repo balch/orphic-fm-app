@@ -121,11 +121,10 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                 float drift_prob = complexity * 0.1f;
                 float drift_roll = static_cast<float>((h >> 16) & 0xFFFF) / 65535.0f;
                 if (drift_roll < drift_prob) {
-                    // Drift by ±1-2 semitones, staying in a simple scale
-                    // Use chromatic steps that are common in minor/major scales
+                    // Drift by ±1-2 semitones from raw_note, then quantize
                     int offsets[] = {-2, -1, 1, 2};
                     int idx = static_cast<int>((h >> 24) & 0x3);
-                    int new_note = static_cast<int>(step.note) + offsets[idx];
+                    int new_note = static_cast<int>(step.raw_note) + offsets[idx];
                     if (new_note >= 24 && new_note <= 96) {
                         uint8_t root = static_cast<uint8_t>(
                             engine->pulsar_root_note.load(std::memory_order_relaxed));
@@ -133,8 +132,9 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
                         if (si < 0) si = 0;
                         if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
                         const PulsarScale& scale = kPulsarScales[si];
-                        new_note = quantize_to_scale(new_note, root, scale);
-                        step.note = static_cast<uint8_t>(new_note);
+                        step.raw_note = static_cast<uint8_t>(new_note);
+                        step.note = static_cast<uint8_t>(
+                            quantize_to_scale(new_note, root, scale));
                     }
                 }
             }
@@ -266,6 +266,8 @@ static void load_scene(PulsarState* state, int scene_index, OrpheusEngine* engin
     }
 
     state->current_scene = scene_index;
+    state->last_root_note = scene.root_note;
+    state->last_scale_index = scene.scale_index;
     state->clock_accumulator = 0.0;
     state->mutation_seed = base_seed;
     state->loop_count = 0;
@@ -311,6 +313,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         state->tempo_drift = 0.0f;
         state->tempo_drift_target = 0.0f;
         state->tempo_drift_countdown = 0;
+        state->last_root_note = -1;
+        state->last_scale_index = -1;
         for (int t = 0; t < kNumPulsarTracks; t++) {
             PulsarTrackState& ts = state->tracks[t];
             ts.step_count = 0;
@@ -361,6 +365,29 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     int scene = engine->pulsar_scene.load(std::memory_order_relaxed);
     if (scene != state->current_scene) {
         load_scene(state, scene, engine);
+    }
+
+    // ── Re-quantize melodic notes when root/scale changes live ──
+    int live_root = engine->pulsar_root_note.load(std::memory_order_relaxed);
+    int live_scale = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+    if (live_scale < 0) live_scale = 0;
+    if (live_scale >= kNumPulsarScales) live_scale = kNumPulsarScales - 1;
+
+    if (live_root != state->last_root_note || live_scale != state->last_scale_index) {
+        uint8_t root = static_cast<uint8_t>(live_root);
+        const PulsarScale& scale = kPulsarScales[live_scale];
+        for (int t = 3; t < kNumPulsarTracks; t++) {
+            PulsarTrackState& ts = state->tracks[t];
+            for (int s = 0; s < ts.step_count; s++) {
+                if (ts.steps[s].gate) {
+                    // Re-quantize from raw_note (original intent) to avoid drift
+                    ts.steps[s].note = static_cast<uint8_t>(
+                        quantize_to_scale(ts.steps[s].raw_note, root, scale));
+                }
+            }
+        }
+        state->last_root_note = live_root;
+        state->last_scale_index = live_scale;
     }
 
     // ── Read and smooth macros (~10ms coefficient) ──
@@ -659,6 +686,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
         if (!self_enveloped) {
             int envelope_mode = engine->pulsar_envelope_mode.load(std::memory_order_relaxed);
+
+            // Blend mode (2): AD at high energy (EDM), Tides at low energy (Space)
+            if (envelope_mode == 2) {
+                envelope_mode = (energy > 0.5f) ? 0 : 1;
+            }
 
             if (envelope_mode == 1) {
                 // === TIDES ENVELOPE ===

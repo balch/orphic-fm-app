@@ -8,9 +8,9 @@ import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
 import org.balch.orpheus.core.plugin.Port
+import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
-import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 
@@ -42,7 +42,7 @@ class PulsarPlugin : DspPlugin {
     private var _scaleIndex = 0
     private var _mix = 0.0f
     private var _percMix = 0.7f
-    private var _envelopeMode = 0  // 0=AD, 1=Tides
+    private var _envelopeMode = 0  // 0=AD, 1=Tides, 2=Blend (energy-driven)
     private var _trackEdm = intArrayOf(20, 17, 23, 9, 6, 14, 11, 20)
     private var _trackSpace = intArrayOf(20, 18, 23, 19, 6, 19, 13, 19)
 

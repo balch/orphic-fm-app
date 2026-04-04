@@ -6,6 +6,11 @@
 // Algorithmic pattern generation for Pulsar beat machine
 // ---------------------------------------------------------------------------
 
+// Helper: create a PulsarStep with raw_note = note (non-destructive re-quantization source)
+inline PulsarStep make_step(uint8_t note, float velocity, bool gate, float duration) {
+    return {note, note, velocity, gate, duration};
+}
+
 // xorshift32 PRNG — deterministic from seed
 inline uint32_t pattern_rand(uint32_t& seed) {
     seed ^= seed << 13;
@@ -32,24 +37,24 @@ inline void generate_rhythm_pattern(
 
     // Clear all steps
     for (int i = 0; i < step_count; i++) {
-        steps[i] = {0, 0.0f, false, 0.0f};
+        steps[i] = make_step(0, 0.0f, false, 0.0f);
     }
 
     switch (genre.rhythm_pattern) {
         case 0: { // Sparse
             if (track_index == 0) {
                 // KICK: beat 1 only
-                steps[0] = {36, 0.9f, true, 0.5f};
+                steps[0] = make_step(36, 0.9f, true, 0.5f);
                 // Occasional second hit
                 if (step_count >= 12 && pattern_rand01(seed) < density) {
-                    steps[8] = {36, 0.7f, true, 0.4f};
+                    steps[8] = make_step(36, 0.7f, true, 0.4f);
                 }
             } else if (track_index == 1) {
                 // PERC: very occasional
                 for (int i = 0; i < step_count; i++) {
                     if (pattern_rand01(seed) < density * 0.5f) {
                         float vel = 0.4f + pattern_rand01(seed) * 0.3f;
-                        steps[i] = {40, vel, true, 0.15f + pattern_rand01(seed) * 0.15f};
+                        steps[i] = make_step(40, vel, true, 0.15f + pattern_rand01(seed) * 0.15f);
                     }
                 }
             } else {
@@ -57,7 +62,7 @@ inline void generate_rhythm_pattern(
                 for (int i = 0; i < step_count; i++) {
                     if (pattern_rand01(seed) < density * 0.3f) {
                         float vel = 0.3f + pattern_rand01(seed) * 0.3f;
-                        steps[i] = {42, vel, true, 0.1f + pattern_rand01(seed) * 0.1f};
+                        steps[i] = make_step(42, vel, true, 0.1f + pattern_rand01(seed) * 0.1f);
                     }
                 }
             }
@@ -68,38 +73,38 @@ inline void generate_rhythm_pattern(
                 // KICK on 1/5/9/13
                 for (int i = 0; i < step_count; i += 4) {
                     float vel = 0.85f + pattern_rand01(seed) * 0.15f;
-                    steps[i] = {36, vel, true, 0.5f};
+                    steps[i] = make_step(36, vel, true, 0.5f);
                 }
                 // Ghost notes
                 for (int i = 0; i < step_count; i++) {
                     if (!steps[i].gate && pattern_rand01(seed) < ghost_prob * density) {
-                        steps[i] = {36, 0.3f + pattern_rand01(seed) * 0.15f, true, 0.3f};
+                        steps[i] = make_step(36, 0.3f + pattern_rand01(seed) * 0.15f, true, 0.3f);
                     }
                 }
             } else if (track_index == 1) {
                 // PERC: backbeat on 5/13 (in 16-step = steps 4, 12)
                 if (step_count >= 8) {
-                    steps[4] = {40, 0.8f + pattern_rand01(seed) * 0.2f, true, 0.3f};
+                    steps[4] = make_step(40, 0.8f + pattern_rand01(seed) * 0.2f, true, 0.3f);
                 }
                 if (step_count >= 16) {
-                    steps[12] = {40, 0.8f + pattern_rand01(seed) * 0.2f, true, 0.3f};
+                    steps[12] = make_step(40, 0.8f + pattern_rand01(seed) * 0.2f, true, 0.3f);
                 }
                 // Occasional fills
                 for (int i = 0; i < step_count; i++) {
                     if (!steps[i].gate && pattern_rand01(seed) < density * 0.3f) {
-                        steps[i] = {40, 0.3f + pattern_rand01(seed) * 0.2f, true, 0.15f};
+                        steps[i] = make_step(40, 0.3f + pattern_rand01(seed) * 0.2f, true, 0.15f);
                     }
                 }
             } else {
                 // HIHAT: offbeat 8ths (steps 2,6,10,14)
                 for (int i = 2; i < step_count; i += 4) {
                     float vel = 0.6f + pattern_rand01(seed) * 0.2f;
-                    steps[i] = {42, vel, true, 0.15f};
+                    steps[i] = make_step(42, vel, true, 0.15f);
                 }
                 // Additional ghost hats
                 for (int i = 0; i < step_count; i++) {
                     if (!steps[i].gate && pattern_rand01(seed) < ghost_prob * 0.5f) {
-                        steps[i] = {42, 0.2f + pattern_rand01(seed) * 0.15f, true, 0.1f};
+                        steps[i] = make_step(42, 0.2f + pattern_rand01(seed) * 0.15f, true, 0.1f);
                     }
                 }
             }
@@ -108,29 +113,29 @@ inline void generate_rhythm_pattern(
         case 2: { // Backbeat-heavy
             if (track_index == 0) {
                 // KICK: 1 and 9 with ghosts
-                steps[0] = {36, 0.95f, true, 0.5f};
+                steps[0] = make_step(36, 0.95f, true, 0.5f);
                 if (step_count >= 12) {
-                    steps[8] = {36, 0.9f, true, 0.5f};
+                    steps[8] = make_step(36, 0.9f, true, 0.5f);
                 }
                 // Ghost kicks
                 for (int i = 0; i < step_count; i++) {
                     if (!steps[i].gate && pattern_rand01(seed) < ghost_prob * density * 0.6f) {
-                        steps[i] = {36, 0.3f + pattern_rand01(seed) * 0.2f, true, 0.3f};
+                        steps[i] = make_step(36, 0.3f + pattern_rand01(seed) * 0.2f, true, 0.3f);
                     }
                 }
             } else if (track_index == 1) {
                 // PERC: hard 2+4 (steps 4, 12) with triplet fills
                 if (step_count >= 8) {
-                    steps[4] = {40, 0.95f, true, 0.35f};
+                    steps[4] = make_step(40, 0.95f, true, 0.35f);
                 }
                 if (step_count >= 16) {
-                    steps[12] = {40, 0.95f, true, 0.35f};
+                    steps[12] = make_step(40, 0.95f, true, 0.35f);
                 }
                 // Triplet-feel fills
                 for (int i = 0; i < step_count; i++) {
                     if (!steps[i].gate && pattern_rand01(seed) < density * 0.4f) {
                         float vel = 0.35f + pattern_rand01(seed) * 0.3f;
-                        steps[i] = {40, vel, true, 0.2f};
+                        steps[i] = make_step(40, vel, true, 0.2f);
                     }
                 }
             } else {
@@ -138,12 +143,12 @@ inline void generate_rhythm_pattern(
                 for (int i = 0; i < step_count; i += 2) {
                     float vel = (i % 4 == 0) ? 0.7f : 0.55f;
                     vel += pattern_rand01(seed) * 0.1f;
-                    steps[i] = {42, vel, true, 0.15f};
+                    steps[i] = make_step(42, vel, true, 0.15f);
                 }
                 // Fill in some 16ths
                 for (int i = 1; i < step_count; i += 2) {
                     if (pattern_rand01(seed) < density * 0.5f) {
-                        steps[i] = {42, 0.25f + pattern_rand01(seed) * 0.2f, true, 0.1f};
+                        steps[i] = make_step(42, 0.25f + pattern_rand01(seed) * 0.2f, true, 0.1f);
                     }
                 }
             }
@@ -153,11 +158,11 @@ inline void generate_rhythm_pattern(
             if (track_index == 0) {
                 // KICK: four-on-floor + ghosts
                 for (int i = 0; i < step_count; i += 4) {
-                    steps[i] = {36, 0.9f + pattern_rand01(seed) * 0.1f, true, 0.45f};
+                    steps[i] = make_step(36, 0.9f + pattern_rand01(seed) * 0.1f, true, 0.45f);
                 }
                 for (int i = 0; i < step_count; i++) {
                     if (!steps[i].gate && pattern_rand01(seed) < ghost_prob * density) {
-                        steps[i] = {36, 0.25f + pattern_rand01(seed) * 0.2f, true, 0.25f};
+                        steps[i] = make_step(36, 0.25f + pattern_rand01(seed) * 0.2f, true, 0.25f);
                     }
                 }
             } else if (track_index == 1) {
@@ -168,7 +173,7 @@ inline void generate_rhythm_pattern(
                         // Accent on backbeats
                         if (i % 4 == 2) vel += 0.2f;
                         if (vel > 1.0f) vel = 1.0f;
-                        steps[i] = {40, vel, true, 0.15f + pattern_rand01(seed) * 0.15f};
+                        steps[i] = make_step(40, vel, true, 0.15f + pattern_rand01(seed) * 0.15f);
                     }
                 }
             } else {
@@ -183,7 +188,7 @@ inline void generate_rhythm_pattern(
                     if (vel > 1.0f) vel = 1.0f;
                     // Skip some of the softest hits for variation
                     if (vel < 0.4f && pattern_rand01(seed) > density) continue;
-                    steps[i] = {42, vel, true, 0.1f + pattern_rand01(seed) * 0.08f};
+                    steps[i] = make_step(42, vel, true, 0.1f + pattern_rand01(seed) * 0.08f);
                 }
             }
             break;
@@ -204,7 +209,7 @@ inline void generate_melodic_pattern(
 
     // Clear all steps
     for (int i = 0; i < step_count; i++) {
-        steps[i] = {0, 0.0f, false, 0.0f};
+        steps[i] = make_step(0, 0.0f, false, 0.0f);
     }
 
     if (track_index == 3) {
@@ -213,7 +218,7 @@ inline void generate_melodic_pattern(
         if (bass_root < genre.note_range_low) bass_root += 12;
 
         // Strong hit on beat 1
-        steps[0] = {static_cast<uint8_t>(bass_root), 0.9f, true, 0.5f + pattern_rand01(seed) * 0.2f};
+        steps[0] = make_step(static_cast<uint8_t>(bass_root), 0.9f, true, 0.5f + pattern_rand01(seed) * 0.2f);
 
         for (int i = 1; i < step_count; i++) {
             if (pattern_rand01(seed) < density) {
@@ -250,7 +255,7 @@ inline void generate_melodic_pattern(
 
                 float vel = 0.6f + pattern_rand01(seed) * 0.3f;
                 float dur = 0.4f + pattern_rand01(seed) * 0.3f;
-                steps[i] = {static_cast<uint8_t>(note), vel, true, dur};
+                steps[i] = make_step(static_cast<uint8_t>(note), vel, true, dur);
             }
         }
     } else {
@@ -280,7 +285,7 @@ inline void generate_melodic_pattern(
 
                 float vel = 0.5f + pattern_rand01(seed) * 0.3f;
                 float dur = 0.3f + pattern_rand01(seed) * 0.5f;
-                steps[i] = {static_cast<uint8_t>(note), vel, true, dur};
+                steps[i] = make_step(static_cast<uint8_t>(note), vel, true, dur);
             }
         }
     }
@@ -299,7 +304,7 @@ inline void generate_effect_pattern(
 
     // Clear all steps
     for (int i = 0; i < step_count; i++) {
-        steps[i] = {0, 0.0f, false, 0.0f};
+        steps[i] = make_step(0, 0.0f, false, 0.0f);
     }
 
     // Upper note range for effects
@@ -337,7 +342,7 @@ inline void generate_effect_pattern(
 
             float vel = 0.3f + pattern_rand01(seed) * 0.4f;
             float dur = dur_min + pattern_rand01(seed) * (dur_max - dur_min);
-            steps[i] = {static_cast<uint8_t>(note), vel, true, dur};
+            steps[i] = make_step(static_cast<uint8_t>(note), vel, true, dur);
         }
     }
 }
