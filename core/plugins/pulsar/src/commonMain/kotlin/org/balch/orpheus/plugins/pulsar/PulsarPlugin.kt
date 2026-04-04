@@ -30,28 +30,28 @@ class PulsarPlugin : DspPlugin {
     }
 
     private var _playing = 0
-    private var _scene = 0
+    private var _scene = 2  // Cosmic Techno (first in display order)
     private var _energy = 0.5f
     private var _complexity = 0.3f
     private var _space = 0.4f
     private var _mood = 0.5f
-    private var _bpm = 120.0f
+    private var _bpm = 128.0f
     private var _delaySend = 0.0f
     private var _reverbSend = 0.0f
-    private var _rootNote = 0
-    private var _scaleIndex = 0
+    private var _rootNote = 2  // D
+    private var _scaleIndex = 0  // Minor
     private var _mix = 0.0f
     private var _percMix = 0.7f
     private var _envelopeMode = 0  // 0=AD, 1=Tides, 2=Blend (energy-driven)
-    private var _trackEdm = intArrayOf(20, 17, 23, 9, 6, 14, 11, 20)
-    private var _trackSpace = intArrayOf(20, 18, 23, 19, 6, 19, 13, 19)
+    private var _trackEdm = intArrayOf(21, 22, 23, 9, 14, 14, 17, 20)
+    private var _trackSpace = intArrayOf(20, 17, 23, 19, 6, 14, 17, 19)
 
     private val portDefs = ports(startIndex = 0) {
         controlPort(PulsarSymbol.PLAYING) {
             intType { default = 0; get { _playing }; set { _playing = it } }
         }
         controlPort(PulsarSymbol.SCENE) {
-            intType { default = 0; get { _scene }; set { _scene = it } }
+            intType { default = 2; get { _scene }; set { _scene = it } }
         }
         controlPort(PulsarSymbol.ENERGY) {
             floatType { default = 0.5f; get { _energy }; set { _energy = it } }
@@ -66,7 +66,7 @@ class PulsarPlugin : DspPlugin {
             floatType { default = 0.5f; get { _mood }; set { _mood = it } }
         }
         controlPort(PulsarSymbol.BPM) {
-            floatType { default = 120.0f; min = 40f; max = 300f; get { _bpm }; set { _bpm = it } }
+            floatType { default = 128.0f; min = 40f; max = 300f; get { _bpm }; set { _bpm = it } }
         }
         controlPort(PulsarSymbol.DELAY_SEND) {
             floatType { default = 0.0f; min = 0f; max = 1f; get { _delaySend }; set { _delaySend = it } }
@@ -75,7 +75,7 @@ class PulsarPlugin : DspPlugin {
             floatType { default = 0.0f; min = 0f; max = 1f; get { _reverbSend }; set { _reverbSend = it } }
         }
         controlPort(PulsarSymbol.ROOT_NOTE) {
-            intType { default = 0; get { _rootNote }; set { _rootNote = it } }
+            intType { default = 2; get { _rootNote }; set { _rootNote = it } }
         }
         controlPort(PulsarSymbol.SCALE) {
             intType { default = 0; get { _scaleIndex }; set { _scaleIndex = it } }
@@ -90,16 +90,16 @@ class PulsarPlugin : DspPlugin {
             intType { default = 0; get { _envelopeMode }; set { _envelopeMode = it } }
         }
         controlPort(PulsarSymbol.TRACK_0_ENGINE_EDM) {
-            intType { default = 20; get { _trackEdm[0] }; set { _trackEdm[0] = it } }
+            intType { default = 21; get { _trackEdm[0] }; set { _trackEdm[0] = it } }
         }
         controlPort(PulsarSymbol.TRACK_0_ENGINE_SPACE) {
             intType { default = 20; get { _trackSpace[0] }; set { _trackSpace[0] = it } }
         }
         controlPort(PulsarSymbol.TRACK_1_ENGINE_EDM) {
-            intType { default = 17; get { _trackEdm[1] }; set { _trackEdm[1] = it } }
+            intType { default = 22; get { _trackEdm[1] }; set { _trackEdm[1] = it } }
         }
         controlPort(PulsarSymbol.TRACK_1_ENGINE_SPACE) {
-            intType { default = 18; get { _trackSpace[1] }; set { _trackSpace[1] = it } }
+            intType { default = 17; get { _trackSpace[1] }; set { _trackSpace[1] = it } }
         }
         controlPort(PulsarSymbol.TRACK_2_ENGINE_EDM) {
             intType { default = 23; get { _trackEdm[2] }; set { _trackEdm[2] = it } }
@@ -114,7 +114,7 @@ class PulsarPlugin : DspPlugin {
             intType { default = 19; get { _trackSpace[3] }; set { _trackSpace[3] = it } }
         }
         controlPort(PulsarSymbol.TRACK_4_ENGINE_EDM) {
-            intType { default = 6; get { _trackEdm[4] }; set { _trackEdm[4] = it } }
+            intType { default = 14; get { _trackEdm[4] }; set { _trackEdm[4] = it } }
         }
         controlPort(PulsarSymbol.TRACK_4_ENGINE_SPACE) {
             intType { default = 6; get { _trackSpace[4] }; set { _trackSpace[4] = it } }
@@ -123,13 +123,13 @@ class PulsarPlugin : DspPlugin {
             intType { default = 14; get { _trackEdm[5] }; set { _trackEdm[5] = it } }
         }
         controlPort(PulsarSymbol.TRACK_5_ENGINE_SPACE) {
-            intType { default = 19; get { _trackSpace[5] }; set { _trackSpace[5] = it } }
+            intType { default = 14; get { _trackSpace[5] }; set { _trackSpace[5] = it } }
         }
         controlPort(PulsarSymbol.TRACK_6_ENGINE_EDM) {
-            intType { default = 11; get { _trackEdm[6] }; set { _trackEdm[6] = it } }
+            intType { default = 17; get { _trackEdm[6] }; set { _trackEdm[6] = it } }
         }
         controlPort(PulsarSymbol.TRACK_6_ENGINE_SPACE) {
-            intType { default = 13; get { _trackSpace[6] }; set { _trackSpace[6] = it } }
+            intType { default = 17; get { _trackSpace[6] }; set { _trackSpace[6] = it } }
         }
         controlPort(PulsarSymbol.TRACK_7_ENGINE_EDM) {
             intType { default = 20; get { _trackEdm[7] }; set { _trackEdm[7] = it } }

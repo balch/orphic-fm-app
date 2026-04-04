@@ -12,6 +12,10 @@ data class AppPreferences(
     val selectedAiModel: String? = null,
     /** Per-panel signal visualization toggle (disabled by default). */
     val signalVizEnabled: Boolean = false,
+    /** Serialized Pulsar UI state JSON for cross-session persistence. */
+    val lastPulsarJson: String? = null,
+    /** Serialized panel expansion overrides: Map of panelId -> expanded. */
+    val lastExpandedPanelsJson: String? = null,
 )
 
 

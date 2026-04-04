@@ -3,7 +3,6 @@ package org.balch.orpheus.ui.panels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -11,22 +10,30 @@ import dev.zacsweers.metro.binding
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.SynthFeature
-import org.balch.orpheus.ui.FactoryPanelSets
-import org.balch.orpheus.core.panels.PanelSet
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.panels.PanelSet
+import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
+import org.balch.orpheus.ui.FactoryPanelSets
 
 /**
  * UI state for the HeaderPanel, containing expansion states and active panel set.
@@ -80,6 +87,7 @@ private sealed class HeaderIntent {
  * Feature for the HeaderPanel, managing panel expansion/collapse state
  * and panel set visibility/ordering.
  */
+@OptIn(FlowPreview::class)
 @Inject
 @ClassKey(HeaderViewModel::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
@@ -87,7 +95,9 @@ class HeaderViewModel(
     panelExpansionEventBus: PanelExpansionEventBus,
     panels: Set<FeaturePanel>,
     panelSetRegistry: PanelSetRegistry,
-    scope: FeatureCoroutineScope,
+    private val appPreferencesRepository: AppPreferencesRepository,
+    private val dispatcherProvider: DispatcherProvider,
+    private val scope: FeatureCoroutineScope,
 ) : HeaderFeature {
 
     private val log = logging("HeaderViewModel")
@@ -95,6 +105,10 @@ class HeaderViewModel(
     init {
         // Seed the shared registry with factory panel sets
         panelSetRegistry.seed(FactoryPanelSets.all)
+        // Restore saved panel expansion state from previous session
+        scope.launch(dispatcherProvider.io) {
+            restoreSavedExpansion()
+        }
     }
 
     private val panelMap: Map<PanelId, FeaturePanel> =
@@ -105,7 +119,9 @@ class HeaderViewModel(
 
     private val defaultPanelSet = FactoryPanelSets.DesktopScreen
 
-    private val uiIntents = MutableSharedFlow<HeaderIntent>(extraBufferCapacity = 64)
+    // replay needed: restoreSavedExpansion() emits before stateIn(Eagerly) collector
+    // is dispatched, so tryEmit would silently drop values without a replay buffer.
+    private val uiIntents = MutableSharedFlow<HeaderIntent>(replay = 64, extraBufferCapacity = 64)
 
     private val busIntents = panelExpansionEventBus.events
         .map { event ->
@@ -178,6 +194,39 @@ class HeaderViewModel(
             uiIntents.tryEmit(HeaderIntent.Single(panelId, expanded))
         }
     )
+
+    // ═══════════════════════════════════════════════════════════
+    // Persistence
+    // ═══════════════════════════════════════════════════════════
+    init {
+        // Debounced save: persist expansion state 1s after the last change
+        scope.launch(dispatcherProvider.io) {
+            stateFlow.drop(1).debounce(1_000L).collect { state ->
+                saveExpansionState(state)
+            }
+        }
+    }
+
+    private suspend fun restoreSavedExpansion() {
+        val json = appPreferencesRepository.load().lastExpandedPanelsJson ?: return
+        val saved: Map<String, Boolean> = try {
+            Json.decodeFromString(json)
+        } catch (e: Exception) {
+            log.warn(e) { "Failed to restore panel expansion state" }
+            return
+        }
+        // Emit saved overrides as individual intents so they merge with the default state
+        saved.forEach { (id, expanded) ->
+            uiIntents.tryEmit(HeaderIntent.Single(PanelId(id), expanded))
+        }
+        log.debug { "Restored panel expansion: ${saved.count { it.value }} expanded" }
+    }
+
+    private suspend fun saveExpansionState(state: HeaderPanelUiState) {
+        val map = state.expandedPanels.map { (k, v) -> k.id to v }.toMap()
+        val json = Json.encodeToString<Map<String, Boolean>>(map)
+        appPreferencesRepository.update { it.copy(lastExpandedPanelsJson = json) }
+    }
 
     companion object {
         fun previewFeature(

@@ -92,8 +92,7 @@ class AiModelProvider(
     suspend fun selectModel(model: AiModel) {
         withContext(dispatcherProvider.io) {
             runCatchingSuspend {
-                val prefs = preferencesRepository.load()
-                preferencesRepository.save(prefs.copy(selectedAiModel = model.id))
+                preferencesRepository.update { it.copy(selectedAiModel = model.id) }
                 _selectedModel.value = model
                 log.debug { "Selected model: ${model.displayName}" }
             }.exceptionOrNull()?.let { e ->

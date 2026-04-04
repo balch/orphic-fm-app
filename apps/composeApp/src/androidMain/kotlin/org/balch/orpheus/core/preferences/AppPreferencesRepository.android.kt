@@ -15,7 +15,7 @@ import java.io.File
 @Inject
 class AndroidAppPreferencesRepository(
     private val context: Context
-) : AppPreferencesRepository {
+) : BaseAppPreferencesRepository() {
 
     private val log = logging()
 

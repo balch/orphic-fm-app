@@ -164,8 +164,7 @@ class VizViewModel(
             updateState()
 
             if (save) {
-                val prefs = appPreferencesRepository.load().copy(lastVizId = viz.id)
-                appPreferencesRepository.save(prefs)
+                appPreferencesRepository.update { it.copy(lastVizId = viz.id) }
             }
         }
     }
@@ -187,8 +186,7 @@ class VizViewModel(
     private fun onToggleSignalViz(enabled: Boolean) {
         _uiState.update { it.copy(signalVizEnabled = enabled) }
         scope.launch(dispatcherProvider.default) {
-            val prefs = appPreferencesRepository.load().copy(signalVizEnabled = enabled)
-            appPreferencesRepository.save(prefs)
+            appPreferencesRepository.update { it.copy(signalVizEnabled = enabled) }
         }
     }
 

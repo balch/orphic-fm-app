@@ -11,7 +11,7 @@ import java.io.File
  * Stores settings in ~/.config/orpheus/settings.json
  */
 @Inject
-class JvmAppPreferencesRepository : AppPreferencesRepository {
+class JvmAppPreferencesRepository : BaseAppPreferencesRepository() {
     private val log = logging("JvmAppPreferencesRepository")
 
     private val json = Json {

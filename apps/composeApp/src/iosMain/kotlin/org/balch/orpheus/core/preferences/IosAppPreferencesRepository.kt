@@ -9,7 +9,7 @@ import platform.Foundation.NSUserDefaults
  * iOS implementation of AppPreferencesRepository using NSUserDefaults.
  */
 @Inject
-class IosAppPreferencesRepository : AppPreferencesRepository {
+class IosAppPreferencesRepository : BaseAppPreferencesRepository() {
     private val log = logging("IosAppPreferencesRepository")
 
     private val json = Json {

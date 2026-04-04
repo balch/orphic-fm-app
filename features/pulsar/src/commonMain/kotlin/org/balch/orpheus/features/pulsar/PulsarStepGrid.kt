@@ -176,9 +176,9 @@ fun PulsarStepGrid(
     val saturation = energy * 0.5f + mood * 0.3f + (1f - space) * 0.2f
     val dispersion = complexity * 0.4f + energy * 0.3f + mood * 0.3f
     val liquidScope = VisualizationLiquidScope(
-        refraction = refraction * 2f,            // 0-3 range, full strength
+        refraction = refraction * 1.5f,             // 0-1.5 range
         saturation = 0.5f + saturation * 1.5f,  // 0.5-2.0 range
-        dispersion = dispersion * 2f,     // 0-0.5 range
+        dispersion = dispersion,                 // 0-1.0 range
         curve = 0.001f,          // lens curvature follows refraction
     )
 

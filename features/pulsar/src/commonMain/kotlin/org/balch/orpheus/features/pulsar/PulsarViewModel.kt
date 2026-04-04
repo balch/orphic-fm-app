@@ -2,19 +2,27 @@ package org.balch.orpheus.features.pulsar
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.controller.intSetter
@@ -27,27 +35,30 @@ import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
+import org.balch.orpheus.core.preferences.AppPreferencesRepository
+import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
 
+@Serializable
 @Immutable
 data class PulsarUiState(
     val playing: Boolean = false,
-    val bpm: Float = 120f,
-    val sceneIndex: Int = 0,
+    val bpm: Float = 128f,
+    val sceneIndex: Int = 2,
     val energy: Float = 0.5f,
     val complexity: Float = 0.3f,
     val space: Float = 0.4f,
     val mood: Float = 0.5f,
     val delaySend: Float = 0.0f,
     val reverbSend: Float = 0.0f,
-    val rootNote: Int = 0,
+    val rootNote: Int = 2,
     val scaleIndex: Int = 0,
     val mix: Float = 0.0f,
     val percMix: Float = 0.7f,
     val envelopeMode: Int = 0,  // 0=AD, 1=Tides, 2=Blend (energy-driven)
     val selectedTrack: Int? = null,
-    val trackEnginesEdm: List<Int> = listOf(20, 17, 23, 9, 6, 14, 11, 20),
-    val trackEnginesSpace: List<Int> = listOf(20, 18, 23, 19, 6, 19, 13, 19),
+    val trackEnginesEdm: List<Int> = listOf(21, 22, 23, 9, 14, 14, 17, 20),
+    val trackEnginesSpace: List<Int> = listOf(20, 17, 23, 19, 6, 14, 17, 19),
 )
 
 @Immutable
@@ -148,15 +159,20 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
  * Bridges PulsarSymbol controls to the C++ engine via SynthController,
  * exposing a reactive PulsarUiState and stable PulsarPanelActions.
  */
+@OptIn(FlowPreview::class)
 @Inject
 @ClassKey(PulsarViewModel::class)
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class PulsarViewModel(
     private val synthController: SynthController,
     private val globalTempo: GlobalTempo,
-    dispatcherProvider: DispatcherProvider,
-    scope: FeatureCoroutineScope,
+    private val appPreferencesRepository: AppPreferencesRepository,
+    private val presetLoader: PresetLoader,
+    private val dispatcherProvider: DispatcherProvider,
+    private val scope: FeatureCoroutineScope,
 ) : PulsarFeature {
+
+    private val log = logging("PulsarVM")
 
     // ═══════════════════════════════════════════════════════════
     // Control flows
@@ -183,11 +199,20 @@ class PulsarViewModel(
     }
 
     private val selectedTrackFlow = MutableStateFlow<Int?>(null)
+    private val restoreComplete = CompletableDeferred<Unit>()
 
     // Seed BPM from GlobalTempo before controlIntents/stateFlow subscribe,
     // so the first emission matches the system tempo, not the plugin default.
     init {
         bpmId.value = FloatValue(globalTempo.getBpm().toFloat())
+        // Re-apply saved Pulsar state after EVERY preset load (initial or manual),
+        // since applyPreset() resets all ports including Pulsar.
+        scope.launch(dispatcherProvider.io) {
+            presetLoader.presetFlow.collect {
+                restoreSavedState()
+                restoreComplete.complete(Unit) // no-op after first call
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -309,6 +334,54 @@ class PulsarViewModel(
                 bpmId.value = FloatValue(bpm.toFloat())
             }
         }
+        // Debounced save: waits for restore to complete first to avoid saving stale defaults.
+        // Timeout ensures saving isn't blocked forever if presetFlow never emits.
+        scope.launch(dispatcherProvider.io) {
+            withTimeoutOrNull(5_000L) { restoreComplete.await() }
+            stateFlow.drop(1).debounce(2_000L).collect { state ->
+                saveState(state)
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Persistence
+    // ═══════════════════════════════════════════════════════════
+    private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+
+    private suspend fun restoreSavedState() {
+        val json = appPreferencesRepository.load().lastPulsarJson ?: return
+        val saved = try {
+            persistJson.decodeFromString<PulsarUiState>(json)
+        } catch (e: Exception) {
+            log.warn(e) { "Failed to restore Pulsar state" }
+            return
+        }
+        // Push saved values into control flows (drives both UI and C++ engine)
+        // Mix is intentionally excluded — always starts at 0 (off)
+        sceneId.value = IntValue(saved.sceneIndex)
+        energyId.value = FloatValue(saved.energy)
+        complexityId.value = FloatValue(saved.complexity)
+        spaceId.value = FloatValue(saved.space)
+        moodId.value = FloatValue(saved.mood)
+        bpmId.value = FloatValue(saved.bpm)
+        globalTempo.setBpm(saved.bpm.toDouble())
+        delaySendId.value = FloatValue(saved.delaySend)
+        reverbSendId.value = FloatValue(saved.reverbSend)
+        rootNoteId.value = IntValue(saved.rootNote)
+        scaleId.value = IntValue(saved.scaleIndex)
+        percMixId.value = FloatValue(saved.percMix)
+        envelopeModeId.value = IntValue(saved.envelopeMode)
+        saved.trackEnginesEdm.forEachIndexed { i, eng -> trackEdmIds[i].value = IntValue(eng) }
+        saved.trackEnginesSpace.forEachIndexed { i, eng -> trackSpaceIds[i].value = IntValue(eng) }
+        log.debug { "Restored Pulsar state: scene=${saved.sceneIndex}, bpm=${saved.bpm}" }
+    }
+
+    private suspend fun saveState(state: PulsarUiState) {
+        // Strip transient fields; mix always starts at 0 (user dials it in)
+        val toSave = state.copy(playing = false, selectedTrack = null, mix = 0f)
+        val json = persistJson.encodeToString(PulsarUiState.serializer(), toSave)
+        appPreferencesRepository.update { it.copy(lastPulsarJson = json) }
     }
 
     companion object {

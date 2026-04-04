@@ -74,11 +74,12 @@ class AiKeyRepository(
                     return@withContext false
                 }
 
-                val prefs = preferencesRepository.load()
-                val updatedKeys = prefs.userApiKeys.toMutableMap().apply {
-                    put(aiProvider.id, key)
+                preferencesRepository.update { prefs ->
+                    val updatedKeys = prefs.userApiKeys.toMutableMap().apply {
+                        put(aiProvider.id, key)
+                    }
+                    prefs.copy(userApiKeys = updatedKeys)
                 }
-                preferencesRepository.save(prefs.copy(userApiKeys = updatedKeys))
                 log.debug { "Saved user-provided API key" }
                 true
             }
@@ -94,11 +95,12 @@ class AiKeyRepository(
     suspend fun clearApiKey(aiProvider: AiProvider) {
         withContext(dispatcherProvider.io) {
             runCatchingSuspend {
-                val prefs = preferencesRepository.load()
-                val updatedKeys = prefs.userApiKeys.toMutableMap().apply {
-                    remove(aiProvider.id)
+                preferencesRepository.update { prefs ->
+                    val updatedKeys = prefs.userApiKeys.toMutableMap().apply {
+                        remove(aiProvider.id)
+                    }
+                    prefs.copy(userApiKeys = updatedKeys)
                 }
-                preferencesRepository.save(prefs.copy(userApiKeys = updatedKeys))
                 log.debug { "Cleared user-provided API key" }
             }.onSuccess { _ -> updateKeyState(null) }
             .onFailure { e ->

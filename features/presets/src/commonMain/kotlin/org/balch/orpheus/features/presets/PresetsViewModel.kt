@@ -3,7 +3,6 @@ package org.balch.orpheus.features.presets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -11,21 +10,22 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.presets.PresetsRepository
 import org.balch.orpheus.core.presets.SynthPreset
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.synthFeature
 
 /** UI state for the Presets panel. */
 @Immutable
@@ -213,8 +213,7 @@ class PresetsViewModel(
                 presetLoader.applyPreset(intent.preset)
                 log.info { "Applied preset: ${intent.preset.name}" }
                 scope.launch(dispatcherProvider.io) {
-                    val prefs = appPreferencesRepository.load().copy(lastPresetName = intent.preset.name)
-                    appPreferencesRepository.save(prefs)
+                    appPreferencesRepository.update { it.copy(lastPresetName = intent.preset.name) }
                 }
             }
             is PresetIntent.SaveNewPreset -> {

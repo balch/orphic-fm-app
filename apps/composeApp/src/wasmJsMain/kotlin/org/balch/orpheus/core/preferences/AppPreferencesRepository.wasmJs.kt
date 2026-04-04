@@ -12,7 +12,7 @@ import org.w3c.dom.set
  * WASM implementation of AppPreferencesRepository using browser localStorage.
  */
 @Inject
-class WasmAppPreferencesRepository : AppPreferencesRepository {
+class WasmAppPreferencesRepository : BaseAppPreferencesRepository() {
     private val log = logging("WasmAppPreferencesRepository")
 
     private val json = Json {
