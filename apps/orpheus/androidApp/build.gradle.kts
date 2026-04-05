@@ -80,7 +80,7 @@ android {
 }
 
 dependencies {
-    implementation(projects.apps.composeApp)
+    implementation(projects.apps.orpheus)
     implementation(project(":core:foundation"))
     implementation(project(":core:mediapipe"))
     implementation(project(":features:mediapipe"))

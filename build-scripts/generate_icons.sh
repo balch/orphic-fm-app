@@ -12,11 +12,11 @@ fi
 echo "Generating icons from $SOURCE_IMAGE..."
 
 # Common Resources (if needed, but mainly platform specific)
-# sips -s format webp --resampleHeightWidth 512 512 "$SOURCE_IMAGE" --out "composeApp/src/commonMain/resources/icon.webp"
+# sips -s format webp --resampleHeightWidth 512 512 "$SOURCE_IMAGE" --out "orpheus/src/commonMain/resources/icon.webp"
 
 # Android
 echo "Generating Android icons..."
-ANDROID_RES="composeApp/src/androidMain/res"
+ANDROID_RES="orpheus/src/androidMain/res"
 mkdir -p "$ANDROID_RES/mipmap-mdpi"
 mkdir -p "$ANDROID_RES/mipmap-hdpi"
 mkdir -p "$ANDROID_RES/mipmap-xhdpi"
@@ -40,14 +40,14 @@ sips -s format png --resampleHeightWidth 192 192 "$SOURCE_IMAGE" --out "$ANDROID
 
 # JVM
 echo "Generating JVM icons..."
-JVM_RES="composeApp/src/jvmMain/resources"
+JVM_RES="orpheus/src/jvmMain/resources"
 mkdir -p "$JVM_RES"
 sips -s format png --resampleHeightWidth 512 512 "$SOURCE_IMAGE" --out "$JVM_RES/icon.png"
 sips -s format icns --resampleHeightWidth 512 512 "$SOURCE_IMAGE" --out "$JVM_RES/icon.icns"
 
 # WasmJS
 echo "Generating WasmJS icons..."
-WASM_RES="composeApp/src/wasmJsMain/resources"
+WASM_RES="orpheus/src/wasmJsMain/resources"
 mkdir -p "$WASM_RES"
 # Using png for wasm icon as webp support in sips might vary or just to be safe, but user asked for webp.
 # Actually sips output said "org.webmproject.webp webp" is supported but not "Writable"? Wait.

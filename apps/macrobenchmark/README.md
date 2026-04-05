@@ -21,7 +21,7 @@ Macrobenchmarks test app performance from an external perspective (outside the a
 ### From Android Studio
 
 1. Open the **Build Variants** panel
-2. Select `benchmark` for both `:composeApp` and `:macrobenchmark`
+2. Select `benchmark` for both `:orpheus` and `:macrobenchmark`
 3. Run the benchmark tests using the gutter icons next to test methods
 
 ### From Command Line

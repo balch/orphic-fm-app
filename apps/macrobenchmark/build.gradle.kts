@@ -30,8 +30,8 @@ android {
         }
     }
 
-    // Target the androidApp module now (since composeApp is a library)
-    targetProjectPath = ":apps:androidApp"
+    // Target the androidApp module now (since orpheus is a library)
+    targetProjectPath = ":apps:orpheus:androidApp"
     experimentalProperties["android.experimental.self-instrumenting"] = true
 }
 

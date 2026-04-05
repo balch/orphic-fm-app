@@ -7,8 +7,8 @@ description: Use when building, deploying, or debugging the WASM target, when wo
 
 ## Build Commands
 
-- Production build: `./gradlew :apps:composeApp:wasmJsBrowserDistribution`
-- Dev server: `./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun` (serves on localhost:8080)
+- Production build: `./gradlew :apps:orpheus:wasmJsBrowserDistribution`
+- Dev server: `./gradlew :apps:orpheus:wasmJsBrowserDevelopmentRun` (serves on localhost:8080)
 
 ## Local Dev with orphic.fm Site
 
@@ -36,7 +36,7 @@ Use Playwright MCP to debug the running WASM app at `http://localhost:4001/synth
 
 ## JS Bridge Conventions
 
-- All JS bridge files live in `apps/composeApp/src/wasmJsMain/resources/`
+- All JS bridge files live in `apps/orpheus/src/wasmJsMain/resources/`
 - Use `console.log`/`console.error` with a prefix tag (e.g., `[MP]`) for filtering
 - Kotlin-side logging via KmLogging also appears in the browser console
 

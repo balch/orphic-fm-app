@@ -12,9 +12,9 @@ FetchContent_MakeAvailable(oboe)
 
 # ── liborpheus_dsp ────────────────────────────────
 # EURORACK_DIR must be passed from Gradle or defaults to a peer of the project root.
-set(LIBORPHEUS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../liborpheus_dsp")
+set(LIBORPHEUS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../liborpheus_dsp")
 if(NOT DEFINED EURORACK_DIR)
-    set(EURORACK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../../../eurorack"
+    set(EURORACK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../../../../eurorack"
         CACHE PATH "Path to eurorack source repo")
 endif()
 add_subdirectory(

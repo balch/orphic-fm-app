@@ -321,7 +321,7 @@ The `channels` list and `allData` list must stay in sync by index.
 
 ## App Dependency Registration
 
-**File**: `apps/composeApp/build.gradle.kts`
+**File**: `apps/orpheus/build.gradle.kts`
 
 Both plugin AND feature must be added:
 ```kotlin
@@ -353,7 +353,7 @@ companion object {
 - [ ] Panel composable consuming feature flows and actions
 - [ ] PanelRegistration with `@ContributesIntoSet(..., binding = binding<FeaturePanel>())`
 - [ ] Viz flows added to SynthEngine interface + SignalMonitorViz
-- [ ] Both `:core:plugins:<name>` and `:features:<name>` added to `apps/composeApp/build.gradle.kts`
+- [ ] Both `:core:plugins:<name>` and `:features:<name>` added to `apps/orpheus/build.gradle.kts`
 - [ ] `previewFeature()` and `preview()` companions for Compose previews
 - [ ] `portControlKeys` populated for AI agent discovery
 - [ ] Default values consistent across Plugin, ViewModel UiState, and C++ engine atomics

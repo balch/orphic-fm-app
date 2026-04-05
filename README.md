@@ -63,7 +63,7 @@ core/plugin-api/     Shared symbol definitions across all plugins
 core/plugins/        14 self-contained DSP plugin modules
 features/            20+ UI feature modules (Compose + ViewModel, MVI)
 ui/theme, ui/widgets Dark synth theme, knobs, sliders, collapsible panels
-apps/composeApp/     App wiring: signal routing, voice management, DI
+apps/orpheus/     App wiring: signal routing, voice management, DI
 liborpheus_dsp/      C++ DSP engine (Plaits, effects, graph routing)
 build-logic/         Convention plugins for consistent KMP module config
 ```
@@ -113,18 +113,18 @@ The **iOS** target links the C++ DSP engine as a static library via Kotlin/Nativ
 
 ```bash
 # Desktop (C++ DSP engine via JNI + miniaudio)
-./gradlew buildDesktopNative && ./gradlew :apps:composeApp:run
+./gradlew buildDesktopNative && ./gradlew :apps:orpheus:run
 
 # Android
 ./gradlew :apps:androidApp:installDebugRelease
 
 # iOS (build framework, then open Xcode project)
-./gradlew :apps:composeApp:linkDebugFrameworkIosSimulatorArm64
+./gradlew :apps:orpheus:linkDebugFrameworkIosSimulatorArm64
 cd apps/iosApp && xcodegen generate
 open OrpheusApp.xcodeproj
 
 # WASM dev server (opens browser at localhost:8080)
-./gradlew :apps:composeApp:wasmJsBrowserDevelopmentRun
+./gradlew :apps:orpheus:wasmJsBrowserDevelopmentRun
 
 # WASM in orphic.fm site (serves at localhost:4001/synth/)
 ./scripts/dev-site.sh
@@ -133,7 +133,7 @@ open OrpheusApp.xcodeproj
 ./scripts/deploy-gh-pages.sh
 
 # Desktop release (dmg/msi/deb depending on OS)
-./gradlew :apps:composeApp:packageReleaseDistributionForCurrentOS
+./gradlew :apps:orpheus:packageReleaseDistributionForCurrentOS
 ```
 
 See **[BUILD.md](docs/BUILD.md)** for prerequisites, platform details, C++ DSP builds, Emscripten setup, and configuration. See **[TESTS.md](docs/TESTS.md)** for testing strategies, C++ test suites, and cross-platform verification.

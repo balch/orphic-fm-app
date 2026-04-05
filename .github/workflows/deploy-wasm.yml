@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/deploy-wasm.yml'
-      - 'apps/composeApp/**'
+      - 'apps/orpheus/**'
       - 'core/**'
       - 'features/**'
       - 'ui/**'
@@ -40,14 +40,14 @@ jobs:
         run: mkdir -p liborpheus_dsp/platform/wasm/build
 
       - name: Build WASM production distribution
-        run: ./gradlew :apps:composeApp:wasmJsBrowserDistribution
+        run: ./gradlew :apps:orpheus:wasmJsBrowserDistribution
 
       - name: Deploy to GitHub Pages repo
         env:
           DEPLOY_KEY: ${{ secrets.ORPHIC_FM_DEPLOY_KEY }}
         run: |
           set -euo pipefail
-          DIST_DIR="apps/composeApp/build/dist/wasmJs/productionExecutable"
+          DIST_DIR="apps/orpheus/build/dist/wasmJs/productionExecutable"
 
           if [[ ! -f "$DIST_DIR/index.html" ]]; then
             echo "::error::Build output missing at $DIST_DIR"

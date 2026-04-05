@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SITE_DIR="${ORPHIC_FM_SITE:-$HOME/Source/orphic-fm}"
 SYNTH_DIR="$SITE_DIR/synth"
-DIST_DIR="$REPO_ROOT/apps/composeApp/build/dist/wasmJs/productionExecutable"
+DIST_DIR="$REPO_ROOT/apps/orpheus/build/dist/wasmJs/productionExecutable"
 PORT="${PORT:-4001}"
 
 SKIP_BUILD=false
@@ -61,7 +61,7 @@ if [[ "$SKIP_BUILD" != true ]]; then
     fi
     echo "Building WASM production distribution..."
     mkdir -p "$REPO_ROOT/liborpheus_dsp/platform/wasm/build"
-    "$REPO_ROOT/gradlew" -p "$REPO_ROOT" :apps:composeApp:wasmJsBrowserDistribution
+    "$REPO_ROOT/gradlew" -p "$REPO_ROOT" :apps:orpheus:wasmJsBrowserDistribution
     restore_local_properties
 fi
 

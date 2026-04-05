@@ -32,9 +32,9 @@ tools/train-asl-model/.venv/
 gradle/gradle-daemon-jvm.properties
 
 # Native DSP build outputs (built by Gradle tasks buildDesktopNative / buildWasmNative)
-apps/composeApp/src/jvmMain/resources/native/*/liborpheus_desktop.*
-apps/composeApp/src/wasmJsMain/resources/orpheus_dsp.js
-apps/composeApp/src/wasmJsMain/resources/orpheus_dsp.wasm
+apps/orpheus/src/jvmMain/resources/native/*/liborpheus_desktop.*
+apps/orpheus/src/wasmJsMain/resources/orpheus_dsp.js
+apps/orpheus/src/wasmJsMain/resources/orpheus_dsp.wasm
 
 # C++ DSP build artifacts
 liborpheus_dsp/build_test/

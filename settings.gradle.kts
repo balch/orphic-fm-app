@@ -34,8 +34,8 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":apps:androidApp")
-include(":apps:composeApp")
+include(":apps:orpheus:androidApp")
+include(":apps:orpheus")
 include(":apps:macrobenchmark")
 include(":core:ai")
 include(":core:audio")
