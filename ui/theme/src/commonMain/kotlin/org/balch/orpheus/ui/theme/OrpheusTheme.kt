@@ -267,6 +267,19 @@ object OrpheusColors {
     val djRedLight = Color(0xFFFF4D5E)               // Lighter red (knob, progress)
     val djCream = Color(0xFFF5F0E1)                  // Cream (labels, frozen indicator)
 
+    // Timer (Sleep) Palette — legacy amber
+    val timerAmber = Color(0xFFFFB050)
+    val timerDarkAmber = Color(0xFF3A2510)
+    val timerGlowAmber = Color(0xFFFFCC70)
+    val timerEmber = Color(0xFFCC6620)
+
+    // Sleep Timer Palette — moonlight blue/indigo for nighttime calm
+    val sleepMoonlight = Color(0xFF8BB8D4)          // Soft moonlight blue — primary accent
+    val sleepIndigo = Color(0xFF151030)              // Deep night indigo — card backgrounds
+    val sleepGlow = Color(0xFFA8D0F0)                // Pale blue glow — highlights
+    val sleepDusk = Color(0xFF4A5A8A)                // Twilight blue-grey — mid-tone
+    val sleepEmber = Color(0xFF6B78AA)               // Fading dusk — low-urgency state
+
     // Warps Meta-Modulator Palette
     val warpsGreen = Color(0xFF90EE90)           // Primary Warps Green
     val warpsYellow = Color(0xFFFFFF00)          // Bright Yellow for accents

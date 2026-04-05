@@ -111,6 +111,7 @@ kotlin {
             api(project(":features:dj"))
             api(project(":features:tides"))
             api(project(":features:pulsar"))
+            api(project(":features:timer"))
             api(project(":core:mediapipe"))
             implementation(libs.compose.material.icons)
             implementation(libs.compose.ui.tooling.preview)

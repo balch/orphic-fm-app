@@ -37,6 +37,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+/
+        <receiver
+            android:name="org.balch.orpheus.features.timer.widget.TimerWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="org.balch.orpheus.timer.PLAY_PAUSE" />
+                <action android:name="org.balch.orpheus.timer.STOP" />
+                <action android:name="org.balch.orpheus.timer.STATE_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/timer_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

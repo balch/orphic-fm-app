@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.os.Build
@@ -17,6 +18,7 @@ import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import com.diamondedge.logging.logging
+import org.balch.orpheus.core.media.ForegroundServiceController
 
 /**
  * Foreground service that keeps audio playing when the app is backgrounded.
@@ -33,44 +35,44 @@ class AudioForegroundService : Service() {
     
     private val log = logging("AudioForegroundService")
     private var mediaSession: MediaSessionCompat? = null
-    private var isPlaying = true  // Track current playback state
-    private var currentModeName = "Manual Play"  // Current mode display name
-    private var currentMode = "USER"  // Current mode enum name for color selection
-    
+    private var albumArtBitmap: Bitmap? = null
+    private var isPlaying = true
+    private var currentTitle = "Orpheus Synthesizer"
+    private var currentModeName = "Manual Play"
+    private var currentMode = "USER"
+
     companion object {
         const val NOTIFICATION_ID = 1
         const val CHANNEL_ID = "orpheus_audio_playback"
-        const val ACTION_PLAY = "org.balch.orpheus.PLAY"
-        const val ACTION_PAUSE = "org.balch.orpheus.PAUSE"
-        const val ACTION_STOP = "org.balch.orpheus.STOP"
-        const val ACTION_UPDATE_STATE_PLAYING = "org.balch.orpheus.UPDATE_STATE_PLAYING"
-        const val ACTION_UPDATE_STATE_PAUSED = "org.balch.orpheus.UPDATE_STATE_PAUSED"
-        const val ACTION_UPDATE_METADATA = "org.balch.orpheus.UPDATE_METADATA"
-        
-        // Intent extras for metadata
-        const val EXTRA_MODE = "extra_mode"
-        const val EXTRA_MODE_DISPLAY_NAME = "extra_mode_display_name"
-        const val EXTRA_IS_PLAYING = "extra_is_playing"
-        
+
+        // Action and extra constants sourced from ForegroundServiceController
+        // to keep a single source of truth.
+        private val ACTION_PLAY = ForegroundServiceController.ACTION_PLAY
+        private val ACTION_PAUSE = ForegroundServiceController.ACTION_PAUSE
+        private val ACTION_STOP = ForegroundServiceController.ACTION_STOP
+        private val ACTION_UPDATE_STATE_PLAYING = ForegroundServiceController.ACTION_UPDATE_STATE_PLAYING
+        private val ACTION_UPDATE_STATE_PAUSED = ForegroundServiceController.ACTION_UPDATE_STATE_PAUSED
+        private val ACTION_UPDATE_METADATA = ForegroundServiceController.ACTION_UPDATE_METADATA
+        private val EXTRA_TITLE = ForegroundServiceController.EXTRA_TITLE
+        private val EXTRA_MODE = ForegroundServiceController.EXTRA_MODE
+        private val EXTRA_MODE_DISPLAY_NAME = ForegroundServiceController.EXTRA_MODE_DISPLAY_NAME
+        private val EXTRA_IS_PLAYING = ForegroundServiceController.EXTRA_IS_PLAYING
+
         var actionHandler: ((String) -> Unit)? = null
-        
-        /**
-         * Color scheme for different playback modes.
-         * Each mode has a distinct color for visual identification.
-         */
+
         private val MODE_COLORS = mapOf(
-            "USER" to Color.parseColor("#6B7FD7"),    // Soft indigo - calm, manual control
-            "DRONE" to Color.parseColor("#7B68EE"),   // Medium slate blue - ambient, expansive
-            "SOLO" to Color.parseColor("#9370DB"),    // Medium purple - expressive, lead
-            "REPL" to Color.parseColor("#00CED1")     // Dark turquoise - code, live coding vibe
+            "USER" to Color.parseColor("#6B7FD7"),
+            "DRONE" to Color.parseColor("#7B68EE"),
+            "SOLO" to Color.parseColor("#9370DB"),
+            "REPL" to Color.parseColor("#00CED1")
         )
-        
-        // Default notification color (deep purple gradient base)
+
         private val DEFAULT_COLOR = Color.parseColor("#7B68EE")
     }
     
     override fun onCreate() {
         super.onCreate()
+        albumArtBitmap = BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
         createNotificationChannel()
         setupMediaSession()
     }
@@ -95,6 +97,7 @@ class AudioForegroundService : Service() {
             ACTION_STOP -> {
                 log.info { "Stop action received" }
                 actionHandler?.invoke("stop")
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -110,12 +113,14 @@ class AudioForegroundService : Service() {
             }
             ACTION_UPDATE_METADATA -> {
                 // Extract metadata from intent
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Orpheus Synthesizer"
                 val mode = intent.getStringExtra(EXTRA_MODE) ?: "USER"
                 val modeDisplayName = intent.getStringExtra(EXTRA_MODE_DISPLAY_NAME) ?: "Manual Play"
                 val intentIsPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, true)
-                
-                log.debug { "Metadata update: mode=$mode, displayName=$modeDisplayName, isPlaying=$intentIsPlaying" }
-                
+
+                log.debug { "Metadata update: title=$title, mode=$mode, displayName=$modeDisplayName, isPlaying=$intentIsPlaying" }
+
+                currentTitle = title
                 currentMode = mode
                 currentModeName = modeDisplayName
                 isPlaying = intentIsPlaying
@@ -190,15 +195,13 @@ class AudioForegroundService : Service() {
     }
     
     private fun updateMediaSessionMetadata() {
-        val albumArt = BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
-        
         mediaSession?.setMetadata(
             MediaMetadataCompat.Builder()
-                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "Orpheus Synthesizer")
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
                 .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, getSubtitle())
                 .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, currentModeName)
-                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, albumArt)
-                .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, albumArt)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, albumArtBitmap)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, albumArtBitmap)
                 .build()
         )
     }
@@ -272,15 +275,12 @@ class AudioForegroundService : Service() {
             createActionIntent(ACTION_STOP)
         )
         
-        // Get app icon for large icon
-        val albumArt = BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
-        
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Orpheus Synthesizer")
+            .setContentTitle(currentTitle)
             .setContentText(getSubtitle())
-            .setSubText(currentModeName)  // Shows mode in notification shade
-            .setSmallIcon(R.mipmap.ic_launcher_foreground)  // Use app icon for status bar
-            .setLargeIcon(albumArt)  // App icon in expanded notification
+            .setSubText(currentModeName)
+            .setSmallIcon(R.mipmap.ic_launcher_foreground)
+            .setLargeIcon(albumArtBitmap)
             .setContentIntent(contentIntent)
             .addAction(playPauseAction)
             .addAction(stopAction)

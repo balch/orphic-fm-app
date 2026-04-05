@@ -44,9 +44,10 @@ class ForegroundServiceControllerImpl(
         context.startService(intent)
     }
     
-    override fun updateMetadata(mode: String, modeDisplayName: String, isPlaying: Boolean) {
+    override fun updateMetadata(title: String, mode: String, modeDisplayName: String, isPlaying: Boolean) {
         val intent = Intent(context, AudioForegroundService::class.java).apply {
             action = ForegroundServiceController.ACTION_UPDATE_METADATA
+            putExtra(ForegroundServiceController.EXTRA_TITLE, title)
             putExtra(ForegroundServiceController.EXTRA_MODE, mode)
             putExtra(ForegroundServiceController.EXTRA_MODE_DISPLAY_NAME, modeDisplayName)
             putExtra(ForegroundServiceController.EXTRA_IS_PLAYING, isPlaying)

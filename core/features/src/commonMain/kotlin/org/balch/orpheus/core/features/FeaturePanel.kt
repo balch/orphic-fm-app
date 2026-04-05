@@ -40,6 +40,7 @@ value class PanelId(val id: String) {
         val DJ = PanelId("dj")
         val TIDES = PanelId("tides")
         val PULSAR = PanelId("pulsar")
+        val TIMER = PanelId("timer")
     }
 }
 

@@ -20,7 +20,8 @@ enum class AudioActivitySource {
     EVO,      // Audio Evolution is enabled
     REPL,     // REPL is playing patterns
     DRONE,    // AI Drone mode is active
-    SOLO      // AI Solo mode is active
+    SOLO,     // AI Solo mode is active
+    TIMER     // Sleep timer countdown is active
 }
 
 /**
@@ -47,7 +48,8 @@ class MediaSessionStateManager {
     private val _isReplPlaying = MutableStateFlow(false)
     private val _isDroneActive = MutableStateFlow(false)
     private val _isSoloActive = MutableStateFlow(false)
-    
+    private val _isTimerActive = MutableStateFlow(false)
+
     /**
      * Combined flow indicating whether MediaSession should be active.
      * True if ANY source is active, false if ALL are inactive.
@@ -69,10 +71,13 @@ class MediaSessionStateManager {
                 _isEvoActive,
                 _isReplPlaying,
                 _isDroneActive,
-                _isSoloActive
-            ) { evo, repl, drone, solo ->
-                val needed = evo || repl || drone || solo
+                _isSoloActive,
+                _isTimerActive,
+            ) { states ->
+                val (evo, repl, drone, solo, timer) = states
+                val needed = evo || repl || drone || solo || timer
                 val source = when {
+                    timer -> AudioActivitySource.TIMER
                     evo -> AudioActivitySource.EVO
                     repl -> AudioActivitySource.REPL
                     drone -> AudioActivitySource.DRONE
@@ -84,6 +89,10 @@ class MediaSessionStateManager {
                 if (_isMediaSessionNeeded.value != needed) {
                     log.debug { "MediaSession needed: $needed (source: $source)" }
                     _isMediaSessionNeeded.value = needed
+                }
+                // Always update active source so metadata stays current
+                // when switching between modes (e.g. DRONE → SOLO)
+                if (_activeSource.value != source) {
                     _activeSource.value = source
                 }
             }
@@ -131,6 +140,16 @@ class MediaSessionStateManager {
     }
     
     /**
+     * Update the timer active state.
+     */
+    fun setTimerActive(active: Boolean) {
+        if (_isTimerActive.value != active) {
+            log.debug { "Timer active: $active" }
+            _isTimerActive.value = active
+        }
+    }
+
+    /**
      * Clear all activity states (e.g., when stopping everything).
      */
     fun clearAll() {
@@ -139,5 +158,6 @@ class MediaSessionStateManager {
         _isReplPlaying.value = false
         _isDroneActive.value = false
         _isSoloActive.value = false
+        _isTimerActive.value = false
     }
 }

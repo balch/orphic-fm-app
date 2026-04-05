@@ -15,6 +15,7 @@ import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.media.PlaybackMetadata
 import org.balch.orpheus.core.media.PlaybackMode
+import kotlin.concurrent.Volatile
 
 /**
  * Orchestrates the lifecycle of the synthesizer engine.
@@ -46,10 +47,10 @@ class SynthOrchestrator(
 ) : MediaSessionActionHandler {
     private val log = logging("SynthOrchestrator")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private var isStarted = false
-    private var isPaused = false
-    private var isMediaSessionActive = false
-    private var savedMasterVolume = 0.7f
+    @Volatile private var isStarted = false
+    @Volatile private var isPaused = false
+    @Volatile private var isMediaSessionActive = false
+    @Volatile private var savedMasterVolume = 0.7f
     private var currentPlaybackMode = PlaybackMode.USER
 
     init {
@@ -107,10 +108,11 @@ class SynthOrchestrator(
      */
     private fun deactivateMediaSession() {
         if (isMediaSessionActive) {
-            mediaSessionManager.updatePlaybackState(false)
+            // Deactivate directly — no need to update playback state first.
+            // Sending updatePlaybackState via startService could restart
+            // the service after stopService is called in deactivate().
             mediaSessionManager.deactivate()
             isMediaSessionActive = false
-            // Reset playback mode to USER when session deactivates
             currentPlaybackMode = PlaybackMode.USER
             log.debug { "SynthOrchestrator: Media session deactivated" }
         }
@@ -143,8 +145,10 @@ class SynthOrchestrator(
      */
     fun pause() {
         if (isStarted && !isPaused) {
-            // Save current master volume and mute
-            savedMasterVolume = engine.getMasterVolume()
+            // Save current master volume (guard against saving 0 if already
+            // muted by AndroidAppLifecycleManager or sleep timer fade)
+            val vol = engine.getMasterVolume()
+            if (vol > 0f) savedMasterVolume = vol
             engine.setMasterVolume(0f)
             mediaSessionManager.updatePlaybackState(false)
             isPaused = true

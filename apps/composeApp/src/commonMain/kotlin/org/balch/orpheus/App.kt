@@ -25,6 +25,9 @@ import org.balch.orpheus.features.ai.chat.ChatDialog
 import org.balch.orpheus.features.debug.DebugBottomBar
 import org.balch.orpheus.features.debug.DebugFeature
 import org.balch.orpheus.features.debug.DebugViewModel
+import org.balch.orpheus.features.timer.TimerFeature
+import org.balch.orpheus.features.timer.TimerOverlay
+import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
 import org.balch.orpheus.ui.infrastructure.LocalDialogLiquidState
@@ -59,6 +62,7 @@ fun App(
 
             // Get AI feature for chat dialog state
             val aiFeature: AiOptionsFeature = registry.feature<AiOptionsViewModel, AiOptionsFeature>()
+            val timerFeature: TimerFeature = registry.feature<TimerViewModel, TimerFeature>()
             val aiState by aiFeature.stateFlow.collectAsState()
             val showChatDialog = aiState.showChatDialog
             val dialogPosition = aiState.dialogPosition
@@ -125,6 +129,13 @@ fun App(
                                     .padding(start = 16.dp, bottom = 60.dp)
                             )
                         }
+
+                        // Timer overlay — fullscreen in compact landscape, draggable dialog otherwise
+                        TimerOverlay(
+                            feature = timerFeature,
+                            modifier = Modifier.fillMaxSize(),
+                            liquidState = dialogLiquidState,
+                        )
                     }
                 }
             }

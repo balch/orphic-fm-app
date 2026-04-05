@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#CC1A1A2E"
+    android:paddingStart="14dp"
+    android:paddingEnd="10dp">
+
+    <Chronometer
+        android:id="@+id/timer_chronometer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_alignParentStart="true"
+        android:format="%s"
+        android:textSize="24sp"
+        android:textColor="#FFFFB050"
+        android:fontFamily="monospace"
+        android:shadowColor="#80FFB050"
+        android:shadowDx="0"
+        android:shadowDy="0"
+        android:shadowRadius="6" />
+
+    <TextView
+        android:id="@+id/timer_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/timer_chronometer"
+        android:layout_alignStart="@id/timer_chronometer"
+        android:text="Orphic.fm"
+        android:textSize="9sp"
+        android:textColor="#55FFB050"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.15"
+        android:layout_marginTop="-2dp" />
+
+    <TextView
+        android:id="@+id/btn_stop"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_centerVertical="true"
+        android:layout_alignParentEnd="true"
+        android:text="&#x00D7;"
+        android:textSize="20sp"
+        android:textColor="#88FFB050"
+        android:fontFamily="sans-serif-light"
+        android:gravity="center"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <TextView
+        android:id="@+id/btn_play_pause"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_centerVertical="true"
+        android:layout_toStartOf="@id/btn_stop"
+        android:text="&#x25B6;"
+        android:textSize="16sp"
+        android:textColor="#CCFFB050"
+        android:fontFamily="sans-serif"
+        android:gravity="center"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="true" />
+
+</RelativeLayout>

@@ -41,10 +41,13 @@ actual class MediaSessionManager(
     
     actual fun deactivate() {
         if (!isActive) return
-        
+
         log.info { "Deactivating media session" }
-        foregroundServiceController.stop()
+        // Clear handler BEFORE stopping service to prevent reentrant
+        // callbacks during teardown (e.g. MediaSession.Callback.onStop
+        // firing during service destruction)
         foregroundServiceController.actionHandler = null
+        foregroundServiceController.stop()
         isActive = false
     }
     
@@ -64,6 +67,7 @@ actual class MediaSessionManager(
         
         log.debug { "Updating metadata: mode=${metadata.mode}, isPlaying=${metadata.isPlaying}" }
         foregroundServiceController.updateMetadata(
+            title = metadata.title,
             mode = metadata.mode.name,
             modeDisplayName = metadata.mode.displayName,
             isPlaying = metadata.isPlaying

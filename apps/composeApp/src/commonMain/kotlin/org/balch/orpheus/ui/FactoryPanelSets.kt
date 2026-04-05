@@ -12,6 +12,7 @@ object FactoryPanelSets {
 
     private val All = factoryPanelSet("All") {
         collapse(PanelId.PRESETS)
+        collapse(PanelId.TIMER)
         collapse(PanelId.MIDI)
         collapse(PanelId.EVO)
         collapse(PanelId.VIZ)
@@ -48,6 +49,7 @@ object FactoryPanelSets {
     val Compact = factoryPanelSet("Compact") {
         expand(PanelId.EVO)
         expand(PanelId.PRESETS)
+        expand(PanelId.TIMER)
         expand(PanelId.VIZ)
         expand(PanelId.TWEAKS)
         expand(PanelId.DISTORTION)
