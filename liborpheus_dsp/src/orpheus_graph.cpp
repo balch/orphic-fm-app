@@ -301,8 +301,8 @@ void orpheus_graph_dump_exec_order(OrpheusGraph* graph) {
     static const char* type_names[] = {
         "TRI_OSC", "SQ_OSC", "MULTIPLY", "ADD", "MUL_ADD",
         "ENV", "LIN_RAMP", "PASS", "PEAK_FOLLOW", "HARD_CLIP",
-        "LIMITER", "DELAY_LINE", "CLOUDS", "RINGS", "WARPS",
-        "DUAL_DELAY", "REVERB", "LFO", "MASTER_OUT", "PLAITS",
+        "LIMITER", "PLAITS", "CLOUDS", "RINGS", "WARPS",
+        "DELAY_LINE", "REVERB", "MASTER_OUT", "DUAL_DELAY", "LFO",
         "CLOCK", "GRIDS", "MARBLES", "LOOPER", "BENDER",
         "PER_STR_BEND", "DUO_VOICE", "LORENZ", "POLY_LFO",
         "BASS_VOICE", "OVERDRIVE", "COMPRESSOR", "HORN", "TURNTABLE", "TIDES",

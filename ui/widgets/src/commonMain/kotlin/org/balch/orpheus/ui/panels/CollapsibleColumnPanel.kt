@@ -56,7 +56,7 @@ val LocalCompactMode = staticCompositionLocalOf { false }
 fun CollapsibleColumnPanel(
     modifier: Modifier = Modifier,
     title: String,
-    expandedTitle: String,
+    expandedTitle: String? = null,
     color: Color,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,

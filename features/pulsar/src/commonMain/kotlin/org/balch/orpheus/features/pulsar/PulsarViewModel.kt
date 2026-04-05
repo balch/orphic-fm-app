@@ -200,17 +200,19 @@ class PulsarViewModel(
 
     private val selectedTrackFlow = MutableStateFlow<Int?>(null)
     private val restoreComplete = CompletableDeferred<Unit>()
+    private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
     // Seed BPM from GlobalTempo before controlIntents/stateFlow subscribe,
     // so the first emission matches the system tempo, not the plugin default.
     init {
         bpmId.value = FloatValue(globalTempo.getBpm().toFloat())
-        // Re-apply saved Pulsar state after EVERY preset load (initial or manual),
-        // since applyPreset() resets all ports including Pulsar.
+        // Restore saved state on startup, then re-apply after every preset load
+        // (since applyPreset() resets all ports including Pulsar).
         scope.launch(dispatcherProvider.io) {
+            restoreSavedState()
+            restoreComplete.complete(Unit)
             presetLoader.presetFlow.collect {
                 restoreSavedState()
-                restoreComplete.complete(Unit) // no-op after first call
             }
         }
     }
@@ -347,8 +349,6 @@ class PulsarViewModel(
     // ═══════════════════════════════════════════════════════════
     // Persistence
     // ═══════════════════════════════════════════════════════════
-    private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
-
     private suspend fun restoreSavedState() {
         val json = appPreferencesRepository.load().lastPulsarJson ?: return
         val saved = try {

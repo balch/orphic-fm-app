@@ -2,6 +2,7 @@ package org.balch.orpheus.features.dj
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
 import org.balch.orpheus.core.controller.floatSetter
@@ -23,12 +25,17 @@ import org.balch.orpheus.core.controller.intSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.FeatureStatePersistence
+import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.plugin.PortValue.FloatValue
+import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.DjSource
 import org.balch.orpheus.core.plugin.symbols.DjSymbol
 
 @Immutable
+@Serializable
 data class DjUiState(
     val wetA: Float = 0f,
     val wetB: Float = 0f,
@@ -87,7 +94,9 @@ private sealed interface DjIntent {
 class DjViewModel(
     synthController: SynthController,
     private val dispatchers: DispatcherProvider,
-    scope: FeatureCoroutineScope,
+    private val scope: FeatureCoroutineScope,
+    persistence: FeatureStatePersistence,
+    private val restoreStrategy: RestoreStrategy,
 ) : DjFeature {
 
     // Control flows for DJ plugin ports
@@ -231,6 +240,28 @@ class DjViewModel(
                 initialValue = DjUiState()
             )
 
+    init {
+        persistence.bind(
+            stateFlow = stateFlow,
+            serializer = DjUiState.serializer(),
+            reader = { it.lastDjJson },
+            writer = { prefs, json -> prefs.copy(lastDjJson = json) },
+            restoreStrategy = restoreStrategy,
+            stripTransient = { it.copy(velocityA = 0f, velocityB = 0f, frozenA = false, frozenB = false) },
+            onRestore = { saved ->
+                wetAId.value = FloatValue(saved.wetA)
+                wetBId.value = FloatValue(saved.wetB)
+                sourceAId.value = IntValue(saved.sourceA.index)
+                sourceBId.value = IntValue(saved.sourceB.index)
+                crossfaderId.value = FloatValue(saved.crossfader)
+                delaySendId.value = FloatValue(saved.delaySend)
+                reverbSendId.value = FloatValue(saved.reverbSend)
+                currentWetA = saved.wetA
+                currentWetB = saved.wetB
+            },
+        )
+    }
+
     // ═══════════════════════════════════════════════════════════
     // REDUCER
     // ═══════════════════════════════════════════════════════════
@@ -253,6 +284,7 @@ class DjViewModel(
         }
 
     companion object {
+        private val log = logging("DjViewModel")
         private const val MOTOR_SPEED = 1.0f
         private const val MOTOR_DECAY = 0.05f      // slow return to motor (released)
         private const val SCRATCH_RESPONSE = 0.7f   // near-instant follow of drag gesture

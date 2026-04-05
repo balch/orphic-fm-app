@@ -298,6 +298,7 @@ enum class ModSource {
     TIDES
 }
 
+@kotlinx.serialization.Serializable
 enum class StereoMode {
     VOICE_PAN,      // Per-voice stereo positioning
     STEREO_DELAYS   // Delay 1→Left, Delay 2→Right (future)

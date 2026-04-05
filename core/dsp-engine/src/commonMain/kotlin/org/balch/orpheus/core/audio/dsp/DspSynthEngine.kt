@@ -46,7 +46,8 @@ class DspSynthEngine(
     private val dispatcherProvider: DispatcherProvider,
     private val globalTempo: GlobalTempo,
     private val voiceManager: DspVoiceManager,
-    private val synthController: SynthController
+    private val synthController: SynthController,
+    private val wiringGraphProvider: WiringGraphProvider
 ) : SynthEngine {
 
     private val log = logging("DspSynthEngine")
@@ -403,7 +404,7 @@ class DspSynthEngine(
         syncNativeBridgeState() // Re-sync after C++ engine is created
 
         // Load the default wiring graph into the C++ engine
-        nativeBridge.nativeLoadGraph(buildDefaultWiringGraph()).also { result ->
+        nativeBridge.nativeLoadGraph(wiringGraphProvider.buildGraph()).also { result ->
             log.info { "nativeLoadGraph result: $result" }
         }
 

@@ -13,10 +13,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
@@ -24,14 +28,15 @@ import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
 enum class TimerStatus { IDLE, RUNNING, PAUSED, FADING, FINISHED }
 
 @Immutable
+@Serializable
 data class TimerUiState(
     val durationMinutes: Int = 30,
-    val remainingSeconds: Long = 1800,
-    val status: TimerStatus = TimerStatus.IDLE,
-    val fadeProgress: Float = 1.0f,
-    val showOverlay: Boolean = false,
-    val overlayPosition: Pair<Float, Float> = 0f to 0f,
-    val overlaySize: Pair<Float, Float> = 420f to 350f,
+    @Transient val remainingSeconds: Long = 1800,
+    @Transient val status: TimerStatus = TimerStatus.IDLE,
+    @Transient val fadeProgress: Float = 1.0f,
+    @Transient val showOverlay: Boolean = false,
+    @Transient val overlayPosition: Pair<Float, Float> = 0f to 0f,
+    @Transient val overlaySize: Pair<Float, Float> = 420f to 350f,
 )
 
 @Immutable
@@ -84,12 +89,24 @@ class TimerViewModel(
     private val metadataNotifier: TimerMetadataNotifier,
     private val widgetNotifier: TimerWidgetNotifier,
     scope: FeatureCoroutineScope,
+    persistence: FeatureStatePersistence,
 ) : TimerFeature {
 
     private val coroutineScope = scope
 
     private val _state = MutableStateFlow(TimerUiState())
     override val stateFlow: StateFlow<TimerUiState> = _state.asStateFlow()
+
+    init {
+        persistence.bind(
+            stateFlow = stateFlow,
+            serializer = TimerUiState.serializer(),
+            reader = { it.lastTimerJson },
+            writer = { prefs, json -> prefs.copy(lastTimerJson = json) },
+            restoreStrategy = RestoreStrategy.USER_PREFERENCES,
+            onRestore = { saved -> setDuration(saved.durationMinutes) },
+        )
+    }
 
     private val wakeLockManager = WakeLockManager()
 

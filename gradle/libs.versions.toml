@@ -5,19 +5,19 @@ android-minSdk = "26"
 android-targetSdk = "36"
 androidx-activity = "1.13.0"
 androidx-appcompat = "1.7.1"
-androidx-core = "1.17.0"
+androidx-core = "1.18.0"
 androidx-espresso = "3.7.0"
-androidx-lifecycle = "2.9.6"
+androidx-lifecycle = "2.10.0"
 androidx-lifecycle-viewmodel = "2.10.0"
 androidx-testExt = "1.3.0"
-composeGradlePlugin = "1.10.2"
+composeGradlePlugin = "1.10.3"
 composeHotReload = "1.0.0"
-composeMultiplatform = "1.10.2"
+composeMultiplatform = "1.10.3"
 gradle = "9.1.0"
 junit = "4.13.2"
 kotlin = "2.3.20"
 ksp = "2.3.6"
-kotlinx-atomicfu = "0.31.0"
+kotlinx-atomicfu = "0.32.1"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.10.0"
 kotlinx-datetime = "0.7.1-0.6.x-compat"
@@ -28,14 +28,15 @@ material3Version = "1.9.0"
 media = "1.7.1"
 slf4jApi = "2.0.17"
 logback = "1.5.32"
-metro = "0.11.4"
+metro = "0.13.0"
+multiplatform-nav3-ui = "1.0.0-alpha06"
 ktmidi = "0.11.2"
 coremidi4j = "1.6"
 navigation3 = "1.0.1"
 adaptiveNavigation3 = "1.2.0"
-material3 = "1.5.0-alpha15"
-koog = "0.7.1"
-ktor = "3.4.1"
+material3 = "1.5.0-alpha16"
+koog = "0.7.3"
+ktor = "3.4.2"
 buildkonfig = "0.17.1"
 markdown = "0.39.2"
 androidx-benchmark-macro = "1.4.1"
@@ -43,7 +44,7 @@ androidx-profileinstaller = "1.4.1"
 androidx-test-uiautomator = "2.3.0"
 composeIcons = "1.7.3"
 mediapipe = "0.10.32"
-camerax = "1.5.3"
+camerax = "1.6.0"
 javacv = "1.5.13"
 
 [libraries]
@@ -90,7 +91,10 @@ metrox-viewmodel-compose = { module = "dev.zacsweers.metro:metrox-viewmodel-comp
 metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
 metrox-viewmodel = { module = "dev.zacsweers.metro:metrox-viewmodel", version.ref = "metro" }
 
-# Navigation3
+# Navigation3 (JetBrains KMP)
+jetbrains-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "multiplatform-nav3-ui" }
+
+# Navigation3 (AndroidX)
 navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
 navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
 lifecycle-viewmodel-navigation3 = { module = "androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "androidx-lifecycle-viewmodel" }

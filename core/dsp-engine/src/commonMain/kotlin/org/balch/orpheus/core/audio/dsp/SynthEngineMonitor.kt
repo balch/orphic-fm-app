@@ -177,6 +177,8 @@ class SynthEngineMonitor(
         // Poll monitor data from C++ via native bridge
         monitoringJob = monitoringScope.launch(dispatcherProvider.io) {
             val monitorBuf = FloatArray(20) // OrpheusMonitorData: peak_l, peak_r, cpu, voice_levels[12], lfo, master, bend, lfo_a, lfo_b
+            val pulsarVizBuf = FloatArray(VIZ_BUF_SIZE)
+            val pulsarReadPos = IntArray(VIZ_CHANNEL_COUNT)
             while (isActive) {
                 nativeBridge.nativeGetMonitor(monitorBuf)
                 _peakFlow.value = maxOf(monitorBuf[0], monitorBuf[1])
@@ -189,6 +191,27 @@ class SynthEngineMonitor(
                 _bendFlow.value = monitorBuf[17]
                 _lfoAOutputFlow.value = monitorBuf[18]
                 _lfoBOutputFlow.value = monitorBuf[19]
+
+                // Poll Pulsar step grid (structural UI data, not viz waveforms).
+                // Always poll when monitoring is active so the grid/playhead
+                // works regardless of viz waveform toggle.
+                nativeBridge.nativeGetPulsarViz(
+                    pulsarGates, pulsarVelocities, pulsarPlayheads, pulsarStepCounts
+                )
+                val trackLevels = FloatArray(PULSAR_NUM_TRACKS)
+                for (t in 0 until PULSAR_NUM_TRACKS) {
+                    pollVizChannel(VIZ_PULSAR_TRACK_0 + t, pulsarReadPos, pulsarVizBuf, _pulsarTrackVizFlows[t])
+                    val data = _pulsarTrackVizFlows[t].value
+                    trackLevels[t] = if (data.isNotEmpty()) data[data.size - 1] else 0f
+                }
+                _pulsarVizFlow.value = PulsarVizData(
+                    stepGates = Array(PULSAR_NUM_TRACKS) { t -> BooleanArray(PULSAR_MAX_STEPS) { s -> pulsarGates[t * PULSAR_MAX_STEPS + s] } },
+                    stepVelocities = Array(PULSAR_NUM_TRACKS) { t -> FloatArray(PULSAR_MAX_STEPS) { s -> pulsarVelocities[t * PULSAR_MAX_STEPS + s] } },
+                    playheads = pulsarPlayheads.copyOf(),
+                    stepCounts = pulsarStepCounts.copyOf(),
+                    trackLevels = trackLevels,
+                )
+
                 delay(MONITOR_POLL_INTERVAL_MS)
             }
         }
@@ -265,26 +288,6 @@ class SynthEngineMonitor(
                     pollVizChannel(VIZ_TIDES_CH1, readPositions, vizBuf, _tidesCh1VizFlow)
                     pollVizChannel(VIZ_TIDES_CH2, readPositions, vizBuf, _tidesCh2VizFlow)
                     pollVizChannel(VIZ_TIDES_CH3, readPositions, vizBuf, _tidesCh3VizFlow)
-
-                    // Poll Pulsar step grid viz (structured data, not a VizRing channel)
-                    nativeBridge.nativeGetPulsarViz(
-                        pulsarGates, pulsarVelocities, pulsarPlayheads, pulsarStepCounts
-                    )
-                    // Poll per-track audio waveform viz rings
-                    val levels = FloatArray(PULSAR_NUM_TRACKS)
-                    for (t in 0 until PULSAR_NUM_TRACKS) {
-                        pollVizChannel(VIZ_PULSAR_TRACK_0 + t, readPositions, vizBuf, _pulsarTrackVizFlows[t])
-                        // Also extract latest peak for PulsarVizData.trackLevels
-                        val data = _pulsarTrackVizFlows[t].value
-                        levels[t] = if (data.isNotEmpty()) data[data.size - 1] else 0f
-                    }
-                    _pulsarVizFlow.value = PulsarVizData(
-                        stepGates = Array(PULSAR_NUM_TRACKS) { t -> BooleanArray(PULSAR_MAX_STEPS) { s -> pulsarGates[t * PULSAR_MAX_STEPS + s] } },
-                        stepVelocities = Array(PULSAR_NUM_TRACKS) { t -> FloatArray(PULSAR_MAX_STEPS) { s -> pulsarVelocities[t * PULSAR_MAX_STEPS + s] } },
-                        playheads = pulsarPlayheads.copyOf(),
-                        stepCounts = pulsarStepCounts.copyOf(),
-                        trackLevels = levels,
-                    )
 
                     delay(VIZ_POLL_INTERVAL_MS)
                 }

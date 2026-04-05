@@ -65,7 +65,7 @@ cd liborpheus_dsp/build-desktop && ./orpheus_dsp_test
 # Step 5: Build dylib for app testing
 cmake --build liborpheus_dsp/desktop/build --target orpheus_desktop --config Release
 cp liborpheus_dsp/desktop/build/liborpheus_desktop.dylib \
-   apps/composeApp/src/jvmMain/resources/native/darwin-aarch64/liborpheus_desktop.dylib
+   apps/orpheus/src/jvmMain/resources/native/darwin-aarch64/liborpheus_desktop.dylib
 ```
 
 ## Tests That Must Exist (Add If Missing)

@@ -194,6 +194,8 @@ if(BUILD_TESTS)
         test/test_turntable.cpp
         test/test_tides.cpp
         test/test_pulsar.cpp
+        test/test_pulsar_bus.cpp
+        test/test_djapp_graph.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE

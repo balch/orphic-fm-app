@@ -441,6 +441,14 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     std::memset(out_l, 0, num_frames * sizeof(float));
     std::memset(out_r, 0, num_frames * sizeof(float));
 
+    // Zero per-bus accumulation buffers
+    std::memset(engine->pulsar_bus_keys_l, 0, num_frames * sizeof(float));
+    std::memset(engine->pulsar_bus_keys_r, 0, num_frames * sizeof(float));
+    std::memset(engine->pulsar_bus_drums_l, 0, num_frames * sizeof(float));
+    std::memset(engine->pulsar_bus_drums_r, 0, num_frames * sizeof(float));
+    std::memset(engine->pulsar_bus_bass_l, 0, num_frames * sizeof(float));
+    std::memset(engine->pulsar_bus_bass_r, 0, num_frames * sizeof(float));
+
     // ── Clock: find step boundaries within this block ──
     // Swing: odd steps are delayed by swing_amount * 0.5 * samples_per_step.
     // We track a global step parity to alternate even/odd thresholds.
@@ -764,10 +772,44 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // ── Mix to stereo with constant-power pan ──
         float vol = track_volume;
         float track_peak = 0.0f;
+
+        // Classify track into bus: engine-type for drums, track role for bass.
+        // Track 3 is always the bass track across all scenes, regardless of engine.
+        PulsarBusType bus;
+        if (t == 3) {
+            bus = PULSAR_BUS_BASS;
+        } else {
+            int engine_id = ts.engine_index;
+            if (engine_id < 0) engine_id = 0;
+            if (engine_id >= 24) engine_id = 0;
+            bus = kEngineBusType[engine_id];
+        }
+
+        // Select bus output pointers
+        float* bus_l;
+        float* bus_r;
+        switch (bus) {
+            case PULSAR_BUS_DRUMS:
+                bus_l = engine->pulsar_bus_drums_l;
+                bus_r = engine->pulsar_bus_drums_r;
+                break;
+            case PULSAR_BUS_BASS:
+                bus_l = engine->pulsar_bus_bass_l;
+                bus_r = engine->pulsar_bus_bass_r;
+                break;
+            default: // PULSAR_BUS_KEYS
+                bus_l = engine->pulsar_bus_keys_l;
+                bus_r = engine->pulsar_bus_keys_r;
+                break;
+        }
+
         for (int i = 0; i < num_frames; i++) {
             float s = track_buffer[i] * vol;
             out_l[i] += s * pan_l;
             out_r[i] += s * pan_r;
+            // Also accumulate into the per-bus buffer
+            bus_l[i] += s * pan_l;
+            bus_r[i] += s * pan_r;
             float a = std::fabs(s);
             if (a > track_peak) track_peak = a;
         }
@@ -775,19 +817,32 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         engine->viz_rings[VIZ_PULSAR_TRACK_0 + t].write(track_peak);
     }
 
-    // Bus limiter: soft-clip the 8-track sum to prevent digital overs.
-    // soft_limit is linear below 0.5, tanh saturation above — natural bus compression.
+    // Copy bus buffers to warps_source_buffers for turntable capture.
+    // warps_source_buffers were zeroed at frame start; += accumulates with other sources.
     for (int i = 0; i < num_frames; i++) {
-        out_l[i] = soft_limit(out_l[i]);
-        out_r[i] = soft_limit(out_r[i]);
+        engine->warps_source_buffers[0][i] +=
+            (engine->pulsar_bus_keys_l[i] + engine->pulsar_bus_keys_r[i]) * 0.5f;
+        engine->warps_source_buffers[1][i] +=
+            (engine->pulsar_bus_drums_l[i] + engine->pulsar_bus_drums_r[i]) * 0.5f;
+        engine->warps_source_buffers[9][i] +=
+            (engine->pulsar_bus_bass_l[i] + engine->pulsar_bus_bass_r[i]) * 0.5f;
     }
 
-    // Apply mix gain with output boost to match other modules.
+    // Apply mix gain BEFORE bus limiter so soft_limit catches the boosted peaks.
+    // Previously gain was applied after limiting, sending 1.5-1.7 peaks into the
+    // master limiter which caused audible pumping on dense bass patterns.
     static constexpr float kPulsarOutputGain = 3.0f;
     float output_gain = mix * kPulsarOutputGain;
     for (int i = 0; i < num_frames; i++) {
         out_l[i] *= output_gain;
         out_r[i] *= output_gain;
+    }
+
+    // Bus limiter: soft-clip the boosted 8-track sum to prevent digital overs.
+    // soft_limit is linear below 0.5, tanh saturation above — natural bus compression.
+    for (int i = 0; i < num_frames; i++) {
+        out_l[i] = soft_limit(out_l[i]);
+        out_r[i] = soft_limit(out_r[i]);
     }
 
     // ── Copy to graph output buffers for effects routing ──

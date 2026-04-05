@@ -43,6 +43,7 @@ fun DistortionPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
+    showExpandedTitle: Boolean = true,
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
@@ -51,7 +52,7 @@ fun DistortionPanel(
     CollapsibleColumnPanel(
         title = "VOL",
         color = OrpheusColors.neonMagenta,
-        expandedTitle = "Mix",
+        expandedTitle = if (showExpandedTitle) "Mix" else null,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,

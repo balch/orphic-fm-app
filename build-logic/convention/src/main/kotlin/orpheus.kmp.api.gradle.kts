@@ -15,8 +15,7 @@ plugins {
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 kotlin {
-    // Android configuration using the new androidLibrary block for AGP 9.0
-    androidLibrary {
+    android {
         compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
         minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
 

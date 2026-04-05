@@ -15,7 +15,7 @@ plugins {
 }
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "org.balch.orpheus.core.ai"
     }
 

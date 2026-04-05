@@ -85,7 +85,7 @@ Your domain is the Orpheus-FM synthesizer — an 8-oscillator organismic synth w
 1. **Audit First**: Before making changes, read the existing panel implementations in `features/*/` to understand current patterns. Check `ui/theme/` for the current OrpheusTheme definition and `ui/widgets/` for shared controls.
 2. **Plan Changes**: Identify inconsistencies or missing elements before writing code.
 3. **Implement**: Make changes following existing Kotlin conventions (Kotlin 2.3.0, Compose Multiplatform).
-4. **Verify**: After changes, run `./gradlew :apps:composeApp:jvmTest` and `./gradlew build` to catch compilation issues.
+4. **Verify**: After changes, run `./gradlew :apps:orpheus:jvmTest` and `./gradlew build` to catch compilation issues.
 5. **Preview**: Ensure all modified composables have working previews.
 
 ## Platform Awareness

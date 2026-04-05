@@ -74,6 +74,8 @@ fun DjPanel(
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
+    showExpandedTitle: Boolean = true,
 ) {
     val djColors = remember { DjColors() }
     val state by feature.stateFlow.collectAsState()
@@ -85,11 +87,12 @@ fun DjPanel(
     CollapsibleColumnPanel(
         title = "DJ",
         color = djColors.panelColor,
-        expandedTitle = "Itchy & Scratchy",
+        expandedTitle = if (showExpandedTitle) "Itchy & Scratchy" else null,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
         modifier = modifier,
+        showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
             SignalTrace(data = outViz, color = djColors.deckAColor, alpha = 0.25f)
         },

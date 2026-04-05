@@ -14,18 +14,24 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.plugin.PortValue.FloatValue
+import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.HornSymbol
 
 @Immutable
+@Serializable
 data class HornUiState(
     val speed: Float = 0.5f,
     val ratio: Float = 0.5f,
@@ -102,6 +108,8 @@ class HornViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
     scope: FeatureCoroutineScope,
+    persistence: FeatureStatePersistence,
+    private val restoreStrategy: RestoreStrategy,
 ) : HornFeature {
 
     private val speedFlow = synthController.controlFlow(HornSymbol.SPEED.controlId)
@@ -137,6 +145,23 @@ class HornViewModel(
                 started = this.sharingStrategy,
                 initialValue = HornUiState()
             )
+
+    init {
+        persistence.bind(
+            stateFlow = stateFlow,
+            serializer = HornUiState.serializer(),
+            reader = { it.lastHornJson },
+            writer = { prefs, json -> prefs.copy(lastHornJson = json) },
+            restoreStrategy = restoreStrategy,
+            onRestore = { saved ->
+                speedFlow.value = FloatValue(saved.speed)
+                ratioFlow.value = FloatValue(saved.ratio)
+                depthFlow.value = FloatValue(saved.depth)
+                mixFlow.value = FloatValue(saved.mix)
+                brakeFlow.value = IntValue(if (saved.brake) 1 else 0)
+            },
+        )
+    }
 
     private fun reduce(state: HornUiState, intent: HornIntent): HornUiState =
         when (intent) {

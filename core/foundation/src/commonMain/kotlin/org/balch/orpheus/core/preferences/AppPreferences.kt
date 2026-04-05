@@ -12,10 +12,17 @@ data class AppPreferences(
     val selectedAiModel: String? = null,
     /** Per-panel signal visualization toggle (disabled by default). */
     val signalVizEnabled: Boolean = false,
+    /** Serialized DJ UI state JSON for cross-session persistence. */
+    val lastDjJson: String? = null,
     /** Serialized Pulsar UI state JSON for cross-session persistence. */
     val lastPulsarJson: String? = null,
     /** Serialized panel expansion overrides: Map of panelId -> expanded. */
     val lastExpandedPanelsJson: String? = null,
+    /** Serialized effect UI states for DJ app cross-session persistence. */
+    val lastTimerJson: String? = null,
+    val lastReverbJson: String? = null,
+    val lastHornJson: String? = null,
+    val lastDistortionJson: String? = null,
 )
 
 

@@ -28,6 +28,8 @@ fun TimerPanel(
     modifier: Modifier = Modifier,
     isExpanded: Boolean = true,
     onExpandedChange: (Boolean) -> Unit = {},
+    showCollapsedHeader: Boolean = true,
+    showExpandedTitle: Boolean = true,
 ) {
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
@@ -39,7 +41,8 @@ fun TimerPanel(
     CollapsibleColumnPanel(
         modifier = modifier,
         title = "Timer",
-        expandedTitle = "Sleep",
+        expandedTitle = if (showExpandedTitle) "Sleep" else null,
+        showCollapsedHeader = showCollapsedHeader,
         color = OrpheusColors.sleepMoonlight,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,

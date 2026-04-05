@@ -38,6 +38,42 @@ enum PulsarEnvelopeProfile : uint8_t {
     ENV_PROFILE_WILD = 3,
 };
 
+// Engine-type bus classification for DJ turntable source routing.
+enum PulsarBusType : uint8_t {
+    PULSAR_BUS_KEYS  = 0,  // melodic engines → warps_source_buffers[0] (SYNTH slot)
+    PULSAR_BUS_DRUMS = 1,  // percussive engines → warps_source_buffers[1] (DRUMS slot)
+    PULSAR_BUS_BASS  = 2,  // bass engines → warps_source_buffers[9] (BASS slot)
+};
+
+// Classification table: Plaits engine ID → bus type.
+// 24 engines total (see kOrpheusOutGain in orpheus_voice.h for IDs).
+static constexpr PulsarBusType kEngineBusType[24] = {
+    PULSAR_BUS_BASS,   //  0: VirtualAnalogVCF — bass-oriented filter sweep
+    PULSAR_BUS_KEYS,   //  1: PhaseDistortion — melodic
+    PULSAR_BUS_KEYS,   //  2: SixOp FM1 — melodic
+    PULSAR_BUS_KEYS,   //  3: SixOp FM2 — melodic
+    PULSAR_BUS_KEYS,   //  4: SixOp FM3 — melodic
+    PULSAR_BUS_KEYS,   //  5: WaveTerrain — melodic
+    PULSAR_BUS_KEYS,   //  6: StringMachine — melodic
+    PULSAR_BUS_KEYS,   //  7: Chiptune — melodic
+    PULSAR_BUS_KEYS,   //  8: VirtualAnalog — melodic
+    PULSAR_BUS_KEYS,   //  9: Waveshaping — melodic
+    PULSAR_BUS_KEYS,   // 10: FM — melodic
+    PULSAR_BUS_KEYS,   // 11: Grain — melodic/textural
+    PULSAR_BUS_KEYS,   // 12: Additive — melodic
+    PULSAR_BUS_KEYS,   // 13: Wavetable — melodic
+    PULSAR_BUS_KEYS,   // 14: Chord — melodic
+    PULSAR_BUS_KEYS,   // 15: Speech — melodic/vocal
+    PULSAR_BUS_KEYS,   // 16: Swarm — melodic/textural
+    PULSAR_BUS_DRUMS,  // 17: Noise — percussive
+    PULSAR_BUS_DRUMS,  // 18: Particle — percussive
+    PULSAR_BUS_KEYS,   // 19: String — melodic
+    PULSAR_BUS_DRUMS,  // 20: Modal — percussive (tuned percussion)
+    PULSAR_BUS_DRUMS,  // 21: BassDrum — percussive
+    PULSAR_BUS_DRUMS,  // 22: SnareDrum — percussive
+    PULSAR_BUS_DRUMS,  // 23: HiHat — percussive
+};
+
 struct PulsarGenreProfile {
     float base_density[8];
     float swing_amount;

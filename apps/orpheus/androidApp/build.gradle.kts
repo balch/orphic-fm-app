@@ -1,19 +1,12 @@
 plugins {
-    alias(libs.plugins.androidApplication)
-    id("org.jetbrains.compose")
-    id("org.jetbrains.kotlin.plugin.compose")
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.metro)
+    id("orpheus.android.app")
 }
 
 android {
     namespace = "org.balch.orpheus"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
         applicationId = "org.balch.orpheus"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
 
@@ -21,55 +14,9 @@ android {
             cmake {
                 cppFlags += "-std=c++17"
                 arguments += "-DANDROID_STL=c++_shared"
-                arguments += "-DEURORACK_DIR=/Users/balch/Source/eurorack"
+                arguments += "-DEURORACK_DIR=${File(System.getProperty("user.home"), "Source/eurorack").absolutePath}"
             }
         }
-        ndk {
-            abiFilters += setOf("arm64-v8a", "x86_64")
-        }
-    }
-
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "META-INF/INDEX.LIST"
-            excludes += "META-INF/io.netty.versions.properties"
-            excludes += "META-INF/DEPENDENCIES"
-        }
-    }
-
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("debug")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-        create("debugRelease") {
-            // Release-level R8 + AOT optimization with debug signing.
-            // Use this for day-to-day development on Android to avoid the ~90% CPU
-            // overhead of JIT-only mode on JSyn's DSP synthesis thread.
-            // Logcat still works; step-debugger does not (rarely needed for synth work).
-            initWith(getByName("release"))
-            matchingFallbacks += listOf("release")
-            signingConfig = signingConfigs.getByName("debug")
-        }
-        create("benchmark") {
-            initWith(getByName("release"))
-            matchingFallbacks += listOf("release")
-            signingConfig = signingConfigs.getByName("debug")
-        }
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlin {
-        jvmToolchain(17)
     }
 
     externalNativeBuild {

@@ -22,7 +22,7 @@ plugins {
 
 kotlin {
     // Override namespace for this specific module
-    androidLibrary {
+    android {
         namespace = "org.balch.orpheus.shared"
     }
 

@@ -13,11 +13,13 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.FloatVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.arrayMemberAt
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.usePinned
 import orpheus_dsp.OrpheusMonitorData
 import orpheus_dsp.orpheus_engine_clear_automation
@@ -25,6 +27,7 @@ import orpheus_dsp.orpheus_engine_create
 import orpheus_dsp.orpheus_engine_destroy
 import orpheus_dsp.orpheus_engine_get_monitor
 import orpheus_dsp.orpheus_engine_get_port
+import orpheus_dsp.orpheus_engine_get_pulsar_viz
 import orpheus_dsp.orpheus_engine_get_turntable_viz
 import orpheus_dsp.orpheus_engine_get_viz
 import orpheus_dsp.orpheus_engine_is_tts_playing
@@ -66,6 +69,8 @@ import platform.AVFAudio.sampleRate
 import platform.AVFAudio.setActive
 import platform.AVFAudio.setPreferredIOBufferDuration
 import platform.AVFAudio.setPreferredSampleRate
+import platform.CoreAudioTypes.AudioBuffer
+import platform.CoreAudioTypes.AudioBufferList
 import platform.Foundation.NSDate
 import platform.Foundation.NSNotification
 import platform.Foundation.NSNotificationCenter
@@ -215,10 +220,14 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
             renderBlock = { _, _, frameCount, bufferListPtr ->
                 val eng = engine ?: return@AVAudioSourceNode 0
                 val abl = bufferListPtr!!.pointed
-                // Use .ptr indexing for flexible array member (C's mBuffers[1])
-                val buffersPtr = abl.mBuffers.ptr
-                val leftPtr = buffersPtr[0].mData?.reinterpret<FloatVar>()
-                val rightPtr = buffersPtr[1].mData?.reinterpret<FloatVar>()
+                // Flexible array member offset: AudioBufferList contains one AudioBuffer at end,
+                // so mBuffers offset = sizeOf(AudioBufferList) - sizeOf(AudioBuffer).
+                // This accounts for alignment padding after mNumberBuffers.
+                val mBuffersOffset = sizeOf<AudioBufferList>() - sizeOf<AudioBuffer>()
+                val leftPtr = abl.arrayMemberAt<AudioBuffer>(mBuffersOffset)[0]
+                    .mData?.reinterpret<FloatVar>()
+                val rightPtr = abl.arrayMemberAt<AudioBuffer>(mBuffersOffset + sizeOf<AudioBuffer>())[0]
+                    .mData?.reinterpret<FloatVar>()
 
                 if (leftPtr != null && rightPtr != null) {
                     // C++ renders interleaved internally, deinterleaves into L/R
@@ -486,10 +495,35 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
         return engine?.let { orpheus_engine_is_tts_playing(it) } ?: 0
     }
 
+    @OptIn(ExperimentalForeignApi::class)
     override fun nativeGetPulsarViz(
         gatesOut: BooleanArray, velocitiesOut: FloatArray,
         playheadsOut: IntArray, stepCountsOut: IntArray,
-    ) { /* iOS: not yet implemented */ }
+    ) {
+        engine?.let { eng ->
+            // C API uses int[] for gates (0/1), Kotlin uses BooleanArray — use IntArray as bridge
+            val intGates = IntArray(gatesOut.size)
+            intGates.usePinned { pinnedGates ->
+                velocitiesOut.usePinned { pinnedVel ->
+                    playheadsOut.usePinned { pinnedPlay ->
+                        stepCountsOut.usePinned { pinnedSteps ->
+                            orpheus_engine_get_pulsar_viz(
+                                eng,
+                                pinnedGates.addressOf(0),
+                                pinnedVel.addressOf(0),
+                                pinnedPlay.addressOf(0),
+                                pinnedSteps.addressOf(0),
+                            )
+                        }
+                    }
+                }
+            }
+            // Convert int gates (0/1) to BooleanArray
+            for (i in intGates.indices) {
+                gatesOut[i] = intGates[i] != 0
+            }
+        }
+    }
 
     companion object {
         private val log = logging("IosAudioEngine")

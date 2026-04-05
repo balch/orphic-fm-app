@@ -688,6 +688,14 @@ struct OrpheusEngine {
     float pulsar_out_l[kMaxFrames] = {};
     float pulsar_out_r[kMaxFrames] = {};
 
+    // Per-bus output buffers for Pulsar engine-type classification.
+    float pulsar_bus_keys_l[kMaxFrames] = {};
+    float pulsar_bus_keys_r[kMaxFrames] = {};
+    float pulsar_bus_drums_l[kMaxFrames] = {};
+    float pulsar_bus_drums_r[kMaxFrames] = {};
+    float pulsar_bus_bass_l[kMaxFrames] = {};
+    float pulsar_bus_bass_r[kMaxFrames] = {};
+
     // Pulsar visualization (written by audio thread, read by UI)
     PulsarViz pulsar_viz = {};
     std::atomic<int> pulsar_viz_version{0};

@@ -2,30 +2,34 @@ package org.balch.orpheus.features.reverb
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-
-import kotlinx.coroutines.flow.SharingStarted
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
+import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.FeatureStatePersistence
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.RestoreStrategy
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.plugin.PortValue.FloatValue
+import org.balch.orpheus.core.plugin.symbols.ReverbSymbol
 
 @Immutable
+@Serializable
 data class ReverbUiState(
     val amount: Float = 0.0f,
     val time: Float = 0.5f,
@@ -97,6 +101,8 @@ class ReverbViewModel(
     synthController: SynthController,
     dispatcherProvider: DispatcherProvider,
     scope: FeatureCoroutineScope,
+    persistence: FeatureStatePersistence,
+    private val restoreStrategy: RestoreStrategy,
 ) : ReverbFeature {
 
     private val amountFlow = synthController.controlFlow(ReverbSymbol.AMOUNT.controlId)
@@ -129,6 +135,22 @@ class ReverbViewModel(
                 started = this.sharingStrategy,
                 initialValue = ReverbUiState()
             )
+
+    init {
+        persistence.bind(
+            stateFlow = stateFlow,
+            serializer = ReverbUiState.serializer(),
+            reader = { it.lastReverbJson },
+            writer = { prefs, json -> prefs.copy(lastReverbJson = json) },
+            restoreStrategy = restoreStrategy,
+            onRestore = { saved ->
+                amountFlow.value = FloatValue(saved.amount)
+                timeFlow.value = FloatValue(saved.time)
+                dampingFlow.value = FloatValue(saved.damping)
+                diffusionFlow.value = FloatValue(saved.diffusion)
+            },
+        )
+    }
 
     private fun reduce(state: ReverbUiState, intent: ReverbIntent): ReverbUiState =
         when (intent) {

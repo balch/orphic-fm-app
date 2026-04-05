@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +45,8 @@ import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.EnginePickerButton
+import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
+import org.balch.orpheus.ui.widgets.LabelSide
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
 // Display order (decoupled from C++ kPulsarScenes[] index)
@@ -152,6 +156,7 @@ fun PulsarPanel(
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
+    showExpandedTitle: Boolean = true,
 ) {
     val vizData by vizFlow.collectAsState()
     CollapsibleColumnPanel(
@@ -161,7 +166,7 @@ fun PulsarPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = true,
-        expandedTitle = "8 Track",
+        expandedTitle = if (showExpandedTitle) "8 Track" else null,
         showCollapsedHeader = showCollapsedHeader,
     ) {
         val state by pulsar.stateFlow.collectAsState()
@@ -240,31 +245,7 @@ fun PulsarPanel(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(horizontal = 8.dp),
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                RotaryKnob(
-                    value = state.bpm,
-                    onValueChange = actions.setBpm,
-                    label = "BPM",
-                    controlId = PulsarSymbol.BPM.controlId.key,
-                    range = 40f..300f,
-                    size = 28.dp,
-                    progressColor = OrpheusColors.cosmicPurple,
-                    valueFormatter = { "${it.toInt()}" },
-                )
-
-                RotaryKnob(
-                    value = state.reverbSend,
-                    onValueChange = actions.setReverbSend,
-                    label = "REVERB",
-                    controlId = PulsarSymbol.REVERB_SEND.controlId.key,
-                    size = 28.dp,
-                    progressColor = OrpheusColors.cosmicPurple,
-                )
-            }
 
             // Center: Step grid — weight(1f) fills remaining Row space, max capped inside
             PulsarStepGrid(
@@ -276,7 +257,11 @@ fun PulsarPanel(
                 mood = state.mood,
                 selectedTrack = state.selectedTrack,
                 onTrackSelected = actions.selectTrack,
-                modifier = Modifier,
+                modifier = Modifier
+                    .width(360.dp)
+                    .height(120.dp)
+                    .alpha(.8f)
+                ,
             )
         }
 
@@ -338,10 +323,50 @@ fun PulsarPanel(
             }
         }
 
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(30.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HorizontalRotaryKnob(
+                value = state.reverbSend,
+                onValueChange = actions.setReverbSend,
+                label = "REVERB",
+                controlId = PulsarSymbol.REVERB_SEND.controlId.key,
+                size = 28.dp,
+                progressColor = OrpheusColors.cosmicPurple,
+                labelSide = LabelSide.START,
+                valueFormatter = null,
+            )
+            HorizontalRotaryKnob(
+                value = state.bpm,
+                onValueChange = actions.setBpm,
+                label = "BPM",
+                controlId = PulsarSymbol.BPM.controlId.key,
+                range = 40f..300f,
+                size = 36.dp,
+                progressColor = OrpheusColors.cosmicPurple,
+                labelSide = LabelSide.START,
+                valueFormatter = { "${it.toInt()}" },
+            )
+
+            HorizontalRotaryKnob(
+                value = state.percMix,
+                onValueChange = actions.setPercMix,
+                label = "PERC",
+                controlId = PulsarSymbol.PERC_MIX.controlId.key,
+                size = 28.dp,
+                progressColor = OrpheusColors.cosmicPurple,
+                labelSide = LabelSide.START,
+                valueFormatter = null,
+
+            )
+        }
+
         // Row 4: Big macro knobs
         Row(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Bottom,
+            modifier = Modifier.padding(top = 8.dp),
         ) {
             RotaryKnob(
                 value = state.energy,
@@ -350,6 +375,7 @@ fun PulsarPanel(
                 controlId = PulsarSymbol.ENERGY.controlId.key,
                 size = 48.dp,
                 progressColor = OrpheusColors.cosmicPurple,
+                valueFormatter = null,
             )
             RotaryKnob(
                 value = state.complexity,
@@ -358,6 +384,7 @@ fun PulsarPanel(
                 controlId = PulsarSymbol.COMPLEXITY.controlId.key,
                 size = 48.dp,
                 progressColor = OrpheusColors.cosmicPurple,
+                valueFormatter = null,
             )
             RotaryKnob(
                 value = state.space,
@@ -366,6 +393,7 @@ fun PulsarPanel(
                 controlId = PulsarSymbol.SPACE.controlId.key,
                 size = 48.dp,
                 progressColor = OrpheusColors.cosmicPurple,
+                valueFormatter = null,
             )
             RotaryKnob(
                 value = state.mood,
@@ -374,14 +402,7 @@ fun PulsarPanel(
                 controlId = PulsarSymbol.MOOD.controlId.key,
                 size = 48.dp,
                 progressColor = OrpheusColors.cosmicPurple,
-            )
-            RotaryKnob(
-                value = state.percMix,
-                onValueChange = actions.setPercMix,
-                label = "PERC",
-                controlId = PulsarSymbol.PERC_MIX.controlId.key,
-                size = 32.dp,
-                progressColor = OrpheusColors.cosmicPurple,
+                valueFormatter = null,
             )
             RotaryKnob(
                 value = state.mix,
@@ -390,6 +411,7 @@ fun PulsarPanel(
                 controlId = PulsarSymbol.MIX.controlId.key,
                 size = 32.dp,
                 progressColor = OrpheusColors.cosmicPurple,
+                valueFormatter = null,
             )
 
         }

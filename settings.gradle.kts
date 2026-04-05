@@ -36,6 +36,8 @@ plugins {
 
 include(":apps:orpheus:androidApp")
 include(":apps:orpheus")
+include(":apps:djapp")
+include(":apps:djapp:androidApp")
 include(":apps:macrobenchmark")
 include(":core:ai")
 include(":core:audio")

@@ -28,6 +28,7 @@ import org.balch.orpheus.ui.theme.OrpheusColors
 @Composable
 fun AppTitleTreatment(
     modifier: Modifier = Modifier,
+    title: String = AppConfig.APP_DISPLAY_NAME,
     effects: VisualizationLiquidEffects = VisualizationLiquidEffects.Default,
     showSizeEffects: Boolean = true,
 ) {
@@ -66,7 +67,7 @@ fun AppTitleTreatment(
             } else null
     ) {
         Text(
-            text = AppConfig.APP_DISPLAY_NAME,
+            text = title,
             fontSize =
                 if (showSizeEffects) {
                     effects.title.titleSize

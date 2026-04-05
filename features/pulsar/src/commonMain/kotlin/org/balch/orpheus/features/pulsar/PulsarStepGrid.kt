@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -184,8 +183,6 @@ fun PulsarStepGrid(
 
     BoxWithConstraints(
         modifier = modifier
-            .width(320.dp)
-            .height(120.dp)
             .graphicsLayer {
                 scaleX = beatPulse
                 scaleY = beatPulse
@@ -203,8 +200,11 @@ fun PulsarStepGrid(
             }
     ) {
 
-        // Layer 0: Canvas draws cells, glow, particles (liquefiable = glass source)
-        Canvas(modifier = Modifier.matchParentSize().liquefiable(gridLiquidState)) {
+        // Layer 0: Canvas draws cells, glow, particles
+        Canvas(
+            modifier = Modifier.matchParentSize()
+                .liquefiable(gridLiquidState)
+        ) {
             val totalTrackGaps = (NUM_TRACKS - 1) * trackGap
             val trackHeight = (size.height - totalTrackGaps) / NUM_TRACKS
 

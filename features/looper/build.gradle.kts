@@ -5,7 +5,7 @@ plugins {
 }
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "org.balch.orpheus.features.looper"
     }
 

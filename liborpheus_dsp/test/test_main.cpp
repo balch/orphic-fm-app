@@ -45,6 +45,8 @@ static TestSuite suites[] = {
     {"preset-voices",   run_preset_voice_tests,    true},
     {"benchmark",       run_benchmark_tests,       true},
     {"pulsar",          run_pulsar_tests,          true},
+    {"pulsar_bus",      run_pulsar_bus_tests,      true},
+    {"djapp",           run_djapp_graph_tests,     true},
 };
 
 static constexpr int kNumSuites = sizeof(suites) / sizeof(suites[0]);

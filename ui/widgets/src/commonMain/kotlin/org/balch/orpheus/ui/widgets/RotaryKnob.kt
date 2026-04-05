@@ -40,6 +40,251 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
+/** Shared state holder for knob drag interaction. */
+internal class KnobDragState(
+    initialValue: Float,
+    private val range: ClosedFloatingPointRange<Float>,
+    private val sensitivity: Float,
+) {
+    var internalValue by mutableStateOf(initialValue)
+
+    fun applyDrag(dragAmount: Float, ctrlPressed: Boolean, fineTune: Boolean = false): Float? {
+        val ctrlMultiplier = if (ctrlPressed) 20f else 1f
+        val effectiveSensitivity = sensitivity * (if (fineTune) 10f else 1f) * ctrlMultiplier
+        val delta = (-dragAmount) * (range.endInclusive - range.start) / effectiveSensitivity
+        val newValue = (internalValue + delta).coerceIn(range)
+        return if (newValue != internalValue) {
+            internalValue = newValue
+            newValue
+        } else null
+    }
+}
+
+@Composable
+internal fun rememberKnobDragState(
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    sensitivity: Float = 200f,
+): KnobDragState {
+    val state = remember(value) { KnobDragState(value, range, sensitivity) }
+    return state
+}
+
+/**
+ * The knob circle + arc drawing with drag interaction.
+ * Shared between [RotaryKnob] and [HorizontalRotaryKnob].
+ */
+@Composable
+internal fun RotaryKnobDial(
+    dragState: KnobDragState,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 64.dp,
+    range: ClosedFloatingPointRange<Float> = 0f..1f,
+    trackColor: Color = OrpheusColors.deepPurple,
+    progressColor: Color = OrpheusColors.neonCyan,
+    knobColor: Color = OrpheusColors.softPurple,
+    indicatorColor: Color = OrpheusColors.neonCyan,
+    isLearning: Boolean = false,
+    enabled: Boolean = true,
+) {
+    val sensitivity = 200f
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
+
+    Box(modifier = modifier.size(size)) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(sensitivity, range, isLearning, enabled) {
+                    if (isLearning || !enabled) return@pointerInput
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var previousY = down.position.y
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: break
+                            if (!change.pressed) break
+                            val dragAmount = change.position.y - previousY
+                            previousY = change.position.y
+                            if (dragAmount != 0f) {
+                                change.consume()
+                                dragState.applyDrag(dragAmount, event.keyboardModifiers.isCtrlPressed)
+                                    ?.let { currentOnValueChange(it) }
+                            }
+                        }
+                    }
+                }
+        ) {
+            val strokeWidth = size.toPx() * 0.1f
+            val radius = (size.toPx() - strokeWidth) / 2
+            val center = Offset(size.toPx() / 2, size.toPx() / 2)
+            val arcSize = Size(radius * 2, radius * 2)
+            val topLeft = Offset(center.x - radius, center.y - radius)
+
+            val startAngle = 135f
+            val sweepAngle = 270f
+
+            // Track Groove (Shadow)
+            drawArc(
+                color = Color.Black.copy(alpha = 0.5f),
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+
+            drawArc(
+                color = trackColor.copy(alpha = 0.3f),
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+
+            // Active Progress Arc with Glow
+            val normalizedValue =
+                (dragState.internalValue - range.start) / (range.endInclusive - range.start)
+            val currentSweep = sweepAngle * normalizedValue
+
+            drawArc(
+                brush = Brush.sweepGradient(
+                    colors = listOf(
+                        progressColor.copy(alpha = 0.0f),
+                        progressColor.copy(alpha = 0.6f)
+                    ),
+                    center = center
+                ),
+                startAngle = startAngle,
+                sweepAngle = currentSweep,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth * 1.5f, cap = StrokeCap.Round)
+            )
+
+            drawArc(
+                brush = Brush.sweepGradient(
+                    colors = listOf(progressColor.copy(alpha = 0.5f), progressColor),
+                    center = center
+                ),
+                startAngle = startAngle,
+                sweepAngle = currentSweep,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+
+            // Knob Body
+            val knobRadius = radius * 0.7f
+            val angleInDegrees = startAngle + currentSweep
+            val angleInRadians = angleInDegrees.toDouble() * PI / 180.0
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent),
+                    center = center.copy(y = center.y + 4.dp.toPx()),
+                    radius = knobRadius + 4.dp.toPx()
+                ),
+                radius = knobRadius + 4.dp.toPx(),
+                center = center.copy(y = center.y + 4.dp.toPx())
+            )
+
+            drawCircle(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        knobColor.copy(alpha = 0.8f),
+                        trackColor,
+                        Color.Black
+                    ),
+                    start = Offset(center.x - knobRadius, center.y - knobRadius),
+                    end = Offset(center.x + knobRadius, center.y + knobRadius)
+                ),
+                radius = knobRadius,
+                center = center
+            )
+
+            drawCircle(
+                style = Stroke(width = 2.dp.toPx()),
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.3f),
+                        Color.Black.copy(alpha = 0.6f)
+                    ),
+                    start = Offset(center.x - knobRadius, center.y - knobRadius),
+                    end = Offset(center.x + knobRadius, center.y + knobRadius)
+                ),
+                radius = knobRadius,
+                center = center
+            )
+
+            // Indicator (Notch)
+            val indicatorLength = knobRadius * 0.5f
+            val endX = center.x + indicatorLength * cos(angleInRadians).toFloat()
+            val endY = center.y + indicatorLength * sin(angleInRadians).toFloat()
+
+            drawLine(
+                color = indicatorColor,
+                start = center,
+                end = Offset(endX, endY),
+                strokeWidth = strokeWidth * 0.8f,
+                cap = StrokeCap.Round
+            )
+
+            drawCircle(
+                color = indicatorColor,
+                radius = strokeWidth * 0.6f,
+                center = Offset(endX, endY)
+            )
+        }
+    }
+}
+
+/** Fine-tune value text with precision drag (10x slower). */
+@Composable
+internal fun KnobValueText(
+    dragState: KnobDragState,
+    onValueChange: (Float) -> Unit,
+    range: ClosedFloatingPointRange<Float>,
+    progressColor: Color,
+    valueFormatter: (Float) -> String,
+    modifier: Modifier = Modifier,
+    textAlign: TextAlign = TextAlign.Center,
+) {
+    val sensitivity = 200f
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
+
+    Text(
+        text = valueFormatter(dragState.internalValue),
+        style = MaterialTheme.typography.labelMedium,
+        color = progressColor.lighten(0.3f),
+        textAlign = textAlign,
+        maxLines = 1,
+        modifier = modifier.pointerInput(range, sensitivity) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                var previousY = down.position.y
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull() ?: break
+                    if (!change.pressed) break
+                    val dragAmount = change.position.y - previousY
+                    previousY = change.position.y
+                    if (dragAmount != 0f) {
+                        change.consume()
+                        dragState.applyDrag(dragAmount, event.keyboardModifiers.isCtrlPressed, fineTune = true)
+                            ?.let { currentOnValueChange(it) }
+                    }
+                }
+            }
+        }
+    )
+}
+
 @Composable
 @Preview
 fun RotaryKnobPreview() {
@@ -52,8 +297,10 @@ fun RotaryKnobPreview() {
     }
 }
 
+typealias KnobValueFormatter = (Float) -> String
+
 /**
- * A synth-style rotary knob control.
+ * A synth-style rotary knob control with vertical layout (knob above, label below).
  * Supports vertical drag interaction for precision.
  *
  * @param controlId Optional ID for MIDI learn mode. If provided, this knob can be selected for CC mapping.
@@ -74,19 +321,14 @@ fun RotaryKnob(
     indicatorColor: Color = OrpheusColors.neonCyan,
     labelColor: Color = progressColor,
     enabled: Boolean = true,
-    valueFormatter: (Float) -> String = { value -> 
-        ((value * 100).roundToInt() / 100.0).toString() 
+    valueFormatter: KnobValueFormatter? = { value ->
+        ((value * 100).roundToInt() / 100.0).toString()
     }
 ) {
-    // Sensitivity for drag (pixels per full range)
-    val sensitivity = 200f
-
-    // Get learn mode state from composition local
     val learnState = LocalLearnModeState.current
     val isLearning = controlId != null && learnState.isLearning(controlId)
-
-    // AI tutorial highlight
     val highlightMod = if (controlId != null) Modifier.highlightable(controlId) else Modifier
+    val dragState = rememberKnobDragState(value, range)
 
     Column(
         modifier = modifier
@@ -100,178 +342,18 @@ fun RotaryKnob(
             ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Track current value internally for smooth updates, syncing with external value when it changes
-        var internalValue by remember(value) { mutableStateOf(value) }
-        // Keep onValueChange fresh for pointerInput closures (avoids stale capture when keys don't change)
-        val currentOnValueChange by rememberUpdatedState(onValueChange)
-
-        Box(
-            modifier = Modifier.size(size)
-        ) {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(sensitivity, range, isLearning, enabled) {
-                        if (isLearning || !enabled) {
-                            return@pointerInput
-                        }
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            var previousY = down.position.y
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val change = event.changes.firstOrNull() ?: break
-                                if (!change.pressed) break
-                                val dragAmount = change.position.y - previousY
-                                previousY = change.position.y
-                                if (dragAmount != 0f) {
-                                    change.consume()
-                                    val ctrlMultiplier = if (event.keyboardModifiers.isCtrlPressed) 20f else 1f
-                                    val delta = (-dragAmount) * (range.endInclusive - range.start) / (sensitivity * ctrlMultiplier)
-                                    val newValue = (internalValue + delta).coerceIn(range)
-                                    if (newValue != internalValue) {
-                                        internalValue = newValue
-                                        currentOnValueChange(newValue)
-                                    }
-                                }
-                            }
-                        }
-                    }
-            ) {
-                val strokeWidth = size.toPx() * 0.1f
-                val radius = (size.toPx() - strokeWidth) / 2
-                val center = Offset(size.toPx() / 2, size.toPx() / 2)
-                val arcSize = Size(radius * 2, radius * 2)
-                val topLeft = Offset(center.x - radius, center.y - radius)
-
-                // Track (background arc) - darker and deeper
-                val startAngle = 135f
-                val sweepAngle = 270f
-
-                // Track Groove (Shadow)
-                drawArc(
-                    color = Color.Black.copy(alpha = 0.5f),
-                    startAngle = startAngle,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-
-                drawArc(
-                    color = trackColor.copy(alpha = 0.3f),
-                    startAngle = startAngle,
-                    sweepAngle = sweepAngle,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-
-                // Active Progress Arc with Glow
-                val normalizedValue =
-                    (internalValue - range.start) / (range.endInclusive - range.start)
-                val currentSweep = sweepAngle * normalizedValue
-
-                // Progress Glow
-                drawArc(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(
-                            progressColor.copy(alpha = 0.0f),
-                            progressColor.copy(alpha = 0.6f)
-                        ),
-                        center = center
-                    ),
-                    startAngle = startAngle,
-                    sweepAngle = currentSweep,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth * 1.5f, cap = StrokeCap.Round)
-                )
-
-                // Progress Core
-                drawArc(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(progressColor.copy(alpha = 0.5f), progressColor),
-                        center = center
-                    ),
-                    startAngle = startAngle,
-                    sweepAngle = currentSweep,
-                    useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                )
-
-                // Knob Body Calculation
-                val knobRadius = radius * 0.7f
-                val angleInDegrees = startAngle + currentSweep
-                val angleInRadians = angleInDegrees.toDouble() * PI / 180.0
-
-                // Knob Shadow (fake drop shadow)
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color.Black.copy(alpha = 0.8f), Color.Transparent),
-                        center = center.copy(y = center.y + 4.dp.toPx()),
-                        radius = knobRadius + 4.dp.toPx()
-                    ),
-                    radius = knobRadius + 4.dp.toPx(),
-                    center = center.copy(y = center.y + 4.dp.toPx())
-                )
-
-                // Knob Main Body (Gradient for convexity)
-                drawCircle(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            knobColor.copy(alpha = 0.8f), // Highlight top-left
-                            trackColor,                   // Mid
-                            Color.Black                   // Shadow bottom-right
-                        ),
-                        start = Offset(center.x - knobRadius, center.y - knobRadius),
-                        end = Offset(center.x + knobRadius, center.y + knobRadius)
-                    ),
-                    radius = knobRadius,
-                    center = center
-                )
-
-                // Knob Bevel/Edge
-                drawCircle(
-                    style = Stroke(width = 2.dp.toPx()),
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.3f),
-                            Color.Black.copy(alpha = 0.6f)
-                        ),
-                        start = Offset(center.x - knobRadius, center.y - knobRadius),
-                        end = Offset(center.x + knobRadius, center.y + knobRadius)
-                    ),
-                    radius = knobRadius,
-                    center = center
-                )
-
-                // Indicator (Notch)
-                val indicatorLength = knobRadius * 0.5f
-                val endX = center.x + indicatorLength * cos(angleInRadians).toFloat()
-                val endY = center.y + indicatorLength * sin(angleInRadians).toFloat()
-
-                drawLine(
-                    color = indicatorColor,
-                    start = center,
-                    end = Offset(endX, endY),
-                    strokeWidth = strokeWidth * 0.8f,
-                    cap = StrokeCap.Round
-                )
-
-                // Indicator Glow Point
-                drawCircle(
-                    color = indicatorColor,
-                    radius = strokeWidth * 0.6f,
-                    center = Offset(endX, endY)
-                )
-            }
-        }
+        RotaryKnobDial(
+            dragState = dragState,
+            onValueChange = onValueChange,
+            size = size,
+            range = range,
+            trackColor = trackColor,
+            progressColor = progressColor,
+            knobColor = knobColor,
+            indicatorColor = indicatorColor,
+            isLearning = isLearning,
+            enabled = enabled,
+        )
 
         if (label != null) {
             Spacer(modifier = Modifier.height(2.dp))
@@ -283,37 +365,15 @@ fun RotaryKnob(
                 maxLines = 1
             )
         }
-        Text(
-            text = valueFormatter(internalValue),
-            style = MaterialTheme.typography.labelMedium,
-            color = progressColor.lighten(0.3f),
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.pointerInput(range, sensitivity) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    var previousY = down.position.y
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull() ?: break
-                        if (!change.pressed) break
-                        val dragAmount = change.position.y - previousY
-                        previousY = change.position.y
-                        if (dragAmount != 0f) {
-                            change.consume()
-                            // Fine tune: 10x slower, Ctrl: additional 5x
-                            val ctrlMultiplier = if (event.keyboardModifiers.isCtrlPressed) 20f else 1f
-                            val fineSensitivity = sensitivity * 10f * ctrlMultiplier
-                            val delta = (-dragAmount) * (range.endInclusive - range.start) / fineSensitivity
-                            val newValue = (internalValue + delta).coerceIn(range)
-                            if (newValue != internalValue) {
-                                internalValue = newValue
-                                currentOnValueChange(newValue)
-                            }
-                        }
-                    }
-                }
-            }
-        )
+
+        if (valueFormatter != null) {
+            KnobValueText(
+                dragState = dragState,
+                onValueChange = onValueChange,
+                range = range,
+                progressColor = progressColor,
+                valueFormatter = valueFormatter,
+            )
+        }
     }
 }

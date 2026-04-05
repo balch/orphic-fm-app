@@ -78,6 +78,8 @@ fun HornPanel(
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
+    showCollapsedHeader: Boolean = true,
+    showExpandedTitle: Boolean = true,
 ) {
     val uiState by feature.stateFlow.collectAsState()
     val actions = feature.actions
@@ -142,7 +144,8 @@ fun HornPanel(
 
     CollapsibleColumnPanel(
         title = "HORN",
-        expandedTitle = "Leslie",
+        expandedTitle = if (showExpandedTitle) "Leslie" else null,
+        showCollapsedHeader = showCollapsedHeader,
         color = CrimsonHorn,
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,

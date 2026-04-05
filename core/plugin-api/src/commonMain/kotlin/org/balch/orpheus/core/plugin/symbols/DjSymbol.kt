@@ -1,5 +1,6 @@
 package org.balch.orpheus.core.plugin.symbols
 
+import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.plugin.PortSymbol
 import org.balch.orpheus.core.plugin.Symbol
 
@@ -23,6 +24,7 @@ enum class DjSymbol(
     REVERB_SEND("reverb_send", displayName = "Reverb Send"),
 }
 
+@Serializable
 enum class DjSource(val index: Int, val label: String) {
     SYNTH(0, "Synth"),
     DRUMS(1, "Drums"),

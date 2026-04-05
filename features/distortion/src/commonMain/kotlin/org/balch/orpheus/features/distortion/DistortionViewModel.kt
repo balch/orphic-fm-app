@@ -2,7 +2,6 @@ package org.balch.orpheus.features.distortion
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -15,19 +14,25 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
+import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.FeatureStatePersistence
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.RestoreStrategy
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.DistortionSymbol
 import org.balch.orpheus.core.plugin.symbols.StereoSymbol
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.synthFeature
 
 @Immutable
+@Serializable
 data class DistortionUiState(
     val drive: Float = 0.0f,
     val volume: Float = 0.7f,
@@ -105,6 +110,8 @@ interface DistortionFeature : SynthFeature<DistortionUiState, DistortionPanelAct
 class DistortionViewModel(
     private val engine: SynthEngine,
     private val synthController: SynthController,
+    persistence: FeatureStatePersistence,
+    private val restoreStrategy: RestoreStrategy,
     dispatcherProvider: DispatcherProvider,
     scope: FeatureCoroutineScope,
 ) : DistortionFeature {
@@ -148,6 +155,23 @@ class DistortionViewModel(
                 started = this.sharingStrategy,
                 initialValue = DistortionUiState()
             )
+
+    init {
+        persistence.bind(
+            stateFlow = stateFlow,
+            serializer = DistortionUiState.serializer(),
+            reader = { it.lastDistortionJson },
+            writer = { prefs, json -> prefs.copy(lastDistortionJson = json) },
+            restoreStrategy = restoreStrategy,
+            stripTransient = { it.copy(peak = 0f) },
+            onRestore = { saved ->
+                driveId.value = FloatValue(saved.drive)
+                mixId.value = FloatValue(saved.mix)
+                volumeId.value = FloatValue(saved.volume)
+                masterPanId.value = FloatValue(saved.masterPan)
+            },
+        )
+    }
 
     // ═══════════════════════════════════════════════════════════
     // REDUCER
