@@ -1,6 +1,7 @@
 #pragma once
 
 #include "orpheus_unit_pulsar.h"
+#include <algorithm>
 
 // ---------------------------------------------------------------------------
 // Algorithmic pattern generation for Pulsar beat machine
@@ -348,35 +349,112 @@ inline void generate_effect_pattern(
 }
 
 // ---------------------------------------------------------------------------
+// Lick pattern generator: melodic tracks driven by AI-generated lick data
+// ---------------------------------------------------------------------------
+
+inline void generate_lick_pattern(
+    PulsarStep* steps, int step_count,
+    const PulsarLickStep* lick, int lick_length,
+    float mutation, uint8_t root_note, const PulsarScale& scale,
+    uint32_t seed)
+{
+    // Clear all steps first (rests by default)
+    for (int i = 0; i < step_count; i++) {
+        steps[i] = make_step(0, 0.0f, false, 0.0f);
+    }
+
+    // Walk through lick steps, converting beat-based durations to sequencer slots.
+    // Each lick duration is in beats (0.5 = eighth, 1.0 = quarter, 2.0 = half).
+    // Sequencer runs at 4 steps/beat (16th notes), so duration * 4 = steps occupied.
+    // Gate fires on the first step; remaining steps within the duration are rests.
+    int step_pos = 0;
+    int lick_idx = 0;
+
+    while (step_pos < step_count) {
+        int li = lick_idx % lick_length;
+        lick_idx++;
+        const auto& ls = lick[li];
+
+        float mutate_chance = pattern_rand01(seed);
+
+        int degree = ls.scale_degree;
+        float dur = ls.duration;
+        float vel = ls.velocity;
+
+        // How many sequencer steps this lick note occupies
+        int slots = std::max(1, static_cast<int>(dur * 4.0f + 0.5f));
+
+        if (degree < 0) {
+            // Rest — at high mutation, might become a note
+            if (mutate_chance < mutation * 0.3f) {
+                degree = static_cast<int>(pattern_rand(seed) % 5);
+                vel = 0.5f + pattern_rand01(seed) * 0.3f;
+            } else {
+                // Skip these slots (already cleared to rests)
+                step_pos += slots;
+                continue;
+            }
+        } else if (mutate_chance < mutation) {
+            float intensity = mutation * pattern_rand01(seed);
+            if (intensity > 0.7f) {
+                degree = static_cast<int>(pattern_rand(seed) % 7);
+            } else if (intensity > 0.3f) {
+                int shift = static_cast<int>(pattern_rand(seed) % 3) - 1;
+                degree += shift;
+            }
+            vel += (pattern_rand01(seed) - 0.5f) * 0.2f * mutation;
+            vel = std::max(0.2f, std::min(1.0f, vel));
+            // Mutate duration slightly but keep slot count stable
+            dur += (pattern_rand01(seed) - 0.5f) * 0.3f * mutation;
+            dur = std::max(0.1f, std::min(2.0f, dur));
+        }
+
+        // Quantize scale degree to MIDI note
+        int octave = 0;
+        int d = degree;
+        while (d < 0) { d += scale.count; octave--; }
+        while (d >= scale.count) { d -= scale.count; octave++; }
+
+        uint8_t midi_note = static_cast<uint8_t>(
+            std::max(0, std::min(127,
+                static_cast<int>(root_note) + 48 + octave * 12 + scale.degrees[d])));
+
+        // Gate duration as fraction of the note's total step span
+        float gate_frac = std::min(1.0f, 0.8f / static_cast<float>(slots));
+
+        if (step_pos < step_count) {
+            steps[step_pos] = make_step(midi_note, vel, true, gate_frac);
+        }
+        // Remaining slots within this note's duration stay as rests
+        step_pos += slots;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Main dispatcher: generates pattern for a track based on its index
 // ---------------------------------------------------------------------------
 
 inline void generate_track_pattern(
     PulsarTrackState& ts, int track_index,
-    const PulsarScenePreset& scene, uint32_t seed)
+    bool percussive,
+    const PulsarGenreProfile& genre,
+    uint8_t root_note, const PulsarScale& scale,
+    int step_count, uint32_t seed)
 {
-    // Mix track index into seed for uniqueness
     seed ^= static_cast<uint32_t>(track_index * 2654435761u);
-    pattern_rand(seed); // warm up
+    pattern_rand(seed);
 
-    const PulsarGenreProfile& genre = scene.genre;
-    const PulsarScale& scale = kPulsarScales[scene.scale_index];
-    int step_count = scene.tracks[track_index].step_count;
     if (step_count <= 0) step_count = 16;
     if (step_count > kMaxPulsarSteps) step_count = kMaxPulsarSteps;
-
     ts.step_count = step_count;
 
-    if (track_index <= 2) {
-        // Rhythm tracks: KICK=0, PERC=1, HIHAT=2
+    if (percussive) {
         generate_rhythm_pattern(ts.steps, step_count, track_index, genre, seed);
     } else if (track_index <= 4) {
-        // Melodic tracks: BASS=3, KEYS=4
         generate_melodic_pattern(ts.steps, step_count, track_index, genre,
-                                 scene.root_note, scale, seed);
+                                 root_note, scale, seed);
     } else {
-        // Effect tracks: PAD=5, TEXTURE=6, FX=7
         generate_effect_pattern(ts.steps, step_count, track_index, genre,
-                                scene.root_note, scale, seed);
+                                root_note, scale, seed);
     }
 }

@@ -83,19 +83,6 @@ struct PulsarGenreProfile {
     uint8_t rhythm_pattern;  // 0=sparse, 1=four-on-floor, 2=backbeat-heavy, 3=dense-16th
 };
 
-struct PulsarTrackPreset {
-    int engine_edm;        // engine for high-energy
-    int engine_space;      // engine for low-energy
-    int step_count;
-    float volume;
-    float pan;
-    float harmonics;
-    float timbre;
-    float morph;
-    PulsarTrackMacroMap macro_map;
-    PulsarEnvelopeProfile envelope_profile;
-};
-
 struct PulsarScale {
     int count;
     uint8_t degrees[12];
@@ -110,14 +97,6 @@ static const PulsarScale kPulsarScales[] = {
     {12, {0,1,2,3,4,5,6,7,8,9,10,11}},             // 5: Chromatic
 };
 static constexpr int kNumPulsarScales = 6;
-
-struct PulsarScenePreset {
-    float default_bpm;
-    uint8_t root_note;     // 0=C, 1=C#, ... 11=B
-    uint8_t scale_index;   // index into kPulsarScales
-    PulsarTrackPreset tracks[kNumPulsarTracks];
-    PulsarGenreProfile genre;
-};
 
 enum PulsarEnvPhase { ENV_IDLE, ENV_ATTACK, ENV_SUSTAIN, ENV_DECAY };
 
@@ -150,32 +129,14 @@ struct PulsarTrackState {
     bool prev_step_gated;    // was the previous step also gated
 };
 
-// ---------------------------------------------------------------------------
-// Scene Presets
-// ---------------------------------------------------------------------------
+// ── Lick step (mirrors OrpheusEngine::LickStepAtomic layout) ────────────
+static constexpr int kMaxLickSteps = 32;
 
-// Helper: inactive step
-#define _PS0 {0, 0.0f, false, 0.0f}
-// Helper: active step (note, velocity, duration)
-#define _PS(n,v,d) {n, v, true, d}
-
-#include "pulsar_scene_deep_space.h"
-#include "pulsar_scene_chillwave.h"
-#include "pulsar_scene_cosmic_techno.h"
-#include "pulsar_scene_dog_house.h"
-#include "pulsar_scene_artemis2.h"
-
-static constexpr int kNumPulsarScenes = 5;
-static const PulsarScenePreset kPulsarScenes[kNumPulsarScenes] = {
-    kPulsarSceneDeepSpace,
-    kPulsarSceneChillwave,
-    kPulsarSceneCosmicTechno,
-    kPulsarSceneDogHouse,
-    kPulsarSceneArtemis2,
+struct PulsarLickStep {
+    int8_t scale_degree;
+    float duration;
+    float velocity;
 };
-
-#undef _PS0
-#undef _PS
 
 // ── Persistent state (heap-allocated on first process call) ──────────────
 static constexpr int kVoiceAllocBytes_Pulsar = 32768;
@@ -183,7 +144,7 @@ static constexpr int kVoiceAllocBytes_Pulsar = 32768;
 struct PulsarState {
     PulsarTrackState tracks[kNumPulsarTracks];
     double clock_accumulator;   // fractional sample counter for step grid
-    int current_scene;
+    int current_vibe_generation;
     bool initialized;
     float smooth_energy, smooth_complexity, smooth_space, smooth_mood;
 
@@ -204,14 +165,17 @@ struct PulsarState {
     int last_root_note;
     int last_scale_index;
 
+    // Lick state (copied from engine atomics on vibe load)
+    int lick_length;
+    PulsarLickStep lick[kMaxLickSteps];
+    float lick_mutation;
+
     // Elastic tempo: slow random walk
     float tempo_drift;           // current tempo offset (-0.15 to +0.15)
     float tempo_drift_target;    // random walk target
     int tempo_drift_countdown;   // samples until next target change
 };
 
-// Forward declaration
-struct OrpheusEngine;
 struct GraphUnit;
 
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);

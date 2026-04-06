@@ -702,7 +702,7 @@ struct OrpheusEngine {
 
     // Pulsar parameters (set by Kotlin via setPort)
     std::atomic<int> pulsar_playing{0};
-    std::atomic<int> pulsar_scene{0};
+    std::atomic<int> pulsar_vibe_generation{0};  // incremented by Kotlin on vibe load
     std::atomic<float> pulsar_energy{0.5f};
     std::atomic<float> pulsar_complexity{0.3f};
     std::atomic<float> pulsar_space{0.4f};
@@ -712,9 +712,52 @@ struct OrpheusEngine {
     std::atomic<int> pulsar_scale_index{0};    // 0-5 into kPulsarScales
     std::atomic<float> pulsar_mix{0.0f};       // output level 0-1
     std::atomic<float> pulsar_perc_mix{0.7f};  // percussion group volume 0-1
-    std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides, 2=Blend (AD at high energy, Tides at low)
+    std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides, 2=Blend
     std::atomic<int> pulsar_track_engine_edm[8]{};
     std::atomic<int> pulsar_track_engine_space[8]{};
+
+    // Per-track voice params (set by Kotlin on vibe load)
+    std::atomic<float> pulsar_track_volume[8]{};
+    std::atomic<float> pulsar_track_pan[8]{};
+    std::atomic<float> pulsar_track_harmonics[8]{};
+    std::atomic<float> pulsar_track_timbre[8]{};
+    std::atomic<float> pulsar_track_morph[8]{};
+    std::atomic<int>   pulsar_track_envelope[8]{};
+    std::atomic<int>   pulsar_track_percussive[8]{};
+
+    // Per-track macro maps (set by Kotlin on vibe load)
+    // 8 targets × 2 (min/max) = 16 floats per track
+    struct PulsarTrackMacroAtomic {
+        std::atomic<float> energy_vol_min{0.5f}, energy_vol_max{1.0f};
+        std::atomic<float> energy_density_min{0.3f}, energy_density_max{0.8f};
+        std::atomic<float> complexity_swing_min{0.0f}, complexity_swing_max{0.2f};
+        std::atomic<float> complexity_var_min{0.0f}, complexity_var_max{0.3f};
+        std::atomic<float> space_decay_min{0.2f}, space_decay_max{0.5f};
+        std::atomic<float> space_reverb_min{0.0f}, space_reverb_max{0.3f};
+        std::atomic<float> mood_harm_min{0.3f}, mood_harm_max{0.7f};
+        std::atomic<float> mood_timbre_min{0.3f}, mood_timbre_max{0.7f};
+    };
+    PulsarTrackMacroAtomic pulsar_track_macros[8];
+
+    // Genre profile (set by Kotlin on vibe load)
+    std::atomic<float> pulsar_genre_density[8]{};
+    std::atomic<float> pulsar_genre_swing{0.0f};
+    std::atomic<float> pulsar_genre_ghost_prob{0.0f};
+    std::atomic<int>   pulsar_genre_note_range_low{36};
+    std::atomic<int>   pulsar_genre_note_range_high{72};
+    std::atomic<int>   pulsar_genre_rhythm_pattern{0};
+
+    // Lick transfer buffer (written by Kotlin before setting lick_length)
+    static constexpr int kMaxLickSteps = 32;
+    struct LickStepAtomic {
+        int8_t scale_degree;
+        float duration;
+        float velocity;
+    };
+    std::atomic<int> pulsar_lick_length{0};        // 0 = no lick (pure generative)
+    LickStepAtomic pulsar_lick[kMaxLickSteps];     // not atomic; guarded by length write order
+    std::atomic<float> pulsar_lick_mutation{0.5f};
+    std::atomic<int64_t> pulsar_seed{0};           // 0 = random seed each load
 
     // ── Signal visualization ring buffers ──
     // Written by audio thread (one sample per block), read by UI at ~60fps.

@@ -49,14 +49,6 @@ import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
 import org.balch.orpheus.ui.widgets.LabelSide
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
-// Display order (decoupled from C++ kPulsarScenes[] index)
-private val KitEntries = listOf(
-    "COSMIC TECHNO" to 2,
-    "DOG HOUSE" to 3,
-    "CHILLWAVE" to 1,
-    "ARTEMIS II" to 4,
-    "DEEP SPACE" to 0,
-)
 private val NoteNames = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 private val ScaleNames = listOf("Minor", "Major", "Pentatonic", "Phrygian", "Whole Tone", "Chromatic")
 
@@ -177,12 +169,13 @@ fun PulsarPanel(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Top,
         ) {
+            val vibeList = remember { PulsarVibes.all() }
             EnumDropdown(
-                label = "KIT",
-                selectedDisplay = KitEntries.first { it.second == state.sceneIndex }.first,
-                entries = KitEntries,
-                displayName = { it.first },
-                onSelected = { actions.setScene(it.second) },
+                label = "VIBE",
+                selectedDisplay = state.vibe.name,
+                entries = vibeList,
+                displayName = { it.name },
+                onSelected = { actions.setVibe(it) },
                 color = OrpheusColors.cosmicPurple,
             )
 
@@ -437,7 +430,11 @@ private fun PulsarPanelPreview() {
 private fun PulsarPanelWithSelectionPreview() {
     PulsarPanel(
         pulsar = PulsarViewModel.previewFeature(
-            PulsarUiState(selectedTrack = 2, mix = 0.8f)
+            PulsarUiState(
+                selectedTrack = 2,
+                mix = 0.8f,
+                vibe = PulsarVibes.all()[0]
+            )
         ),
         isExpanded = true,
         showCollapsedHeader = false,

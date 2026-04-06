@@ -214,42 +214,93 @@ static float compute_fx_probability(float energy, float complexity) {
     return std::max(low_prob, high_prob);
 }
 
-// ── Scene loading ────────────────────────────────────────────────────
+// ── Vibe loading (reads recipe from engine atomics) ─────────────────
 
-static void load_scene(PulsarState* state, int scene_index, OrpheusEngine* engine) {
-    if (scene_index < 0) scene_index = 0;
-    if (scene_index >= kNumPulsarScenes) scene_index = kNumPulsarScenes - 1;
+static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine) {
+    // Read seed — 0 means random
+    int64_t seed_val = engine->pulsar_seed.load(std::memory_order_relaxed);
+    uint32_t base_seed;
+    if (seed_val == 0) {
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        uint32_t time_bits = static_cast<uint32_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(now).count());
+        state->seed_counter += time_bits;
+        base_seed = state->seed_counter * 2654435761u;
+    } else {
+        base_seed = static_cast<uint32_t>(seed_val) * 2654435761u;
+    }
 
-    const PulsarScenePreset& scene = kPulsarScenes[scene_index];
+    // Read genre profile from atomics
+    PulsarGenreProfile genre;
+    for (int i = 0; i < 8; i++)
+        genre.base_density[i] = engine->pulsar_genre_density[i].load(std::memory_order_relaxed);
+    genre.swing_amount = engine->pulsar_genre_swing.load(std::memory_order_relaxed);
+    genre.ghost_probability = engine->pulsar_genre_ghost_prob.load(std::memory_order_relaxed);
+    genre.note_range_low = static_cast<uint8_t>(engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed));
+    genre.note_range_high = static_cast<uint8_t>(engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed));
+    genre.rhythm_pattern = static_cast<uint8_t>(engine->pulsar_genre_rhythm_pattern.load(std::memory_order_relaxed));
 
-    // Mix time entropy so the same kit generates fresh patterns each load
-    auto now = std::chrono::steady_clock::now().time_since_epoch();
-    uint32_t time_bits = static_cast<uint32_t>(
-        std::chrono::duration_cast<std::chrono::microseconds>(now).count());
-    state->seed_counter += time_bits;
-    uint32_t base_seed = state->seed_counter * 2654435761u;
+    // Read lick (length acts as acquire fence)
+    int lick_len = engine->pulsar_lick_length.load(std::memory_order_acquire);
+    if (lick_len > kMaxLickSteps) lick_len = kMaxLickSteps;
+    state->lick_length = lick_len;
+    if (lick_len > 0) {
+        for (int i = 0; i < lick_len; i++) {
+            state->lick[i].scale_degree = engine->pulsar_lick[i].scale_degree;
+            state->lick[i].duration = engine->pulsar_lick[i].duration;
+            state->lick[i].velocity = engine->pulsar_lick[i].velocity;
+        }
+    }
+    state->lick_mutation = engine->pulsar_lick_mutation.load(std::memory_order_relaxed);
+
+    int root = engine->pulsar_root_note.load(std::memory_order_relaxed);
+    int scale_idx = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+    if (scale_idx < 0) scale_idx = 0;
+    if (scale_idx >= static_cast<int>(sizeof(kPulsarScales) / sizeof(kPulsarScales[0])))
+        scale_idx = static_cast<int>(sizeof(kPulsarScales) / sizeof(kPulsarScales[0])) - 1;
+    const PulsarScale& scale = kPulsarScales[scale_idx];
 
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
-        const PulsarTrackPreset& tp = scene.tracks[t];
 
-        // Copy config (NO step data — patterns are generated)
-        ts.step_count = tp.step_count;
-        ts.volume = tp.volume;
-        ts.pan = tp.pan;
-        ts.harmonics = tp.harmonics;
-        ts.timbre = tp.timbre;
-        ts.morph = tp.morph;
-        ts.macro_map = tp.macro_map;
-        ts.envelope_profile = tp.envelope_profile;
+        // Read per-track voice config from atomics
+        ts.volume = engine->pulsar_track_volume[t].load(std::memory_order_relaxed);
+        ts.pan = engine->pulsar_track_pan[t].load(std::memory_order_relaxed);
+        ts.harmonics = engine->pulsar_track_harmonics[t].load(std::memory_order_relaxed);
+        ts.timbre = engine->pulsar_track_timbre[t].load(std::memory_order_relaxed);
+        ts.morph = engine->pulsar_track_morph[t].load(std::memory_order_relaxed);
+        ts.envelope_profile = static_cast<PulsarEnvelopeProfile>(
+            engine->pulsar_track_envelope[t].load(std::memory_order_relaxed));
+        bool percussive = engine->pulsar_track_percussive[t].load(std::memory_order_relaxed) != 0;
 
-        // Generate pattern algorithmically
-        generate_track_pattern(ts, t, scene, base_seed);
+        // Read macro map from atomics
+        auto& m = engine->pulsar_track_macros[t];
+        ts.macro_map = {
+            {m.energy_vol_min.load(std::memory_order_relaxed), m.energy_vol_max.load(std::memory_order_relaxed)},
+            {m.energy_density_min.load(std::memory_order_relaxed), m.energy_density_max.load(std::memory_order_relaxed)},
+            {m.complexity_swing_min.load(std::memory_order_relaxed), m.complexity_swing_max.load(std::memory_order_relaxed)},
+            {m.complexity_var_min.load(std::memory_order_relaxed), m.complexity_var_max.load(std::memory_order_relaxed)},
+            {m.space_decay_min.load(std::memory_order_relaxed), m.space_decay_max.load(std::memory_order_relaxed)},
+            {m.space_reverb_min.load(std::memory_order_relaxed), m.space_reverb_max.load(std::memory_order_relaxed)},
+            {m.mood_harm_min.load(std::memory_order_relaxed), m.mood_harm_max.load(std::memory_order_relaxed)},
+            {m.mood_timbre_min.load(std::memory_order_relaxed), m.mood_timbre_max.load(std::memory_order_relaxed)},
+        };
 
-        // Write engine defaults to atomics
-        engine->pulsar_track_engine_edm[t].store(tp.engine_edm, std::memory_order_relaxed);
-        engine->pulsar_track_engine_space[t].store(tp.engine_space, std::memory_order_relaxed);
-        ts.engine_index = tp.engine_edm;
+        // Generate pattern
+        // Lick drives the lead melody (keys=4) only.
+        // Bass (3) uses its root-heavy generative pattern for complementary foundation.
+        // Tracks 5-7 (pad, texture, FX) use generative patterns for variety.
+        if (lick_len > 0 && !percussive && t == 4) {
+            ts.step_count = 16;
+            generate_lick_pattern(ts.steps, ts.step_count, state->lick, lick_len,
+                                  state->lick_mutation, static_cast<uint8_t>(root), scale,
+                                  base_seed ^ (t * 7919u));
+        } else {
+            generate_track_pattern(ts, t, percussive, genre,
+                                   static_cast<uint8_t>(root), scale, 16, base_seed);
+        }
+
+        ts.engine_index = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
 
         // Reset state
         ts.playhead = 0;
@@ -265,9 +316,9 @@ static void load_scene(PulsarState* state, int scene_index, OrpheusEngine* engin
         ts.prev_step_gated = false;
     }
 
-    state->current_scene = scene_index;
-    state->last_root_note = scene.root_note;
-    state->last_scale_index = scene.scale_index;
+    state->current_vibe_generation = generation;
+    state->last_root_note = root;
+    state->last_scale_index = scale_idx;
     state->clock_accumulator = 0.0;
     state->mutation_seed = base_seed;
     state->loop_count = 0;
@@ -294,7 +345,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         // Zero POD fields only — don't memset the whole struct, which
         // contains OrpheusVoice instances with vtable pointers.
         state->clock_accumulator = 0.0;
-        state->current_scene = -1;  // force scene load
+        state->current_vibe_generation = -1;  // force vibe load
         state->initialized = false;
         state->smooth_energy = 0.5f;
         state->smooth_complexity = 0.3f;
@@ -346,7 +397,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             state->tracks[t].voice.Init(&allocator);
             state->tracks[t].tides_env.Init();
         }
-        load_scene(state, 0, engine);
+        load_vibe(state, engine->pulsar_vibe_generation.load(std::memory_order_relaxed), engine);
         state->initialized = true;
     }
 
@@ -361,10 +412,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         return;
     }
 
-    // ── Handle scene change ──
-    int scene = engine->pulsar_scene.load(std::memory_order_relaxed);
-    if (scene != state->current_scene) {
-        load_scene(state, scene, engine);
+    // ── Handle vibe change ──
+    int vibe_gen = engine->pulsar_vibe_generation.load(std::memory_order_relaxed);
+    if (vibe_gen != state->current_vibe_generation) {
+        load_vibe(state, vibe_gen, engine);
     }
 
     // ── Re-quantize melodic notes when root/scale changes live ──
@@ -376,11 +427,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     if (live_root != state->last_root_note || live_scale != state->last_scale_index) {
         uint8_t root = static_cast<uint8_t>(live_root);
         const PulsarScale& scale = kPulsarScales[live_scale];
-        for (int t = 3; t < kNumPulsarTracks; t++) {
+        for (int t = 0; t < kNumPulsarTracks; t++) {
+            bool percussive = engine->pulsar_track_percussive[t].load(std::memory_order_relaxed) != 0;
+            if (percussive) continue;
             PulsarTrackState& ts = state->tracks[t];
             for (int s = 0; s < ts.step_count; s++) {
                 if (ts.steps[s].gate) {
-                    // Re-quantize from raw_note (original intent) to avoid drift
                     ts.steps[s].note = static_cast<uint8_t>(
                         quantize_to_scale(ts.steps[s].raw_note, root, scale));
                 }
@@ -561,13 +613,38 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                 int reset_interval = std::max(4, static_cast<int>(32.0f * (1.0f - complexity)));
                 if (state->loops_since_reset >= reset_interval) {
                     state->loops_since_reset = 0;
-                    const PulsarScenePreset& sp = kPulsarScenes[state->current_scene];
+                    // Re-read genre profile for regeneration
+                    PulsarGenreProfile rg;
+                    for (int gi = 0; gi < 8; gi++)
+                        rg.base_density[gi] = engine->pulsar_genre_density[gi].load(std::memory_order_relaxed);
+                    rg.swing_amount = engine->pulsar_genre_swing.load(std::memory_order_relaxed);
+                    rg.ghost_probability = engine->pulsar_genre_ghost_prob.load(std::memory_order_relaxed);
+                    rg.note_range_low = static_cast<uint8_t>(engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed));
+                    rg.note_range_high = static_cast<uint8_t>(engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed));
+                    rg.rhythm_pattern = static_cast<uint8_t>(engine->pulsar_genre_rhythm_pattern.load(std::memory_order_relaxed));
+
+                    int rr = engine->pulsar_root_note.load(std::memory_order_relaxed);
+                    int rsi = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+                    if (rsi < 0) rsi = 0;
+                    if (rsi >= static_cast<int>(sizeof(kPulsarScales) / sizeof(kPulsarScales[0])))
+                        rsi = static_cast<int>(sizeof(kPulsarScales) / sizeof(kPulsarScales[0])) - 1;
+                    const PulsarScale& rscale = kPulsarScales[rsi];
+
                     uint32_t reset_seed = state->seed_counter * 2654435761u;
                     for (int rt = 0; rt < kNumPulsarTracks; rt++) {
                         PulsarTrackState& rts = state->tracks[rt];
-                        const PulsarTrackPreset& rtp = sp.tracks[rt];
-                        rts.step_count = rtp.step_count;
-                        generate_track_pattern(rts, rt, sp, reset_seed);
+                        bool perc = engine->pulsar_track_percussive[rt].load(std::memory_order_relaxed) != 0;
+                        if (state->lick_length > 0 && !perc && rt == 4) {
+                            rts.step_count = 16;
+                            generate_lick_pattern(rts.steps, rts.step_count,
+                                                  state->lick, state->lick_length,
+                                                  state->lick_mutation,
+                                                  static_cast<uint8_t>(rr), rscale,
+                                                  reset_seed ^ (rt * 7919u));
+                        } else {
+                            generate_track_pattern(rts, rt, perc, rg,
+                                                   static_cast<uint8_t>(rr), rscale, 16, reset_seed);
+                        }
                     }
                 }
             }
