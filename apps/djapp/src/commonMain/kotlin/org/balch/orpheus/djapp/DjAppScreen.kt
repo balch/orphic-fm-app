@@ -93,109 +93,111 @@ fun DjAppScreen(
     ) {
         val isLandscape = maxWidth > maxHeight
 
-    DjAppNavScaffold(
-        currentRoute = currentRoute,
-        onRouteSelected = { route ->
-            if (route != currentRoute) {
-                backStack.clear()
-                backStack.add(route)
-            }
-        },
-        isLandscape = isLandscape,
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        // Shared nav content composable used in both orientations
-        val navContent: @Composable (Modifier) -> Unit = { navModifier ->
-            Box(modifier = navModifier) {
-                NavDisplay(
-                    backStack = backStack,
-                    onBack = { backStack.removeLastOrNull() },
-                    entryDecorators = listOf(
-                        rememberSaveableStateHolderNavEntryDecorator(),
-                    ),
-                    entryProvider = entryProvider {
-                        entry<DjTab> {
-                            DjPanel(
-                                feature = djFeature,
-                                vizFlowA = synthEngine.djVizFlowA,
-                                vizFlowB = synthEngine.djVizFlowB,
-                                outVizFlow = synthEngine.djOutVizFlow,
-                                modifier = Modifier.fillMaxSize(),
-                                isExpanded = true,
-                                onExpandedChange = {},
-                                showCollapsedHeader = false,
-                                showExpandedTitle = false,
-                            )
-                        }
-                        entry<TimerTab> {
-                            TimerPanel(
-                                modifier = Modifier.fillMaxSize(),
-                                showCollapsedHeader = false,
-                                showExpandedTitle = false,
-                            )
-                        }
-                        entry<MixTab> {
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                ReverbPanel(
-                                    inVizFlow = synthEngine.reverbInVizFlow,
-                                    outVizFlow = synthEngine.reverbOutVizFlow,
-                                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                                    isExpanded = true,
-                                    onExpandedChange = {},
-                                    showCollapsedHeader = false,
-                                    showExpandedTitle = false,
-                                )
-                                DistortionPanel(
-                                    outVizFlow = synthEngine.masterOutVizFlow,
-                                    modifier = Modifier.fillMaxWidth(),
+        DjAppNavScaffold(
+            currentRoute = currentRoute,
+            onRouteSelected = { route ->
+                if (route != currentRoute) {
+                    backStack.clear()
+                    backStack.add(route)
+                }
+            },
+            isLandscape = isLandscape,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            // Shared nav content composable used in both orientations
+            val navContent: @Composable (Modifier) -> Unit = { navModifier ->
+                Box(modifier = navModifier) {
+                    NavDisplay(
+                        backStack = backStack,
+                        onBack = { backStack.removeLastOrNull() },
+                        entryDecorators = listOf(
+                            rememberSaveableStateHolderNavEntryDecorator(),
+                        ),
+                        entryProvider = entryProvider {
+                            entry<DjTab> {
+                                DjPanel(
+                                    feature = djFeature,
+                                    vizFlowA = synthEngine.djVizFlowA,
+                                    vizFlowB = synthEngine.djVizFlowB,
+                                    outVizFlow = synthEngine.djOutVizFlow,
+                                    modifier = Modifier.fillMaxSize(),
                                     isExpanded = true,
                                     onExpandedChange = {},
                                     showCollapsedHeader = false,
                                     showExpandedTitle = false,
                                 )
                             }
-                        }
-                        entry<HornTab> {
-                            HornPanel(
-                                inVizFlow = synthEngine.hornInVizFlow,
-                                outVizFlow = synthEngine.hornOutVizFlow,
-                                hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
-                                wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
-                                modifier = Modifier.fillMaxSize(),
-                                isExpanded = true,
-                                onExpandedChange = {},
-                                showCollapsedHeader = false,
-                                showExpandedTitle = false,
-                            )
-                        }
-                    },
-                )
-            }
-        }
-
-        if (isLandscape) {
-                // Landscape: Header top, Pulsar left + nav content right
-                Column(modifier = Modifier.fillMaxSize().padding(top = 4.dp)) {
-                    DjAppHeaderRow(
-                        vizFeature = vizFeature,
-                        pulsarFeature = pulsarFeature,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            entry<TimerTab> {
+                                TimerPanel(
+                                    modifier = Modifier.fillMaxSize(),
+                                    showCollapsedHeader = false,
+                                    showExpandedTitle = false,
+                                )
+                            }
+                            entry<MixTab> {
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    ReverbPanel(
+                                        inVizFlow = synthEngine.reverbInVizFlow,
+                                        outVizFlow = synthEngine.reverbOutVizFlow,
+                                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                                        isExpanded = true,
+                                        onExpandedChange = {},
+                                        showCollapsedHeader = false,
+                                        showExpandedTitle = false,
+                                    )
+                                    DistortionPanel(
+                                        outVizFlow = synthEngine.masterOutVizFlow,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        isExpanded = true,
+                                        onExpandedChange = {},
+                                        showCollapsedHeader = false,
+                                        showExpandedTitle = false,
+                                    )
+                                }
+                            }
+                            entry<HornTab> {
+                                HornPanel(
+                                    inVizFlow = synthEngine.hornInVizFlow,
+                                    outVizFlow = synthEngine.hornOutVizFlow,
+                                    hornPhaseVizFlow = synthEngine.hornPhaseVizFlow,
+                                    wooferPhaseVizFlow = synthEngine.wooferPhaseVizFlow,
+                                    modifier = Modifier.fillMaxSize(),
+                                    isExpanded = true,
+                                    onExpandedChange = {},
+                                    showCollapsedHeader = false,
+                                    showExpandedTitle = false,
+                                )
+                            }
+                        },
                     )
-                    Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        PulsarPanel(
-                            pulsar = pulsarFeature,
-                            vizFlow = synthEngine.pulsarVizFlow,
-                            trackVizFlows = synthEngine.pulsarTrackVizFlows,
-                            modifier = Modifier.weight(.5f).fillMaxHeight(),
-                            isExpanded = true,
-                            onExpandedChange = {},
-                            showCollapsedHeader = false,
-                            showExpandedTitle = false,
+                }
+            }
 
+            if (isLandscape) {
+                // Landscape: Header top, Pulsar left + nav content right
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    PulsarPanel(
+                        modifier = Modifier.weight(.5f).fillMaxHeight(),
+                        pulsar = pulsarFeature,
+                        vizFlow = synthEngine.pulsarVizFlow,
+                        trackVizFlows = synthEngine.pulsarTrackVizFlows,
+                        isExpanded = true,
+                        onExpandedChange = {},
+                        showCollapsedHeader = false,
+                        showExpandedTitle = false,
+                    )
+                    Column(
+                        modifier = Modifier
+                            .weight(.5f)
+                            .fillMaxHeight()
+                            .padding(top = 4.dp)) {
+                        DjAppHeaderRow(
+                            vizFeature = vizFeature,
+                            pulsarFeature = pulsarFeature,
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                         )
-                        navContent(Modifier.weight(.5f).fillMaxHeight())
+                        navContent(Modifier)
                     }
                 }
             } else {
@@ -224,7 +226,6 @@ fun DjAppScreen(
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
