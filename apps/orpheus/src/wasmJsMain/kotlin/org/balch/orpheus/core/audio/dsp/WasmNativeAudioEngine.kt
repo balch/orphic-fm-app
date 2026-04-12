@@ -147,6 +147,7 @@ class WasmNativeAudioEngine : AudioEngine, NativeDspBridge {
         gatesOut: BooleanArray, velocitiesOut: FloatArray,
         playheadsOut: IntArray, stepCountsOut: IntArray,
     ) { /* WASM: not yet implemented */ }
+    override fun nativeGetPulsarArrangement(out: IntArray) { /* WASM: not yet implemented */ }
 
     companion object {
         private val log = logging("WasmNativeAudioEngine")

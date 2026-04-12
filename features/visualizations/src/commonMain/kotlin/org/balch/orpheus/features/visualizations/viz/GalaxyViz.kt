@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -22,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -87,7 +87,7 @@ data class Star(
  * Knob2 (ARMS): Controls spiral arm tightness
  */
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<Visualization>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
 class GalaxyViz(
     private val engine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,

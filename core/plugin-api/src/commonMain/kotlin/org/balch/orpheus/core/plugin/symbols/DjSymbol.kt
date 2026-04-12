@@ -25,9 +25,10 @@ enum class DjSymbol(
 }
 
 @Serializable
-enum class DjSource(val index: Int, val label: String) {
+enum class DjSource(val sourceId: Int, val label: String) {
     SYNTH(0, "Synth"),
     DRUMS(1, "Drums"),
     BASS(2, "Bass"),
-    MASTER(3, "Master"),
+    MASTER(3, "Feedback"),
+    SUM(4, "8-Track"),
 }

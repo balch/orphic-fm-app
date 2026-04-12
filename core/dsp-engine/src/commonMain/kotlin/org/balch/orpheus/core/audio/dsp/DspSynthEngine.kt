@@ -57,6 +57,9 @@ class DspSynthEngine(
 
     override val hasNativeEngine: Boolean get() = true
 
+    private val _graphReady = kotlinx.coroutines.CompletableDeferred<Unit>()
+    override val graphReady: kotlinx.coroutines.Deferred<Unit> get() = _graphReady
+
     private fun setPort(ps: PortSymbol, value: PortValue): Boolean =
         setPluginPort(ps.uri, ps.symbol, value)
     private fun getPort(ps: PortSymbol): PortValue? =
@@ -111,6 +114,7 @@ class DspSynthEngine(
     override val tidesCh3VizFlow: StateFlow<FloatArray> get() = monitor.tidesCh3VizFlow
     override val pulsarVizFlow get() = monitor.pulsarVizFlow
     override val pulsarTrackVizFlows get() = monitor.pulsarTrackVizFlows
+    override val pulsarArrangementStateFlow get() = monitor.arrangementStateFlow
 
     init {
         voiceManager.initialize()
@@ -418,6 +422,7 @@ class DspSynthEngine(
             monitor.setVizEnabled(true, true)
         }
         log.debug { "Audio Engine Started" }
+        _graphReady.complete(Unit)
     }
 
     override fun setVizEnabled(enabled: Boolean) {

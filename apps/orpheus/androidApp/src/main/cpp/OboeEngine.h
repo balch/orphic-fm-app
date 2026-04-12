@@ -24,7 +24,7 @@ public:
     double getCpuLoad() const;
 
     // Direct C++ DSP engine access
-    OrpheusEngine* getDspEngine() { return dsp_engine_; }
+    OrpheusEngine* getDspEngine() { return dsp_engine_.load(std::memory_order_acquire); }
 
     // C API pass-through (called from JNI bridge for parameter control)
     void setPort(const char* uri, const char* sym, float value);
@@ -48,6 +48,7 @@ public:
     void getMonitor(OrpheusMonitorData* out);
     int  getViz(int channel, float* outBuf, int maxSamples, int* lastReadPos);
     void getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
+    void getPulsarArrangement(int* out);
     void getTurntableViz(int deck, float* outBuf);
     void setAutomation(int target, int voiceIndex, const float* times, const float* values, int count);
     void clearAutomation(int target, int voiceIndex);
@@ -64,7 +65,8 @@ public:
 
 private:
     std::shared_ptr<oboe::AudioStream> mStream;
-    OrpheusEngine* dsp_engine_ = nullptr;
+    std::atomic<OrpheusEngine*> dsp_engine_{nullptr};
+    int32_t mCreatedSampleRate = 0;
     std::atomic<bool> mIsRunning{false};
     std::atomic<double> mCpuLoad{0.0};
 };

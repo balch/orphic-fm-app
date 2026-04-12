@@ -16,8 +16,9 @@ class MainActivity : ComponentActivity() {
         // Edge to edge
         enableEdgeToEdge()
         
-        // Keep screen on
+        // Keep screen on — set on decorView so it survives configuration changes
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.decorView.keepScreenOn = true
         
         // Full screen / Hide status bars
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)

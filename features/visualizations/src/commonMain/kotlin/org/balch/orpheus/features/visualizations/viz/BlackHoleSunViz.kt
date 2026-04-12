@@ -14,11 +14,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -114,7 +115,7 @@ data class BlackholeSunUiState(
  * Knob2 (TRAILS): Controls particle trail length/density
  */
 @Inject
-@ContributesIntoSet(AppScope::class)
+@ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
 class BlackHoleSunViz(
     private val engine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,

@@ -19,6 +19,10 @@ actual class MediaSessionManager(
     private val log = logging("MediaSessionManager")
     private var handler: MediaSessionActionHandler? = null
     private var isActive = false
+    actual var onSkipNext: (() -> Unit)? = null
+    actual var onSkipPrevious: (() -> Unit)? = null
+    actual var onPlay: (() -> Unit)? = null
+    actual var onPause: (() -> Unit)? = null
     
     actual fun activate() {
         if (isActive) return
@@ -29,9 +33,17 @@ actual class MediaSessionManager(
         foregroundServiceController.actionHandler = { action ->
             log.debug { "Received action from service: $action" }
             when (action) {
-                "play" -> handler?.onPlay()
-                "pause" -> handler?.onPause()
+                "play" -> {
+                    val customHandler = onPlay
+                    if (customHandler != null) customHandler() else handler?.onPlay()
+                }
+                "pause" -> {
+                    val customHandler = onPause
+                    if (customHandler != null) customHandler() else handler?.onPause()
+                }
                 "stop" -> handler?.onStop()
+                "skipNext" -> onSkipNext?.invoke() ?: handler?.onSkipNext()
+                "skipPrevious" -> onSkipPrevious?.invoke() ?: handler?.onSkipPrevious()
             }
         }
         
@@ -69,7 +81,7 @@ actual class MediaSessionManager(
         foregroundServiceController.updateMetadata(
             title = metadata.title,
             mode = metadata.mode.name,
-            modeDisplayName = metadata.mode.displayName,
+            modeDisplayName = metadata.displaySubtitle,
             isPlaying = metadata.isPlaying
         )
     }

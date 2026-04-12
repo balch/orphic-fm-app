@@ -284,4 +284,37 @@ void orpheus_engine_get_pulsar_viz(OrpheusEngine* engine,
     }
 }
 
+void orpheus_engine_get_pulsar_arrangement(OrpheusEngine* engine, int* out) {
+    if (!engine || !out) { if (out) out[0] = -1; return; }
+    const PulsarState* ps = engine->pulsar_state;
+    // Use arr_viz_section_index as the gate (not arrangement.active which is a
+    // non-atomic bool and may not be visible across threads).
+    // arr_viz_section_index >= 0 means arrangement is active and has been written.
+    if (!ps) {
+        out[0] = -1;
+        out[1] = 0;
+        out[2] = 0;
+        out[3] = 0;
+        out[4] = -1;
+        out[5] = 0;
+        return;
+    }
+    int sec = ps->arr_viz_section_index.load(std::memory_order_relaxed);
+    if (sec < 0) {
+        out[0] = -1;
+        out[1] = 0;
+        out[2] = 0;
+        out[3] = 0;
+        out[4] = -1;
+        out[5] = 0;
+        return;
+    }
+    out[0] = sec;
+    out[1] = ps->arr_viz_bars_elapsed.load(std::memory_order_relaxed);
+    out[2] = ps->arr_viz_bars_total.load(std::memory_order_relaxed);
+    out[3] = ps->arr_viz_solo_active.load(std::memory_order_relaxed) ? 1 : 0;
+    out[4] = ps->arr_viz_solo_track.load(std::memory_order_relaxed);
+    out[5] = ps->arr_viz_solo_mode.load(std::memory_order_relaxed);
+}
+
 }  // extern "C"

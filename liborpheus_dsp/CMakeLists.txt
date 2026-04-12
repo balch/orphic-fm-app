@@ -122,6 +122,8 @@ set(ORPHEUS_SRC
     "src/orpheus_turntable.cpp"
     "src/orpheus_unit_tides.cpp"
     "src/orpheus_unit_pulsar.cpp"
+    "src/orpheus_unit_pulsar_delay.cpp"
+    "src/orpheus_unit_pulsar_reverb.cpp"
     "src/orpheus_patch.cpp"
     "src/orpheus_resonator.cpp"
 )
@@ -196,6 +198,21 @@ if(BUILD_TESTS)
         test/test_pulsar.cpp
         test/test_pulsar_bus.cpp
         test/test_djapp_graph.cpp
+        test/test_bar_strategy.cpp
+        test/test_pulsar_routing.cpp
+        test/test_pulsar_chords.cpp
+        test/test_pulsar_signal_quality.cpp
+        test/test_pulsar_tension.cpp
+        test/test_pulsar_motifs.cpp
+        test/test_pulsar_solos.cpp
+        test/test_pulsar_sections.cpp
+        test/test_oboe_buffer.cpp
+        test/test_pulsar_texture.cpp
+        test/test_pulsar_pattern_gen.cpp
+        test/test_pulsar_band_solo.cpp
+        test/test_pulsar_lick_techniques.cpp
+        test/test_markov_solo.cpp
+        test/test_pulsar_analysis.cpp
     )
     target_link_libraries(orpheus_dsp_test orpheus_dsp)
     target_include_directories(orpheus_dsp_test PRIVATE

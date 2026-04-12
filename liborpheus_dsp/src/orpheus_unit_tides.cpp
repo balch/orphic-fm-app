@@ -24,11 +24,12 @@ void unit_process_tides(GraphUnit* u, OrpheusEngine* engine, int num_frames, flo
         std::memset(out0, 0, num_frames * sizeof(float));
         std::memset(out1, 0, num_frames * sizeof(float));
         std::memset(out2, 0, num_frames * sizeof(float));
-        // Zero warps source buffers 10-13
-        std::memset(engine->warps_source_buffers[10], 0, num_frames * sizeof(float));
-        std::memset(engine->warps_source_buffers[11], 0, num_frames * sizeof(float));
-        std::memset(engine->warps_source_buffers[12], 0, num_frames * sizeof(float));
-        std::memset(engine->warps_source_buffers[13], 0, num_frames * sizeof(float));
+        // Zero warps source buffers 10-13 (full kMaxFrames to prevent stale tails
+        // when Bluetooth chunking produces unequal chunk sizes)
+        std::memset(engine->warps_source_buffers[10], 0, kMaxFrames * sizeof(float));
+        std::memset(engine->warps_source_buffers[11], 0, kMaxFrames * sizeof(float));
+        std::memset(engine->warps_source_buffers[12], 0, kMaxFrames * sizeof(float));
+        std::memset(engine->warps_source_buffers[13], 0, kMaxFrames * sizeof(float));
         // Zero tides output buffers
         std::memset(engine->tides_output_buffer[0], 0, num_frames * sizeof(float));
         std::memset(engine->tides_output_buffer[1], 0, num_frames * sizeof(float));

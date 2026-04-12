@@ -265,7 +265,8 @@ object OrpheusColors {
     val djNavy = Color(0xFF0C2340)                   // Midnight Navy (panel bg, track)
     val djRed = Color(0xFFE31937)                    // Fastball Red (primary accent)
     val djRedLight = Color(0xFFFF4D5E)               // Lighter red (knob, progress)
-    val djCream = Color(0xFFF5F0E1)                  // Cream (labels, frozen indicator)
+    val djCream = Color(0xFFF5F0E1)                  // Cream (labels)
+    val djIceBlue = Color(0xFF4FC3F7)                // Ice blue (frozen indicator)
 
     // Timer (Sleep) Palette — legacy amber
     val timerAmber = Color(0xFFFFB050)

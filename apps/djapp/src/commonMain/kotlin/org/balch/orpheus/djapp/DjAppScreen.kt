@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.entryProvider
@@ -42,7 +43,6 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.features.distortion.DistortionPanel
 import org.balch.orpheus.features.distortion.DistortionViewModel
@@ -64,8 +64,6 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
-import org.balch.orpheus.ui.widgets.HorizontalRotaryKnob
-import org.balch.orpheus.ui.widgets.LabelSide
 
 @Composable
 fun DjAppScreen(
@@ -102,6 +100,7 @@ fun DjAppScreen(
                 }
             },
             isLandscape = isLandscape,
+            pulsarFeature = pulsarFeature,
             modifier = Modifier.fillMaxSize(),
         ) {
             // Shared nav content composable used in both orientations
@@ -193,9 +192,9 @@ fun DjAppScreen(
                             .padding(top = 4.dp)) {
                         DjAppHeaderRow(
                             vizFeature = vizFeature,
-                            pulsarFeature = pulsarFeature,
                             modifier = Modifier
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalPadding = 0.dp,
                         )
                         navContent(Modifier)
                     }
@@ -205,7 +204,6 @@ fun DjAppScreen(
                 Column(modifier = Modifier.fillMaxSize()) {
                     DjAppHeaderRow(
                         vizFeature = vizFeature,
-                        pulsarFeature = pulsarFeature,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -231,8 +229,8 @@ fun DjAppScreen(
 @Composable
 private fun DjAppHeaderRow(
     vizFeature: VizFeature,
-    pulsarFeature: PulsarFeature,
     modifier: Modifier = Modifier,
+    horizontalPadding: Dp = 8.dp,
 ) {
     val liquidState = LocalLiquidState.current
     val effects = LocalLiquidEffects.current
@@ -246,10 +244,11 @@ private fun DjAppHeaderRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AppTitleTreatment(
-            title = "Orphic-FM: DJ",
+            title = "Orphic-DJ",
             modifier = Modifier.height(36.dp),
             effects = effects,
             showSizeEffects = false,
+            horizontalPadding = horizontalPadding,
         )
 
         // Viz dropdown
@@ -329,17 +328,6 @@ private fun DjAppHeaderRow(
             }
         }
 
-        val pulsarState by pulsarFeature.stateFlow.collectAsState()
-        HorizontalRotaryKnob(
-            value = pulsarState.mix,
-            onValueChange = pulsarFeature.actions.setMix,
-            label = "MIX",
-            controlId = PulsarSymbol.MIX.controlId.key,
-            size = 36.dp,
-            progressColor = OrpheusColors.cosmicPurple,
-            valueFormatter = null,
-            labelSide = LabelSide.START,
-        )
     }
 }
 
@@ -380,7 +368,6 @@ private fun DjAppPreviewLayout(
         Column(modifier = modifier.fillMaxSize()) {
             DjAppHeaderRow(
                 vizFeature = VizViewModel.previewFeature(),
-                pulsarFeature = pulsarFeature,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 4.dp),

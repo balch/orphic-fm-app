@@ -5,6 +5,10 @@ plugins {
 android {
     namespace = "org.balch.djapp"
 
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+
     defaultConfig {
         applicationId = "org.balch.djapp"
         versionCode = 1

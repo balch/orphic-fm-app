@@ -111,6 +111,7 @@ class DesktopDspBridge {
         playheadsOut: IntArray,
         stepCountsOut: IntArray,
     )
+    external fun nativeGetPulsarArrangement(out: IntArray)
 
     // miniaudio audio device control
     external fun nativeStartAudio(): Boolean

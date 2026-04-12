@@ -16,6 +16,7 @@ enum TurntableSource : int {
     TT_SOURCE_DRUMS  = 1,
     TT_SOURCE_BASS   = 2,
     TT_SOURCE_MASTER = 3,
+    TT_SOURCE_SUM    = 4,   // All 8 Pulsar tracks (stereo summed to mono)
 };
 
 struct TurntableDeck {
@@ -24,7 +25,9 @@ struct TurntableDeck {
     int   write_pos = 0;             // integer write head
     float smoothed_velocity = 1.0f;  // after one-pole smoothing
     float aa_lpf_state = 0.0f;      // anti-alias filter state (persists across blocks)
-    bool  frozen = false;
+    bool  frozen = false;            // manual freeze from UI
+    bool  auto_frozen = false;       // auto-freeze when input goes silent
+    int   silence_blocks = 0;        // consecutive silent blocks counter
     int   source = TT_SOURCE_SYNTH;
 
     // Double-buffered viz snapshot for thread safety.

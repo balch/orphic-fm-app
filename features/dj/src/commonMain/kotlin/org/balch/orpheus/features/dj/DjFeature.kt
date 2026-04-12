@@ -31,8 +31,8 @@ interface DjFeature : SynthFeature<DjUiState, DjPanelActions> {
             override val portControlKeys = mapOf(
                 DjSymbol.WET_A.controlId.key to "Deck A dry/wet (0=dry source, 1=turntable only)",
                 DjSymbol.WET_B.controlId.key to "Deck B dry/wet (0=dry source, 1=turntable only)",
-                DjSymbol.SOURCE_A.controlId.key to "Deck A capture source (0=Synth, 1=Drums, 2=Bass, 3=Master)",
-                DjSymbol.SOURCE_B.controlId.key to "Deck B capture source (0=Synth, 1=Drums, 2=Bass, 3=Master)",
+                DjSymbol.SOURCE_A.controlId.key to "Deck A capture source (0=Synth, 1=Drums, 2=Bass, 3=Master, 4=Sum)",
+                DjSymbol.SOURCE_B.controlId.key to "Deck B capture source (0=Synth, 1=Drums, 2=Bass, 3=Master, 4=Sum)",
                 DjSymbol.CROSSFADER.controlId.key to "Crossfader (0=all A, 0.5=center, 1=all B)",
                 DjSymbol.DELAY_SEND.controlId.key to "Post-crossfader send to delay (0-1)",
                 DjSymbol.REVERB_SEND.controlId.key to "Post-crossfader send to reverb (0-1)",

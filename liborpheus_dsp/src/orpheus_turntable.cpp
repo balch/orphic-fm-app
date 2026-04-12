@@ -1,6 +1,7 @@
 #include "orpheus_turntable.h"
 #include "orpheus_engine.h"
 #include "orpheus_graph.h"
+#include "orpheus_voice.h"
 #include <cstring>
 #include <cmath>
 
@@ -34,7 +35,32 @@ static inline float wrap_pos(float pos, int buf_size) {
     return pos;
 }
 
+// Silence threshold: ~-60dB. Blocks of silence before auto-freeze triggers.
+static constexpr float kSilenceThreshold = 0.001f;
+static constexpr int kSilenceBlocksToFreeze = 5;  // ~50ms at 512-sample blocks
+
 static void capture_source(TurntableDeck* deck, const float* source, int num_frames) {
+    // Check if this block has signal
+    float peak = 0.0f;
+    for (int i = 0; i < num_frames; i++) {
+        float a = std::fabs(source[i]);
+        if (a > peak) peak = a;
+    }
+
+    if (peak < kSilenceThreshold) {
+        deck->silence_blocks++;
+        if (deck->silence_blocks >= kSilenceBlocksToFreeze && !deck->auto_frozen) {
+            deck->auto_frozen = true;  // stop recording, keep buffer
+            return;
+        }
+    } else {
+        // Signal returned — unfreeze and resume recording
+        deck->silence_blocks = 0;
+        deck->auto_frozen = false;
+    }
+
+    if (deck->auto_frozen) return;
+
     for (int i = 0; i < num_frames; i++) {
         deck->buffer[deck->write_pos] = source[i];
         deck->write_pos = (deck->write_pos + 1) % kTurntableBufSize;
@@ -80,12 +106,20 @@ static void playback_deck(TurntableDeck* deck, float target_velocity,
 // Source-dependent gain — source buffers are normalized low
 static float turntable_source_gain(int src) {
     switch (src) {
-        case TT_SOURCE_SYNTH:  return 10.0f;
-        case TT_SOURCE_DRUMS:  return 4.0f;
-        case TT_SOURCE_BASS:   return 4.0f;
-        case TT_SOURCE_MASTER: return 2.0f;
-        default:               return 6.0f;
+        case TT_SOURCE_SYNTH:  return 6.0f;
+        case TT_SOURCE_DRUMS:  return 3.0f;
+        case TT_SOURCE_BASS:   return 3.0f;
+        case TT_SOURCE_MASTER: return 1.5f;
+        case TT_SOURCE_SUM:    return 2.0f;
+        default:               return 4.0f;
     }
+}
+
+// Fader ease-in: strong curve so bottom half is near-silent,
+// midpoint is ~15% gain, top half ramps up hot.
+// Cubic (w³) gives: 0.1→0.001, 0.3→0.027, 0.5→0.125, 0.7→0.343, 1.0→1.0
+static inline float fader_ease(float wet) {
+    return wet * wet * wet;
 }
 
 static void turntable_update_viz(TurntableDeck* deck) {
@@ -136,6 +170,12 @@ void unit_process_turntable(GraphUnit* u, OrpheusEngine* engine,
     deck_a.source = src_a;
     deck_b.source = src_b;
 
+    // Sum Pulsar stereo to mono for TT_SOURCE_SUM
+    float pulsar_sum[kMaxFrames];
+    for (int i = 0; i < num_frames; i++) {
+        pulsar_sum[i] = (engine->pulsar_out_l[i] + engine->pulsar_out_r[i]) * 0.5f;
+    }
+
     // Get source buffers (double-buffered reads from previous frame)
     auto get_source = [&](int source) -> const float* {
         switch (source) {
@@ -143,6 +183,7 @@ void unit_process_turntable(GraphUnit* u, OrpheusEngine* engine,
             case TT_SOURCE_DRUMS:  return engine->warps_drums_read;
             case TT_SOURCE_BASS:   return engine->warps_bass_read;
             case TT_SOURCE_MASTER: return engine->turntable_prev_master;
+            case TT_SOURCE_SUM:    return pulsar_sum;
             default:               return engine->warps_synth_read;
         }
     };
@@ -199,7 +240,9 @@ void unit_process_turntable(GraphUnit* u, OrpheusEngine* engine,
     for (int i = 0; i < num_frames; i++) {
         wet_a += wet_a_inc;
         wet_b += wet_b_inc;
-        out[i] = play_a[i] * boost_a * wet_a + play_b[i] * boost_b * wet_b;
+        float fa = fader_ease(wet_a);
+        float fb = fader_ease(wet_b);
+        out[i] = soft_limit(play_a[i] * boost_a * fa + play_b[i] * boost_b * fb);
     }
     engine->turntable_smooth_wet_a = wet_a;
     engine->turntable_smooth_wet_b = wet_b;

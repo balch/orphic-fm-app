@@ -46,6 +46,8 @@ void unit_process_compressor(GraphUnit* u, OrpheusEngine* engine, int num_frames
 void unit_process_horn(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_tides(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
 void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sample_rate);
+void unit_process_pulsar_delay(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr);
+void unit_process_pulsar_reverb(GraphUnit* u, OrpheusEngine* engine, int num_frames, float sr);
 
 // Initialize unit state from descriptor params
 void unit_init(GraphUnit* u, float sample_rate);

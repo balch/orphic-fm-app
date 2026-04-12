@@ -40,40 +40,32 @@ fun buildDjAppWiringGraph(): ByteArray = wiringGraph {
     ttReverbSend.out to rev.inputA
     ttReverbSend.out to rev.inputB
 
-    // ── Pulsar send gains for delay/reverb ──
-    val pulsarSendMix = add("pulsarSendMix")
-    val pulsarSendHalf = multiply("pulsarSendHalf") { inputB = 0.5f }
-    pulsarUnit.out to pulsarSendMix.inputA
-    pulsarUnit.outRight to pulsarSendMix.inputB
-    pulsarSendMix.out to pulsarSendHalf.inputA
-    val pulsarDelaySend = multiply("pulsarDelaySend") { inputB = 0.0f }
-    val pulsarReverbSend = multiply("pulsarReverbSend") { inputB = 0.0f }
-    pulsarSendHalf.out to pulsarDelaySend.inputA
-    pulsarSendHalf.out to pulsarReverbSend.inputA
-
-    pulsarDelaySend.out to delay.inputA
-    pulsarDelaySend.out to delay.inputB
-    pulsarReverbSend.out to rev.inputA
-    pulsarReverbSend.out to rev.inputB
+    // ── Pulsar dedicated delay/reverb ──
+    val pulsarDelayUnit = pulsarDelay("pulsarDelay")
+    val pulsarReverbUnit = pulsarReverb("pulsarReverb")
 
     // ── Sum all sources into pre-limiter bus (ADD accumulates, then scale) ──
-    // Left bus: horn L + turntable + delay L + reverb L
+    // Left bus: horn L + turntable + delay L + reverb L + pulsarDelay L + pulsarReverb L
     val busL = add("busL")
     hornUnit.out to busL.inputA
     turntableUnit.out to busL.inputA
     delay.out to busL.inputA
     rev.out to busL.inputA
+    pulsarDelayUnit.out to busL.inputA
+    pulsarReverbUnit.out to busL.inputA
 
-    // Right bus: horn R + turntable + delay R + reverb R
+    // Right bus: horn R + turntable + delay R + reverb R + pulsarDelay R + pulsarReverb R
     val busR = add("busR")
     hornUnit.outRight to busR.inputA
     turntableUnit.out to busR.inputA
     delay.outRight to busR.inputA
     rev.outRight to busR.inputA
+    pulsarDelayUnit.outRight to busR.inputA
+    pulsarReverbUnit.outRight to busR.inputA
 
-    // Attenuate summed bus to prevent clipping (4 sources → -6dB = 0.5)
-    val busAttenL = multiply("busAttenL") { inputB = 0.5f }
-    val busAttenR = multiply("busAttenR") { inputB = 0.5f }
+    // Attenuate summed bus to prevent clipping (6 sources → -8dB ≈ 0.4)
+    val busAttenL = multiply("busAttenL") { inputB = 0.4f }
+    val busAttenR = multiply("busAttenR") { inputB = 0.4f }
     busL.out to busAttenL.inputA
     busR.out to busAttenR.inputA
 
@@ -90,9 +82,6 @@ fun buildDjAppWiringGraph(): ByteArray = wiringGraph {
         // DJ Turntable send levels
         map("org.balch.orpheus.plugins.dj", "delay_send", "ttDelaySend", IPORT_INPUT_B)
         map("org.balch.orpheus.plugins.dj", "reverb_send", "ttReverbSend", IPORT_INPUT_B)
-        // Pulsar beat machine send levels
-        map("org.balch.orpheus.plugins.pulsar", "delay_send", "pulsarDelaySend", IPORT_INPUT_B)
-        map("org.balch.orpheus.plugins.pulsar", "reverb_send", "pulsarReverbSend", IPORT_INPUT_B)
         // Tempo clock
         map("org.balch.orpheus.plugins.tempo", "bpm", "clock", IPORT_INPUT_A)
         map("org.balch.orpheus.plugins.tempo", "run", "clock", IPORT_INPUT_B)

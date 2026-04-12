@@ -35,7 +35,8 @@ oboe::Result OboeEngine::open() {
     }
 
     float sr = static_cast<float>(mStream->getSampleRate());
-    dsp_engine_ = orpheus_engine_create(sr);
+    mCreatedSampleRate = mStream->getSampleRate();
+    dsp_engine_.store(orpheus_engine_create(sr), std::memory_order_release);
 
     LOGI("Stream opened: sampleRate=%d, framesPerBurst=%d, dsp_engine=%p",
          mStream->getSampleRate(), mStream->getFramesPerBurst(), dsp_engine_);
@@ -43,8 +44,9 @@ oboe::Result OboeEngine::open() {
 }
 
 int OboeEngine::loadGraph(const uint8_t* data, size_t length) {
-    if (!dsp_engine_) return -100;
-    return orpheus_engine_load_patch(dsp_engine_, data, length);
+    OrpheusEngine* engine = dsp_engine_.load(std::memory_order_acquire);
+    if (!engine) return -100;
+    return orpheus_engine_load_patch(engine, data, length);
 }
 
 oboe::Result OboeEngine::requestStart() {
@@ -69,9 +71,9 @@ oboe::Result OboeEngine::stop() {
         mStream.reset();
     }
 
-    if (dsp_engine_) {
-        orpheus_engine_destroy(dsp_engine_);
-        dsp_engine_ = nullptr;
+    OrpheusEngine* old_engine = dsp_engine_.exchange(nullptr, std::memory_order_acq_rel);
+    if (old_engine) {
+        orpheus_engine_destroy(old_engine);
     }
 
     return result;
@@ -84,7 +86,8 @@ double OboeEngine::getCpuLoad() const { return mCpuLoad.load(); }
 
 oboe::DataCallbackResult OboeEngine::onAudioReady(
         oboe::AudioStream* stream, void* audioData, int32_t numFrames) {
-    if (!mIsRunning.load() || !dsp_engine_) {
+    OrpheusEngine* engine = dsp_engine_.load(std::memory_order_acquire);
+    if (!mIsRunning.load() || !engine) {
         memset(audioData, 0, numFrames * 2 * sizeof(float));
         return oboe::DataCallbackResult::Stop;
     }
@@ -92,7 +95,7 @@ oboe::DataCallbackResult OboeEngine::onAudioReady(
     auto start = std::chrono::steady_clock::now();
 
     // Direct C++ DSP — no JNI, no Kotlin, no GC
-    orpheus_engine_process(dsp_engine_, static_cast<float*>(audioData), numFrames);
+    orpheus_engine_process(engine, static_cast<float*>(audioData), numFrames);
 
     auto end = std::chrono::steady_clock::now();
     double us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -105,102 +108,127 @@ oboe::DataCallbackResult OboeEngine::onAudioReady(
 void OboeEngine::onErrorAfterClose(oboe::AudioStream* stream, oboe::Result error) {
     LOGE("Stream disconnected: %s — reopening", oboe::convertToText(error));
     if (mIsRunning.load()) {
+        int32_t old_sr = mCreatedSampleRate;
         oboe::Result result = openStream();
         if (result == oboe::Result::OK) {
-            // DSP engine persists across reconnects — just restart audio
+            int32_t new_sr = mStream->getSampleRate();
+            // Recreate DSP engine if sample rate changed (e.g. speaker → Bluetooth).
+            // Atomically null the pointer BEFORE destroying to prevent use-after-free
+            // from concurrent JNI calls (getMonitor, setPort, etc.).
+            if (new_sr != old_sr) {
+                LOGI("Sample rate changed %d → %d — recreating DSP engine", old_sr, new_sr);
+                OrpheusEngine* old_engine = dsp_engine_.exchange(nullptr, std::memory_order_acq_rel);
+                if (old_engine) orpheus_engine_destroy(old_engine);
+                dsp_engine_.store(orpheus_engine_create(static_cast<float>(new_sr)),
+                                  std::memory_order_release);
+                mCreatedSampleRate = new_sr;
+                // NOTE: graph must be reloaded from Kotlin side after engine recreation.
+                // The new engine has no graph — audio will be silent until nativeLoadGraph.
+            }
             mIsRunning.store(true);
             mStream->requestStart();
+            LOGI("Stream reopened: sampleRate=%d, framesPerBurst=%d",
+                 new_sr, mStream->getFramesPerBurst());
         }
     }
 }
 
 // ── C API pass-throughs ──────────────────────────────
+// Each method loads the atomic dsp_engine_ pointer once to avoid use-after-free
+// during BT reconnection (onErrorAfterClose destroys/recreates the engine).
 void OboeEngine::setPort(const char* uri, const char* sym, float value) {
-    if (dsp_engine_) orpheus_engine_set_port(dsp_engine_, uri, sym, value);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_port(e, uri, sym, value);
 }
 float OboeEngine::getPort(const char* uri, const char* sym) {
-    return dsp_engine_ ? orpheus_engine_get_port(dsp_engine_, uri, sym) : 0.0f;
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) return orpheus_engine_get_port(e, uri, sym);
+    return 0.0f;
 }
 void OboeEngine::setVoiceGate(int index, int active) {
-    if (dsp_engine_) orpheus_engine_set_voice_gate(dsp_engine_, index, active);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_voice_gate(e, index, active);
 }
 void OboeEngine::setVoiceTune(int index, float tune) {
-    if (dsp_engine_) orpheus_engine_set_voice_tune(dsp_engine_, index, tune);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_voice_tune(e, index, tune);
 }
 void OboeEngine::setVoiceEngine(int index, int engineIndex) {
-    if (dsp_engine_) orpheus_engine_set_voice_engine(dsp_engine_, index, engineIndex);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_voice_engine(e, index, engineIndex);
 }
 void OboeEngine::setVoiceHarmonics(int index, float value) {
-    if (dsp_engine_) orpheus_engine_set_voice_harmonics(dsp_engine_, index, value);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_voice_harmonics(e, index, value);
 }
 void OboeEngine::setVoiceTimbre(int index, float value) {
-    if (dsp_engine_) orpheus_engine_set_voice_timbre(dsp_engine_, index, value);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_voice_timbre(e, index, value);
 }
 void OboeEngine::setVoiceMorph(int index, float value) {
-    if (dsp_engine_) orpheus_engine_set_voice_morph(dsp_engine_, index, value);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_voice_morph(e, index, value);
 }
 void OboeEngine::setVoiceDecay(int index, float value) {
-    if (dsp_engine_) orpheus_engine_set_voice_decay(dsp_engine_, index, value);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_voice_decay(e, index, value);
 }
 void OboeEngine::setVoiceActive(int index, int active) {
-    if (dsp_engine_) orpheus_engine_set_voice_active(dsp_engine_, index, active);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_voice_active(e, index, active);
 }
 void OboeEngine::setVoiceHold(int index, float level) {
-    if (dsp_engine_) orpheus_engine_set_voice_hold(dsp_engine_, index, level);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_voice_hold(e, index, level);
 }
 void OboeEngine::triggerDrum(int drumIndex, float accent) {
-    if (dsp_engine_) orpheus_engine_trigger_drum(dsp_engine_, drumIndex, accent);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_trigger_drum(e, drumIndex, accent);
 }
 void OboeEngine::setMasterVolume(float v) {
-    if (dsp_engine_) orpheus_engine_set_master_volume(dsp_engine_, v);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_master_volume(e, v);
 }
 void OboeEngine::setDrive(float v) {
-    if (dsp_engine_) orpheus_engine_set_drive(dsp_engine_, v);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_drive(e, v);
 }
 void OboeEngine::setDelayMix(float v) {
-    if (dsp_engine_) orpheus_engine_set_delay_mix(dsp_engine_, v);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_delay_mix(e, v);
 }
 void OboeEngine::setVibrato(float v) {
-    if (dsp_engine_) orpheus_engine_set_vibrato(dsp_engine_, v);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_vibrato(e, v);
 }
 void OboeEngine::setVibratoRate(float hz) {
-    if (dsp_engine_) orpheus_engine_set_vibrato_rate(dsp_engine_, hz);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_vibrato_rate(e, hz);
 }
 void OboeEngine::setBend(float v) {
-    if (dsp_engine_) orpheus_engine_set_bend(dsp_engine_, v);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_bend(e, v);
 }
 void OboeEngine::getMonitor(OrpheusMonitorData* out) {
-    if (dsp_engine_) {
-        orpheus_engine_get_monitor(dsp_engine_, out);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) {
+        orpheus_engine_get_monitor(e, out);
     } else {
         memset(out, 0, sizeof(OrpheusMonitorData));
     }
 }
 int OboeEngine::getViz(int channel, float* outBuf, int maxSamples, int* lastReadPos) {
-    return dsp_engine_ ? orpheus_engine_get_viz(dsp_engine_, channel, outBuf, maxSamples, lastReadPos) : 0;
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) return orpheus_engine_get_viz(e, channel, outBuf, maxSamples, lastReadPos);
+    return 0;
 }
 void OboeEngine::getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut) {
-    if (dsp_engine_) orpheus_engine_get_pulsar_viz(dsp_engine_, gatesOut, velocitiesOut, playheadsOut, stepCountsOut);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_get_pulsar_viz(e, gatesOut, velocitiesOut, playheadsOut, stepCountsOut);
+}
+void OboeEngine::getPulsarArrangement(int* out) {
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_get_pulsar_arrangement(e, out);
+    else out[0] = -1;
 }
 void OboeEngine::getTurntableViz(int deck, float* outBuf) {
-    if (dsp_engine_) orpheus_engine_get_turntable_viz(dsp_engine_, deck, outBuf);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_get_turntable_viz(e, deck, outBuf);
     else memset(outBuf, 0, 129 * sizeof(float));
 }
 void OboeEngine::setAutomation(int target, int voiceIndex, const float* times, const float* values, int count) {
-    if (dsp_engine_) orpheus_engine_set_automation(dsp_engine_, target, voiceIndex, times, values, count);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_set_automation(e, target, voiceIndex, times, values, count);
 }
 void OboeEngine::clearAutomation(int target, int voiceIndex) {
-    if (dsp_engine_) orpheus_engine_clear_automation(dsp_engine_, target, voiceIndex);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_clear_automation(e, target, voiceIndex);
 }
 void OboeEngine::loadTtsAudio(const float* samples, int count, int sampleRate) {
-    if (dsp_engine_) orpheus_engine_load_tts_audio(dsp_engine_, samples, count, sampleRate);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_load_tts_audio(e, samples, count, sampleRate);
 }
 void OboeEngine::playTts() {
-    if (dsp_engine_) orpheus_engine_play_tts(dsp_engine_);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_play_tts(e);
 }
 void OboeEngine::stopTts() {
-    if (dsp_engine_) orpheus_engine_stop_tts(dsp_engine_);
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) orpheus_engine_stop_tts(e);
 }
 int OboeEngine::isTtsPlaying() {
-    return dsp_engine_ ? orpheus_engine_is_tts_playing(dsp_engine_) : 0;
+    if (auto* e = dsp_engine_.load(std::memory_order_acquire)) return orpheus_engine_is_tts_playing(e);
+    return 0;
 }

@@ -29,7 +29,6 @@ import org.balch.orpheus.core.features.FeatureStatePersistence
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
-import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
 import org.balch.orpheus.core.plugin.symbols.DjSource
 import org.balch.orpheus.core.plugin.symbols.DjSymbol
@@ -45,6 +44,8 @@ data class DjUiState(
     val velocityB: Float = 0f,
     val frozenA: Boolean = false,
     val frozenB: Boolean = false,
+    val lockedA: Boolean = false,
+    val lockedB: Boolean = false,
     val crossfader: Float = 0.5f,
     val delaySend: Float = 0f,
     val reverbSend: Float = 0f,
@@ -61,9 +62,10 @@ data class DjPanelActions(
     val setReverbSend: (Float) -> Unit,
     val setPlatterDrag: (Int, Float) -> Unit,
     val setPlatterRelease: (Int) -> Unit,
+    val toggleLock: (Int) -> Unit,
 ) {
     companion object {
-        val EMPTY = DjPanelActions({}, {}, {}, {}, {}, {}, {}, { _, _ -> }, {})
+        val EMPTY = DjPanelActions({}, {}, {}, {}, {}, {}, {}, { _, _ -> }, {}, {})
     }
 }
 
@@ -80,6 +82,7 @@ private sealed interface DjIntent {
         val velocityA: Float, val velocityB: Float,
         val frozenA: Boolean, val frozenB: Boolean,
     ) : DjIntent
+    data class ToggleLock(val deck: Int) : DjIntent
 }
 
 /**
@@ -121,6 +124,8 @@ class DjViewModel(
     private var dragVelocityB = 0f
     private var currentVelocityA = MOTOR_SPEED
     private var currentVelocityB = MOTOR_SPEED
+    private var lockedA = false
+    private var lockedB = false
 
     // Direct setters for physics-driven ports (send to C++ engine)
     private val wetASetter = wetAId.floatSetter()
@@ -153,6 +158,7 @@ class DjViewModel(
                 1 -> touchingB = false
             }
         },
+        toggleLock = { deck -> physicsIntentFlow.tryEmit(DjIntent.ToggleLock(deck)) },
     )
 
     // Track current wet levels for gating the physics loop
@@ -180,7 +186,7 @@ class DjViewModel(
                         currentVelocityA = lerp(currentVelocityA, MOTOR_SPEED, MOTOR_DECAY)
                     }
                     setVelocityA(currentVelocityA)
-                    setFrozenA(touchingA)
+                    setFrozenA(touchingA || lockedA)
                 }
 
                 // Deck B — only run physics when this deck is active
@@ -191,7 +197,7 @@ class DjViewModel(
                         currentVelocityB = lerp(currentVelocityB, MOTOR_SPEED, MOTOR_DECAY)
                     }
                     setVelocityB(currentVelocityB)
-                    setFrozenB(touchingB)
+                    setFrozenB(touchingB || lockedB)
                 }
 
                 // Emit to MVI so UiState reflects velocity/frozen for UI display
@@ -200,8 +206,8 @@ class DjViewModel(
                     DjIntent.PhysicsTick(
                         velocityA = if (deckAActive) currentVelocityA else 0f,
                         velocityB = if (deckBActive) currentVelocityB else 0f,
-                        frozenA = touchingA,
-                        frozenB = touchingB,
+                        frozenA = touchingA || lockedA,
+                        frozenB = touchingB || lockedB,
                     )
                 )
             }
@@ -214,14 +220,12 @@ class DjViewModel(
         wetAId.map { DjIntent.SetWetA(it.asFloat()) },
         wetBId.map { DjIntent.SetWetB(it.asFloat()) },
         sourceAId.map {
-            val sources = DjSource.entries
-            val index = it.asInt().coerceIn(0, sources.size - 1)
-            DjIntent.SetSourceA(sources[index])
+            val id = it.asInt()
+            DjIntent.SetSourceA(DjSource.entries.first { s -> s.sourceId == id })
         },
         sourceBId.map {
-            val sources = DjSource.entries
-            val index = it.asInt().coerceIn(0, sources.size - 1)
-            DjIntent.SetSourceB(sources[index])
+            val id = it.asInt()
+            DjIntent.SetSourceB(DjSource.entries.first { s -> s.sourceId == id })
         },
         crossfaderId.map { DjIntent.SetCrossfader(it.asFloat()) },
         delaySendId.map { DjIntent.SetDelaySend(it.asFloat()) },
@@ -247,17 +251,18 @@ class DjViewModel(
             reader = { it.lastDjJson },
             writer = { prefs, json -> prefs.copy(lastDjJson = json) },
             restoreStrategy = restoreStrategy,
-            stripTransient = { it.copy(velocityA = 0f, velocityB = 0f, frozenA = false, frozenB = false) },
+            stripTransient = {
+                it.copy(
+                    wetA = 0f, wetB = 0f,
+                    velocityA = 0f, velocityB = 0f,
+                    frozenA = false, frozenB = false,
+                    lockedA = false, lockedB = false,
+                    crossfader = 0.5f, delaySend = 0f, reverbSend = 0f,
+                )
+            },
             onRestore = { saved ->
-                wetAId.value = FloatValue(saved.wetA)
-                wetBId.value = FloatValue(saved.wetB)
-                sourceAId.value = IntValue(saved.sourceA.index)
-                sourceBId.value = IntValue(saved.sourceB.index)
-                crossfaderId.value = FloatValue(saved.crossfader)
-                delaySendId.value = FloatValue(saved.delaySend)
-                reverbSendId.value = FloatValue(saved.reverbSend)
-                currentWetA = saved.wetA
-                currentWetB = saved.wetB
+                sourceAId.value = IntValue(saved.sourceA.sourceId)
+                sourceBId.value = IntValue(saved.sourceB.sourceId)
             },
         )
     }
@@ -281,6 +286,13 @@ class DjViewModel(
                 frozenA = intent.frozenA,
                 frozenB = intent.frozenB,
             )
+            is DjIntent.ToggleLock -> {
+                when (intent.deck) {
+                    0 -> { lockedA = !lockedA; state.copy(lockedA = lockedA) }
+                    1 -> { lockedB = !lockedB; state.copy(lockedB = lockedB) }
+                    else -> state
+                }
+            }
         }
 
     companion object {

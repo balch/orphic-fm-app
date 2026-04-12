@@ -19,33 +19,20 @@ static void setup_pulsar_cosmic_techno(OrpheusEngine* engine) {
     engine->clock_bpm.store(128.0f);
 }
 
-// ── Graph loader for DJ App ─────────────────────────────────────────
+// load_dj_graph() is defined in test_pulsar_helpers.h (shared)
 
-static bool load_dj_graph(OrpheusEngine* engine) {
-    const char* path = TEST_DATA_DIR "/dj_graph.odwg";
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        fprintf(stderr, "Cannot open DJ graph: %s\n", path);
-        return false;
+// ── Helper: set per-track effect sends on dedicated Pulsar delay/reverb ──
+
+static void set_pulsar_delay_sends(OrpheusEngine* engine, float level, int track_start = 0, int track_end = 8) {
+    for (int t = track_start; t < track_end; t++) {
+        engine->pulsar_track_delay_send[t].store(level, std::memory_order_relaxed);
     }
-    fseek(f, 0, SEEK_END);
-    size_t len = (size_t)ftell(f);
-    fseek(f, 0, SEEK_SET);
-    auto* buf = new uint8_t[len];
-    size_t read = fread(buf, 1, len, f);
-    fclose(f);
-    if (read != len) {
-        fprintf(stderr, "Short read on DJ graph: %zu/%zu bytes\n", read, len);
-        delete[] buf;
-        return false;
+}
+
+static void set_pulsar_reverb_sends(OrpheusEngine* engine, float level, int track_start = 0, int track_end = 8) {
+    for (int t = track_start; t < track_end; t++) {
+        engine->pulsar_track_reverb_send[t].store(level, std::memory_order_relaxed);
     }
-    int result = orpheus_engine_load_patch(engine, buf, len);
-    delete[] buf;
-    if (result != 0) {
-        fprintf(stderr, "Failed to load DJ graph: error %d\n", result);
-        return false;
-    }
-    return true;
 }
 
 // ── Helper: render DJ graph and return stereo buffer ────────────────
@@ -229,12 +216,16 @@ static bool test_djapp_reverb_active() {
     engine->delay_bypass.store(1);
     engine->drive_mix.store(0.0f);
 
-    // Reverb on with Pulsar reverb send
-    engine->reverb_bypass.store(0);
-    engine->reverb_amount.store(0.7f);
-    engine->reverb_time.store(0.8f);
+    // Enable dedicated Pulsar reverb
+    engine->pulsar_reverb_bypass.store(0);
+    engine->pulsar_reverb_amount.store(0.7f);
+    engine->pulsar_reverb_time.store(0.8f);
 
-    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.pulsar", "reverb_send", 0.8f);
+    // Bypass shared reverb to isolate dedicated unit
+    engine->reverb_bypass.store(1);
+
+    // Set per-track reverb sends directly
+    set_pulsar_reverb_sends(engine, 0.8f);
 
     // Run Pulsar for 1 second
     float warmup[128 * 2];
@@ -271,13 +262,17 @@ static bool test_djapp_delay_active() {
     engine->reverb_bypass.store(1);
     engine->drive_mix.store(0.0f);
 
-    engine->delay_bypass.store(0);
-    engine->delay_mix.store(0.7f);
-    engine->delay_feedback.store(0.4f);
-    engine->delay_time_1.store(0.15f);
-    engine->delay_time_2.store(0.2f);
+    // Enable dedicated Pulsar delay
+    engine->pulsar_delay_bypass.store(0);
+    engine->pulsar_delay_time_a.store(0.15f);
+    engine->pulsar_delay_time_b.store(0.2f);
+    engine->pulsar_delay_feedback.store(0.4f);
 
-    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.pulsar", "delay_send", 0.8f);
+    // Bypass shared delay to isolate dedicated unit
+    engine->delay_bypass.store(1);
+
+    // Set per-track delay sends directly
+    set_pulsar_delay_sends(engine, 0.8f);
 
     // Run long enough for echoes to appear
     float warmup[128 * 2];
@@ -512,21 +507,27 @@ static bool test_djapp_full_chain() {
     engine->horn_depth.store(0.5f);
     engine->horn_brake.store(0);
 
-    engine->reverb_bypass.store(0);
-    engine->reverb_amount.store(0.4f);
-    engine->reverb_time.store(0.6f);
+    // Dedicated Pulsar reverb
+    engine->pulsar_reverb_bypass.store(0);
+    engine->pulsar_reverb_amount.store(0.4f);
+    engine->pulsar_reverb_time.store(0.6f);
 
-    engine->delay_bypass.store(0);
-    engine->delay_mix.store(0.4f);
-    engine->delay_feedback.store(0.3f);
-    engine->delay_time_1.store(0.12f);
-    engine->delay_time_2.store(0.18f);
+    // Dedicated Pulsar delay
+    engine->pulsar_delay_bypass.store(0);
+    engine->pulsar_delay_time_a.store(0.12f);
+    engine->pulsar_delay_time_b.store(0.18f);
+    engine->pulsar_delay_feedback.store(0.3f);
+
+    // Bypass shared effects (Pulsar uses dedicated units now)
+    engine->reverb_bypass.store(1);
+    engine->delay_bypass.store(1);
 
     engine->drive_mix.store(0.5f);
     engine->drive_amount.store(2.0f);
 
-    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.pulsar", "delay_send", 0.5f);
-    orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.pulsar", "reverb_send", 0.5f);
+    // Per-track effect sends
+    set_pulsar_delay_sends(engine, 0.5f);
+    set_pulsar_reverb_sends(engine, 0.5f);
 
     auto r = render_dj_graph(engine, 96000, 40);
 
@@ -565,14 +566,14 @@ static bool test_djapp_drive_sweep() {
         engine->horn_mix.store(0.0f);
         engine->reverb_bypass.store(1);
 
-        // Route through delay so it hits the limiter path
-        engine->delay_bypass.store(0);
-        engine->delay_mix.store(0.7f);
-        engine->delay_feedback.store(0.2f);
-        engine->delay_time_1.store(0.001f);  // Very short = near-instant echo
-        engine->delay_time_2.store(0.001f);
+        // Route through dedicated Pulsar delay so it hits the limiter path
+        engine->pulsar_delay_bypass.store(0);
+        engine->pulsar_delay_time_a.store(0.001f);  // Very short = near-instant echo
+        engine->pulsar_delay_time_b.store(0.001f);
+        engine->pulsar_delay_feedback.store(0.2f);
+        engine->delay_bypass.store(1);
 
-        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.pulsar", "delay_send", 1.0f);
+        set_pulsar_delay_sends(engine, 1.0f);
 
         engine->drive_mix.store(1.0f);
         engine->drive_amount.store(drive_levels[d]);
@@ -628,14 +629,14 @@ static bool test_djapp_distortion_mix() {
         engine->horn_mix.store(0.0f);
         engine->reverb_bypass.store(1);
 
-        // Route ALL signal through delay → limiter path
-        engine->delay_bypass.store(0);
-        engine->delay_mix.store(1.0f);
-        engine->delay_feedback.store(0.0f);
-        engine->delay_time_1.store(0.001f);  // Near-instant (passthrough)
-        engine->delay_time_2.store(0.001f);
+        // Route ALL signal through dedicated Pulsar delay → limiter path
+        engine->pulsar_delay_bypass.store(0);
+        engine->pulsar_delay_time_a.store(0.001f);  // Near-instant (passthrough)
+        engine->pulsar_delay_time_b.store(0.001f);
+        engine->pulsar_delay_feedback.store(0.0f);
+        engine->delay_bypass.store(1);
 
-        orpheus_engine_set_port(engine, "org.balch.orpheus.plugins.pulsar", "delay_send", 1.0f);
+        set_pulsar_delay_sends(engine, 1.0f);
 
         // High drive so saturation is obvious
         engine->drive_amount.store(8.0f);
@@ -672,12 +673,12 @@ static bool test_djapp_distortion_mix() {
         setup_pulsar_cosmic_techno(e0);
         e0->horn_mix.store(0.0f);
         e0->reverb_bypass.store(1);
-        e0->delay_bypass.store(0);
-        e0->delay_mix.store(1.0f);
-        e0->delay_feedback.store(0.0f);
-        e0->delay_time_1.store(0.001f);
-        e0->delay_time_2.store(0.001f);
-        orpheus_engine_set_port(e0, "org.balch.orpheus.plugins.pulsar", "delay_send", 1.0f);
+        e0->delay_bypass.store(1);
+        e0->pulsar_delay_bypass.store(0);
+        e0->pulsar_delay_time_a.store(0.001f);
+        e0->pulsar_delay_time_b.store(0.001f);
+        e0->pulsar_delay_feedback.store(0.0f);
+        set_pulsar_delay_sends(e0, 1.0f);
         e0->drive_amount.store(8.0f);
         e0->drive_mix.store(0.0f);
         auto dry = render_dj_graph(e0, 48000, 30);
@@ -689,12 +690,12 @@ static bool test_djapp_distortion_mix() {
         setup_pulsar_cosmic_techno(e1);
         e1->horn_mix.store(0.0f);
         e1->reverb_bypass.store(1);
-        e1->delay_bypass.store(0);
-        e1->delay_mix.store(1.0f);
-        e1->delay_feedback.store(0.0f);
-        e1->delay_time_1.store(0.001f);
-        e1->delay_time_2.store(0.001f);
-        orpheus_engine_set_port(e1, "org.balch.orpheus.plugins.pulsar", "delay_send", 1.0f);
+        e1->delay_bypass.store(1);
+        e1->pulsar_delay_bypass.store(0);
+        e1->pulsar_delay_time_a.store(0.001f);
+        e1->pulsar_delay_time_b.store(0.001f);
+        e1->pulsar_delay_feedback.store(0.0f);
+        set_pulsar_delay_sends(e1, 1.0f);
         e1->drive_amount.store(8.0f);
         e1->drive_mix.store(1.0f);
         auto wet = render_dj_graph(e1, 48000, 30);
@@ -710,6 +711,393 @@ static bool test_djapp_distortion_mix() {
     printf("  Pulsar->Horn->Limiter->Master (warmth on direct output).\n");
 
     return all_pass;
+}
+
+// ── Test 12: BT turntable — large callback vs small callback ───────
+//
+// Simulates Bluetooth earbuds (960-frame callbacks that trigger the engine's
+// internal chunking loop at kMaxFrames=512) and compares turntable output
+// against the normal speaker path (128-frame callbacks).
+// Both should produce equivalent RMS levels with no signal degradation.
+
+static bool test_djapp_turntable_bt_chunking() {
+    printf("\n=== Test: Turntable BT chunking (960 vs 128 frame callbacks) ===\n");
+
+    auto setup_turntable = [](OrpheusEngine* engine) {
+        // Disable effects, keep bass voice active for live capture
+        engine->pulsar_playing.store(0);
+        engine->horn_mix.store(0.0f);
+        engine->drive_mix.store(0.0f);
+        engine->reverb_bypass.store(1);
+        engine->delay_bypass.store(1);
+
+        // Activate bass voice playing a note (provides source signal for turntable)
+        engine->bass_mix.store(1.0f);
+        orpheus_engine_set_voice_active(engine, 12, 1);  // bass voice index
+        orpheus_engine_set_voice_tune(engine, 12, 48.0f);
+        orpheus_engine_set_voice_gate(engine, 12, 1);
+        orpheus_engine_set_voice_engine(engine, 12, 8);  // VA engine
+        orpheus_engine_set_voice_harmonics(engine, 12, 0.5f);
+        orpheus_engine_set_voice_timbre(engine, 12, 0.5f);
+        orpheus_engine_set_voice_morph(engine, 12, 0.5f);
+
+        // Set up deck A to capture from bass, unfrozen (live recording)
+        engine->turntable_wet_a.store(1.0f);
+        engine->turntable_wet_b.store(0.0f);
+        engine->turntable_source_a.store(2);  // TT_SOURCE_BASS
+        engine->turntable_frozen_a.store(0);  // live capture!
+    };
+
+    // ── Reference: 128-frame callbacks (speaker mode) ──
+    // Use production graph (has turntable) since DJ graph file may not exist
+    OrpheusEngine* e_ref = orpheus_engine_create(48000.0f);
+    if (!load_production_graph(e_ref)) { orpheus_engine_destroy(e_ref); return false; }
+    setup_turntable(e_ref);
+
+    // Warmup: 19200 total frames (using 128-frame calls = 150 calls)
+    float warmup[128 * 2];
+    for (int i = 0; i < 150; i++)
+        orpheus_engine_process(e_ref, warmup, 128);
+
+    // Render 4800 frames using 128-frame calls (like speakers)
+    int total_frames = 4800;
+    std::vector<float> ref_buf(total_frames * 2, 0.0f);
+    for (int off = 0; off < total_frames; off += 128) {
+        int chunk = std::min(128, total_frames - off);
+        orpheus_engine_process(e_ref, ref_buf.data() + off * 2, chunk);
+    }
+
+    // Measure reference RMS
+    double ref_sum = 0.0;
+    float ref_peak = 0.0f;
+    for (int i = 0; i < total_frames; i++) {
+        float s = ref_buf[i * 2];
+        ref_sum += (double)s * s;
+        float a = std::fabs(s);
+        if (a > ref_peak) ref_peak = a;
+    }
+    float ref_rms = (float)std::sqrt(ref_sum / total_frames);
+
+    // ── BT mode: 960-frame callbacks (triggers internal 512+448 chunking) ──
+    OrpheusEngine* e_bt = orpheus_engine_create(48000.0f);
+    if (!load_production_graph(e_bt)) { orpheus_engine_destroy(e_bt); return false; }
+    setup_turntable(e_bt);
+
+    // Warmup with 960-frame calls (BT-sized)
+    std::vector<float> bt_warmup(960 * 2, 0.0f);
+    for (int i = 0; i < 20; i++)
+        orpheus_engine_process(e_bt, bt_warmup.data(), 960);
+
+    // Render same total frames using 960-frame calls
+    std::vector<float> bt_buf(total_frames * 2, 0.0f);
+    for (int off = 0; off < total_frames; off += 960) {
+        int chunk = std::min(960, total_frames - off);
+        orpheus_engine_process(e_bt, bt_buf.data() + off * 2, chunk);
+    }
+
+    // Measure BT RMS
+    double bt_sum = 0.0;
+    float bt_peak = 0.0f;
+    for (int i = 0; i < total_frames; i++) {
+        float s = bt_buf[i * 2];
+        bt_sum += (double)s * s;
+        float a = std::fabs(s);
+        if (a > bt_peak) bt_peak = a;
+    }
+    float bt_rms = (float)std::sqrt(bt_sum / total_frames);
+
+    orpheus_engine_destroy(e_ref);
+    orpheus_engine_destroy(e_bt);
+
+    // Both should have signal
+    bool ref_has_signal = ref_rms > 0.01f;
+    bool bt_has_signal = bt_rms > 0.01f;
+
+    // RMS should be within 20% of each other (same source, same gain)
+    float rms_ratio = (ref_rms > 0.001f) ? bt_rms / ref_rms : 0.0f;
+    bool rms_close = rms_ratio > 0.8f && rms_ratio < 1.2f;
+
+    printf("  Reference (128-frame): rms=%.4f peak=%.4f\n", ref_rms, ref_peak);
+    printf("  BT mode   (960-frame): rms=%.4f peak=%.4f\n", bt_rms, bt_peak);
+    printf("  RMS ratio (bt/ref):    %.3f\n", rms_ratio);
+    printf("  Reference has signal:  %s\n", ref_has_signal ? "PASS" : "FAIL");
+    printf("  BT has signal:         %s\n", bt_has_signal ? "PASS" : "FAIL");
+    printf("  RMS within 20%%:        %s\n", rms_close ? "PASS" : "FAIL");
+
+    bool ok = ref_has_signal && bt_has_signal && rms_close;
+    printf("  Overall: %s\n", ok ? "PASS" : "FAIL");
+    return ok;
+}
+
+// ── Test 13: Dedicated Pulsar delay produces output and tail ────────
+
+static bool test_djapp_pulsar_dedicated_delay() {
+    printf("\n=== Test: Dedicated Pulsar delay produces output and tail ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+
+    setup_pulsar_cosmic_techno(engine);
+    engine->horn_mix.store(0.0f);
+    engine->drive_mix.store(0.0f);
+
+    // Bypass shared effects
+    engine->reverb_bypass.store(1);
+    engine->delay_bypass.store(1);
+
+    // Enable dedicated Pulsar delay
+    engine->pulsar_delay_bypass.store(0);
+    engine->pulsar_delay_time_a.store(0.15f);
+    engine->pulsar_delay_time_b.store(0.2f);
+    engine->pulsar_delay_feedback.store(0.5f);
+
+    // Bypass dedicated reverb
+    engine->pulsar_reverb_bypass.store(1);
+
+    // Set per-track delay sends on tracks 5-7
+    set_pulsar_delay_sends(engine, 0.8f, 5, 8);
+
+    // Warmup + render 1 second
+    float warmup[128 * 2];
+    for (int i = 0; i < 50; i++) orpheus_engine_process(engine, warmup, 128);
+    auto active = render_dj_graph(engine, 48000, 0);
+
+    // Stop Pulsar, render delay tail
+    engine->pulsar_playing.store(0);
+    engine->pulsar_mix.store(0.0f);
+    auto tail = render_dj_graph(engine, 24000, 0);
+
+    bool active_ok = active.rms_l > 0.001f;
+    bool has_tail = tail.rms_l > 0.0001f;
+
+    printf("  active rms=%.4f tail rms=%.6f\n", active.rms_l, tail.rms_l);
+    printf("  active_ok=%s has_tail=%s %s\n",
+           active_ok ? "yes" : "NO", has_tail ? "yes" : "NO",
+           (active_ok && has_tail) ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return active_ok && has_tail;
+}
+
+// ── Test 14: Dedicated Pulsar reverb produces output and tail ──────
+
+static bool test_djapp_pulsar_dedicated_reverb() {
+    printf("\n=== Test: Dedicated Pulsar reverb produces output and tail ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+
+    setup_pulsar_cosmic_techno(engine);
+    engine->horn_mix.store(0.0f);
+    engine->drive_mix.store(0.0f);
+
+    // Bypass shared effects
+    engine->reverb_bypass.store(1);
+    engine->delay_bypass.store(1);
+
+    // Enable dedicated Pulsar reverb
+    engine->pulsar_reverb_bypass.store(0);
+    engine->pulsar_reverb_amount.store(0.7f);
+    engine->pulsar_reverb_time.store(0.8f);
+
+    // Bypass dedicated delay
+    engine->pulsar_delay_bypass.store(1);
+
+    // Set per-track reverb sends on tracks 5-7
+    set_pulsar_reverb_sends(engine, 0.8f, 5, 8);
+
+    // Warmup + render 1 second
+    float warmup[128 * 2];
+    for (int i = 0; i < 50; i++) orpheus_engine_process(engine, warmup, 128);
+    auto active = render_dj_graph(engine, 48000, 0);
+
+    // Stop Pulsar, render reverb tail
+    engine->pulsar_playing.store(0);
+    engine->pulsar_mix.store(0.0f);
+    auto tail = render_dj_graph(engine, 24000, 0);
+
+    bool active_ok = active.rms_l > 0.001f;
+    bool has_tail = tail.rms_l > 0.0001f;
+
+    printf("  active rms=%.4f tail rms=%.6f\n", active.rms_l, tail.rms_l);
+    printf("  active_ok=%s has_tail=%s %s\n",
+           active_ok ? "yes" : "NO", has_tail ? "yes" : "NO",
+           (active_ok && has_tail) ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return active_ok && has_tail;
+}
+
+// ── Test 15: Dedicated effects are independent from shared ─────────
+
+static bool test_djapp_pulsar_effects_independent() {
+    printf("\n=== Test: Dedicated Pulsar effects independent from shared ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+
+    setup_pulsar_cosmic_techno(engine);
+    engine->horn_mix.store(0.0f);
+    engine->drive_mix.store(0.0f);
+
+    // Bypass shared effects completely
+    engine->reverb_bypass.store(1);
+    engine->delay_bypass.store(1);
+
+    // Enable dedicated Pulsar delay and reverb
+    engine->pulsar_delay_bypass.store(0);
+    engine->pulsar_delay_time_a.store(0.15f);
+    engine->pulsar_delay_time_b.store(0.2f);
+    engine->pulsar_delay_feedback.store(0.4f);
+
+    engine->pulsar_reverb_bypass.store(0);
+    engine->pulsar_reverb_amount.store(0.6f);
+    engine->pulsar_reverb_time.store(0.7f);
+
+    // Set per-track sends
+    set_pulsar_delay_sends(engine, 0.6f, 5, 8);
+    set_pulsar_reverb_sends(engine, 0.6f, 5, 8);
+
+    // Render with effects
+    auto wet = render_dj_graph(engine, 96000, 30);
+
+    // Compare against dry (no sends)
+    orpheus_engine_destroy(engine);
+    engine = orpheus_engine_create(48000.0f);
+    if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+
+    setup_pulsar_cosmic_techno(engine);
+    engine->horn_mix.store(0.0f);
+    engine->drive_mix.store(0.0f);
+    engine->reverb_bypass.store(1);
+    engine->delay_bypass.store(1);
+
+    // Dedicated effects bypassed too
+    engine->pulsar_delay_bypass.store(1);
+    engine->pulsar_reverb_bypass.store(1);
+
+    auto dry = render_dj_graph(engine, 96000, 30);
+
+    bool wet_ok = wet.rms_l > 0.001f;
+    bool dry_ok = dry.rms_l > 0.001f;
+    float d = diff_rms(wet, dry);
+    bool differs = d > 0.001f;
+
+    printf("  dry rms=%.4f wet rms=%.4f diff=%.4f\n", dry.rms_l, wet.rms_l, d);
+    printf("  dry_ok=%s wet_ok=%s differs=%s %s\n",
+           dry_ok ? "yes" : "NO", wet_ok ? "yes" : "NO", differs ? "yes" : "NO",
+           (dry_ok && wet_ok && differs) ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return dry_ok && wet_ok && differs;
+}
+
+// ── Test 16: Zero sends produce no effect tail (DEEP=0 equivalent) ──
+
+static bool test_djapp_pulsar_zero_sends() {
+    printf("\n=== Test: Zero sends produce no effect tail (DEEP=0) ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+    if (!load_dj_graph(engine)) { orpheus_engine_destroy(engine); return false; }
+
+    setup_pulsar_cosmic_techno(engine);
+    engine->horn_mix.store(0.0f);
+    engine->drive_mix.store(0.0f);
+
+    // Bypass shared effects
+    engine->reverb_bypass.store(1);
+    engine->delay_bypass.store(1);
+
+    // Dedicated effects enabled but with zero sends (simulates DEEP=0)
+    engine->pulsar_delay_bypass.store(0);
+    engine->pulsar_delay_time_a.store(0.15f);
+    engine->pulsar_delay_time_b.store(0.2f);
+    engine->pulsar_delay_feedback.store(0.5f);
+
+    engine->pulsar_reverb_bypass.store(0);
+    engine->pulsar_reverb_amount.store(0.7f);
+    engine->pulsar_reverb_time.store(0.8f);
+
+    // All sends at zero
+    set_pulsar_delay_sends(engine, 0.0f);
+    set_pulsar_reverb_sends(engine, 0.0f);
+
+    // Run Pulsar for 1 second
+    float warmup[128 * 2];
+    for (int i = 0; i < 50; i++) orpheus_engine_process(engine, warmup, 128);
+    render_dj_graph(engine, 48000, 0);
+
+    // Stop Pulsar, check for tail — should be near-silent
+    engine->pulsar_playing.store(0);
+    engine->pulsar_mix.store(0.0f);
+    auto tail = render_dj_graph(engine, 24000, 0);
+
+    // Tail should be negligible (no signal was sent to effects)
+    bool no_tail = tail.rms_l < 0.0005f;
+
+    printf("  tail rms=%.6f %s\n", tail.rms_l,
+           no_tail ? "PASS (no effect tail)" : "FAIL (unexpected tail)");
+
+    orpheus_engine_destroy(engine);
+    return no_tail;
+}
+
+// ── Test 17: Delay-only vs reverb-only produce different output ────
+
+static bool test_djapp_pulsar_delay_vs_reverb() {
+    printf("\n=== Test: Delay-only vs reverb-only produce different output ===\n");
+
+    // Delay-only
+    OrpheusEngine* e_delay = orpheus_engine_create(48000.0f);
+    if (!load_dj_graph(e_delay)) { orpheus_engine_destroy(e_delay); return false; }
+
+    setup_pulsar_cosmic_techno(e_delay);
+    e_delay->horn_mix.store(0.0f);
+    e_delay->drive_mix.store(0.0f);
+    e_delay->reverb_bypass.store(1);
+    e_delay->delay_bypass.store(1);
+
+    e_delay->pulsar_delay_bypass.store(0);
+    e_delay->pulsar_delay_time_a.store(0.15f);
+    e_delay->pulsar_delay_time_b.store(0.2f);
+    e_delay->pulsar_delay_feedback.store(0.4f);
+    e_delay->pulsar_reverb_bypass.store(1);
+
+    set_pulsar_delay_sends(e_delay, 0.7f, 5, 8);
+    set_pulsar_reverb_sends(e_delay, 0.0f);
+
+    auto delay_r = render_dj_graph(e_delay, 96000, 30);
+    orpheus_engine_destroy(e_delay);
+
+    // Reverb-only
+    OrpheusEngine* e_reverb = orpheus_engine_create(48000.0f);
+    if (!load_dj_graph(e_reverb)) { orpheus_engine_destroy(e_reverb); return false; }
+
+    setup_pulsar_cosmic_techno(e_reverb);
+    e_reverb->horn_mix.store(0.0f);
+    e_reverb->drive_mix.store(0.0f);
+    e_reverb->reverb_bypass.store(1);
+    e_reverb->delay_bypass.store(1);
+
+    e_reverb->pulsar_delay_bypass.store(1);
+    e_reverb->pulsar_reverb_bypass.store(0);
+    e_reverb->pulsar_reverb_amount.store(0.7f);
+    e_reverb->pulsar_reverb_time.store(0.8f);
+
+    set_pulsar_delay_sends(e_reverb, 0.0f);
+    set_pulsar_reverb_sends(e_reverb, 0.7f, 5, 8);
+
+    auto reverb_r = render_dj_graph(e_reverb, 96000, 30);
+    orpheus_engine_destroy(e_reverb);
+
+    bool delay_ok = delay_r.rms_l > 0.001f;
+    bool reverb_ok = reverb_r.rms_l > 0.001f;
+    float d = diff_rms(delay_r, reverb_r);
+    bool differs = d > 0.001f;
+
+    printf("  delay-only rms=%.4f reverb-only rms=%.4f diff=%.4f\n",
+           delay_r.rms_l, reverb_r.rms_l, d);
+    printf("  delay_ok=%s reverb_ok=%s differs=%s %s\n",
+           delay_ok ? "yes" : "NO", reverb_ok ? "yes" : "NO", differs ? "yes" : "NO",
+           (delay_ok && reverb_ok && differs) ? "PASS" : "FAIL");
+
+    return delay_ok && reverb_ok && differs;
 }
 
 // ── Suite runner ────────────────────────────────────────────────────
@@ -728,6 +1116,12 @@ bool run_djapp_graph_tests() {
     all_pass &= test_djapp_full_chain();
     all_pass &= test_djapp_drive_sweep();
     all_pass &= test_djapp_distortion_mix();
+    all_pass &= test_djapp_turntable_bt_chunking();
+    all_pass &= test_djapp_pulsar_dedicated_delay();
+    all_pass &= test_djapp_pulsar_dedicated_reverb();
+    all_pass &= test_djapp_pulsar_effects_independent();
+    all_pass &= test_djapp_pulsar_zero_sends();
+    all_pass &= test_djapp_pulsar_delay_vs_reverb();
     printf("\nDJ App graph tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
     return all_pass;
 }

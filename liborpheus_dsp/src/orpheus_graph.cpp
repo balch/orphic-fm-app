@@ -306,7 +306,7 @@ void orpheus_graph_dump_exec_order(OrpheusGraph* graph) {
         "CLOCK", "GRIDS", "MARBLES", "LOOPER", "BENDER",
         "PER_STR_BEND", "DUO_VOICE", "LORENZ", "POLY_LFO",
         "BASS_VOICE", "OVERDRIVE", "COMPRESSOR", "HORN", "TURNTABLE", "TIDES",
-        "PULSAR"
+        "PULSAR", "PULSAR_DELAY", "PULSAR_REVERB"
     };
     static_assert(sizeof(type_names) / sizeof(type_names[0]) == UNIT_TYPE_COUNT,
                   "type_names[] out of sync with UnitType enum");
@@ -351,11 +351,15 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
     std::memcpy(engine->warps_bass_read, engine->warps_source_buffers[9],
                 num_frames * sizeof(float));
 
-    // Now zero for this frame's voice accumulation
-    std::memset(engine->warps_source_buffers[0], 0, num_frames * sizeof(float)); // SYNTH
-    std::memset(engine->warps_source_buffers[1], 0, num_frames * sizeof(float)); // DRUMS
-    std::memset(engine->warps_source_buffers[2], 0, num_frames * sizeof(float)); // REPL
-    std::memset(engine->warps_source_buffers[9], 0, num_frames * sizeof(float)); // BASS
+    // Zero the FULL kMaxFrames extent of each source buffer, not just num_frames.
+    // When Bluetooth callbacks are chunked (e.g. 960 = 512 + 448), a smaller chunk
+    // leaves stale samples in the [num_frames..kMaxFrames) tail.  The next larger
+    // chunk then copies/reads those stale samples, injecting periodic glitches
+    // into the turntable capture buffer (audible as "mud", especially on bass).
+    std::memset(engine->warps_source_buffers[0], 0, kMaxFrames * sizeof(float)); // SYNTH
+    std::memset(engine->warps_source_buffers[1], 0, kMaxFrames * sizeof(float)); // DRUMS
+    std::memset(engine->warps_source_buffers[2], 0, kMaxFrames * sizeof(float)); // REPL
+    std::memset(engine->warps_source_buffers[9], 0, kMaxFrames * sizeof(float)); // BASS
 
     // Smooth warps_mix here (before any voice runs) so warps_dry_scale()
     // reads a consistent value regardless of execution order.
@@ -480,6 +484,10 @@ void orpheus_graph_process(OrpheusGraph* graph, OrpheusEngine* engine,
                 unit_process_tides(u, engine, num_frames, sr); break;
             case UNIT_PULSAR:
                 unit_process_pulsar(u, engine, num_frames, sr); break;
+            case UNIT_PULSAR_DELAY:
+                unit_process_pulsar_delay(u, engine, num_frames, sr); break;
+            case UNIT_PULSAR_REVERB:
+                unit_process_pulsar_reverb(u, engine, num_frames, sr); break;
             default: break;
         }
 

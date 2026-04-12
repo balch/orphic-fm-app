@@ -35,8 +35,8 @@ class DjPlugin(
 
     private var _wetA = 0f
     private var _wetB = 0f
-    private var _sourceA = DjSource.SYNTH.index
-    private var _sourceB = DjSource.BASS.index
+    private var _sourceA = DjSource.SYNTH.sourceId
+    private var _sourceB = DjSource.BASS.sourceId
     private var _velocityA = 1f
     private var _velocityB = 1f
     private var _frozenA = false
@@ -65,7 +65,7 @@ class DjPlugin(
         controlPort(DjSymbol.SOURCE_A) {
             intType {
                 options = DjSource.entries.map { it.label }
-                default = DjSource.SYNTH.index
+                default = DjSource.SYNTH.sourceId
                 get { _sourceA }
                 set { _sourceA = it }
             }
@@ -73,7 +73,7 @@ class DjPlugin(
         controlPort(DjSymbol.SOURCE_B) {
             intType {
                 options = DjSource.entries.map { it.label }
-                default = DjSource.BASS.index
+                default = DjSource.BASS.sourceId
                 get { _sourceB }
                 set { _sourceB = it }
             }

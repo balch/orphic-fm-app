@@ -45,6 +45,10 @@ actual class MediaSessionManager {
     private val log = logging("MediaSessionManager")
     private var handler: MediaSessionActionHandler? = null
     private var isActive = false
+    actual var onSkipNext: (() -> Unit)? = null
+    actual var onSkipPrevious: (() -> Unit)? = null
+    actual var onPlay: (() -> Unit)? = null
+    actual var onPause: (() -> Unit)? = null
     
     actual fun activate() {
         if (isActive) return
@@ -85,7 +89,7 @@ actual class MediaSessionManager {
     
     actual fun updateMetadata(metadata: PlaybackMetadata) {
         try {
-            jsUpdateMetadata(metadata.title, metadata.subtitle, metadata.mode.displayName)
+            jsUpdateMetadata(metadata.title, metadata.displaySubtitle, metadata.mode.displayName)
         } catch (e: Exception) {
             // MediaSession may not be available
         }

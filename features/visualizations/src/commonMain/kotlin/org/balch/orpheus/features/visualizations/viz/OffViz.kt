@@ -3,14 +3,15 @@ package org.balch.orpheus.features.visualizations.viz
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.viz.Visualization
 
 @Inject
-@ContributesIntoSet(AppScope::class)
+@ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
 class OffViz : Visualization {
     override val id = "off"
     override val name = "Off"

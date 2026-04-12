@@ -56,6 +56,7 @@ public:
     int   isTtsPlaying();
 
     void  getPulsarViz(int* gatesOut, float* velocitiesOut, int* playheadsOut, int* stepCountsOut);
+    void  getPulsarArrangement(int* out);
 
 private:
     OrpheusEngine* dsp_engine_ = nullptr;

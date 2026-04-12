@@ -35,6 +35,10 @@ expect class MediaSessionManager {
      * Set the handler for media button actions (play/pause/stop).
      */
     fun setActionHandler(handler: MediaSessionActionHandler)
+    var onSkipNext: (() -> Unit)?
+    var onSkipPrevious: (() -> Unit)?
+    var onPlay: (() -> Unit)?
+    var onPause: (() -> Unit)?
 }
 
 /**
@@ -44,4 +48,6 @@ interface MediaSessionActionHandler {
     fun onPlay()
     fun onPause()
     fun onStop()
+    fun onSkipNext() {}
+    fun onSkipPrevious() {}
 }

@@ -38,6 +38,14 @@ add_library(orpheus_desktop SHARED
     miniaudio_impl.cpp
 )
 
+# macOS Now Playing integration (MPNowPlayingInfoCenter / MPRemoteCommandCenter)
+if(APPLE)
+    target_sources(orpheus_desktop PRIVATE macos_now_playing.mm)
+    set_source_files_properties(macos_now_playing.mm PROPERTIES
+        COMPILE_FLAGS "-x objective-c++"
+    )
+endif()
+
 target_include_directories(orpheus_desktop PRIVATE
     ${JNI_INCLUDE_DIRS}
     "${CMAKE_CURRENT_SOURCE_DIR}/../include"
@@ -52,6 +60,8 @@ if(APPLE)
         "-framework CoreAudio"
         "-framework AudioToolbox"
         "-framework CoreFoundation"
+        "-framework Foundation"
+        "-framework MediaPlayer"
     )
 elseif(UNIX)
     target_link_libraries(orpheus_desktop PRIVATE pthread m dl)

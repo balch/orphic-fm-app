@@ -6,6 +6,7 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import org.balch.orpheus.core.audio.dsp.WiringGraphProvider
 import org.balch.orpheus.core.audio.dsp.buildDefaultWiringGraph
+import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.midi.MidiController
 import org.balch.orpheus.core.midi.MidiMappingRepository
@@ -36,5 +37,8 @@ interface OrpheusModule {
 
         @Provides
         fun provideRestoreStrategy(): RestoreStrategy = RestoreStrategy.PRESET
+
+        @Provides
+        fun providePulsarPlaybackMode(): PulsarPlaybackMode = PulsarPlaybackMode.MIX_GATED
     }
 }

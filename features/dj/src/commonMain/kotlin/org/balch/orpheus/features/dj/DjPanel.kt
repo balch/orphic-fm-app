@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -62,7 +64,7 @@ private data class DjColors(
     val labelColor: Color = OrpheusColors.djRed,
     val deckAColor: Color = OrpheusColors.djRedLight,
     val deckBColor: Color = OrpheusColors.djCream,
-    val frozenColor: Color = OrpheusColors.djCream,
+    val frozenColor: Color = OrpheusColors.djIceBlue,
 )
 
 @Composable
@@ -111,6 +113,7 @@ fun DjPanel(
                 TurntablePlatter(
                     vizData = vizA,
                     frozen = state.frozenA,
+                    locked = state.lockedA,
                     velocity = state.velocityA,
                     wet = state.wetA,
                     deckColor = djColors.deckAColor,
@@ -118,6 +121,7 @@ fun DjPanel(
                     deckLabel = "A",
                     onDrag = { velocity -> actions.setPlatterDrag(0, velocity) },
                     onRelease = { actions.setPlatterRelease(0) },
+                    onToggleLock = { actions.toggleLock(0) },
                     modifier = Modifier.size(100.dp),
                 )
                 SourceDropdown(
@@ -200,6 +204,7 @@ fun DjPanel(
                 TurntablePlatter(
                     vizData = vizB,
                     frozen = state.frozenB,
+                    locked = state.lockedB,
                     velocity = state.velocityB,
                     wet = state.wetB,
                     deckColor = djColors.deckBColor,
@@ -207,6 +212,7 @@ fun DjPanel(
                     deckLabel = "B",
                     onDrag = { velocity -> actions.setPlatterDrag(1, velocity) },
                     onRelease = { actions.setPlatterRelease(1) },
+                    onToggleLock = { actions.toggleLock(1) },
                     modifier = Modifier.size(100.dp),
                 )
                 SourceDropdown(
@@ -234,6 +240,7 @@ fun DjPanel(
 private fun TurntablePlatter(
     vizData: FloatArray,
     frozen: Boolean,
+    locked: Boolean,
     velocity: Float,
     wet: Float,
     deckColor: Color,
@@ -241,25 +248,32 @@ private fun TurntablePlatter(
     deckLabel: String,
     onDrag: (Float) -> Unit,
     onRelease: () -> Unit,
+    onToggleLock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val currentOnDrag by rememberUpdatedState(onDrag)
     val currentOnRelease by rememberUpdatedState(onRelease)
+    val currentOnToggleLock by rememberUpdatedState(onToggleLock)
     val currentVelocity by rememberUpdatedState(velocity)
     val currentWet by rememberUpdatedState(wet)
 
     // Continuous rotation animation — only spins when this deck's wet > 0
     var rotationAngle by remember { mutableStateOf(0f) }
+    // Pulsing alpha for frozen overlay / locked spindle
+    var pulseAlpha by remember { mutableStateOf(1f) }
     LaunchedEffect(Unit) {
         while (true) {
             withFrameMillis { }
             if (currentWet > 0.001f) {
                 rotationAngle += currentVelocity * 0.05f
             }
+            val pulse = kotlin.math.abs(kotlin.math.sin(System.nanoTime() / 166_000_000f))
+            pulseAlpha = 0.4f + 0.6f * pulse
         }
     }
 
-    val borderColor = if (frozen) frozenColor else deckColor
+    val isFrozen = frozen || locked
+    val borderColor = if (isFrozen) frozenColor else deckColor
 
     Box(
         modifier = modifier,
@@ -268,6 +282,22 @@ private fun TurntablePlatter(
         Canvas(
             modifier = Modifier
                 .matchParentSize()
+                .pointerInput(Unit) {
+                    // Long-press center spindle to toggle lock
+                    detectTapGestures(
+                        onLongPress = { offset ->
+                            val cx = size.width / 2f
+                            val cy = size.height / 2f
+                            val dx = offset.x - cx
+                            val dy = offset.y - cy
+                            val dist = kotlin.math.sqrt(dx * dx + dy * dy)
+                            val spindleRadius = minOf(size.width, size.height) / 2f * 0.35f
+                            if (dist < spindleRadius) {
+                                currentOnToggleLock()
+                            }
+                        }
+                    )
+                }
                 .pointerInput(Unit) {
                     var lastY = 0f
                     // Vertical drag: up = forward (positive), down = backward (negative).
@@ -298,12 +328,21 @@ private fun TurntablePlatter(
             val innerRadius = outerRadius * 0.3f
             val waveRadius = outerRadius * 0.7f
 
-            // Outer ring border
+            // Frozen: filled ice overlay that pulses
+            if (isFrozen) {
+                drawCircle(
+                    color = frozenColor.copy(alpha = pulseAlpha * 0.15f),
+                    radius = outerRadius,
+                    center = Offset(cx, cy),
+                )
+            }
+
+            // Outer ring border — thicker when frozen
             drawCircle(
                 color = borderColor,
                 radius = outerRadius,
                 center = Offset(cx, cy),
-                style = Stroke(width = 2f),
+                style = Stroke(width = if (isFrozen) 4f else 2f),
             )
 
             // Inner ring
@@ -314,25 +353,41 @@ private fun TurntablePlatter(
                 style = Stroke(width = 1f),
             )
 
-            // Radial waveform ring — 128 samples mapped around the circle
+            // Radial waveform ring — etched grooves with highlight/shadow
             val sampleCount = vizData.size.coerceAtMost(128)
+            val etchOffset = 0.012f // angular offset for highlight/shadow
+            val highlightColor = Color.White.copy(alpha = 0.35f)
+            val shadowColor = Color.Black.copy(alpha = 0.4f)
+            val grooveColor = deckColor.copy(alpha = 0.5f)
             if (sampleCount > 0) {
                 for (i in 0 until sampleCount) {
-                    val angle = (i.toFloat() / sampleCount) * 2f * PI.toFloat() - (PI.toFloat() / 2f) + rotationAngle
+                    val baseAngle = (i.toFloat() / sampleCount) * 2f * PI.toFloat() - (PI.toFloat() / 2f) + rotationAngle
                     val sample = vizData[i].coerceIn(-1f, 1f)
                     val r0 = waveRadius
                     val r1 = waveRadius + sample * (outerRadius - waveRadius) * 0.8f
 
-                    val x0 = cx + cos(angle) * r0
-                    val y0 = cy + sin(angle) * r0
-                    val x1 = cx + cos(angle) * r1
-                    val y1 = cy + sin(angle) * r1
-
+                    // Shadow (clockwise offset)
+                    val shadowAngle = baseAngle + etchOffset
                     drawLine(
-                        color = deckColor.copy(alpha = 0.6f),
-                        start = Offset(x0, y0),
-                        end = Offset(x1, y1),
+                        color = shadowColor,
+                        start = Offset(cx + cos(shadowAngle) * r0, cy + sin(shadowAngle) * r0),
+                        end = Offset(cx + cos(shadowAngle) * r1, cy + sin(shadowAngle) * r1),
                         strokeWidth = 1.5f,
+                    )
+                    // Main groove
+                    drawLine(
+                        color = grooveColor,
+                        start = Offset(cx + cos(baseAngle) * r0, cy + sin(baseAngle) * r0),
+                        end = Offset(cx + cos(baseAngle) * r1, cy + sin(baseAngle) * r1),
+                        strokeWidth = 1.5f,
+                    )
+                    // Highlight (counter-clockwise offset)
+                    val hlAngle = baseAngle - etchOffset
+                    drawLine(
+                        color = highlightColor,
+                        start = Offset(cx + cos(hlAngle) * r0, cy + sin(hlAngle) * r0),
+                        end = Offset(cx + cos(hlAngle) * r1, cy + sin(hlAngle) * r1),
+                        strokeWidth = 1f,
                     )
                 }
             }
@@ -353,10 +408,25 @@ private fun TurntablePlatter(
                 strokeWidth = 2f,
             )
 
-            // Center spindle
+            // Center spindle — pulses when frozen/locked
             drawCircle(
-                color = borderColor,
+                color = borderColor.copy(alpha = if (isFrozen) pulseAlpha else 1f),
                 radius = innerRadius * 0.4f,
+                center = Offset(cx, cy),
+            )
+
+            // Glass lens overlay — top specular highlight fading to transparent
+            drawCircle(
+                brush = Brush.verticalGradient(
+                    0.0f to Color.White.copy(alpha = 0.18f),
+                    0.35f to Color.White.copy(alpha = 0.06f),
+                    0.5f to Color.Transparent,
+                    0.85f to Color.Transparent,
+                    1.0f to Color.White.copy(alpha = 0.04f),
+                    startY = cy - outerRadius,
+                    endY = cy + outerRadius,
+                ),
+                radius = outerRadius,
                 center = Offset(cx, cy),
             )
         }
@@ -447,7 +517,7 @@ private fun SourceDropdown(
                             )
                         },
                         onClick = {
-                            onSourceChange(entry.index)
+                            onSourceChange(entry.sourceId)
                             expanded = false
                         },
                     )

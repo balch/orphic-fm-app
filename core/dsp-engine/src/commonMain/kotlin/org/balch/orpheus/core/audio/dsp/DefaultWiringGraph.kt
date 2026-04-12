@@ -286,17 +286,6 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // Pulsar → Grains → Resonator → Drive → Horn → Delay/Reverb → Master
     pulsarUnit.out to grains.inputA
     pulsarUnit.outRight to grains.inputB
-    // Pulsar send gains for direct delay/reverb sends (in addition to chain)
-    val pulsarSendMix = add("pulsarSendMix")
-    val pulsarSendHalf = multiply("pulsarSendHalf") { inputB = 0.5f }
-    pulsarUnit.out to pulsarSendMix.inputA
-    pulsarUnit.outRight to pulsarSendMix.inputB
-    pulsarSendMix.out to pulsarSendHalf.inputA
-    val pulsarDelaySend = multiply("pulsarDelaySend") { inputB = 0.0f }
-    val pulsarReverbSend = multiply("pulsarReverbSend") { inputB = 0.0f }
-    pulsarSendHalf.out to pulsarDelaySend.inputA
-    pulsarSendHalf.out to pulsarReverbSend.inputA
-    // Pulsar → delay/reverb send wiring is below, after delay/reverb units are created.
 
     // Global Bender (pitch CV + timbre CV + audio)
     val benderUnit = bender("bender")
@@ -308,6 +297,10 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     val reverb = reverb("reverb")
     horn.out to reverb.inputA
     horn.outRight to reverb.inputB
+
+    // ── Pulsar dedicated delay/reverb (independent from shared voice chain effects) ──
+    val pulsarDelayUnit = pulsarDelay("pulsarDelay")
+    val pulsarReverbUnit = pulsarReverb("pulsarReverb")
 
     // ── Bass voice chain ──
     // bass_voice → overdrive → compressor → master bus + delay/reverb sends
@@ -335,13 +328,6 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     // Turntable → reverb send
     ttReverbSend.out to reverb.inputA
     ttReverbSend.out to reverb.inputB
-
-    // Pulsar → delay send (mono sum to both channels)
-    pulsarDelaySend.out to delay.inputA
-    pulsarDelaySend.out to delay.inputB
-    // Pulsar → reverb send
-    pulsarReverbSend.out to reverb.inputA
-    pulsarReverbSend.out to reverb.inputB
 
     // Master output (no hard clip)
     val master = masterOut("master")
@@ -412,6 +398,11 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
     delay.outRight to master.inputB
     reverb.out to master.inputA
     reverb.outRight to master.inputB
+    // Pulsar effects output → master bus
+    pulsarDelayUnit.out to master.inputA
+    pulsarDelayUnit.outRight to master.inputB
+    pulsarReverbUnit.out to master.inputA
+    pulsarReverbUnit.outRight to master.inputB
 
     // Port map for nativeSetPort routing
     portMap {
@@ -468,8 +459,5 @@ fun buildDefaultWiringGraph(): ByteArray = wiringGraph {
         // DJ Turntable send levels
         map("org.balch.orpheus.plugins.dj", "delay_send", "ttDelaySend", IPORT_INPUT_B)
         map("org.balch.orpheus.plugins.dj", "reverb_send", "ttReverbSend", IPORT_INPUT_B)
-        // Pulsar beat machine send levels
-        map("org.balch.orpheus.plugins.pulsar", "delay_send", "pulsarDelaySend", IPORT_INPUT_B)
-        map("org.balch.orpheus.plugins.pulsar", "reverb_send", "pulsarReverbSend", IPORT_INPUT_B)
     }
 }

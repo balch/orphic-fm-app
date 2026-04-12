@@ -207,23 +207,37 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
     // Pulsar output is now routed through the graph (delay/reverb sends + master),
     // not summed here. See DefaultWiringGraph.kt for wiring.
 
-    // Signal chain: pan → volume → peak measurement → limiter → output
+    // Signal chain: global_mute → pan → volume → peak measurement → limiter → output
     float pan_target = engine->master_pan.load(std::memory_order_relaxed);
     float vol_target = engine->master_volume.load(std::memory_order_relaxed);
     float coeff = smooth_coeff(sr);
 
+    // Global mute: smooth toward 0 (muted) or 1 (unmuted) for click-free transitions
+    float mute_target = engine->global_muted.load(std::memory_order_relaxed) != 0 ? 0.0f : 1.0f;
+
+    // Fast early-out: if fully muted and target is still muted, zero output
+    if (engine->smooth_global_mute < 0.0001f && mute_target < 0.5f) {
+        engine->smooth_global_mute = 0.0f;
+        std::memset(output_buffer, 0, n * 2 * sizeof(float));
+        engine->peak_left.store(0.0f, std::memory_order_relaxed);
+        engine->peak_right.store(0.0f, std::memory_order_relaxed);
+        engine->viz_rings[VIZ_MASTER_OUT].write(0.0f);
+        return;
+    }
+
     // Feed-forward limiter coefficients
-    // Threshold: 0.9 (starts limiting before hard clip)
-    // Attack: ~0.1ms (catches transients)
-    // Release: ~100ms (smooth recovery, avoids pumping)
     constexpr float kLimiterThreshold = 0.9f;
-    float attack_coeff  = 1.0f - std::exp(-1.0f / (0.0001f * sr));  // ~0.1ms
-    float release_coeff = 1.0f - std::exp(-1.0f / (0.100f * sr));   // ~100ms
+    float attack_coeff  = 1.0f - std::exp(-1.0f / (0.0001f * sr));
+    float release_coeff = 1.0f - std::exp(-1.0f / (0.100f * sr));
 
     float env = engine->master_limiter_env;
     float pk_l = 0.0f, pk_r = 0.0f;
 
     for (int i = 0; i < n; i++) {
+        // Global mute (smoothed)
+        engine->smooth_global_mute += coeff * (mute_target - engine->smooth_global_mute);
+        float mute_gain = engine->smooth_global_mute;
+
         // Pan (constant-power, per-sample smoothed)
         engine->smooth_master_pan += coeff * (pan_target - engine->smooth_master_pan);
         float mp_angle = ((engine->smooth_master_pan + 1.0f) * 0.5f) * (3.14159265f * 0.5f);
@@ -235,38 +249,32 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
         l *= engine->smooth_master_volume;
         r *= engine->smooth_master_volume;
 
+        // Apply global mute
+        l *= mute_gain;
+        r *= mute_gain;
+
         // Peak measurement (pre-limiter)
         float al = std::fabs(l);
         float ar = std::fabs(r);
         if (al > pk_l) pk_l = al;
         if (ar > pk_r) pk_r = ar;
 
-        // Feed-forward limiter: track peak, compute gain reduction
+        // Feed-forward limiter
         float peak = std::max(al, ar);
         float over = peak - kLimiterThreshold;
-
-        // Envelope follower (fast attack, slow release)
         if (over > env) {
             env += attack_coeff * (over - env);
         } else {
             env += release_coeff * (0.0f - env);
         }
-
-        // Compute gain: reduce by the amount we're over threshold
-        // Soft knee: blend between unity and limited in the knee region
         float gain = 1.0f;
         if (env > 0.0f) {
             gain = kLimiterThreshold / (kLimiterThreshold + env);
         }
-
         l *= gain;
         r *= gain;
 
-        // Safety net: soft-saturate anything still above the limiter threshold.
-        // Hard clip creates discontinuities (clicks) when fast transients
-        // punch through the limiter's 0.1ms attack. This is transparent
-        // below 0.9 (limiter catches everything else) and smoothly saturates
-        // toward ±1.0 above that — no derivative discontinuities.
+        // Soft-saturate safety net
         auto soft_sat = [](float x) -> float {
             float ax = std::fabs(x);
             if (ax <= 0.9f) return x;
@@ -281,12 +289,8 @@ void unit_process_master_out(GraphUnit* u, OrpheusEngine* engine, float* output_
     }
 
     engine->master_limiter_env = env;
-
-    // Store pre-limiter peaks for monitoring
     engine->peak_left.store(pk_l, std::memory_order_relaxed);
     engine->peak_right.store(pk_r, std::memory_order_relaxed);
-
-    // Write master output visualization (mono peak of L+R)
     float master_viz = std::max(pk_l, pk_r);
     engine->viz_rings[VIZ_MASTER_OUT].write(master_viz);
 }

@@ -41,3 +41,16 @@ data class PulsarVizData(
         return result
     }
 }
+
+data class PulsarArrangementState(
+    val sectionIndex: Int,
+    val barsElapsed: Int,
+    val barsTotal: Int,
+    val soloActive: Boolean,
+    val soloTrack: Int,
+    val soloMode: Int,
+    val bandSolo: Boolean = false,
+    val bandMemberNames: List<String> = emptyList(),
+)
+
+val ARRANGEMENT_STATE_UNKNOWN = PulsarArrangementState(-1, 0, 0, false, -1, 0)

@@ -7,11 +7,12 @@ import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -35,7 +36,7 @@ data class LavaLampUiState(
  * Lava Lamp visualization using Compose withFrameNanos for vsync-aligned animation.
  */
 @Inject
-@ContributesIntoSet(AppScope::class)
+@ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
 class LavaLampViz(
     private val engine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,

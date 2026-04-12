@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -17,6 +19,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -29,12 +32,15 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
@@ -108,6 +114,8 @@ fun PulsarStepGrid(
     mood: Float = 0.5f,
     selectedTrack: Int? = null,
     onTrackSelected: (Int?) -> Unit = {},
+    arrangementState: PulsarArrangementState? = null,
+    arrangement: Arrangement? = null,
     modifier: Modifier = Modifier,
 ) {
     val cellGap = 2f
@@ -118,6 +126,8 @@ fun PulsarStepGrid(
     var beatPulse by remember { mutableFloatStateOf(1f) }
     val prevPlayheads = remember { IntArray(NUM_TRACKS) { -1 } }
     val smoothedLevels = remember { FloatArray(NUM_TRACKS) }
+    // Running peak per track for stable waveform normalization (slow decay)
+    val trackPeaks = remember { FloatArray(NUM_TRACKS) { 0.1f } }
     // Collect per-track waveform data from viz flows
     val trackWaveforms = Array(NUM_TRACKS) { t ->
         trackVizFlows[t].collectAsState().value
@@ -138,11 +148,16 @@ fun PulsarStepGrid(
                 for (t in 0 until NUM_TRACKS) {
                     val raw = vizData.trackLevels[t].coerceIn(0f, 1f)
                     if (raw > smoothedLevels[t]) {
-                        // Attack: jump quickly to new peak
                         smoothedLevels[t] += (raw - smoothedLevels[t]) * (1f - kotlin.math.exp(-dt / 0.01f))
                     } else {
-                        // Decay: fall slowly
                         smoothedLevels[t] *= (1f - dt * 3f).coerceAtLeast(0f)
+                    }
+                    // Running peak for waveform normalization: fast attack, very slow decay (~10s)
+                    if (raw > trackPeaks[t]) {
+                        trackPeaks[t] = raw
+                    } else {
+                        trackPeaks[t] *= (1f - dt * 0.1f).coerceAtLeast(0f)  // ~10s decay
+                        if (trackPeaks[t] < 0.01f) trackPeaks[t] = 0.01f     // floor
                     }
                 }
 
@@ -175,9 +190,9 @@ fun PulsarStepGrid(
     val saturation = energy * 0.5f + mood * 0.3f + (1f - space) * 0.2f
     val dispersion = complexity * 0.4f + energy * 0.3f + mood * 0.3f
     val liquidScope = VisualizationLiquidScope(
-        refraction = refraction * 1.5f,             // 0-1.5 range
+        refraction = refraction,
         saturation = 0.5f + saturation * 1.5f,  // 0.5-2.0 range
-        dispersion = dispersion,                 // 0-1.0 range
+        dispersion = dispersion,
         curve = 0.001f,          // lens curvature follows refraction
     )
 
@@ -207,9 +222,6 @@ fun PulsarStepGrid(
         ) {
             val totalTrackGaps = (NUM_TRACKS - 1) * trackGap
             val trackHeight = (size.height - totalTrackGaps) / NUM_TRACKS
-
-            // (waveform traces drawn after cells — see Layer 7 below)
-            val isPlaying = vizData.playheads[0] >= 0
 
             // Layer 2-5: Cells, glow, playhead, selection
             for (track in 0 until NUM_TRACKS) {
@@ -418,10 +430,8 @@ fun PulsarStepGrid(
                 val baseY = trackY + trackHeight * 0.85f
                 val maxH = trackHeight * 0.78f  // 85% - 7% = 78% range
 
-                // Find max value in data for per-track normalization
-                var maxVal = 0f
-                for (v in data) { val a = kotlin.math.abs(v); if (a > maxVal) maxVal = a }
-                if (maxVal < 0.001f) maxVal = 1f  // avoid div by zero
+                // Use running peak for stable normalization (not per-frame max)
+                val maxVal = trackPeaks[track].coerceAtLeast(0.01f)
 
                 val path = Path()
                 val xStep = size.width / data.size.coerceAtLeast(1)
@@ -459,6 +469,44 @@ fun PulsarStepGrid(
                     path = path,
                     color = color.copy(alpha = (0.25f * boldness).coerceAtMost(0.6f)),
                     style = Stroke(width = 1.5f),
+                )
+            }
+        }
+
+        // Layer 9: Arrangement state overlay
+
+        val sectionName = arrangementState?.sectionIndex?.let { sectionIndex ->
+            arrangement?.sections?.getOrNull(sectionIndex)?.name
+        }
+
+        if (sectionName != null) {
+            val currentBar = arrangementState.barsElapsed + 1
+            val barText = "$currentBar/${arrangementState.barsTotal}"
+            val soloText = if (arrangementState.soloActive && arrangementState.soloTrack >= 0) {
+                val name = if (arrangementState.bandSolo) {
+                    arrangementState.bandMemberNames.getOrElse(arrangementState.soloTrack) { "?" }
+                } else {
+                    PULSAR_TRACK_NAMES.getOrElse(arrangementState.soloTrack) { "?" }
+                }
+                " \u25b8 $name"
+            } else ""
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(4.dp)
+                    .background(
+                        OrpheusColors.deepPurple.copy(alpha = 0.4f),
+                        RoundedCornerShape(4.dp),
+                    )
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
+            ) {
+                Text(
+                    text = "$sectionName $barText$soloText",
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
                 )
             }
         }

@@ -1,4 +1,5 @@
 #include "orpheus_engine.h"
+#include "orpheus_graph.h"
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -455,11 +456,16 @@ void orpheus_engine_process(OrpheusEngine* engine,
 
     OrpheusGraph* graph = engine->graph.load(std::memory_order_acquire);
     if (graph) {
-        // Graph-based rendering: voices + effects chain via ODWG descriptor
-        // master_out unit handles drive, pan, and soft-clip
-        orpheus_graph_process(graph, engine, output_buffer, num_frames);
-    } else {
-        // No graph loaded — silent output (graph required for audio rendering)
+        // Process in kMaxFrames (512) chunks for large Bluetooth callbacks.
+        // orpheus_graph_process clamps to kMaxFrames internally — without
+        // chunking, frames beyond 512 would be silence (causing BT crackling).
+        int frames_done = 0;
+        while (frames_done < num_frames) {
+            int chunk = num_frames - frames_done;
+            if (chunk > kMaxFrames) chunk = kMaxFrames;
+            orpheus_graph_process(graph, engine, output_buffer + frames_done * 2, chunk);
+            frames_done += chunk;
+        }
     }
 
     // Peak monitoring is handled inside unit_process_master_out (pre-clip, matching JSyn).
@@ -508,9 +514,15 @@ void orpheus_engine_process(OrpheusEngine* engine,
         }
     }
 
-    // Save this frame's master output (mono downmix) for turntable "master" source next frame
-    for (int i = 0; i < num_frames; i++) {
-        engine->turntable_prev_master[i] = (output_buffer[i * 2] + output_buffer[i * 2 + 1]) * 0.5f;
+    // Save the LAST chunk's master output (mono downmix) for turntable "master" source.
+    // turntable_prev_master is float[kMaxFrames]; the turntable unit reads up to kMaxFrames
+    // per chunk. For BT callbacks > kMaxFrames, offset into the final chunk so the turntable
+    // reads the most recent audio, not stale data from the first chunk.
+    int master_frames = num_frames < kMaxFrames ? num_frames : kMaxFrames;
+    int last_chunk_offset = num_frames - master_frames;
+    for (int i = 0; i < master_frames; i++) {
+        int src = (last_chunk_offset + i) * 2;
+        engine->turntable_prev_master[i] = (output_buffer[src] + output_buffer[src + 1]) * 0.5f;
     }
 
     // CPU load: elapsed time / audio buffer duration

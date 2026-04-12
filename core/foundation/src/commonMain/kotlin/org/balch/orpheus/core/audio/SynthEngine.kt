@@ -3,15 +3,21 @@ package org.balch.orpheus.core.audio
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.PortValue
+import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 
 private val emptyVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0))
 private val emptyPulsarTrackVizFlows: List<StateFlow<FloatArray>> = List(8) { emptyVizFlow }
 private val emptyPulsarVizFlow: StateFlow<PulsarVizData> = MutableStateFlow(PulsarVizData())
+private val emptyPulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> = MutableStateFlow(null)
 
 interface SynthEngine {
     fun start()
     fun stop()
+
+    /** Completes when the DSP graph is loaded and all ports are synced.
+     *  ViewModels should await this before pushing vibe data. */
+    val graphReady: kotlinx.coroutines.Deferred<Unit> get() = kotlinx.coroutines.CompletableDeferred(Unit)
 
     /** True when a native C++ DSP engine is available (WASM, Android, desktop-native). */
     val hasNativeEngine: Boolean get() = false
@@ -196,6 +202,9 @@ interface SynthEngine {
 
     // Per-track audio waveform viz (8 tracks, each a FloatArray ring)
     val pulsarTrackVizFlows: List<StateFlow<FloatArray>> get() = emptyPulsarTrackVizFlows
+
+    // Arrangement state (section, bars remaining, solo) from C++ engine
+    val pulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> get() = emptyPulsarArrangementStateFlow
 
     /** Enable/disable viz data polling. Only poll when Signal Monitor is active. */
     fun setVizEnabled(enabled: Boolean) {}

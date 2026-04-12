@@ -7,9 +7,50 @@
 // Algorithmic pattern generation for Pulsar beat machine
 // ---------------------------------------------------------------------------
 
+// ── Scale quantization (shared by pattern_gen and bar_strategy) ─────
+inline int quantize_to_scale(int note, uint8_t root, const PulsarScale& scale) {
+    if (scale.count >= 12) return note;
+    int rel = ((note - root) % 12 + 12) % 12;
+    int octave_base = note - rel;
+
+    int best = scale.degrees[0];
+    int best_dist = 12;
+    for (int i = 0; i < scale.count; i++) {
+        int dist = rel - scale.degrees[i];
+        if (dist < 0) dist = -dist;
+        if (dist > 6) dist = 12 - dist;
+        if (dist < best_dist) {
+            best_dist = dist;
+            best = scale.degrees[i];
+        }
+    }
+
+    int result = octave_base + best;
+    while (result < note - 6 && result + 12 <= 96) result += 12;
+    while (result > note + 6 && result - 12 >= 24) result -= 12;
+    if (result < 24) result += 12;
+    if (result > 96) result -= 12;
+    return result;
+}
+
+// ── Chord degree to semitone offset ───────────────────────────────────
+// Maps scale degree (0-6) to semitone offset using the current scale.
+
+inline int chord_degree_to_semitones(int degree, const PulsarScale& scale) {
+    degree = ((degree % 7) + 7) % 7;
+    if (degree < scale.count) {
+        return scale.degrees[degree];
+    }
+    // Fallback: approximate diatonic mapping
+    constexpr int kDiatonic[7] = {0, 2, 4, 5, 7, 9, 11};
+    return kDiatonic[degree];
+}
+
 // Helper: create a PulsarStep with raw_note = note (non-destructive re-quantization source)
 inline PulsarStep make_step(uint8_t note, float velocity, bool gate, float duration) {
-    return {note, note, velocity, gate, duration};
+    PulsarStep s = {note, note, velocity, gate, duration};
+    s.hold = false;
+    return s;
 }
 
 // xorshift32 PRNG — deterministic from seed
@@ -29,19 +70,18 @@ inline float pattern_rand01(uint32_t& seed) {
 // Rhythm pattern generators (tracks 0=KICK, 1=PERC, 2=HIHAT)
 // ---------------------------------------------------------------------------
 
-inline void generate_rhythm_pattern(
+// Helper: generate pattern for a single discrete level (0-3).
+// level 0=Sparse, 1=Four-on-floor, 2=Backbeat-heavy, 3=Dense-16th
+inline void generate_pattern_level(
     PulsarStep* steps, int step_count, int track_index,
-    const PulsarGenreProfile& genre, uint32_t& seed)
+    float density, float ghost_prob, int level, uint32_t& seed)
 {
-    const float density = genre.base_density[track_index];
-    const float ghost_prob = genre.ghost_probability;
-
     // Clear all steps
     for (int i = 0; i < step_count; i++) {
         steps[i] = make_step(0, 0.0f, false, 0.0f);
     }
 
-    switch (genre.rhythm_pattern) {
+    switch (level) {
         case 0: { // Sparse
             if (track_index == 0) {
                 // KICK: beat 1 only
@@ -197,6 +237,87 @@ inline void generate_rhythm_pattern(
     }
 }
 
+// Continuous rhythm density: maps rhythm_density (0.0-1.0) to a blend
+// between two adjacent discrete pattern levels.
+inline void generate_rhythm_pattern(
+    PulsarStep* steps, int step_count, int track_index,
+    const PulsarGenreProfile& genre, uint32_t& seed)
+{
+    const float density = genre.base_density[track_index];
+    const float ghost_prob = genre.ghost_probability;
+
+    // Map 0.0-1.0 to the 0-3 level range
+    float d = genre.rhythm_density * 3.0f;
+    if (d < 0.0f) d = 0.0f;
+    if (d > 3.0f) d = 3.0f;
+
+    int lo = static_cast<int>(d);
+    if (lo > 2) lo = 2;  // clamp so hi=lo+1 <= 3
+    int hi = lo + 1;
+    float blend = d - static_cast<float>(lo);
+
+    // At exact boundaries (or very close), use pure pattern — no blending needed
+    if (blend < 0.001f || d >= 3.0f) {
+        int level = (d >= 3.0f) ? 3 : lo;
+        // Use a copy of seed so the caller's PRNG state advances predictably
+        uint32_t level_seed = seed;
+        generate_pattern_level(steps, step_count, track_index,
+                               density, ghost_prob, level, level_seed);
+        seed = level_seed;
+        return;
+    }
+
+    // Generate both adjacent levels into temp buffers
+    PulsarStep buf_lo[kMaxPulsarSteps];
+    PulsarStep buf_hi[kMaxPulsarSteps];
+
+    uint32_t seed_lo = seed;
+    generate_pattern_level(buf_lo, step_count, track_index,
+                           density, ghost_prob, lo, seed_lo);
+
+    // Offset hi seed so it differs from lo (but is still deterministic)
+    uint32_t seed_hi = seed ^ 0x9E3779B9u;
+    generate_pattern_level(buf_hi, step_count, track_index,
+                           density, ghost_prob, hi, seed_hi);
+
+    // Advance caller's seed past both generators
+    seed = seed_lo ^ seed_hi;
+    pattern_rand(seed);
+
+    // Blend per step using a fresh PRNG stream for coin flips
+    uint32_t blend_seed = seed ^ 0x517CC1B7u;
+    for (int i = 0; i < step_count; i++) {
+        bool lo_gate = buf_lo[i].gate;
+        bool hi_gate = buf_hi[i].gate;
+
+        if (lo_gate && hi_gate) {
+            // Both have hits — lerp velocity, pick note/duration from whichever
+            // side has higher velocity (keeps musically stronger pattern dominant)
+            float v = buf_lo[i].velocity * (1.0f - blend) + buf_hi[i].velocity * blend;
+            float dur = buf_lo[i].duration * (1.0f - blend) + buf_hi[i].duration * blend;
+            uint8_t note = (blend < 0.5f) ? buf_lo[i].note : buf_hi[i].note;
+            steps[i] = make_step(note, v, true, dur);
+        } else if (lo_gate && !hi_gate) {
+            // Only lo has a hit — keep it with probability (1-blend)
+            if (pattern_rand01(blend_seed) >= blend) {
+                steps[i] = buf_lo[i];
+            } else {
+                steps[i] = make_step(0, 0.0f, false, 0.0f);
+            }
+        } else if (!lo_gate && hi_gate) {
+            // Only hi has a hit — keep it with probability blend
+            if (pattern_rand01(blend_seed) < blend) {
+                steps[i] = buf_hi[i];
+            } else {
+                steps[i] = make_step(0, 0.0f, false, 0.0f);
+            }
+        } else {
+            // Neither has a hit
+            steps[i] = make_step(0, 0.0f, false, 0.0f);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Melodic pattern generators (tracks 3=BASS, 4=KEYS)
 // ---------------------------------------------------------------------------
@@ -204,9 +325,19 @@ inline void generate_rhythm_pattern(
 inline void generate_melodic_pattern(
     PulsarStep* steps, int step_count, int track_index,
     const PulsarGenreProfile& genre, uint8_t root, const PulsarScale& scale,
-    uint32_t& seed)
+    int chord_degree,
+    uint32_t& seed,
+    float density_override = -1.0f,
+    int note_range_low_override = 0,
+    int note_range_high_override = 0,
+    int engine_note_min = 0)
 {
-    const float density = genre.base_density[track_index];
+    const float density = (density_override >= 0.0f) ? density_override : genre.base_density[track_index];
+    int eff_range_low = (note_range_low_override > 0) ? note_range_low_override : genre.note_range_low;
+    int eff_range_high = (note_range_high_override > 0) ? note_range_high_override : genre.note_range_high;
+    if (engine_note_min > 0 && eff_range_low < engine_note_min)
+        eff_range_low = engine_note_min;
+    const int chord_semitones = chord_degree_to_semitones(chord_degree, scale);
 
     // Clear all steps
     for (int i = 0; i < step_count; i++) {
@@ -214,9 +345,12 @@ inline void generate_melodic_pattern(
     }
 
     if (track_index == 3) {
-        // BASS: root-heavy with fifths and octaves
-        int bass_root = root + 36; // Low octave
-        if (bass_root < genre.note_range_low) bass_root += 12;
+        // BASS: chord-root-heavy with fifths and octaves
+        // Center bass root in effective range instead of hardcoded octave
+        int bass_mid = (eff_range_low + eff_range_high) / 2;
+        int bass_root = root + 12 * ((bass_mid - root + 6) / 12) + chord_semitones;
+        while (bass_root > eff_range_high) bass_root -= 12;
+        while (bass_root < eff_range_low) bass_root += 12;
 
         // Strong hit on beat 1
         steps[0] = make_step(static_cast<uint8_t>(bass_root), 0.9f, true, 0.5f + pattern_rand01(seed) * 0.2f);
@@ -227,9 +361,9 @@ inline void generate_melodic_pattern(
                 float r = pattern_rand01(seed);
                 int note;
                 if (r < 0.5f) {
-                    note = bass_root; // root
+                    note = bass_root; // chord root
                 } else if (r < 0.75f) {
-                    // fifth: find degree closest to 7 semitones
+                    // fifth: find degree closest to 7 semitones above chord root
                     int fifth = bass_root + 7;
                     // Quantize: find nearest scale degree
                     int best = bass_root;
@@ -251,8 +385,8 @@ inline void generate_melodic_pattern(
                 }
 
                 // Clamp to range
-                if (note < genre.note_range_low) note += 12;
-                if (note > genre.note_range_high) note -= 12;
+                if (note < eff_range_low) note += 12;
+                if (note > eff_range_high) note -= 12;
 
                 float vel = 0.6f + pattern_rand01(seed) * 0.3f;
                 float dur = 0.4f + pattern_rand01(seed) * 0.3f;
@@ -260,15 +394,28 @@ inline void generate_melodic_pattern(
             }
         }
     } else {
-        // KEYS (track 4): chord tones (degrees 1, 3, 5)
-        int key_base = root + 48; // Mid octave
-        if (key_base < genre.note_range_low) key_base += 12;
+        // KEYS (track 4): chord triad from current chord degree
+        // Center key base in effective range instead of hardcoded octave
+        int key_mid = (eff_range_low + eff_range_high) / 2;
+        int key_base = root + 12 * ((key_mid - root + 6) / 12);
 
-        // Pick chord tones from scale
+        // Build triad from chord degree within the scale
+        int d0 = ((chord_degree % 7) + 7) % 7;
+        int d2 = (d0 + 2) % 7;  // third
+        int d4 = (d0 + 4) % 7;  // fifth
+
         int chord_notes[3];
-        chord_notes[0] = key_base + (scale.count > 0 ? scale.degrees[0] : 0);
-        chord_notes[1] = key_base + (scale.count > 2 ? scale.degrees[2] : 4);
-        chord_notes[2] = key_base + (scale.count > 4 ? scale.degrees[4] : 7);
+        chord_notes[0] = key_base + (d0 < scale.count ? scale.degrees[d0] : chord_semitones);
+        chord_notes[1] = key_base + (d2 < scale.count ? scale.degrees[d2] : chord_semitones + 4);
+        chord_notes[2] = key_base + (d4 < scale.count ? scale.degrees[d4] : chord_semitones + 7);
+
+        // Ensure third/fifth wrap correctly if their semitone < root semitone
+        if (chord_notes[1] < chord_notes[0]) chord_notes[1] += 12;
+        if (chord_notes[2] < chord_notes[0]) chord_notes[2] += 12;
+
+        if (key_base < eff_range_low) {
+            for (int n = 0; n < 3; n++) chord_notes[n] += 12;
+        }
 
         for (int i = 0; i < step_count; i++) {
             if (pattern_rand01(seed) < density) {
@@ -281,8 +428,8 @@ inline void generate_melodic_pattern(
                 if (pattern_rand01(seed) < 0.1f) note -= 12;
 
                 // Clamp to range
-                while (note < genre.note_range_low) note += 12;
-                while (note > genre.note_range_high) note -= 12;
+                while (note < eff_range_low) note += 12;
+                while (note > eff_range_high) note -= 12;
 
                 float vel = 0.5f + pattern_rand01(seed) * 0.3f;
                 float dur = 0.3f + pattern_rand01(seed) * 0.5f;
@@ -299,19 +446,42 @@ inline void generate_melodic_pattern(
 inline void generate_effect_pattern(
     PulsarStep* steps, int step_count, int track_index,
     const PulsarGenreProfile& genre, uint8_t root, const PulsarScale& scale,
-    uint32_t& seed)
+    int chord_degree,
+    uint32_t& seed,
+    float hold_probability = 0.0f,
+    int hold_length_min = 2,
+    int hold_length_max = 8,
+    float density_override = -1.0f,
+    int note_range_low_override = 0,
+    int note_range_high_override = 0,
+    int engine_note_min = 0)
 {
-    const float density = genre.base_density[track_index];
+    const float density = (density_override >= 0.0f) ? density_override : genre.base_density[track_index];
+    int eff_range_low = (note_range_low_override > 0) ? note_range_low_override : genre.note_range_low;
+    int eff_range_high = (note_range_high_override > 0) ? note_range_high_override : genre.note_range_high;
+    // Raise floor to engine's minimum playable note
+    if (engine_note_min > 0 && eff_range_low < engine_note_min)
+        eff_range_low = engine_note_min;
 
     // Clear all steps
     for (int i = 0; i < step_count; i++) {
         steps[i] = make_step(0, 0.0f, false, 0.0f);
     }
 
-    // Upper note range for effects
-    int base_note = root + 60;
-    if (base_note > genre.note_range_high) base_note -= 12;
-    if (base_note < genre.note_range_low) base_note += 12;
+    // Base note: center of effective range, snapped to nearest root octave
+    int range_mid = (eff_range_low + eff_range_high) / 2;
+    int base_note = root + 12 * ((range_mid - root + 6) / 12);  // nearest root octave to midpoint
+    while (base_note > eff_range_high) base_note -= 12;
+    while (base_note < eff_range_low) base_note += 12;
+
+    // Build chord tones for biasing (root/third/fifth of current chord)
+    int d0 = ((chord_degree % 7) + 7) % 7;
+    int d2 = (d0 + 2) % 7;
+    int d4 = (d0 + 4) % 7;
+    int chord_semi[3];
+    chord_semi[0] = d0 < scale.count ? scale.degrees[d0] : 0;
+    chord_semi[1] = d2 < scale.count ? scale.degrees[d2] : 4;
+    chord_semi[2] = d4 < scale.count ? scale.degrees[d4] : 7;
 
     // Duration ranges by track type
     float dur_min, dur_max;
@@ -326,26 +496,86 @@ inline void generate_effect_pattern(
         dur_min = 0.5f; dur_max = 0.9f;
     }
 
-    for (int i = 0; i < step_count; i++) {
+    int i = 0;
+    while (i < step_count) {
         if (pattern_rand01(seed) < density) {
-            // Pick a scale degree
-            int degree_idx = static_cast<int>(pattern_rand01(seed) * (scale.count - 0.01f));
-            if (degree_idx >= scale.count) degree_idx = scale.count - 1;
-            int note = base_note + scale.degrees[degree_idx];
+            int note;
+            // Hold steps (pads/drones) use stronger chord bias for harmonic coherence.
+            // Non-hold steps (triggered FX) keep more randomness for variety.
+            float chord_bias = (hold_probability > 0.5f) ? 0.85f : 0.6f;
+            if (pattern_rand01(seed) < chord_bias) {
+                // Chord tone: root, third, or fifth
+                int ct = static_cast<int>(pattern_rand01(seed) * 2.99f);
+                if (ct > 2) ct = 2;
+                note = base_note + chord_semi[ct];
+            } else {
+                // Any scale degree (adds color but can be dissonant)
+                int degree_idx = static_cast<int>(pattern_rand01(seed) * (scale.count - 0.01f));
+                if (degree_idx >= scale.count) degree_idx = scale.count - 1;
+                note = base_note + scale.degrees[degree_idx];
+            }
 
-            // Occasional octave shift
-            if (pattern_rand01(seed) < 0.15f) note += 12;
-            if (pattern_rand01(seed) < 0.15f) note -= 12;
+            // Octave shifts: suppress for hold-heavy tracks (pads want stability)
+            float octave_prob = (hold_probability > 0.5f) ? 0.03f : 0.15f;
+            if (pattern_rand01(seed) < octave_prob) note += 12;
+            if (pattern_rand01(seed) < octave_prob) note -= 12;
 
             // Clamp to range
-            while (note < genre.note_range_low) note += 12;
-            while (note > genre.note_range_high) note -= 12;
+            while (note < eff_range_low) note += 12;
+            while (note > eff_range_high) note -= 12;
 
             float vel = 0.3f + pattern_rand01(seed) * 0.4f;
             float dur = dur_min + pattern_rand01(seed) * (dur_max - dur_min);
-            steps[i] = make_step(static_cast<uint8_t>(note), vel, true, dur);
+
+            // Hold chain: when hold_probability > 0, possibly extend across multiple steps
+            if (hold_probability > 0.0f && pattern_rand01(seed) < hold_probability) {
+                int chain_len = hold_length_min +
+                    static_cast<int>(pattern_rand01(seed) * (hold_length_max - hold_length_min + 1));
+                if (chain_len < 1) chain_len = 1;
+                if (i + chain_len > step_count) chain_len = step_count - i;
+
+                for (int c = 0; c < chain_len; c++) {
+                    PulsarStep s = make_step(static_cast<uint8_t>(note),
+                                            c == 0 ? vel : vel * 0.8f,
+                                            true, 0.95f);
+                    s.hold = (c < chain_len - 1);  // last step ends the chain
+                    steps[i + c] = s;
+                }
+                i += chain_len;
+            } else {
+                steps[i] = make_step(static_cast<uint8_t>(note), vel, true, dur);
+                i++;
+            }
+        } else {
+            i++;
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Lick octave base: explicit octave or auto from note range midpoint
+// ---------------------------------------------------------------------------
+
+// Returns the MIDI octave offset (multiple of 12) to add to root_note.
+// lick_octave: -1 = auto (midpoint of noteRange), 0-8 = explicit MIDI octave.
+// note_range_low/high: genre profile note range for auto fallback.
+inline int lick_octave_base(int lick_octave, uint8_t root_note,
+                            uint8_t note_range_low, uint8_t note_range_high) {
+    if (lick_octave >= 0) {
+        // Explicit: lick_octave is the MIDI octave (e.g. 3 = C3 = MIDI 36)
+        return lick_octave * 12;
+    }
+    // Auto: midpoint of note range, rounded down to nearest octave
+    int mid = (static_cast<int>(note_range_low) + static_cast<int>(note_range_high)) / 2;
+    // Clamp to safe range
+    if (mid < 24) mid = 24;
+    if (mid > 84) mid = 84;
+    // Remove root offset so caller adds root_note + base
+    int base = mid - static_cast<int>(root_note);
+    // Round down to nearest multiple of 12
+    if (base < 0) base = 0;
+    base = (base / 12) * 12;
+    return base;
 }
 
 // ---------------------------------------------------------------------------
@@ -356,11 +586,37 @@ inline void generate_lick_pattern(
     PulsarStep* steps, int step_count,
     const PulsarLickStep* lick, int lick_length,
     float mutation, uint8_t root_note, const PulsarScale& scale,
-    uint32_t seed)
+    uint32_t seed,
+    int chord_degree = 0,
+    int lick_octave = -1,
+    uint8_t note_range_low = 36, uint8_t note_range_high = 72,
+    int lick_loop_length = 0)
 {
     // Clear all steps first (rests by default)
     for (int i = 0; i < step_count; i++) {
         steps[i] = make_step(0, 0.0f, false, 0.0f);
+    }
+
+    // Compute how many sequencer steps the lick notes occupy (at 4 steps/beat)
+    float note_beats = 0.0f;
+    for (int i = 0; i < lick_length; i++) {
+        note_beats += lick[i].duration;
+    }
+    int note_steps = std::max(1, static_cast<int>(note_beats * 4.0f + 0.5f));
+
+    // lick_loop_length is in beats. Convert to sequencer steps for comparison.
+    // When loop_steps > note_steps, notes fill (note_beats / loop_beats) of the
+    // pattern and the rest is silence. E.g. 4 beats of notes with loopLength=8
+    // means 50% notes + 50% rest.
+    int loop_steps = (lick_loop_length > 0)
+        ? std::max(1, static_cast<int>(static_cast<float>(lick_loop_length) * 4.0f + 0.5f))
+        : note_steps;
+
+    int play_steps = step_count;
+    if (loop_steps > note_steps) {
+        play_steps = std::max(note_steps,
+            static_cast<int>(static_cast<float>(step_count) *
+                static_cast<float>(note_steps) / static_cast<float>(loop_steps)));
     }
 
     // Walk through lick steps, converting beat-based durations to sequencer slots.
@@ -370,9 +626,10 @@ inline void generate_lick_pattern(
     int step_pos = 0;
     int lick_idx = 0;
 
-    while (step_pos < step_count) {
+    while (step_pos < play_steps) {
         int li = lick_idx % lick_length;
         lick_idx++;
+
         const auto& ls = lick[li];
 
         float mutate_chance = pattern_rand01(seed);
@@ -415,17 +672,22 @@ inline void generate_lick_pattern(
         while (d < 0) { d += scale.count; octave--; }
         while (d >= scale.count) { d -= scale.count; octave++; }
 
+        int chord_semitones = chord_degree_to_semitones(chord_degree, scale);
+        int base = lick_octave_base(lick_octave, root_note, note_range_low, note_range_high);
         uint8_t midi_note = static_cast<uint8_t>(
             std::max(0, std::min(127,
-                static_cast<int>(root_note) + 48 + octave * 12 + scale.degrees[d])));
+                static_cast<int>(root_note) + base + chord_semitones + octave * 12 + scale.degrees[d])));
 
-        // Gate duration as fraction of the note's total step span
-        float gate_frac = std::min(1.0f, 0.8f / static_cast<float>(slots));
-
+        // Gate fires on the first step with full duration for AR envelope sustain.
+        // Remaining slots are hold steps so the gate stays high across the full note.
         if (step_pos < step_count) {
-            steps[step_pos] = make_step(midi_note, vel, true, gate_frac);
+            steps[step_pos] = make_step(midi_note, vel, true, 1.0f);
+            steps[step_pos].hold = (slots > 1);  // start hold chain if multi-step
         }
-        // Remaining slots within this note's duration stay as rests
+        for (int h = 1; h < slots && (step_pos + h) < step_count; h++) {
+            steps[step_pos + h] = make_step(midi_note, vel, true, 1.0f);
+            steps[step_pos + h].hold = (h < slots - 1);  // last step ends the hold
+        }
         step_pos += slots;
     }
 }
@@ -439,7 +701,15 @@ inline void generate_track_pattern(
     bool percussive,
     const PulsarGenreProfile& genre,
     uint8_t root_note, const PulsarScale& scale,
-    int step_count, uint32_t seed)
+    int step_count, uint32_t seed,
+    int chord_degree = 0,
+    float hold_probability = 0.0f,
+    int hold_length_min = 2,
+    int hold_length_max = 8,
+    float density_override = -1.0f,
+    int note_range_low_override = 0,
+    int note_range_high_override = 0,
+    int engine_note_min = 0)
 {
     seed ^= static_cast<uint32_t>(track_index * 2654435761u);
     pattern_rand(seed);
@@ -452,9 +722,14 @@ inline void generate_track_pattern(
         generate_rhythm_pattern(ts.steps, step_count, track_index, genre, seed);
     } else if (track_index <= 4) {
         generate_melodic_pattern(ts.steps, step_count, track_index, genre,
-                                 root_note, scale, seed);
+                                 root_note, scale, chord_degree, seed,
+                                 density_override, note_range_low_override, note_range_high_override,
+                                 engine_note_min);
     } else {
         generate_effect_pattern(ts.steps, step_count, track_index, genre,
-                                root_note, scale, seed);
+                                root_note, scale, chord_degree, seed,
+                                hold_probability, hold_length_min, hold_length_max,
+                                density_override, note_range_low_override, note_range_high_override,
+                                engine_note_min);
     }
 }

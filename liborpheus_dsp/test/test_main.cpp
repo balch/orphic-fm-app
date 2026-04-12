@@ -47,6 +47,21 @@ static TestSuite suites[] = {
     {"pulsar",          run_pulsar_tests,          true},
     {"pulsar_bus",      run_pulsar_bus_tests,      true},
     {"djapp",           run_djapp_graph_tests,     true},
+    {"bar_strategy",    run_bar_strategy_tests,    true},
+    {"pulsar_routing",  run_pulsar_routing_tests,  true},
+    {"pulsar_chords",   run_pulsar_chords_tests,   true},
+    {"pulsar_signal",   run_pulsar_signal_tests,   true},
+    {"tension",         run_pulsar_tension_tests,  true},
+    {"pulsar_motifs",   run_pulsar_motifs_tests,   true},
+    {"pulsar_solos",    run_pulsar_solos_tests,    true},
+    {"pulsar_sections", run_pulsar_sections_tests, true},
+    {"oboe_buffer",     run_oboe_buffer_tests,     true},
+    {"texture",         run_pulsar_texture_tests,  true},
+    {"pattern_gen",     run_pulsar_pattern_gen_tests, true},
+    {"band_solo",       run_pulsar_band_solo_tests, true},
+    {"lick_techniques", run_pulsar_lick_techniques_tests, true},
+    {"markov_solo",     run_markov_solo_tests,     true},
+    {"analysis",        run_pulsar_analysis_tests, false},  // manual: writes WAV files
 };
 
 static constexpr int kNumSuites = sizeof(suites) / sizeof(suites[0]);

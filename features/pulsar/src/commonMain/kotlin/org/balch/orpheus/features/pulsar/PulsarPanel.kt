@@ -1,5 +1,13 @@
 package org.balch.orpheus.features.pulsar
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +27,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -50,7 +60,10 @@ import org.balch.orpheus.ui.widgets.LabelSide
 import org.balch.orpheus.ui.widgets.RotaryKnob
 
 private val NoteNames = listOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
-private val ScaleNames = listOf("Minor", "Major", "Pentatonic", "Phrygian", "Whole Tone", "Chromatic")
+private val ScaleNames = listOf(
+    "Minor", "Major", "Pentatonic", "Phrygian", "Whole Tone", "Chromatic",
+    "Dorian", "Lydian", "Mixolydian", "Harm Minor", "Min Penta", "Hirajoshi", "In Sen",
+)
 
 @Composable
 private fun <T> EnumDropdown(
@@ -162,6 +175,7 @@ fun PulsarPanel(
         showCollapsedHeader = showCollapsedHeader,
     ) {
         val state by pulsar.stateFlow.collectAsState()
+        val arrangementState by pulsar.arrangementStateFlow.collectAsState()
         val actions = pulsar.actions
 
         // Row 1: Selectors only
@@ -169,7 +183,7 @@ fun PulsarPanel(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            val vibeList = remember { PulsarVibes.all() }
+            val vibeList = remember { pulsar.vibeList }
             EnumDropdown(
                 label = "VIBE",
                 selectedDisplay = state.vibe.name,
@@ -250,6 +264,8 @@ fun PulsarPanel(
                 mood = state.mood,
                 selectedTrack = state.selectedTrack,
                 onTrackSelected = actions.selectTrack,
+                arrangementState = arrangementState,
+                arrangement = state.vibe.arrangement,
                 modifier = Modifier
                     .width(360.dp)
                     .height(120.dp)
@@ -258,10 +274,14 @@ fun PulsarPanel(
             )
         }
 
-        // Row 3: Voice detail strip (only when a track is selected)
+        // Row 3: Voice detail strip with animated show/hide
         // Auto-dismiss after 10s of inactivity, suppressed while picker is open
-        val selected = state.selectedTrack
-        if (selected != null) {
+        AnimatedVisibility(
+            visible = state.selectedTrack != null,
+            enter = fadeIn(tween(300)) + expandVertically(tween(300)),
+            exit = fadeOut(tween(200)) + shrinkVertically(tween(200)),
+        ) {
+            val selected = state.selectedTrack ?: return@AnimatedVisibility
             var pickerOpen by remember { mutableStateOf(false) }
             val edmEngine = state.trackEnginesEdm[selected]
             val spaceEngine = state.trackEnginesSpace[selected]
@@ -275,12 +295,42 @@ fun PulsarPanel(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = PULSAR_TRACK_NAMES[selected],
-                    color = TrackColors[selected],
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                // Animated mute toggle on track name
+                val isMuted = state.trackMuted[selected]
+                val animatedAlpha by animateFloatAsState(
+                    targetValue = if (isMuted) 0.35f else 1.0f,
+                    animationSpec = tween(200),
                 )
+                val animatedScale by animateFloatAsState(
+                    targetValue = if (isMuted) 0.9f else 1.05f,
+                    animationSpec = tween(200),
+                )
+                val animatedElevation by animateDpAsState(
+                    targetValue = if (isMuted) 0.dp else 4.dp,
+                    animationSpec = tween(200),
+                )
+
+                Surface(
+                    onClick = { actions.toggleTrackMute(selected) },
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (isMuted) Color.Transparent
+                            else TrackColors[selected].copy(alpha = 0.15f),
+                    shadowElevation = animatedElevation,
+                    modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = animatedScale
+                            scaleY = animatedScale
+                            alpha = animatedAlpha
+                        },
+                ) {
+                    Text(
+                        text = PULSAR_TRACK_NAMES[selected],
+                        color = TrackColors[selected],
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
 
                 Text(
                     text = "HI",
@@ -317,19 +367,20 @@ fun PulsarPanel(
         }
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(30.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             HorizontalRotaryKnob(
-                value = state.reverbSend,
-                onValueChange = actions.setReverbSend,
-                label = "REVERB",
-                controlId = PulsarSymbol.REVERB_SEND.controlId.key,
+                value = state.percMix,
+                onValueChange = actions.setPercMix,
+                label = "PERC",
+                controlId = PulsarSymbol.PERC_MIX.controlId.key,
                 size = 28.dp,
                 progressColor = OrpheusColors.cosmicPurple,
                 labelSide = LabelSide.START,
                 valueFormatter = null,
             )
+
             HorizontalRotaryKnob(
                 value = state.bpm,
                 onValueChange = actions.setBpm,
@@ -343,15 +394,14 @@ fun PulsarPanel(
             )
 
             HorizontalRotaryKnob(
-                value = state.percMix,
-                onValueChange = actions.setPercMix,
-                label = "PERC",
-                controlId = PulsarSymbol.PERC_MIX.controlId.key,
+                value = state.deep,
+                onValueChange = actions.setDeep,
+                label = "DEEP",
+                controlId = PulsarSymbol.DEEP.controlId.key,
                 size = 28.dp,
                 progressColor = OrpheusColors.cosmicPurple,
                 labelSide = LabelSide.START,
                 valueFormatter = null,
-
             )
         }
 
@@ -380,19 +430,19 @@ fun PulsarPanel(
                 valueFormatter = null,
             )
             RotaryKnob(
-                value = state.space,
-                onValueChange = actions.setSpace,
-                label = "SPACE",
-                controlId = PulsarSymbol.SPACE.controlId.key,
+                value = state.mood,
+                onValueChange = actions.setMood,
+                label = "MOOD",
+                controlId = PulsarSymbol.MOOD.controlId.key,
                 size = 48.dp,
                 progressColor = OrpheusColors.cosmicPurple,
                 valueFormatter = null,
             )
             RotaryKnob(
-                value = state.mood,
-                onValueChange = actions.setMood,
-                label = "MOOD",
-                controlId = PulsarSymbol.MOOD.controlId.key,
+                value = state.space,
+                onValueChange = actions.setSpace,
+                label = "SPACE",
+                controlId = PulsarSymbol.SPACE.controlId.key,
                 size = 48.dp,
                 progressColor = OrpheusColors.cosmicPurple,
                 valueFormatter = null,
@@ -406,7 +456,6 @@ fun PulsarPanel(
                 progressColor = OrpheusColors.cosmicPurple,
                 valueFormatter = null,
             )
-
         }
 
         // (small knobs now flank the grid above)
@@ -414,7 +463,7 @@ fun PulsarPanel(
 }
 
 @Suppress("StateFlowValueCalledInComposition")
-@Preview(widthDp = 500, heightDp = 300)
+@Preview(widthDp = 500, heightDp = 420)
 @Composable
 private fun PulsarPanelPreview() {
     PulsarPanel(
@@ -425,15 +474,16 @@ private fun PulsarPanelPreview() {
 }
 
 @Suppress("StateFlowValueCalledInComposition")
-@Preview(widthDp = 500, heightDp = 380)
+@Preview(widthDp = 500, heightDp = 420)
 @Composable
 private fun PulsarPanelWithSelectionPreview() {
+    val preview = PulsarViewModel.previewFeature()
     PulsarPanel(
         pulsar = PulsarViewModel.previewFeature(
             PulsarUiState(
                 selectedTrack = 2,
                 mix = 0.8f,
-                vibe = PulsarVibes.all()[0]
+                vibe = preview.vibeList.first()
             )
         ),
         isExpanded = true,

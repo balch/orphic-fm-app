@@ -46,5 +46,8 @@ interface ForegroundServiceController {
         const val EXTRA_MODE = "extra_mode"
         const val EXTRA_MODE_DISPLAY_NAME = "extra_mode_display_name"
         const val EXTRA_IS_PLAYING = "extra_is_playing"
+        const val ACTION_SKIP_NEXT = "org.balch.orpheus.SKIP_NEXT"
+        const val ACTION_SKIP_PREVIOUS = "org.balch.orpheus.SKIP_PREVIOUS"
+        const val EXTRA_SUBTITLE = "extra_subtitle"
     }
 }

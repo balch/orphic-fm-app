@@ -128,6 +128,9 @@ struct OrpheusVoice {
     int previous_engine_index_;
     bool trigger_state_;
 
+    // Anti-click: last output sample for retrigger crossfade.
+    float last_sample_;
+
     // Initialize all engines. Must be called once before Render().
     // The allocator is freed between each engine Init() so all engines
     // share the same RAM space (same pattern as plaits::Voice::Init).
@@ -172,6 +175,7 @@ struct OrpheusVoice {
         previous_engine_index_ = -1;
         trigger_state_ = false;
         remainder_count_ = 0;
+        last_sample_ = 0.0f;
     }
 
     // Render audio using the specified engine.
@@ -232,6 +236,7 @@ struct OrpheusVoice {
             int drain = (remainder_count_ < num_frames)
                 ? remainder_count_ : num_frames;
             std::memcpy(out, remainder_buffer_, drain * sizeof(float));
+            if (drain > 0) last_sample_ = out[drain - 1];
             // Shift any undrained remainder forward
             remainder_count_ -= drain;
             if (remainder_count_ > 0) {
@@ -275,23 +280,62 @@ struct OrpheusVoice {
             bool already_enveloped = false;
             e->Render(p, out_buffer_, aux_buffer_, kOrpheusBlockSize, &already_enveloped);
 
-            int frames_needed = num_frames - frames_rendered;
-            if (frames_needed >= kOrpheusBlockSize) {
-                // Full block fits — copy all 24 samples directly
-                for (int i = 0; i < kOrpheusBlockSize; i++) {
-                    out[frames_rendered + i] = soft_limit(out_buffer_[i] * gain);
+            // Anti-click: on rising edge, crossfade the first 12 samples
+            // from the last output level to the new engine output.
+            // This prevents phase discontinuities when oscillators snap to
+            // new frequencies (especially audible on Chord engine retrigger).
+            // Works in post-gain domain (last_sample_ stores post-gain value).
+            if (rising_edge) {
+                static constexpr int kXfadeLen = 12;  // 0.25ms at 48kHz
+                int xf = (kOrpheusBlockSize < kXfadeLen) ? kOrpheusBlockSize : kXfadeLen;
+                for (int i = 0; i < xf; i++) {
+                    float alpha = static_cast<float>(i + 1) / static_cast<float>(xf + 1);
+                    float new_sample = soft_limit(out_buffer_[i] * gain);
+                    out_buffer_[i] = (last_sample_ * (1.0f - alpha) + new_sample * alpha);
+                    // Store back in out_buffer_ as post-gain (bypass gain/limit below)
                 }
-                frames_rendered += kOrpheusBlockSize;
+                // Copy the crossfaded samples directly, apply gain/limit to rest
+                int frames_needed = num_frames - frames_rendered;
+                int copy_count = (frames_needed < kOrpheusBlockSize)
+                    ? frames_needed : kOrpheusBlockSize;
+                for (int i = 0; i < copy_count; i++) {
+                    if (i < xf) {
+                        out[frames_rendered + i] = out_buffer_[i];  // already post-gain
+                    } else {
+                        out[frames_rendered + i] = soft_limit(out_buffer_[i] * gain);
+                    }
+                }
+                if (copy_count > 0) {
+                    last_sample_ = out[frames_rendered + copy_count - 1];
+                }
+                if (copy_count < kOrpheusBlockSize) {
+                    remainder_count_ = kOrpheusBlockSize - copy_count;
+                    for (int i = 0; i < remainder_count_; i++) {
+                        remainder_buffer_[i] = soft_limit(out_buffer_[copy_count + i] * gain);
+                    }
+                }
+                frames_rendered += copy_count;
             } else {
-                // Partial block — copy what we need, buffer the rest
-                for (int i = 0; i < frames_needed; i++) {
-                    out[frames_rendered + i] = soft_limit(out_buffer_[i] * gain);
+                int frames_needed = num_frames - frames_rendered;
+                if (frames_needed >= kOrpheusBlockSize) {
+                    for (int i = 0; i < kOrpheusBlockSize; i++) {
+                        out[frames_rendered + i] = soft_limit(out_buffer_[i] * gain);
+                    }
+                    last_sample_ = out[frames_rendered + kOrpheusBlockSize - 1];
+                    frames_rendered += kOrpheusBlockSize;
+                } else {
+                    for (int i = 0; i < frames_needed; i++) {
+                        out[frames_rendered + i] = soft_limit(out_buffer_[i] * gain);
+                    }
+                    if (frames_needed > 0) {
+                        last_sample_ = out[frames_rendered + frames_needed - 1];
+                    }
+                    remainder_count_ = kOrpheusBlockSize - frames_needed;
+                    for (int i = 0; i < remainder_count_; i++) {
+                        remainder_buffer_[i] = soft_limit(out_buffer_[frames_needed + i] * gain);
+                    }
+                    frames_rendered += frames_needed;
                 }
-                remainder_count_ = kOrpheusBlockSize - frames_needed;
-                for (int i = 0; i < remainder_count_; i++) {
-                    remainder_buffer_[i] = soft_limit(out_buffer_[frames_needed + i] * gain);
-                }
-                frames_rendered += frames_needed;
             }
         }
     }

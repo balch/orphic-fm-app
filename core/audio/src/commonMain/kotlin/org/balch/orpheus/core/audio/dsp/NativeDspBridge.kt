@@ -41,4 +41,5 @@ interface NativeDspBridge {
         playheadsOut: IntArray,
         stepCountsOut: IntArray,
     )
+    fun nativeGetPulsarArrangement(out: IntArray)
 }

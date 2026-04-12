@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.viz.PULSAR_MAX_STEPS
 import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
+import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
 
 /**
@@ -115,12 +116,15 @@ class SynthEngineMonitor(
     val pulsarVizFlow: StateFlow<PulsarVizData> = _pulsarVizFlow.asStateFlow()
     private val _pulsarTrackVizFlows = List(PULSAR_NUM_TRACKS) { MutableStateFlow(FloatArray(0)) }
     val pulsarTrackVizFlows: List<StateFlow<FloatArray>> = _pulsarTrackVizFlows.map { it.asStateFlow() }
+    private val _arrangementStateFlow = MutableStateFlow<PulsarArrangementState?>(null)
+    val arrangementStateFlow: StateFlow<PulsarArrangementState?> = _arrangementStateFlow.asStateFlow()
 
     // Reusable buffers for Pulsar viz polling (avoid allocations)
     private val pulsarGates = BooleanArray(PULSAR_NUM_TRACKS * PULSAR_MAX_STEPS)
     private val pulsarVelocities = FloatArray(PULSAR_NUM_TRACKS * PULSAR_MAX_STEPS)
     private val pulsarPlayheads = IntArray(PULSAR_NUM_TRACKS)
     private val pulsarStepCounts = IntArray(PULSAR_NUM_TRACKS)
+    private val arrangementBuf = IntArray(6)
 
     // Monitoring
     private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -128,6 +132,8 @@ class SynthEngineMonitor(
     private var monitoringJob: Job? = null
     private var vizJob: Job? = null
     private var turntableVizJob: Job? = null
+    private var pulsarVizJob: Job? = null
+    private var arrangementPollJob: Job? = null
     var startRequested = false
     var vizRequested = false
         private set
@@ -177,8 +183,6 @@ class SynthEngineMonitor(
         // Poll monitor data from C++ via native bridge
         monitoringJob = monitoringScope.launch(dispatcherProvider.io) {
             val monitorBuf = FloatArray(20) // OrpheusMonitorData: peak_l, peak_r, cpu, voice_levels[12], lfo, master, bend, lfo_a, lfo_b
-            val pulsarVizBuf = FloatArray(VIZ_BUF_SIZE)
-            val pulsarReadPos = IntArray(VIZ_CHANNEL_COUNT)
             while (isActive) {
                 nativeBridge.nativeGetMonitor(monitorBuf)
                 _peakFlow.value = maxOf(monitorBuf[0], monitorBuf[1])
@@ -192,9 +196,17 @@ class SynthEngineMonitor(
                 _lfoAOutputFlow.value = monitorBuf[18]
                 _lfoBOutputFlow.value = monitorBuf[19]
 
-                // Poll Pulsar step grid (structural UI data, not viz waveforms).
-                // Always poll when monitoring is active so the grid/playhead
-                // works regardless of viz waveform toggle.
+                delay(MONITOR_POLL_INTERVAL_MS)
+            }
+        }
+
+        // Poll Pulsar step grid at ~60fps so the playhead doesn't skip steps.
+        // Always active when monitoring runs so the grid works regardless of
+        // the viz waveform toggle.
+        pulsarVizJob = monitoringScope.launch(dispatcherProvider.io) {
+            val pulsarVizBuf = FloatArray(VIZ_BUF_SIZE)
+            val pulsarReadPos = IntArray(VIZ_CHANNEL_COUNT)
+            while (isActive) {
                 nativeBridge.nativeGetPulsarViz(
                     pulsarGates, pulsarVelocities, pulsarPlayheads, pulsarStepCounts
                 )
@@ -212,7 +224,25 @@ class SynthEngineMonitor(
                     trackLevels = trackLevels,
                 )
 
-                delay(MONITOR_POLL_INTERVAL_MS)
+                delay(VIZ_POLL_INTERVAL_MS)
+            }
+        }
+
+        arrangementPollJob = monitoringScope.launch(dispatcherProvider.io) {
+            while (isActive) {
+                nativeBridge.nativeGetPulsarArrangement(arrangementBuf)
+                val sectionIdx = arrangementBuf[0]
+                _arrangementStateFlow.value = if (sectionIdx >= 0) {
+                    PulsarArrangementState(
+                        sectionIndex = sectionIdx,
+                        barsElapsed = arrangementBuf[1],
+                        barsTotal = arrangementBuf[2],
+                        soloActive = arrangementBuf[3] != 0,
+                        soloTrack = arrangementBuf[4],
+                        soloMode = arrangementBuf[5],
+                    )
+                } else null
+                delay(200)
             }
         }
     }
@@ -247,6 +277,10 @@ class SynthEngineMonitor(
         vizJob = null
         turntableVizJob?.cancel()
         turntableVizJob = null
+        pulsarVizJob?.cancel()
+        pulsarVizJob = null
+        arrangementPollJob?.cancel()
+        arrangementPollJob = null
         monitoringJob?.cancel()
         monitoringJob = null
     }

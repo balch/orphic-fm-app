@@ -2,6 +2,19 @@ plugins {
     id("orpheus.kmp.library")
 }
 
+// Export ODWG graph binaries for C++ test harness.
+// Run: ./gradlew :core:dsp-engine:exportOdwg
+tasks.register<Test>("exportOdwg") {
+    description = "Export wiring graph binaries (ODWG) for C++ tests"
+    group = "verification"
+    testClassesDirs = tasks.named<Test>("jvmTest").get().testClassesDirs
+    classpath = tasks.named<Test>("jvmTest").get().classpath
+    filter {
+        includeTestsMatching("*ExportOdwgTest*")
+        includeTestsMatching("*ExportDjAppOdwgTest*")
+    }
+}
+
 kotlin {
     android {
         namespace = "org.balch.orpheus.core.dsp.engine"

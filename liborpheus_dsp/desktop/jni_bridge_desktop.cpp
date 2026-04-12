@@ -275,4 +275,11 @@ JNI_FN(nativeGetPulsarViz)(JNIEnv *env, jobject thiz,
     env->SetIntArrayRegion(stepCountsOut, 0, kTracks, reinterpret_cast<jint*>(stepCounts));
 }
 
+JNIEXPORT void JNICALL
+JNI_FN(nativeGetPulsarArrangement)(JNIEnv *env, jobject thiz, jintArray out) {
+    int data[6] = {-1, 0, 0, 0, -1, 0};
+    sEngine.getPulsarArrangement(data);
+    env->SetIntArrayRegion(out, 0, 6, reinterpret_cast<jint*>(data));
+}
+
 } // extern "C"

@@ -38,6 +38,8 @@ const val UNIT_HORN = 32
 const val UNIT_TURNTABLE = 33
 const val UNIT_TIDES = 34
 const val UNIT_PULSAR = 35
+const val UNIT_PULSAR_DELAY = 36
+const val UNIT_PULSAR_REVERB = 37
 
 // ── Output port constants ───────────────────────────────────────────────────
 
@@ -348,6 +350,12 @@ class WiringGraphBuilder {
 
     fun pulsar(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
         addUnit(UNIT_PULSAR, name, init)
+
+    fun pulsarDelay(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_PULSAR_DELAY, name, init)
+
+    fun pulsarReverb(name: String, init: (UnitParamBuilder.() -> Unit)? = null) =
+        addUnit(UNIT_PULSAR_REVERB, name, init)
 
     // ── Connection wiring ───────────────────────────────────────────────────
 

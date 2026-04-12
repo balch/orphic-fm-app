@@ -12,8 +12,10 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.controller.intSetter
@@ -30,48 +33,63 @@ import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
+import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.media.MediaSessionManager
+import org.balch.orpheus.core.media.MediaSessionStateManager
+import org.balch.orpheus.core.media.PlaybackMetadata
+import org.balch.orpheus.core.media.PlaybackMode
+import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
+import org.balch.orpheus.core.plugin.symbols.AppSymbol
+import org.balch.orpheus.core.plugin.symbols.PULSAR_URI
 import org.balch.orpheus.core.plugin.symbols.PulsarSymbol
+import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
+import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
 import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tempo.GlobalTempo
+import kotlin.concurrent.Volatile
 
 @Serializable
 @Immutable
 data class PulsarUiState(
     val playing: Boolean = false,
+    val globalPaused: Boolean = true,
     val bpm: Float = 128f,
+    val vibeName: String = "",
     val vibe: Vibe,
     val energy: Float = 0.5f,
     val complexity: Float = 0.3f,
     val space: Float = 0.4f,
     val mood: Float = 0.5f,
-    val delaySend: Float = 0.0f,
-    val reverbSend: Float = 0.0f,
+    val deep: Float = 0.0f,
     val rootNote: Int = 2,
     val scaleIndex: Int = 0,
-    val mix: Float = 0.0f,
+    val mix: Float = 1.0f,
     val percMix: Float = 0.7f,
     val envelopeMode: Int = 0,  // 0=AD, 1=Tides, 2=Blend (energy-driven)
     val selectedTrack: Int? = null,
     val trackEnginesEdm: List<Int> = listOf(21, 22, 23, 9, 14, 14, 17, 20),
     val trackEnginesSpace: List<Int> = listOf(20, 17, 23, 19, 6, 14, 17, 19),
+    val trackMuted: List<Boolean> = List(8) { false },
 )
 
 @Immutable
 data class PulsarPanelActions(
     val togglePlaying: () -> Unit = {},
+    val toggleGlobalPause: () -> Unit = {},
     val setVibe: (Vibe) -> Unit = {},
     val setEnergy: (Float) -> Unit = {},
     val setComplexity: (Float) -> Unit = {},
     val setSpace: (Float) -> Unit = {},
     val setMood: (Float) -> Unit = {},
     val setBpm: (Float) -> Unit = {},
-    val setDelaySend: (Float) -> Unit = {},
-    val setReverbSend: (Float) -> Unit = {},
+    val setDeep: (Float) -> Unit = {},
     val setRootNote: (Int) -> Unit = {},
     val setScale: (Int) -> Unit = {},
     val setMix: (Float) -> Unit = {},
@@ -80,6 +98,7 @@ data class PulsarPanelActions(
     val selectTrack: (Int?) -> Unit = {},
     val setTrackEngineEdm: (Int, Int) -> Unit = { _, _ -> },
     val setTrackEngineSpace: (Int, Int) -> Unit = { _, _ -> },
+    val toggleTrackMute: (Int) -> Unit = {},
 ) {
     companion object {
         val EMPTY = PulsarPanelActions()
@@ -89,14 +108,14 @@ data class PulsarPanelActions(
 /** User intents for the Pulsar panel. */
 private sealed interface PulsarIntent {
     data class Playing(val value: Boolean) : PulsarIntent
+    data class GlobalPaused(val value: Boolean) : PulsarIntent
     data class VibeChange(val value: Vibe) : PulsarIntent
     data class Energy(val value: Float) : PulsarIntent
     data class Complexity(val value: Float) : PulsarIntent
     data class Space(val value: Float) : PulsarIntent
     data class Mood(val value: Float) : PulsarIntent
     data class Bpm(val value: Float) : PulsarIntent
-    data class DelaySend(val value: Float) : PulsarIntent
-    data class ReverbSend(val value: Float) : PulsarIntent
+    data class Deep(val value: Float) : PulsarIntent
     data class RootNote(val value: Int) : PulsarIntent
     data class Scale(val value: Int) : PulsarIntent
     data class Mix(val value: Float) : PulsarIntent
@@ -105,9 +124,15 @@ private sealed interface PulsarIntent {
     data class SelectedTrack(val value: Int?) : PulsarIntent
     data class TrackEngineEdm(val track: Int, val engine: Int) : PulsarIntent
     data class TrackEngineSpace(val track: Int, val engine: Int) : PulsarIntent
+    data class TrackMuteList(val muteList: List<Boolean>) : PulsarIntent
 }
 
 interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
+    val vibeList: List<Vibe>
+        get() = emptyList()  // default for previews
+
+    val arrangementStateFlow: StateFlow<PulsarArrangementState>
+
     override val sharingStrategy: SharingStarted
         get() = SharingStarted.Eagerly
 
@@ -131,8 +156,8 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
                 - **COMPLEXITY**: Rhythmic density and variation.
                 - **SPACE**: Stereo width and reverb amount.
                 - **MOOD**: Tonal character of the drum sounds.
-                - **DELAY**: Send level to delay effect.
-                - **REVERB**: Send level to reverb effect.
+                - **DEEP**: Overall send level to delay/reverb effects.
+                - **BALANCE**: Slider to blend between delay (left) and reverb (right).
             """.trimIndent()
 
             override val portControlKeys = mapOf(
@@ -142,8 +167,7 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
                 PulsarSymbol.SPACE.controlId.key to "Stereo width and space (0..1)",
                 PulsarSymbol.MOOD.controlId.key to "Tonal character (0..1)",
                 PulsarSymbol.BPM.controlId.key to "Tempo in BPM (0..300)",
-                PulsarSymbol.DELAY_SEND.controlId.key to "Delay send level (0..1)",
-                PulsarSymbol.REVERB_SEND.controlId.key to "Reverb send level (0..1)",
+                PulsarSymbol.DEEP.controlId.key to "Effect send depth (0=dry, 1=full vibe sends)",
                 PulsarSymbol.ROOT_NOTE.controlId.key to "Root note (0=C, 11=B)",
                 PulsarSymbol.SCALE.controlId.key to "Scale index (0-5)",
                 PulsarSymbol.MIX.controlId.key to "Output mix level (0..1)",
@@ -164,12 +188,23 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class PulsarViewModel(
     private val synthController: SynthController,
+    synthEngine: SynthEngine,
     private val globalTempo: GlobalTempo,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val presetLoader: PresetLoader,
     dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope,
+    vibeProviders: Set<VibeProvider>,
+    private val mediaSessionStateManager: MediaSessionStateManager,
+    private val mediaSessionManager: MediaSessionManager,
+    private val playbackLifecycleManager: PlaybackLifecycleManager,
+    private val playbackMode: PulsarPlaybackMode,
 ) : PulsarFeature {
+
+    override val vibeList: List<Vibe> = vibeProviders.map { it.vibe }.sortedBy { it.name }
+
+    @Volatile
+    private var mediaPaused = false
 
     private val log = logging("PulsarVM")
 
@@ -177,14 +212,21 @@ class PulsarViewModel(
     // Control flows
     // ═══════════════════════════════════════════════════════════
     private val playingId = synthController.controlFlow(PulsarSymbol.PLAYING.controlId)
+    private val mutedId = synthController.controlFlow(AppSymbol.MUTED.controlId)
     private val vibeGenerationId = synthController.controlFlow(PulsarSymbol.VIBE_GENERATION.controlId)
     private val energyId = synthController.controlFlow(PulsarSymbol.ENERGY.controlId)
     private val complexityId = synthController.controlFlow(PulsarSymbol.COMPLEXITY.controlId)
     private val spaceId = synthController.controlFlow(PulsarSymbol.SPACE.controlId)
     private val moodId = synthController.controlFlow(PulsarSymbol.MOOD.controlId)
     private val bpmId = synthController.controlFlow(PulsarSymbol.BPM.controlId)
-    private val delaySendId = synthController.controlFlow(PulsarSymbol.DELAY_SEND.controlId)
-    private val reverbSendId = synthController.controlFlow(PulsarSymbol.REVERB_SEND.controlId)
+    private val deepId = synthController.controlFlow(PulsarSymbol.DEEP.controlId)
+    private val pulsarDelayTimeAId = synthController.controlFlow(PulsarSymbol.PULSAR_DELAY_TIME_A.controlId)
+    private val pulsarDelayTimeBId = synthController.controlFlow(PulsarSymbol.PULSAR_DELAY_TIME_B.controlId)
+    private val pulsarDelayFeedbackId = synthController.controlFlow(PulsarSymbol.PULSAR_DELAY_FEEDBACK.controlId)
+    private val pulsarDelayDampingId = synthController.controlFlow(PulsarSymbol.PULSAR_DELAY_DAMPING.controlId)
+    private val pulsarReverbSizeId = synthController.controlFlow(PulsarSymbol.PULSAR_REVERB_SIZE.controlId)
+    private val pulsarReverbDampingId = synthController.controlFlow(PulsarSymbol.PULSAR_REVERB_DAMPING.controlId)
+    private val pulsarReverbBrightnessId = synthController.controlFlow(PulsarSymbol.PULSAR_REVERB_BRIGHTNESS.controlId)
     private val rootNoteId = synthController.controlFlow(PulsarSymbol.ROOT_NOTE.controlId)
     private val scaleId = synthController.controlFlow(PulsarSymbol.SCALE.controlId)
     private val mixId = synthController.controlFlow(PulsarSymbol.MIX.controlId)
@@ -192,6 +234,7 @@ class PulsarViewModel(
     private val envelopeModeId = synthController.controlFlow(PulsarSymbol.ENVELOPE_MODE.controlId)
     private val seedId = synthController.controlFlow(PulsarSymbol.SEED.controlId)
     private val lickMutationId = synthController.controlFlow(PulsarSymbol.LICK_MUTATION.controlId)
+    private val lickOctaveId = synthController.controlFlow(PulsarSymbol.LICK_OCTAVE.controlId)
     private val trackEdmIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ENGINE_EDM.ordinal + i * 2].controlId)
     }
@@ -221,9 +264,16 @@ class PulsarViewModel(
     private val trackPercussiveIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PERCUSSIVE.ordinal + i].controlId)
     }
+    private val trackBarStrategyIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_BAR_STRATEGY.ordinal + i].controlId)
+    }
+    private val trackMarkovContourIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MARKOV_CONTOUR.ordinal + i].controlId)
+    }
+    private val stepCountId = synthController.controlFlow(PulsarSymbol.STEP_COUNT.controlId)
     private val trackMacroIds = (0..7).map { t ->
-        (0..15).map { m ->
-            synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MACRO_ENERGY_VOL_MIN.ordinal + t * 16 + m].controlId)
+        (0..13).map { m ->
+            synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MACRO_ENERGY_VOL_MIN.ordinal + t * 14 + m].controlId)
         }
     }
     private val genreDensityIds = (0..7).map { i ->
@@ -233,14 +283,83 @@ class PulsarViewModel(
     private val genreGhostProbId = synthController.controlFlow(PulsarSymbol.GENRE_GHOST_PROB.controlId)
     private val genreNoteRangeLowId = synthController.controlFlow(PulsarSymbol.GENRE_NOTE_RANGE_LOW.controlId)
     private val genreNoteRangeHighId = synthController.controlFlow(PulsarSymbol.GENRE_NOTE_RANGE_HIGH.controlId)
-    private val genreRhythmPatternId = synthController.controlFlow(PulsarSymbol.GENRE_RHYTHM_PATTERN.controlId)
+    private val genreRhythmDensityId = synthController.controlFlow(PulsarSymbol.GENRE_RHYTHM_DENSITY.controlId)
+    private val genreProgressionStyleId = synthController.controlFlow(PulsarSymbol.GENRE_PROGRESSION_STYLE.controlId)
+    private val genreChordsPerBarId = synthController.controlFlow(PulsarSymbol.GENRE_CHORDS_PER_BAR.controlId)
     private val lickLengthId = synthController.controlFlow(PulsarSymbol.LICK_LENGTH.controlId)
+    private val lickLoopLengthId = synthController.controlFlow(PulsarSymbol.LICK_LOOP_LENGTH.controlId)
     private val lickDataIds = (0..95).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.LICK_DATA_0.ordinal + i].controlId)
     }
 
+    // Tension control flows
+    private val tensionInnerBarsId = synthController.controlFlow(PulsarSymbol.TENSION_INNER_BARS.controlId)
+    private val tensionOuterBarsId = synthController.controlFlow(PulsarSymbol.TENSION_OUTER_BARS.controlId)
+    private val tensionOuterDepthId = synthController.controlFlow(PulsarSymbol.TENSION_OUTER_DEPTH.controlId)
+    private val tensionVolumeId = synthController.controlFlow(PulsarSymbol.TENSION_VOLUME.controlId)
+    private val tensionTimingId = synthController.controlFlow(PulsarSymbol.TENSION_TIMING.controlId)
+    private val tensionOctaveShiftId = synthController.controlFlow(PulsarSymbol.TENSION_OCTAVE_SHIFT.controlId)
+    private val tensionKeyShiftId = synthController.controlFlow(PulsarSymbol.TENSION_KEY_SHIFT.controlId)
+    private val tensionHalfLickId = synthController.controlFlow(PulsarSymbol.TENSION_HALF_LICK.controlId)
+    private val tensionChromaticPassingId = synthController.controlFlow(PulsarSymbol.TENSION_CHROMATIC_PASSING.controlId)
+    private val tensionEvoTimbreLowId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_TIMBRE_LOW.controlId)
+    private val tensionEvoTimbreHighId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_TIMBRE_HIGH.controlId)
+    private val tensionEvoTimbreProbId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_TIMBRE_PROB.controlId)
+    private val tensionEvoMorphLowId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_MORPH_LOW.controlId)
+    private val tensionEvoMorphHighId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_MORPH_HIGH.controlId)
+    private val tensionEvoMorphProbId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_MORPH_PROB.controlId)
+    private val tensionEvoHarmLowId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_HARM_LOW.controlId)
+    private val tensionEvoHarmHighId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_HARM_HIGH.controlId)
+    private val tensionEvoHarmProbId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_HARM_PROB.controlId)
+    private val tensionEvoAttackPointId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_ATTACK_POINT.controlId)
+    private val tensionEvoReleaseSpeedId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_RELEASE_SPEED.controlId)
+    private val trackEvoWeightIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_WEIGHT.ordinal + i].controlId)
+    }
+    private val trackModLfoRateIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_RATE.ordinal + i].controlId)
+    }
+    private val trackModLfoDepthIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_DEPTH.ordinal + i].controlId)
+    }
+    private val trackModLfoShapeIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_SHAPE.ordinal + i].controlId)
+    }
+    private val trackModLfoCouplingIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MOD_LFO_COUPLING.ordinal + i].controlId)
+    }
+    private val trackHoldProbabilityIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HOLD_PROBABILITY.ordinal + i].controlId)
+    }
+    private val trackHoldLengthMinIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HOLD_LENGTH_MIN.ordinal + i].controlId)
+    }
+    private val trackHoldLengthMaxIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HOLD_LENGTH_MAX.ordinal + i].controlId)
+    }
+    private val trackDelaySendIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DELAY_SEND.ordinal + i].controlId)
+    }
+    private val trackReverbSendIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_REVERB_SEND_TRACK.ordinal + i].controlId)
+    }
+    private val trackNoteRangeLowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_NOTE_RANGE_LOW.ordinal + it].controlId) }
+    private val trackNoteRangeHighIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_NOTE_RANGE_HIGH.ordinal + it].controlId) }
+    private val trackReverbBrightnessIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_REVERB_BRIGHTNESS.ordinal + it].controlId) }
+    private val trackDelayFeedbackIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DELAY_FEEDBACK_TRACK.ordinal + it].controlId) }
+    private val trackGlideRateIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GLIDE_RATE.ordinal + it].controlId) }
+    private val trackUseLickIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_USE_LICK.ordinal + it].controlId) }
+
+    private val muteSymbols = listOf(
+        PulsarSymbol.TRACK_0_MUTE, PulsarSymbol.TRACK_1_MUTE,
+        PulsarSymbol.TRACK_2_MUTE, PulsarSymbol.TRACK_3_MUTE,
+        PulsarSymbol.TRACK_4_MUTE, PulsarSymbol.TRACK_5_MUTE,
+        PulsarSymbol.TRACK_6_MUTE, PulsarSymbol.TRACK_7_MUTE,
+    )
+
     private val selectedTrackFlow = MutableStateFlow<Int?>(null)
-    private val vibeFlow = MutableStateFlow(PulsarVibes.all().first())
+    private val _trackMutedFlow = MutableStateFlow(List(8) { false })
+    private val vibeFlow = MutableStateFlow(vibeList.first())
     private val restoreComplete = CompletableDeferred<Unit>()
     private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
@@ -257,7 +376,54 @@ class PulsarViewModel(
                 restoreSavedState()
             }
         }
+        // Re-apply vibe after engine graph loads: the initial restore runs before
+        // nativeLoadGraph which resets all engine atomics. Await graphReady to ensure
+        // the graph is loaded before re-pushing the vibe.
+        scope.launch(dispatcherProvider.io) {
+            restoreComplete.await()
+            synthEngine.graphReady.await()
+            if (vibeFlow.value.arrangement != null) {
+                log.debug { "Re-applying vibe after engine init" }
+                applyVibe(vibeFlow.value)
+            }
+        }
     }
+
+    override val arrangementStateFlow: StateFlow<PulsarArrangementState> =
+        synthEngine.pulsarArrangementStateFlow
+            .filterNotNull()
+            .map { state ->
+                // Enrich with band member names if band solos are configured
+                val vibe = vibeFlow.value
+                val section = vibe.arrangement?.sections?.getOrNull(state.sectionIndex)
+                val bandConfig = section?.bandSoloConfig
+                    ?: vibe.arrangement?.sections?.firstNotNullOfOrNull { it.bandSoloConfig }
+                val enriched = if (bandConfig != null) {
+                    state.copy(
+                        bandSolo = true,
+                        bandMemberNames = bandConfig.members.map { it.name },
+                    )
+                } else state
+
+                val sectionName = section?.name ?: "section-${state.sectionIndex}"
+                if (enriched.soloActive && enriched.soloTrack >= 0) {
+                    val name = if (enriched.bandSolo) {
+                        enriched.bandMemberNames.getOrElse(enriched.soloTrack) { "?" }
+                    } else {
+                        PULSAR_TRACK_NAMES.getOrElse(enriched.soloTrack) { "?" }
+                    }
+                    log.debug { "Solo active: $name section=$sectionName" }
+                } else {
+                    log.debug { "Section: $sectionName bar=${state.barsElapsed}/${state.barsTotal}" }
+                }
+                enriched
+            }
+            .flowOn(dispatcherProvider.io)
+            .stateIn(
+                scope = scope,
+                started = sharingStrategy,
+                initialValue = ARRANGEMENT_STATE_UNKNOWN
+            )
 
     // ═══════════════════════════════════════════════════════════
     // Actions
@@ -267,24 +433,37 @@ class PulsarViewModel(
             val current = playingId.value.asInt()
             playingId.value = IntValue(if (current != 0) 0 else 1)
         },
+        toggleGlobalPause = {
+            val currentlyMuted = mutedId.value.asInt() != 0
+            mutedId.value = IntValue(if (currentlyMuted) 0 else 1)
+            if (currentlyMuted) {
+                // Unmuting: start Pulsar
+                playingId.value = IntValue(1)
+            } else {
+                // Muting: stop Pulsar to save CPU
+                playingId.value = IntValue(0)
+            }
+        },
         setVibe = { vibe -> applyVibe(vibe) },
         setEnergy = energyId.floatSetter(),
         setComplexity = complexityId.floatSetter(),
-        setSpace = spaceId.floatSetter(),
+        setSpace = { value ->
+            spaceId.value = FloatValue(value)
+            pushEffectiveSends(deepId.value.asFloat())
+        },
         setMood = moodId.floatSetter(),
         setBpm = { bpm ->
             bpmId.value = FloatValue(bpm)
             globalTempo.setBpm(bpm.toDouble())
         },
-        setDelaySend = delaySendId.floatSetter(),
-        setReverbSend = reverbSendId.floatSetter(),
+        setDeep = { value ->
+            deepId.value = FloatValue(value)
+            pushEffectiveSends(value)
+        },
         setRootNote = rootNoteId.intSetter(),
         setScale = scaleId.intSetter(),
         setMix = { value ->
             mixId.value = FloatValue(value)
-            if (value > 0f && playingId.value.asInt() == 0) {
-                playingId.value = IntValue(1)
-            }
         },
         setPercMix = percMixId.floatSetter(),
         setEnvelopeMode = envelopeModeId.intSetter(),
@@ -295,27 +474,63 @@ class PulsarViewModel(
         setTrackEngineSpace = { track, engine ->
             trackSpaceIds[track].value = IntValue(engine)
         },
+        toggleTrackMute = { track ->
+            val currentMuted = _trackMutedFlow.value[track]
+            val newMuted = !currentMuted
+            _trackMutedFlow.value = _trackMutedFlow.value.toMutableList().also { it[track] = newMuted }
+            synthController.setPluginControl(muteSymbols[track].controlId, FloatValue(if (newMuted) 1f else 0f))
+            log.debug { "Track $track ${if (newMuted) "muted" else "unmuted"}" }
+        },
     )
+
+    private fun buildArrangementSubtitle(
+        state: PulsarArrangementState,
+        vibe: Vibe,
+    ): String {
+        if (state.sectionIndex < 0) return "Pulsar"
+
+        val section = vibe.arrangement?.sections?.getOrNull(state.sectionIndex)
+        val sectionName = section?.name ?: "Section ${state.sectionIndex + 1}"
+        val currentBar = state.barsElapsed + 1
+
+        return buildString {
+            append(sectionName)
+            if (state.soloActive && state.soloTrack >= 0) {
+                val bandConfig = section?.bandSoloConfig
+                    ?: vibe.arrangement?.sections?.firstNotNullOfOrNull { it.bandSoloConfig }
+                val soloistName = if (state.bandSolo && bandConfig != null) {
+                    bandConfig.members.getOrElse(state.soloTrack) { null }?.name
+                } else {
+                    PULSAR_TRACK_NAMES.getOrElse(state.soloTrack) { null }
+                }
+                if (soloistName != null) {
+                    append(" \u00b7 $soloistName Solo")
+                }
+            }
+            append(" \u00b7 Bar $currentBar/${state.barsTotal}")
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════
     // State flow
     // ═══════════════════════════════════════════════════════════
     private val controlIntents = merge(
         playingId.map { PulsarIntent.Playing(it.asInt() != 0) },
+        mutedId.map { PulsarIntent.GlobalPaused(it.asInt() != 0) },
         vibeFlow.map { PulsarIntent.VibeChange(it) },
         energyId.map { PulsarIntent.Energy(it.asFloat()) },
         complexityId.map { PulsarIntent.Complexity(it.asFloat()) },
         spaceId.map { PulsarIntent.Space(it.asFloat()) },
         moodId.map { PulsarIntent.Mood(it.asFloat()) },
         bpmId.map { PulsarIntent.Bpm(it.asFloat()) },
-        delaySendId.map { PulsarIntent.DelaySend(it.asFloat()) },
-        reverbSendId.map { PulsarIntent.ReverbSend(it.asFloat()) },
+        deepId.map { PulsarIntent.Deep(it.asFloat()) },
         rootNoteId.map { PulsarIntent.RootNote(it.asInt()) },
         scaleId.map { PulsarIntent.Scale(it.asInt()) },
         mixId.map { PulsarIntent.Mix(it.asFloat()) },
         percMixId.map { PulsarIntent.PercMix(it.asFloat()) },
         envelopeModeId.map { PulsarIntent.EnvelopeMode(it.asInt()) },
         selectedTrackFlow.map { PulsarIntent.SelectedTrack(it) },
+        _trackMutedFlow.map { PulsarIntent.TrackMuteList(it) },
         *trackEdmIds.mapIndexed { i, flow ->
             flow.map { PulsarIntent.TrackEngineEdm(i, it.asInt()) }
         }.toTypedArray(),
@@ -332,14 +547,14 @@ class PulsarViewModel(
             )) { state, intent ->
                 when (intent) {
                     is PulsarIntent.Playing -> state.copy(playing = intent.value)
-                    is PulsarIntent.VibeChange -> state.copy(vibe = intent.value)
+                    is PulsarIntent.GlobalPaused -> state.copy(globalPaused = intent.value)
+                    is PulsarIntent.VibeChange -> state.copy(vibe = intent.value, vibeName = intent.value.name)
                     is PulsarIntent.Energy -> state.copy(energy = intent.value)
                     is PulsarIntent.Complexity -> state.copy(complexity = intent.value)
                     is PulsarIntent.Space -> state.copy(space = intent.value)
                     is PulsarIntent.Mood -> state.copy(mood = intent.value)
                     is PulsarIntent.Bpm -> state.copy(bpm = intent.value)
-                    is PulsarIntent.DelaySend -> state.copy(delaySend = intent.value)
-                    is PulsarIntent.ReverbSend -> state.copy(reverbSend = intent.value)
+                    is PulsarIntent.Deep -> state.copy(deep = intent.value)
                     is PulsarIntent.RootNote -> state.copy(rootNote = intent.value)
                     is PulsarIntent.Scale -> state.copy(scaleIndex = intent.value)
                     is PulsarIntent.Mix -> state.copy(mix = intent.value)
@@ -356,6 +571,7 @@ class PulsarViewModel(
                             it[intent.track] = intent.engine
                         }
                     )
+                    is PulsarIntent.TrackMuteList -> state.copy(trackMuted = intent.muteList)
                 }
             }
             .flowOn(dispatcherProvider.io)
@@ -385,6 +601,81 @@ class PulsarViewModel(
         }
     }
 
+    init {
+        // Activate/deactivate MediaSession based on global mute state.
+        // When paused via notification (mediaPaused=true), keep session active
+        // so the Play button can re-activate.
+        scope.launch(dispatcherProvider.io) {
+            mutedId.collect { value ->
+                val muted = value.asInt() != 0
+                val active = !muted || mediaPaused
+                mediaSessionStateManager.setPulsarActive(active)
+            }
+        }
+
+        // Update notification metadata when arrangement state, vibe, or mute changes
+        scope.launch(dispatcherProvider.io) {
+            combine(
+                arrangementStateFlow,
+                vibeFlow,
+                mutedId.map { it.asInt() == 0 },
+            ) { arrState, vibe, playing ->
+                Triple(arrState, vibe, playing)
+            }.collect { (arrState, vibe, playing) ->
+                if (playing || mediaPaused) {
+                    val subtitle = buildArrangementSubtitle(arrState, vibe)
+                    mediaSessionManager.updateMetadata(
+                        PlaybackMetadata(
+                            title = vibe.name,
+                            mode = PlaybackMode.PULSAR,
+                            isPlaying = playing,
+                            subtitle = subtitle,
+                        )
+                    )
+                }
+            }
+        }
+
+        // Wire skip actions to vibe cycling
+        mediaSessionManager.onSkipNext = {
+            val currentIndex = vibeList.indexOfFirst { it.name == vibeFlow.value.name }
+            val nextIndex = (currentIndex + 1) % vibeList.size
+            applyVibe(vibeList[nextIndex])
+        }
+        mediaSessionManager.onSkipPrevious = {
+            val currentIndex = vibeList.indexOfFirst { it.name == vibeFlow.value.name }
+            val prevIndex = if (currentIndex <= 0) vibeList.size - 1 else currentIndex - 1
+            applyVibe(vibeList[prevIndex])
+        }
+
+        // Wire play/pause to global mute.
+        // mediaPaused flag keeps the MediaSession alive during notification pause
+        // so the Play button remains functional.
+        mediaSessionManager.onPlay = {
+            mediaPaused = false
+            mutedId.value = IntValue(0)
+            if (playingId.value.asInt() == 0) {
+                playingId.value = IntValue(1)
+            }
+        }
+        mediaSessionManager.onPause = {
+            mediaPaused = true
+            mutedId.value = IntValue(1)
+            playingId.value = IntValue(0)
+        }
+
+        // Subscribe to PlaybackLifecycleEvent.StopAll (e.g., timer expiry)
+        scope.launch(dispatcherProvider.io) {
+            playbackLifecycleManager.events.collect { event ->
+                if (event is PlaybackLifecycleEvent.StopAll) {
+                    log.debug { "Received StopAll — pausing" }
+                    mutedId.value = IntValue(1)
+                    playingId.value = IntValue(0)
+                }
+            }
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════
     // Persistence
     // ═══════════════════════════════════════════════════════════
@@ -398,8 +689,12 @@ class PulsarViewModel(
         }
         // Push saved values into control flows (drives both UI and C++ engine)
         // Mix is intentionally excluded — always starts at 0 (off)
-        // Apply the full vibe recipe first (sets engines, genre, lick, macro defaults)
-        applyVibe(saved.vibe)
+        // Always resolve vibe from current definitions so structural updates
+        // (arrangement, tracks) take effect. Try vibeName first (new format),
+        // fall back to saved vibe name (old format), then first vibe.
+        val name = saved.vibeName.ifEmpty { saved.vibe.name }
+        val currentVibe = vibeList.firstOrNull { it.name == name } ?: vibeList.first()
+        applyVibe(currentVibe)
         // Then override with saved macro values
         energyId.value = FloatValue(saved.energy)
         complexityId.value = FloatValue(saved.complexity)
@@ -407,16 +702,19 @@ class PulsarViewModel(
         moodId.value = FloatValue(saved.mood)
         bpmId.value = FloatValue(saved.bpm)
         globalTempo.setBpm(saved.bpm.toDouble())
-        delaySendId.value = FloatValue(saved.delaySend)
-        reverbSendId.value = FloatValue(saved.reverbSend)
+        deepId.value = FloatValue(saved.deep)
+        pushEffectiveSends(saved.deep)
         percMixId.value = FloatValue(saved.percMix)
         envelopeModeId.value = IntValue(saved.envelopeMode)
         log.debug { "Restored Pulsar state: vibe=${saved.vibe.name}, bpm=${saved.bpm}" }
     }
 
     private suspend fun saveState(state: PulsarUiState) {
-        // Strip transient fields; mix always starts at 0 (user dials it in)
-        val toSave = state.copy(playing = false, selectedTrack = null, mix = 0f)
+        // Strip transient fields; mutes are never persisted.
+        // MIX_GATED (Orpheus): mix saves as 0 (user dials it in each session).
+        // EXPLICIT (DJ app): mix saves as 1 (always audible, play/pause gates audio).
+        val savedMix = if (playbackMode == PulsarPlaybackMode.MIX_GATED) 0f else 1f
+        val toSave = state.copy(playing = false, selectedTrack = null, mix = savedMix, trackMuted = List(8) { false })
         val json = persistJson.encodeToString(PulsarUiState.serializer(), toSave)
         appPreferencesRepository.update { it.copy(lastPulsarJson = json) }
     }
@@ -429,6 +727,15 @@ class PulsarViewModel(
      * Push the entire vibe recipe to C++. Called from setVibe action and restoreSavedState.
      */
     private fun applyVibe(vibe: Vibe) {
+        // Set vibeFlow first so pushEffectiveSends reads the new vibe's per-track sends
+        vibeFlow.value = vibe
+
+        // Reset all track mutes on vibe load
+        _trackMutedFlow.value = List(8) { false }
+        for (i in 0 until 8) {
+            synthController.setPluginControl(muteSymbols[i].controlId, FloatValue(0f))
+        }
+
         // Push per-track voice params
         vibe.tracks.forEachIndexed { i, tv ->
             trackEdmIds[i].value = IntValue(tv.engineEdm.id)
@@ -440,16 +747,60 @@ class PulsarViewModel(
             trackMorphIds[i].value = FloatValue(tv.morph)
             trackEnvelopeIds[i].value = IntValue(tv.envelopeProfile.id)
             trackPercussiveIds[i].value = IntValue(if (tv.isPercussive) 1 else 0)
+            trackBarStrategyIds[i].value = IntValue(tv.barStrategy.id)
+            trackMarkovContourIds[i].value = IntValue(if (tv.markovContour) 1 else 0)
             pushMacroMap(i, tv.macroMap)
+            trackModLfoRateIds[i].value = FloatValue(tv.modLfoRate)
+            trackModLfoDepthIds[i].value = FloatValue(tv.modLfoDepth)
+            trackModLfoShapeIds[i].value = FloatValue(tv.modLfoShape)
+            trackModLfoCouplingIds[i].value = FloatValue(tv.modLfoCoupling)
+            trackHoldProbabilityIds[i].value = FloatValue(tv.holdProbability)
+            trackHoldLengthMinIds[i].value = IntValue(tv.holdLengthMin)
+            trackHoldLengthMaxIds[i].value = IntValue(tv.holdLengthMax)
+            trackNoteRangeLowIds[i].value = IntValue(tv.noteRangeLow ?: 0)
+            trackNoteRangeHighIds[i].value = IntValue(tv.noteRangeHigh ?: 0)
+            trackReverbBrightnessIds[i].value = FloatValue(tv.reverbBrightness)
+            genreDensityIds[i].value = FloatValue(tv.density)
+            trackDelayFeedbackIds[i].value = FloatValue(tv.delayFeedback ?: -1f)
+            trackGlideRateIds[i].value = FloatValue(tv.glideRate)
+            trackUseLickIds[i].value = IntValue(if (tv.useLick) 1 else 0)
         }
+        stepCountId.value = IntValue(vibe.stepCount)
+        pushEffectiveSends(deepId.value.asFloat())
+
+        // Push vibe-defined effect params to dedicated Pulsar delay/reverb
+        val fx = vibe.effects
+        pulsarDelayTimeAId.value = FloatValue(fx.delayTimeA)
+        pulsarDelayTimeBId.value = FloatValue(fx.delayTimeB)
+        pulsarDelayFeedbackId.value = FloatValue(fx.delayFeedback)
+        pulsarDelayDampingId.value = FloatValue(fx.delayDamping)
+        pulsarReverbSizeId.value = FloatValue(fx.reverbSize)
+        pulsarReverbDampingId.value = FloatValue(fx.reverbDamping)
+        pulsarReverbBrightnessId.value = FloatValue(fx.reverbBrightness)
 
         // Push genre profile
-        vibe.genre.baseDensity.forEachIndexed { i, d -> genreDensityIds[i].value = FloatValue(d) }
         genreSwingId.value = FloatValue(vibe.genre.swingAmount)
         genreGhostProbId.value = FloatValue(vibe.genre.ghostProbability)
         genreNoteRangeLowId.value = IntValue(vibe.genre.noteRangeLow)
         genreNoteRangeHighId.value = IntValue(vibe.genre.noteRangeHigh)
-        genreRhythmPatternId.value = IntValue(vibe.genre.rhythmPattern)
+        genreRhythmDensityId.value = FloatValue(vibe.genre.rhythmDensity)
+        genreProgressionStyleId.value = IntValue(vibe.genre.progressionStyle.ordinal)
+        genreChordsPerBarId.value = IntValue(vibe.genre.chordsPerBar)
+
+        // Custom chord transition matrix (49 floats = 7x7 row-major)
+        val chordMatrix = vibe.genre.chordTransitionMatrix
+        synthController.setPluginControl(
+            PluginControlId(PULSAR_URI, "chord_matrix_active"),
+            IntValue(if (chordMatrix != null) 1 else 0)
+        )
+        if (chordMatrix != null) {
+            for (i in 0 until minOf(chordMatrix.size, 49)) {
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "chord_matrix_$i"),
+                    FloatValue(chordMatrix[i])
+                )
+            }
+        }
 
         // Push lick (data first, length last as release fence)
         val lick = vibe.lick
@@ -460,29 +811,70 @@ class PulsarViewModel(
                 lickDataIds[i * 3 + 2].value = FloatValue(step.velocity)
             }
             lickMutationId.value = FloatValue(vibe.lickMutation)
+            lickOctaveId.value = IntValue(vibe.lickOctave)
+            lickLoopLengthId.value = IntValue(lick.loopLength)
             lickLengthId.value = IntValue(lick.steps.size)
         } else {
+            lickLoopLengthId.value = IntValue(0)
             lickLengthId.value = IntValue(0)
         }
 
         seedId.value = IntValue(vibe.seed)
-        envelopeModeId.value = IntValue(vibe.envelopeMode)
+        envelopeModeId.value = IntValue(vibe.envelopeType.modeIndex)
+
+        // Push tension profile
+        val t = vibe.tension
+        tensionInnerBarsId.value = IntValue(t.innerBars)
+        tensionOuterBarsId.value = IntValue(t.outerBars)
+        tensionOuterDepthId.value = FloatValue(t.outerDepth)
+        tensionVolumeId.value = FloatValue(t.volume)
+        tensionTimingId.value = FloatValue(t.timing)
+        tensionOctaveShiftId.value = IntValue(if (t.tonal.octaveShift) 1 else 0)
+        tensionKeyShiftId.value = IntValue(t.tonal.keyShift)
+        tensionHalfLickId.value = IntValue(if (t.tonal.halfLick) 1 else 0)
+        tensionChromaticPassingId.value = FloatValue(t.tonal.chromaticPassing)
+        val e = t.evolution
+        tensionEvoTimbreLowId.value = FloatValue(e.timbreLow)
+        tensionEvoTimbreHighId.value = FloatValue(e.timbreHigh)
+        tensionEvoTimbreProbId.value = FloatValue(e.timbreProbability)
+        tensionEvoMorphLowId.value = FloatValue(e.morphLow)
+        tensionEvoMorphHighId.value = FloatValue(e.morphHigh)
+        tensionEvoMorphProbId.value = FloatValue(e.morphProbability)
+        tensionEvoHarmLowId.value = FloatValue(e.harmonicsLow)
+        tensionEvoHarmHighId.value = FloatValue(e.harmonicsHigh)
+        tensionEvoHarmProbId.value = FloatValue(e.harmonicsProbability)
+        tensionEvoAttackPointId.value = FloatValue(e.attackPoint)
+        tensionEvoReleaseSpeedId.value = FloatValue(e.releaseSpeed)
+        // Per-track evolution weight
+        vibe.tracks.forEachIndexed { i, tv ->
+            trackEvoWeightIds[i].value = FloatValue(tv.evolutionWeight)
+        }
 
         // Set macro defaults
-        rootNoteId.value = IntValue(vibe.rootNote)
-        scaleId.value = IntValue(vibe.scaleIndex)
+        rootNoteId.value = IntValue(vibe.rootNote.noteIndex)
+        scaleId.value = IntValue(vibe.scaleType.scaleIndex)
         bpmId.value = FloatValue(vibe.bpm)
         globalTempo.setBpm(vibe.bpm.toDouble())
         energyId.value = FloatValue(vibe.energy)
         complexityId.value = FloatValue(vibe.complexity)
         spaceId.value = FloatValue(vibe.space)
         moodId.value = FloatValue(vibe.mood)
+        deepId.value = FloatValue(vibe.deep)
+
+        // Push arrangement data (MUST be before vibe generation increment)
+        pushArrangement(vibe)
+
+        // In MIX_GATED mode (Orpheus), auto-start on vibe load — mix knob controls audibility.
+        // In EXPLICIT mode (DJ app), playing is controlled by toggleGlobalPause, mix stays at 1.
+        if (playbackMode == PulsarPlaybackMode.MIX_GATED) {
+            playingId.value = IntValue(1)
+            mixId.value = FloatValue(0f)
+        } else {
+            mixId.value = FloatValue(1f)
+        }
 
         // Trigger vibe reload (MUST be last)
         vibeGenerationId.value = IntValue(vibeGenerationId.value.asInt() + 1)
-
-        // Update local vibe index for UI state
-        vibeFlow.value = vibe
     }
 
     /**
@@ -500,19 +892,318 @@ class PulsarViewModel(
         ids[7].value = FloatValue(map.complexityVariation.max)
         ids[8].value = FloatValue(map.spaceDecay.min)
         ids[9].value = FloatValue(map.spaceDecay.max)
-        ids[10].value = FloatValue(map.spaceReverbSend.min)
-        ids[11].value = FloatValue(map.spaceReverbSend.max)
-        ids[12].value = FloatValue(map.moodHarmonics.min)
-        ids[13].value = FloatValue(map.moodHarmonics.max)
-        ids[14].value = FloatValue(map.moodTimbre.min)
-        ids[15].value = FloatValue(map.moodTimbre.max)
+        ids[10].value = FloatValue(map.moodHarmonics.min)
+        ids[11].value = FloatValue(map.moodHarmonics.max)
+        ids[12].value = FloatValue(map.moodTimbre.min)
+        ids[13].value = FloatValue(map.moodTimbre.max)
+    }
+
+    private fun pushEffectiveSends(deep: Float) {
+        val vibe = vibeFlow.value
+        val space = spaceId.value.asFloat()
+        val floor = vibe.effects.deepFloor
+        // SPACE boosts DEEP with a per-vibe floor: effectiveDeep = deep * (floor + space * (1 - floor))
+        val effectiveDeep = deep * (floor + space * (1.0f - floor))
+        for (i in 0 until 8) {
+            val tv = vibe.tracks.getOrNull(i) ?: continue
+            trackDelaySendIds[i].value = FloatValue(tv.delaySend * effectiveDeep)
+            trackReverbSendIds[i].value = FloatValue(tv.reverbSend * effectiveDeep)
+        }
+    }
+
+    /**
+     * Pack and write arrangement data to engine atomics via SynthController.
+     *
+     * Layout for C++ engine arrays (must match orpheus_engine_routing.cpp and load_vibe()):
+     *
+     * section_data[s * 18 + field]:
+     *   0=bars_min, 1=bars_max, 2=transition_bars, 3=recency_decay,
+     *   4=macro_energy, 5=macro_complexity, 6=macro_space, 7=macro_mood,
+     *   8=has_solo, 9=solo_mode, 10=solo_probability, 11=bars_per_soloist_min,
+     *   12=bars_per_soloist_max, 13=solo_transition_bars, 14=improv_carryover,
+     *   15=transition_count, 16=reserved, 17=reserved
+     *
+     * section_transitions[s * 8 * 2 + t * 2 + field]:
+     *   0=targetIndex, 1=weight (up to 8 transitions per section)
+     *
+     * track_solo_behavior[t * 15 + field]:
+     *   0=volume_boost, 1=density_boost, 2=timbre_min, 3=timbre_max,
+     *   4=morph_min, 5=morph_max, 6=harmonics_min, 7=harmonics_max,
+     *   8=evolution_intensity, 9=fill_probability,
+     *   10=rest_probability, 11=hold_probability, 12=density_curve_min,
+     *   13=density_curve_max, 14=chromatic_passing
+     *
+     * track_ducking[t * 6 + field]:
+     *   0=volume_reduction, 1=density_reduction, 2=ghost_reduction,
+     *   3=fill_suppression, 4=simplify (0/1), 5=reverb_boost
+     *
+     * track_solo_markov[t * 15 + i] = intervalWeights[i]
+     *
+     * arrangement_generation written last as acquire fence.
+     */
+    private fun pushArrangement(vibe: Vibe) {
+        val arr = vibe.arrangement
+        if (arr == null) {
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "arrangement_active"), IntValue(0)
+            )
+            log.debug { "Arrangement: inactive (vibe=${vibe.name})" }
+            return
+        }
+        log.debug { "Arrangement: pushing ${arr.sections.size} sections for vibe=${vibe.name}" }
+
+        // Scalar arrangement headers
+        synthController.setPluginControl(
+            PluginControlId(PULSAR_URI, "arrangement_active"), IntValue(1)
+        )
+        synthController.setPluginControl(
+            PluginControlId(PULSAR_URI, "arrangement_section_count"), IntValue(arr.sections.size)
+        )
+        synthController.setPluginControl(
+            PluginControlId(PULSAR_URI, "arrangement_intro_index"), IntValue(arr.introIndex ?: -1)
+        )
+        synthController.setPluginControl(
+            PluginControlId(PULSAR_URI, "arrangement_outro_index"), IntValue(arr.outroIndex ?: -1)
+        )
+
+        // Section data (18 floats per section)
+        arr.sections.forEachIndexed { s, section ->
+            val base = s * 18
+            val mo = section.macroOverrides
+            val hasSolo = if (section.soloConfig != null) 1f else 0f
+            val solo = section.soloConfig
+            fun setSection(field: Int, v: Float) =
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_data_${base + field}"), FloatValue(v)
+                )
+            // Must match C++ load_vibe() unpack order exactly:
+            // [0]=bars_min, [1]=bars_max, [2]=transition_bars, [3]=recency_decay,
+            // [4]=transition_count, [5]=energy, [6]=complexity, [7]=space, [8]=mood,
+            // [9]=has_solo, [10]=solo_mode, [11]=solo_prob, [12]=solo_bars_min,
+            // [13]=solo_bars_max, [14]=solo_selection_mode, [15]=solo_recency_decay,
+            // [16]=solo_allow_effects, [17]=solo_improv_carryover
+            setSection(0, section.barsMin.toFloat())
+            setSection(1, section.barsMax.toFloat())
+            setSection(2, section.transitionBars.toFloat())
+            setSection(3, section.recencyDecay)
+            setSection(4, section.transitions.size.toFloat())
+            setSection(5, mo?.energy ?: -1f)
+            setSection(6, mo?.complexity ?: -1f)
+            setSection(7, mo?.space ?: -1f)
+            setSection(8, mo?.mood ?: -1f)
+            setSection(9, hasSolo)
+            setSection(10, (solo?.mode?.ordinal ?: 0).toFloat())
+            setSection(11, solo?.probability ?: 0.5f)
+            setSection(12, (solo?.barsPerSoloistMin ?: 2).toFloat())
+            setSection(13, (solo?.barsPerSoloistMax ?: 4).toFloat())
+            setSection(14, (solo?.soloistSelection?.mode?.ordinal ?: 2).toFloat())
+            setSection(15, solo?.soloistSelection?.recencyDecay ?: 0.5f)
+            setSection(16, if (solo?.soloistSelection?.allowEffects != false) 1f else 0f)
+            setSection(17, solo?.improvCarryover ?: 0.7f)
+
+            // Transitions for this section (up to 8 × 2 floats)
+            val transBase = s * 8 * 2
+            section.transitions.forEachIndexed { t, tr ->
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 2}"),
+                    FloatValue(tr.targetIndex.toFloat())
+                )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 2 + 1}"),
+                    FloatValue(tr.weight)
+                )
+            }
+        }
+
+        // Soloist transition matrix (64 floats = 8x8 row-major, shared across sections)
+        val firstSoloConfig = arr.sections.firstOrNull()?.soloConfig
+        val soloistMatrix = firstSoloConfig?.soloistSelection?.transitionMatrix
+        synthController.setPluginControl(
+            PluginControlId(PULSAR_URI, "soloist_matrix_active"),
+            IntValue(if (soloistMatrix != null) 1 else 0)
+        )
+        if (soloistMatrix != null) {
+            for (i in 0 until minOf(soloistMatrix.size, 64)) {
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "soloist_matrix_$i"),
+                    FloatValue(soloistMatrix[i])
+                )
+            }
+        }
+
+        // Band solo config (shared across all sections that use it)
+        val bandConfig = arr.sections.firstNotNullOfOrNull { it.bandSoloConfig }
+        synthController.setPluginControl(
+            PluginControlId(PULSAR_URI, "band_active"),
+            IntValue(if (bandConfig != null) 1 else 0)
+        )
+        if (bandConfig != null) {
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "band_member_count"),
+                IntValue(bandConfig.members.size)
+            )
+            bandConfig.members.forEachIndexed { m, member ->
+                val base = m * 12
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "band_member_data_${base + 0}"),
+                    FloatValue(member.tracks.size.toFloat())
+                )
+                member.tracks.forEachIndexed { t, trackIdx ->
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "band_member_data_${base + 1 + t}"),
+                        FloatValue(trackIdx.toFloat())
+                    )
+                }
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "band_member_data_${base + 9}"),
+                    FloatValue(if (member.alwaysActive) 1f else 0f)
+                )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "band_member_data_${base + 10}"),
+                    FloatValue(member.defaultTechnique.ordinal.toFloat())
+                )
+            }
+            val N = bandConfig.members.size
+            for (i in 0 until minOf(bandConfig.handoffMatrix.size, N * N)) {
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "band_handoff_$i"),
+                    FloatValue(bandConfig.handoffMatrix[i])
+                )
+            }
+            for (i in 0 until minOf(bandConfig.pullInMatrix.size, N * N)) {
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "band_pull_in_$i"),
+                    FloatValue(bandConfig.pullInMatrix[i])
+                )
+            }
+            synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_pull_in_bars_min"), IntValue(bandConfig.pullInBarsMin))
+            synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_pull_in_bars_max"), IntValue(bandConfig.pullInBarsMax))
+            synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_improv_carryover"), FloatValue(bandConfig.improvCarryover))
+            synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_probability"), FloatValue(bandConfig.probability))
+            synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_bars_per_lead_min"), IntValue(bandConfig.barsPerLeadMin))
+            synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_bars_per_lead_max"), IntValue(bandConfig.barsPerLeadMax))
+        }
+
+        // Per-track solo behavior and ducking (use track's own config if present,
+        // else use defaults derived from the track's envelope profile)
+        vibe.tracks.forEachIndexed { t, tv ->
+            val behavior = tv.soloBehavior ?: defaultSoloBehavior(tv.envelopeProfile)
+            val markov = behavior.markovConfig
+            val behaviorBase = t * 15
+            fun setSolo(field: Int, v: Float) =
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "track_solo_behavior_${behaviorBase + field}"),
+                    FloatValue(v)
+                )
+            setSolo(0, behavior.volumeBoost)
+            setSolo(1, behavior.densityBoost)
+            setSolo(2, behavior.timbreMin)
+            setSolo(3, behavior.timbreMax)
+            setSolo(4, behavior.morphMin)
+            setSolo(5, behavior.morphMax)
+            setSolo(6, behavior.harmonicsMin)
+            setSolo(7, behavior.harmonicsMax)
+            setSolo(8, behavior.evolutionIntensity)
+            setSolo(9, behavior.fillProbability)
+            setSolo(10, markov?.restProbability ?: 0.15f)
+            setSolo(11, markov?.holdProbability ?: 0.2f)
+            setSolo(12, markov?.densityCurveMin ?: 0.4f)
+            setSolo(13, markov?.densityCurveMax ?: 0.8f)
+            setSolo(14, markov?.chromaticPassing ?: 0.1f)
+
+            // Markov interval weights (15 floats)
+            val markovBase = t * 15
+            val weights = markov?.intervalWeights
+            for (i in 0 until 15) {
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "track_solo_markov_${markovBase + i}"),
+                    FloatValue(weights?.getOrNull(i) ?: (1f / 15f))
+                )
+            }
+
+            // Ducking profile
+            val ducking = tv.duckingProfile ?: defaultDuckingProfile(tv.envelopeProfile)
+            val duckBase = t * 6
+            fun setDuck(field: Int, v: Float) =
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "track_ducking_${duckBase + field}"),
+                    FloatValue(v)
+                )
+            setDuck(0, ducking.volumeReduction)
+            setDuck(1, ducking.densityReduction)
+            setDuck(2, ducking.ghostReduction)
+            setDuck(3, ducking.fillSuppression)
+            setDuck(4, if (ducking.simplify) 1f else 0f)
+            setDuck(5, ducking.reverbBoost)
+        }
+
+        // Write arrangement generation last as release fence (triggers C++ load_vibe re-read)
+        synthController.setPluginControl(
+            PluginControlId(PULSAR_URI, "arrangement_generation"),
+            IntValue(1)
+        )
+    }
+
+    private fun defaultSoloBehavior(profile: EnvelopeProfile): SoloBehavior = when (profile) {
+        EnvelopeProfile.RHYTHM -> SoloBehavior(
+            fillProbability = 0.8f, densityBoost = 0.4f,
+            markovConfig = SoloMarkovConfig.RHYTHMIC_DEFAULT,
+        )
+        EnvelopeProfile.MELODIC -> SoloBehavior(
+            markovConfig = SoloMarkovConfig.MELODIC_DEFAULT,
+        )
+        EnvelopeProfile.EFFECT -> SoloBehavior(
+            harmonicsMin = 0.1f, harmonicsMax = 0.9f,
+            markovConfig = SoloMarkovConfig.EFFECT_DEFAULT,
+        )
+        EnvelopeProfile.WILD -> SoloBehavior(
+            volumeBoost = 0.3f, evolutionIntensity = 1.5f,
+            markovConfig = SoloMarkovConfig.WILD_DEFAULT,
+        )
+        EnvelopeProfile.DRONE -> SoloBehavior(
+            markovConfig = SoloMarkovConfig.MELODIC_DEFAULT,
+        )
+    }
+
+    private fun defaultDuckingProfile(profile: EnvelopeProfile): DuckingProfile = when (profile) {
+        EnvelopeProfile.RHYTHM -> DuckingProfile(
+            volumeReduction = 0.2f, densityReduction = 0.5f,
+            ghostReduction = 0.7f, fillSuppression = 0.9f,
+        )
+        EnvelopeProfile.MELODIC -> DuckingProfile()
+        EnvelopeProfile.EFFECT -> DuckingProfile(
+            volumeReduction = 0.4f, densityReduction = 0.6f,
+            reverbBoost = 0.15f, simplify = false,
+        )
+        EnvelopeProfile.WILD -> DuckingProfile(
+            volumeReduction = 0.5f, densityReduction = 0.7f,
+            fillSuppression = 0.95f,
+        )
+        EnvelopeProfile.DRONE -> DuckingProfile()
     }
 
     companion object {
+        private val previewVibe = Vibe(
+            name = "Preview",
+            bpm = 120f,
+            rootNote = RootNote.C,
+            scaleType = ScaleType.MINOR,
+            genre = GenreProfile(
+                swingAmount = 0f,
+                ghostProbability = 0f,
+                noteRangeLow = 36,
+                noteRangeHigh = 72,
+                rhythmDensity = RhythmPattern.SPARSE.density,
+            ),
+            tracks = List(8) { TrackVoice(engineEdm = Engine.VA, engineSpace = Engine.VA, isPercussive = it < 3) },
+        )
+
         fun previewFeature(state: PulsarUiState = PulsarUiState(
-            vibe = PulsarVibes.all().first(),
+            vibe = previewVibe,
         )): PulsarFeature =
             object : PulsarFeature {
+                override val vibeList: List<Vibe> = listOf(previewVibe)
+                override val arrangementStateFlow: StateFlow<PulsarArrangementState> = MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
                 override val stateFlow: StateFlow<PulsarUiState> = MutableStateFlow(state)
                 override val actions: PulsarPanelActions = PulsarPanelActions.EMPTY
             }

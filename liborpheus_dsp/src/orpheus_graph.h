@@ -41,6 +41,8 @@ enum OrpheusUnitType : uint16_t {
     UNIT_TURNTABLE = 33,
     UNIT_TIDES = 34,
     UNIT_PULSAR = 35,
+    UNIT_PULSAR_DELAY = 36,
+    UNIT_PULSAR_REVERB = 37,
     UNIT_TYPE_COUNT
 };
 

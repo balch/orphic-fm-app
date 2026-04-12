@@ -133,6 +133,16 @@ void orpheus_engine_get_pulsar_viz(OrpheusEngine* engine,
                                    int* playheads_out,
                                    int* step_counts_out);
 
+// ── Pulsar arrangement state read-back (polled at ~5fps from UI thread) ──
+// Reads the current arrangement state into out[6]:
+//   out[0] = section_index (-1 = inactive)
+//   out[1] = bars_elapsed
+//   out[2] = bars_total
+//   out[3] = solo_active (0 or 1)
+//   out[4] = solo_track (-1 = none)
+//   out[5] = solo_mode
+void orpheus_engine_get_pulsar_arrangement(OrpheusEngine* engine, int* out);
+
 #ifdef __cplusplus
 }
 #endif

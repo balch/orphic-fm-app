@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.balch.orpheus.core.config.AppConfig
@@ -31,6 +32,7 @@ fun AppTitleTreatment(
     title: String = AppConfig.APP_DISPLAY_NAME,
     effects: VisualizationLiquidEffects = VisualizationLiquidEffects.Default,
     showSizeEffects: Boolean = true,
+    horizontalPadding: Dp = 16.dp,
 ) {
     val liquidState = LocalLiquidState.current
     val shape = RoundedCornerShape(8.dp)
@@ -76,7 +78,7 @@ fun AppTitleTreatment(
             color = effects.title.titleColor,
             style = TextStyle(shadow = textShadow),
             modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = horizontalPadding, vertical = 8.dp)
 
         )
     }

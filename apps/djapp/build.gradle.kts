@@ -29,6 +29,7 @@ kotlin {
             api(project(":core:foundation"))
             api(project(":core:plugins:pulsar"))
             api(project(":core:plugins:dj"))
+            api(project(":core:plugins:app"))
             api(project(":core:plugins:reverb"))
             api(project(":core:plugins:horn"))
             api(project(":core:plugins:distortion"))

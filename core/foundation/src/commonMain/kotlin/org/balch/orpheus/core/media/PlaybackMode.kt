@@ -14,7 +14,10 @@ enum class PlaybackMode(val displayName: String) {
     SOLO("AI Solo"),
     
     /** REPL/Tidal code generation mode is active */
-    REPL("Live Code")
+    REPL("Live Code"),
+
+    /** Pulsar beat machine is active */
+    PULSAR("Pulsar")
 }
 
 /**
@@ -23,12 +26,14 @@ enum class PlaybackMode(val displayName: String) {
 data class PlaybackMetadata(
     val title: String = "Orpheus Synthesizer",
     val mode: PlaybackMode = PlaybackMode.USER,
-    val isPlaying: Boolean = true
+    val isPlaying: Boolean = true,
+    val subtitle: String? = null,
 ) {
-    /** 
+    /**
      * The subtitle to display based on the current mode.
+     * Uses custom subtitle if provided, otherwise generates from mode.
      * Format: "Playing: AI Drone" or "Paused: Live Code"
      */
-    val subtitle: String
-        get() = if (isPlaying) "Playing: ${mode.displayName}" else "Paused: ${mode.displayName}"
+    val displaySubtitle: String
+        get() = subtitle ?: if (isPlaying) "Playing: ${mode.displayName}" else "Paused: ${mode.displayName}"
 }

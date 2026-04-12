@@ -164,6 +164,64 @@ static bool test_turntable_viz_snapshot() {
     return has_waveform && playhead_ok;
 }
 
+// Simulates Bluetooth chunked callbacks (e.g. 960 = 512 + 448) and verifies
+// that the turntable buffer doesn't contain stale samples from unequal chunks.
+static bool test_turntable_chunked_capture_no_stale_tail() {
+    printf("\n=== Test: Chunked capture has no stale tail ===\n");
+    OrpheusEngine* engine = orpheus_engine_create(48000.0f);
+
+    // Fill bass source buffer with a known signal for chunk 1 (512 frames)
+    float tone_a = 0.1f;
+    for (int i = 0; i < kMaxFrames; i++) {
+        engine->warps_source_buffers[9][i] = tone_a;
+    }
+
+    // Simulate graph_process double-buffer swap + zero for chunk 1 (512 frames)
+    std::memcpy(engine->warps_bass_read, engine->warps_source_buffers[9],
+                kMaxFrames * sizeof(float));
+    // With the fix, this zeros kMaxFrames; without it, only num_frames
+    std::memset(engine->warps_source_buffers[9], 0, kMaxFrames * sizeof(float));
+
+    // Bass voice writes 512 samples for chunk 1
+    float tone_b = 0.2f;
+    for (int i = 0; i < 512; i++) {
+        engine->warps_source_buffers[9][i] = tone_b;
+    }
+
+    // Simulate graph_process for chunk 2 (448 frames) — smaller chunk
+    int chunk2 = 448;
+    std::memcpy(engine->warps_bass_read, engine->warps_source_buffers[9],
+                chunk2 * sizeof(float));
+    // With fix: zeros full kMaxFrames, clearing tail
+    // Without fix: only zeros 448, leaving samples 448-511 = tone_b (stale)
+    std::memset(engine->warps_source_buffers[9], 0, kMaxFrames * sizeof(float));
+
+    // Bass voice writes 448 samples for chunk 2
+    float tone_c = 0.3f;
+    for (int i = 0; i < chunk2; i++) {
+        engine->warps_source_buffers[9][i] = tone_c;
+    }
+
+    // Now simulate NEXT callback, chunk 1 (512 frames) — reads full 512
+    std::memcpy(engine->warps_bass_read, engine->warps_source_buffers[9],
+                512 * sizeof(float));
+
+    // Check: samples 448-511 should be ZERO (properly cleared), not stale tone_b
+    bool tail_clean = true;
+    for (int i = chunk2; i < 512; i++) {
+        if (engine->warps_bass_read[i] != 0.0f) {
+            printf("  FAIL: warps_bass_read[%d] = %.4f (expected 0, stale data)\n",
+                   i, engine->warps_bass_read[i]);
+            tail_clean = false;
+            break;
+        }
+    }
+
+    orpheus_engine_destroy(engine);
+    printf("  Tail samples clean: %s\n", tail_clean ? "PASS" : "FAIL");
+    return tail_clean;
+}
+
 bool run_turntable_tests() {
     printf("\n========== TURNTABLE TESTS ==========\n");
     bool all_pass = true;
@@ -172,6 +230,7 @@ bool run_turntable_tests() {
     all_pass &= test_turntable_freeze_stops_capture();
     all_pass &= test_turntable_crossfader();
     all_pass &= test_turntable_viz_snapshot();
+    all_pass &= test_turntable_chunked_capture_no_stale_tail();
     printf("\nTurntable tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
     return all_pass;
 }

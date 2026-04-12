@@ -1,8 +1,8 @@
 package org.balch.djapp
 
 import android.app.Application
+import android.content.Context
 import dev.zacsweers.metro.createGraphFactory
-import org.balch.orpheus.core.media.ForegroundServiceController
 import org.balch.orpheus.djapp.di.DjAppGraph
 
 class DjAppApplication : Application() {
@@ -14,15 +14,12 @@ class DjAppApplication : Application() {
         super.onCreate()
         graph = createGraphFactory<DjAppGraph.Factory>().create(
             this,
-            NoOpForegroundServiceController,
+            DjForegroundServiceControllerImpl(this),
         )
     }
-}
 
-private object NoOpForegroundServiceController : ForegroundServiceController {
-    override var actionHandler: ((String) -> Unit)? = null
-    override fun start() {}
-    override fun stop() {}
-    override fun updatePlaybackState(isPlaying: Boolean) {}
-    override fun updateMetadata(title: String, mode: String, modeDisplayName: String, isPlaying: Boolean) {}
+    companion object {
+        fun getGraph(context: Context): DjAppGraph =
+            (context.applicationContext as DjAppApplication).graph
+    }
 }

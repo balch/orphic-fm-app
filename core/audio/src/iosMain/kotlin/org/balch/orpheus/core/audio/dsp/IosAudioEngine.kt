@@ -27,6 +27,7 @@ import orpheus_dsp.orpheus_engine_create
 import orpheus_dsp.orpheus_engine_destroy
 import orpheus_dsp.orpheus_engine_get_monitor
 import orpheus_dsp.orpheus_engine_get_port
+import orpheus_dsp.orpheus_engine_get_pulsar_arrangement
 import orpheus_dsp.orpheus_engine_get_pulsar_viz
 import orpheus_dsp.orpheus_engine_get_turntable_viz
 import orpheus_dsp.orpheus_engine_get_viz
@@ -493,6 +494,15 @@ class IosAudioEngine : AudioEngine, NativeDspBridge {
 
     override fun nativeIsTtsPlaying(): Int {
         return engine?.let { orpheus_engine_is_tts_playing(it) } ?: 0
+    }
+
+    @OptIn(ExperimentalForeignApi::class)
+    override fun nativeGetPulsarArrangement(out: IntArray) {
+        engine?.let { eng ->
+            out.usePinned { pinned ->
+                orpheus_engine_get_pulsar_arrangement(eng, pinned.addressOf(0))
+            }
+        }
     }
 
     @OptIn(ExperimentalForeignApi::class)

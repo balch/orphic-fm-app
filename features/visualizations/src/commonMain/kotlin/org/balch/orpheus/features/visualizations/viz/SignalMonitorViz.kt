@@ -13,11 +13,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -29,7 +29,7 @@ import org.balch.orpheus.ui.viz.Visualization
  * Glowing traces on a dark background, low frost for maximum clarity.
  */
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<Visualization>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
 class SignalMonitorViz(
     private val engine: SynthEngine,
 ) : Visualization {

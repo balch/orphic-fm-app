@@ -86,7 +86,8 @@ static bool test_warps_source_levels() {
     // Report source buffer levels
     const char* names[] = {
         "SYNTH", "DRUMS", "REPL", "LFO", "RESO", "WARPS_FB",
-        "FLUX", "BENDER", "STRINGS", "BASS", "TIDES_0", "TIDES_1", "TIDES_2", "TIDES_3"
+        "FLUX", "BENDER", "STRINGS", "BASS", "TIDES_0", "TIDES_1", "TIDES_2", "TIDES_3",
+        "DELAY_SEND", "REVERB_SEND"
     };
     static_assert(sizeof(names)/sizeof(names[0]) >= OrpheusEngine::kNumWarpsSources,
                   "names[] too short for kNumWarpsSources");

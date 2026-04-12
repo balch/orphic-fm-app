@@ -165,8 +165,8 @@ struct OrpheusEngine {
     std::atomic<int>   warps_bypass{1};         // bypassed by default
 
     // ── Warps Source Routing ────────────────────────────
-    static constexpr int kNumWarpsSources = 14;
-    // 0=SYNTH, 1=DRUMS, 2=REPL, 3=LFO, 4=RESONATOR, 5=WARPS(feedback), 6=FLUX, 7=BENDER, 8=STRINGS, 9=BASS, 10=TIDES1, 11=TIDES2, 12=TIDES3, 13=TIDES4
+    static constexpr int kNumWarpsSources = 16;
+    // 0=SYNTH, 1=DRUMS, 2=REPL, 3=LFO, 4=RESONATOR, 5=WARPS(feedback), 6=FLUX, 7=BENDER, 8=STRINGS, 9=BASS, 10=TIDES1, 11=TIDES2, 12=TIDES3, 13=TIDES4, 14=PULSAR_DELAY_SEND, 15=PULSAR_REVERB_SEND
     float warps_source_buffers[kNumWarpsSources][kMaxFrames] = {};
     float warps_feedback_l[kMaxFrames] = {};
     float warps_feedback_r[kMaxFrames] = {};
@@ -631,6 +631,10 @@ struct OrpheusEngine {
     float turntable_duck_drums = 1.0f;
     float turntable_duck_bass  = 1.0f;
 
+    // ── Global mute (play/pause) ──
+    std::atomic<int> global_muted{0};       // 0 = unmuted; DJ app sets 1 on init via AppPlugin
+    float smooth_global_mute{1.0f};         // smoothing state (0=silent, 1=audible)
+
     // Bass double-buffer read (new, for turntable + future use)
     float warps_bass_read[kMaxFrames] = {};
 
@@ -696,6 +700,12 @@ struct OrpheusEngine {
     float pulsar_bus_bass_l[kMaxFrames] = {};
     float pulsar_bus_bass_r[kMaxFrames] = {};
 
+    // Per-track effect send accumulation buses
+    float pulsar_delay_send_l[kMaxFrames] = {};
+    float pulsar_delay_send_r[kMaxFrames] = {};
+    float pulsar_reverb_send_l[kMaxFrames] = {};
+    float pulsar_reverb_send_r[kMaxFrames] = {};
+
     // Pulsar visualization (written by audio thread, read by UI)
     PulsarViz pulsar_viz = {};
     std::atomic<int> pulsar_viz_version{0};
@@ -710,7 +720,7 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_bpm_override{0.0f};  // 0 = follow global tempo
     std::atomic<int> pulsar_root_note{0};      // 0=C, 11=B
     std::atomic<int> pulsar_scale_index{0};    // 0-5 into kPulsarScales
-    std::atomic<float> pulsar_mix{0.0f};       // output level 0-1
+    std::atomic<float> pulsar_mix{0.0f};       // output level 0-1 (Kotlin sets per-app default)
     std::atomic<float> pulsar_perc_mix{0.7f};  // percussion group volume 0-1
     std::atomic<int> pulsar_envelope_mode{0};  // 0=AD, 1=Tides, 2=Blend
     std::atomic<int> pulsar_track_engine_edm[8]{};
@@ -724,6 +734,9 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_morph[8]{};
     std::atomic<int>   pulsar_track_envelope[8]{};
     std::atomic<int>   pulsar_track_percussive[8]{};
+    std::atomic<int>   pulsar_track_bar_strategy[8]{};  // BarStrategy enum (0-4)
+    std::atomic<int>   pulsar_track_markov_contour[8]{};  // 1 = use second-order Markov for note mutation
+    std::atomic<int>   pulsar_step_count{16};           // 16 or 32
 
     // Per-track macro maps (set by Kotlin on vibe load)
     // 8 targets × 2 (min/max) = 16 floats per track
@@ -733,7 +746,6 @@ struct OrpheusEngine {
         std::atomic<float> complexity_swing_min{0.0f}, complexity_swing_max{0.2f};
         std::atomic<float> complexity_var_min{0.0f}, complexity_var_max{0.3f};
         std::atomic<float> space_decay_min{0.2f}, space_decay_max{0.5f};
-        std::atomic<float> space_reverb_min{0.0f}, space_reverb_max{0.3f};
         std::atomic<float> mood_harm_min{0.3f}, mood_harm_max{0.7f};
         std::atomic<float> mood_timbre_min{0.3f}, mood_timbre_max{0.7f};
     };
@@ -745,7 +757,11 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_genre_ghost_prob{0.0f};
     std::atomic<int>   pulsar_genre_note_range_low{36};
     std::atomic<int>   pulsar_genre_note_range_high{72};
-    std::atomic<int>   pulsar_genre_rhythm_pattern{0};
+    std::atomic<float> pulsar_genre_rhythm_density{0.0f};
+    std::atomic<int>   pulsar_genre_progression_style{0};
+    std::atomic<int>   pulsar_genre_chords_per_bar{2};
+    std::atomic<int>   pulsar_chord_matrix_active{0};   // 1 = use custom matrix
+    std::atomic<float> pulsar_chord_matrix[49]{};        // 7x7 row-major
 
     // Lick transfer buffer (written by Kotlin before setting lick_length)
     static constexpr int kMaxLickSteps = 32;
@@ -755,9 +771,148 @@ struct OrpheusEngine {
         float velocity;
     };
     std::atomic<int> pulsar_lick_length{0};        // 0 = no lick (pure generative)
+    std::atomic<int> pulsar_lick_loop_length{0};   // beats; 0 = no rest padding
     LickStepAtomic pulsar_lick[kMaxLickSteps];     // not atomic; guarded by length write order
     std::atomic<float> pulsar_lick_mutation{0.5f};
+    std::atomic<int> pulsar_lick_octave{-1};       // -1 = auto (midpoint of noteRange)
     std::atomic<int64_t> pulsar_seed{0};           // 0 = random seed each load
+
+    // ── Pulsar Tension ──
+    std::atomic<int>   pulsar_tension_inner_bars{4};
+    std::atomic<int>   pulsar_tension_outer_bars{0};
+    std::atomic<float> pulsar_tension_outer_depth{0.5f};
+    std::atomic<float> pulsar_tension_volume{0.3f};
+    std::atomic<float> pulsar_tension_timing{0.2f};
+    std::atomic<int>   pulsar_tension_octave_shift{0};
+    std::atomic<int>   pulsar_tension_key_shift{0};
+    std::atomic<int>   pulsar_tension_half_lick{0};
+    std::atomic<float> pulsar_tension_chromatic_passing{0.0f};
+    std::atomic<float> pulsar_tension_evo_timbre_low{0.25f};
+    std::atomic<float> pulsar_tension_evo_timbre_high{0.55f};
+    std::atomic<float> pulsar_tension_evo_timbre_prob{0.7f};
+    std::atomic<float> pulsar_tension_evo_morph_low{-1.0f};
+    std::atomic<float> pulsar_tension_evo_morph_high{-1.0f};
+    std::atomic<float> pulsar_tension_evo_morph_prob{0.5f};
+    std::atomic<float> pulsar_tension_evo_harm_low{-1.0f};
+    std::atomic<float> pulsar_tension_evo_harm_high{-1.0f};
+    std::atomic<float> pulsar_tension_evo_harm_prob{0.3f};
+    std::atomic<float> pulsar_tension_evo_attack_point{0.5f};
+    std::atomic<float> pulsar_tension_evo_release_speed{0.3f};
+    std::atomic<float> pulsar_track_evo_weight[8] = {
+        {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}
+    };
+
+    // ── Arrangement / Section system ──
+    std::atomic<int>   pulsar_arrangement_active{0};
+    std::atomic<int>   pulsar_arrangement_section_count{0};
+    std::atomic<int>   pulsar_arrangement_intro_index{-1};
+    std::atomic<int>   pulsar_arrangement_outro_index{-1};
+    std::atomic<float> pulsar_section_data[8 * 18] = {};
+    std::atomic<float> pulsar_section_transitions[8 * 8 * 2] = {};
+    std::atomic<float> pulsar_track_solo_behavior[8 * 15] = {};
+    std::atomic<float> pulsar_track_ducking[8 * 6] = {};
+    std::atomic<float> pulsar_track_solo_markov[8 * 15] = {};
+    std::atomic<int>   pulsar_soloist_matrix_active{0};
+    std::atomic<float> pulsar_soloist_matrix[64] = {};  // 8x8 row-major
+    std::atomic<int>   pulsar_arrangement_generation{0};
+
+    // ── Band solo system ──
+    std::atomic<int>   pulsar_band_active{0};
+    std::atomic<int>   pulsar_band_member_count{0};
+    std::atomic<float> pulsar_band_member_data[8 * 12] = {};  // 8 members × 12 floats each
+    std::atomic<float> pulsar_band_handoff_matrix[64] = {};    // 8x8 max
+    std::atomic<float> pulsar_band_pull_in_matrix[64] = {};    // 8x8 max
+    std::atomic<int>   pulsar_band_pull_in_bars_min{2};
+    std::atomic<int>   pulsar_band_pull_in_bars_max{4};
+    std::atomic<float> pulsar_band_improv_carryover{0.7f};
+    std::atomic<float> pulsar_band_probability{0.7f};
+    std::atomic<int>   pulsar_band_bars_per_lead_min{2};
+    std::atomic<int>   pulsar_band_bars_per_lead_max{4};
+
+    // Per-track hold parameters (TEXTURE/FX tracks 5-7)
+    std::atomic<float> pulsar_track_hold_probability[8] = {};
+    std::atomic<int>   pulsar_track_hold_length_min[8] = {};
+    std::atomic<int>   pulsar_track_hold_length_max[8] = {};
+
+    // Per-track mod LFO parameters (TEXTURE/FX modulation)
+    std::atomic<float> pulsar_track_mod_lfo_rate[8] = {};      // Hz (0.05-2.0)
+    std::atomic<float> pulsar_track_mod_lfo_depth[8] = {};     // 0.0-1.0
+    std::atomic<float> pulsar_track_mod_lfo_shape[8] = {};     // 0.0-1.0 (PolyLfo shape morph)
+    std::atomic<float> pulsar_track_mod_lfo_coupling[8] = {};  // 0.0-1.0
+
+    // Track mute (0=enabled, 1=muted) — UI toggle, not persisted
+    std::atomic<int>   pulsar_track_mute[8] = {};
+
+    // Per-track delay/reverb sends
+    std::atomic<float> pulsar_track_delay_send[8] = {};
+    std::atomic<float> pulsar_track_reverb_send[8] = {};
+
+    // Per-track note range overrides (0 = use genre default)
+    std::atomic<int>   pulsar_track_note_range_low[8] = {};
+    std::atomic<int>   pulsar_track_note_range_high[8] = {};
+    // Per-track reverb send brightness (0-1, default 0.5)
+    std::atomic<float> pulsar_track_reverb_brightness[8] = {};
+    // Per-track density override (-1 = use genre, 0-1 = override)
+    std::atomic<float> pulsar_track_density_override[8] = {};
+    // Per-track delay feedback (-1 = use global, 0-0.95 = override)
+    std::atomic<float> pulsar_track_delay_feedback[8] = {};
+    // Per-track glide rate (0 = instant, 1 = very slow ~2s)
+    std::atomic<float> pulsar_track_glide_rate[8] = {};
+    // Per-track lick usage (0 = no lick, 1 = use vibe lick)
+    std::atomic<int>   pulsar_track_use_lick[8] = {};
+
+    // ── Pulsar Dedicated Delay ────────────────────────
+    // Separate delay instance for Pulsar sends, independent from the shared voice delay.
+    static constexpr int kPulsarMaxDelaySamples = 96000 * 2;  // 2s at 96kHz
+    float pulsar_delay_buf_1l[kPulsarMaxDelaySamples] = {};
+    float pulsar_delay_buf_1r[kPulsarMaxDelaySamples] = {};
+    float pulsar_delay_buf_2l[kPulsarMaxDelaySamples] = {};
+    float pulsar_delay_buf_2r[kPulsarMaxDelaySamples] = {};
+    int   pulsar_delay_write_pos{0};
+
+    std::atomic<float> pulsar_delay_time_a{0.3f};
+    std::atomic<float> pulsar_delay_time_b{0.35f};
+    std::atomic<float> pulsar_delay_feedback{0.4f};
+    std::atomic<float> pulsar_delay_damping{0.5f};
+    std::atomic<int>   pulsar_delay_bypass{0};  // active by default (DEEP controls wet)
+
+    float pulsar_delay_time_a_smooth{0.0f};
+    float pulsar_delay_time_b_smooth{0.0f};
+    float pulsar_smooth_delay_feedback{0.4f};
+
+    // ── Pulsar Dedicated Reverb ──────────────────────
+    // Separate reverb for Pulsar sends, independent from the shared voice reverb.
+    // Dattorro plate — same topology as shared reverb, separate state.
+    static constexpr int kPulsarReverbBufSize = 16384;  // must cover 96kHz (del2_len=12624)
+    float pulsar_rv_ap1[kPulsarReverbBufSize] = {};
+    float pulsar_rv_ap2[kPulsarReverbBufSize] = {};
+    float pulsar_rv_ap3[kPulsarReverbBufSize] = {};
+    float pulsar_rv_ap4[kPulsarReverbBufSize] = {};
+    float pulsar_rv_dly1[kPulsarReverbBufSize] = {};
+    float pulsar_rv_dly2[kPulsarReverbBufSize] = {};
+    float pulsar_rv_dly3[kPulsarReverbBufSize] = {};
+    float pulsar_rv_dly4[kPulsarReverbBufSize] = {};
+    float pulsar_rv_ap5[kPulsarReverbBufSize] = {};
+    float pulsar_rv_ap6[kPulsarReverbBufSize] = {};
+    int   pulsar_rv_write_pos{0};
+
+    float pulsar_rv_lfo_phase{0.0f};
+    float pulsar_rv_lfo2_phase{0.37f};
+    float pulsar_rv_lfo_value{0.0f};
+    float pulsar_rv_lfo2_value{0.0f};
+    float pulsar_rv_lp_decay1{0.0f};
+    float pulsar_rv_lp_decay2{0.0f};
+
+    std::atomic<float> pulsar_reverb_amount{0.6f};
+    std::atomic<float> pulsar_reverb_time{0.6f};
+    std::atomic<float> pulsar_reverb_damping{0.5f};
+    std::atomic<float> pulsar_reverb_diffusion{0.625f};
+    std::atomic<int>   pulsar_reverb_bypass{0};  // active by default
+
+    float smooth_pulsar_reverb_amount{0.0f};
+    float smooth_pulsar_reverb_time{0.6f};
+    float smooth_pulsar_reverb_damping{0.5f};
+    float smooth_pulsar_reverb_diffusion{0.625f};
 
     // ── Signal visualization ring buffers ──
     // Written by audio thread (one sample per block), read by UI at ~60fps.

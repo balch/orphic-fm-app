@@ -8,11 +8,12 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.visualizations.viz.shader.MetaballsCanvas
 import org.balch.orpheus.features.visualizations.viz.shader.MetaballsConfig
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
@@ -57,7 +58,7 @@ data class LavaBlob(
  * Shader Lamp - High-performance lava lamp style visualization.
  */
 @Inject
-@ContributesIntoSet(AppScope::class)
+@ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
 class ShaderLampViz(
     private val engine: SynthEngine,
     private val dispatcherProvider: DispatcherProvider,
