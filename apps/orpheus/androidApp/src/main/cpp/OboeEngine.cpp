@@ -39,7 +39,8 @@ oboe::Result OboeEngine::open() {
     dsp_engine_.store(orpheus_engine_create(sr), std::memory_order_release);
 
     LOGI("Stream opened: sampleRate=%d, framesPerBurst=%d, dsp_engine=%p",
-         mStream->getSampleRate(), mStream->getFramesPerBurst(), dsp_engine_);
+         mStream->getSampleRate(), mStream->getFramesPerBurst(),
+         dsp_engine_.load(std::memory_order_relaxed));
     return oboe::Result::OK;
 }
 
