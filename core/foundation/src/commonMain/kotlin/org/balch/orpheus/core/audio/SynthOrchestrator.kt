@@ -59,9 +59,16 @@ class SynthOrchestrator(
         // Subscribe to MediaSessionStateManager to auto-activate/deactivate MediaSession
         scope.launch {
             mediaSessionStateManager.isMediaSessionNeeded.collect { needed ->
-                if (needed && !isMediaSessionActive && isStarted) {
-                    log.debug { "MediaSession needed - activating (source: ${mediaSessionStateManager.activeSource.value})" }
-                    activateMediaSession()
+                if (needed && !isMediaSessionActive) {
+                    if (!isStarted) {
+                        // Engine was stopped (e.g., via notification Stop button).
+                        // Restart it so the user can resume from the UI.
+                        log.debug { "MediaSession needed but engine stopped - restarting" }
+                        start()
+                    } else {
+                        log.debug { "MediaSession needed - activating (source: ${mediaSessionStateManager.activeSource.value})" }
+                        activateMediaSession()
+                    }
                 } else if (!needed && isMediaSessionActive) {
                     log.debug { "MediaSession no longer needed - deactivating" }
                     deactivateMediaSession()
@@ -135,6 +142,13 @@ class SynthOrchestrator(
             isStarted = true
             isPaused = false
             log.debug { "SynthOrchestrator: Engine started (media session not yet active)" }
+
+            // Re-check: if isMediaSessionNeeded became true before isStarted,
+            // the collector already skipped activation. Activate now.
+            if (mediaSessionStateManager.isMediaSessionNeeded.value && !isMediaSessionActive) {
+                log.debug { "MediaSession was needed before engine started - activating now" }
+                activateMediaSession()
+            }
         }
     }
 

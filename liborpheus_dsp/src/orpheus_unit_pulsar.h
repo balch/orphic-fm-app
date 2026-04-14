@@ -222,12 +222,10 @@ struct TensionParams {
     float evo_attack_point = 0.5f;
     float evo_release_speed = 0.3f;
     float track_evo_weight[8] = {-1,-1,-1,-1,-1,-1,-1,-1};
+    float spurt_chance = 0.0f;  // per-bar random spurt probability (0 = tension-only)
 };
 
 // ── Section system parameters ───────────────────────────────────────
-
-enum class SoloMode : uint8_t { ROUND_ROBIN = 0, EXTENDED = 1, IMPROVISERS = 2 };
-enum class SelectionMode : uint8_t { FIXED_ORDER = 0, MARKOV = 1, WEIGHTED_RANDOM = 2 };
 
 struct SectionTransitionParam {
     int target_index;
@@ -239,15 +237,6 @@ struct MacroOverridesParam {
     float complexity = -1.0f;
     float space = -1.0f;
     float mood = -1.0f;
-};
-
-struct SoloistSelectionParam {
-    SelectionMode mode = SelectionMode::WEIGHTED_RANDOM;
-    int order[kNumPulsarTracks] = {};
-    int order_count = 0;
-    float weights[kNumPulsarTracks] = {};
-    float recency_decay = 0.5f;
-    bool allow_effects = true;
 };
 
 struct SoloBehaviorParam {
@@ -284,18 +273,6 @@ struct DuckingParam {
     float reverb_boost = 0.1f;
 };
 
-struct SoloConfigParam {
-    SoloMode mode = SoloMode::ROUND_ROBIN;
-    float probability = 0.5f;
-    SoloistSelectionParam soloist_selection;
-    int bars_per_soloist_min = 2, bars_per_soloist_max = 4;
-    int transition_bars = 0;
-    float improv_carryover = 0.7f;
-    // Markov soloist handoff matrix (8x8, row=from, col=to)
-    bool has_soloist_matrix = false;
-    float soloist_matrix[kNumPulsarTracks][kNumPulsarTracks] = {};
-};
-
 struct MotifParam {
     float track_densities[kNumPulsarTracks] = {};
     bool track_density_active[kNumPulsarTracks] = {};
@@ -313,6 +290,13 @@ struct MotifSetParam {
     float switch_probability = 0.6f;
 };
 
+enum class SoloModeId : uint8_t {
+    NONE         = 0,
+    LONG_FILL    = 1,
+    LICK_BUILDER = 2,
+    JAM          = 3,
+};
+
 struct SectionParam {
     int bars_min = 4, bars_max = 8;
     SectionTransitionParam transitions[kMaxSectionTransitions];
@@ -322,8 +306,12 @@ struct SectionParam {
     MacroOverridesParam macro_overrides;
     bool has_tension_override = false;
     TensionParams tension_override;
-    bool has_solo = false;
-    SoloConfigParam solo_config;
+    SoloModeId solo_mode = SoloModeId::NONE;
+    float solo_probability = 0.0f;
+    float solo_mutation_rate = 0.5f;    // LickBuilder only
+    float solo_lick_influence = 0.5f;   // Jam only
+    int solo_bars_min = 2;              // LongFill only
+    int solo_bars_max = 4;              // LongFill only
     bool has_motif_set = false;
     MotifSetParam motif_set;
 };
@@ -351,30 +339,8 @@ struct SectionState {
     float target_space = -1.0f, target_mood = -1.0f;
 };
 
-struct SoloState {
-    bool active = false;
-    int current_soloist = -1;
-    int bars_remaining = 0;
-    SoloMode mode = SoloMode::ROUND_ROBIN;
-    int8_t last_phrase[kMaxSoloPhrase] = {};
-    int phrase_cursor = 0;
-    int markov_state = 0;
-    int soloists_visited = 0;
-    int bars_since_soloist[kNumPulsarTracks] = {};
-    int order_cursor = 0;
-};
-
 // ── Band-based solo system ──────────────────────────────────────────
 static constexpr int kMaxBandMembers = 8;
-
-enum class SoloTechniqueId : uint8_t {
-    STANDARD_MARKOV = 0,
-    LICK_MELODY     = 1,
-    LICK_RHYTHM     = 2,
-    LICK_CONTOUR    = 3,
-    FILL_BUILDER    = 4,
-    MARKOV_CONTOUR  = 5,  // opt-in: regenerate patterns via second-order Markov
-};
 
 enum class MemberSoloRole : uint8_t {
     SUPPORT  = 0,
@@ -386,7 +352,10 @@ struct BandMemberParam {
     int tracks[kNumPulsarTracks] = {};
     int track_count = 0;
     bool always_active = false;
-    SoloTechniqueId default_technique = SoloTechniqueId::STANDARD_MARKOV;
+    float loudness = 0.5f;
+    float creativity = 0.5f;
+    float swing_amount = 0.0f;
+    float drag_amount = 0.0f;
 };
 
 struct BandSoloConfigParam {
@@ -406,7 +375,6 @@ struct BandSoloState {
     MemberSoloRole member_role[kMaxBandMembers] = {};
     int member_bars_remaining[kMaxBandMembers] = {};
     int bars_since_lead[kMaxBandMembers] = {};
-    SoloTechniqueId active_technique[kMaxBandMembers] = {};
     int8_t last_phrase[kMaxSoloPhrase] = {};
     int phrase_cursor = 0;
     uint32_t solo_seed = 0;
@@ -448,9 +416,14 @@ struct PulsarState {
     // Lick state (copied from engine atomics on vibe load)
     int lick_length;      // actual step count (array bounds)
     int lick_loop_length; // beats; when > note duration sum, rest fills the gap
-    PulsarLickStep lick[kMaxLickSteps];
+    PulsarLickStep lick[kMaxLickSteps];           // working copy (drifts over time)
+    PulsarLickStep original_lick[kMaxLickSteps];  // immutable copy from Kotlin
     float lick_mutation;
     int lick_octave;  // -1 = auto (midpoint of noteRange), 0-8 = explicit MIDI octave
+
+    // Lick evolution spurt state
+    bool in_spurt = false;
+    int spurt_bars_remaining = 0;
 
     // Chord progression state
     PulsarChordState chord_state;
@@ -468,7 +441,6 @@ struct PulsarState {
     // Section / Solo / Motif system
     ArrangementParams arrangement;
     SectionState section_state;
-    SoloState solo_state;
     MotifState motif_state;
     SoloBehaviorParam track_solo_behavior[kNumPulsarTracks];
     DuckingParam track_ducking[kNumPulsarTracks];
@@ -477,6 +449,13 @@ struct PulsarState {
     BandSoloState band_solo_state;
     BandSoloConfigParam band_solo_config;
     bool has_band_solo = false;
+
+    // Living lick state for LickBuilder/Jam modes
+    int8_t live_lick_degrees[32] = {};
+    float live_lick_durations[32] = {};
+    float live_lick_velocities[32] = {};
+    int live_lick_length = 0;
+    bool live_lick_active = false;
 
     // Arrangement read-back (written by audio thread, read by viz polling)
     // relaxed atomics: zero overhead on ARM/x86 for aligned ints, standards-compliant

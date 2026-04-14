@@ -179,93 +179,6 @@ inline DuckingParam default_ducking(PulsarEnvelopeProfile profile) {
     return param;
 }
 
-// ── Soloist selection ──────────────────────────────────────────────────
-
-inline int select_soloist(
-    const SoloConfigParam& config,
-    const SoloState& state,
-    const PulsarTrackState* tracks,
-    uint32_t& seed
-) {
-    const SoloistSelectionParam& sel = config.soloist_selection;
-
-    // FIXED_ORDER mode: cycle through order[] array
-    if (sel.mode == SelectionMode::FIXED_ORDER && sel.order_count > 0) {
-        int cursor = state.order_cursor % sel.order_count;
-        return sel.order[cursor];
-    }
-
-    // MARKOV mode: use transition matrix row from current soloist
-    if (sel.mode == SelectionMode::MARKOV && config.has_soloist_matrix) {
-        int from = state.current_soloist;
-        if (from < 0 || from >= kNumPulsarTracks) from = 0;
-
-        float weights[kNumPulsarTracks];
-        float total = 0.0f;
-
-        for (int i = 0; i < kNumPulsarTracks; i++) {
-            float base = config.soloist_matrix[from][i];
-            if (base <= 0.0f) { weights[i] = 0.0f; continue; }
-
-            // Apply recency decay on top of matrix weights
-            int bars_ago = state.bars_since_soloist[i];
-            float recency = 1.0f;
-            for (int p = 0; p < bars_ago && p < 32; p++)
-                recency *= sel.recency_decay;
-            weights[i] = base * (0.05f + 0.95f * (1.0f - recency));
-            total += weights[i];
-        }
-
-        if (total > 0.0f) {
-            float roll = pattern_rand01(seed) * total;
-            float cumulative = 0.0f;
-            for (int i = 0; i < kNumPulsarTracks; i++) {
-                cumulative += weights[i];
-                if (roll <= cumulative) return i;
-            }
-            return kNumPulsarTracks - 1;
-        }
-        // Fallthrough to WEIGHTED_RANDOM if matrix row is all zeros
-    }
-
-    // WEIGHTED_RANDOM: apply recency decay to weights
-    float weights[kNumPulsarTracks];
-    float total = 0.0f;
-
-    for (int i = 0; i < kNumPulsarTracks; i++) {
-        float base = sel.weights[i];
-        if (base <= 0.0f) continue;
-
-        int bars_ago = state.bars_since_soloist[i];
-        float recency = 1.0f;
-        for (int p = 0; p < bars_ago && p < 32; p++) {
-            recency *= sel.recency_decay;
-        }
-
-        weights[i] = base * (0.05f + 0.95f * (1.0f - recency));
-        total += weights[i];
-    }
-
-    if (total <= 0.0f) {
-        // Fallback: uniform distribution
-        for (int i = 0; i < kNumPulsarTracks; i++) {
-            weights[i] = 1.0f;
-        }
-        total = static_cast<float>(kNumPulsarTracks);
-    }
-
-    float roll = pattern_rand01(seed) * total;
-    float cumulative = 0.0f;
-    for (int i = 0; i < kNumPulsarTracks; i++) {
-        cumulative += weights[i];
-        if (roll <= cumulative) {
-            return i;
-        }
-    }
-
-    return kNumPulsarTracks - 1;
-}
-
 // ── Apply solo modifiers to all tracks ─────────────────────────────────
 
 inline void apply_solo_modifiers(
@@ -401,7 +314,7 @@ inline int markov_next_note(
 // ── IMPROVISERS handoff: bias next behavior toward continuing phrase ──
 
 inline void improvisers_handoff(
-    const SoloState& state,
+    const BandSoloState& state,
     float carryover,  // 0.0-1.0: how much to bias toward last phrase
     SoloBehaviorParam& next_behavior,
     uint32_t& seed
@@ -443,122 +356,10 @@ inline void improvisers_handoff(
     }
 }
 
-// ── Initialize solo state ──────────────────────────────────────────────
-
-inline void start_solo(
-    SoloState& state,
-    const SoloConfigParam& config,
-    PulsarTrackState* tracks,
-    const SoloBehaviorParam* track_solo_behavior,
-    const DuckingParam* track_ducking,
-    uint32_t& seed,
-    int num_tracks = kNumPulsarTracks
-) {
-    // Probability gate: should solo even start?
-    if (pattern_rand01(seed) > config.probability) {
-        state.active = false;
-        clear_solo_modifiers(tracks, num_tracks);
-        return;
-    }
-
-    state.active = true;
-    state.mode = config.mode;
-    state.phrase_cursor = 0;
-    std::memset(state.last_phrase, -1, sizeof(state.last_phrase));
-
-    // Randomize initial solo duration
-    int range = config.bars_per_soloist_max - config.bars_per_soloist_min + 1;
-    state.bars_remaining = config.bars_per_soloist_min +
-                           static_cast<int>(pattern_rand01(seed) * range) % range;
-
-    // Select first soloist
-    state.current_soloist = select_soloist(config, state, tracks, seed);
-    state.soloists_visited = 1;
-    state.order_cursor = 0;
-
-    // Reset bars_since tracking
-    for (int i = 0; i < num_tracks; i++) {
-        state.bars_since_soloist[i] = 0;
-    }
-    state.bars_since_soloist[state.current_soloist] = 0;
-
-    // Apply modifiers for first soloist
-    apply_solo_modifiers(tracks, state.current_soloist,
-                        track_solo_behavior[state.current_soloist],
-                        track_ducking[state.current_soloist],
-                        num_tracks);
-}
-
-// ── Advance solo to next bar/soloist ───────────────────────────────────
-
-inline void advance_solo(
-    SoloState& state,
-    const SoloConfigParam& config,
-    PulsarTrackState* tracks,
-    const SoloBehaviorParam* track_solo_behavior,
-    const DuckingParam* track_ducking,
-    uint32_t& seed,
-    int num_tracks = kNumPulsarTracks
-) {
-    if (!state.active) return;
-
-    // Update bars_since for all tracks
-    for (int i = 0; i < num_tracks; i++) {
-        state.bars_since_soloist[i]++;
-    }
-    state.bars_since_soloist[state.current_soloist] = 0;
-
-    state.bars_remaining--;
-
-    if (state.bars_remaining > 0) {
-        return;  // Still in current solo
-    }
-
-    // Bar boundary: decide what happens next
-    if (state.mode == SoloMode::EXTENDED) {
-        // EXTENDED: solo ends when bars_remaining expires
-        state.active = false;
-        clear_solo_modifiers(tracks, num_tracks);
-        return;
-    }
-
-    // ROUND_ROBIN or IMPROVISERS: pick next soloist
-    int next_soloist = select_soloist(config, state, tracks, seed);
-
-    // IMPROVISERS: apply handoff bias to next soloist's behavior
-    if (state.mode == SoloMode::IMPROVISERS) {
-        SoloBehaviorParam biased_behavior = track_solo_behavior[next_soloist];
-        improvisers_handoff(state, config.improv_carryover, biased_behavior, seed);
-        // Note: The biased behavior should be applied when rendering the next soloist's notes.
-        // For now, we just advance the state; the caller handles re-application.
-    }
-
-    state.current_soloist = next_soloist;
-    state.soloists_visited++;
-    state.order_cursor = (state.order_cursor + 1) % config.soloist_selection.order_count;
-
-    // Reset phrase for new soloist (or carry over for IMPROVISERS)
-    if (state.mode != SoloMode::IMPROVISERS) {
-        state.phrase_cursor = 0;
-        std::memset(state.last_phrase, -1, sizeof(state.last_phrase));
-    }
-
-    // Randomize bars for next soloist
-    int range = config.bars_per_soloist_max - config.bars_per_soloist_min + 1;
-    state.bars_remaining = config.bars_per_soloist_min +
-                           static_cast<int>(pattern_rand01(seed) * range) % range;
-
-    // Apply modifiers for new soloist
-    apply_solo_modifiers(tracks, state.current_soloist,
-                        track_solo_behavior[state.current_soloist],
-                        track_ducking[state.current_soloist],
-                        num_tracks);
-}
-
 // ── Record note in solo phrase history ─────────────────────────────────
 
 inline void record_solo_note(
-    SoloState& state,
+    BandSoloState& state,
     int scale_degree
 ) {
     if (state.phrase_cursor < kMaxSoloPhrase) {

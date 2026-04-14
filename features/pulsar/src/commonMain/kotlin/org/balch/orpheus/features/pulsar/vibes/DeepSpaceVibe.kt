@@ -5,8 +5,8 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.features.pulsar.Arrangement
+import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
-import org.balch.orpheus.features.pulsar.BandSoloConfig
 import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
@@ -22,7 +22,7 @@ import org.balch.orpheus.features.pulsar.RootNote
 import org.balch.orpheus.features.pulsar.ScaleType
 import org.balch.orpheus.features.pulsar.Section
 import org.balch.orpheus.features.pulsar.SectionTransition
-import org.balch.orpheus.features.pulsar.SoloTechnique
+import org.balch.orpheus.features.pulsar.SoloMode
 import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TrackMacroMap
 import org.balch.orpheus.features.pulsar.TrackVoice
@@ -60,6 +60,38 @@ class DeepSpaceVibe : VibeProvider {
         ),
         lickMutation = 0.6f,
         lickOctave = 3,        // octave 3 (MIDI 37-49, deep bass)
+        band = Band(
+            members = listOf(
+                BandMember("Rhythm", listOf(0, 1, 2), alwaysActive = true,
+                    loudness = 0.7f, creativity = 0.4f, swing = 0.08f, drag = -0.05f),
+                BandMember("Bassist", listOf(3),
+                    loudness = 0.5f, creativity = 0.5f, swing = 0.0f, drag = 0.1f),
+                BandMember("Keys", listOf(4),
+                    loudness = 0.5f, creativity = 0.6f, swing = 0.0f, drag = 0.1f),
+                BandMember("Guitar", listOf(5),
+                    loudness = 0.4f, creativity = 0.7f, swing = 0.0f, drag = 0.15f),
+                BandMember("Textures", listOf(6, 7),
+                    loudness = 0.3f, creativity = 0.8f, swing = 0.0f, drag = 0.15f),
+            ),
+            handoffMatrix = bandMatrix(
+                //             RHYTHM BASS  KEYS  GUITAR TEX
+                "Rhythm"   to row(0.00f, 0.40f, 0.25f, 0.25f, 0.10f),
+                "Bassist"  to row(0.15f, 0.00f, 0.35f, 0.35f, 0.15f),
+                "Keys"     to row(0.10f, 0.35f, 0.00f, 0.40f, 0.15f),
+                "Guitar"   to row(0.10f, 0.30f, 0.35f, 0.00f, 0.25f),
+                "Textures" to row(0.10f, 0.30f, 0.25f, 0.35f, 0.00f),
+            ),
+            pullInMatrix = bandMatrix(
+                //             RHYTHM BASS  KEYS  GUITAR TEX
+                "Rhythm"   to row(0.00f, 0.30f, 0.20f, 0.20f, 0.05f),
+                "Bassist"  to row(0.20f, 0.00f, 0.40f, 0.30f, 0.10f),
+                "Keys"     to row(0.15f, 0.35f, 0.00f, 0.35f, 0.10f),
+                "Guitar"   to row(0.10f, 0.25f, 0.30f, 0.00f, 0.20f),
+                "Textures" to row(0.10f, 0.20f, 0.20f, 0.30f, 0.00f),
+            ),
+            pullInBarsMin = 2, pullInBarsMax = 4,
+            barsPerLeadMin = 2, barsPerLeadMax = 6,
+        ),
         energy = 0.35f,
         complexity = 0.75f,
         space = 0.85f,
@@ -257,39 +289,7 @@ class DeepSpaceVibe : VibeProvider {
                     macroOverrides = MacroOverrides(
                         energy = 1.3f, complexity = 1.0f, space = 0.9f,
                     ),
-                    bandSoloConfig = BandSoloConfig(
-                        members = listOf(
-                            BandMember("Rhythm", listOf(0, 1, 2), alwaysActive = true,
-                                techniques = listOf(SoloTechnique.LICK_RHYTHM, SoloTechnique.FILL_BUILDER)),
-                            BandMember("Bassist", listOf(3),
-                                techniques = listOf(SoloTechnique.LICK_MELODY)),
-                            BandMember("Keys", listOf(4),
-                                techniques = listOf(SoloTechnique.LICK_MELODY)),
-                            BandMember("Guitar", listOf(5),
-                                techniques = listOf(SoloTechnique.LICK_CONTOUR)),
-                            BandMember("Textures", listOf(6, 7),
-                                techniques = listOf(SoloTechnique.LICK_CONTOUR)),
-                        ),
-                        handoffMatrix = bandMatrix(
-                            //             RHYTHM BASS  KEYS  GUITAR TEX
-                            "Rhythm"  to row(0.00f, 0.40f, 0.25f, 0.25f, 0.10f),
-                            "Bassist" to row(0.15f, 0.00f, 0.35f, 0.35f, 0.15f),
-                            "Keys"    to row(0.10f, 0.35f, 0.00f, 0.40f, 0.15f),
-                            "Guitar"  to row(0.10f, 0.30f, 0.35f, 0.00f, 0.25f),
-                            "Textures" to row(0.10f, 0.30f, 0.25f, 0.35f, 0.00f),
-                        ),
-                        pullInMatrix = bandMatrix(
-                            //             RHYTHM BASS  KEYS  GUITAR TEX
-                            "Rhythm"  to row(0.00f, 0.30f, 0.20f, 0.20f, 0.05f),
-                            "Bassist" to row(0.20f, 0.00f, 0.40f, 0.30f, 0.10f),
-                            "Keys"    to row(0.15f, 0.35f, 0.00f, 0.35f, 0.10f),
-                            "Guitar"  to row(0.10f, 0.25f, 0.30f, 0.00f, 0.20f),
-                            "Textures" to row(0.10f, 0.20f, 0.20f, 0.30f, 0.00f),
-                        ),
-                        pullInBarsMin = 2, pullInBarsMax = 4,
-                        improvCarryover = 0.65f,
-                        barsPerLeadMin = 2, barsPerLeadMax = 6,
-                    ),
+                    soloMode = SoloMode.LickBuilder(probability = 0.7f, mutationRate = 0.6f),
                 ),
                 // 2: void — the atonal middle section, wind and seagulls
                 Section(
@@ -317,39 +317,7 @@ class DeepSpaceVibe : VibeProvider {
                     macroOverrides = MacroOverrides(
                         energy = 1.6f, complexity = 1.2f, space = 1.0f, mood = 1.1f,
                     ),
-                    bandSoloConfig = BandSoloConfig(
-                        members = listOf(
-                            BandMember("Rhythm", listOf(0, 1, 2), alwaysActive = true,
-                                techniques = listOf(SoloTechnique.LICK_RHYTHM, SoloTechnique.FILL_BUILDER)),
-                            BandMember("Bassist", listOf(3),
-                                techniques = listOf(SoloTechnique.LICK_MELODY)),
-                            BandMember("Keys", listOf(4),
-                                techniques = listOf(SoloTechnique.LICK_MELODY)),
-                            BandMember("Guitar", listOf(5),
-                                techniques = listOf(SoloTechnique.LICK_CONTOUR)),
-                            BandMember("Textures", listOf(6, 7),
-                                techniques = listOf(SoloTechnique.LICK_CONTOUR)),
-                        ),
-                        handoffMatrix = bandMatrix(
-                            //             RHYTHM BASS  KEYS  GUITAR TEX
-                            "Rhythm"  to row(0.00f, 0.30f, 0.25f, 0.30f, 0.15f),
-                            "Bassist" to row(0.10f, 0.00f, 0.30f, 0.40f, 0.20f),
-                            "Keys"    to row(0.10f, 0.25f, 0.00f, 0.45f, 0.20f),
-                            "Guitar"  to row(0.10f, 0.25f, 0.30f, 0.00f, 0.35f),
-                            "Textures" to row(0.10f, 0.25f, 0.25f, 0.40f, 0.00f),
-                        ),
-                        pullInMatrix = bandMatrix(
-                            //             RHYTHM BASS  KEYS  GUITAR TEX
-                            "Rhythm"  to row(0.00f, 0.30f, 0.25f, 0.25f, 0.10f),
-                            "Bassist" to row(0.20f, 0.00f, 0.35f, 0.35f, 0.15f),
-                            "Keys"    to row(0.15f, 0.30f, 0.00f, 0.40f, 0.15f),
-                            "Guitar"  to row(0.10f, 0.20f, 0.30f, 0.00f, 0.25f),
-                            "Textures" to row(0.10f, 0.20f, 0.25f, 0.35f, 0.00f),
-                        ),
-                        pullInBarsMin = 2, pullInBarsMax = 4,
-                        improvCarryover = 0.75f,
-                        barsPerLeadMin = 2, barsPerLeadMax = 4,
-                    ),
+                    soloMode = SoloMode.LickBuilder(probability = 0.8f, mutationRate = 0.6f),
                 ),
             ),
         ),

@@ -419,6 +419,7 @@ data class TensionProfile(
     val tonal: TonalTension = TonalTension(),
     val timing: Float = 0.2f,
     val evolution: EvolutionTension = EvolutionTension(),
+    val spurtChance: Float = 0.0f,  // per-bar random spurt probability (0 = tension-only)
 )
 
 /**
@@ -463,6 +464,7 @@ data class Vibe(
     val lick: Lick? = null,
     val lickMutation: Float = 0.5f,
     val lickOctave: Int = -1,
+    val band: Band? = null,
     val seed: Int = 0,
     val bpm: Float,
     val envelopeType: EnvelopeType = EnvelopeType.AD,
@@ -542,45 +544,6 @@ data class SectionTransition(
     val weight: Float,
 )
 
-/**
- * How solos rotate between tracks in a section.
- * - ROUND_ROBIN: Each eligible track gets a turn, cycling in order.
- * - EXTENDED: One soloist plays for an extended period before passing.
- * - IMPROVISERS: Multiple tracks solo simultaneously, trading phrases.
- */
-@Serializable
-enum class SoloMode {
-    ROUND_ROBIN,
-    EXTENDED,
-    IMPROVISERS,
-}
-
-/** How the next soloist is chosen. */
-@Serializable
-enum class SelectionMode {
-    FIXED_ORDER,
-    MARKOV,
-    WEIGHTED_RANDOM,
-}
-
-/**
- * Controls which tracks get picked for solos and in what order.
- * @param mode Selection algorithm (FIXED_ORDER, MARKOV chain, or WEIGHTED_RANDOM).
- * @param order Explicit track indices for FIXED_ORDER mode.
- * @param weights Per-track solo probability weights for WEIGHTED_RANDOM mode.
- * @param recencyDecay How much to penalize recently-soloed tracks, 0-1. Higher = more variety.
- * @param allowEffects Whether effect/texture tracks (5-7) are eligible for solos.
- * @param transitionMatrix Optional NxN Markov matrix for soloist-to-soloist transitions.
- */
-@Serializable
-data class SoloistSelection(
-    val mode: SelectionMode = SelectionMode.WEIGHTED_RANDOM,
-    val order: List<Int>? = null,
-    val weights: List<Float>? = null,
-    val recencyDecay: Float = 0.5f,
-    val allowEffects: Boolean = true,
-    val transitionMatrix: List<Float>? = null,
-)
 
 /**
  * Markov chain config for melodic solo generation. Controls how notes are chosen
@@ -729,38 +692,26 @@ data class DuckingProfile(
     val reverbBoost: Float = 0.1f,
 )
 
-/**
- * Solo note-generation algorithm.
- * - STANDARD_MARKOV: Random walks using interval weights (most common)
- * - LICK_MELODY: Plays the lick's melody with embellishments
- * - LICK_RHYTHM: Uses the lick's rhythm but with different notes
- * - LICK_CONTOUR: Follows the lick's melodic contour (up/down) with different intervals
- * - FILL_BUILDER: Builds drum fills with increasing density toward bar boundaries
- */
-@Serializable
-enum class SoloTechnique {
-    STANDARD_MARKOV,
-    LICK_MELODY,
-    LICK_RHYTHM,
-    LICK_CONTOUR,
-    FILL_BUILDER,
-}
 
 /**
  * A "band member" — a named group of tracks that solo together.
  * @param name Display name (e.g., "Rhythm Section", "Keys", "FX").
  * @param tracks Track indices this member controls (e.g., [0,1,2] for drums).
  * @param alwaysActive If true, this member never ducks (e.g., drums keep playing).
- * @param techniques Solo algorithms this member can use.
- * @param defaultTechnique Starting technique.
+ * @param loudness Relative output level for this member, 0-1.
+ * @param creativity How much this member varies from the base pattern, 0-1.
+ * @param swing Timing swing amount for this member, 0-1.
+ * @param drag Timing drag (behind the beat) for this member, 0-1.
  */
 @Serializable
 data class BandMember(
     val name: String,
     val tracks: List<Int>,
     val alwaysActive: Boolean = false,
-    val techniques: List<SoloTechnique> = listOf(SoloTechnique.STANDARD_MARKOV),
-    val defaultTechnique: SoloTechnique = techniques.first(),
+    val loudness: Float = 0.5f,
+    val creativity: Float = 0.5f,
+    val swing: Float = 0.0f,
+    val drag: Float = 0.0f,
 )
 
 /**
@@ -813,56 +764,61 @@ fun chordMatrix(vararg rows: Pair<String, List<Float>>): List<Float> {
     return result
 }
 
+
 /**
- * Band-style solo system where named groups of tracks take turns leading.
- * More structured than [SoloConfig] — models a real band with handoffs.
+ * A reusable band definition — the cast of characters for a vibe.
+ * Defines members, their track assignments, and interaction matrices.
+ * Referenced by [Vibe.band], used by [SoloMode] sections in the arrangement.
  *
- * @param members The band members (named track groups).
- * @param handoffMatrix NxN Markov matrix: probability of member i passing the lead to member j.
- *   Build with [bandMatrix]. Diagonal should be 0 (can't hand off to yourself).
- * @param pullInMatrix NxN matrix: probability of member i pulling in member j to play together.
- * @param pullInBarsMin Minimum bars before a pull-in starts.
+ * @param members The band members (named track groups with personality traits).
+ * @param handoffMatrix NxN Markov matrix for lead handoff probabilities. Build with [bandMatrix].
+ * @param pullInMatrix NxN matrix for pull-in probabilities. Build with [bandMatrix].
+ * @param pullInBarsMin Minimum bars a pull-in lasts.
  * @param pullInBarsMax Maximum bars a pull-in lasts.
- * @param improvCarryover How much of the previous soloist's energy carries into the next, 0-1.
- * @param probability Chance of a band solo occurring in this section, 0-1.
- * @param barsPerLeadMin Minimum bars each lead member plays.
- * @param barsPerLeadMax Maximum bars each lead member plays.
+ * @param barsPerLeadMin Minimum bars each lead member plays before handoff.
+ * @param barsPerLeadMax Maximum bars each lead member plays before handoff.
  */
 @Serializable
-data class BandSoloConfig(
+data class Band(
     val members: List<BandMember>,
     val handoffMatrix: List<Float>,
     val pullInMatrix: List<Float>,
     val pullInBarsMin: Int = 2,
     val pullInBarsMax: Int = 4,
-    val improvCarryover: Float = 0.7f,
-    val probability: Float = 0.7f,
     val barsPerLeadMin: Int = 2,
-    val barsPerLeadMax: Int = 4,
+    val barsPerLeadMax: Int = 6,
 )
 
 /**
- * Simple solo system — tracks take turns soloing within a section.
- * For band-style solos with named groups and handoffs, use [BandSoloConfig] instead.
+ * Solo mode for a section — declares what kind of solo happens.
+ * The band structure comes from [Vibe.band]; the section just picks the mode.
  *
- * @param mode How solos rotate (ROUND_ROBIN, EXTENDED, IMPROVISERS).
- * @param probability Chance of a solo occurring in this section, 0-1.
- * @param soloistSelection How the next soloist is chosen.
- * @param barsPerSoloistMin Minimum bars each soloist plays.
- * @param barsPerSoloistMax Maximum bars each soloist plays.
- * @param transitionBars Crossfade bars between soloists.
- * @param improvCarryover Energy carryover between soloists, 0-1.
+ * - [LongFill]: Brief single-member spotlight on the lick. No handoff.
+ * - [LickBuilder]: Aggressive lick mutation passed between members via handoff matrix.
+ * - [Jam]: Free improv with configurable lick influence from prior mutations.
  */
 @Serializable
-data class SoloConfig(
-    val mode: SoloMode = SoloMode.ROUND_ROBIN,
-    val probability: Float = 0.5f,
-    val soloistSelection: SoloistSelection = SoloistSelection(),
-    val barsPerSoloistMin: Int = 2,
-    val barsPerSoloistMax: Int = 4,
-    val transitionBars: Int = 0,
-    val improvCarryover: Float = 0.7f,
-)
+sealed class SoloMode {
+    @Serializable
+    data class LongFill(
+        val probability: Float = 0.5f,
+        val barsMin: Int = 2,
+        val barsMax: Int = 4,
+    ) : SoloMode()
+
+    @Serializable
+    data class LickBuilder(
+        val probability: Float = 0.7f,
+        val mutationRate: Float = 0.5f,
+    ) : SoloMode()
+
+    @Serializable
+    data class Jam(
+        val probability: Float = 0.8f,
+        val lickInfluence: Float = 0.5f,
+    ) : SoloMode()
+}
+
 
 /**
  * A named rhythmic pattern that can be swapped in during a section.
@@ -932,8 +888,7 @@ data class TrackSectionOverride(
  * @param macroOverrides Multiply macro values during this section.
  *   e.g., `MacroOverrides(energy = 1.4f)` boosts energy 40% during this section.
  * @param tensionOverride Replace the vibe's tension profile for this section.
- * @param soloConfig Simple solo system for this section (null = no solos).
- * @param bandSoloConfig Band-style solo system (null = no band solos). Overrides soloConfig.
+ * @param soloMode Solo mode for this section (null = no solos).
  * @param motifSet Beat pattern variations for this section.
  * @param trackOverrides Per-track parameter overrides specific to this section.
  */
@@ -947,8 +902,7 @@ data class Section(
     val recencyDecay: Float = 0.5f,
     val macroOverrides: MacroOverrides? = null,
     val tensionOverride: TensionProfile? = null,
-    val soloConfig: SoloConfig? = null,
-    val bandSoloConfig: BandSoloConfig? = null,
+    val soloMode: SoloMode? = null,
     val motifSet: MotifSet? = null,
     val trackOverrides: Map<Int, TrackSectionOverride>? = null,
 )
@@ -1025,7 +979,7 @@ data class Arrangement(
                         SectionTransition(targetIndex = 0, weight = 0.8f),
                         SectionTransition(targetIndex = 2, weight = 0.2f),
                     ),
-                    soloConfig = SoloConfig(mode = SoloMode.ROUND_ROBIN),
+                    soloMode = SoloMode.LongFill(),
                 ),
                 Section(
                     name = "build",
@@ -1080,7 +1034,7 @@ data class Arrangement(
                         SectionTransition(targetIndex = 1, weight = 0.3f),
                         SectionTransition(targetIndex = 4, weight = 0.1f),
                     ),
-                    soloConfig = SoloConfig(mode = SoloMode.EXTENDED),
+                    soloMode = SoloMode.LickBuilder(),
                     recencyDecay = 0.4f,
                 ),
                 Section(
@@ -1140,12 +1094,7 @@ data class Arrangement(
                         space = 1.5f,
                         mood = 1.3f,
                     ),
-                    soloConfig = SoloConfig(
-                        mode = SoloMode.IMPROVISERS,
-                        probability = 0.7f,
-                        barsPerSoloistMin = 2,
-                        barsPerSoloistMax = 4,
-                    ),
+                    soloMode = SoloMode.Jam(probability = 0.7f),
                 ),
             ),
         )

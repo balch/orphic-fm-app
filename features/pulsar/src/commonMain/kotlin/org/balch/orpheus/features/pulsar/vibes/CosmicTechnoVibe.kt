@@ -5,8 +5,8 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.features.pulsar.Arrangement
+import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
-import org.balch.orpheus.features.pulsar.BandSoloConfig
 import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
@@ -20,7 +20,7 @@ import org.balch.orpheus.features.pulsar.RootNote
 import org.balch.orpheus.features.pulsar.ScaleType
 import org.balch.orpheus.features.pulsar.Section
 import org.balch.orpheus.features.pulsar.SectionTransition
-import org.balch.orpheus.features.pulsar.SoloTechnique
+import org.balch.orpheus.features.pulsar.SoloMode
 import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TonalTension
 import org.balch.orpheus.features.pulsar.TrackMacroMap
@@ -40,6 +40,34 @@ class CosmicTechnoVibe : VibeProvider {
         envelopeType = EnvelopeType.AD,
         rootNote = RootNote.D,
         scaleType = ScaleType.MAJOR,
+        band = Band(
+            members = listOf(
+                BandMember("Drummer", listOf(0, 1, 2), alwaysActive = true,
+                    loudness = 0.7f, creativity = 0.3f, swing = 0.02f, drag = -0.05f),
+                BandMember("Bassist", listOf(3),
+                    loudness = 0.8f, creativity = 0.5f, swing = 0.0f, drag = 0.05f),
+                BandMember("Keys", listOf(4),
+                    loudness = 0.5f, creativity = 0.5f, swing = 0.0f, drag = 0.0f),
+                BandMember("FX", listOf(5, 6, 7),
+                    loudness = 0.3f, creativity = 0.7f, swing = 0.0f, drag = 0.1f),
+            ),
+            handoffMatrix = bandMatrix(
+                //            DRUM  BASS  KEYS  FX
+                "Drummer" to row(0.00f, 0.30f, 0.35f, 0.10f),
+                "Bassist" to row(0.25f, 0.00f, 0.35f, 0.15f),
+                "Keys"    to row(0.20f, 0.35f, 0.00f, 0.20f),
+                "FX"      to row(0.15f, 0.30f, 0.30f, 0.00f),
+            ),
+            pullInMatrix = bandMatrix(
+                //            DRUM  BASS  KEYS  FX
+                "Drummer" to row(0.00f, 0.25f, 0.20f, 0.05f),
+                "Bassist" to row(0.20f, 0.00f, 0.35f, 0.10f),
+                "Keys"    to row(0.15f, 0.35f, 0.00f, 0.10f),
+                "FX"      to row(0.10f, 0.20f, 0.20f, 0.00f),
+            ),
+            pullInBarsMin = 2, pullInBarsMax = 4,
+            barsPerLeadMin = 2, barsPerLeadMax = 6,
+        ),
         energy = 0.7f,
         complexity = 0.5f,
         space = 0.5f,
@@ -136,36 +164,7 @@ class CosmicTechnoVibe : VibeProvider {
                     macroOverrides = MacroOverrides(
                         energy = 1.5f, complexity = 1.3f, mood = 1.3f,
                     ),
-                    bandSoloConfig = BandSoloConfig(
-                        members = listOf(
-                            BandMember("Drummer", listOf(0, 1, 2), alwaysActive = true,
-                                techniques = listOf(SoloTechnique.FILL_BUILDER, SoloTechnique.STANDARD_MARKOV)),
-                            BandMember("Bassist", listOf(3),
-                                techniques = listOf(SoloTechnique.STANDARD_MARKOV)),
-                            BandMember("Keys", listOf(4),
-                                techniques = listOf(SoloTechnique.STANDARD_MARKOV)),
-                            BandMember("FX", listOf(5, 6, 7),
-                                techniques = listOf(SoloTechnique.STANDARD_MARKOV)),
-                        ),
-                        handoffMatrix = bandMatrix(
-                            //            DRUM  BASS  KEYS  FX
-                            "Drummer" to row(0.00f, 0.30f, 0.35f, 0.10f),
-                            "Bassist" to row(0.25f, 0.00f, 0.35f, 0.15f),
-                            "Keys"    to row(0.20f, 0.35f, 0.00f, 0.20f),
-                            "FX"      to row(0.15f, 0.30f, 0.30f, 0.00f),
-                        ),
-                        pullInMatrix = bandMatrix(
-                            //            DRUM  BASS  KEYS  FX
-                            "Drummer" to row(0.00f, 0.25f, 0.20f, 0.05f),
-                            "Bassist" to row(0.20f, 0.00f, 0.35f, 0.10f),
-                            "Keys"    to row(0.15f, 0.35f, 0.00f, 0.10f),
-                            "FX"      to row(0.10f, 0.20f, 0.20f, 0.00f),
-                        ),
-                        pullInBarsMin = 2, pullInBarsMax = 4,
-                        improvCarryover = 0.5f,
-                        probability = 0.8f,
-                        barsPerLeadMin = 2, barsPerLeadMax = 6,
-                    ),
+                    soloMode = SoloMode.Jam(probability = 0.8f),
                 ),
                 // 3: drop — sudden silence then kick returns, maximum impact
                 Section(

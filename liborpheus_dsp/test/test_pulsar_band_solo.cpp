@@ -32,10 +32,14 @@ static bool test_band_lead_selection() {
     config.members[2].track_count = 1;
     config.members[2].always_active = false;
 
+    SectionParam section{};
+    section.solo_mode = SoloModeId::LICK_BUILDER;
+    section.solo_probability = 1.0f;
+
     PulsarTrackState tracks[kNumPulsarTracks]{};
     uint32_t seed = 12345;
 
-    start_band_solo(state, config, tracks, seed);
+    start_band_solo(state, config, section, tracks, seed);
 
     bool active_ok = state.active;
     bool lead_ok = state.lead_member >= 0 && state.lead_member < config.member_count;
@@ -129,6 +133,10 @@ static bool test_pull_in_mechanic() {
     std::memset(config.handoff_matrix, 0, sizeof(config.handoff_matrix));
     config.handoff_matrix[0 * kMaxBandMembers + 1] = 1.0f;
 
+    SectionParam section{};
+    section.solo_mode = SoloModeId::JAM;
+    section.solo_probability = 1.0f;
+
     // Manually set up state: member 0 is leading
     state.active = true;
     state.lead_member = 0;
@@ -141,7 +149,7 @@ static bool test_pull_in_mechanic() {
     uint32_t seed = 77777;
 
     // Advance one bar -- should pull in member 1
-    advance_band_solo(state, config, tracks, seed);
+    advance_band_solo(state, config, section, tracks, seed);
 
     bool pulled_in = state.member_role[1] == MemberSoloRole::ACTIVE;
     bool has_bars = state.member_bars_remaining[1] >= config.pull_in_bars_min;
@@ -184,6 +192,10 @@ static bool test_pull_in_duration_and_dropout() {
     std::memset(config.handoff_matrix, 0, sizeof(config.handoff_matrix));
     config.handoff_matrix[0 * kMaxBandMembers + 0] = 1.0f;  // self-loop for lead
 
+    SectionParam section{};
+    section.solo_mode = SoloModeId::JAM;
+    section.solo_probability = 1.0f;
+
     // Set up: member 0 leading, member 1 just pulled in with 2 bars
     state.active = true;
     state.lead_member = 0;
@@ -196,7 +208,7 @@ static bool test_pull_in_duration_and_dropout() {
     uint32_t seed = 88888;
 
     // Advance 1 bar -- member 1 should still be ACTIVE (1 bar remaining)
-    advance_band_solo(state, config, tracks, seed);
+    advance_band_solo(state, config, section, tracks, seed);
     bool still_active = state.member_role[1] == MemberSoloRole::ACTIVE;
     int bars_after_1 = state.member_bars_remaining[1];
 
@@ -205,7 +217,7 @@ static bool test_pull_in_duration_and_dropout() {
            still_active ? "OK" : "FAIL");
 
     // Advance 1 more bar -- member 1 should drop to SUPPORT (0 bars remaining)
-    advance_band_solo(state, config, tracks, seed);
+    advance_band_solo(state, config, section, tracks, seed);
     bool dropped = state.member_role[1] == MemberSoloRole::SUPPORT;
 
     printf("  After 2 advances: role=%d (expect SUPPORT=0) -- %s\n",
@@ -216,6 +228,101 @@ static bool test_pull_in_duration_and_dropout() {
     return pass;
 }
 
+static bool test_long_fill_no_handoff() {
+    printf("\n=== Test: LongFill solo deactivates without handoff ===\n");
+
+    BandSoloState state{};
+    BandSoloConfigParam config{};
+    config.probability = 1.0f;
+    config.member_count = 2;
+    config.bars_per_lead_min = 4;
+    config.bars_per_lead_max = 4;
+
+    config.members[0].tracks[0] = 0;
+    config.members[0].track_count = 1;
+    config.members[0].always_active = false;
+
+    config.members[1].tracks[0] = 1;
+    config.members[1].track_count = 1;
+    config.members[1].always_active = false;
+
+    std::memset(config.handoff_matrix, 0, sizeof(config.handoff_matrix));
+    config.handoff_matrix[0 * kMaxBandMembers + 1] = 1.0f;
+    config.handoff_matrix[1 * kMaxBandMembers + 0] = 1.0f;
+
+    SectionParam section{};
+    section.solo_mode = SoloModeId::LONG_FILL;
+    section.solo_probability = 1.0f;
+    section.solo_bars_min = 3;
+    section.solo_bars_max = 3;
+
+    PulsarTrackState tracks[kNumPulsarTracks]{};
+    uint32_t seed = 55555;
+
+    start_band_solo(state, config, section, tracks, seed);
+    bool started = state.active;
+    int lead = state.lead_member;
+    printf("  Started: active=%d, lead=%d -- %s\n", state.active, lead,
+           started ? "OK" : "FAIL");
+
+    // Advance through all bars (3 bars for LongFill)
+    for (int bar = 0; bar < 4; bar++) {
+        advance_band_solo(state, config, section, tracks, seed);
+    }
+
+    // After bars expire, LongFill should deactivate (no handoff)
+    bool deactivated = !state.active;
+    printf("  After bars expire: active=%d (expect 0) -- %s\n",
+           state.active, deactivated ? "OK" : "FAIL");
+
+    bool pass = started && deactivated;
+    printf("  LongFill no handoff: %s\n", pass ? "PASS" : "FAIL");
+    return pass;
+}
+
+static bool test_personality_modifiers() {
+    printf("\n=== Test: Personality modifiers (loudness affects volume) ===\n");
+
+    BandSoloState state{};
+    BandSoloConfigParam config{};
+    config.member_count = 2;
+
+    // Member 0: high loudness (track 0)
+    config.members[0].tracks[0] = 0;
+    config.members[0].track_count = 1;
+    config.members[0].loudness = 0.9f;
+
+    // Member 1: low loudness (track 1)
+    config.members[1].tracks[0] = 1;
+    config.members[1].track_count = 1;
+    config.members[1].loudness = 0.1f;
+
+    PulsarTrackState tracks[kNumPulsarTracks]{};
+
+    // Test member 0 as LEADING
+    state.active = true;
+    state.lead_member = 0;
+    state.member_role[0] = MemberSoloRole::LEADING;
+    state.member_role[1] = MemberSoloRole::SUPPORT;
+    apply_band_solo_modifiers(tracks, config, state);
+    float high_loud_vol = tracks[0].solo_volume_mod;
+
+    // Test member 1 as LEADING
+    state.lead_member = 1;
+    state.member_role[0] = MemberSoloRole::SUPPORT;
+    state.member_role[1] = MemberSoloRole::LEADING;
+    apply_band_solo_modifiers(tracks, config, state);
+    float low_loud_vol = tracks[1].solo_volume_mod;
+
+    bool vol_ok = high_loud_vol > low_loud_vol;
+    printf("  High loudness (0.9) volume_mod=%.3f\n", high_loud_vol);
+    printf("  Low loudness (0.1) volume_mod=%.3f\n", low_loud_vol);
+    printf("  High > Low: %s\n", vol_ok ? "YES" : "NO");
+
+    printf("  Personality modifiers: %s\n", vol_ok ? "PASS" : "FAIL");
+    return vol_ok;
+}
+
 bool run_pulsar_band_solo_tests() {
     printf("\n========== PULSAR BAND SOLO TESTS ==========\n");
     bool all_pass = true;
@@ -223,6 +330,8 @@ bool run_pulsar_band_solo_tests() {
     all_pass &= test_always_active_not_ducked();
     all_pass &= test_pull_in_mechanic();
     all_pass &= test_pull_in_duration_and_dropout();
+    all_pass &= test_long_fill_no_handoff();
+    all_pass &= test_personality_modifiers();
     printf("\nPulsar band solo tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
     return all_pass;
 }

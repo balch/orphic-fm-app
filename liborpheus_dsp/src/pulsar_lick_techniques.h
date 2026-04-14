@@ -14,6 +14,65 @@
 // - FILL_BUILDER: progressive fills for drums
 // ---------------------------------------------------------------------------
 
+// ── Living lick management ──────────────────────────────────────────
+
+// Copy the vibe's lick into a mutable working buffer
+inline void init_live_lick(
+    int8_t* live_degrees, float* live_durations, float* live_velocities,
+    int& live_length, bool& live_active,
+    const int8_t* src_degrees, const float* src_durations, const float* src_velocities,
+    int src_length
+) {
+    live_length = src_length;
+    live_active = src_length > 0;
+    for (int i = 0; i < src_length && i < 32; i++) {
+        live_degrees[i] = src_degrees[i];
+        live_durations[i] = src_durations[i];
+        live_velocities[i] = src_velocities[i];
+    }
+}
+
+// Mutate the live lick in place based on a member's creativity trait.
+// Called once per bar when a LickBuilder lead is active.
+// creativity: 0 = faithful, 1 = wild reinterpretation
+inline void mutate_live_lick(
+    int8_t* degrees, float* durations, float* velocities, int length,
+    float creativity, uint32_t& seed
+) {
+    if (length <= 0) return;
+
+    for (int i = 0; i < length; i++) {
+        float roll = pattern_rand01(seed);
+
+        // Note substitution: probability scales with creativity
+        if (roll < creativity * 0.3f) {
+            int shift = static_cast<int>(pattern_rand01(seed) * 5.0f) - 2;
+            degrees[i] = static_cast<int8_t>(degrees[i] + shift);
+        }
+
+        // Duration variation
+        roll = pattern_rand01(seed);
+        if (roll < creativity * 0.2f) {
+            float mult = 0.5f + pattern_rand01(seed) * 1.0f;  // 0.5x to 1.5x
+            durations[i] = std::max(0.125f, std::min(4.0f, durations[i] * mult));
+        }
+
+        // Velocity variation
+        roll = pattern_rand01(seed);
+        if (roll < creativity * 0.25f) {
+            float delta = (pattern_rand01(seed) - 0.5f) * 0.3f * creativity;
+            velocities[i] = std::max(0.1f, std::min(1.0f, velocities[i] + delta));
+        }
+
+        // Octave jump (high creativity only)
+        roll = pattern_rand01(seed);
+        if (roll < creativity * 0.1f) {
+            int octave = (pattern_rand01(seed) > 0.5f) ? 7 : -7;
+            degrees[i] = static_cast<int8_t>(degrees[i] + octave);
+        }
+    }
+}
+
 // ── LICK_RHYTHM — lick durations → drum patterns ────────────────────────
 
 inline void generate_lick_rhythm_pattern(

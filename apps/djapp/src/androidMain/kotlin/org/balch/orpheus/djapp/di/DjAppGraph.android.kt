@@ -10,6 +10,7 @@ import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.features.FeatureGraph
 import org.balch.orpheus.core.media.ForegroundServiceController
 import org.balch.orpheus.core.tempo.GlobalTempo
+import org.balch.orpheus.djapp.lifecycle.DjAppLifecycleManager
 
 @DependencyGraph(AppScope::class)
 actual interface DjAppGraph : ViewModelGraph {
@@ -17,6 +18,9 @@ actual interface DjAppGraph : ViewModelGraph {
     actual val synthEngine: SynthEngine
     actual val globalTempo: GlobalTempo
     val featureGraphFactory: FeatureGraph.Factory
+
+    /** Eagerly initialized to register lifecycle callbacks. */
+    val djAppLifecycleManager: DjAppLifecycleManager
 
     @DependencyGraph.Factory
     fun interface Factory {

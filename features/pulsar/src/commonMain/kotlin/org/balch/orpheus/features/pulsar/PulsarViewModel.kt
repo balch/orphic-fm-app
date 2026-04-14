@@ -313,6 +313,7 @@ class PulsarViewModel(
     private val tensionEvoHarmProbId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_HARM_PROB.controlId)
     private val tensionEvoAttackPointId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_ATTACK_POINT.controlId)
     private val tensionEvoReleaseSpeedId = synthController.controlFlow(PulsarSymbol.TENSION_EVO_RELEASE_SPEED.controlId)
+    private val tensionSpurtChanceId = synthController.controlFlow(PulsarSymbol.TENSION_SPURT_CHANCE.controlId)
     private val trackEvoWeightIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_WEIGHT.ordinal + i].controlId)
     }
@@ -396,12 +397,11 @@ class PulsarViewModel(
                 // Enrich with band member names if band solos are configured
                 val vibe = vibeFlow.value
                 val section = vibe.arrangement?.sections?.getOrNull(state.sectionIndex)
-                val bandConfig = section?.bandSoloConfig
-                    ?: vibe.arrangement?.sections?.firstNotNullOfOrNull { it.bandSoloConfig }
-                val enriched = if (bandConfig != null) {
+                val memberNames = vibe.band?.members?.map { it.name }
+                val enriched = if (memberNames != null) {
                     state.copy(
                         bandSolo = true,
-                        bandMemberNames = bandConfig.members.map { it.name },
+                        bandMemberNames = memberNames,
                     )
                 } else state
 
@@ -496,10 +496,9 @@ class PulsarViewModel(
         return buildString {
             append(sectionName)
             if (state.soloActive && state.soloTrack >= 0) {
-                val bandConfig = section?.bandSoloConfig
-                    ?: vibe.arrangement?.sections?.firstNotNullOfOrNull { it.bandSoloConfig }
-                val soloistName = if (state.bandSolo && bandConfig != null) {
-                    bandConfig.members.getOrElse(state.soloTrack) { null }?.name
+                val bandMembers = vibe.band?.members
+                val soloistName = if (state.bandSolo && bandMembers != null) {
+                    bandMembers.getOrElse(state.soloTrack) { null }?.name
                 } else {
                     PULSAR_TRACK_NAMES.getOrElse(state.soloTrack) { null }
                 }
@@ -845,6 +844,7 @@ class PulsarViewModel(
         tensionEvoHarmProbId.value = FloatValue(e.harmonicsProbability)
         tensionEvoAttackPointId.value = FloatValue(e.attackPoint)
         tensionEvoReleaseSpeedId.value = FloatValue(e.releaseSpeed)
+        tensionSpurtChanceId.value = FloatValue(t.spurtChance)
         // Per-track evolution weight
         vibe.tracks.forEachIndexed { i, tv ->
             trackEvoWeightIds[i].value = FloatValue(tv.evolutionWeight)
@@ -919,7 +919,7 @@ class PulsarViewModel(
      * section_data[s * 18 + field]:
      *   0=bars_min, 1=bars_max, 2=transition_bars, 3=recency_decay,
      *   4=macro_energy, 5=macro_complexity, 6=macro_space, 7=macro_mood,
-     *   8=has_solo, 9=solo_mode, 10=solo_probability, 11=bars_per_soloist_min,
+     *   8=has_solo/solo_mode_id, 9..17=solo params (format depends on new vs legacy),
      *   12=bars_per_soloist_max, 13=solo_transition_bars, 14=improv_carryover,
      *   15=transition_count, 16=reserved, 17=reserved
      *
@@ -970,8 +970,6 @@ class PulsarViewModel(
         arr.sections.forEachIndexed { s, section ->
             val base = s * 18
             val mo = section.macroOverrides
-            val hasSolo = if (section.soloConfig != null) 1f else 0f
-            val solo = section.soloConfig
             fun setSection(field: Int, v: Float) =
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "section_data_${base + field}"), FloatValue(v)
@@ -979,9 +977,7 @@ class PulsarViewModel(
             // Must match C++ load_vibe() unpack order exactly:
             // [0]=bars_min, [1]=bars_max, [2]=transition_bars, [3]=recency_decay,
             // [4]=transition_count, [5]=energy, [6]=complexity, [7]=space, [8]=mood,
-            // [9]=has_solo, [10]=solo_mode, [11]=solo_prob, [12]=solo_bars_min,
-            // [13]=solo_bars_max, [14]=solo_selection_mode, [15]=solo_recency_decay,
-            // [16]=solo_allow_effects, [17]=solo_improv_carryover
+            // [9..17]=solo data (format depends on new vs legacy system)
             setSection(0, section.barsMin.toFloat())
             setSection(1, section.barsMax.toFloat())
             setSection(2, section.transitionBars.toFloat())
@@ -991,15 +987,33 @@ class PulsarViewModel(
             setSection(6, mo?.complexity ?: -1f)
             setSection(7, mo?.space ?: -1f)
             setSection(8, mo?.mood ?: -1f)
-            setSection(9, hasSolo)
-            setSection(10, (solo?.mode?.ordinal ?: 0).toFloat())
-            setSection(11, solo?.probability ?: 0.5f)
-            setSection(12, (solo?.barsPerSoloistMin ?: 2).toFloat())
-            setSection(13, (solo?.barsPerSoloistMax ?: 4).toFloat())
-            setSection(14, (solo?.soloistSelection?.mode?.ordinal ?: 2).toFloat())
-            setSection(15, solo?.soloistSelection?.recencyDecay ?: 0.5f)
-            setSection(16, if (solo?.soloistSelection?.allowEffects != false) 1f else 0f)
-            setSection(17, solo?.improvCarryover ?: 0.7f)
+
+            val sectionSolo = section.soloMode
+            if (sectionSolo != null) {
+                val soloModeId = when (sectionSolo) {
+                    is SoloMode.LongFill -> 1f
+                    is SoloMode.LickBuilder -> 2f
+                    is SoloMode.Jam -> 3f
+                }
+                val soloProbability = when (sectionSolo) {
+                    is SoloMode.LongFill -> sectionSolo.probability
+                    is SoloMode.LickBuilder -> sectionSolo.probability
+                    is SoloMode.Jam -> sectionSolo.probability
+                }
+                setSection(9, soloModeId)
+                setSection(10, soloProbability)
+                setSection(11, (sectionSolo as? SoloMode.LickBuilder)?.mutationRate ?: 0.5f)
+                setSection(12, (sectionSolo as? SoloMode.Jam)?.lickInfluence ?: 0.5f)
+                setSection(13, (sectionSolo as? SoloMode.LongFill)?.barsMin?.toFloat() ?: 2f)
+                setSection(14, (sectionSolo as? SoloMode.LongFill)?.barsMax?.toFloat() ?: 4f)
+                setSection(15, 0f) // reserved
+                setSection(16, 0f) // reserved
+                setSection(17, 0f) // reserved
+            } else {
+                // No solo in this section
+                setSection(9, 0f)
+                for (slot in 10..17) setSection(slot, 0f)
+            }
 
             // Transitions for this section (up to 8 × 2 floats)
             val transBase = s * 8 * 2
@@ -1015,24 +1029,8 @@ class PulsarViewModel(
             }
         }
 
-        // Soloist transition matrix (64 floats = 8x8 row-major, shared across sections)
-        val firstSoloConfig = arr.sections.firstOrNull()?.soloConfig
-        val soloistMatrix = firstSoloConfig?.soloistSelection?.transitionMatrix
-        synthController.setPluginControl(
-            PluginControlId(PULSAR_URI, "soloist_matrix_active"),
-            IntValue(if (soloistMatrix != null) 1 else 0)
-        )
-        if (soloistMatrix != null) {
-            for (i in 0 until minOf(soloistMatrix.size, 64)) {
-                synthController.setPluginControl(
-                    PluginControlId(PULSAR_URI, "soloist_matrix_$i"),
-                    FloatValue(soloistMatrix[i])
-                )
-            }
-        }
-
-        // Band solo config (shared across all sections that use it)
-        val bandConfig = arr.sections.firstNotNullOfOrNull { it.bandSoloConfig }
+        // Band solo config
+        val bandConfig = vibe.band
         synthController.setPluginControl(
             PluginControlId(PULSAR_URI, "band_active"),
             IntValue(if (bandConfig != null) 1 else 0)
@@ -1060,7 +1058,11 @@ class PulsarViewModel(
                 )
                 synthController.setPluginControl(
                     PluginControlId(PULSAR_URI, "band_member_data_${base + 10}"),
-                    FloatValue(member.defaultTechnique.ordinal.toFloat())
+                    FloatValue(member.loudness)
+                )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "band_member_data_${base + 11}"),
+                    FloatValue(member.creativity)
                 )
             }
             val N = bandConfig.members.size
@@ -1078,8 +1080,6 @@ class PulsarViewModel(
             }
             synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_pull_in_bars_min"), IntValue(bandConfig.pullInBarsMin))
             synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_pull_in_bars_max"), IntValue(bandConfig.pullInBarsMax))
-            synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_improv_carryover"), FloatValue(bandConfig.improvCarryover))
-            synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_probability"), FloatValue(bandConfig.probability))
             synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_bars_per_lead_min"), IntValue(bandConfig.barsPerLeadMin))
             synthController.setPluginControl(PluginControlId(PULSAR_URI, "band_bars_per_lead_max"), IntValue(bandConfig.barsPerLeadMax))
         }

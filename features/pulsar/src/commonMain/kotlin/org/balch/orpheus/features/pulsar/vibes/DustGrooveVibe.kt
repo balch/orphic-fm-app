@@ -5,8 +5,8 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.features.pulsar.Arrangement
+import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
-import org.balch.orpheus.features.pulsar.BandSoloConfig
 import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
@@ -22,7 +22,7 @@ import org.balch.orpheus.features.pulsar.RootNote
 import org.balch.orpheus.features.pulsar.ScaleType
 import org.balch.orpheus.features.pulsar.Section
 import org.balch.orpheus.features.pulsar.SectionTransition
-import org.balch.orpheus.features.pulsar.SoloTechnique
+import org.balch.orpheus.features.pulsar.SoloMode
 import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TonalTension
 import org.balch.orpheus.features.pulsar.TrackMacroMap
@@ -56,6 +56,34 @@ class DustGrooveVibe : VibeProvider {
             loopLength = 16,
         ),
         lickMutation = 0.35f,
+        band = Band(
+            members = listOf(
+                BandMember("Drummer", listOf(0, 1, 2), alwaysActive = true,
+                    loudness = 0.7f, creativity = 0.4f, swing = 0.1f, drag = -0.05f),
+                BandMember("Bassist", listOf(3),
+                    loudness = 0.8f, creativity = 0.5f, swing = 0.0f, drag = 0.08f),
+                BandMember("Keys", listOf(4),
+                    loudness = 0.5f, creativity = 0.5f, swing = 0.0f, drag = 0.0f),
+                BandMember("FX", listOf(5, 6, 7),
+                    loudness = 0.3f, creativity = 0.7f, swing = 0.0f, drag = 0.1f),
+            ),
+            handoffMatrix = bandMatrix(
+                //            DRUM  BASS  KEYS  FX
+                "Drummer" to row(0.00f, 0.30f, 0.35f, 0.10f),
+                "Bassist" to row(0.25f, 0.00f, 0.35f, 0.15f),
+                "Keys"    to row(0.20f, 0.35f, 0.00f, 0.20f),
+                "FX"      to row(0.15f, 0.30f, 0.30f, 0.00f),
+            ),
+            pullInMatrix = bandMatrix(
+                //            DRUM  BASS  KEYS  FX
+                "Drummer" to row(0.00f, 0.25f, 0.20f, 0.05f),
+                "Bassist" to row(0.20f, 0.00f, 0.35f, 0.10f),
+                "Keys"    to row(0.15f, 0.35f, 0.00f, 0.10f),
+                "FX"      to row(0.10f, 0.20f, 0.20f, 0.00f),
+            ),
+            pullInBarsMin = 2, pullInBarsMax = 4,
+            barsPerLeadMin = 2, barsPerLeadMax = 6,
+        ),
         energy = 0.6f,
         complexity = 0.4f,
         space = 0.25f,
@@ -134,28 +162,29 @@ class DustGrooveVibe : VibeProvider {
                 useLick = true
             ),
             TrackVoice(
-                engineEdm = Engine.CHD,
-                engineSpace = Engine.ENS,
+                engineEdm = Engine.WSH,
+                engineSpace = Engine.ADD,
                 isPercussive = false,
-                volume = 0.40f,
+                volume = 0.30f,
                 pan = 0.30f,
                 density = 0.20f,
-                envelopeProfile = EnvelopeProfile.EFFECT,
-                macroMap = TrackMacroMap.EFFECT,
-                barStrategy = BarStrategy.INDEPENDENT,
+                envelopeProfile = EnvelopeProfile.MELODIC,
+                macroMap = TrackMacroMap.MELODIC,
+                barStrategy = BarStrategy.CALL_RESPONSE,
                 modLfoRate = 0.3f,
                 modLfoDepth = 0.5f,
                 modLfoShape = 0.35f,
                 modLfoCoupling = 0.2f,
-                holdProbability = 0.45f,
-                holdLengthMin = 4,
-                holdLengthMax = 10,
+//                holdProbability = 0.45f,
+//                holdLengthMin = 4,
+//                holdLengthMax = 10,
                 reverbSend = 0.35f,
                 delaySend = 0.25f,
                 noteRangeLow = 38,
                 noteRangeHigh = 59,
                 reverbBrightness = 0.55f,
-                glideRate = 0.2f
+                glideRate = 0.2f,
+                useLick = true
             ),
             TrackVoice(
                 engineEdm = Engine.GRN,
@@ -216,6 +245,7 @@ class DustGrooveVibe : VibeProvider {
                 timbreLow = 0.25f, timbreHigh = 0.55f, timbreProbability = 0.75f,
                 attackPoint = 0.5f, releaseSpeed = 0.3f,
             ),
+            spurtChance = 0.08f,
         ),
         effects = VibeEffects(
             delayTimeA = 0.3f,
@@ -266,47 +296,7 @@ class DustGrooveVibe : VibeProvider {
                     macroOverrides = MacroOverrides(
                         energy = 0.8f, complexity = 1.5f, space = 1.2f, mood = 1.3f,
                     ),
-                    bandSoloConfig = BandSoloConfig(
-                        members = listOf(
-                            BandMember(
-                                "Drummer", listOf(0, 1, 2), alwaysActive = true,
-                                techniques = listOf(
-                                    SoloTechnique.FILL_BUILDER,
-                                    SoloTechnique.STANDARD_MARKOV
-                                )
-                            ),
-                            BandMember(
-                                "Bassist", listOf(3),
-                                techniques = listOf(SoloTechnique.STANDARD_MARKOV)
-                            ),
-                            BandMember(
-                                "Keys", listOf(4),
-                                techniques = listOf(SoloTechnique.STANDARD_MARKOV)
-                            ),
-                            BandMember(
-                                "FX", listOf(5, 6, 7),
-                                techniques = listOf(SoloTechnique.STANDARD_MARKOV)
-                            ),
-                        ),
-                        handoffMatrix = bandMatrix(
-                            //            DRUM  BASS  KEYS  FX
-                            "Drummer" to row(0.00f, 0.30f, 0.35f, 0.10f),
-                            "Bassist" to row(0.25f, 0.00f, 0.35f, 0.15f),
-                            "Keys" to row(0.20f, 0.35f, 0.00f, 0.20f),
-                            "FX" to row(0.15f, 0.30f, 0.30f, 0.00f),
-                        ),
-                        pullInMatrix = bandMatrix(
-                            //            DRUM  BASS  KEYS  FX
-                            "Drummer" to row(0.00f, 0.25f, 0.20f, 0.05f),
-                            "Bassist" to row(0.20f, 0.00f, 0.35f, 0.10f),
-                            "Keys" to row(0.15f, 0.35f, 0.00f, 0.10f),
-                            "FX" to row(0.10f, 0.20f, 0.20f, 0.00f),
-                        ),
-                        pullInBarsMin = 2, pullInBarsMax = 4,
-                        improvCarryover = 0.5f,
-                        probability = 0.8f,
-                        barsPerLeadMin = 2, barsPerLeadMax = 6,
-                    ),
+                    soloMode = SoloMode.LickBuilder(probability = 0.8f, mutationRate = 0.35f),
                 ),
                 // 3: buildup — rising energy, more fills, pushing toward the loop
                 Section(

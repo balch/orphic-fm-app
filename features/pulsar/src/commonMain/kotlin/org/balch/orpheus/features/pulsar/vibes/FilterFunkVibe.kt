@@ -5,8 +5,8 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.features.pulsar.Arrangement
+import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
-import org.balch.orpheus.features.pulsar.BandSoloConfig
 import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
@@ -22,7 +22,7 @@ import org.balch.orpheus.features.pulsar.RootNote
 import org.balch.orpheus.features.pulsar.ScaleType
 import org.balch.orpheus.features.pulsar.Section
 import org.balch.orpheus.features.pulsar.SectionTransition
-import org.balch.orpheus.features.pulsar.SoloTechnique
+import org.balch.orpheus.features.pulsar.SoloMode
 import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TonalTension
 import org.balch.orpheus.features.pulsar.TrackMacroMap
@@ -55,6 +55,34 @@ class FilterFunkVibe : VibeProvider {
             ),
         ),
         lickMutation = 0.6f,
+        band = Band(
+            members = listOf(
+                BandMember("Drummer", listOf(0, 1, 2), alwaysActive = true,
+                    loudness = 0.7f, creativity = 0.3f, swing = 0.03f, drag = -0.05f),
+                BandMember("Bassist", listOf(3),
+                    loudness = 0.8f, creativity = 0.5f, swing = 0.0f, drag = 0.05f),
+                BandMember("Keys", listOf(4),
+                    loudness = 0.5f, creativity = 0.5f, swing = 0.0f, drag = 0.0f),
+                BandMember("FX", listOf(5, 6, 7),
+                    loudness = 0.3f, creativity = 0.7f, swing = 0.0f, drag = 0.1f),
+            ),
+            handoffMatrix = bandMatrix(
+                //            DRUM  BASS  KEYS  FX
+                "Drummer" to row(0.00f, 0.30f, 0.35f, 0.10f),
+                "Bassist" to row(0.25f, 0.00f, 0.35f, 0.15f),
+                "Keys"    to row(0.20f, 0.35f, 0.00f, 0.20f),
+                "FX"      to row(0.15f, 0.30f, 0.30f, 0.00f),
+            ),
+            pullInMatrix = bandMatrix(
+                //            DRUM  BASS  KEYS  FX
+                "Drummer" to row(0.00f, 0.25f, 0.20f, 0.05f),
+                "Bassist" to row(0.20f, 0.00f, 0.35f, 0.10f),
+                "Keys"    to row(0.15f, 0.35f, 0.00f, 0.10f),
+                "FX"      to row(0.10f, 0.20f, 0.20f, 0.00f),
+            ),
+            pullInBarsMin = 2, pullInBarsMax = 4,
+            barsPerLeadMin = 2, barsPerLeadMax = 6,
+        ),
         energy = 0.55f,
         complexity = 0.25f,
         space = 0.4f,
@@ -94,6 +122,7 @@ class FilterFunkVibe : VibeProvider {
         ),
         stepCount = 32,
         tension = TensionProfile(
+            spurtChance = 0.12f,
             innerBars = 4, outerBars = 16, outerDepth = 0.5f,
             volume = 0.35f,
             tonal = TonalTension(chromaticPassing = 0.08f),
@@ -156,36 +185,7 @@ class FilterFunkVibe : VibeProvider {
                     macroOverrides = MacroOverrides(
                         energy = 0.8f, complexity = 1.2f, space = 1.3f, mood = 1.1f,
                     ),
-                    bandSoloConfig = BandSoloConfig(
-                        members = listOf(
-                            BandMember("Drummer", listOf(0, 1, 2), alwaysActive = true,
-                                techniques = listOf(SoloTechnique.FILL_BUILDER, SoloTechnique.STANDARD_MARKOV)),
-                            BandMember("Bassist", listOf(3),
-                                techniques = listOf(SoloTechnique.STANDARD_MARKOV)),
-                            BandMember("Keys", listOf(4),
-                                techniques = listOf(SoloTechnique.STANDARD_MARKOV)),
-                            BandMember("FX", listOf(5, 6, 7),
-                                techniques = listOf(SoloTechnique.STANDARD_MARKOV)),
-                        ),
-                        handoffMatrix = bandMatrix(
-                            //            DRUM  BASS  KEYS  FX
-                            "Drummer" to row(0.00f, 0.30f, 0.35f, 0.10f),
-                            "Bassist" to row(0.25f, 0.00f, 0.35f, 0.15f),
-                            "Keys"    to row(0.20f, 0.35f, 0.00f, 0.20f),
-                            "FX"      to row(0.15f, 0.30f, 0.30f, 0.00f),
-                        ),
-                        pullInMatrix = bandMatrix(
-                            //            DRUM  BASS  KEYS  FX
-                            "Drummer" to row(0.00f, 0.25f, 0.20f, 0.05f),
-                            "Bassist" to row(0.20f, 0.00f, 0.35f, 0.10f),
-                            "Keys"    to row(0.15f, 0.35f, 0.00f, 0.10f),
-                            "FX"      to row(0.10f, 0.20f, 0.20f, 0.00f),
-                        ),
-                        pullInBarsMin = 2, pullInBarsMax = 4,
-                        improvCarryover = 0.5f,
-                        probability = 0.8f,
-                        barsPerLeadMin = 2, barsPerLeadMax = 6,
-                    ),
+                    soloMode = SoloMode.LickBuilder(probability = 0.8f, mutationRate = 0.6f),
                 ),
                 // 3: drop — stripped to kick + bass, maximum impact on return
                 Section(

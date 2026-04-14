@@ -216,8 +216,7 @@ static bool test_markov_density_curve() {
 static bool test_improvisers_handoff_biases_weights() {
     printf("\n=== Test: IMPROVISERS handoff biases weights ===\n");
 
-    SoloState state;
-    std::memset(&state, 0, sizeof(state));
+    BandSoloState state{};
 
     // Record an ascending phrase (0, 1, 2, 3, 4)
     state.last_phrase[0] = 0;
@@ -253,8 +252,7 @@ static bool test_improvisers_handoff_biases_weights() {
 static bool test_record_solo_note() {
     printf("\n=== Test: Record solo note ===\n");
 
-    SoloState state;
-    std::memset(&state, 0, sizeof(state));
+    BandSoloState state{};
 
     // Record 3 notes
     record_solo_note(state, 0);
@@ -274,46 +272,6 @@ static bool test_record_solo_note() {
     bool pass = cursor_ok && values_ok;
     printf("  Record solo note: %s\n", pass ? "PASS" : "FAIL");
     return pass;
-}
-
-static bool test_markov_soloist_selection() {
-    printf("\n=== Test: Markov soloist selection uses transition matrix ===\n");
-
-    SoloConfigParam config;
-    config.soloist_selection.mode = SelectionMode::MARKOV;
-
-    // Matrix that forces track 0 -> track 3, track 3 -> track 5
-    config.has_soloist_matrix = true;
-    std::memset(config.soloist_matrix, 0, sizeof(config.soloist_matrix));
-    config.soloist_matrix[0][3] = 1.0f;  // from 0, always go to 3
-    config.soloist_matrix[3][5] = 1.0f;  // from 3, always go to 5
-    config.soloist_matrix[5][0] = 1.0f;  // from 5, always go to 0
-
-    SoloState state{};
-    state.current_soloist = 0;
-    for (int i = 0; i < kNumPulsarTracks; i++)
-        state.bars_since_soloist[i] = 10;  // all have high recency (means "long ago")
-
-    PulsarTrackState tracks[kNumPulsarTracks]{};
-    uint32_t seed = 42;
-
-    int next = select_soloist(config, state, tracks, seed);
-    bool ok1 = (next == 3);
-    printf("  From track 0: next=%d (expected 3) -- %s\n", next, ok1 ? "OK" : "FAIL");
-
-    state.current_soloist = 3;
-    next = select_soloist(config, state, tracks, seed);
-    bool ok2 = (next == 5);
-    printf("  From track 3: next=%d (expected 5) -- %s\n", next, ok2 ? "OK" : "FAIL");
-
-    state.current_soloist = 5;
-    next = select_soloist(config, state, tracks, seed);
-    bool ok3 = (next == 0);
-    printf("  From track 5: next=%d (expected 0) -- %s\n", next, ok3 ? "OK" : "FAIL");
-
-    bool ok = ok1 && ok2 && ok3;
-    printf("  Markov soloist selection: %s\n", ok ? "PASS" : "FAIL");
-    return ok;
 }
 
 static bool test_density_curve_shape() {
@@ -402,7 +360,6 @@ bool run_pulsar_solos_tests() {
     all_pass &= test_markov_density_curve();
     all_pass &= test_improvisers_handoff_biases_weights();
     all_pass &= test_record_solo_note();
-    all_pass &= test_markov_soloist_selection();
     all_pass &= test_density_curve_shape();
     all_pass &= test_drone_interval_preset();
     printf("\nPulsar solos tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");

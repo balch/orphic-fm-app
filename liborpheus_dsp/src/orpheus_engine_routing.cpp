@@ -875,6 +875,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_tension_evo_attack_point.store(value, std::memory_order_relaxed);
             else if (std::strcmp(t, "evo_release_speed") == 0)
                 engine->pulsar_tension_evo_release_speed.store(value, std::memory_order_relaxed);
+            else if (std::strcmp(t, "spurt_chance") == 0)
+                engine->pulsar_tension_spurt_chance.store(value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "lick_data_", 10) == 0) {
             int idx = std::atoi(symbol + 10);

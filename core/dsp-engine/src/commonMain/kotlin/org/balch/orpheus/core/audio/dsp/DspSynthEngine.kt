@@ -57,7 +57,7 @@ class DspSynthEngine(
 
     override val hasNativeEngine: Boolean get() = true
 
-    private val _graphReady = kotlinx.coroutines.CompletableDeferred<Unit>()
+    private var _graphReady = kotlinx.coroutines.CompletableDeferred<Unit>()
     override val graphReady: kotlinx.coroutines.Deferred<Unit> get() = _graphReady
 
     private fun setPort(ps: PortSymbol, value: PortValue): Boolean =
@@ -439,6 +439,9 @@ class DspSynthEngine(
         log.debug { "Stopping Audio Engine..." }
         monitor.stopMonitoring()
         audioEngine.stop()
+        // Reset so start() can be called again after stop()
+        monitor.startRequested = false
+        _graphReady = kotlinx.coroutines.CompletableDeferred()
         log.debug { "Audio Engine Stopped" }
     }
 

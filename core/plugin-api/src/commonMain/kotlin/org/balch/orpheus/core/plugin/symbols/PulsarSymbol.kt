@@ -404,6 +404,7 @@ enum class PulsarSymbol(
     TENSION_EVO_HARM_PROB("tension_evo_harm_prob"),
     TENSION_EVO_ATTACK_POINT("tension_evo_attack_point"),
     TENSION_EVO_RELEASE_SPEED("tension_evo_release_speed"),
+    TENSION_SPURT_CHANCE("tension_spurt_chance"),
     // Per-track evolution weight
     TRACK_0_EVO_WEIGHT("track_0_evo_weight"),
     TRACK_1_EVO_WEIGHT("track_1_evo_weight"),

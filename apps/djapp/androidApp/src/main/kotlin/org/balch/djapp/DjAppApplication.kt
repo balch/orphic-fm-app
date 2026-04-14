@@ -16,6 +16,10 @@ class DjAppApplication : Application() {
             this,
             DjForegroundServiceControllerImpl(this),
         )
+
+        // Eagerly initialize lifecycle manager to register activity callbacks.
+        // This enables tearing down the foreground service when backgrounded while paused.
+        graph.djAppLifecycleManager
     }
 
     companion object {

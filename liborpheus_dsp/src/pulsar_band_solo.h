@@ -127,15 +127,17 @@ inline void apply_band_solo_modifiers(
         bool always_active = config.members[m].always_active;
 
         switch (role) {
-            case MemberSoloRole::LEADING:
+            case MemberSoloRole::LEADING: {
+                float loud = config.members[m].loudness;
                 tracks[t].is_soloist = true;
-                tracks[t].solo_volume_mod = 0.2f;
-                tracks[t].solo_density_mod = 0.3f;
+                tracks[t].solo_volume_mod = 0.1f + 0.2f * loud;
+                tracks[t].solo_density_mod = 0.15f + 0.3f * loud;
                 tracks[t].solo_ghost_mod = 0.0f;
-                tracks[t].solo_fill_mod = 0.6f;
+                tracks[t].solo_fill_mod = 0.3f + 0.5f * loud;
                 tracks[t].solo_simplify = false;
                 tracks[t].solo_reverb_mod = 0.0f;
                 break;
+            }
 
             case MemberSoloRole::ACTIVE:
                 tracks[t].is_soloist = false;
@@ -172,17 +174,24 @@ inline void apply_band_solo_modifiers(
     }
 }
 
-// ── Start band solo ──────────────────────────────────────────────────
+// ── Start band solo with SoloMode-aware dispatch ────────────────────
 
 inline void start_band_solo(
     BandSoloState& state,
     const BandSoloConfigParam& config,
+    const SectionParam& section,
     PulsarTrackState* tracks,
     uint32_t& seed,
     int num_tracks = kNumPulsarTracks
 ) {
-    // Probability gate
-    if (pattern_rand01(seed) > config.probability) {
+    if (section.solo_mode == SoloModeId::NONE) {
+        state.active = false;
+        clear_solo_modifiers(tracks, num_tracks);
+        return;
+    }
+
+    // Probability gate uses section's solo probability
+    if (pattern_rand01(seed) > section.solo_probability) {
         state.active = false;
         clear_solo_modifiers(tracks, num_tracks);
         return;
@@ -193,25 +202,28 @@ inline void start_band_solo(
     std::memset(state.last_phrase, -1, sizeof(state.last_phrase));
     state.solo_seed = seed;
 
-    // Select initial lead
     state.lead_member = select_initial_lead(config, seed);
 
-    // Set lead duration
-    int range = config.bars_per_lead_max - config.bars_per_lead_min + 1;
-    int lead_bars = config.bars_per_lead_min +
-                    static_cast<int>(pattern_rand01(seed) * range) % range;
+    // LongFill uses section bars, LickBuilder/Jam uses band's barsPerLead
+    int bars_min, bars_max;
+    if (section.solo_mode == SoloModeId::LONG_FILL) {
+        bars_min = section.solo_bars_min;
+        bars_max = section.solo_bars_max;
+    } else {
+        bars_min = config.bars_per_lead_min;
+        bars_max = config.bars_per_lead_max;
+    }
+    int range = bars_max - bars_min + 1;
+    if (range < 1) range = 1;
+    int lead_bars = bars_min + static_cast<int>(pattern_rand01(seed) * range) % range;
 
-    // Initialize all member roles and state
     for (int m = 0; m < config.member_count; m++) {
         state.bars_since_lead[m] = 0;
         state.member_bars_remaining[m] = 0;
-        state.active_technique[m] = config.members[m].default_technique;
 
         if (m == state.lead_member) {
             state.member_role[m] = MemberSoloRole::LEADING;
             state.member_bars_remaining[m] = lead_bars;
-        } else if (config.members[m].always_active) {
-            state.member_role[m] = MemberSoloRole::SUPPORT;
         } else {
             state.member_role[m] = MemberSoloRole::SUPPORT;
         }
@@ -220,18 +232,18 @@ inline void start_band_solo(
     apply_band_solo_modifiers(tracks, config, state, num_tracks);
 }
 
-// ── Advance band solo (called per bar) ───────────────────────────────
+// ── Advance band solo with SoloMode-aware dispatch ──────────────────
 
 inline void advance_band_solo(
     BandSoloState& state,
     const BandSoloConfigParam& config,
+    const SectionParam& section,
     PulsarTrackState* tracks,
     uint32_t& seed,
     int num_tracks = kNumPulsarTracks
 ) {
     if (!state.active) return;
 
-    // Update bars_since_lead for all members
     for (int m = 0; m < config.member_count; m++) {
         state.bars_since_lead[m]++;
     }
@@ -239,14 +251,25 @@ inline void advance_band_solo(
         state.bars_since_lead[state.lead_member] = 0;
     }
 
-    // Decrement countdowns for all members
     for (int m = 0; m < config.member_count; m++) {
         if (state.member_bars_remaining[m] > 0) {
             state.member_bars_remaining[m]--;
         }
     }
 
-    // Drop expired pull-ins (ACTIVE members whose bars expired)
+    // LongFill: no handoff, end when bars expire
+    if (section.solo_mode == SoloModeId::LONG_FILL) {
+        if (state.lead_member >= 0 &&
+            state.member_bars_remaining[state.lead_member] <= 0) {
+            state.active = false;
+            clear_solo_modifiers(tracks, num_tracks);
+        }
+        return;
+    }
+
+    // LickBuilder and Jam: pull-ins and handoffs (same as existing advance logic)
+
+    // Drop expired pull-ins
     for (int m = 0; m < config.member_count; m++) {
         if (m == state.lead_member) continue;
         if (state.member_role[m] == MemberSoloRole::ACTIVE &&
@@ -255,7 +278,7 @@ inline void advance_band_solo(
         }
     }
 
-    // Roll new pull-ins from the lead member's pull-in row
+    // Roll new pull-ins
     if (state.lead_member >= 0) {
         for (int m = 0; m < config.member_count; m++) {
             if (m == state.lead_member) continue;
@@ -266,6 +289,7 @@ inline void advance_band_solo(
             if (prob > 0.0f && pattern_rand01(seed) < prob) {
                 state.member_role[m] = MemberSoloRole::ACTIVE;
                 int pi_range = config.pull_in_bars_max - config.pull_in_bars_min + 1;
+                if (pi_range < 1) pi_range = 1;
                 state.member_bars_remaining[m] = config.pull_in_bars_min +
                     static_cast<int>(pattern_rand01(seed) * pi_range) % pi_range;
             }
@@ -275,19 +299,17 @@ inline void advance_band_solo(
     // Handle lead expiry and handoff
     if (state.lead_member >= 0 &&
         state.member_bars_remaining[state.lead_member] <= 0) {
-        // Demote current lead
         state.member_role[state.lead_member] = MemberSoloRole::SUPPORT;
 
-        // Select next lead
         int next = select_next_lead(config, state, seed);
         state.lead_member = next;
         state.member_role[next] = MemberSoloRole::LEADING;
 
         int range = config.bars_per_lead_max - config.bars_per_lead_min + 1;
+        if (range < 1) range = 1;
         state.member_bars_remaining[next] = config.bars_per_lead_min +
             static_cast<int>(pattern_rand01(seed) * range) % range;
 
-        // Reset phrase for new lead
         state.phrase_cursor = 0;
         std::memset(state.last_phrase, -1, sizeof(state.last_phrase));
     }
@@ -309,7 +331,6 @@ inline void clear_band_solo(
         state.member_role[m] = MemberSoloRole::SUPPORT;
         state.member_bars_remaining[m] = 0;
         state.bars_since_lead[m] = 0;
-        state.active_technique[m] = SoloTechniqueId::STANDARD_MARKOV;
     }
     std::memset(state.last_phrase, -1, sizeof(state.last_phrase));
 

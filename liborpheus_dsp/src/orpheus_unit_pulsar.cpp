@@ -87,6 +87,48 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
         state->tension_intensity = 0.0f;
     }
 
+    // ── Lick evolution spurt state machine ──
+    if (state->lick_length > 0) {
+        if (state->in_spurt) {
+            state->spurt_bars_remaining--;
+            if (state->spurt_bars_remaining <= 0) {
+                // Exit spurt: write back mutated lick with bounded drift
+                int max_drift = std::max(1, static_cast<int>(state->lick_mutation * 4.0f + 0.5f));
+                for (int i = 0; i < state->lick_length; i++) {
+                    int drift = state->lick[i].scale_degree - state->original_lick[i].scale_degree;
+                    if (std::abs(drift) > max_drift) {
+                        state->lick[i].scale_degree = state->original_lick[i].scale_degree
+                            + std::max(-max_drift, std::min(drift, max_drift));
+                    }
+                    // Velocity drift: clamp to ±0.2 of original
+                    float vel_drift = state->lick[i].velocity - state->original_lick[i].velocity;
+                    if (std::fabs(vel_drift) > 0.2f) {
+                        state->lick[i].velocity = state->original_lick[i].velocity
+                            + std::max(-0.2f, std::min(vel_drift, 0.2f));
+                    }
+                }
+                state->in_spurt = false;
+            }
+        } else {
+            bool trigger = false;
+            if (state->tension_intensity > 0.85f) {
+                trigger = true;
+            } else if (state->tension.spurt_chance > 0.001f) {
+                uint32_t rng = state->mutation_seed;
+                rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+                state->mutation_seed = rng;
+                float r = (rng & 0xFFFF) / 65535.0f;
+                if (r < state->tension.spurt_chance) {
+                    trigger = true;
+                }
+            }
+            if (trigger) {
+                state->in_spurt = true;
+                state->spurt_bars_remaining = std::max(1, state->tension.inner_bars / 2);
+            }
+        }
+    }
+
     // Clamp all step counts to array bounds (defense against prior overflow)
     for (int t = 0; t < kNumPulsarTracks; t++) {
         if (state->tracks[t].step_count > kMaxPulsarSteps)
@@ -358,6 +400,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         }
     }
     state->lick_mutation = engine->pulsar_lick_mutation.load(std::memory_order_relaxed);
+    // Keep immutable copy for bounded drift during evolution spurts
+    std::memcpy(state->original_lick, state->lick, sizeof(PulsarLickStep) * lick_len);
+    state->in_spurt = false;
+    state->spurt_bars_remaining = 0;
     state->lick_octave = engine->pulsar_lick_octave.load(std::memory_order_relaxed);
 
     int root = engine->pulsar_root_note.load(std::memory_order_relaxed);
@@ -366,6 +412,11 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     if (scale_idx >= static_cast<int>(sizeof(kPulsarScales) / sizeof(kPulsarScales[0])))
         scale_idx = static_cast<int>(sizeof(kPulsarScales) / sizeof(kPulsarScales[0])) - 1;
     const PulsarScale& scale = kPulsarScales[scale_idx];
+
+    // Effective mutation: spurt amplifies 3x, capped at 1.0
+    float eff_mutation = state->in_spurt
+        ? std::min(1.0f, state->lick_mutation * 3.0f)
+        : state->lick_mutation;
 
     for (int t = 0; t < kNumPulsarTracks; t++) {
         PulsarTrackState& ts = state->tracks[t];
@@ -414,7 +465,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             ts.step_count = step_count_config;
             bar_strategy_call_response(ts.steps, step_count_config,
                                        state->lick, lick_len,
-                                       state->lick_mutation,
+                                       eff_mutation,
                                        static_cast<uint8_t>(root), scale,
                                        base_seed ^ (t * 7919u),
                                        state->lick_octave,
@@ -424,7 +475,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             // Lick without CALL_RESPONSE: generate across full step count
             ts.step_count = step_count_config;
             generate_lick_pattern(ts.steps, ts.step_count, state->lick, lick_len,
-                                  state->lick_mutation, static_cast<uint8_t>(root), scale,
+                                  eff_mutation, static_cast<uint8_t>(root), scale,
                                   base_seed ^ (t * 7919u), 0,
                                   state->lick_octave,
                                   genre.note_range_low, genre.note_range_high,
@@ -452,7 +503,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                                    static_cast<uint8_t>(root), scale,
                                    engine->pulsar_energy.load(std::memory_order_relaxed),
                                    engine->pulsar_complexity.load(std::memory_order_relaxed),
-                                   state->lick, lick_len, state->lick_mutation,
+                                   state->lick, lick_len, eff_mutation,
                                    base_seed ^ (t * 13331u),
                                    state->lick_octave,
                                    state->lick_loop_length);
@@ -521,6 +572,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->tension.evo_harm_prob = engine->pulsar_tension_evo_harm_prob.load(std::memory_order_relaxed);
     state->tension.evo_attack_point = engine->pulsar_tension_evo_attack_point.load(std::memory_order_relaxed);
     state->tension.evo_release_speed = engine->pulsar_tension_evo_release_speed.load(std::memory_order_relaxed);
+    state->tension.spurt_chance = engine->pulsar_tension_spurt_chance.load(std::memory_order_relaxed);
     for (int i = 0; i < 8; i++)
         state->tension.track_evo_weight[i] = engine->pulsar_track_evo_weight[i].load(std::memory_order_relaxed);
     state->tension_intensity = 0.0f;
@@ -552,26 +604,13 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             sec.macro_overrides.complexity = engine->pulsar_section_data[base + 6].load(std::memory_order_relaxed);
             sec.macro_overrides.space      = engine->pulsar_section_data[base + 7].load(std::memory_order_relaxed);
             sec.macro_overrides.mood       = engine->pulsar_section_data[base + 8].load(std::memory_order_relaxed);
-            sec.has_solo                   = engine->pulsar_section_data[base + 9].load(std::memory_order_relaxed) > 0.5f;
-            sec.solo_config.mode           = static_cast<SoloMode>(static_cast<int>(engine->pulsar_section_data[base + 10].load(std::memory_order_relaxed)));
-            sec.solo_config.probability    = engine->pulsar_section_data[base + 11].load(std::memory_order_relaxed);
-            sec.solo_config.bars_per_soloist_min = static_cast<int>(engine->pulsar_section_data[base + 12].load(std::memory_order_relaxed));
-            sec.solo_config.bars_per_soloist_max = static_cast<int>(engine->pulsar_section_data[base + 13].load(std::memory_order_relaxed));
-            sec.solo_config.soloist_selection.mode = static_cast<SelectionMode>(static_cast<int>(engine->pulsar_section_data[base + 14].load(std::memory_order_relaxed)));
-            sec.solo_config.soloist_selection.recency_decay = engine->pulsar_section_data[base + 15].load(std::memory_order_relaxed);
-            sec.solo_config.soloist_selection.allow_effects = engine->pulsar_section_data[base + 16].load(std::memory_order_relaxed) > 0.5f;
-            sec.solo_config.improv_carryover               = engine->pulsar_section_data[base + 17].load(std::memory_order_relaxed);
-
-            // Load soloist handoff matrix (shared across sections)
-            bool solo_matrix_active = engine->pulsar_soloist_matrix_active.load(std::memory_order_relaxed) > 0;
-            sec.solo_config.has_soloist_matrix = solo_matrix_active;
-            if (solo_matrix_active) {
-                for (int i = 0; i < 64; i++) {
-                    int r = i / kNumPulsarTracks, c = i % kNumPulsarTracks;
-                    sec.solo_config.soloist_matrix[r][c] =
-                        engine->pulsar_soloist_matrix[i].load(std::memory_order_relaxed);
-                }
-            }
+            // Solo mode system
+            sec.solo_mode        = static_cast<SoloModeId>(static_cast<int>(engine->pulsar_section_data[base + 9].load(std::memory_order_relaxed)));
+            sec.solo_probability = engine->pulsar_section_data[base + 10].load(std::memory_order_relaxed);
+            sec.solo_mutation_rate = engine->pulsar_section_data[base + 11].load(std::memory_order_relaxed);
+            sec.solo_lick_influence = engine->pulsar_section_data[base + 12].load(std::memory_order_relaxed);
+            sec.solo_bars_min    = static_cast<int>(engine->pulsar_section_data[base + 13].load(std::memory_order_relaxed));
+            sec.solo_bars_max    = static_cast<int>(engine->pulsar_section_data[base + 14].load(std::memory_order_relaxed));
 
             // Unpack transitions for this section (2 floats per edge: target, weight)
             int trans_base = (s * kMaxSections) * 2;
@@ -634,7 +673,6 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         init_section_state(state->section_state, arr, state->mutation_seed);
 
         // Zero out solo and motif state
-        std::memset(&state->solo_state, 0, sizeof(SoloState));
         std::memset(&state->motif_state, 0, sizeof(MotifState));
         std::memset(&state->band_solo_state, 0, sizeof(BandSoloState));
 
@@ -655,8 +693,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                     bm.tracks[t] = static_cast<int>(engine->pulsar_band_member_data[base + 1 + t].load(std::memory_order_relaxed));
                 }
                 bm.always_active = engine->pulsar_band_member_data[base + 9].load(std::memory_order_relaxed) > 0.5f;
-                bm.default_technique = static_cast<SoloTechniqueId>(
-                    static_cast<int>(engine->pulsar_band_member_data[base + 10].load(std::memory_order_relaxed)));
+                bm.loudness      = engine->pulsar_band_member_data[base + 10].load(std::memory_order_relaxed);
+                bm.creativity    = engine->pulsar_band_member_data[base + 11].load(std::memory_order_relaxed);
             }
 
             int N = bc.member_count;
@@ -692,7 +730,6 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         state->arrangement.active = false;
         state->arrangement.section_count = 0;
         std::memset(&state->section_state, 0, sizeof(SectionState));
-        std::memset(&state->solo_state, 0, sizeof(SoloState));
         std::memset(&state->motif_state, 0, sizeof(MotifState));
         std::memset(&state->band_solo_state, 0, sizeof(BandSoloState));
         state->has_band_solo = false;
@@ -1116,24 +1153,23 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             state->tension_intensity = 0.0f;
                         }
 
-                        // Start solo: band system takes priority over legacy
-                        if (state->has_band_solo) {
+                        // Start solo: new SoloMode system > band system > legacy
+                        if (sec.solo_mode != SoloModeId::NONE && state->has_band_solo) {
+                            // Initialize live lick for LickBuilder mode
+                            if (sec.solo_mode == SoloModeId::LICK_BUILDER && state->lick_length > 0) {
+                                // Copy from struct-of-arrays lick into separate live buffers
+                                int n = state->lick_length < 32 ? state->lick_length : 32;
+                                state->live_lick_length = n;
+                                state->live_lick_active = true;
+                                for (int i = 0; i < n; i++) {
+                                    state->live_lick_degrees[i] = state->lick[i].scale_degree;
+                                    state->live_lick_durations[i] = state->lick[i].duration;
+                                    state->live_lick_velocities[i] = state->lick[i].velocity;
+                                }
+                            }
                             start_band_solo(state->band_solo_state, state->band_solo_config,
-                                            state->tracks, state->mutation_seed);
-                            // Clear legacy solo if it was active
-                            if (state->solo_state.active) {
-                                clear_solo_modifiers(state->tracks, kNumPulsarTracks);
-                                state->solo_state.active = false;
-                            }
-                        } else if (sec.has_solo) {
-                            start_solo(state->solo_state, sec.solo_config,
-                                       state->tracks, state->track_solo_behavior,
-                                       state->track_ducking, state->mutation_seed);
+                                            sec, state->tracks, state->mutation_seed);
                         } else {
-                            if (state->solo_state.active) {
-                                clear_solo_modifiers(state->tracks, kNumPulsarTracks);
-                                state->solo_state.active = false;
-                            }
                             if (state->band_solo_state.active) {
                                 clear_band_solo(state->band_solo_state, state->tracks);
                             }
@@ -1148,15 +1184,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                     // Advance solo within current section
                     if (state->band_solo_state.active) {
-                        advance_band_solo(state->band_solo_state, state->band_solo_config,
-                                          state->tracks, state->mutation_seed);
-                    } else if (state->solo_state.active) {
                         int cur_sec = state->section_state.current_section;
-                        const SectionParam& sec = state->arrangement.sections[cur_sec];
-                        if (sec.has_solo) {
-                            advance_solo(state->solo_state, sec.solo_config,
-                                         state->tracks, state->track_solo_behavior,
-                                         state->track_ducking, state->mutation_seed);
+                        const SectionParam& sec_adv = state->arrangement.sections[cur_sec];
+                        advance_band_solo(state->band_solo_state, state->band_solo_config,
+                                          sec_adv, state->tracks, state->mutation_seed);
+                        // Mutate live lick per bar during LickBuilder
+                        if (sec_adv.solo_mode == SoloModeId::LICK_BUILDER &&
+                            state->live_lick_active && state->band_solo_state.lead_member >= 0) {
+                            float creativity = state->band_solo_config.members[state->band_solo_state.lead_member].creativity;
+                            mutate_live_lick(
+                                state->live_lick_degrees, state->live_lick_durations,
+                                state->live_lick_velocities, state->live_lick_length,
+                                creativity * sec_adv.solo_mutation_rate,
+                                state->mutation_seed
+                            );
                         }
                     }
 
@@ -1183,13 +1224,16 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             std::memory_order_relaxed);
                     }
                     state->arr_viz_solo_active.store(
-                        state->solo_state.active || state->band_solo_state.active, std::memory_order_relaxed);
+                        state->band_solo_state.active, std::memory_order_relaxed);
                     state->arr_viz_solo_track.store(
                         state->band_solo_state.active
-                            ? state->band_solo_state.lead_member
-                            : state->solo_state.current_soloist,
+                            ? state->band_solo_state.lead_member : -1,
                         std::memory_order_relaxed);
-                    state->arr_viz_solo_mode.store(static_cast<int>(state->solo_state.mode), std::memory_order_relaxed);
+                    {
+                        int cur_sec = state->section_state.current_section;
+                        const SectionParam& sec_viz = state->arrangement.sections[cur_sec];
+                        state->arr_viz_solo_mode.store(static_cast<int>(sec_viz.solo_mode), std::memory_order_relaxed);
+                    }
                 }
 
                 // Voice crossfade: select EDM or space engine per track based on energy
@@ -1263,6 +1307,11 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     if (step_count_cfg > kMaxPulsarSteps) step_count_cfg = kMaxPulsarSteps;
                     int bar1_reset = (step_count_cfg > 16) ? 16 : step_count_cfg;
 
+                    // Effective mutation: spurt amplifies 3x, capped at 1.0
+                    float eff_mutation = state->in_spurt
+                        ? std::min(1.0f, state->lick_mutation * 3.0f)
+                        : state->lick_mutation;
+
                     for (int rt = 0; rt < kNumPulsarTracks; rt++) {
                         PulsarTrackState& rts = state->tracks[rt];
                         bool perc = engine->pulsar_track_percussive[rt].load(std::memory_order_relaxed) != 0;
@@ -1273,7 +1322,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             rts.step_count = step_count_cfg;
                             bar_strategy_call_response(rts.steps, step_count_cfg,
                                                        state->lick, state->lick_length,
-                                                       state->lick_mutation,
+                                                       eff_mutation,
                                                        static_cast<uint8_t>(rr), rscale,
                                                        reset_seed ^ (rt * 7919u),
                                                        state->lick_octave,
@@ -1283,7 +1332,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             rts.step_count = step_count_cfg;
                             generate_lick_pattern(rts.steps, rts.step_count,
                                                   state->lick, state->lick_length,
-                                                  state->lick_mutation,
+                                                  eff_mutation,
                                                   static_cast<uint8_t>(rr), rscale,
                                                   reset_seed ^ (rt * 7919u),
                                                   0, state->lick_octave,
@@ -1308,7 +1357,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 apply_bar_strategy(rts, rt, bs, perc, rg,
                                                    static_cast<uint8_t>(rr), rscale,
                                                    energy, complexity,
-                                                   state->lick, state->lick_length, state->lick_mutation,
+                                                   state->lick, state->lick_length, eff_mutation,
                                                    reset_seed ^ (rt * 13331u),
                                                    state->lick_octave,
                                                    state->lick_loop_length);
@@ -1317,192 +1366,6 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                     }
                 }
 
-                // ── Band solo technique dispatch ──────────────────────────
-                // After patterns are (re)generated, override steps for active
-                // band members using their assigned technique.
-                if (state->band_solo_state.active) {
-                    const BandSoloConfigParam& bsc = state->band_solo_config;
-                    const PulsarScale& tech_scale = kPulsarScales[live_scale];
-                    uint8_t tech_root = static_cast<uint8_t>(live_root);
-
-                    for (int m = 0; m < bsc.member_count; m++) {
-                        MemberSoloRole role = state->band_solo_state.member_role[m];
-                        if (role == MemberSoloRole::SUPPORT) continue;
-
-                        SoloTechniqueId tech = state->band_solo_state.active_technique[m];
-                        const BandMemberParam& member = bsc.members[m];
-
-                        switch (tech) {
-                            case SoloTechniqueId::LICK_MELODY: {
-                                if (state->lick_length <= 0) break;
-                                for (int ti = 0; ti < member.track_count; ti++) {
-                                    int tr = member.tracks[ti];
-                                    if (tr < 0 || tr >= kNumPulsarTracks) continue;
-                                    PulsarTrackState& mts = state->tracks[tr];
-                                    generate_lick_melody_variation(
-                                        mts.steps, mts.step_count,
-                                        state->lick, state->lick_length,
-                                        complexity, role,
-                                        tech_root, tech_scale,
-                                        state->mutation_seed);
-                                }
-                                break;
-                            }
-                            case SoloTechniqueId::LICK_RHYTHM: {
-                                if (state->lick_length <= 0) break;
-                                // LICK_RHYTHM needs 3 drum track step arrays
-                                // Find the drum tracks in this member
-                                PulsarStep* drum_steps[3] = {nullptr, nullptr, nullptr};
-                                for (int ti = 0; ti < member.track_count && ti < 3; ti++) {
-                                    int tr = member.tracks[ti];
-                                    if (tr >= 0 && tr < kNumPulsarTracks)
-                                        drum_steps[ti] = state->tracks[tr].steps;
-                                }
-                                if (drum_steps[0]) {
-                                    // Use step count from first drum track
-                                    int sc = state->tracks[member.tracks[0]].step_count;
-                                    // Temp buffers for the 3 drum parts
-                                    PulsarStep kick[kMaxPulsarSteps] = {};
-                                    PulsarStep snare[kMaxPulsarSteps] = {};
-                                    PulsarStep hat[kMaxPulsarSteps] = {};
-                                    generate_lick_rhythm_pattern(
-                                        kick, snare, hat, sc,
-                                        state->lick, state->lick_length,
-                                        complexity, role,
-                                        state->mutation_seed);
-                                    // Copy results to actual track step arrays
-                                    if (drum_steps[0])
-                                        for (int s = 0; s < sc; s++) drum_steps[0][s] = kick[s];
-                                    if (drum_steps[1])
-                                        for (int s = 0; s < sc; s++) drum_steps[1][s] = snare[s];
-                                    if (drum_steps[2])
-                                        for (int s = 0; s < sc; s++) drum_steps[2][s] = hat[s];
-                                }
-                                break;
-                            }
-                            case SoloTechniqueId::LICK_CONTOUR: {
-                                if (state->lick_length <= 0) break;
-                                for (int ti = 0; ti < member.track_count; ti++) {
-                                    int tr = member.tracks[ti];
-                                    if (tr < 0 || tr >= kNumPulsarTracks) continue;
-                                    PulsarTrackState& mts = state->tracks[tr];
-                                    // Generate sweep values and apply to track params
-                                    float timbre_sweep[kMaxPulsarSteps];
-                                    float morph_sweep[kMaxPulsarSteps];
-                                    for (int s = 0; s < mts.step_count; s++) {
-                                        timbre_sweep[s] = mts.timbre;
-                                        morph_sweep[s] = mts.morph;
-                                    }
-                                    generate_lick_contour_sweep(
-                                        timbre_sweep, morph_sweep, mts.step_count,
-                                        state->lick, state->lick_length,
-                                        complexity, state->mutation_seed);
-                                    // Apply swept values as the new base timbre/morph
-                                    // (use midpoint of sweep as the track's timbre/morph for this bar)
-                                    float avg_t = 0.0f, avg_m = 0.0f;
-                                    for (int s = 0; s < mts.step_count; s++) {
-                                        avg_t += timbre_sweep[s];
-                                        avg_m += morph_sweep[s];
-                                    }
-                                    mts.timbre = avg_t / mts.step_count;
-                                    mts.morph = avg_m / mts.step_count;
-                                }
-                                break;
-                            }
-                            case SoloTechniqueId::FILL_BUILDER: {
-                                // Progressive fills — compute solo progress
-                                float solo_progress = 0.5f;  // default mid-point
-                                int lead = state->band_solo_state.lead_member;
-                                if (lead >= 0 && lead < kMaxBandMembers) {
-                                    int total_bars = bsc.bars_per_lead_max;
-                                    int remaining = state->band_solo_state.member_bars_remaining[lead];
-                                    if (total_bars > 0)
-                                        solo_progress = 1.0f - static_cast<float>(remaining) / total_bars;
-                                }
-                                for (int ti = 0; ti < member.track_count; ti++) {
-                                    int tr = member.tracks[ti];
-                                    if (tr < 0 || tr >= kNumPulsarTracks) continue;
-                                    PulsarTrackState& mts = state->tracks[tr];
-                                    generate_fill_pattern(
-                                        mts.steps, mts.step_count,
-                                        complexity, solo_progress,
-                                        state->mutation_seed);
-                                }
-                                break;
-                            }
-                            case SoloTechniqueId::STANDARD_MARKOV:
-                                // No pattern override — existing patterns play with band modifiers.
-                                break;
-                            case SoloTechniqueId::MARKOV_CONTOUR: {
-                                // Opt-in: regenerate soloist melodic patterns via second-order Markov
-                                float solo_progress = 0.5f;
-                                int lead = state->band_solo_state.lead_member;
-                                if (lead >= 0 && lead < kMaxBandMembers) {
-                                    int total_bars = bsc.bars_per_lead_max;
-                                    int remaining = state->band_solo_state.member_bars_remaining[lead];
-                                    if (total_bars > 0)
-                                        solo_progress = 1.0f - static_cast<float>(remaining) / total_bars;
-                                }
-
-                                uint8_t root = static_cast<uint8_t>(
-                                    engine->pulsar_root_note.load(std::memory_order_relaxed));
-                                int si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
-                                if (si < 0) si = 0;
-                                if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
-                                const PulsarScale& scale = kPulsarScales[si];
-
-                                for (int ti = 0; ti < member.track_count; ti++) {
-                                    int tr = member.tracks[ti];
-                                    if (tr < 0 || tr >= kNumPulsarTracks) continue;
-                                    PulsarTrackState& mts = state->tracks[tr];
-                                    bool percussive = engine->pulsar_track_percussive[tr].load(
-                                        std::memory_order_relaxed) != 0;
-                                    if (percussive) continue;
-
-                                    SoloBehaviorParam& sb = state->track_solo_behavior[tr];
-
-                                    // Seed degree from first active step's actual note
-                                    int current_degree = 0;
-                                    for (int s = 0; s < mts.step_count; s++) {
-                                        if (mts.steps[s].gate) {
-                                            int note_in_scale = (mts.steps[s].note - root + 120) % 12;
-                                            for (int d = 0; d < scale.count; d++) {
-                                                if (scale.degrees[d] == note_in_scale) {
-                                                    current_degree = d;
-                                                    break;
-                                                }
-                                            }
-                                            break;
-                                        }
-                                    }
-
-                                    for (int s = 0; s < mts.step_count; s++) {
-                                        int degree = markov_next_note(
-                                            sb, current_degree, scale.count,
-                                            solo_progress, state->mutation_seed);
-                                        if (degree >= 0) {
-                                            int d = degree % scale.count;
-                                            int octave_base = (static_cast<int>(mts.steps[s].note) / 12) * 12;
-                                            int new_note = octave_base + root + scale.degrees[d];
-                                            int original = static_cast<int>(mts.steps[s].note);
-                                            while (new_note - original > 6) new_note -= 12;
-                                            while (original - new_note > 6) new_note += 12;
-                                            new_note = std::max(24, std::min(96, new_note));
-
-                                            mts.steps[s].note = static_cast<uint8_t>(new_note);
-                                            mts.steps[s].gate = true;
-                                            mts.steps[s].velocity = 0.5f + solo_progress * 0.4f;
-                                            current_degree = degree;
-                                        } else if (degree == -1) {
-                                            mts.steps[s].gate = false;
-                                        }
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
             }
 
             if (ts.playhead >= kMaxPulsarSteps) ts.playhead = 0;

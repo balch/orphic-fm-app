@@ -798,6 +798,7 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_tension_evo_harm_prob{0.3f};
     std::atomic<float> pulsar_tension_evo_attack_point{0.5f};
     std::atomic<float> pulsar_tension_evo_release_speed{0.3f};
+    std::atomic<float> pulsar_tension_spurt_chance{0.0f};
     std::atomic<float> pulsar_track_evo_weight[8] = {
         {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}, {-1.0f}
     };

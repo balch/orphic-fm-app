@@ -16,6 +16,11 @@ kotlin {
     }
 
     sourceSets {
+        val jvmTest by getting {
+            dependencies {
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
         val commonMain by getting {
             dependencies {
                 api(project(":core:audio"))
