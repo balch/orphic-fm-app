@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,7 +18,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,12 +38,15 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.plugin.symbols.DjSource
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
+import org.balch.orpheus.ui.theme.OrpheusTheme
 import org.balch.orpheus.ui.viz.SignalTrace
 import org.balch.orpheus.ui.widgets.BenderFaderWidget
 import org.balch.orpheus.ui.widgets.RotaryKnob
@@ -108,8 +108,14 @@ fun DjPanel(
             // Deck A platter + source
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.weight(1f),
             ) {
+                SourceDropdown(
+                    source = state.sourceA,
+                    onSourceChange = actions.setSourceA,
+                    color = djColors.panelColor,
+                )
                 TurntablePlatter(
                     vizData = vizA,
                     frozen = state.frozenA,
@@ -123,11 +129,6 @@ fun DjPanel(
                     onRelease = { actions.setPlatterRelease(0) },
                     onToggleLock = { actions.toggleLock(0) },
                     modifier = Modifier.size(100.dp),
-                )
-                SourceDropdown(
-                    source = state.sourceA,
-                    onSourceChange = actions.setSourceA,
-                    color = djColors.panelColor,
                 )
             }
 
@@ -154,7 +155,7 @@ fun DjPanel(
                 // Knobs stacked vertically between faders
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     RotaryKnob(
                         value = state.delaySend,
@@ -166,6 +167,7 @@ fun DjPanel(
                         knobColor = djColors.knobColor,
                         labelColor = djColors.labelColor,
                         controlId = "dj_delay_send",
+                        valueFormatter = null,
                     )
                     RotaryKnob(
                         value = state.reverbSend,
@@ -177,6 +179,7 @@ fun DjPanel(
                         knobColor = djColors.knobColor,
                         labelColor = djColors.labelColor,
                         controlId = "dj_reverb_send",
+                        valueFormatter = null,
                     )
                 }
 
@@ -199,8 +202,14 @@ fun DjPanel(
             // Deck B platter + source
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.weight(1f),
             ) {
+                SourceDropdown(
+                    source = state.sourceB,
+                    onSourceChange = actions.setSourceB,
+                    color = djColors.panelColor,
+                )
                 TurntablePlatter(
                     vizData = vizB,
                     frozen = state.frozenB,
@@ -214,11 +223,6 @@ fun DjPanel(
                     onRelease = { actions.setPlatterRelease(1) },
                     onToggleLock = { actions.toggleLock(1) },
                     modifier = Modifier.size(100.dp),
-                )
-                SourceDropdown(
-                    source = state.sourceB,
-                    onSourceChange = actions.setSourceB,
-                    color = djColors.panelColor,
                 )
             }
         }
@@ -263,12 +267,13 @@ private fun TurntablePlatter(
     var pulseAlpha by remember { mutableStateOf(1f) }
     LaunchedEffect(Unit) {
         while (true) {
-            withFrameMillis { }
-            if (currentWet > 0.001f) {
-                rotationAngle += currentVelocity * 0.05f
+            withFrameNanos { frameNanos ->
+                if (currentWet > 0.001f) {
+                    rotationAngle += currentVelocity * 0.05f
+                }
+                val pulse = kotlin.math.abs(sin(frameNanos / 166_000_000f))
+                pulseAlpha = 0.4f + 0.6f * pulse
             }
-            val pulse = kotlin.math.abs(kotlin.math.sin(System.nanoTime() / 166_000_000f))
-            pulseAlpha = 0.4f + 0.6f * pulse
         }
     }
 
@@ -456,73 +461,146 @@ private fun TurntablePlatter(
  */
 @Composable
 private fun SourceDropdown(
+    modifier: Modifier = Modifier,
     source: DjSource,
     onSourceChange: (Int) -> Unit,
     color: Color,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
+        modifier = modifier
+            .clickable { expanded = true }
+            .clip(RoundedCornerShape(6.dp))
+            .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(start = 16.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = "SOURCE",
-            style = MaterialTheme.typography.labelSmall,
-            color = color.copy(alpha = 0.7f),
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-        )
-
-        Spacer(Modifier.height(2.dp))
-
-        Box(
-            modifier = Modifier
-                .clickable { expanded = true }
-                .clip(RoundedCornerShape(6.dp))
-                .background(OrpheusColors.darkVoid.copy(alpha = 0.6f))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            contentAlignment = Alignment.Center,
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = source.label,
-                    color = color,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Select source",
-                    tint = color,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
+            Text(
+                text = source.label,
+                color = color,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                maxLines = 1,
+            )
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = "Select source",
+                tint = color,
+                modifier = Modifier.size(16.dp),
+            )
+        }
 
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(OrpheusColors.panelSurface),
-            ) {
-                DjSource.entries.forEach { entry ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = entry.label,
-                                color = if (entry == source) color else Color.White,
-                            )
-                        },
-                        onClick = {
-                            onSourceChange(entry.sourceId)
-                            expanded = false
-                        },
-                    )
-                }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.background(OrpheusColors.panelSurface),
+        ) {
+            DjSource.entries.forEach { entry ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = entry.label,
+                            color = if (entry == source) color else Color.White,
+                        )
+                    },
+                    onClick = {
+                        onSourceChange(entry.sourceId)
+                        expanded = false
+                    },
+                )
             }
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Previews
+// ─────────────────────────────────────────────────────────────────────────────
+
+private fun previewVizData(): FloatArray =
+    FloatArray(129) { i -> if (i < 128) sin(i * PI.toFloat() / 16f) * 0.6f else 0.25f }
+
+@Preview(name = "DJ Panel — Collapsed", widthDp = 500, heightDp = 80)
+@Composable
+private fun DjPanelCollapsedPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(),
+            vizFlowA = MutableStateFlow(FloatArray(0)),
+            vizFlowB = MutableStateFlow(FloatArray(0)),
+            outVizFlow = MutableStateFlow(FloatArray(0)),
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Expanded Default", widthDp = 500, heightDp = 300)
+@Composable
+private fun DjPanelExpandedPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            isExpanded = true,
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Deck A Frozen, B Locked", widthDp = 500, heightDp = 300)
+@Composable
+private fun DjPanelFrozenLockedPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 0.8f,
+                    wetB = 0.6f,
+                    velocityA = 1.0f,
+                    velocityB = -0.5f,
+                    frozenA = true,
+                    lockedB = true,
+                    sourceA = DjSource.SYNTH,
+                    sourceB = DjSource.DRUMS,
+                    delaySend = 0.4f,
+                    reverbSend = 0.6f,
+                )
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            isExpanded = true,
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Both Decks Hot", widthDp = 500, heightDp = 300)
+@Composable
+private fun DjPanelBothDecksHotPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 1.0f,
+                    wetB = 1.0f,
+                    velocityA = 1.0f,
+                    velocityB = 1.0f,
+                    crossfader = 0.5f,
+                    delaySend = 0.7f,
+                    reverbSend = 0.9f,
+                    sourceA = DjSource.MASTER,
+                )
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            isExpanded = true,
+        )
     }
 }

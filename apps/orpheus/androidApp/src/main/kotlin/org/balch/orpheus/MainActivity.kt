@@ -8,18 +8,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Edge to edge
         enableEdgeToEdge()
-        
-        // Keep screen on — set on decorView so it survives configuration changes
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.decorView.keepScreenOn = true
-        
+
         // Full screen / Hide status bars
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -27,7 +25,20 @@ class MainActivity : ComponentActivity() {
 
         // Get the DI graph from Application (survives configuration changes)
         val graph = (application as OrpheusApplication).graph
-        
+
+        // Keep screen on only while an audio source is active (timer, Pulsar, etc.).
+        // When all sources stop (e.g. sleep timer finishes), the flag is cleared
+        // so the device can sleep.
+        lifecycleScope.launch {
+            graph.mediaSessionStateManager.isMediaSessionNeeded.collect { needed ->
+                if (needed) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+            }
+        }
+
         setContent {
             App(
                 graph = graph,

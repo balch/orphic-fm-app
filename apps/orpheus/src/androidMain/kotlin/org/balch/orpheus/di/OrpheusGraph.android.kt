@@ -10,6 +10,7 @@ import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.lifecycle.AndroidAppLifecycleManager
 import org.balch.orpheus.core.media.ForegroundServiceController
+import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.ai.ControlHighlightEventBus
 import org.balch.orpheus.util.ConsoleLogger
@@ -26,6 +27,7 @@ actual interface OrpheusGraph : ViewModelGraph {
     actual val consoleLogger: ConsoleLogger
     actual val globalTempo: GlobalTempo
     actual val controlHighlightEventBus: ControlHighlightEventBus
+    val mediaSessionStateManager: MediaSessionStateManager
 
     /**
      * Android-specific lifecycle manager for background audio handling.

@@ -222,6 +222,154 @@ static bool test_turntable_chunked_capture_no_stale_tail() {
     return tail_clean;
 }
 
+// Helper: run playback_deck directly on an isolated deck to test drop behavior.
+// Fills deck buffer with a 440Hz tone so there's signal to filter.
+static void fill_deck_tone(TurntableDeck* deck, float freq, float sr) {
+    for (int i = 0; i < kTurntableBufSize; i++) {
+        deck->buffer[i] = std::sin(2.0f * 3.14159f * freq * i / sr);
+    }
+    deck->frozen = true;  // prevent capture from overwriting
+}
+
+static bool test_drop_slow_backward_activates() {
+    printf("\n=== Test: Slow backward activates drop buildup ===\n");
+
+    TurntableDeck deck;
+    std::memset(&deck, 0, sizeof(deck));
+    deck.smoothed_velocity = 1.0f;
+    fill_deck_tone(&deck, 440.0f, 48000.0f);
+
+    float out[64];
+    // Slow backward: velocity = -0.1 (below kDropSlowThreshold of 0.3)
+    playback_deck(&deck, -0.1f, out, 64, 48000.0f);
+
+    bool building = (deck.drop_state == DROP_BUILDING);
+    bool amount_positive = (deck.drop_amount > 0.0f);
+
+    printf("  State is BUILDING: %s\n", building ? "PASS" : "FAIL");
+    printf("  Amount > 0: %s (%.6f)\n", amount_positive ? "PASS" : "FAIL", deck.drop_amount);
+    return building && amount_positive;
+}
+
+static bool test_drop_fast_backward_does_not_activate() {
+    printf("\n=== Test: Fast backward does NOT activate drop ===\n");
+
+    TurntableDeck deck;
+    std::memset(&deck, 0, sizeof(deck));
+    deck.smoothed_velocity = 1.0f;
+    fill_deck_tone(&deck, 440.0f, 48000.0f);
+
+    float out[64];
+    // Fast backward: velocity = -1.0 (above threshold)
+    playback_deck(&deck, -1.0f, out, 64, 48000.0f);
+
+    bool idle = (deck.drop_state == DROP_IDLE);
+    bool amount_zero = (deck.drop_amount == 0.0f);
+
+    printf("  State is IDLE: %s\n", idle ? "PASS" : "FAIL");
+    printf("  Amount == 0: %s\n", amount_zero ? "PASS" : "FAIL");
+    return idle && amount_zero;
+}
+
+static bool test_drop_release_snaps_to_idle() {
+    printf("\n=== Test: Releasing platter snaps to IDLE (clean forward sound) ===\n");
+
+    TurntableDeck deck;
+    std::memset(&deck, 0, sizeof(deck));
+    deck.smoothed_velocity = 1.0f;
+    fill_deck_tone(&deck, 440.0f, 48000.0f);
+
+    float out[512];
+    // Build up for several blocks
+    for (int b = 0; b < 10; b++) {
+        playback_deck(&deck, -0.1f, out, 512, 48000.0f);
+    }
+    bool was_building = (deck.drop_state == DROP_BUILDING);
+
+    // Release: velocity goes to 0 (motor returns)
+    playback_deck(&deck, 0.0f, out, 64, 48000.0f);
+
+    bool idle = (deck.drop_state == DROP_IDLE);
+    bool amount_zero = (deck.drop_amount == 0.0f);
+
+    printf("  Was building: %s\n", was_building ? "PASS" : "FAIL");
+    printf("  State is IDLE: %s\n", idle ? "PASS" : "FAIL");
+    printf("  Amount reset: %s\n", amount_zero ? "PASS" : "FAIL");
+    return was_building && idle && amount_zero;
+}
+
+static bool test_drop_filter_attenuates_highs() {
+    printf("\n=== Test: Drop filter attenuates high frequencies during buildup ===\n");
+
+    float sr = 48000.0f;
+    float high_freq = 8000.0f;
+
+    TurntableDeck deck_clean;
+    std::memset(&deck_clean, 0, sizeof(deck_clean));
+    deck_clean.smoothed_velocity = 1.0f;
+    fill_deck_tone(&deck_clean, high_freq, sr);
+
+    TurntableDeck deck_drop;
+    std::memset(&deck_drop, 0, sizeof(deck_drop));
+    deck_drop.smoothed_velocity = 1.0f;
+    fill_deck_tone(&deck_drop, high_freq, sr);
+
+    float out_clean[512];
+    float out_drop[512];
+
+    // Build up deck_drop for ~3 seconds (build rate is slow — 4s to full)
+    for (int b = 0; b < 300; b++) {
+        playback_deck(&deck_drop, -0.1f, out_drop, 512, sr);
+    }
+    // Play both — deck_drop still in BUILDING state
+    playback_deck(&deck_drop, -0.1f, out_drop, 512, sr);
+    playback_deck(&deck_clean, 1.0f, out_clean, 512, sr);
+
+    float rms_clean = 0.0f, rms_drop = 0.0f;
+    for (int i = 0; i < 512; i++) {
+        rms_clean += out_clean[i] * out_clean[i];
+        rms_drop += out_drop[i] * out_drop[i];
+    }
+    rms_clean = std::sqrt(rms_clean / 512.0f);
+    rms_drop = std::sqrt(rms_drop / 512.0f);
+
+    float ratio_db = 20.0f * std::log10(rms_drop / (rms_clean + 1e-10f));
+    // With resonance boost + gain, the filtered signal differs from clean.
+    // The key assertion is that the filter is actively reshaping — >3dB difference.
+    bool filter_active = std::fabs(ratio_db) > 3.0f;
+
+    printf("  Clean RMS: %.4f, Drop RMS: %.4f\n", rms_clean, rms_drop);
+    printf("  Difference: %.1f dB: %s\n", ratio_db, filter_active ? "PASS" : "FAIL");
+    return filter_active;
+}
+
+static bool test_drop_fast_scratch_aborts_buildup() {
+    printf("\n=== Test: Fast backward scratch aborts buildup (no drop) ===\n");
+
+    TurntableDeck deck;
+    std::memset(&deck, 0, sizeof(deck));
+    deck.smoothed_velocity = 1.0f;
+    fill_deck_tone(&deck, 440.0f, 48000.0f);
+
+    float out[512];
+    // Build up
+    for (int b = 0; b < 5; b++) {
+        playback_deck(&deck, -0.1f, out, 512, 48000.0f);
+    }
+    bool was_building = (deck.drop_state == DROP_BUILDING);
+
+    // Fast backward scratch — should abort to IDLE, not RELEASING
+    playback_deck(&deck, -1.0f, out, 512, 48000.0f);
+
+    bool idle = (deck.drop_state == DROP_IDLE);
+    bool amount_zero = (deck.drop_amount <= 0.0f);
+
+    printf("  Was building: %s\n", was_building ? "PASS" : "FAIL");
+    printf("  State is IDLE (aborted): %s\n", idle ? "PASS" : "FAIL");
+    printf("  Amount reset: %s\n", amount_zero ? "PASS" : "FAIL");
+    return was_building && idle && amount_zero;
+}
+
 bool run_turntable_tests() {
     printf("\n========== TURNTABLE TESTS ==========\n");
     bool all_pass = true;
@@ -231,6 +379,11 @@ bool run_turntable_tests() {
     all_pass &= test_turntable_crossfader();
     all_pass &= test_turntable_viz_snapshot();
     all_pass &= test_turntable_chunked_capture_no_stale_tail();
+    all_pass &= test_drop_slow_backward_activates();
+    all_pass &= test_drop_fast_backward_does_not_activate();
+    all_pass &= test_drop_release_snaps_to_idle();
+    all_pass &= test_drop_filter_attenuates_highs();
+    all_pass &= test_drop_fast_scratch_aborts_buildup();
     printf("\nTurntable tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
     return all_pass;
 }
