@@ -261,14 +261,14 @@ class PulsarViewModel(
     private val trackEnvelopeIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ENVELOPE.ordinal + i].controlId)
     }
-    private val trackPercussiveIds = (0..7).map { i ->
-        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PERCUSSIVE.ordinal + i].controlId)
+    private val trackRoleIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ROLE.ordinal + i].controlId)
     }
     private val trackBarStrategyIds = (0..7).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_BAR_STRATEGY.ordinal + i].controlId)
     }
-    private val trackMarkovContourIds = (0..7).map { i ->
-        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_MARKOV_CONTOUR.ordinal + i].controlId)
+    private val trackEvoRhythmicIds = (0..7).map { i ->
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_RHYTHMIC.ordinal + i].controlId)
     }
     private val stepCountId = synthController.controlFlow(PulsarSymbol.STEP_COUNT.controlId)
     private val trackMacroIds = (0..7).map { t ->
@@ -349,7 +349,11 @@ class PulsarViewModel(
     private val trackReverbBrightnessIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_REVERB_BRIGHTNESS.ordinal + it].controlId) }
     private val trackDelayFeedbackIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DELAY_FEEDBACK_TRACK.ordinal + it].controlId) }
     private val trackGlideRateIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GLIDE_RATE.ordinal + it].controlId) }
-    private val trackUseLickIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_USE_LICK.ordinal + it].controlId) }
+    private val trackLickModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_MODE.ordinal + it].controlId) }
+    private val trackEvoTensionRespIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + it].controlId) }
+    private val trackEvoNoteFollowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + it].controlId) }
+    private val trackEvoPitchModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_PITCH_MODE.ordinal + it].controlId) }
+    private val trackEvoVoicingTensionIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_VOICING_TENSION.ordinal + it].controlId) }
 
     private val muteSymbols = listOf(
         PulsarSymbol.TRACK_0_MUTE, PulsarSymbol.TRACK_1_MUTE,
@@ -745,9 +749,19 @@ class PulsarViewModel(
             trackTimbreIds[i].value = FloatValue(tv.timbre)
             trackMorphIds[i].value = FloatValue(tv.morph)
             trackEnvelopeIds[i].value = IntValue(tv.envelopeProfile.id)
-            trackPercussiveIds[i].value = IntValue(if (tv.isPercussive) 1 else 0)
+            trackRoleIds[i].value = IntValue(tv.role.ordinal)
             trackBarStrategyIds[i].value = IntValue(tv.barStrategy.id)
-            trackMarkovContourIds[i].value = IntValue(if (tv.markovContour) 1 else 0)
+            trackEvoRhythmicIds[i].value = IntValue(if (tv.evolution.rhythmic != null) 1 else 0)
+            trackEvoTensionRespIds[i].value = FloatValue(tv.evolution.rhythmic?.tensionResponse ?: 1.0f)
+            trackEvoNoteFollowIds[i].value = IntValue(tv.evolution.rhythmic?.noteFollow?.ordinal ?: 0)
+            trackEvoPitchModeIds[i].value = IntValue(when (tv.evolution.pitch) {
+                null -> 0
+                is PitchEvolution.Contour -> 1
+                is PitchEvolution.Voicing -> 2
+            })
+            trackEvoVoicingTensionIds[i].value = FloatValue(
+                (tv.evolution.pitch as? PitchEvolution.Voicing)?.tensionResponse ?: 1.0f
+            )
             pushMacroMap(i, tv.macroMap)
             trackModLfoRateIds[i].value = FloatValue(tv.modLfoRate)
             trackModLfoDepthIds[i].value = FloatValue(tv.modLfoDepth)
@@ -762,7 +776,11 @@ class PulsarViewModel(
             genreDensityIds[i].value = FloatValue(tv.density)
             trackDelayFeedbackIds[i].value = FloatValue(tv.delayFeedback ?: -1f)
             trackGlideRateIds[i].value = FloatValue(tv.glideRate)
-            trackUseLickIds[i].value = IntValue(if (tv.useLick) 1 else 0)
+            trackLickModeIds[i].value = IntValue(when (tv.lickMode) {
+                is LickMode.None -> 0
+                is LickMode.Squash -> 1
+                is LickMode.Fill -> 2
+            })
         }
         stepCountId.value = IntValue(vibe.stepCount)
         pushEffectiveSends(deepId.value.asFloat())
@@ -1195,7 +1213,7 @@ class PulsarViewModel(
                 noteRangeHigh = 72,
                 rhythmDensity = RhythmPattern.SPARSE.density,
             ),
-            tracks = List(8) { TrackVoice(engineEdm = Engine.VA, engineSpace = Engine.VA, isPercussive = it < 3) },
+            tracks = List(8) { TrackVoice(engineEdm = Engine.VA, engineSpace = Engine.VA, role = if (it < 3) TrackRole.PERCUSSIVE else TrackRole.MELODIC) },
         )
 
         fun previewFeature(state: PulsarUiState = PulsarUiState(

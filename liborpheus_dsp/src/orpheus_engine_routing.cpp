@@ -749,12 +749,12 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_morph[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "envelope") == 0)
                 engine->pulsar_track_envelope[t].store(static_cast<int>(value), std::memory_order_relaxed);
-            else if (std::strcmp(param, "percussive") == 0)
-                engine->pulsar_track_percussive[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "role") == 0)
+                engine->pulsar_track_role[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "bar_strategy") == 0)
                 engine->pulsar_track_bar_strategy[t].store(static_cast<int>(value), std::memory_order_relaxed);
-            else if (std::strcmp(param, "markov_contour") == 0)
-                engine->pulsar_track_markov_contour[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "evo_rhythmic") == 0)
+                engine->pulsar_track_evo_rhythmic[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "evo_weight") == 0)
                 engine->pulsar_track_evo_weight[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "mute") == 0)
@@ -789,8 +789,16 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_delay_feedback[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "glide_rate") == 0)
                 engine->pulsar_track_glide_rate[t].store(value, std::memory_order_relaxed);
-            else if (std::strcmp(param, "use_lick") == 0)
-                engine->pulsar_track_use_lick[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "lick_mode") == 0)
+                engine->pulsar_track_lick_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "evo_tension_resp") == 0)
+                engine->pulsar_track_evo_tension_resp[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "evo_note_follow") == 0)
+                engine->pulsar_track_evo_note_follow[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "evo_pitch_mode") == 0)
+                engine->pulsar_track_evo_pitch_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "evo_voicing_tension") == 0)
+                engine->pulsar_track_evo_voicing_tension[t].store(value, std::memory_order_relaxed);
             else if (std::strncmp(param, "macro_", 6) == 0) {
                 const char* macro = param + 6;
                 auto& m = engine->pulsar_track_macros[t];

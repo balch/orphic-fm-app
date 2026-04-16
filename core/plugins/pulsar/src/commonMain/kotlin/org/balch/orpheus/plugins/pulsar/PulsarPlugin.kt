@@ -60,7 +60,7 @@ class PulsarPlugin : DspPlugin {
     private var _trackTimbre = FloatArray(8) { 0.5f }
     private var _trackMorph = FloatArray(8) { 0.3f }
     private var _trackEnvelope = IntArray(8) { 0 }
-    private var _trackPercussive = intArrayOf(1, 1, 1, 0, 0, 0, 0, 0)
+    private var _trackRole = IntArray(8) { if (it < 3) 0 else 1 }
     private val _trackBarStrategy = IntArray(8) { 0 }
     private var _stepCount = 16
     private var _trackMacro = FloatArray(8 * 16) { 0.5f }
@@ -112,7 +112,12 @@ class PulsarPlugin : DspPlugin {
     private val _densityOverride = FloatArray(8) { -1f }
     private val _delayFeedbackTrack = FloatArray(8) { -1f }
     private val _glideRate = FloatArray(8) { 0f }
-    private val _useLick = IntArray(8) { 0 }
+    private val _trackLickMode = IntArray(8) { 0 }
+    private val _trackEvoRhythmic = IntArray(8) { 0 }
+    private val _trackEvoTensionResp = FloatArray(8) { 1.0f }
+    private val _trackEvoNoteFollow = IntArray(8) { 0 }
+    private val _trackEvoPitchMode = IntArray(8) { 0 }
+    private val _trackEvoVoicingTension = FloatArray(8) { 1.0f }
 
     private val portDefs = ports(startIndex = 0) {
         controlPort(PulsarSymbol.PLAYING) {
@@ -227,13 +232,18 @@ class PulsarPlugin : DspPlugin {
             }
         }
         for (t in 0..7) {
-            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_PERCUSSIVE.ordinal + t]) {
-                intType { default = _trackPercussive[t]; get { _trackPercussive[t] }; set { _trackPercussive[t] = it } }
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ROLE.ordinal + t]) {
+                intType { default = _trackRole[t]; get { _trackRole[t] }; set { _trackRole[t] = it } }
             }
         }
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_BAR_STRATEGY.ordinal + t]) {
                 intType { default = _trackBarStrategy[t]; get { _trackBarStrategy[t] }; set { _trackBarStrategy[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_RHYTHMIC.ordinal + t]) {
+                intType { default = 0; get { _trackEvoRhythmic[t] }; set { _trackEvoRhythmic[t] = it } }
             }
         }
         controlPort(PulsarSymbol.STEP_COUNT) {
@@ -441,8 +451,28 @@ class PulsarPlugin : DspPlugin {
             }
         }
         for (t in 0..7) {
-            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_USE_LICK.ordinal + t]) {
-                intType { default = 0; min = 0; max = 1; get { _useLick[t] }; set { _useLick[t] = it } }
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_MODE.ordinal + t]) {
+                intType { default = 0; get { _trackLickMode[t] }; set { _trackLickMode[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + t]) {
+                floatType { default = 1.0f; min = 0f; max = 1f; get { _trackEvoTensionResp[t] }; set { _trackEvoTensionResp[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + t]) {
+                intType { default = 0; get { _trackEvoNoteFollow[t] }; set { _trackEvoNoteFollow[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_PITCH_MODE.ordinal + t]) {
+                intType { default = 0; get { _trackEvoPitchMode[t] }; set { _trackEvoPitchMode[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_VOICING_TENSION.ordinal + t]) {
+                floatType { default = 1.0f; min = 0f; max = 1f; get { _trackEvoVoicingTension[t] }; set { _trackEvoVoicingTension[t] = it } }
             }
         }
     }

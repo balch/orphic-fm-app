@@ -21,7 +21,7 @@ data class LickStep(
 
 /**
  * A repeating melodic figure (bass riff). Assign to a [Vibe] and set
- * `useLick = true` on the track that should play it.
+ * `lickMode = LickMode.Fill` (or `Squash`) on the track that should play it.
  * @param steps The note sequence. Max 32 steps.
  * @param loopLength Total loop length in **beats**. When larger than the sum of step
  *   durations, the extra time is silence (rest padding). E.g. a 4-beat lick with
@@ -209,6 +209,100 @@ enum class BarStrategy(val id: Int) {
 }
 
 /**
+ * Track behavior role — determines pattern generation, pitch handling, and which
+ * evolution dimensions are available.
+ */
+@Serializable
+enum class TrackRole {
+    /** Drums — fixed pitch, rhythm patterns. */
+    PERCUSSIVE,
+    /** Single notes — scale-quantized, lick-capable. */
+    MELODIC,
+    /** Chord voicings — progression-following, comping patterns. */
+    CHORDAL,
+}
+
+/**
+ * How a track maps the vibe's [Lick] to sequencer steps.
+ * Only meaningful when [TrackVoice.role] is [TrackRole.MELODIC].
+ */
+@Serializable
+sealed class LickMode {
+    /** No lick — track uses generative patterns. */
+    @Serializable
+    data object None : LickMode()
+
+    /** Compress lick to fit within one bar. In 32-step mode, the second
+     *  half is handled by the bar strategy. */
+    @Serializable
+    data object Squash : LickMode()
+
+    /** Lick spans the full step count as a single continuous phrase.
+     *  Bypasses the bar 1/bar 2 split entirely. */
+    @Serializable
+    data object Fill : LickMode()
+}
+
+/**
+ * How moved notes relate to their melodic content during MUTATE transforms.
+ * Only meaningful for [TrackRole.MELODIC] tracks with rhythmic evolution.
+ */
+@Serializable
+enum class NoteFollowMode {
+    /** Notes keep their identity, shift in time with the step. */
+    SLIDE,
+    /** Rhythmic positions keep their role, notes get redistributed. */
+    CONTOUR,
+    /** Blend — notes partially follow position, partially follow identity. */
+    BLEND,
+}
+
+/**
+ * Pitch/voicing evolution — role-specific.
+ * Use [Contour] for MELODIC tracks (Markov pitch drift),
+ * [Voicing] for CHORDAL tracks (inversion shifts, chord substitution).
+ */
+@Serializable
+sealed class PitchEvolution {
+    /** Markov contour for MELODIC tracks — second-order pitch drift. */
+    @Serializable
+    data class Contour(
+        val driftRange: Float = 0.1f,
+    ) : PitchEvolution()
+
+    /** Voicing evolution for CHORDAL tracks — inversion shifts and chord substitution. */
+    @Serializable
+    data class Voicing(
+        val tensionResponse: Float = 1.0f,
+    ) : PitchEvolution()
+}
+
+/**
+ * Rhythmic position evolution via MUTATE transforms (SHIFT/SYNCOPATE/RESHAPE).
+ * Works for all [TrackRole]s.
+ */
+@Serializable
+data class RhythmicEvolution(
+    /** How much tension drives transform intensity.
+     *  0 = always SHIFT, 1 = full SHIFT→SYNCOPATE→RESHAPE arc. */
+    val tensionResponse: Float = 1.0f,
+    /** How moved notes relate to their melodic content. Only meaningful for MELODIC tracks. */
+    val noteFollow: NoteFollowMode = NoteFollowMode.SLIDE,
+)
+
+/**
+ * Per-track evolution config. Composes rhythmic (position) and pitch (content)
+ * evolution independently. Both can be active simultaneously.
+ */
+@Serializable
+data class Evolution(
+    /** Rhythmic position evolution via MUTATE transforms. Null = no rhythmic evolution. */
+    val rhythmic: RhythmicEvolution? = null,
+    /** Pitch/voicing evolution. Null = no pitch evolution. */
+    val pitch: PitchEvolution? = null,
+)
+
+/**
  * One of 8 tracks in a Vibe. Each track is a voice with its own engine, density,
  * envelope shape, and effect sends. Convention: tracks 0-2 = rhythm (kick/snare/hat),
  * 3-4 = melodic, 5-6 = texture/effects, 7 = wild card — but any track can use any engine.
@@ -223,8 +317,7 @@ enum class BarStrategy(val id: Int) {
  * @param engineEdm Plaits engine used when the vibe leans EDM (high energy).
  * @param engineSpace Plaits engine used when the vibe leans Space (low energy).
  *   The engine crossfades between EDM and Space based on the energy macro.
- * @param isPercussive If true, note pitch is ignored (drums/noise). If false, notes
- *   are quantized to the vibe's scale.
+ * @param role Track behavior role — determines pattern generation and pitch handling.
  * @param volume Track volume 0-1. Start around 0.8 for leads, 0.3-0.5 for texture.
  * @param pan Stereo position: -1.0 = hard left, 0.0 = center, 1.0 = hard right.
  * @param density Probability that a step gets a note, 0-1.
@@ -252,13 +345,14 @@ enum class BarStrategy(val id: Int) {
  * @param reverbBrightness Per-track reverb color: 0 = dark/warm, 1 = bright/shimmery.
  * @param delayFeedback Per-track delay feedback override (null = use vibe's global setting).
  * @param glideRate Portamento speed: 0 = instant, 0.3 = smooth, 1.0 = very slow (~2s).
- * @param useLick If true, this track plays the vibe's lick pattern instead of generated notes.
+ * @param lickMode How this track maps the vibe's lick to sequencer steps.
+ * @param evolution Per-track evolution config for rhythmic and pitch evolution.
  */
 @Serializable
 data class TrackVoice(
     val engineEdm: Engine,
     val engineSpace: Engine,
-    val isPercussive: Boolean,
+    val role: TrackRole = TrackRole.PERCUSSIVE,
     val volume: Float = 0.8f,
     val pan: Float = 0.0f,
     val density: Float = 0.5f,
@@ -285,8 +379,8 @@ data class TrackVoice(
     val reverbBrightness: Float = 0.5f,
     val delayFeedback: Float? = null,
     val glideRate: Float = 0.0f,
-    val useLick: Boolean = false,
-    val markovContour: Boolean = false,
+    val lickMode: LickMode = LickMode.None,
+    val evolution: Evolution = Evolution(),
 )
 
 /**
@@ -431,14 +525,14 @@ data class TensionProfile(
  * 2. Set **energy/complexity/space/mood/deep** macro defaults (0-1).
  *    These are the starting positions of the 5 knobs the user can tweak live.
  * 3. Define 8 **tracks** with engines, density, volume, and effect sends.
- * 4. Optionally add a **lick** (bass riff pattern) and mark one track with `useLick = true`.
+ * 4. Optionally add a **lick** (bass riff pattern) and set `lickMode = LickMode.Fill` on one track.
  * 5. Tune **effects** for the delay/reverb character.
  * 6. Set **tension** for build-and-release arcs.
  * 7. Optionally add an **arrangement** for section-based structure (verse/chorus/solo).
  *
  * @param name Display name for the vibe selector.
  * @param tracks Exactly 8 tracks. See [TrackVoice] for per-track tuning.
- * @param lick Optional bass riff pattern. Tracks with `useLick = true` play this.
+ * @param lick Optional bass riff pattern. Tracks with `lickMode` set to Squash or Fill play this.
  * @param lickMutation How much the lick varies on repeat, 0-1. 0 = exact, 0.5 = moderate drift.
  * @param lickOctave MIDI octave for the lick. -1 = auto (midpoint of noteRange), 0-8 = explicit.
  * @param seed Random seed for pattern generation. Same seed = same patterns. 0 = random.

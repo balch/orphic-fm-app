@@ -24,6 +24,7 @@ import org.balch.orpheus.features.pulsar.SoloMode
 import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TonalTension
 import org.balch.orpheus.features.pulsar.TrackMacroMap
+import org.balch.orpheus.features.pulsar.TrackRole
 import org.balch.orpheus.features.pulsar.TrackVoice
 import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
@@ -82,24 +83,24 @@ class CosmicTechnoVibe : VibeProvider {
             chordsPerBar = 2,
         ),
         tracks = listOf(
-            TrackVoice(engineEdm = Engine.BD,  engineSpace = Engine.MOD, isPercussive = true,  volume = 0.90f, pan =  0.00f, density = 0.50f, envelopeProfile = EnvelopeProfile.RHYTHM,  macroMap = TrackMacroMap.RHYTHM,  barStrategy = BarStrategy.REPEAT),
-            TrackVoice(engineEdm = Engine.SD,  engineSpace = Engine.NSE, isPercussive = true,  volume = 0.60f, pan = -0.15f, density = 0.35f, envelopeProfile = EnvelopeProfile.RHYTHM,  macroMap = TrackMacroMap.RHYTHM,  barStrategy = BarStrategy.MUTATE),
-            TrackVoice(engineEdm = Engine.HH,  engineSpace = Engine.HH,  isPercussive = true,  volume = 0.65f, pan =  0.20f, density = 0.80f, envelopeProfile = EnvelopeProfile.RHYTHM,  macroMap = TrackMacroMap.RHYTHM,  barStrategy = BarStrategy.MUTATE),
-            TrackVoice(engineEdm = Engine.WSH, engineSpace = Engine.STR, isPercussive = false, volume = 0.75f, pan =  0.00f, density = 0.40f, envelopeProfile = EnvelopeProfile.MELODIC, macroMap = TrackMacroMap.MELODIC, barStrategy = BarStrategy.MUTATE,
+            TrackVoice(engineEdm = Engine.BD,  engineSpace = Engine.MOD, role = TrackRole.PERCUSSIVE,  volume = 0.90f, pan =  0.00f, density = 0.50f, envelopeProfile = EnvelopeProfile.RHYTHM,  macroMap = TrackMacroMap.RHYTHM,  barStrategy = BarStrategy.REPEAT),
+            TrackVoice(engineEdm = Engine.SD,  engineSpace = Engine.NSE, role = TrackRole.PERCUSSIVE,  volume = 0.60f, pan = -0.15f, density = 0.35f, envelopeProfile = EnvelopeProfile.RHYTHM,  macroMap = TrackMacroMap.RHYTHM,  barStrategy = BarStrategy.MUTATE),
+            TrackVoice(engineEdm = Engine.HH,  engineSpace = Engine.HH,  role = TrackRole.PERCUSSIVE,  volume = 0.65f, pan =  0.20f, density = 0.80f, envelopeProfile = EnvelopeProfile.RHYTHM,  macroMap = TrackMacroMap.RHYTHM,  barStrategy = BarStrategy.MUTATE),
+            TrackVoice(engineEdm = Engine.WSH, engineSpace = Engine.STR, role = TrackRole.MELODIC, volume = 0.75f, pan =  0.00f, density = 0.40f, envelopeProfile = EnvelopeProfile.MELODIC, macroMap = TrackMacroMap.MELODIC, barStrategy = BarStrategy.MUTATE,
                 noteRangeLow = 30, noteRangeHigh = 54, reverbBrightness = 0.5f),
-            TrackVoice(engineEdm = Engine.CHD, engineSpace = Engine.ENS, isPercussive = false, volume = 0.55f, pan = -0.25f, density = 0.30f, envelopeProfile = EnvelopeProfile.MELODIC, macroMap = TrackMacroMap.MELODIC, barStrategy = BarStrategy.MUTATE,
+            TrackVoice(engineEdm = Engine.CHD, engineSpace = Engine.ENS, role = TrackRole.MELODIC, volume = 0.55f, pan = -0.25f, density = 0.30f, envelopeProfile = EnvelopeProfile.MELODIC, macroMap = TrackMacroMap.MELODIC, barStrategy = BarStrategy.MUTATE,
                 noteRangeLow = 48, noteRangeHigh = 72, reverbBrightness = 0.5f, glideRate = 0.05f),
-            TrackVoice(engineEdm = Engine.CHD, engineSpace = Engine.CHD, isPercussive = false, volume = 0.40f, pan = -0.35f, density = 0.20f, envelopeProfile = EnvelopeProfile.EFFECT,  macroMap = TrackMacroMap.EFFECT,  barStrategy = BarStrategy.INDEPENDENT,
+            TrackVoice(engineEdm = Engine.CHD, engineSpace = Engine.CHD, role = TrackRole.MELODIC, volume = 0.40f, pan = -0.35f, density = 0.20f, envelopeProfile = EnvelopeProfile.EFFECT,  macroMap = TrackMacroMap.EFFECT,  barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.5f, modLfoDepth = 0.3f, modLfoShape = 0.3f, modLfoCoupling = 0.1f,
                 holdProbability = 0.1f, holdLengthMin = 2, holdLengthMax = 4,
                 reverbSend = 0.1f, delaySend = 0.15f,
                 noteRangeLow = 36, noteRangeHigh = 60, reverbBrightness = 0.5f),
-            TrackVoice(engineEdm = Engine.NSE, engineSpace = Engine.NSE, isPercussive = true,  volume = 0.30f, pan =  0.30f, density = 0.15f, envelopeProfile = EnvelopeProfile.EFFECT,  macroMap = TrackMacroMap.EFFECT,  barStrategy = BarStrategy.INDEPENDENT,
+            TrackVoice(engineEdm = Engine.NSE, engineSpace = Engine.NSE, role = TrackRole.PERCUSSIVE,  volume = 0.30f, pan =  0.30f, density = 0.15f, envelopeProfile = EnvelopeProfile.EFFECT,  macroMap = TrackMacroMap.EFFECT,  barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.4f, modLfoDepth = 0.25f, modLfoShape = 0.4f, modLfoCoupling = 0.1f,
                 holdProbability = 0.05f, holdLengthMin = 2, holdLengthMax = 3,
                 reverbSend = 0.1f, delaySend = 0.1f,
                 noteRangeLow = 36, noteRangeHigh = 60, reverbBrightness = 0.5f),
-            TrackVoice(engineEdm = Engine.MOD, engineSpace = Engine.STR, isPercussive = false, volume = 0.25f, pan =  0.40f, density = 0.08f, envelopeProfile = EnvelopeProfile.WILD,    macroMap = TrackMacroMap.WILD,    barStrategy = BarStrategy.INDEPENDENT,
+            TrackVoice(engineEdm = Engine.MOD, engineSpace = Engine.STR, role = TrackRole.MELODIC, volume = 0.25f, pan =  0.40f, density = 0.08f, envelopeProfile = EnvelopeProfile.WILD,    macroMap = TrackMacroMap.WILD,    barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.6f, modLfoDepth = 0.2f, modLfoShape = 0.5f, modLfoCoupling = 0.15f,
                 holdProbability = 0.0f, holdLengthMin = 2, holdLengthMax = 4,
                 reverbSend = 0.15f, delaySend = 0.1f,

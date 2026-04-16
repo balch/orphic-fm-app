@@ -25,7 +25,11 @@ import org.balch.orpheus.features.pulsar.SectionTransition
 import org.balch.orpheus.features.pulsar.SoloMode
 import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TrackMacroMap
+import org.balch.orpheus.features.pulsar.TrackRole
 import org.balch.orpheus.features.pulsar.TrackVoice
+import org.balch.orpheus.features.pulsar.LickMode
+import org.balch.orpheus.features.pulsar.Evolution
+import org.balch.orpheus.features.pulsar.PitchEvolution
 import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
 import org.balch.orpheus.features.pulsar.VibeProvider
@@ -126,7 +130,7 @@ class DeepSpaceVibe : VibeProvider {
             // Modal resonator, sparse deep hits, iconic single-note punctuation
             TrackVoice(
                 engineEdm = Engine.MOD, engineSpace = Engine.MOD,
-                density = 0.29f, isPercussive = false, volume = 0.90f, pan = 0.0f,
+                density = 0.29f, role = TrackRole.MELODIC, volume = 0.90f, pan = 0.0f,
                 harmonics = 0.35f, timbre = 0.25f, morph = 0.55f,
                 envelopeProfile = EnvelopeProfile.RHYTHM,
                 macroMap = TrackMacroMap.MELODIC,
@@ -137,7 +141,7 @@ class DeepSpaceVibe : VibeProvider {
             // 1 PERC: Ride shimmer — light metallic texture, like distant cymbals
             TrackVoice(
                 engineEdm = Engine.STR, engineSpace = Engine.STR,
-                density = 0.42f, isPercussive = false, volume = 0.9f, pan = -0.25f,
+                density = 0.42f, role = TrackRole.MELODIC, volume = 0.9f, pan = -0.25f,
                 harmonics = 0.45f, timbre = 0.35f, morph = 0.15f,
                 envelopeProfile = EnvelopeProfile.RHYTHM,
                 macroMap = TrackMacroMap.MELODIC,
@@ -148,7 +152,7 @@ class DeepSpaceVibe : VibeProvider {
             // 2 HH: Wind/atmosphere — crystalline particle scatter, like wind through a canyon
             TrackVoice(
                 engineEdm = Engine.PAR, engineSpace = Engine.PAR,
-                density = 0.7f, isPercussive = false, volume = 0.9f, pan = 0.3f,
+                density = 0.7f, role = TrackRole.MELODIC, volume = 0.9f, pan = 0.3f,
                 harmonics = 1f, timbre = 0.5f, morph = 1f,
                 envelopeProfile = EnvelopeProfile.DRONE,
                 macroMap = TrackMacroMap.EFFECT,
@@ -163,7 +167,7 @@ class DeepSpaceVibe : VibeProvider {
             // 3 BASS: The Echoes bass riff — PD for warm dark bass, lick-driven
             TrackVoice(
                 engineEdm = Engine.PD, engineSpace = Engine.PD,
-                isPercussive = false, volume = 0.22f, pan = 0.0f, density = 0.14f,
+                role = TrackRole.MELODIC, volume = 0.22f, pan = 0.0f, density = 0.14f,
                 harmonics = 0.5f, timbre = 0.55f, morph = 0.1f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
                 macroMap = TrackMacroMap.MELODIC,
@@ -172,13 +176,13 @@ class DeepSpaceVibe : VibeProvider {
                 reverbBrightness = 0.5f, reverbSend = 0.2f, delaySend = 0.3f,
                 glideRate = 0.5f,
                 holdProbability = 0.9f, holdLengthMin = 6, holdLengthMax = 16,
-                useLick = true,
+                lickMode = LickMode.Fill,
             ),
             // 4 KEYS: Evolving drone — VA (warm organ) at high energy, ENS (lush pad) at low
             // Long sustains with slow timbral drift. LFO sweeps harmonics/timbre for builds.
             TrackVoice(
                 engineEdm = Engine.VA, engineSpace = Engine.ENS,
-                density = 0.12f, isPercussive = false, volume = 0.70f, pan = -0.1f,
+                density = 0.12f, role = TrackRole.MELODIC, volume = 0.70f, pan = -0.1f,
                 harmonics = 0.25f, timbre = 0.2f, morph = 0.1f,
                 envelopeProfile = EnvelopeProfile.DRONE,
                 macroMap = TrackMacroMap.MELODIC,
@@ -188,7 +192,7 @@ class DeepSpaceVibe : VibeProvider {
                 modLfoRate = 0.015f, modLfoDepth = 0.7f, modLfoShape = 0.1f, modLfoCoupling = 0.4f,
                 glideRate = 0.6f,
                 holdProbability = 0.5f, holdLengthMin = 6, holdLengthMax = 22,
-                markovContour = true,
+                evolution = Evolution(pitch = PitchEvolution.Contour()),
             ),
 
             // ═══════════════════════════════════════════════════════════
@@ -198,7 +202,7 @@ class DeepSpaceVibe : VibeProvider {
             // 5 PAD (Guitar): Gilmour guitar — resonant STR, high harmonics, delay+reverb
             TrackVoice(
                 engineEdm = Engine.STR, engineSpace = Engine.STR,
-                isPercussive = false, volume = 0.65f, pan = 0.2f, density = 0.22f,
+                role = TrackRole.MELODIC, volume = 0.65f, pan = 0.2f, density = 0.22f,
                 harmonics = 0.9f, timbre = 0.5f, morph = 0.1f,
                 envelopeProfile = EnvelopeProfile.DRONE,
                 macroMap = TrackMacroMap.MELODIC,
@@ -212,7 +216,7 @@ class DeepSpaceVibe : VibeProvider {
             // 6 TEXTURE: Seagull/void sounds — particle clouds for the atonal middle section
             TrackVoice(
                 engineEdm = Engine.PAR, engineSpace = Engine.PAR,
-                isPercussive = false, volume = 0.50f, pan = -0.35f, density = 0.16f,
+                role = TrackRole.MELODIC, volume = 0.50f, pan = -0.35f, density = 0.16f,
                 harmonics = 0.3f, timbre = 0.45f, morph = 0.25f,
                 envelopeProfile = EnvelopeProfile.WILD,
                 macroMap = TrackMacroMap.WILD,
@@ -226,7 +230,7 @@ class DeepSpaceVibe : VibeProvider {
             // 7 FX: Echo repeats — delayed resonant pings that fade into the distance
             TrackVoice(
                 engineEdm = Engine.MOD, engineSpace = Engine.MOD,
-                isPercussive = false, volume = 0.40f, pan = 0.35f, density = 0.08f,
+                role = TrackRole.MELODIC, volume = 0.40f, pan = 0.35f, density = 0.08f,
                 harmonics = 0.5f, timbre = 0.4f, morph = 0.15f,
                 envelopeProfile = EnvelopeProfile.WILD,
                 macroMap = TrackMacroMap.WILD,

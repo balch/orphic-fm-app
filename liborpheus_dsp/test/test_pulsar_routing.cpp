@@ -106,8 +106,8 @@ static bool test_pulsar_per_track_port_routing() {
         check_int_port(engine, sym, t % 4, engine->pulsar_track_envelope[t], pass);
         routed++;
 
-        snprintf(sym, sizeof(sym), "track_%d_percussive", t);
-        check_int_port(engine, sym, t < 3 ? 1 : 0, engine->pulsar_track_percussive[t], pass);
+        snprintf(sym, sizeof(sym), "track_%d_role", t);
+        check_int_port(engine, sym, t < 3 ? 0 : 1, engine->pulsar_track_role[t], pass);
         routed++;
 
         snprintf(sym, sizeof(sym), "track_%d_bar_strategy", t);

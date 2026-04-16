@@ -13,7 +13,7 @@ static void setup_cosmic_techno(OrpheusEngine* engine) {
     int space[] = {20, 17, 23, 19, 6, 14, 17, 19};
     float volumes[] = {0.90f, 0.60f, 0.65f, 0.75f, 0.55f, 0.40f, 0.30f, 0.25f};
     float pans[] = {0.0f, -0.15f, 0.2f, 0.0f, -0.25f, -0.35f, 0.3f, 0.4f};
-    int percussive[] = {1, 1, 1, 0, 0, 0, 1, 0};
+    int role[] = {0, 0, 0, 1, 1, 1, 0, 1};  // TrackRole: 0=PERC, 1=MELODIC
     int envelopes[] = {0, 0, 0, 1, 1, 2, 2, 3};
 
     for (int t = 0; t < 8; t++) {
@@ -25,7 +25,7 @@ static void setup_cosmic_techno(OrpheusEngine* engine) {
         engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
-        engine->pulsar_track_percussive[t].store(percussive[t], std::memory_order_relaxed);
+        engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
 
     float density[] = {0.50f, 0.35f, 0.80f, 0.40f, 0.30f, 0.20f, 0.15f, 0.08f};
@@ -50,7 +50,7 @@ static void setup_deep_space(OrpheusEngine* engine) {
     int space[] = {20, 17, 23, 19, 6, 14, 17, 19};
     float volumes[] = {0.80f, 0.50f, 0.55f, 0.70f, 0.50f, 0.35f, 0.25f, 0.20f};
     float pans[] = {0.0f, -0.1f, 0.15f, 0.0f, -0.2f, -0.3f, 0.25f, 0.35f};
-    int percussive[] = {1, 1, 1, 0, 0, 0, 1, 0};
+    int role[] = {0, 0, 0, 1, 1, 1, 0, 1};  // TrackRole: 0=PERC, 1=MELODIC
     int envelopes[] = {0, 0, 0, 1, 1, 2, 2, 3};
 
     for (int t = 0; t < 8; t++) {
@@ -62,7 +62,7 @@ static void setup_deep_space(OrpheusEngine* engine) {
         engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
-        engine->pulsar_track_percussive[t].store(percussive[t], std::memory_order_relaxed);
+        engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
 
     float density[] = {0.30f, 0.20f, 0.50f, 0.25f, 0.15f, 0.10f, 0.10f, 0.05f};
@@ -88,7 +88,7 @@ static void setup_dog_house(OrpheusEngine* engine) {
     int space[] = {21, 22, 23, 19, 6, 19, 11, 19};
     float volumes[] = {0.85f, 0.60f, 0.55f, 0.75f, 0.50f, 0.40f, 0.30f, 0.20f};
     float pans[] = {0.0f, -0.10f, 0.15f, 0.0f, -0.25f, 0.30f, -0.30f, 0.0f};
-    int percussive[] = {1, 1, 1, 0, 0, 0, 0, 0};
+    int role[] = {0, 0, 0, 1, 1, 1, 1, 1};  // TrackRole: 0=PERC, 1=MELODIC
     int envelopes[] = {0, 0, 0, 1, 1, 2, 2, 3};
 
     for (int t = 0; t < 8; t++) {
@@ -100,7 +100,7 @@ static void setup_dog_house(OrpheusEngine* engine) {
         engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
-        engine->pulsar_track_percussive[t].store(percussive[t], std::memory_order_relaxed);
+        engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
 
     float density[] = {0.45f, 0.35f, 0.55f, 0.40f, 0.30f, 0.25f, 0.15f, 0.08f};
@@ -127,7 +127,7 @@ static void setup_garage_blitz(OrpheusEngine* engine) {
     int space[] = {21, 22, 23, 8, 14, 14, 17, 9};
     float volumes[] = {0.90f, 0.75f, 0.70f, 0.80f, 0.60f, 0.45f, 0.35f, 0.30f};
     float pans[] = {0.0f, -0.10f, 0.20f, 0.0f, -0.20f, -0.30f, 0.25f, 0.35f};
-    int percussive[] = {1, 1, 1, 0, 0, 0, 1, 0};
+    int role[] = {0, 0, 0, 1, 1, 1, 0, 1};  // TrackRole: 0=PERC, 1=MELODIC
     int envelopes[] = {0, 0, 0, 0, 0, 2, 2, 3};
 
     for (int t = 0; t < 8; t++) {
@@ -139,7 +139,7 @@ static void setup_garage_blitz(OrpheusEngine* engine) {
         engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
-        engine->pulsar_track_percussive[t].store(percussive[t], std::memory_order_relaxed);
+        engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
 
     float density[] = {0.60f, 0.50f, 0.80f, 0.50f, 0.40f, 0.25f, 0.20f, 0.10f};
@@ -166,7 +166,7 @@ static void setup_slow_burn(OrpheusEngine* engine) {
     int space[] = {20, 17, 23, 19, 6, 19, 13, 19};
     float volumes[] = {0.75f, 0.45f, 0.40f, 0.70f, 0.55f, 0.45f, 0.30f, 0.25f};
     float pans[] = {0.0f, -0.15f, 0.20f, 0.0f, -0.25f, 0.30f, -0.35f, 0.00f};
-    int percussive[] = {1, 1, 1, 0, 0, 0, 0, 0};
+    int role[] = {0, 0, 0, 1, 1, 1, 1, 1};  // TrackRole: 0=PERC, 1=MELODIC
     int envelopes[] = {0, 0, 0, 1, 1, 2, 2, 3};
 
     for (int t = 0; t < 8; t++) {
@@ -178,7 +178,7 @@ static void setup_slow_burn(OrpheusEngine* engine) {
         engine->pulsar_track_timbre[t].store(0.5f, std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(0.3f, std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
-        engine->pulsar_track_percussive[t].store(percussive[t], std::memory_order_relaxed);
+        engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
 
     float density[] = {0.30f, 0.20f, 0.35f, 0.30f, 0.20f, 0.25f, 0.15f, 0.10f};

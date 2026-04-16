@@ -54,6 +54,30 @@ enum class BarStrategy : uint8_t {
     INDEPENDENT = 4,
 };
 
+enum class TrackRole : uint8_t {
+    PERCUSSIVE = 0,
+    MELODIC = 1,
+    CHORDAL = 2,
+};
+
+enum class LickMode : uint8_t {
+    NONE = 0,
+    SQUASH = 1,
+    FILL = 2,
+};
+
+enum class NoteFollowMode : uint8_t {
+    SLIDE = 0,
+    CONTOUR = 1,
+    BLEND = 2,
+};
+
+enum class PitchEvoMode : uint8_t {
+    NONE = 0,
+    CONTOUR = 1,   // Markov
+    VOICING = 2,   // Chord inversion/substitution
+};
+
 // Engine-type bus classification for DJ turntable source routing.
 enum PulsarBusType : uint8_t {
     PULSAR_BUS_KEYS  = 0,  // melodic engines → warps_source_buffers[0] (SYNTH slot)
@@ -180,6 +204,17 @@ struct PulsarTrackState {
     // Reverb send brightness filter (one-pole LP per channel)
     float reverb_send_filter_state_l = 0.0f;
     float reverb_send_filter_state_r = 0.0f;
+
+    // Track role (persists from load_vibe)
+    TrackRole role = TrackRole::PERCUSSIVE;
+
+    // Evolution state (persists across bars)
+    bool evo_rhythmic = false;
+    float evo_tension_resp = 1.0f;
+    NoteFollowMode evo_note_follow = NoteFollowMode::SLIDE;
+    PitchEvoMode evo_pitch_mode = PitchEvoMode::NONE;
+    float evo_voicing_tension = 1.0f;
+    int anchor_indices[2] = {-1, -1};  // cached anchor positions
 };
 
 // ── Lick step (mirrors OrpheusEngine::LickStepAtomic layout) ────────────

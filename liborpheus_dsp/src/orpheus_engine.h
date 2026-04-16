@@ -733,9 +733,9 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_timbre[8]{};
     std::atomic<float> pulsar_track_morph[8]{};
     std::atomic<int>   pulsar_track_envelope[8]{};
-    std::atomic<int>   pulsar_track_percussive[8]{};
+    std::atomic<int>   pulsar_track_role[8]{};  // TrackRole: 0=PERC, 1=MELODIC, 2=CHORDAL
     std::atomic<int>   pulsar_track_bar_strategy[8]{};  // BarStrategy enum (0-4)
-    std::atomic<int>   pulsar_track_markov_contour[8]{};  // 1 = use second-order Markov for note mutation
+    std::atomic<int>   pulsar_track_evo_rhythmic[8]{};
     std::atomic<int>   pulsar_step_count{16};           // 16 or 32
 
     // Per-track macro maps (set by Kotlin on vibe load)
@@ -859,8 +859,16 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_delay_feedback[8] = {};
     // Per-track glide rate (0 = instant, 1 = very slow ~2s)
     std::atomic<float> pulsar_track_glide_rate[8] = {};
-    // Per-track lick usage (0 = no lick, 1 = use vibe lick)
-    std::atomic<int>   pulsar_track_use_lick[8] = {};
+    // Per-track lick usage
+    std::atomic<int>   pulsar_track_lick_mode[8] = {};  // LickMode: 0=NONE, 1=SQUASH, 2=FILL
+
+    // Per-track evolution parameters
+    // Note: tension_resp and voicing_tension zero-init here; Kotlin defaults are 1.0f.
+    // Safe because load_vibe() always pushes values before they're read in mutate_patterns().
+    std::atomic<float> pulsar_track_evo_tension_resp[8] = {};
+    std::atomic<int>   pulsar_track_evo_note_follow[8] = {};
+    std::atomic<int>   pulsar_track_evo_pitch_mode[8] = {};
+    std::atomic<float> pulsar_track_evo_voicing_tension[8] = {};
 
     // ── Pulsar Dedicated Delay ────────────────────────
     // Separate delay instance for Pulsar sends, independent from the shared voice delay.

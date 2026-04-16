@@ -135,11 +135,10 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
             state->tracks[t].step_count = kMaxPulsarSteps;
     }
 
-    // Read per-track Markov contour opt-in flags
+    // Read per-track Markov contour opt-in from pitch evolution mode
     bool use_markov_contour[kNumPulsarTracks];
     for (int t = 0; t < kNumPulsarTracks; t++) {
-        use_markov_contour[t] = engine->pulsar_track_markov_contour[t].load(
-            std::memory_order_relaxed) != 0;
+        use_markov_contour[t] = (state->tracks[t].evo_pitch_mode == PitchEvoMode::CONTOUR);
     }
 
     for (int t = 0; t < kNumPulsarTracks; t++) {
@@ -429,7 +428,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.morph = engine->pulsar_track_morph[t].load(std::memory_order_relaxed);
         ts.envelope_profile = static_cast<PulsarEnvelopeProfile>(
             engine->pulsar_track_envelope[t].load(std::memory_order_relaxed));
-        bool percussive = engine->pulsar_track_percussive[t].load(std::memory_order_relaxed) != 0;
+        TrackRole role = static_cast<TrackRole>(
+            engine->pulsar_track_role[t].load(std::memory_order_relaxed));
+        ts.role = role;
+        bool percussive = (role == TrackRole::PERCUSSIVE);
 
         // Read macro map from atomics
         auto& m = engine->pulsar_track_macros[t];
@@ -459,29 +461,63 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         // For 32-step vibes, generate bar 1 (16 steps) then apply bar strategy
         int bar1_len = (step_count_config > 16) ? 16 : step_count_config;
 
-        bool use_lick = engine->pulsar_track_use_lick[t].load(std::memory_order_relaxed) != 0;
-        if (lick_len > 0 && use_lick && !percussive && bar_strategy == BarStrategy::CALL_RESPONSE) {
-            // CALL_RESPONSE handles the full pattern (call + response)
-            ts.step_count = step_count_config;
-            bar_strategy_call_response(ts.steps, step_count_config,
-                                       state->lick, lick_len,
-                                       eff_mutation,
+        LickMode lick_mode = static_cast<LickMode>(
+            engine->pulsar_track_lick_mode[t].load(std::memory_order_relaxed));
+
+        // Evolution parameters
+        ts.evo_rhythmic = engine->pulsar_track_evo_rhythmic[t].load(std::memory_order_relaxed) != 0;
+        ts.evo_tension_resp = engine->pulsar_track_evo_tension_resp[t].load(std::memory_order_relaxed);
+        ts.evo_note_follow = static_cast<NoteFollowMode>(
+            engine->pulsar_track_evo_note_follow[t].load(std::memory_order_relaxed));
+        ts.evo_pitch_mode = static_cast<PitchEvoMode>(
+            engine->pulsar_track_evo_pitch_mode[t].load(std::memory_order_relaxed));
+        ts.evo_voicing_tension = engine->pulsar_track_evo_voicing_tension[t].load(std::memory_order_relaxed);
+
+        if (lick_len > 0 && lick_mode != LickMode::NONE && role == TrackRole::MELODIC) {
+            if (lick_mode == LickMode::FILL) {
+                // FILL: lick spans full step count, bypass bar strategy
+                ts.step_count = step_count_config;
+                if (bar_strategy == BarStrategy::CALL_RESPONSE) {
+                    bar_strategy_call_response(ts.steps, step_count_config,
+                                               state->lick, lick_len,
+                                               eff_mutation,
+                                               static_cast<uint8_t>(root), scale,
+                                               base_seed ^ (t * 7919u),
+                                               state->lick_octave,
+                                               genre.note_range_low, genre.note_range_high,
+                                               state->lick_loop_length);
+                } else {
+                    generate_lick_pattern(ts.steps, ts.step_count, state->lick, lick_len,
+                                          eff_mutation, static_cast<uint8_t>(root), scale,
+                                          base_seed ^ (t * 7919u), 0,
+                                          state->lick_octave,
+                                          genre.note_range_low, genre.note_range_high,
+                                          state->lick_loop_length);
+                }
+                // No bar strategy — FILL owns the full pattern
+            } else {
+                // SQUASH: lick compressed to bar1_len, bar strategy handles bar 2
+                ts.step_count = bar1_len;
+                generate_lick_pattern(ts.steps, bar1_len, state->lick, lick_len,
+                                      eff_mutation, static_cast<uint8_t>(root), scale,
+                                      base_seed ^ (t * 7919u), 0,
+                                      state->lick_octave,
+                                      genre.note_range_low, genre.note_range_high,
+                                      state->lick_loop_length);
+                // Apply bar strategy for bar 2
+                if (step_count_config > 16) {
+                    apply_bar_strategy(ts, t, bar_strategy, (role == TrackRole::PERCUSSIVE), genre,
                                        static_cast<uint8_t>(root), scale,
-                                       base_seed ^ (t * 7919u),
+                                       engine->pulsar_energy.load(std::memory_order_relaxed),
+                                       engine->pulsar_complexity.load(std::memory_order_relaxed),
+                                       state->lick, lick_len, eff_mutation,
+                                       base_seed ^ (t * 13331u),
                                        state->lick_octave,
-                                       genre.note_range_low, genre.note_range_high,
                                        state->lick_loop_length);
-        } else if (lick_len > 0 && use_lick && !percussive) {
-            // Lick without CALL_RESPONSE: generate across full step count
-            ts.step_count = step_count_config;
-            generate_lick_pattern(ts.steps, ts.step_count, state->lick, lick_len,
-                                  eff_mutation, static_cast<uint8_t>(root), scale,
-                                  base_seed ^ (t * 7919u), 0,
-                                  state->lick_octave,
-                                  genre.note_range_low, genre.note_range_high,
-                                  state->lick_loop_length);
+                }
+            }
         } else {
-            // Generate bar 1
+            // No lick — generative pattern
             float hold_prob = engine->pulsar_track_hold_probability[t].load(std::memory_order_relaxed);
             int hold_min = engine->pulsar_track_hold_length_min[t].load(std::memory_order_relaxed);
             int hold_max = engine->pulsar_track_hold_length_max[t].load(std::memory_order_relaxed);
@@ -492,14 +528,13 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             int nr_high = engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed);
             int eng_note_min = (ts.engine_index >= 0 && ts.engine_index < 24)
                 ? kEngineModRanges[ts.engine_index].note_min : 0;
-            generate_track_pattern(ts, t, percussive, genre,
+            generate_track_pattern(ts, t, (role == TrackRole::PERCUSSIVE), genre,
                                    static_cast<uint8_t>(root), scale, bar1_len, base_seed,
                                    0, hold_prob, hold_min, hold_max,
                                    density_ovr, nr_low, nr_high, eng_note_min);
 
-            // Apply bar strategy for bar 2 (only if step_count > 16)
             if (step_count_config > 16) {
-                apply_bar_strategy(ts, t, bar_strategy, percussive, genre,
+                apply_bar_strategy(ts, t, bar_strategy, (role == TrackRole::PERCUSSIVE), genre,
                                    static_cast<uint8_t>(root), scale,
                                    engine->pulsar_energy.load(std::memory_order_relaxed),
                                    engine->pulsar_complexity.load(std::memory_order_relaxed),
@@ -893,8 +928,8 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         uint8_t root = static_cast<uint8_t>(live_root);
         const PulsarScale& scale = kPulsarScales[live_scale];
         for (int t = 0; t < kNumPulsarTracks; t++) {
-            bool percussive = engine->pulsar_track_percussive[t].load(std::memory_order_relaxed) != 0;
-            if (percussive) continue;
+            TrackRole role = static_cast<TrackRole>(engine->pulsar_track_role[t].load(std::memory_order_relaxed));
+            if (role == TrackRole::PERCUSSIVE) continue;
             PulsarTrackState& ts = state->tracks[t];
             for (int s = 0; s < ts.step_count; s++) {
                 if (ts.steps[s].gate) {
@@ -1314,10 +1349,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                     for (int rt = 0; rt < kNumPulsarTracks; rt++) {
                         PulsarTrackState& rts = state->tracks[rt];
-                        bool perc = engine->pulsar_track_percussive[rt].load(std::memory_order_relaxed) != 0;
+                        TrackRole r_role = static_cast<TrackRole>(engine->pulsar_track_role[rt].load(std::memory_order_relaxed));
+                        bool perc = (r_role == TrackRole::PERCUSSIVE);
                         BarStrategy bs = rts.bar_strategy;
 
-                        bool r_use_lick = engine->pulsar_track_use_lick[rt].load(std::memory_order_relaxed) != 0;
+                        LickMode r_lick_mode = static_cast<LickMode>(
+                            engine->pulsar_track_lick_mode[rt].load(std::memory_order_relaxed));
+                        bool r_use_lick = (r_lick_mode != LickMode::NONE);
                         if (state->lick_length > 0 && r_use_lick && !perc && bs == BarStrategy::CALL_RESPONSE) {
                             rts.step_count = step_count_cfg;
                             bar_strategy_call_response(rts.steps, step_count_cfg,
@@ -1451,6 +1489,20 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
                             // ── Tonal tension: modify MIDI note before pitch glide ──
                             int midi_note = step.note;
+
+                            // Chord progression transposition (melodic tracks only)
+                            if (ts.role != TrackRole::PERCUSSIVE) {
+                                int chord_deg = state->chord_state.progression[state->chord_state.chord_index];
+                                if (chord_deg != 0) {
+                                    int si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+                                    if (si < 0) si = 0;
+                                    if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
+                                    const PulsarScale& sc = kPulsarScales[si];
+                                    int semi_offset = chord_degree_to_semitones(chord_deg, sc)
+                                                    - chord_degree_to_semitones(0, sc);
+                                    midi_note += semi_offset;
+                                }
+                            }
 
                             // Octave shift at extreme intensities
                             if (state->tension.octave_shift) {

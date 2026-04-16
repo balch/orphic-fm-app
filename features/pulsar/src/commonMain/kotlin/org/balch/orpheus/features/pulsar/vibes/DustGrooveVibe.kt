@@ -14,6 +14,7 @@ import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.EvolutionTension
 import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.Lick
+import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
 import org.balch.orpheus.features.pulsar.ProgressionStyle
@@ -26,6 +27,7 @@ import org.balch.orpheus.features.pulsar.SoloMode
 import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TonalTension
 import org.balch.orpheus.features.pulsar.TrackMacroMap
+import org.balch.orpheus.features.pulsar.TrackRole
 import org.balch.orpheus.features.pulsar.TrackVoice
 import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
@@ -101,7 +103,7 @@ class DustGrooveVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.BD,
                 engineSpace = Engine.BD,
-                isPercussive = true,
+                role = TrackRole.PERCUSSIVE,
                 volume = 0.85f,
                 pan = 0.00f,
                 density = 0.50f,
@@ -112,7 +114,7 @@ class DustGrooveVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.SD,
                 engineSpace = Engine.SD,
-                isPercussive = true,
+                role = TrackRole.PERCUSSIVE,
                 volume = 0.65f,
                 pan = -0.10f,
                 density = 0.40f,
@@ -123,7 +125,7 @@ class DustGrooveVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.HH,
                 engineSpace = Engine.HH,
-                isPercussive = true,
+                role = TrackRole.PERCUSSIVE,
                 volume = 0.60f,
                 pan = 0.20f,
                 density = 0.65f,
@@ -134,7 +136,7 @@ class DustGrooveVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.VCF,
                 engineSpace = Engine.VA,
-                isPercussive = false,
+                role = TrackRole.MELODIC,
                 volume = 0.80f,
                 pan = 0.00f,
                 density = 0.55f,
@@ -148,7 +150,7 @@ class DustGrooveVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.FM,
                 engineSpace = Engine.FM,
-                isPercussive = false,
+                role = TrackRole.MELODIC,
                 volume = 0.55f,
                 pan = -0.20f,
                 density = 0.35f,
@@ -159,12 +161,12 @@ class DustGrooveVibe : VibeProvider {
                 noteRangeHigh = 64,
                 reverbBrightness = 0.45f,
                 glideRate = 0.1f,
-                useLick = true
+                lickMode = LickMode.Squash, // Squash: CALL_RESPONSE owns bar 2
             ),
             TrackVoice(
                 engineEdm = Engine.WSH,
                 engineSpace = Engine.ADD,
-                isPercussive = false,
+                role = TrackRole.MELODIC,
                 volume = 0.30f,
                 pan = 0.30f,
                 density = 0.20f,
@@ -184,12 +186,12 @@ class DustGrooveVibe : VibeProvider {
                 noteRangeHigh = 59,
                 reverbBrightness = 0.55f,
                 glideRate = 0.2f,
-                useLick = true
+                lickMode = LickMode.Squash, // Squash: CALL_RESPONSE owns bar 2
             ),
             TrackVoice(
                 engineEdm = Engine.GRN,
                 engineSpace = Engine.WTB,
-                isPercussive = false,
+                role = TrackRole.MELODIC,
                 volume = 0.30f,
                 pan = -0.30f,
                 density = 0.15f,
@@ -213,7 +215,7 @@ class DustGrooveVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.PAR,
                 engineSpace = Engine.NSE,
-                isPercussive = true,
+                role = TrackRole.PERCUSSIVE,
                 volume = 0.20f,
                 pan = 0.35f,
                 density = 0.08f,

@@ -29,7 +29,7 @@ static void setup_deep_space_v2(OrpheusEngine* engine) {
     int engines[] = {20, 19, 18, 1, 8, 19, 18, 20};
     float volumes[] = {0.35f, 0.25f, 0.15f, 0.65f, 0.45f, 0.55f, 0.35f, 0.25f};
     float pans[] = {0.0f, -0.3f, 0.35f, 0.0f, -0.15f, 0.2f, -0.35f, 0.3f};
-    int percussive[] = {1, 1, 1, 0, 0, 0, 0, 0};
+    int role[] = {0, 0, 0, 1, 1, 1, 1, 1};  // TrackRole: 0=PERC, 1=MELODIC
     // EFFECT=2, MELODIC=1, WILD=3
     int envelopes[] = {2, 2, 3, 1, 2, 2, 2, 3};
     float harmonics[] = {0.3f, 0.4f, 0.2f, 0.15f, 0.3f, 0.35f, 0.15f, 0.5f};
@@ -45,7 +45,7 @@ static void setup_deep_space_v2(OrpheusEngine* engine) {
         engine->pulsar_track_timbre[t].store(timbres[t], std::memory_order_relaxed);
         engine->pulsar_track_morph[t].store(morphs[t], std::memory_order_relaxed);
         engine->pulsar_track_envelope[t].store(envelopes[t], std::memory_order_relaxed);
-        engine->pulsar_track_percussive[t].store(percussive[t], std::memory_order_relaxed);
+        engine->pulsar_track_role[t].store(role[t], std::memory_order_relaxed);
     }
 
     // Per-track note ranges

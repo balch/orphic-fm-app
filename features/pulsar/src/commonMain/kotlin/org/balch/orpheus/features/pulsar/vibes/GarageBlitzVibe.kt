@@ -16,7 +16,10 @@ import org.balch.orpheus.features.pulsar.ScaleType
 import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TonalTension
 import org.balch.orpheus.features.pulsar.TrackMacroMap
+import org.balch.orpheus.features.pulsar.TrackRole
 import org.balch.orpheus.features.pulsar.TrackVoice
+import org.balch.orpheus.features.pulsar.Evolution
+import org.balch.orpheus.features.pulsar.PitchEvolution
 import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
 import org.balch.orpheus.features.pulsar.VibeProvider
@@ -188,7 +191,7 @@ private fun generateBaseVibe(
         TrackVoice(
             engineEdm = Engine.BD,
             engineSpace = Engine.BD,
-            isPercussive = true,
+            role = TrackRole.PERCUSSIVE,
             volume = 0.90f,
             pan = 0.00f,
             density = 0.60f,
@@ -198,7 +201,7 @@ private fun generateBaseVibe(
         TrackVoice(
             engineEdm = Engine.SD,
             engineSpace = Engine.SD,
-            isPercussive = true,
+            role = TrackRole.PERCUSSIVE,
             volume = 0.70f,
             pan = -0.10f,
             density = 0.45f,
@@ -208,7 +211,7 @@ private fun generateBaseVibe(
         TrackVoice(
             engineEdm = Engine.HH,
             engineSpace = Engine.HH,
-            isPercussive = true,
+            role = TrackRole.PERCUSSIVE,
             volume = 0.65f,
             pan = 0.15f,
             density = 0.80f,
@@ -218,7 +221,7 @@ private fun generateBaseVibe(
         TrackVoice(
             engineEdm = Engine.WSH,
             engineSpace = Engine.VA,
-            isPercussive = false,
+            role = TrackRole.MELODIC,
             volume = 0.80f,
             pan = 0.00f,
             density = 0.50f,
@@ -227,12 +230,12 @@ private fun generateBaseVibe(
             noteRangeLow = 30,
             noteRangeHigh = 55,
             reverbBrightness = 0.5f,
-            markovContour = true,
+            evolution = Evolution(pitch = PitchEvolution.Contour()),
         ),
         TrackVoice(
             engineEdm = Engine.CHD,
             engineSpace = Engine.CHD,
-            isPercussive = false,
+            role = TrackRole.MELODIC,
             volume = 0.65f,
             pan = -0.20f,
             density = 0.40f,
@@ -242,12 +245,12 @@ private fun generateBaseVibe(
             noteRangeHigh = 72,
             reverbBrightness = 0.5f,
             glideRate = 0.05f,
-            markovContour = true,
+            evolution = Evolution(pitch = PitchEvolution.Contour()),
         ),
         TrackVoice(
             engineEdm = Engine.WSH,
             engineSpace = Engine.ENS,
-            isPercussive = false,
+            role = TrackRole.MELODIC,
             volume = 0.50f,
             pan = 0.25f,
             density = 0.25f,
@@ -269,7 +272,7 @@ private fun generateBaseVibe(
         TrackVoice(
             engineEdm = Engine.NSE,
             engineSpace = Engine.PAR,
-            isPercussive = true,
+            role = TrackRole.PERCUSSIVE,
             volume = 0.35f,
             pan = -0.30f,
             density = 0.15f,
@@ -291,7 +294,7 @@ private fun generateBaseVibe(
         TrackVoice(
             engineEdm = Engine.NES,
             engineSpace = Engine.NES,
-            isPercussive = false,
+            role = TrackRole.MELODIC,
             volume = 0.20f,
             pan = 0.35f,
             density = 0.10f,
