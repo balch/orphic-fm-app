@@ -78,6 +78,53 @@ enum class PitchEvoMode : uint8_t {
     VOICING = 2,   // Chord inversion/substitution
 };
 
+enum class CompingStyleId : uint8_t {
+    PAD = 0,
+    FUNK_STABS = 1,
+    ROCK_DOWNBEATS = 2,
+    CUSTOM = 3,           // reserved; not yet supported
+    SKA_UPSTROKES = 4,
+    BLUES_SHUFFLE = 5,
+    JAZZ_COMP = 6,
+    REGGAE_SKANK = 7,
+    GOSPEL_STABS = 8,
+};
+
+enum class ArpModeId : uint8_t { AUTO = 0, ALWAYS = 1, NEVER = 2 };
+enum class ArpDirectionId : uint8_t { UP = 0, DOWN = 1, UP_DOWN = 2, RANDOM = 3 };
+
+enum class FillTypeId : uint8_t {
+    NONE = 0,
+    ASCENDING_ARP = 1,
+    DESCENDING_ARP = 2,  // deferred
+    TURNAROUND = 3,      // deferred
+    DOUBLE_TIME = 4,     // deferred
+    STAB_FLURRY = 5,     // deferred
+    DROP_OUT = 6,        // deferred
+};
+
+enum class ChordFollowMode : uint8_t {
+    FOLLOW = 0,
+    ROOT_ONLY = 1,
+    FIXED = 2,
+};
+
+enum class SectionInversionId : uint8_t {
+    FOLLOW_STYLE = 0,
+    ROOT_POSITION = 1,
+    FIRST_INVERSION = 2,
+    SECOND_INVERSION = 3,
+    OPEN_VOICING = 4,
+};
+
+enum class VoicingType : uint8_t {
+    ROOT_ONLY = 0,
+    ROOT_FIFTH = 1,
+    TRIAD = 2,
+    SEVENTH = 3,
+    OCTAVE_STACK = 4,
+};
+
 // Engine-type bus classification for DJ turntable source routing.
 enum PulsarBusType : uint8_t {
     PULSAR_BUS_KEYS  = 0,  // melodic engines → warps_source_buffers[0] (SYNTH slot)
@@ -208,6 +255,44 @@ struct PulsarTrackState {
     // Track role (persists from load_vibe)
     TrackRole role = TrackRole::PERCUSSIVE;
 
+    // Chord follow mode (persists from load_vibe)
+    ChordFollowMode chord_follow = ChordFollowMode::FOLLOW;
+
+    // Comping config (only meaningful when role == CHORDAL)
+    CompingStyleId comping_style = CompingStyleId::PAD;
+
+    // Arpeggiator state (used for CHORDAL tracks; set by load_vibe)
+    ArpModeId arp_mode = ArpModeId::AUTO;
+    float arp_speed = 0.2f;
+    ArpDirectionId arp_direction = ArpDirectionId::UP;
+    SectionInversionId section_inversion = SectionInversionId::FOLLOW_STYLE;
+
+    // Defaults snapshotted at load_vibe — used to restore when a section's
+    // override goes back to "no override" (null → -1 in packed data).
+    ChordFollowMode default_chord_follow = ChordFollowMode::FOLLOW;
+    CompingStyleId default_comping_style = CompingStyleId::PAD;
+    SectionInversionId default_section_inversion = SectionInversionId::FOLLOW_STYLE;
+    // Runtime state (managed during playback — sub-task 2b.4)
+    uint8_t arp_notes[4] = {};
+    int arp_note_count = 0;
+    int arp_index = 0;
+    int64_t arp_next_sample = 0;
+
+    // Humanization probabilities (CHORDAL only, loaded from atomics each bar)
+    float human_drop_prob = 0.0f;
+    float human_ghost_prob = 0.0f;
+    float human_octave_prob = 0.0f;
+    float human_ext_prob = 0.0f;
+    // Fills (CHORDAL only, loaded from atomics on vibe load)
+    int fill_every_n = 0;
+    FillTypeId fill_type = FillTypeId::ASCENDING_ARP;
+    float fill_skip_prob = 0.0f;
+    int bars_since_fill = 0;
+    // BASE cache for CHORDAL (restored each bar before humanization/fills)
+    PulsarStep chordal_base[kMaxPulsarSteps];
+    int chordal_base_count = 0;
+    bool chordal_base_valid = false;
+
     // Evolution state (persists across bars)
     bool evo_rhythmic = false;
     float evo_tension_resp = 1.0f;
@@ -238,6 +323,10 @@ struct PulsarChordState {
     // Custom per-vibe transition matrix (overrides built-in when active)
     bool    use_custom_matrix = false;
     float   custom_matrix[7][7] = {};
+    int8_t  original_progression[kMaxProgressionLength];  // snapshot at load
+    int     anchor_bars = 0;                              // 0 = disabled
+    float   drift_range = 0.5f;                           // 0-1
+    int     bars_since_anchor = 0;                        // counter
 };
 
 // ── Tension system parameters (loaded from engine atomics on vibe reload) ──
@@ -349,6 +438,10 @@ struct SectionParam {
     int solo_bars_max = 4;              // LongFill only
     bool has_motif_set = false;
     MotifSetParam motif_set;
+    // Section-level overrides (-1 = no override, keep track defaults)
+    int comping_style_override = -1;
+    int comping_inversion_override = -1;
+    int chord_follow_override = -1;
 };
 
 struct ArrangementParams {

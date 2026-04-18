@@ -31,7 +31,9 @@ private val PULSAR_FULL_RING = listOf(
 private val PULSAR_V2_RING = listOf(
     PickerEntry("VCF",  0, OrpheusColors.engineRed),       // VirtualAnalogVCF
     PickerEntry("PD",   1, OrpheusColors.enginePurple),    // PhaseDistortion
-    PickerEntry("DX",   2, OrpheusColors.warmGlow),        // SixOp FM
+    PickerEntry("DX",   2, OrpheusColors.warmGlow),        // SixOp FM bank 1
+    PickerEntry("DX2",  3, OrpheusColors.warmGlow.copy(alpha = 0.85f)),  // SixOp FM bank 2
+    PickerEntry("DX3",  4, OrpheusColors.warmGlow.copy(alpha = 0.7f)),   // SixOp FM bank 3
     PickerEntry("TRN",  5, OrpheusColors.engineGreen),     // WaveTerrain
     PickerEntry("ENS",  6, OrpheusColors.engineBlue),      // StringMachine
     PickerEntry("NES",  7, OrpheusColors.neonCyan),        // Chiptune
@@ -75,7 +77,7 @@ val PULSAR_TRACK_NAMES = listOf("KICK", "PERC", "HIHAT", "BASS", "KEYS", "PAD", 
 
 /** Engine index to short label for display */
 fun pulsarEngineLabel(engineIndex: Int): String = when (engineIndex) {
-    0 -> "VCF"; 1 -> "PD"; 2 -> "DX"; 5 -> "TRN"
+    0 -> "VCF"; 1 -> "PD"; 2 -> "DX"; 3 -> "DX2"; 4 -> "DX3"; 5 -> "TRN"
     6 -> "ENS"; 7 -> "NES"; 8 -> "VA"; 9 -> "WSH"; 10 -> "FM"; 11 -> "GRN"
     12 -> "ADD"; 13 -> "WTB"; 14 -> "CHD"; 15 -> "SPK"; 16 -> "SWM"
     17 -> "NSE"; 18 -> "PAR"; 19 -> "STR"; 20 -> "MOD"

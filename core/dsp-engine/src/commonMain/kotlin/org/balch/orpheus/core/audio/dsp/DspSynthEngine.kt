@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.audio.dsp.DspSynthEngine.Companion.OSC_ENGINE_CPP_INDEX
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.ControlPort
@@ -846,7 +847,11 @@ class DspSynthEngine(
 
     /**
      * Maps Kotlin PlaitsEngineId ordinal+1 (1-based engineOrdinal) to
-     * C++ Plaits engine registration index. 0 = engine off (no Plaits rendering).
+     * C++ Plaits engine registration index.
+     *
+     * Voice ordinal 0 is the legacy pre-Plaits "OSC mode" (triangle+square with
+     * ADSR+hold) and returns [OSC_ENGINE_CPP_INDEX] — the C++ voice path routes
+     * that sentinel to the built-in OSC renderer instead of Plaits.
      *
      * C++ registration order (from plaits/dsp/voice.cc Init()):
      * 0-7: engine2 (VA VCF, Phase Dist, 6-Op×3, Wave Terrain, String Machine, Chiptune)
@@ -855,7 +860,7 @@ class DspSynthEngine(
      * 18: Particle, 19: String, 20: Modal, 21: BassDrum, 22: SnareDrum, 23: HiHat
      */
     private fun plaitsEngineOrdinalToCpp(engineOrdinal: Int): Int {
-        if (engineOrdinal <= 0) return -1 // Engine 0 (OSC mode): triangle+square with ADSR+hold
+        if (engineOrdinal <= 0) return OSC_ENGINE_CPP_INDEX
         val idx = engineOrdinal - 1
         return if (idx < CPP_ENGINE_MAP.size) CPP_ENGINE_MAP[idx] else 0
     }
@@ -864,6 +869,13 @@ class DspSynthEngine(
         private const val LOOPER_URI = "org.balch.orpheus.plugins.looper"
         /** VoicePlugin engineOrdinal for SPEECH (PlaitsEngineId.SPEECH.ordinal + 1). */
         private const val SPEECH_ENGINE_ORDINAL = 17
+
+        /**
+         * Sentinel returned by [plaitsEngineOrdinalToCpp] when the voice is in
+         * legacy OSC mode (triangle+square with ADSR+hold) — not a Plaits engine.
+         * C++ voice routing checks for this value and takes the OSC code path.
+         */
+        const val OSC_ENGINE_CPP_INDEX = -1
 
         // Per-voice pitch multiplier in semitones (matches DspVoiceManager voice list):
         // 0,1=bass(0.5x→-12), 2-5=mid(1.0x→0), 6,7=high(2.0x→+12), 8-11=repl(1.0x→0)
@@ -893,10 +905,12 @@ class DspSynthEngine(
             // V1.2 engines (engine2/ directory)
             0,  // VIRTUAL_ANALOG_VCF (C++ index 0)
             1,  // PHASE_DISTORTION (C++ index 1)
-            2,  // SIX_OP_FM (C++ index 2; indices 3,4 are duplicate hardware slots, unused)
+            2,  // SIX_OP_FM (C++ index 2; SixOp bank 0)
             5,  // WAVE_TERRAIN (C++ index 5)
             6,  // STRING_MACHINE (C++ index 6)
             7,  // CHIPTUNE (C++ index 7)
+            3,  // SIX_OP_FM_2 (C++ index 3; SixOp bank 1)
+            4,  // SIX_OP_FM_3 (C++ index 4; SixOp bank 2)
         )
     }
 }

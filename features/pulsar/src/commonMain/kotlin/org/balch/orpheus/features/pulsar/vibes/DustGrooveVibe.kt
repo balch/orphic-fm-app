@@ -8,6 +8,7 @@ import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
 import org.balch.orpheus.features.pulsar.BarStrategy
+import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
@@ -17,6 +18,7 @@ import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
 import org.balch.orpheus.features.pulsar.RootNote
@@ -57,7 +59,14 @@ class DustGrooveVibe : VibeProvider {
             ),
             loopLength = 16,
         ),
-        lickMutation = 0.35f,
+        // 24-bar lick evolution arc — mutations stick:
+        //  - lickMutation = 1.0 → max drift = 4 scale degrees (full musical range)
+        //  - Mutations within ±4 degrees of original are KEPT (not reverted), so the
+        //    lick permanently shifts after each spurt until it hits the bound.
+        //  - innerBars=8 + outerBars=24 → spurts at bars 8, 16, 24 with outer-cycle
+        //    amplification peaking at bar 24.
+        //  - spurtChance=0.15 → occasional extra random spurts between tension peaks.
+        lickMutation = 1.0f,
         band = Band(
             members = listOf(
                 BandMember("Drummer", listOf(0, 1, 2), alwaysActive = true,
@@ -99,11 +108,14 @@ class DustGrooveVibe : VibeProvider {
             progressionStyle = ProgressionStyle.MODAL,
             chordsPerBar = 2,
         ),
+        // Tighter MODAL drift so the pocket doesn't wander.
+        progressionAnchor = ProgressionAnchor.EVERY_8,
+        progressionDriftRange = 0.15f,
         tracks = listOf(
             TrackVoice(
                 engineEdm = Engine.BD,
                 engineSpace = Engine.BD,
-                role = TrackRole.PERCUSSIVE,
+                role = TrackRole.Percussive,
                 volume = 0.85f,
                 pan = 0.00f,
                 density = 0.50f,
@@ -114,7 +126,7 @@ class DustGrooveVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.SD,
                 engineSpace = Engine.SD,
-                role = TrackRole.PERCUSSIVE,
+                role = TrackRole.Percussive,
                 volume = 0.65f,
                 pan = -0.10f,
                 density = 0.40f,
@@ -125,7 +137,7 @@ class DustGrooveVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.HH,
                 engineSpace = Engine.HH,
-                role = TrackRole.PERCUSSIVE,
+                role = TrackRole.Percussive,
                 volume = 0.60f,
                 pan = 0.20f,
                 density = 0.65f,
@@ -133,25 +145,27 @@ class DustGrooveVibe : VibeProvider {
                 macroMap = TrackMacroMap.RHYTHM,
                 barStrategy = BarStrategy.MUTATE
             ),
+            // Bass: locked pattern + ROOT_ONLY chord follow keeps the dusty pocket tight.
+            // noteRangeLow 33 (A1) preserved — the dusty warmth is the character.
             TrackVoice(
                 engineEdm = Engine.VCF,
                 engineSpace = Engine.VA,
-                role = TrackRole.MELODIC,
+                role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                 volume = 0.80f,
                 pan = 0.00f,
                 density = 0.55f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
                 macroMap = TrackMacroMap.MELODIC,
-                barStrategy = BarStrategy.MUTATE,
+                barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 33,
                 noteRangeHigh = 52,
-                reverbBrightness = 0.35f
+                reverbBrightness = 0.35f,
             ),
             TrackVoice(
                 engineEdm = Engine.FM,
                 engineSpace = Engine.FM,
-                role = TrackRole.MELODIC,
-                volume = 0.55f,
+                role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
+                volume = 0.45f,
                 pan = -0.20f,
                 density = 0.35f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
@@ -161,12 +175,11 @@ class DustGrooveVibe : VibeProvider {
                 noteRangeHigh = 64,
                 reverbBrightness = 0.45f,
                 glideRate = 0.1f,
-                lickMode = LickMode.Squash, // Squash: CALL_RESPONSE owns bar 2
             ),
             TrackVoice(
                 engineEdm = Engine.WSH,
                 engineSpace = Engine.ADD,
-                role = TrackRole.MELODIC,
+                role = TrackRole.Melodic(lickMode = LickMode.Squash), // Squash: CALL_RESPONSE owns bar 2
                 volume = 0.30f,
                 pan = 0.30f,
                 density = 0.20f,
@@ -186,12 +199,11 @@ class DustGrooveVibe : VibeProvider {
                 noteRangeHigh = 59,
                 reverbBrightness = 0.55f,
                 glideRate = 0.2f,
-                lickMode = LickMode.Squash, // Squash: CALL_RESPONSE owns bar 2
             ),
             TrackVoice(
                 engineEdm = Engine.GRN,
                 engineSpace = Engine.WTB,
-                role = TrackRole.MELODIC,
+                role = TrackRole.Melodic(),
                 volume = 0.30f,
                 pan = -0.30f,
                 density = 0.15f,
@@ -215,7 +227,7 @@ class DustGrooveVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.PAR,
                 engineSpace = Engine.NSE,
-                role = TrackRole.PERCUSSIVE,
+                role = TrackRole.Percussive,
                 volume = 0.20f,
                 pan = 0.35f,
                 density = 0.08f,
@@ -239,7 +251,8 @@ class DustGrooveVibe : VibeProvider {
         ),
         stepCount = 32,
         tension = TensionProfile(
-            innerBars = 4, outerBars = 8, outerDepth = 0.4f,
+            // 8-bar inner cycle, 24-bar outer — lick spurts every 8 bars, outer peaks at 24
+            innerBars = 8, outerBars = 24, outerDepth = 0.6f,
             volume = 0.4f,
             tonal = TonalTension(octaveShift = true, chromaticPassing = 0.12f),
             timing = 0.3f,
@@ -247,7 +260,7 @@ class DustGrooveVibe : VibeProvider {
                 timbreLow = 0.25f, timbreHigh = 0.55f, timbreProbability = 0.75f,
                 attackPoint = 0.5f, releaseSpeed = 0.3f,
             ),
-            spurtChance = 0.08f,
+            spurtChance = 0.15f,  // occasional extra random spurts
         ),
         effects = VibeEffects(
             delayTimeA = 0.3f,
@@ -272,7 +285,7 @@ class DustGrooveVibe : VibeProvider {
                     ),
                     recencyDecay = 0.5f,
                 ),
-                // 1: breakdown — stripped, just drums and bass, lo-fi
+                // 1: breakdown — stripped, bass drones on root for the lo-fi pocket
                 Section(
                     name = "breakdown",
                     barsMin = 4, barsMax = 8,
@@ -284,6 +297,7 @@ class DustGrooveVibe : VibeProvider {
                     macroOverrides = MacroOverrides(
                         energy = 0.5f, complexity = 0.4f, space = 1.4f, mood = 0.7f,
                     ),
+                    chordFollow = ChordFollow.FIXED,  // bass drones on E during breakdown
                 ),
                 // 2: jam — IMPROVISERS, modal improv over the groove
                 Section(

@@ -31,6 +31,8 @@ enum class PlaitsEngineId(val displayName: String) {
     WAVE_TERRAIN("Wave Terrain"),
     STRING_MACHINE("String Machine"),
     CHIPTUNE("Chiptune"),
+    SIX_OP_FM_2("Six-Op FM Bank 2"),
+    SIX_OP_FM_3("Six-Op FM Bank 3"),
 ;
 
 /** True for v1.2 engines that only render in C++ (no Kotlin DSP). */

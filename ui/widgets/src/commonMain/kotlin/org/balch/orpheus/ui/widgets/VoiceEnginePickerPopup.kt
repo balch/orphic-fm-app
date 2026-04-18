@@ -101,6 +101,8 @@ val VOICE_PICKER_V2_CONFIG = PickerConfig(
         PickerEntry("VCF", 18, OrpheusColors.engineRed),
         PickerEntry("PD",  19, OrpheusColors.enginePurple),
         PickerEntry("DX",  20, OrpheusColors.warmGlow),
+        PickerEntry("DX2", 24, OrpheusColors.warmGlow.copy(alpha = 0.85f)),
+        PickerEntry("DX3", 25, OrpheusColors.warmGlow.copy(alpha = 0.7f)),
         PickerEntry("TRN", 21, OrpheusColors.engineGreen),
         PickerEntry("ENS", 22, OrpheusColors.engineBlue),
         PickerEntry("NES", 23, OrpheusColors.neonCyan),
@@ -144,6 +146,8 @@ private val DRUM_V2_RING = listOf(
     PickerEntry("VCF", 17, OrpheusColors.engineRed),
     PickerEntry("PD",  18, OrpheusColors.enginePurple),
     PickerEntry("DX",  19, OrpheusColors.warmGlow),
+    PickerEntry("DX2", 23, OrpheusColors.warmGlow.copy(alpha = 0.85f)),
+    PickerEntry("DX3", 24, OrpheusColors.warmGlow.copy(alpha = 0.7f)),
     PickerEntry("TRN", 20, OrpheusColors.engineGreen),
     PickerEntry("ENS", 21, OrpheusColors.engineBlue),
     PickerEntry("NES", 22, OrpheusColors.neonCyan),
@@ -191,6 +195,7 @@ fun engineLabel(ordinal: Int): String = when (ordinal) {
     8 -> "VA"; 9 -> "ADD"; 10 -> "GRN"; 11 -> "STR"; 12 -> "MOD"
     13 -> "PAR"; 14 -> "SWM"; 15 -> "CHD"; 16 -> "WTB"; 17 -> "SPK"
     18 -> "VCF"; 19 -> "PD"; 20 -> "DX"; 21 -> "TRN"; 22 -> "ENS"; 23 -> "NES"
+    24 -> "DX2"; 25 -> "DX3"
     else -> "?"
 }
 
@@ -201,6 +206,7 @@ fun drumEngineLabel(ordinal: Int): String = when (ordinal) {
     7 -> "VA"; 8 -> "ADD"; 9 -> "GRN"; 10 -> "STR"; 11 -> "MOD"
     12 -> "PAR"; 13 -> "SWM"; 14 -> "CHD"; 15 -> "WTB"; 16 -> "SPK"
     17 -> "VCF"; 18 -> "PD"; 19 -> "DX"; 20 -> "TRN"; 21 -> "ENS"; 22 -> "NES"
+    23 -> "DX2"; 24 -> "DX3"
     else -> "?"
 }
 

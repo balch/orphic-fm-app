@@ -286,6 +286,8 @@ class PulsarViewModel(
     private val genreRhythmDensityId = synthController.controlFlow(PulsarSymbol.GENRE_RHYTHM_DENSITY.controlId)
     private val genreProgressionStyleId = synthController.controlFlow(PulsarSymbol.GENRE_PROGRESSION_STYLE.controlId)
     private val genreChordsPerBarId = synthController.controlFlow(PulsarSymbol.GENRE_CHORDS_PER_BAR.controlId)
+    private val progressionAnchorId = synthController.controlFlow(PulsarSymbol.PROGRESSION_ANCHOR.controlId)
+    private val progressionDriftRangeId = synthController.controlFlow(PulsarSymbol.PROGRESSION_DRIFT_RANGE.controlId)
     private val lickLengthId = synthController.controlFlow(PulsarSymbol.LICK_LENGTH.controlId)
     private val lickLoopLengthId = synthController.controlFlow(PulsarSymbol.LICK_LOOP_LENGTH.controlId)
     private val lickDataIds = (0..95).map { i ->
@@ -350,6 +352,45 @@ class PulsarViewModel(
     private val trackDelayFeedbackIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_DELAY_FEEDBACK_TRACK.ordinal + it].controlId) }
     private val trackGlideRateIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_GLIDE_RATE.ordinal + it].controlId) }
     private val trackLickModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LICK_MODE.ordinal + it].controlId) }
+    private val trackCompingStyleIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_COMPING_STYLE.ordinal + it].controlId)
+    }
+    private val trackArpModeIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ARP_MODE.ordinal + it].controlId)
+    }
+    private val trackArpSpeedIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ARP_SPEED.ordinal + it].controlId)
+    }
+    private val trackArpDirectionIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ARP_DIRECTION.ordinal + it].controlId)
+    }
+    private val trackInversionIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_INVERSION.ordinal + it].controlId)
+    }
+    private val trackHumanDropIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HUMAN_DROP_PROB.ordinal + it].controlId)
+    }
+    private val trackHumanGhostIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HUMAN_GHOST_PROB.ordinal + it].controlId)
+    }
+    private val trackHumanOctaveIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HUMAN_OCTAVE_PROB.ordinal + it].controlId)
+    }
+    private val trackHumanExtIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HUMAN_EXT_PROB.ordinal + it].controlId)
+    }
+    private val trackFillEveryNIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FILL_EVERY_N.ordinal + it].controlId)
+    }
+    private val trackFillTypeIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FILL_TYPE.ordinal + it].controlId)
+    }
+    private val trackFillSkipProbIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FILL_SKIP_PROB.ordinal + it].controlId)
+    }
+    private val trackChordFollowIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_CHORD_FOLLOW.ordinal + it].controlId)
+    }
     private val trackEvoTensionRespIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + it].controlId) }
     private val trackEvoNoteFollowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + it].controlId) }
     private val trackEvoPitchModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_PITCH_MODE.ordinal + it].controlId) }
@@ -726,6 +767,9 @@ class PulsarViewModel(
     // Vibe application
     // ═══════════════════════════════════════════════════════════
 
+    private fun compingStyleToInt(style: CompingStyle?): Int =
+        style?.engineId ?: 0  // PAD (default for non-CHORDAL tracks — harmless)
+
     /**
      * Push the entire vibe recipe to C++. Called from setVibe action and restoreSavedState.
      */
@@ -749,7 +793,7 @@ class PulsarViewModel(
             trackTimbreIds[i].value = FloatValue(tv.timbre)
             trackMorphIds[i].value = FloatValue(tv.morph)
             trackEnvelopeIds[i].value = IntValue(tv.envelopeProfile.id)
-            trackRoleIds[i].value = IntValue(tv.role.ordinal)
+            trackRoleIds[i].value = IntValue(tv.role.engineId)
             trackBarStrategyIds[i].value = IntValue(tv.barStrategy.id)
             trackEvoRhythmicIds[i].value = IntValue(if (tv.evolution.rhythmic != null) 1 else 0)
             trackEvoTensionRespIds[i].value = FloatValue(tv.evolution.rhythmic?.tensionResponse ?: 1.0f)
@@ -781,6 +825,19 @@ class PulsarViewModel(
                 is LickMode.Squash -> 1
                 is LickMode.Fill -> 2
             })
+            trackCompingStyleIds[i].value = IntValue(compingStyleToInt(tv.chordComping?.style))
+            trackArpModeIds[i].value = IntValue(tv.chordComping?.arpMode?.ordinal ?: 0)
+            trackArpSpeedIds[i].value = FloatValue(tv.chordComping?.arpSpeed ?: 0.2f)
+            trackArpDirectionIds[i].value = IntValue(tv.chordComping?.arpDirection?.ordinal ?: 0)
+            trackInversionIds[i].value = IntValue(tv.chordComping?.sectionInversion?.ordinal ?: 0)
+            trackHumanDropIds[i].value = FloatValue(tv.chordComping?.humanization?.dropProbability ?: 0f)
+            trackHumanGhostIds[i].value = FloatValue(tv.chordComping?.humanization?.ghostProbability ?: 0f)
+            trackHumanOctaveIds[i].value = FloatValue(tv.chordComping?.humanization?.octaveJumpProbability ?: 0f)
+            trackHumanExtIds[i].value = FloatValue(tv.chordComping?.humanization?.extensionProbability ?: 0f)
+            trackFillEveryNIds[i].value = IntValue(tv.chordComping?.fills?.everyNBars ?: 0)
+            trackFillTypeIds[i].value = IntValue(tv.chordComping?.fills?.fillType?.ordinal ?: 0)
+            trackFillSkipProbIds[i].value = FloatValue(tv.chordComping?.fills?.skipProbability ?: 0f)
+            trackChordFollowIds[i].value = IntValue(tv.chordFollow.ordinal)
         }
         stepCountId.value = IntValue(vibe.stepCount)
         pushEffectiveSends(deepId.value.asFloat())
@@ -803,6 +860,8 @@ class PulsarViewModel(
         genreRhythmDensityId.value = FloatValue(vibe.genre.rhythmDensity)
         genreProgressionStyleId.value = IntValue(vibe.genre.progressionStyle.ordinal)
         genreChordsPerBarId.value = IntValue(vibe.genre.chordsPerBar)
+        progressionAnchorId.value = IntValue(vibe.progressionAnchor.barsBetweenResets)
+        progressionDriftRangeId.value = FloatValue(vibe.progressionDriftRange)
 
         // Custom chord transition matrix (49 floats = 7x7 row-major)
         val chordMatrix = vibe.genre.chordTransitionMatrix
@@ -817,6 +876,33 @@ class PulsarViewModel(
                     FloatValue(chordMatrix[i])
                 )
             }
+        }
+
+        // Custom progression (optional chord sequence override, max 8 slots).
+        // Write degrees first, then length (acts as a release fence on the C++ side).
+        val customProg = vibe.genre.customProgression
+        if (customProg != null) {
+            customProg.forEachIndexed { i, degree ->
+                if (i < 8) {
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "custom_progression_$i"),
+                        IntValue(degree)
+                    )
+                }
+            }
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "custom_progression_length"),
+                IntValue(minOf(customProg.size, 8))
+            )
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "custom_progression_active"),
+                IntValue(1)
+            )
+        } else {
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "custom_progression_active"),
+                IntValue(0)
+            )
         }
 
         // Push lick (data first, length last as release fence)
@@ -934,12 +1020,13 @@ class PulsarViewModel(
      *
      * Layout for C++ engine arrays (must match orpheus_engine_routing.cpp and load_vibe()):
      *
-     * section_data[s * 18 + field]:
+     * section_data[s * 21 + field]:
      *   0=bars_min, 1=bars_max, 2=transition_bars, 3=recency_decay,
      *   4=macro_energy, 5=macro_complexity, 6=macro_space, 7=macro_mood,
      *   8=has_solo/solo_mode_id, 9..17=solo params (format depends on new vs legacy),
      *   12=bars_per_soloist_max, 13=solo_transition_bars, 14=improv_carryover,
-     *   15=transition_count, 16=reserved, 17=reserved
+     *   15=transition_count, 16=reserved, 17=reserved,
+     *   18=comping_style_override (-1=no override), 19=comping_inversion_override, 20=chord_follow_override
      *
      * section_transitions[s * 8 * 2 + t * 2 + field]:
      *   0=targetIndex, 1=weight (up to 8 transitions per section)
@@ -984,9 +1071,9 @@ class PulsarViewModel(
             PluginControlId(PULSAR_URI, "arrangement_outro_index"), IntValue(arr.outroIndex ?: -1)
         )
 
-        // Section data (18 floats per section)
+        // Section data (21 floats per section)
         arr.sections.forEachIndexed { s, section ->
-            val base = s * 18
+            val base = s * 21
             val mo = section.macroOverrides
             fun setSection(field: Int, v: Float) =
                 synthController.setPluginControl(
@@ -1032,6 +1119,11 @@ class PulsarViewModel(
                 setSection(9, 0f)
                 for (slot in 10..17) setSection(slot, 0f)
             }
+
+            // Section-level comping overrides (slots 18-20); -1.0 = no override
+            setSection(18, compingStyleOrSentinel(section.compingStyle))
+            setSection(19, compingInversionOrSentinel(section.compingInversion))
+            setSection(20, chordFollowOrSentinel(section.chordFollow))
 
             // Transitions for this section (up to 8 × 2 floats)
             val transBase = s * 8 * 2
@@ -1200,6 +1292,15 @@ class PulsarViewModel(
         EnvelopeProfile.DRONE -> DuckingProfile()
     }
 
+    private fun compingStyleOrSentinel(s: CompingStyle?): Float =
+        s?.engineId?.toFloat() ?: -1.0f
+
+    private fun compingInversionOrSentinel(inv: SectionInversion?): Float =
+        inv?.ordinal?.toFloat() ?: -1.0f
+
+    private fun chordFollowOrSentinel(cf: ChordFollow?): Float =
+        cf?.ordinal?.toFloat() ?: -1.0f
+
     companion object {
         private val previewVibe = Vibe(
             name = "Preview",
@@ -1213,7 +1314,7 @@ class PulsarViewModel(
                 noteRangeHigh = 72,
                 rhythmDensity = RhythmPattern.SPARSE.density,
             ),
-            tracks = List(8) { TrackVoice(engineEdm = Engine.VA, engineSpace = Engine.VA, role = if (it < 3) TrackRole.PERCUSSIVE else TrackRole.MELODIC) },
+            tracks = List(8) { TrackVoice(engineEdm = Engine.VA, engineSpace = Engine.VA, role = if (it < 3) TrackRole.Percussive else TrackRole.Melodic()) },
         )
 
         fun previewFeature(state: PulsarUiState = PulsarUiState(

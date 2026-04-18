@@ -120,15 +120,15 @@ bool run_pulsar_chords_tests() {
         bool ok = (cs.progression[cs.chord_index] == 0);
 
         // Advance 8 times — should move to chord index 1 (degree 4)
-        for (int i = 0; i < 8; i++) advance_chord(cs, 0.0f);
+        for (int i = 0; i < 8; i++) advance_chord(cs, 0.0f, 0.5f);
         ok = ok && (cs.chord_index == 1) && (cs.progression[cs.chord_index] == 4);
 
         // Advance 8 more — chord index 2 (degree 5)
-        for (int i = 0; i < 8; i++) advance_chord(cs, 0.0f);
+        for (int i = 0; i < 8; i++) advance_chord(cs, 0.0f, 0.5f);
         ok = ok && (cs.chord_index == 2) && (cs.progression[cs.chord_index] == 5);
 
         // Advance 8 more — chord index 3 (degree 3)
-        for (int i = 0; i < 8; i++) advance_chord(cs, 0.0f);
+        for (int i = 0; i < 8; i++) advance_chord(cs, 0.0f, 0.5f);
         ok = ok && (cs.chord_index == 3) && (cs.progression[cs.chord_index] == 3);
 
         if (ok) {
@@ -151,7 +151,7 @@ bool run_pulsar_chords_tests() {
         // 4 chords * 8 steps = 32 steps for full cycle
 
         // Advance 32 times (with complexity=0 so no mutation)
-        for (int i = 0; i < 32; i++) advance_chord(cs, 0.0f);
+        for (int i = 0; i < 32; i++) advance_chord(cs, 0.0f, 0.5f);
 
         bool ok = (cs.chord_index == 0) && (cs.progression[cs.chord_index] == 0);
         if (ok) {
@@ -176,7 +176,7 @@ bool run_pulsar_chords_tests() {
         bool first_always_zero = true;
         for (int cycle = 0; cycle < 100; cycle++) {
             for (int i = 0; i < steps_per_cycle; i++) {
-                advance_chord(cs, 1.0f);  // max complexity -> mutations happen
+                advance_chord(cs, 1.0f, 0.5f);  // max complexity -> mutations happen
             }
             if (cs.progression[0] != 0) {
                 first_always_zero = false;
@@ -205,7 +205,7 @@ bool run_pulsar_chords_tests() {
         bool in_range = true;
         for (int cycle = 0; cycle < 200; cycle++) {
             for (int i = 0; i < steps_per_cycle; i++) {
-                advance_chord(cs, 1.0f);
+                advance_chord(cs, 1.0f, 0.5f);
             }
             // Check all progression entries
             for (int p = 0; p < cs.progression_length; p++) {
@@ -338,7 +338,7 @@ bool run_pulsar_chords_tests() {
         int steps_per_cycle = cs.progression_length * cs.steps_per_chord;
         for (int cycle = 0; cycle < 500; cycle++) {
             for (int s = 0; s < steps_per_cycle; s++) {
-                advance_chord(cs, 1.0f);
+                advance_chord(cs, 1.0f, 0.5f);
             }
         }
 
@@ -352,6 +352,101 @@ bool run_pulsar_chords_tests() {
         printf("    mutable slots at V: %d/%d -- %s\n", became_V,
                cs.progression_length - 1, ok ? "PASS" : "FAIL");
         if (ok) pass++; else fail++;
+    }
+
+    // ── Anchor / drift tests ─────────────────────────────────────────
+    {
+        printf("  Test 11: anchor=0 (NONE) allows progression to diverge\n");
+        PulsarChordState cs{};
+        init_chord_progression(cs, 0 /* POP */, 2, 16, 0xC0FFEEu);
+        cs.anchor_bars = 0;
+        cs.drift_range = 1.0f;
+        int8_t initial[kMaxProgressionLength];
+        std::memcpy(initial, cs.progression, sizeof(initial));
+        // Advance enough bars to trigger many mutations at max complexity
+        for (int bar = 0; bar < 100; bar++) {
+            for (int step = 0; step < 16; step++) {
+                advance_chord(cs, 1.0f, 1.0f);
+            }
+        }
+        bool ok = std::memcmp(cs.progression, initial, cs.progression_length) != 0;
+        if (ok) { printf("    PASS: progression mutated\n"); pass++; }
+        else { printf("    FAIL: no mutation observed\n"); fail++; }
+    }
+
+    {
+        printf("  Test 12: anchor>0 resets progression to original\n");
+        PulsarChordState cs{};
+        init_chord_progression(cs, 0 /* POP */, 2, 16, 0xC0FFEEu);
+        cs.anchor_bars = 4;
+        cs.drift_range = 1.0f;
+        // Manually corrupt working progression
+        cs.progression[1] = 6;
+        cs.progression[2] = 6;
+        cs.bars_since_anchor = 4;  // ready to trigger reset on next wrap
+        // Force a progression wrap: set chord_index to last, step counter one from boundary
+        cs.chord_index = cs.progression_length - 1;
+        cs.chord_step_counter = cs.steps_per_chord - 1;
+        // One more step should advance past boundary, wrap chord_index to 0, and reset
+        advance_chord(cs, 1.0f, 1.0f);
+        bool ok = std::memcmp(cs.progression, cs.original_progression,
+                              cs.progression_length) == 0;
+        if (ok) { printf("    PASS: progression reset to original after anchor boundary\n"); pass++; }
+        else {
+            printf("    FAIL: progression=");
+            for (int i = 0; i < cs.progression_length; i++) printf("%d ", cs.progression[i]);
+            printf("original=");
+            for (int i = 0; i < cs.progression_length; i++) printf("%d ", cs.original_progression[i]);
+            printf("\n");
+            fail++;
+        }
+    }
+
+    {
+        printf("  Test 13: drift_range=0 produces no drift even at mood=1.0\n");
+        PulsarChordState cs{};
+        init_chord_progression(cs, 0 /* POP */, 2, 16, 0x1234u);
+        cs.anchor_bars = 0;
+        cs.drift_range = 0.0f;
+        int8_t initial[kMaxProgressionLength];
+        std::memcpy(initial, cs.progression, sizeof(initial));
+        for (int bar = 0; bar < 100; bar++) {
+            for (int step = 0; step < 16; step++) {
+                advance_chord(cs, 1.0f, 1.0f);
+            }
+        }
+        // max_drift = 1.0 * 0.0 * 6 = 0 → any mutation clamps back to original
+        bool ok = std::memcmp(cs.progression, initial, cs.progression_length) == 0;
+        if (ok) { printf("    PASS: progression unchanged\n"); pass++; }
+        else {
+            printf("    FAIL: progression drifted despite drift_range=0\n");
+            fail++;
+        }
+    }
+
+    {
+        printf("  Test 14: drift_range bounds stray from original\n");
+        PulsarChordState cs{};
+        init_chord_progression(cs, 0 /* POP */, 2, 16, 0x9999u);
+        cs.anchor_bars = 0;
+        cs.drift_range = 0.25f;  // max_drift = 1.0 * 0.25 * 6 = 1.5 → round to 2
+        int8_t original[kMaxProgressionLength];
+        std::memcpy(original, cs.progression, sizeof(original));
+        for (int bar = 0; bar < 200; bar++) {
+            for (int step = 0; step < 16; step++) {
+                advance_chord(cs, 1.0f, 1.0f);
+            }
+        }
+        bool ok = true;
+        for (int i = 0; i < cs.progression_length; i++) {
+            int diff = std::abs(cs.progression[i] - original[i]);
+            if (diff > 2) { ok = false; break; }
+        }
+        if (ok) { printf("    PASS: all chords within +/-2 of original\n"); pass++; }
+        else {
+            printf("    FAIL: out-of-bounds drift\n");
+            fail++;
+        }
     }
 
     // ── Summary ──────────────────────────────────────────────────────────

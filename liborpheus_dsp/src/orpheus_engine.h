@@ -762,6 +762,15 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_genre_chords_per_bar{2};
     std::atomic<int>   pulsar_chord_matrix_active{0};   // 1 = use custom matrix
     std::atomic<float> pulsar_chord_matrix[49]{};        // 7x7 row-major
+    std::atomic<int>   pulsar_progression_anchor{0};
+    std::atomic<float> pulsar_progression_drift_range{0.5f};
+
+    // Custom chord progression (overrides template.progression when active).
+    // Matrix selection still comes from genre_progression_style unless
+    // pulsar_chord_matrix_active is also set. Max 8 slots (kMaxProgressionLength).
+    std::atomic<int>   pulsar_custom_progression_active{0};
+    std::atomic<int>   pulsar_custom_progression_length{0};
+    std::atomic<int>   pulsar_custom_progression[8]{};   // chord degrees 0-6
 
     // Lick transfer buffer (written by Kotlin before setting lick_length)
     static constexpr int kMaxLickSteps = 32;
@@ -808,7 +817,7 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_arrangement_section_count{0};
     std::atomic<int>   pulsar_arrangement_intro_index{-1};
     std::atomic<int>   pulsar_arrangement_outro_index{-1};
-    std::atomic<float> pulsar_section_data[8 * 18] = {};
+    std::atomic<float> pulsar_section_data[8 * 21] = {};
     std::atomic<float> pulsar_section_transitions[8 * 8 * 2] = {};
     std::atomic<float> pulsar_track_solo_behavior[8 * 15] = {};
     std::atomic<float> pulsar_track_ducking[8 * 6] = {};
@@ -861,6 +870,23 @@ struct OrpheusEngine {
     std::atomic<float> pulsar_track_glide_rate[8] = {};
     // Per-track lick usage
     std::atomic<int>   pulsar_track_lick_mode[8] = {};  // LickMode: 0=NONE, 1=SQUASH, 2=FILL
+    std::atomic<int>   pulsar_track_comping_style[8] = {};  // CompingStyleId: 0=PAD, 1=FUNK, 2=ROCK, 3=CUSTOM
+    std::atomic<int>   pulsar_track_arp_mode[8] = {};       // ArpModeId: 0=AUTO, 1=ALWAYS, 2=NEVER
+    std::atomic<float> pulsar_track_arp_speed[8] = {};      // 0.0-1.0
+    std::atomic<int>   pulsar_track_arp_direction[8] = {};  // ArpDirectionId: 0=UP, 1=DOWN, 2=UP_DOWN, 3=RANDOM
+    std::atomic<int>   pulsar_track_inversion[8] = {};      // SectionInversionId: 0=FOLLOW, 1=ROOT, 2=FIRST, 3=SECOND, 4=OPEN
+    // Per-track humanization probabilities (CHORDAL only)
+    std::atomic<float> pulsar_track_human_drop_prob[8] = {};
+    std::atomic<float> pulsar_track_human_ghost_prob[8] = {};
+    std::atomic<float> pulsar_track_human_octave_prob[8] = {};
+    std::atomic<float> pulsar_track_human_ext_prob[8] = {};
+    // Per-track fill parameters (CHORDAL only)
+    std::atomic<int>   pulsar_track_fill_every_n[8] = {};
+    std::atomic<int>   pulsar_track_fill_type[8] = {};
+    std::atomic<float> pulsar_track_fill_skip_prob[8] = {};
+
+    // Per-track chord follow mode (0=FOLLOW, 1=ROOT_ONLY, 2=FIXED)
+    std::atomic<int> pulsar_track_chord_follow[8] = {};
 
     // Per-track evolution parameters
     // Note: tension_resp and voicing_tension zero-init here; Kotlin defaults are 1.0f.

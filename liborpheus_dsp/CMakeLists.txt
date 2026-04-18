@@ -201,6 +201,7 @@ if(BUILD_TESTS)
         test/test_bar_strategy.cpp
         test/test_pulsar_routing.cpp
         test/test_pulsar_chords.cpp
+        test/test_pulsar_comping.cpp
         test/test_pulsar_signal_quality.cpp
         test/test_pulsar_tension.cpp
         test/test_pulsar_motifs.cpp

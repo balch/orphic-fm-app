@@ -72,6 +72,8 @@ class PulsarPlugin : DspPlugin {
     private var _genreRhythmDensity = 1.0f
     private var _genreProgressionStyle = 0
     private var _genreChordsPerBar = 2
+    private var _progressionAnchor = 4  // default EVERY_4 = 4 bars
+    private var _progressionDriftRange = 0.5f
     private var _lickLength = 0
     private var _lickLoopLength = 0
     private var _lickData = FloatArray(96) { 0f }
@@ -118,6 +120,19 @@ class PulsarPlugin : DspPlugin {
     private val _trackEvoNoteFollow = IntArray(8) { 0 }
     private val _trackEvoPitchMode = IntArray(8) { 0 }
     private val _trackEvoVoicingTension = FloatArray(8) { 1.0f }
+    private val _trackCompingStyle = IntArray(8) { 0 }  // 0 = PAD
+    private val _trackArpMode = IntArray(8) { 0 }           // AUTO
+    private val _trackArpSpeed = FloatArray(8) { 0.2f }
+    private val _trackArpDirection = IntArray(8) { 0 }      // UP
+    private val _trackInversion = IntArray(8) { 0 }         // FOLLOW_STYLE
+    private val _trackHumanDropProb = FloatArray(8) { 0.0f }
+    private val _trackHumanGhostProb = FloatArray(8) { 0.0f }
+    private val _trackHumanOctaveProb = FloatArray(8) { 0.0f }
+    private val _trackHumanExtProb = FloatArray(8) { 0.0f }
+    private val _trackFillEveryN = IntArray(8) { 0 }
+    private val _trackFillType = IntArray(8) { 1 }  // ASCENDING_ARP
+    private val _trackFillSkipProb = FloatArray(8) { 0.0f }
+    private val _trackChordFollow = IntArray(8) { 0 }  // default FOLLOW
 
     private val portDefs = ports(startIndex = 0) {
         controlPort(PulsarSymbol.PLAYING) {
@@ -287,6 +302,13 @@ class PulsarPlugin : DspPlugin {
         }
         controlPort(PulsarSymbol.GENRE_CHORDS_PER_BAR) {
             intType { default = 2; get { _genreChordsPerBar }; set { _genreChordsPerBar = it } }
+        }
+        controlPort(PulsarSymbol.PROGRESSION_ANCHOR) {
+            intType { default = 4; get { _progressionAnchor }; set { _progressionAnchor = it } }
+        }
+        controlPort(PulsarSymbol.PROGRESSION_DRIFT_RANGE) {
+            floatType { default = 0.5f; min = 0f; max = 1f
+                get { _progressionDriftRange }; set { _progressionDriftRange = it } }
         }
 
         // Lick buffer
@@ -473,6 +495,71 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_VOICING_TENSION.ordinal + t]) {
                 floatType { default = 1.0f; min = 0f; max = 1f; get { _trackEvoVoicingTension[t] }; set { _trackEvoVoicingTension[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_COMPING_STYLE.ordinal + t]) {
+                intType { default = 0; get { _trackCompingStyle[t] }; set { _trackCompingStyle[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ARP_MODE.ordinal + t]) {
+                intType { default = 0; get { _trackArpMode[t] }; set { _trackArpMode[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ARP_SPEED.ordinal + t]) {
+                floatType { default = 0.2f; min = 0f; max = 1f; get { _trackArpSpeed[t] }; set { _trackArpSpeed[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_ARP_DIRECTION.ordinal + t]) {
+                intType { default = 0; get { _trackArpDirection[t] }; set { _trackArpDirection[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_INVERSION.ordinal + t]) {
+                intType { default = 0; get { _trackInversion[t] }; set { _trackInversion[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HUMAN_DROP_PROB.ordinal + t]) {
+                floatType { default = 0.0f; get { _trackHumanDropProb[t] }; set { _trackHumanDropProb[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HUMAN_GHOST_PROB.ordinal + t]) {
+                floatType { default = 0.0f; get { _trackHumanGhostProb[t] }; set { _trackHumanGhostProb[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HUMAN_OCTAVE_PROB.ordinal + t]) {
+                floatType { default = 0.0f; get { _trackHumanOctaveProb[t] }; set { _trackHumanOctaveProb[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_HUMAN_EXT_PROB.ordinal + t]) {
+                floatType { default = 0.0f; get { _trackHumanExtProb[t] }; set { _trackHumanExtProb[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FILL_EVERY_N.ordinal + t]) {
+                intType { default = 0; get { _trackFillEveryN[t] }; set { _trackFillEveryN[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FILL_TYPE.ordinal + t]) {
+                intType { default = 1; get { _trackFillType[t] }; set { _trackFillType[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_FILL_SKIP_PROB.ordinal + t]) {
+                floatType { default = 0.0f; get { _trackFillSkipProb[t] }; set { _trackFillSkipProb[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_CHORD_FOLLOW.ordinal + t]) {
+                intType { default = 0; get { _trackChordFollow[t] }; set { _trackChordFollow[t] = it } }
             }
         }
     }

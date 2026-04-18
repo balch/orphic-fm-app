@@ -9,6 +9,7 @@
 #include "pulsar_lick_techniques.h"
 #include "pulsar_motif.h"
 #include "pulsar_mod_ranges.h"
+#include "pulsar_comping.h"
 #include <cmath>
 #include <cstring>
 #include <algorithm>
@@ -288,6 +289,98 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
             }
         }
     }
+
+    // ── CHORDAL per-bar evolution pass (humanization + fills) ──
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        PulsarTrackState& ts = state->tracks[t];
+        if (ts.role != TrackRole::CHORDAL) continue;
+        if (!ts.chordal_base_valid) continue;
+
+        bool any_human = (ts.human_drop_prob > 0.001f) || (ts.human_ghost_prob > 0.001f)
+                         || (ts.human_octave_prob > 0.001f) || (ts.human_ext_prob > 0.001f);
+        bool fills_enabled = (ts.fill_every_n > 0) && (ts.fill_type != FillTypeId::NONE);
+        if (!any_human && !fills_enabled) continue;
+
+        // Restore BASE
+        std::memcpy(ts.steps, ts.chordal_base, sizeof(PulsarStep) * ts.step_count);
+
+        uint32_t seed = static_cast<uint32_t>(state->loop_count * 0x9E3779B9u)
+                      ^ static_cast<uint32_t>(t * 2654435761u);
+
+        // ── Fills first (replaces whole bar) ──
+        bool fill_fired = false;
+        if (fills_enabled) {
+            ts.bars_since_fill++;
+            if (ts.bars_since_fill >= ts.fill_every_n) {
+                ts.bars_since_fill = 0;
+                // Skip-probability roll
+                uint32_t sseed = seed;
+                float skip_roll = static_cast<float>((lcg_next(sseed) >> 8) & 0xFFFF) / 65535.0f;
+                if (skip_roll >= ts.fill_skip_prob) {
+                    // Apply the fill
+                    int cd = state->chord_state.progression[state->chord_state.chord_index];
+                    int si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+                    if (si < 0) si = 0;
+                    if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
+                    const PulsarScale& sc = kPulsarScales[si];
+                    int r = engine->pulsar_root_note.load(std::memory_order_relaxed);
+                    int nr_low  = engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed);
+                    int nr_high = engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed);
+                    if (nr_low  <= 0) nr_low  = engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed);
+                    if (nr_high <= 0) nr_high = engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed);
+                    if (nr_low  <= 0) nr_low  = 48;  // final safety fallback
+                    if (nr_high <= 0) nr_high = 72;
+                    const uint8_t lo = static_cast<uint8_t>(nr_low);
+                    const uint8_t hi = static_cast<uint8_t>(nr_high);
+                    const int octv   = comping_default_octave(ts.comping_style);
+
+                    switch (ts.fill_type) {
+                        case FillTypeId::ASCENDING_ARP:
+                            apply_fill_ascending_arp(ts.steps, ts.step_count, cd,
+                                static_cast<uint8_t>(r), sc, lo, hi, octv);
+                            fill_fired = true;
+                            break;
+                        case FillTypeId::DESCENDING_ARP:
+                            apply_fill_descending_arp(ts.steps, ts.step_count, cd,
+                                static_cast<uint8_t>(r), sc, lo, hi, octv);
+                            fill_fired = true;
+                            break;
+                        case FillTypeId::TURNAROUND:
+                            apply_fill_turnaround(ts.steps, ts.step_count, cd,
+                                static_cast<uint8_t>(r), sc, lo, hi, octv);
+                            fill_fired = true;
+                            break;
+                        case FillTypeId::DOUBLE_TIME:
+                            apply_fill_double_time(ts.steps, ts.step_count, cd,
+                                static_cast<uint8_t>(r), sc, lo, hi, octv);
+                            fill_fired = true;
+                            break;
+                        case FillTypeId::STAB_FLURRY:
+                            apply_fill_stab_flurry(ts.steps, ts.step_count, cd,
+                                static_cast<uint8_t>(r), sc, lo, hi, octv);
+                            fill_fired = true;
+                            break;
+                        case FillTypeId::DROP_OUT:
+                            apply_fill_drop_out(ts.steps, ts.step_count, cd,
+                                static_cast<uint8_t>(r), sc, lo, hi, octv);
+                            fill_fired = true;
+                            break;
+                        case FillTypeId::NONE:
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+
+        // ── Humanization (only if no fill this bar) ──
+        if (!fill_fired && any_human) {
+            apply_humanization(ts.steps, ts.step_count,
+                               ts.human_drop_prob, ts.human_ghost_prob,
+                               ts.human_octave_prob, ts.human_ext_prob,
+                               complexity, seed);
+        }
+    }
 }
 
 // ── Tides envelope parameter computation ────────────────────────────
@@ -431,6 +524,17 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         TrackRole role = static_cast<TrackRole>(
             engine->pulsar_track_role[t].load(std::memory_order_relaxed));
         ts.role = role;
+        ts.comping_style = static_cast<CompingStyleId>(
+            engine->pulsar_track_comping_style[t].load(std::memory_order_relaxed));
+        ts.arp_mode = static_cast<ArpModeId>(
+            engine->pulsar_track_arp_mode[t].load(std::memory_order_relaxed));
+        ts.arp_speed =
+            engine->pulsar_track_arp_speed[t].load(std::memory_order_relaxed);
+        ts.arp_direction = static_cast<ArpDirectionId>(
+            engine->pulsar_track_arp_direction[t].load(std::memory_order_relaxed));
+        ts.section_inversion = static_cast<SectionInversionId>(
+            engine->pulsar_track_inversion[t].load(std::memory_order_relaxed));
+        ts.arp_note_count = 0;  // runtime state, initialized inactive
         bool percussive = (role == TrackRole::PERCUSSIVE);
 
         // Read macro map from atomics
@@ -464,6 +568,15 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         LickMode lick_mode = static_cast<LickMode>(
             engine->pulsar_track_lick_mode[t].load(std::memory_order_relaxed));
 
+        // Chord follow mode
+        ts.chord_follow = static_cast<ChordFollowMode>(
+            engine->pulsar_track_chord_follow[t].load(std::memory_order_relaxed));
+
+        // Snapshot defaults so section overrides can revert to them on -1 (no override)
+        ts.default_chord_follow = ts.chord_follow;
+        ts.default_comping_style = ts.comping_style;
+        ts.default_section_inversion = ts.section_inversion;
+
         // Evolution parameters
         ts.evo_rhythmic = engine->pulsar_track_evo_rhythmic[t].load(std::memory_order_relaxed) != 0;
         ts.evo_tension_resp = engine->pulsar_track_evo_tension_resp[t].load(std::memory_order_relaxed);
@@ -473,7 +586,32 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             engine->pulsar_track_evo_pitch_mode[t].load(std::memory_order_relaxed));
         ts.evo_voicing_tension = engine->pulsar_track_evo_voicing_tension[t].load(std::memory_order_relaxed);
 
-        if (lick_len > 0 && lick_mode != LickMode::NONE && role == TrackRole::MELODIC) {
+        if (role == TrackRole::CHORDAL) {
+            // CHORDAL: walk rhythm template, stab chord root (CHD renders voicing)
+            ts.step_count = step_count_config;
+            int initial_chord_degree = (state->chord_state.progression_length > 0)
+                ? state->chord_state.progression[0] : 0;
+            generate_chordal_pattern(
+                ts.steps, ts.step_count,
+                ts.comping_style,
+                initial_chord_degree,
+                static_cast<uint8_t>(root), scale,
+                genre.note_range_low, genre.note_range_high);
+            // Snapshot BASE for humanization restore
+            std::memcpy(ts.chordal_base, ts.steps, sizeof(ts.steps));
+            ts.chordal_base_count = ts.step_count;
+            ts.chordal_base_valid = true;
+            // Load humanization probabilities
+            ts.human_drop_prob = engine->pulsar_track_human_drop_prob[t].load(std::memory_order_relaxed);
+            ts.human_ghost_prob = engine->pulsar_track_human_ghost_prob[t].load(std::memory_order_relaxed);
+            ts.human_octave_prob = engine->pulsar_track_human_octave_prob[t].load(std::memory_order_relaxed);
+            ts.human_ext_prob = engine->pulsar_track_human_ext_prob[t].load(std::memory_order_relaxed);
+            ts.fill_every_n = engine->pulsar_track_fill_every_n[t].load(std::memory_order_relaxed);
+            ts.fill_type = static_cast<FillTypeId>(
+                engine->pulsar_track_fill_type[t].load(std::memory_order_relaxed));
+            ts.fill_skip_prob = engine->pulsar_track_fill_skip_prob[t].load(std::memory_order_relaxed);
+            ts.bars_since_fill = 0;  // counter reset on vibe load
+        } else if (lick_len > 0 && lick_mode != LickMode::NONE && role == TrackRole::MELODIC) {
             if (lick_mode == LickMode::FILL) {
                 // FILL: lick spans full step count, bypass bar strategy
                 ts.step_count = step_count_config;
@@ -583,8 +721,26 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 engine->pulsar_chord_matrix[i].load(std::memory_order_relaxed);
         }
     }
+
+    // Optional caller-supplied progression (overrides the template's chord sequence)
+    int custom_prog[kMaxProgressionLength];
+    int custom_prog_len = 0;
+    if (engine->pulsar_custom_progression_active.load(std::memory_order_relaxed) > 0) {
+        custom_prog_len = engine->pulsar_custom_progression_length.load(std::memory_order_relaxed);
+        if (custom_prog_len > kMaxProgressionLength) custom_prog_len = kMaxProgressionLength;
+        for (int i = 0; i < custom_prog_len; i++) {
+            custom_prog[i] = engine->pulsar_custom_progression[i].load(std::memory_order_relaxed);
+        }
+    }
     init_chord_progression(state->chord_state, genre.progression_style,
-                           genre.chords_per_bar, step_count_for_chords, base_seed);
+                           genre.chords_per_bar, step_count_for_chords, base_seed,
+                           custom_prog_len > 0 ? custom_prog : nullptr,
+                           custom_prog_len);
+    state->chord_state.anchor_bars =
+        engine->pulsar_progression_anchor.load(std::memory_order_relaxed);
+    state->chord_state.drift_range =
+        engine->pulsar_progression_drift_range.load(std::memory_order_relaxed);
+    state->chord_state.bars_since_anchor = 0;
 
     // ── Load tension params from engine atomics ──
     state->tension.inner_bars = engine->pulsar_tension_inner_bars.load(std::memory_order_relaxed);
@@ -628,7 +784,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
 
         for (int s = 0; s < arr.section_count; s++) {
             SectionParam& sec = arr.sections[s];
-            int base = s * 18;
+            int base = s * 21;
             sec.bars_min              = static_cast<int>(engine->pulsar_section_data[base + 0].load(std::memory_order_relaxed));
             sec.bars_max              = static_cast<int>(engine->pulsar_section_data[base + 1].load(std::memory_order_relaxed));
             sec.transition_bars       = static_cast<int>(engine->pulsar_section_data[base + 2].load(std::memory_order_relaxed));
@@ -646,6 +802,16 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             sec.solo_lick_influence = engine->pulsar_section_data[base + 12].load(std::memory_order_relaxed);
             sec.solo_bars_min    = static_cast<int>(engine->pulsar_section_data[base + 13].load(std::memory_order_relaxed));
             sec.solo_bars_max    = static_cast<int>(engine->pulsar_section_data[base + 14].load(std::memory_order_relaxed));
+
+            // Section-level comping overrides (slots 18-20); -1 = no override
+            {
+                float cs = engine->pulsar_section_data[base + 18].load(std::memory_order_relaxed);
+                sec.comping_style_override = (cs < 0.0f) ? -1 : static_cast<int>(cs);
+                float ci = engine->pulsar_section_data[base + 19].load(std::memory_order_relaxed);
+                sec.comping_inversion_override = (ci < 0.0f) ? -1 : static_cast<int>(ci);
+                float cf = engine->pulsar_section_data[base + 20].load(std::memory_order_relaxed);
+                sec.chord_follow_override = (cf < 0.0f) ? -1 : static_cast<int>(cf);
+            }
 
             // Unpack transitions for this section (2 floats per edge: target, weight)
             int trans_base = (s * kMaxSections) * 2;
@@ -1160,7 +1326,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
 
             // Advance chord progression on track 0 step boundaries
             if (t == 0) {
-                advance_chord(state->chord_state, complexity);
+                advance_chord(state->chord_state, complexity, mood);
             }
 
             // Detect loop wrap (playhead wrapped to 0) — trigger mutation
@@ -1214,6 +1380,55 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         if (sec.has_motif_set) {
                             init_motif_state(state->motif_state, sec.motif_set,
                                              state->mutation_seed);
+                        }
+
+                        // Apply section-level comping overrides to all CHORDAL tracks
+                        // (-1 = restore default snapshotted at load_vibe)
+                        {
+                            int si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+                            if (si < 0) si = 0;
+                            if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
+                            const PulsarScale& sc_now = kPulsarScales[si];
+                            int root_now = engine->pulsar_root_note.load(std::memory_order_relaxed);
+                            int cd = state->chord_state.progression[state->chord_state.chord_index];
+                            for (int t = 0; t < kNumPulsarTracks; t++) {
+                                if (state->tracks[t].role != TrackRole::CHORDAL) continue;
+                                CompingStyleId target = (sec.comping_style_override >= 0)
+                                    ? static_cast<CompingStyleId>(sec.comping_style_override)
+                                    : state->tracks[t].default_comping_style;
+                                if (target != state->tracks[t].comping_style) {
+                                    state->tracks[t].comping_style = target;
+                                    if (state->tracks[t].chordal_base_valid) {
+                                        generate_chordal_pattern(
+                                            state->tracks[t].chordal_base, state->tracks[t].chordal_base_count,
+                                            state->tracks[t].comping_style, cd,
+                                            static_cast<uint8_t>(root_now), sc_now,
+                                            static_cast<uint8_t>(engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed)),
+                                            static_cast<uint8_t>(engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed)));
+                                        std::memcpy(state->tracks[t].steps, state->tracks[t].chordal_base,
+                                                    sizeof(PulsarStep) * state->tracks[t].step_count);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Inversion override (-1 = restore default)
+                        for (int t = 0; t < kNumPulsarTracks; t++) {
+                            if (state->tracks[t].role != TrackRole::CHORDAL) continue;
+                            SectionInversionId target = (sec.comping_inversion_override >= 0)
+                                ? static_cast<SectionInversionId>(sec.comping_inversion_override)
+                                : state->tracks[t].default_section_inversion;
+                            state->tracks[t].section_inversion = target;
+                        }
+
+                        // Chord-follow override (-1 = restore default)
+                        for (int t = 0; t < kNumPulsarTracks; t++) {
+                            TrackRole r = state->tracks[t].role;
+                            if (r != TrackRole::MELODIC && r != TrackRole::CHORDAL) continue;
+                            ChordFollowMode target = (sec.chord_follow_override >= 0)
+                                ? static_cast<ChordFollowMode>(sec.chord_follow_override)
+                                : state->tracks[t].default_chord_follow;
+                            state->tracks[t].chord_follow = target;
                         }
                     }
 
@@ -1490,17 +1705,47 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             // ── Tonal tension: modify MIDI note before pitch glide ──
                             int midi_note = step.note;
 
-                            // Chord progression transposition (melodic tracks only)
-                            if (ts.role != TrackRole::PERCUSSIVE) {
+                            // Chord progression transposition (melodic tracks, mode-dependent)
+                            if (ts.role != TrackRole::PERCUSSIVE && ts.chord_follow != ChordFollowMode::FIXED) {
                                 int chord_deg = state->chord_state.progression[state->chord_state.chord_index];
-                                if (chord_deg != 0) {
-                                    int si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
-                                    if (si < 0) si = 0;
-                                    if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
-                                    const PulsarScale& sc = kPulsarScales[si];
+                                int si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+                                if (si < 0) si = 0;
+                                if (si >= kNumPulsarScales) si = kNumPulsarScales - 1;
+                                const PulsarScale& sc = kPulsarScales[si];
+
+                                if (ts.chord_follow == ChordFollowMode::ROOT_ONLY) {
+                                    // Play the chord root, pinned to the LOWEST valid octave in the
+                                    // track's note range. Bass stays on the floor; V-chord offsets
+                                    // push up from there instead of wandering relative to pattern octave.
+                                    int root = engine->pulsar_root_note.load(std::memory_order_relaxed);
+                                    int chord_semis = chord_degree_to_semitones(chord_deg, sc);
+                                    int nr_low_root = engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed);
+                                    // Find lowest octave where (octave*12 + root + chord_semis) >= nr_low_root
+                                    int base = root + chord_semis;
+                                    int octave = 0;
+                                    while (octave * 12 + base < nr_low_root) octave++;
+                                    midi_note = octave * 12 + base;
+                                } else if (chord_deg != 0) {
+                                    // FOLLOW: transpose by degree-to-degree offset
                                     int semi_offset = chord_degree_to_semitones(chord_deg, sc)
                                                     - chord_degree_to_semitones(0, sc);
                                     midi_note += semi_offset;
+                                }
+
+                                // Octave pin: bias toward the lowest valid octave of the track's
+                                // note range. For bass (narrow range), this keeps the bass in the
+                                // bass register on every chord. For wider-range tracks, this keeps
+                                // chord transposition from drifting upward over time — pattern shape
+                                // preserved within the floor octave.
+                                int nr_low = engine->pulsar_track_note_range_low[t].load(std::memory_order_relaxed);
+                                int nr_high = engine->pulsar_track_note_range_high[t].load(std::memory_order_relaxed);
+                                if (nr_low > 0 && nr_high > nr_low) {
+                                    // Drop down to within one octave of the floor
+                                    while (midi_note >= nr_low + 12) midi_note -= 12;
+                                    // Bump up if below floor
+                                    while (midi_note < nr_low) midi_note += 12;
+                                    // Safety cap (shouldn't trigger given above logic)
+                                    if (midi_note > nr_high) midi_note = nr_high;
                                 }
                             }
 
@@ -1538,7 +1783,46 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             float new_note = static_cast<float>(midi_note);
                             ts.target_pitch = new_note;
 
-                            float glide_param = engine->pulsar_track_glide_rate[t].load(std::memory_order_relaxed);
+                            // ── Arpeggiator initialization (CHORDAL tracks) ──
+                            if (ts.role == TrackRole::CHORDAL && ts.arp_mode != ArpModeId::NEVER) {
+                                bool use_arp = (ts.arp_mode == ArpModeId::ALWAYS)
+                                               || !engine_has_native_chord(ts.engine_index);
+                                if (use_arp) {
+                                    int cd = state->chord_state.progression[state->chord_state.chord_index];
+                                    int arp_si = engine->pulsar_scale_index.load(std::memory_order_relaxed);
+                                    if (arp_si < 0) arp_si = 0;
+                                    if (arp_si >= kNumPulsarScales) arp_si = kNumPulsarScales - 1;
+                                    const PulsarScale& arp_sc = kPulsarScales[arp_si];
+
+                                    uint32_t seed = static_cast<uint32_t>(
+                                        state->loop_count * 0x9E3779B9u) ^ static_cast<uint32_t>(t);
+                                    // 2 notes (root + 5th) by default — less blippy than triad arps.
+                                    // With arpDirection = DOWN, plays 5th then root — like a grace
+                                    // note landing on the root. Chord color comes from humanization.
+                                    ts.arp_note_count = compute_chord_tones(
+                                        midi_note, cd, arp_sc,
+                                        2 /* root + 5th */, ts.arp_direction, ts.section_inversion, seed, ts.arp_notes);
+
+                                    // First note plays immediately via target_pitch already set above.
+                                    // Override with computed arp_notes[0] for consistent ordering.
+                                    ts.target_pitch = static_cast<float>(ts.arp_notes[0]);
+                                    ts.current_pitch = ts.target_pitch;  // no glide on arp retriggers
+                                    ts.arp_index = 1;  // next retrigger = arp_notes[1]
+
+                                    // Schedule next retrigger (countdown in samples)
+                                    int spn = arp_samples_per_note(ts.arp_speed,
+                                                                    static_cast<int>(samples_per_step));
+                                    ts.arp_next_sample = static_cast<int64_t>(spn);
+                                } else {
+                                    ts.arp_note_count = 0;  // arp inactive (CHD engine, AUTO mode)
+                                }
+                            } else {
+                                ts.arp_note_count = 0;
+                            }
+
+                            // Arp suppresses glide — each note fires at exact pitch.
+                            float glide_param = (ts.arp_note_count > 0) ? 0.0f
+                                : engine->pulsar_track_glide_rate[t].load(std::memory_order_relaxed);
                             if (glide_param > 0.001f && ts.prev_step_gated) {
                                 // Map 0-1 to glide rate: 0.001 (fast ~20ms) to 0.00002 (very slow ~2s)
                                 ts.glide_rate = 0.001f * std::pow(0.02f, glide_param);
@@ -1574,6 +1858,43 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             if (ts.gate_timer <= 0.0f) {
                 ts.gate_timer = 0.0f;
                 ts.voice_active = false;
+            }
+        }
+
+        // ── Arpeggiator per-block countdown ──
+        // Fires next chord tone when countdown expires. Uses block-rate decrement
+        // (same convention as gate_timer). Option A sustain: hold last note.
+        if (ts.arp_note_count > 0 && ts.arp_index < ts.arp_note_count) {
+            ts.arp_next_sample -= static_cast<int64_t>(num_frames);
+            if (ts.arp_next_sample <= 0) {
+                // Retrigger voice with next arp note
+                ts.target_pitch = static_cast<float>(ts.arp_notes[ts.arp_index]);
+                ts.current_pitch = ts.target_pitch;  // no glide between arp notes
+                ts.arp_index++;
+
+                // Force rising edge so Tides/AD envelope restarts
+                ts.tides_prev_gate = stmlib::GATE_FLAG_LOW;
+                ts.voice_active = true;
+                // Reset gate timer so the voice fires a full envelope for this note.
+                // Use current playhead step duration; fall back to one arp interval.
+                float arp_note_duration = 1.0f;
+                if (ts.playhead >= 0 && ts.playhead < ts.step_count) {
+                    arp_note_duration = ts.steps[ts.playhead].duration;
+                }
+                int spn_for_gate = arp_samples_per_note(ts.arp_speed,
+                                                        static_cast<int>(samples_per_step));
+                float base_gate = static_cast<float>(arp_note_duration) * static_cast<float>(spn_for_gate);
+                ts.gate_timer = std::max(base_gate, static_cast<float>(720));
+
+                if (ts.arp_index < ts.arp_note_count) {
+                    // Schedule next retrigger
+                    int spn = arp_samples_per_note(ts.arp_speed,
+                                                    static_cast<int>(samples_per_step));
+                    ts.arp_next_sample = static_cast<int64_t>(spn);
+                } else {
+                    // Option A: sequence complete — hold last note, no more retriggers
+                    ts.arp_note_count = 0;
+                }
             }
         }
 
@@ -1744,6 +2065,24 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                    mr.timbre_min, mr.timbre_max, true);
             mod_morph = apply_mod(mod_morph, ts.mod_lfo_output[1], 1.0f,
                                   mr.morph_min, mr.morph_max, mr.morph_safe);
+        }
+
+        // ── CHD engine inversion: override morph to select voicing registration ──
+        // CHD (engine 14) uses morph to select chord voicing type.
+        // Map SectionInversion → morph: 0.0=root, 0.3=1st, 0.6=2nd, 0.9=open.
+        if (ts.role == TrackRole::CHORDAL
+            && engine_has_native_chord(ts.engine_index)
+            && ts.section_inversion != SectionInversionId::FOLLOW_STYLE)
+        {
+            float morph_val = mod_morph;  // default: preserve existing mod
+            switch (ts.section_inversion) {
+                case SectionInversionId::ROOT_POSITION:    morph_val = 0.0f;  break;
+                case SectionInversionId::FIRST_INVERSION:  morph_val = 0.3f;  break;
+                case SectionInversionId::SECOND_INVERSION: morph_val = 0.6f;  break;
+                case SectionInversionId::OPEN_VOICING:     morph_val = 0.9f;  break;
+                default: break;
+            }
+            mod_morph = morph_val;
         }
 
         // Truly self-enveloped engines: BD(21), SD(22), HH(23), DX(2-4).

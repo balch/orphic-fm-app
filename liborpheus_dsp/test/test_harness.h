@@ -495,6 +495,7 @@ bool run_djapp_graph_tests();
 bool run_bar_strategy_tests();
 bool run_pulsar_routing_tests();
 bool run_pulsar_chords_tests();
+bool run_pulsar_comping_tests();
 bool run_pulsar_signal_tests();
 bool run_pulsar_tension_tests();
 bool run_pulsar_motifs_tests();

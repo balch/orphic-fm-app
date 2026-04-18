@@ -8,14 +8,19 @@ import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
 import org.balch.orpheus.features.pulsar.BarStrategy
+import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
+import org.balch.orpheus.features.pulsar.Evolution
 import org.balch.orpheus.features.pulsar.EvolutionTension
 import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.Lick
+import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
 import org.balch.orpheus.features.pulsar.MacroOverrides
+import org.balch.orpheus.features.pulsar.PitchEvolution
+import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
 import org.balch.orpheus.features.pulsar.RhythmPattern
 import org.balch.orpheus.features.pulsar.RootNote
@@ -27,9 +32,6 @@ import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TrackMacroMap
 import org.balch.orpheus.features.pulsar.TrackRole
 import org.balch.orpheus.features.pulsar.TrackVoice
-import org.balch.orpheus.features.pulsar.LickMode
-import org.balch.orpheus.features.pulsar.Evolution
-import org.balch.orpheus.features.pulsar.PitchEvolution
 import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
 import org.balch.orpheus.features.pulsar.VibeProvider
@@ -121,6 +123,8 @@ class DeepSpaceVibe : VibeProvider {
                 "VII" to row(0.14f, 0.02f, 0.02f, 0.04f, 0.03f, 0.05f, 0.70f),
             ),
         ),
+        progressionAnchor = ProgressionAnchor.EVERY_8,
+        progressionDriftRange = 0.2f,
         tracks = listOf(
             // ═══════════════════════════════════════════════════════════
             // Rhythm section — sparse, textural
@@ -130,7 +134,7 @@ class DeepSpaceVibe : VibeProvider {
             // Modal resonator, sparse deep hits, iconic single-note punctuation
             TrackVoice(
                 engineEdm = Engine.MOD, engineSpace = Engine.MOD,
-                density = 0.29f, role = TrackRole.MELODIC, volume = 0.90f, pan = 0.0f,
+                density = 0.29f, role = TrackRole.Melodic(), volume = 0.90f, pan = 0.0f,
                 harmonics = 0.35f, timbre = 0.25f, morph = 0.55f,
                 envelopeProfile = EnvelopeProfile.RHYTHM,
                 macroMap = TrackMacroMap.MELODIC,
@@ -141,7 +145,7 @@ class DeepSpaceVibe : VibeProvider {
             // 1 PERC: Ride shimmer — light metallic texture, like distant cymbals
             TrackVoice(
                 engineEdm = Engine.STR, engineSpace = Engine.STR,
-                density = 0.42f, role = TrackRole.MELODIC, volume = 0.9f, pan = -0.25f,
+                density = 0.42f, role = TrackRole.Melodic(), volume = 0.9f, pan = -0.25f,
                 harmonics = 0.45f, timbre = 0.35f, morph = 0.15f,
                 envelopeProfile = EnvelopeProfile.RHYTHM,
                 macroMap = TrackMacroMap.MELODIC,
@@ -152,7 +156,7 @@ class DeepSpaceVibe : VibeProvider {
             // 2 HH: Wind/atmosphere — crystalline particle scatter, like wind through a canyon
             TrackVoice(
                 engineEdm = Engine.PAR, engineSpace = Engine.PAR,
-                density = 0.7f, role = TrackRole.MELODIC, volume = 0.9f, pan = 0.3f,
+                density = 0.7f, role = TrackRole.Melodic(), volume = 0.9f, pan = 0.3f,
                 harmonics = 1f, timbre = 0.5f, morph = 1f,
                 envelopeProfile = EnvelopeProfile.DRONE,
                 macroMap = TrackMacroMap.EFFECT,
@@ -164,10 +168,13 @@ class DeepSpaceVibe : VibeProvider {
             // Melodic — the Echoes core
             // ═══════════════════════════════════════════════════════════
 
-            // 3 BASS: The Echoes bass riff — PD for warm dark bass, lick-driven
+            // 3 BASS: The Echoes bass riff — PD for warm dark bass, lick-driven.
+            // chordFollow = FIXED so the iconic C#-D#-E-F#-E-D#-C#-B riff plays
+            // exactly as written — chord progression moves via the KEYS drone above.
             TrackVoice(
                 engineEdm = Engine.PD, engineSpace = Engine.PD,
-                role = TrackRole.MELODIC, volume = 0.22f, pan = 0.0f, density = 0.14f,
+                role = TrackRole.Melodic(lickMode = LickMode.Fill, chordFollow = ChordFollow.FIXED),
+                volume = 0.22f, pan = 0.0f, density = 0.14f,
                 harmonics = 0.5f, timbre = 0.55f, morph = 0.1f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
                 macroMap = TrackMacroMap.MELODIC,
@@ -176,13 +183,12 @@ class DeepSpaceVibe : VibeProvider {
                 reverbBrightness = 0.5f, reverbSend = 0.2f, delaySend = 0.3f,
                 glideRate = 0.5f,
                 holdProbability = 0.9f, holdLengthMin = 6, holdLengthMax = 16,
-                lickMode = LickMode.Fill,
             ),
             // 4 KEYS: Evolving drone — VA (warm organ) at high energy, ENS (lush pad) at low
             // Long sustains with slow timbral drift. LFO sweeps harmonics/timbre for builds.
             TrackVoice(
                 engineEdm = Engine.VA, engineSpace = Engine.ENS,
-                density = 0.12f, role = TrackRole.MELODIC, volume = 0.70f, pan = -0.1f,
+                density = 0.12f, role = TrackRole.Melodic(), volume = 0.70f, pan = -0.1f,
                 harmonics = 0.25f, timbre = 0.2f, morph = 0.1f,
                 envelopeProfile = EnvelopeProfile.DRONE,
                 macroMap = TrackMacroMap.MELODIC,
@@ -202,7 +208,7 @@ class DeepSpaceVibe : VibeProvider {
             // 5 PAD (Guitar): Gilmour guitar — resonant STR, high harmonics, delay+reverb
             TrackVoice(
                 engineEdm = Engine.STR, engineSpace = Engine.STR,
-                role = TrackRole.MELODIC, volume = 0.65f, pan = 0.2f, density = 0.22f,
+                role = TrackRole.Melodic(), volume = 0.65f, pan = 0.2f, density = 0.22f,
                 harmonics = 0.9f, timbre = 0.5f, morph = 0.1f,
                 envelopeProfile = EnvelopeProfile.DRONE,
                 macroMap = TrackMacroMap.MELODIC,
@@ -216,7 +222,7 @@ class DeepSpaceVibe : VibeProvider {
             // 6 TEXTURE: Seagull/void sounds — particle clouds for the atonal middle section
             TrackVoice(
                 engineEdm = Engine.PAR, engineSpace = Engine.PAR,
-                role = TrackRole.MELODIC, volume = 0.50f, pan = -0.35f, density = 0.16f,
+                role = TrackRole.Melodic(), volume = 0.50f, pan = -0.35f, density = 0.16f,
                 harmonics = 0.3f, timbre = 0.45f, morph = 0.25f,
                 envelopeProfile = EnvelopeProfile.WILD,
                 macroMap = TrackMacroMap.WILD,
@@ -230,7 +236,7 @@ class DeepSpaceVibe : VibeProvider {
             // 7 FX: Echo repeats — delayed resonant pings that fade into the distance
             TrackVoice(
                 engineEdm = Engine.MOD, engineSpace = Engine.MOD,
-                role = TrackRole.MELODIC, volume = 0.40f, pan = 0.35f, density = 0.08f,
+                role = TrackRole.Melodic(), volume = 0.40f, pan = 0.35f, density = 0.08f,
                 harmonics = 0.5f, timbre = 0.4f, morph = 0.15f,
                 envelopeProfile = EnvelopeProfile.WILD,
                 macroMap = TrackMacroMap.WILD,

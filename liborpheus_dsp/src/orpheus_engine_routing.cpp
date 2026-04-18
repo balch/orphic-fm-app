@@ -84,7 +84,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             // (matches DspSynthEngine.CPP_ENGINE_MAP)
             static const int kEngineMap[] = {
                 21, 22, 23, 21, 10, 17, 9, 8, 12, 11, 19, 20, 18, 16, 14, 13, 15,
-                0, 1, 2, 5, 6, 7
+                0, 1, 2, 5, 6, 7,
+                3, 4  // SixOp FM bank 2, bank 3
             };
             static const int kEngineMapSize = sizeof(kEngineMap) / sizeof(kEngineMap[0]);
             for (int i = 0; i < 6; i++) {
@@ -463,7 +464,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 //         7=VA, 8=Additive, 9=Grain, 10=String, 11=Modal, 12=Particle,
                 //         13=Swarm, 14=Chord, 15=Wavetable, 16=Speech,
                 //         17=VA_VCF, 18=PhaseDistortion, 19=SixOpFM, 20=WaveTerrain,
-                //         21=StringMachine, 22=Chiptune
+                //         21=StringMachine, 22=Chiptune,
+                //         23=SixOpFM_2 (bank 2), 24=SixOpFM_3 (bank 3)
                 // C++: see kOrpheusOutGain[] in orpheus_voice.h for index meanings
                 static const int kKotlinToEngine[] = {
                     21, 22, 23, 10, // BD, SD, HH, FMDrum→FM(10) (no C++ FmDrum; Kotlin has custom impl)
@@ -473,7 +475,9 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                     15,             // Speech
                     // V1.2 engines (ordinals 17-22)
                      0,  1,  2,  5, // VA_VCF, PhaseDistortion, SixOpFM, WaveTerrain
-                     6,  7           // StringMachine, Chiptune
+                     6,  7,         // StringMachine, Chiptune
+                    // SixOp additional banks (ordinals 23-24)
+                     3,  4          // SixOpFM_2 (bank 2), SixOpFM_3 (bank 3)
                 };
                 int ordinal = static_cast<int>(value);
                 if (ordinal >= 0 && ordinal < static_cast<int>(sizeof(kKotlinToEngine)/sizeof(kKotlinToEngine[0]))) {
@@ -791,8 +795,34 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_glide_rate[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "lick_mode") == 0)
                 engine->pulsar_track_lick_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "comping_style") == 0)
+                engine->pulsar_track_comping_style[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "arp_mode") == 0)
+                engine->pulsar_track_arp_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "arp_speed") == 0)
+                engine->pulsar_track_arp_speed[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "arp_direction") == 0)
+                engine->pulsar_track_arp_direction[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "inversion") == 0)
+                engine->pulsar_track_inversion[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "human_drop_prob") == 0)
+                engine->pulsar_track_human_drop_prob[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "human_ghost_prob") == 0)
+                engine->pulsar_track_human_ghost_prob[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "human_octave_prob") == 0)
+                engine->pulsar_track_human_octave_prob[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "human_ext_prob") == 0)
+                engine->pulsar_track_human_ext_prob[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "fill_every_n") == 0)
+                engine->pulsar_track_fill_every_n[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "fill_type") == 0)
+                engine->pulsar_track_fill_type[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "fill_skip_prob") == 0)
+                engine->pulsar_track_fill_skip_prob[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "evo_tension_resp") == 0)
                 engine->pulsar_track_evo_tension_resp[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "chord_follow") == 0)
+                engine->pulsar_track_chord_follow[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "evo_note_follow") == 0)
                 engine->pulsar_track_evo_note_follow[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "evo_pitch_mode") == 0)
@@ -841,6 +871,19 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             if (idx >= 0 && idx < 49)
                 engine->pulsar_chord_matrix[idx].store(value, std::memory_order_relaxed);
         }
+        else if (std::strcmp(symbol, "custom_progression_active") == 0)
+            engine->pulsar_custom_progression_active.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "custom_progression_length") == 0)
+            engine->pulsar_custom_progression_length.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strncmp(symbol, "custom_progression_", 19) == 0) {
+            int idx = std::atoi(symbol + 19);
+            if (idx >= 0 && idx < 8)
+                engine->pulsar_custom_progression[idx].store(static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strcmp(symbol, "progression_anchor") == 0)
+            engine->pulsar_progression_anchor.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "progression_drift_range") == 0)
+            engine->pulsar_progression_drift_range.store(value, std::memory_order_relaxed);
         else if (std::strncmp(symbol, "tension_", 8) == 0) {
             const char* t = symbol + 8;
             if (std::strcmp(t, "inner_bars") == 0)
@@ -909,7 +952,7 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_arrangement_outro_index.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strncmp(symbol, "section_data_", 13) == 0) {
             int idx = std::atoi(symbol + 13);
-            if (idx >= 0 && idx < 8 * 18)
+            if (idx >= 0 && idx < 8 * 21)
                 engine->pulsar_section_data[idx].store(value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_transitions_", 20) == 0) {

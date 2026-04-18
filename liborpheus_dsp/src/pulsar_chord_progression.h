@@ -119,16 +119,34 @@ static const float (*kTransitionMatrices[kNumTransitionMatrices])[7] = {
 
 // ── Initialize chord progression from template ────────────────────────
 
+// @param custom_degrees  Optional caller-supplied chord degrees. When non-null
+//                        and custom_length > 0, overrides the template's chord
+//                        sequence. Matrix selection still comes from the style
+//                        (unless cs.use_custom_matrix is set). Pass nullptr to
+//                        use the style's template unchanged.
 inline void init_chord_progression(PulsarChordState& cs, int style,
                                    int chords_per_bar, int step_count,
-                                   uint32_t seed) {
+                                   uint32_t seed,
+                                   const int* custom_degrees = nullptr,
+                                   int custom_length = 0) {
     if (style < 0) style = 0;
     if (style >= kNumProgressionStyles) style = kNumProgressionStyles - 1;
 
     const ProgressionTemplate& tmpl = kProgressionTemplates[style];
-    cs.progression_length = tmpl.length;
-    for (int i = 0; i < tmpl.length; i++) {
-        cs.progression[i] = tmpl.chords[i].degree;
+    if (custom_degrees != nullptr && custom_length > 0) {
+        if (custom_length > kMaxProgressionLength) custom_length = kMaxProgressionLength;
+        cs.progression_length = custom_length;
+        for (int i = 0; i < custom_length; i++) {
+            int d = custom_degrees[i];
+            if (d < 0) d = 0;
+            if (d > 6) d = 6;
+            cs.progression[i] = static_cast<int8_t>(d);
+        }
+    } else {
+        cs.progression_length = tmpl.length;
+        for (int i = 0; i < tmpl.length; i++) {
+            cs.progression[i] = tmpl.chords[i].degree;
+        }
     }
     if (!cs.use_custom_matrix) {
         cs.matrix_index = tmpl.matrix_index;
@@ -145,11 +163,19 @@ inline void init_chord_progression(PulsarChordState& cs, int style,
     if (chords_per_bar > 8) chords_per_bar = 8;
     cs.steps_per_chord = step_count / chords_per_bar;
     if (cs.steps_per_chord < 1) cs.steps_per_chord = 1;
+
+    std::memcpy(cs.original_progression, cs.progression, sizeof(cs.progression));
+    cs.bars_since_anchor = 0;
+    // Clear anchor/drift to sane defaults so init is a true reset. The host
+    // load_vibe() path immediately overwrites these from the vibe config;
+    // other callers (tests, hot-swapped progressions) get a stable baseline.
+    cs.anchor_bars = 0;      // 0 = never auto-anchor
+    cs.drift_range = 0.0f;   // 0 = no Markov drift
 }
 
 // ── Maybe mutate one chord in the progression via Markov transition ───
 
-inline void maybe_mutate_progression(PulsarChordState& cs, float complexity) {
+inline void maybe_mutate_progression(PulsarChordState& cs, float complexity, float mood) {
     // Only mutate when complexity > 0.3, probability scales with complexity
     float roll = pattern_rand01(cs.chord_seed);
     float mutation_prob = (complexity - 0.3f) * 0.4f;  // 0 at 0.3, 0.28 at 1.0
@@ -180,19 +206,38 @@ inline void maybe_mutate_progression(PulsarChordState& cs, float complexity) {
         }
     }
     cs.progression[pos] = static_cast<int8_t>(new_degree);
+
+    // Bound drift: clamp new_degree to ±max_drift of original at this position
+    int max_drift = static_cast<int>(mood * cs.drift_range * 6.0f + 0.5f);
+    if (max_drift < 0) max_drift = 0;
+    if (max_drift > 6) max_drift = 6;
+    int original = cs.original_progression[pos];
+    int clamped = cs.progression[pos];
+    if (clamped < original - max_drift) clamped = original - max_drift;
+    if (clamped > original + max_drift) clamped = original + max_drift;
+    if (clamped < 0) clamped = 0;
+    if (clamped > 6) clamped = 6;
+    cs.progression[pos] = static_cast<int8_t>(clamped);
 }
 
 // ── Advance chord state by one step ───────────────────────────────────
 
-inline void advance_chord(PulsarChordState& cs, float complexity) {
+inline void advance_chord(PulsarChordState& cs, float complexity, float mood) {
     cs.chord_step_counter++;
     if (cs.chord_step_counter >= cs.steps_per_chord) {
         cs.chord_step_counter = 0;
         cs.chord_index = (cs.chord_index + 1) % cs.progression_length;
 
-        // At progression wrap, maybe mutate
+        // At progression wrap, maybe mutate or reset to anchor
         if (cs.chord_index == 0) {
-            maybe_mutate_progression(cs, complexity);
+            cs.bars_since_anchor++;
+            if (cs.anchor_bars > 0 && cs.bars_since_anchor >= cs.anchor_bars) {
+                // Reset progression to original snapshot
+                std::memcpy(cs.progression, cs.original_progression, sizeof(cs.progression));
+                cs.bars_since_anchor = 0;
+            } else {
+                maybe_mutate_progression(cs, complexity, mood);
+            }
         }
     }
 }

@@ -50,6 +50,7 @@ static TestSuite suites[] = {
     {"bar_strategy",    run_bar_strategy_tests,    true},
     {"pulsar_routing",  run_pulsar_routing_tests,  true},
     {"pulsar_chords",   run_pulsar_chords_tests,   true},
+    {"comping",         run_pulsar_comping_tests,  true},
     {"pulsar_signal",   run_pulsar_signal_tests,   true},
     {"tension",         run_pulsar_tension_tests,  true},
     {"pulsar_motifs",   run_pulsar_motifs_tests,   true},

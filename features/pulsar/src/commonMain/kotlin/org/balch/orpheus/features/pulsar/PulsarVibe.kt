@@ -209,17 +209,54 @@ enum class BarStrategy(val id: Int) {
 }
 
 /**
- * Track behavior role — determines pattern generation, pitch handling, and which
- * evolution dimensions are available.
+ * How a melodic track responds to the chord progression at playback time.
  */
 @Serializable
-enum class TrackRole {
+enum class ChordFollow {
+    /** Default — transpose pattern notes by the current chord degree. */
+    FOLLOW,
+    /** Override each stab with the chord root (simple chord-following bass). */
+    ROOT_ONLY,
+    /** Ignore progression — play pattern as generated (drone/pedal). */
+    FIXED,
+}
+
+/**
+ * Track behavior role — determines pattern generation, pitch handling, and which
+ * evolution dimensions are available. Role-specific fields live on their subclass,
+ * so invalid combinations (e.g. percussive tracks with comping) are unrepresentable.
+ */
+@Serializable
+sealed class TrackRole {
     /** Drums — fixed pitch, rhythm patterns. */
-    PERCUSSIVE,
+    @Serializable
+    data object Percussive : TrackRole()
+
     /** Single notes — scale-quantized, lick-capable. */
-    MELODIC,
+    @Serializable
+    data class Melodic(
+        /** How this track responds to the chord progression. */
+        val chordFollow: ChordFollow = ChordFollow.FOLLOW,
+        /** How this track maps the vibe's lick to sequencer steps. */
+        val lickMode: LickMode = LickMode.None,
+    ) : TrackRole()
+
     /** Chord voicings — progression-following, comping patterns. */
-    CHORDAL,
+    @Serializable
+    data class Chordal(
+        /** Rhythmic voicing configuration. */
+        val comping: ChordComping = ChordComping(),
+        /** How this track responds to the chord progression. */
+        val chordFollow: ChordFollow = ChordFollow.FOLLOW,
+    ) : TrackRole()
+
+    /** Engine id for C++ TrackRole enum. Keep in sync with orpheus_unit_pulsar.h. */
+    val engineId: Int
+        get() = when (this) {
+            Percussive -> 0
+            is Melodic -> 1
+            is Chordal -> 2
+        }
 }
 
 /**
@@ -303,6 +340,163 @@ data class Evolution(
 )
 
 /**
+ * Rhythmic comping style for CHORDAL tracks.
+ * Each preset maps to a hardcoded 16-step velocity template + default voicing.
+ *
+ * The C++ enum reserves id 3 for a future parametric Custom style (Phase 2).
+ * Kotlin does not expose that slot today — adding a subclass before the
+ * engine supports it would silently produce no output.
+ */
+@Serializable
+sealed class CompingStyle {
+    /** Sustained single note — classic pad. No rhythmic stabs. */
+    @Serializable data object PAD : CompingStyle()
+
+    /** Syncopated 16th-note stabs — classic funk/soul feel. */
+    @Serializable data object FUNK_STABS : CompingStyle()
+
+    /** Hits on beats 1 and 3 — rock downbeat comping. */
+    @Serializable data object ROCK_DOWNBEATS : CompingStyle()
+
+    /** Off-beat accents on the "and" of every beat — ska/reggae upstroke feel. */
+    @Serializable data object SKA_UPSTROKES : CompingStyle()
+
+    /** Triplet-feel shuffle on dotted-8th/16th — blues/swing comping. */
+    @Serializable data object BLUES_SHUFFLE : CompingStyle()
+
+    /** Syncopated, busy comping with ghost hits — jazz piano comping. */
+    @Serializable data object JAZZ_COMP : CompingStyle()
+
+    /** Strong accent on beat 2 and 4 only — classic reggae skank. */
+    @Serializable data object REGGAE_SKANK : CompingStyle()
+
+    /** Dense 8th-note stabs with heavy accents — gospel/soul comping. */
+    @Serializable data object GOSPEL_STABS : CompingStyle()
+
+    /** Engine id for the C++ CompingStyleId enum. Keep in sync with orpheus_unit_pulsar.h. */
+    val engineId: Int
+        get() = when (this) {
+            PAD -> 0
+            FUNK_STABS -> 1
+            ROCK_DOWNBEATS -> 2
+            SKA_UPSTROKES -> 4
+            BLUES_SHUFFLE -> 5
+            JAZZ_COMP -> 6
+            REGGAE_SKANK -> 7
+            GOSPEL_STABS -> 8
+        }
+}
+
+/**
+ * How many notes to stack on each chord stab.
+ */
+@Serializable
+enum class VoicingType {
+    ROOT_ONLY,      // single root note (pad mode)
+    ROOT_FIFTH,     // power chord (root + 5th)
+    TRIAD,          // root + 3rd + 5th
+    SEVENTH,        // triad + 7th
+    OCTAVE_STACK,   // root + octave
+}
+
+/**
+ * How a CHORDAL track's voice renders chord voicings.
+ */
+@Serializable
+enum class ArpMode {
+    /** CHD engine: use native chord. Monophonic engines: arpeggiate. */
+    AUTO,
+    /** Force arpeggio on every engine — rolled/strummed chord effect. */
+    ALWAYS,
+    /** Force single root note — CHORDAL track plays root only, no chord. */
+    NEVER,
+}
+
+/**
+ * Arpeggiator note ordering.
+ */
+@Serializable
+enum class ArpDirection { UP, DOWN, UP_DOWN, RANDOM }
+
+/**
+ * Type of fill played at phrase boundaries. Phase 2e ships ASCENDING_ARP;
+ * others are stubs that fall through to NONE behavior.
+ */
+@Serializable
+enum class FillType {
+    NONE,
+    ASCENDING_ARP,   // chord tones walk up through the bar with rising velocity
+    DESCENDING_ARP,  // deferred
+    TURNAROUND,      // deferred
+    DOUBLE_TIME,     // deferred
+    STAB_FLURRY,     // deferred
+    DROP_OUT,        // deferred
+}
+
+/**
+ * Phrase-boundary fills on CHORDAL tracks. Every [everyNBars] bars, the
+ * current bar gets replaced with the fill variant.
+ */
+@Serializable
+data class CompingFills(
+    /** Insert fills every N bars. 0 = disabled. */
+    val everyNBars: Int = 0,
+    val fillType: FillType = FillType.ASCENDING_ARP,
+    /** Chance to skip the fill when a boundary hits (0-1). */
+    val skipProbability: Float = 0.0f,
+)
+
+/**
+ * Probabilistic per-bar variations for CHORDAL tracks — the "Keith Richards" layer.
+ * All probabilities scaled by complexity (complexity=0 → no variations).
+ */
+@Serializable
+data class CompingHumanization(
+    /** Chance per non-anchor active step to be dropped for this bar. */
+    val dropProbability: Float = 0.0f,
+    /** Chance per inactive step to become a low-velocity ghost stab. */
+    val ghostProbability: Float = 0.0f,
+    /** Chance per non-anchor active step to shift ±12 semitones. */
+    val octaveJumpProbability: Float = 0.0f,
+    /** Chance per active step to add extension interval (+2 or +5 semis). */
+    val extensionProbability: Float = 0.0f,
+)
+
+/**
+ * Voicing stance for chord stabs — which chord tone is the "lowest."
+ * Drives CHD engine morph parameter or reorders arp sequence on mono engines.
+ */
+@Serializable
+enum class SectionInversion {
+    FOLLOW_STYLE,    // use whatever the style defaults to (root position)
+    ROOT_POSITION,   // lowest note = root
+    FIRST_INVERSION, // lowest note = 3rd
+    SECOND_INVERSION,// lowest note = 5th
+    OPEN_VOICING,    // spread across 2 octaves (root low, upper tones spread)
+}
+
+/**
+ * Comping configuration for [TrackRole.CHORDAL] tracks.
+ * Evolution (inversions, humanization, fills) arrives in Phase 2+; for now,
+ * Phase 1 ships static comping that follows the progression.
+ *
+ * @param style The rhythmic/voicing preset (or custom pattern).
+ * @param arpMode How the CHORDAL track renders chord voicings (native vs arpeggiated).
+ * @param arpSpeed 0 = slow (each note fills step duration), 1 = fast (~15ms per note, near-simultaneous).
+ * @param arpDirection Arpeggiator note ordering.
+ */
+@Serializable
+data class ChordComping(
+    val style: CompingStyle = CompingStyle.PAD,
+    val arpMode: ArpMode = ArpMode.AUTO,
+    val arpSpeed: Float = 0.2f,
+    val arpDirection: ArpDirection = ArpDirection.UP,
+    val sectionInversion: SectionInversion = SectionInversion.FOLLOW_STYLE,
+    val humanization: CompingHumanization = CompingHumanization(),
+    val fills: CompingFills = CompingFills(),
+)
+
+/**
  * One of 8 tracks in a Vibe. Each track is a voice with its own engine, density,
  * envelope shape, and effect sends. Convention: tracks 0-2 = rhythm (kick/snare/hat),
  * 3-4 = melodic, 5-6 = texture/effects, 7 = wild card — but any track can use any engine.
@@ -352,7 +546,7 @@ data class Evolution(
 data class TrackVoice(
     val engineEdm: Engine,
     val engineSpace: Engine,
-    val role: TrackRole = TrackRole.PERCUSSIVE,
+    val role: TrackRole = TrackRole.Percussive,
     val volume: Float = 0.8f,
     val pan: Float = 0.0f,
     val density: Float = 0.5f,
@@ -379,9 +573,24 @@ data class TrackVoice(
     val reverbBrightness: Float = 0.5f,
     val delayFeedback: Float? = null,
     val glideRate: Float = 0.0f,
-    val lickMode: LickMode = LickMode.None,
     val evolution: Evolution = Evolution(),
 )
+
+/** Convenience: [ChordComping] if this track is [TrackRole.Chordal], else null. */
+val TrackVoice.chordComping: ChordComping?
+    get() = (role as? TrackRole.Chordal)?.comping
+
+/** Convenience: [LickMode] if this track is [TrackRole.Melodic], else [LickMode.None]. */
+val TrackVoice.lickMode: LickMode
+    get() = (role as? TrackRole.Melodic)?.lickMode ?: LickMode.None
+
+/** Convenience: chord-follow mode — [ChordFollow.FOLLOW] for percussive tracks. */
+val TrackVoice.chordFollow: ChordFollow
+    get() = when (val r = role) {
+        is TrackRole.Percussive -> ChordFollow.FOLLOW
+        is TrackRole.Melodic -> r.chordFollow
+        is TrackRole.Chordal -> r.chordFollow
+    }
 
 /**
  * Preset rhythm density levels mapped to common drum patterns.
@@ -419,6 +628,19 @@ enum class ProgressionStyle {
 }
 
 /**
+ * How often the chord progression resets to its original state.
+ * Bounds cumulative Markov drift so progressions evolve then come home.
+ */
+@Serializable
+enum class ProgressionAnchor(val barsBetweenResets: Int) {
+    NONE(0),        // never reset — unbounded drift
+    EVERY_2(2),     // tight leash
+    EVERY_4(4),     // typical 4-bar phrase
+    EVERY_8(8),     // 8-bar section
+    EVERY_16(16),   // full verse/chorus
+}
+
+/**
  * Genre-level musical parameters shared across all 8 tracks.
  *
  * @param swingAmount Shuffle feel 0-1. 0 = straight, 0.1 = subtle groove, 0.3+ = heavy swing.
@@ -430,9 +652,20 @@ enum class ProgressionStyle {
  * @param rhythmDensity Overall rhythm feel. Use [RhythmPattern] values:
  *   SPARSE(0.0), FOUR_ON_FLOOR(0.33), BACKBEAT(0.67), DENSE_16TH(1.0).
  * @param progressionStyle Chord progression character (POP, BLUES, JAZZ, MODAL, DRONE, etc.)
+ *   Selects both the default chord sequence and the Markov transition matrix.
+ *   The sequence is overridden by [customProgression] when set; the matrix is
+ *   overridden by [chordTransitionMatrix] when set.
  * @param chordsPerBar How many chord changes per bar. 1 = static, 2 = standard, 4 = busy.
  * @param chordTransitionMatrix Optional 7x7 Markov matrix for chord transitions (I-VII).
- *   Build with [chordMatrix]. Null = use progressionStyle defaults.
+ *   Build with [chordMatrix]. Null = use [progressionStyle]'s default matrix.
+ * @param customProgression Optional explicit chord sequence. Each entry is a scale
+ *   degree 0-6 (I-VII). Overrides the [progressionStyle]'s template sequence but
+ *   still uses its matrix unless [chordTransitionMatrix] is also supplied. Size
+ *   1..8. Useful for "hang-on-tonic" feels and other vibe-specific forms:
+ *   ```
+ *   customProgression = listOf(0, 0, 0, 6)  // i-i-i-VII roots reggae
+ *   customProgression = listOf(0, 5, 3, 4)  // I-vi-IV-V doo-wop
+ *   ```
  */
 @Serializable
 data class GenreProfile(
@@ -444,7 +677,19 @@ data class GenreProfile(
     val progressionStyle: ProgressionStyle = ProgressionStyle.POP,
     val chordsPerBar: Int = 2,
     val chordTransitionMatrix: List<Float>? = null,
-)
+    val customProgression: List<Int>? = null,
+) {
+    init {
+        customProgression?.let { p ->
+            require(p.size in 1..8) {
+                "customProgression size must be 1..8, got ${p.size}"
+            }
+            require(p.all { it in 0..6 }) {
+                "customProgression degrees must be 0..6 (I-VII), got $p"
+            }
+        }
+    }
+}
 
 /**
  * Pitch/scale modifications applied during high-tension moments.
@@ -573,6 +818,8 @@ data class Vibe(
     val stepCount: Int = 16,
     val tension: TensionProfile = TensionProfile(),
     val arrangement: Arrangement? = null,
+    val progressionAnchor: ProgressionAnchor = ProgressionAnchor.EVERY_4,
+    val progressionDriftRange: Float = 0.5f,
     val effects: VibeEffects = VibeEffects(),
 ) {
     init {
@@ -999,6 +1246,12 @@ data class Section(
     val soloMode: SoloMode? = null,
     val motifSet: MotifSet? = null,
     val trackOverrides: Map<Int, TrackSectionOverride>? = null,
+    /** Override all CHORDAL tracks' comping style for this section. null = keep defaults. */
+    val compingStyle: CompingStyle? = null,
+    /** Override all CHORDAL tracks' section inversion for this section. null = keep defaults. */
+    val compingInversion: SectionInversion? = null,
+    /** Override all melodic+chordal tracks' chord-follow mode. null = keep defaults. */
+    val chordFollow: ChordFollow? = null,
 )
 
 /**

@@ -252,8 +252,15 @@ static void setup_jam_arrangement(OrpheusEngine* engine) {
 
     // Section 0: groove (bars 4-8, transitions to 0 and 1)
     // Section 1: improv (bars 4-8, IMPROVISERS solo)
-    // 18 floats per section
-    float section_data[8 * 18] = {};
+    // 21 floats per section (slots 18-20 = comping overrides, -1 = no override)
+    constexpr int kSectionStride = 21;
+    float section_data[8 * kSectionStride] = {};
+    // Default all comping-override slots to -1 across every section
+    for (int s = 0; s < 8; s++) {
+        section_data[s * kSectionStride + 18] = -1;
+        section_data[s * kSectionStride + 19] = -1;
+        section_data[s * kSectionStride + 20] = -1;
+    }
     // Section 0
     section_data[0] = 4;    // bars_min
     section_data[1] = 8;    // bars_max
@@ -265,7 +272,7 @@ static void setup_jam_arrangement(OrpheusEngine* engine) {
     section_data[9] = 0;    // has_solo = false
 
     // Section 1
-    int s1 = 18;
+    int s1 = kSectionStride;
     section_data[s1 + 0] = 4;
     section_data[s1 + 1] = 8;
     section_data[s1 + 2] = 0;
@@ -283,7 +290,7 @@ static void setup_jam_arrangement(OrpheusEngine* engine) {
     section_data[s1 + 16] = 1;   // allow_effects
     section_data[s1 + 17] = 0.7f;
 
-    for (int i = 0; i < 8 * 18; i++)
+    for (int i = 0; i < 8 * kSectionStride; i++)
         engine->pulsar_section_data[i].store(section_data[i], std::memory_order_relaxed);
 
     // Transitions: s0->{0:0.6, 1:0.4}, s1->{0:0.6, 1:0.4}
