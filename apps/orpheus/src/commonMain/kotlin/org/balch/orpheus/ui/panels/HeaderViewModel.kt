@@ -32,6 +32,7 @@ import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.panels.PanelSet
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
+import org.balch.orpheus.di.HeaderPanelGraph
 import org.balch.orpheus.features.ai.PanelExpansionEventBus
 import org.balch.orpheus.ui.FactoryPanelSets
 
@@ -93,7 +94,7 @@ private sealed class HeaderIntent {
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class HeaderViewModel(
     panelExpansionEventBus: PanelExpansionEventBus,
-    panels: Set<FeaturePanel>,
+    headerPanelGraphFactory: HeaderPanelGraph.Factory,
     panelSetRegistry: PanelSetRegistry,
     private val appPreferencesRepository: AppPreferencesRepository,
     private val dispatcherProvider: DispatcherProvider,
@@ -101,6 +102,7 @@ class HeaderViewModel(
 ) : HeaderFeature {
 
     private val log = logging("HeaderViewModel")
+    private val panels: Set<FeaturePanel> = headerPanelGraphFactory.create().featurePanels
 
     init {
         // Seed the shared registry with factory panel sets

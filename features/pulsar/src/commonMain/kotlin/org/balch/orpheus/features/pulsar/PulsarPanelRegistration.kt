@@ -6,14 +6,14 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.di.HeaderPanelScope
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
-@ContributesIntoSet(FeatureScope::class, binding = binding<FeaturePanel>())
+@ContributesIntoSet(HeaderPanelScope::class, binding = binding<FeaturePanel>())
 class PulsarPanelRegistration(
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {

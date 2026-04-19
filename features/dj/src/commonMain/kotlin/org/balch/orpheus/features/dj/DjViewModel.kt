@@ -173,8 +173,8 @@ class DjViewModel(
     private var touchingB = false
     private var dragVelocityA = 0f
     private var dragVelocityB = 0f
-    private var currentVelocityA = MOTOR_SPEED
-    private var currentVelocityB = MOTOR_SPEED
+    private var currentVelocityA = 0f
+    private var currentVelocityB = 0f
     private var lockedA = false
     private var lockedB = false
     // Mirrors decks[i].drop != NONE. Set from the setDrop action on the gesture
@@ -258,15 +258,16 @@ class DjViewModel(
                 // Skip physics when both decks are fully dry and nobody is touching
                 if (!deckAActive && !deckBActive) continue
 
-                // Deck A — only run physics when this deck is active
+                // Deck A — only run physics when this deck is active.
+                // Motor target while the finger is lifted: DROP_MOTOR_SPEED when a drop
+                // is locked, MOTOR_SPEED (normal playback) otherwise. While the finger
+                // is down, the drag velocity wins — holding still at the fader deadspot
+                // (drag == 0) lerps the platter toward 0, so the deadspot feels like a
+                // brake rather than a phantom motor boost.
                 if (deckAActive) {
                     val motorTargetA = if (lockedDropA) DROP_MOTOR_SPEED else MOTOR_SPEED
                     val motorRampA = if (lockedDropA) LOCKED_MOTOR_RAMP else MOTOR_DECAY
-                    // When drop is locked, treat near-zero drag as "holding still" so
-                    // the motor keeps the platter spinning fast; only active scratch
-                    // (|drag| > dead zone) overrides the boosted motor target.
-                    val activeDragA = touchingA && (!lockedDropA || kotlin.math.abs(dragVelocityA) > SCRATCH_DEAD_ZONE)
-                    if (activeDragA) {
+                    if (touchingA) {
                         currentVelocityA = lerp(currentVelocityA, dragVelocityA, SCRATCH_RESPONSE)
                     } else {
                         currentVelocityA = lerp(currentVelocityA, motorTargetA, motorRampA)
@@ -275,12 +276,11 @@ class DjViewModel(
                     setFrozenA(touchingA || lockedA)
                 }
 
-                // Deck B — only run physics when this deck is active
+                // Deck B — same rules as deck A.
                 if (deckBActive) {
                     val motorTargetB = if (lockedDropB) DROP_MOTOR_SPEED else MOTOR_SPEED
                     val motorRampB = if (lockedDropB) LOCKED_MOTOR_RAMP else MOTOR_DECAY
-                    val activeDragB = touchingB && (!lockedDropB || kotlin.math.abs(dragVelocityB) > SCRATCH_DEAD_ZONE)
-                    if (activeDragB) {
+                    if (touchingB) {
                         currentVelocityB = lerp(currentVelocityB, dragVelocityB, SCRATCH_RESPONSE)
                     } else {
                         currentVelocityB = lerp(currentVelocityB, motorTargetB, motorRampB)
@@ -420,12 +420,11 @@ class DjViewModel(
 
     companion object {
         private val log = logging("DjViewModel")
-        private const val MOTOR_SPEED = 1.0f
+        private const val MOTOR_SPEED = 1.0f       // normal playback target (no drop locked)
         private const val DROP_MOTOR_SPEED = 3.5f  // boosted target while a drop is locked
         private const val MOTOR_DECAY = 0.05f      // slow return to motor (released)
         private const val LOCKED_MOTOR_RAMP = 0.18f // faster pull toward DROP_MOTOR_SPEED (~180 ms)
         private const val SCRATCH_RESPONSE = 0.7f   // near-instant follow of drag gesture
-        private const val SCRATCH_DEAD_ZONE = 0.05f // below this, hold-still defers to motor target
         private const val kMixBypassThreshold = 0.001f
 
         private fun lerp(current: Float, target: Float, alpha: Float): Float =

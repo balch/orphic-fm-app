@@ -124,8 +124,10 @@ private fun TimerDraggableDialog(
             FlipClockDisplay(
                 remainingTime = state.remainingTime,
                 isRunning = state.status == TimerStatus.RUNNING,
+                isScrollable = false,
                 digitHeight = 108.dp,
                 glowColor = glowColor,
+                onDurationChange = { }
             )
 
             // Labels row: HOURS and MINUTES
@@ -237,6 +239,9 @@ fun TimerFullscreen(
             FlipClockDisplay(
                 remainingTime = state.remainingTime,
                 isRunning = state.status == TimerStatus.RUNNING,
+                isScrollable = state.status == TimerStatus.IDLE,
+                onDurationChange = { actions.onSetDuration(it) },
+                initialTime = state.initialTime,
                 digitHeight = 140.dp,
                 glowColor = glowColor,
             )

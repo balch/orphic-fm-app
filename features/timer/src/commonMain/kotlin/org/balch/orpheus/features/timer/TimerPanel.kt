@@ -98,9 +98,10 @@ fun TimerPanel(
             FlipClockDisplay(
                 remainingTime = state.remainingTime,
                 isRunning = state.status == TimerStatus.RUNNING,
+                isScrollable = state.status == TimerStatus.IDLE,
                 digitHeight = 65.dp,
                 glowColor = glowColor,
-                onDurationChange = { /* knobs handle setting */ },
+                onDurationChange = { actions.onSetDuration(it) },
                 initialTime = state.initialTime,
             )
 

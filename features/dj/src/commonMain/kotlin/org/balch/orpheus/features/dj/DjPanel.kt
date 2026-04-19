@@ -1,7 +1,9 @@
 package org.balch.orpheus.features.dj
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -11,13 +13,16 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -26,6 +31,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +53,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -66,6 +73,7 @@ import org.balch.orpheus.ui.widgets.RotaryKnob
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sign
 import kotlin.math.sin
 
 // Strip visibility tuning.
@@ -77,6 +85,29 @@ private val kStripReservedHeight = 48.dp           // reserved space; strip fade
 // hasn't wired the engine's real beatPhaseFlow. Hoisted so the default doesn't
 // allocate a new MutableStateFlow on every composition.
 private val kConstantZeroBeatPhase: StateFlow<Float> = MutableStateFlow(0f)
+
+/**
+ * Quadratic, signed velocity mapping for the drop fader.
+ * Input fx is the normalized fader position in [-1, 1] (clamped). Output is a
+ * signed velocity in [-10, 10] via sign(fx)·fx²·10. Gives fine control near
+ * center and decisive extents. Matches spec §7.
+ */
+internal fun faderVelocity(fx: Float): Float {
+    val c = fx.coerceIn(-1f, 1f)
+    return sign(c) * c * c * 10f
+}
+
+/**
+ * Preview-only override for local fader state in [DjPanel]. Lets @Preview
+ * composables render mid-drive fader states that would otherwise require a
+ * live pointer gesture. Production call sites pass null.
+ */
+@Immutable
+data class FaderPreviewOverride(
+    val deck: Int,            // 0 or 1
+    val pressed: Boolean,
+    val thumbX: Float,        // normalized [-1, 1]
+)
 
 // Cleveland Guardians palette for DJ panel
 private data class DjColors(
@@ -102,6 +133,7 @@ fun DjPanel(
     onExpandedChange: ((Boolean) -> Unit)? = null,
     showCollapsedHeader: Boolean = true,
     showExpandedTitle: Boolean = true,
+    previewFaderOverride: FaderPreviewOverride? = null,
 ) {
     val djColors = remember { DjColors() }
     val state by feature.stateFlow.collectAsState()
@@ -111,16 +143,63 @@ fun DjPanel(
     val outViz by outVizFlow.collectAsState()
     val beatPhase by beatPhaseFlow.collectAsState()
 
-    var platterABounds by remember { mutableStateOf<Rect?>(null) }
-    var platterBBounds by remember { mutableStateOf<Rect?>(null) }
-    var stripBounds by remember { mutableStateOf<Rect?>(null) }
+    // Hit-test rects are stored in window-space pixels (boundsInWindow /
+    // positionInWindow). Those pixel values are density-dependent, so when the
+    // window crosses between monitors with different scale factors the cached
+    // rects go stale relative to new pointer positions. Keying the remembered
+    // state on LocalDensity discards the stale values; fresh layout from the
+    // density change re-fires onGloballyPositioned with the new pixel rects.
+    val density = LocalDensity.current
+    var platterABounds by remember(density) { mutableStateOf<Rect?>(null) }
+    var platterBBounds by remember(density) { mutableStateOf<Rect?>(null) }
+    var stripBounds by remember(density) { mutableStateOf<Rect?>(null) }
     var armingDeck by remember { mutableStateOf<Int?>(null) }
     var armingZoneIdx by remember { mutableStateOf(0) }
     var armingProgress by remember { mutableStateOf(0f) }
     // Outer-box origin in window coords. We hit-test using window-space rects
     // (captured via boundsInWindow) and must convert local pointer positions
     // into window space by adding this offset.
-    var outerOrigin by remember { mutableStateOf(Offset.Zero) }
+    var outerOrigin by remember(density) { mutableStateOf(Offset.Zero) }
+
+    // ── Fader state (per deck) ──
+    // pressed[deck] = true while the pointer is actively over the fader for that deck.
+    // targetX[deck] = the raw normalized pointer x in [-1, 1] that the pointer last drove.
+    // displayX[deck] = animated value used for rendering + velocity output.
+    var faderPressedA by remember {
+        mutableStateOf(previewFaderOverride?.takeIf { it.deck == 0 }?.pressed ?: false)
+    }
+    var faderPressedB by remember {
+        mutableStateOf(previewFaderOverride?.takeIf { it.deck == 1 }?.pressed ?: false)
+    }
+    var faderTargetXA by remember {
+        mutableStateOf(previewFaderOverride?.takeIf { it.deck == 0 }?.thumbX ?: 0f)
+    }
+    var faderTargetXB by remember {
+        mutableStateOf(previewFaderOverride?.takeIf { it.deck == 1 }?.thumbX ?: 0f)
+    }
+
+    val faderDisplayXA by animateFloatAsState(
+        targetValue = if (faderPressedA) faderTargetXA else 0f,
+        animationSpec = if (faderPressedA) tween(durationMillis = 30)
+            else spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessHigh),
+        label = "faderDisplayXA",
+    )
+    val faderDisplayXB by animateFloatAsState(
+        targetValue = if (faderPressedB) faderTargetXB else 0f,
+        animationSpec = if (faderPressedB) tween(durationMillis = 30)
+            else spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessHigh),
+        label = "faderDisplayXB",
+    )
+
+    // ── Derived fader activation ──
+    // faderActive[deck] = drop is locked AND not BRAKE. BRAKE has no meaningful
+    // forward/reverse velocity to drive (spec §9).
+    val anyDropLocked = state.decks.any { it.drop != DjDrop.NONE }
+    val faderActiveA = (state.decks.getOrNull(0)?.drop ?: DjDrop.NONE)
+        .let { it != DjDrop.NONE && it != DjDrop.BRAKE }
+    val faderActiveB = (state.decks.getOrNull(1)?.drop ?: DjDrop.NONE)
+        .let { it != DjDrop.NONE && it != DjDrop.BRAKE }
+    val currentAnyDropLocked by rememberUpdatedState(anyDropLocked)
 
     val currentActions by rememberUpdatedState(actions)
     val currentZoneOrder by rememberUpdatedState(state.zoneOrder)
@@ -141,6 +220,8 @@ fun DjPanel(
         }
     }
     val currentStripRevealed by rememberUpdatedState(stripRevealed)
+    val currentFaderActiveA by rememberUpdatedState(faderActiveA)
+    val currentFaderActiveB by rememberUpdatedState(faderActiveB)
 
     LaunchedEffect(armingDeck, armingZoneIdx) {
         armingProgress = 0f
@@ -194,41 +275,93 @@ fun DjPanel(
                             val posWin = Offset(change.position.x + outerOrigin.x,
                                                 change.position.y + outerOrigin.y)
 
-                            val isLocked = state.decks.getOrNull(deck)?.drop != null &&
-                                    state.decks.getOrNull(deck)?.drop != DjDrop.NONE
+                            val lockedDrop = state.decks.getOrNull(deck)?.drop ?: DjDrop.NONE
+                            val isLocked = lockedDrop != DjDrop.NONE
+                            val faderActiveForThisDeck = when (deck) {
+                                0 -> currentFaderActiveA
+                                1 -> currentFaderActiveB
+                                else -> false
+                            }
                             val strip = stripBounds
-                            // Only treat pointer-in-strip as arming territory once the strip
-                            // is actually visible — during the 300ms reveal delay (or when
-                            // the deck is inaudible) the strip is chrome, not interactive.
-                            val inStrip = currentStripRevealed && strip != null && strip.contains(posWin)
+                            val inStripBounds = strip != null && strip.contains(posWin)
+                            // Fader shares the strip row, so bounds coincide. Differentiate
+                            // by whether this deck currently has a non-BRAKE drop locked.
+                            val inFader = faderActiveForThisDeck && inStripBounds
+                            val inStrip = !faderActiveForThisDeck && currentStripRevealed && inStripBounds
 
-                            if (inStrip) {
-                                // Inside strip. Arm a new zone only if no drop is locked yet;
-                                // once locked the zone is permanent for this gesture, so further
-                                // in-strip motion is a no-op (don't re-arm, don't scratch).
-                                if (!isLocked) {
-                                    // strip is non-null: inStrip implies it.
-                                    val xInStrip = ((posWin.x - strip.left) / strip.width).coerceIn(0f, 0.9999f)
-                                    val idx = (xInStrip * 4f).toInt().coerceIn(0, 3)
-                                    armingDeck = deck
-                                    armingZoneIdx = idx
+                            when {
+                                inFader -> {
+                                    // Fader drive: quadratic sign(fx)·fx²·10 velocity.
+                                    val fx = (((posWin.x - strip.left) / strip.width) * 2f - 1f)
+                                        .coerceIn(-1f, 1f)
+                                    when (deck) {
+                                        0 -> { faderPressedA = true; faderTargetXA = fx }
+                                        1 -> { faderPressedB = true; faderTargetXB = fx }
+                                    }
+                                    currentActions.setPlatterDrag(deck, faderVelocity(fx))
+                                    lastY = change.position.y
                                 }
-                                // Keep lastY fresh so the first scratch sample after the pointer
-                                // leaves the strip computes delta from the exit point, not from
-                                // some stale pre-strip position (which would produce a click).
-                                lastY = change.position.y
-                            } else {
-                                // Outside strip: full scratch control, whether locked or not.
-                                // After lock-in this is the path back to platter control — the
-                                // drop effect keeps processing whatever scratch velocity produces.
-                                if (!isLocked) {
-                                    armingDeck = null
-                                    armingProgress = 0f
+                                else -> {
+                                    // Not on the fader. Arm a zone if dwelling in the strip,
+                                    // and drive velocity based on whether a drop is locked and
+                                    // where the pointer is.
+                                    val ownPlatter = when (deck) {
+                                        0 -> platterABounds
+                                        1 -> platterBBounds
+                                        else -> null
+                                    }
+                                    val onOwnPlatter = ownPlatter?.contains(posWin) == true
+
+                                    if (inStrip && !isLocked && !currentAnyDropLocked) {
+                                        // Inside strip, nothing locked yet — arm a zone
+                                        // (gated on !currentAnyDropLocked: one drop at a time).
+                                        val xInStrip = ((posWin.x - strip.left) / strip.width)
+                                            .coerceIn(0f, 0.9999f)
+                                        val idx = (xInStrip * 4f).toInt().coerceIn(0, 3)
+                                        armingDeck = deck
+                                        armingZoneIdx = idx
+                                    } else if (!isLocked) {
+                                        armingDeck = null
+                                        armingProgress = 0f
+                                    }
+                                    // Release fader pressed state on any exit from the fader.
+                                    when (deck) {
+                                        0 -> faderPressedA = false
+                                        1 -> faderPressedB = false
+                                    }
+
+                                    // Velocity:
+                                    //  - No drop locked → free scratch anywhere under the
+                                    //    gesture (deltaY-based drag). Off-platter still tracks
+                                    //    mouse motion so the user can scratch freely.
+                                    //  - Drop locked + on own platter → scratch (spec §3.5).
+                                    //  - Drop locked + empty space (not on fader, not on own
+                                    //    platter) → release so physics motor target wins
+                                    //    (DROP_MOTOR_SPEED = 3.5×, spec §3.6).
+                                    if (!isLocked || onOwnPlatter) {
+                                        val deltaY = change.position.y - lastY
+                                        // Time-normalize so mouse (high poll rate, small
+                                        // per-event deltas) and trackpad (lower poll rate,
+                                        // OS-smoothed larger deltas) feel the same. pxPerMs
+                                        // is pixels of travel per millisecond — independent
+                                        // of event cadence. Amp ramps from 3.5× at slow
+                                        // speeds to 5× on fast flings (~3000+ px/s). Clamp
+                                        // ±12 lets flings overshoot the fader's ±10 ceiling.
+                                        val deltaTime = (change.uptimeMillis - change.previousUptimeMillis)
+                                            .coerceAtLeast(1L)
+                                        val pxPerMs = deltaY / deltaTime.toFloat()
+                                        val speed = kotlin.math.abs(pxPerMs)
+                                        // floor 3.5 (bite at slow speeds) + 1.5 range, capped
+                                        // when speed reaches 3 px/ms (~3000 px/s).
+                                        val ampNorm = (speed / 3f).coerceAtMost(1f)
+                                        val amp = 3.5f + 1.5f * ampNorm
+                                        val v = (pxPerMs * -amp).coerceIn(-12f, 12f)
+                                        currentActions.setPlatterDrag(deck, v)
+                                    } else {
+                                        currentActions.setPlatterRelease(deck)
+                                    }
+                                    lastY = change.position.y
                                 }
-                                val deltaY = change.position.y - lastY
-                                val v = (deltaY * -0.1f).coerceIn(-5f, 5f)
-                                currentActions.setPlatterDrag(deck, v)
-                                lastY = change.position.y
                             }
                             change.consume()
                         }
@@ -238,6 +371,11 @@ fun DjPanel(
                         currentActions.setDragActive(deck, false)
                         armingDeck = null
                         armingProgress = 0f
+                        // Triggers spring-back animation as the fader fades out.
+                        when (deck) {
+                            0 -> faderPressedA = false
+                            1 -> faderPressedB = false
+                        }
                     }
                 }
             }
@@ -406,6 +544,10 @@ fun DjPanel(
             armingProgress = armingProgress,
             deckAColor = djColors.deckAColor,
             deckBColor = djColors.deckBColor,
+            faderActiveA = faderActiveA,
+            faderActiveB = faderActiveB,
+            faderDisplayXA = faderDisplayXA,
+            faderDisplayXB = faderDisplayXB,
             onStripBounds = { stripBounds = it },
             modifier = Modifier
                 .fillMaxWidth()
@@ -693,17 +835,55 @@ private fun DropZoneStrip(
     armingProgress: Float,
     deckAColor: Color,
     deckBColor: Color,
+    faderActiveA: Boolean,
+    faderActiveB: Boolean,
+    faderDisplayXA: Float,
+    faderDisplayXB: Float,
     onStripBounds: (Rect) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val anyLocked = decks.any { it.drop != DjDrop.NONE }
-    Row(
+    val anyFader = faderActiveA || faderActiveB
+    val faderAccent = when {
+        faderActiveA -> OrpheusColors.accentFor(decks.getOrNull(0)?.drop ?: DjDrop.NONE)
+        faderActiveB -> OrpheusColors.accentFor(decks.getOrNull(1)?.drop ?: DjDrop.NONE)
+        else -> Color.Transparent
+    }
+    val trackAlpha by animateFloatAsState(
+        targetValue = if (anyFader) 0.25f else 0f,
+        animationSpec = tween(durationMillis = 180),
+        label = "trackAlpha",
+    )
+
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp)
             .onGloballyPositioned { onStripBounds(it.boundsInWindow()) },
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        val rowWidth = maxWidth
+        val gapWidth = 4.dp
+        val cellWidth = (rowWidth - gapWidth * 3) / 4
+
+        // Track line (horizontal, full width) — fades in when any fader active.
+        if (trackAlpha > 0f) {
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .background(faderAccent.copy(alpha = trackAlpha)),
+            )
+            // Center tick — vertical anchor at x=0.5 of row.
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .size(width = 1.dp, height = 16.dp)
+                    .background(faderAccent.copy(alpha = (trackAlpha * 1.6f).coerceAtMost(1f))),
+            )
+        }
+
+        // Cells. Each renders at its grid slot OR (if it's a fader thumb) at display x.
         zoneOrder.forEachIndexed { idx, drop ->
             val accent = OrpheusColors.accentFor(drop)
             val lockedBy = buildList {
@@ -712,6 +892,31 @@ private fun DropZoneStrip(
             }
             val dimmed = anyLocked && lockedBy.isEmpty()
             val arming = armingDeck != null && armingZoneIdx == idx && lockedBy.isEmpty()
+
+            val isThumbA = faderActiveA && decks.getOrNull(0)?.drop == drop
+            val isThumbB = faderActiveB && decks.getOrNull(1)?.drop == drop
+            val isThumb = isThumbA || isThumbB
+
+            val gridCenterX = cellWidth / 2 + (cellWidth + gapWidth) * idx
+            val thumbCenterX = when {
+                isThumbA -> cellWidth / 2 + (rowWidth - cellWidth) * ((faderDisplayXA + 1f) / 2f)
+                isThumbB -> cellWidth / 2 + (rowWidth - cellWidth) * ((faderDisplayXB + 1f) / 2f)
+                else -> gridCenterX
+            }
+
+            val targetAlpha = if (anyFader && !isThumb) 0f else 1f
+            val targetScale = if (anyFader && !isThumb) 0.6f else 1f
+            val cellAlpha by animateFloatAsState(
+                targetValue = targetAlpha,
+                animationSpec = tween(durationMillis = 200),
+                label = "cellAlpha$idx",
+            )
+            val cellScale by animateFloatAsState(
+                targetValue = targetScale,
+                animationSpec = tween(durationMillis = 200),
+                label = "cellScale$idx",
+            )
+
             DropZoneCell(
                 label = drop.label,
                 accent = accent,
@@ -721,8 +926,13 @@ private fun DropZoneStrip(
                 arming = arming,
                 armingProgress = if (arming) armingProgress else 0f,
                 modifier = Modifier
-                    .weight(1f)
-                    .height(44.dp),
+                    .offset(x = thumbCenterX - cellWidth / 2)
+                    .width(cellWidth)
+                    .height(44.dp)
+                    .graphicsLayer {
+                        alpha = cellAlpha
+                        scaleX = cellScale
+                    },
             )
         }
     }
@@ -982,6 +1192,126 @@ private fun DjPanelShuffledPreview() {
             outVizFlow = MutableStateFlow(previewVizData()),
             beatPhaseFlow = MutableStateFlow(0f),
             isExpanded = true,
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Fader A Forward", widthDp = 500, heightDp = 340)
+@Composable
+private fun DjPanelFaderAEngagedForwardPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 0.8f, velocityA = 6.4f,
+                    decks = listOf(
+                        DeckDropState(dragActive = true, drop = DjDrop.STUTTER),
+                        DeckDropState(),
+                    ),
+                ),
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            beatPhaseFlow = MutableStateFlow(0.2f),
+            isExpanded = true,
+            previewFaderOverride = FaderPreviewOverride(deck = 0, pressed = true, thumbX = 0.8f),
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Fader A Reverse", widthDp = 500, heightDp = 340)
+@Composable
+private fun DjPanelFaderAEngagedReversePreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 0.8f, velocityA = -3.6f,
+                    decks = listOf(
+                        DeckDropState(dragActive = true, drop = DjDrop.ECHO),
+                        DeckDropState(),
+                    ),
+                ),
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            beatPhaseFlow = MutableStateFlow(0.5f),
+            isExpanded = true,
+            previewFaderOverride = FaderPreviewOverride(deck = 0, pressed = true, thumbX = -0.6f),
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Fader A Springing Back", widthDp = 500, heightDp = 340)
+@Composable
+private fun DjPanelFaderASpringingPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 0.8f, velocityA = 3.5f,
+                    decks = listOf(
+                        DeckDropState(dragActive = true, drop = DjDrop.FREEZE),
+                        DeckDropState(),
+                    ),
+                ),
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            beatPhaseFlow = MutableStateFlow(0.3f),
+            isExpanded = true,
+            previewFaderOverride = FaderPreviewOverride(deck = 0, pressed = false, thumbX = 0f),
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — BRAKE Locked (no fader)", widthDp = 500, heightDp = 340)
+@Composable
+private fun DjPanelBrakeLockedPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 0.8f, velocityA = 0.3f,
+                    decks = listOf(
+                        DeckDropState(dragActive = true, drop = DjDrop.BRAKE),
+                        DeckDropState(),
+                    ),
+                ),
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            beatPhaseFlow = MutableStateFlow(0.1f),
+            isExpanded = true,
+            // No previewFaderOverride — BRAKE has no fader.
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Fader Deck B", widthDp = 500, heightDp = 340)
+@Composable
+private fun DjPanelFaderDeckBActivePreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetB = 0.8f, velocityB = 0.9f,
+                    decks = listOf(
+                        DeckDropState(),
+                        DeckDropState(dragActive = true, drop = DjDrop.PHASER),
+                    ),
+                ),
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            beatPhaseFlow = MutableStateFlow(0.4f),
+            isExpanded = true,
+            previewFaderOverride = FaderPreviewOverride(deck = 1, pressed = true, thumbX = 0.3f),
         )
     }
 }

@@ -64,7 +64,7 @@ class RastaManVibe : VibeProvider {
         bpm = 78f,  // classic roots reggae tempo
         envelopeType = EnvelopeType.BLEND,
         rootNote = RootNote.A,
-        scaleType = ScaleType.MINOR,
+        scaleType = ScaleType.MINOR_PENTATONIC,
         // Melodica horn lick — A minor pentatonic-flavored.
         // A → C → E (hold) → C → A (home, long) — 4 beats of phrase + 4 beats rest.
         lick = Lick(

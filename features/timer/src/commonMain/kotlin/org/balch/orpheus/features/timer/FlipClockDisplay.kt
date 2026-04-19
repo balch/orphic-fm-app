@@ -52,9 +52,10 @@ import kotlin.time.Duration.Companion.seconds
 fun FlipClockDisplay(
     remainingTime: Duration,
     isRunning: Boolean,
+    isScrollable: Boolean,
     digitHeight: Dp = 108.dp,
     glowColor: Color = OrpheusColors.sleepMoonlight,
-    onDurationChange: ((Duration) -> Unit)? = null,
+    onDurationChange: ((Duration) -> Unit),
     initialTime: Duration = 0.seconds,
     modifier: Modifier = Modifier,
 ) {
@@ -118,11 +119,11 @@ fun FlipClockDisplay(
     fun handleDrag(accum: Float, stepMinutes: Int, delta: Float): Float {
         val newAccum = accum + delta
         val steps = (newAccum / dragThresholdPx).toInt()
-        if (steps != 0 && durationCallback != null) {
+        if (steps != 0) {
             // Positive delta = drag down = decrease; negative delta = drag up = increase
             val minutesDelta = -steps * stepMinutes
             val newDuration = (currentDuration + minutesDelta.minutes).clampToTimerLimits()
-            durationCallback?.invoke(newDuration)
+            durationCallback(newDuration)
             return newAccum - steps * dragThresholdPx
         }
         return newAccum
@@ -134,8 +135,8 @@ fun FlipClockDisplay(
         horizontalArrangement = Arrangement.Center,
     ) {
         // Hours digit pair
-        val hoursPairModifier = if (!isRunning && durationCallback != null) {
-            Modifier.pointerInput(!isRunning) {
+        val hoursPairModifier = if (isScrollable) {
+            Modifier.pointerInput(isScrollable) {
                 detectVerticalDragGestures(
                     onDragEnd = { hourDragAccum = 0f },
                     onDragCancel = { hourDragAccum = 0f },
@@ -166,8 +167,8 @@ fun FlipClockDisplay(
         Spacer(modifier = Modifier.width(colonGap))
 
         // Minutes digit pair
-        val minutesPairModifier = if (!isRunning && durationCallback != null) {
-            Modifier.pointerInput(!isRunning) {
+        val minutesPairModifier = if (isScrollable) {
+            Modifier.pointerInput(isScrollable) {
                 detectVerticalDragGestures(
                     onDragEnd = { minuteDragAccum = 0f },
                     onDragCancel = { minuteDragAccum = 0f },
@@ -293,6 +294,8 @@ private fun FlipClockPreviewRunning() {
             remainingTime = 1.hours.plus(23.minutes).plus(17.seconds),
             isRunning = true,
             digitHeight = 72.dp,
+            isScrollable = false,
+            onDurationChange = {},
         )
     }
 }
@@ -306,6 +309,8 @@ private fun FlipClockPreviewFinalMinute() {
             isRunning = true,
             digitHeight = 72.dp,
             glowColor = OrpheusColors.sleepEmber,
+            isScrollable = false,
+            onDurationChange = {},
         )
     }
 }
@@ -319,6 +324,8 @@ private fun FlipClockPreviewIdle() {
             isRunning = false,
             digitHeight = 72.dp,
             initialTime = 30.minutes,
+            isScrollable = true,
+            onDurationChange = {},
         )
     }
 }
@@ -328,10 +335,12 @@ private fun FlipClockPreviewIdle() {
 private fun FlipClockPreviewIdleTime0() {
     org.balch.orpheus.ui.theme.OrpheusTheme {
         FlipClockDisplay(
-            remainingTime = 0.minutes,
+            remainingTime = Duration.ZERO,
             isRunning = false,
             digitHeight = 72.dp,
             initialTime = 0.minutes,
+            isScrollable = true,
+            onDurationChange = {},
         )
     }
 }
@@ -341,10 +350,12 @@ private fun FlipClockPreviewIdleTime0() {
 private fun FlipClockPreviewRunningTime0() {
     org.balch.orpheus.ui.theme.OrpheusTheme {
         FlipClockDisplay(
-            remainingTime = 0.minutes,
+            remainingTime = Duration.ZERO,
             isRunning = true,
             digitHeight = 72.dp,
             initialTime = 0.minutes,
+            isScrollable = false,
+            onDurationChange = {},
         )
     }
 }

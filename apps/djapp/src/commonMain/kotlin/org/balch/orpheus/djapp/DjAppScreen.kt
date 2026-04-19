@@ -56,6 +56,8 @@ import org.balch.orpheus.features.pulsar.PulsarViewModel
 import org.balch.orpheus.features.reverb.ReverbPanel
 import org.balch.orpheus.features.reverb.ReverbViewModel
 import org.balch.orpheus.features.timer.TimerPanel
+import org.balch.orpheus.features.timer.TimerStatus
+import org.balch.orpheus.features.timer.TimerUiState
 import org.balch.orpheus.features.timer.TimerViewModel
 import org.balch.orpheus.features.visualizations.VizFeature
 import org.balch.orpheus.features.visualizations.VizViewModel
@@ -64,6 +66,8 @@ import org.balch.orpheus.ui.infrastructure.LocalLiquidState
 import org.balch.orpheus.ui.infrastructure.liquidVizEffects
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.AppTitleTreatment
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 @Composable
 fun DjAppScreen(
@@ -101,6 +105,7 @@ fun DjAppScreen(
             },
             isLandscape = isLandscape,
             pulsarFeature = pulsarFeature,
+            timerFeature = timerFeature,
             modifier = Modifier.fillMaxSize(),
         ) {
             // Shared nav content composable used in both orientations
@@ -456,6 +461,62 @@ private fun TimerTabPreview() {
             showCollapsedHeader = false,
             showExpandedTitle = false,
         )
+    }
+}
+
+@Preview(widthDp = 360, heightDp = 780, name = "DJ Nav — Timer Running")
+@Composable
+private fun DjAppNavTimerRunningPreview() {
+    val runningTimer = TimerViewModel.previewFeature(
+        TimerUiState(
+            initialTime = 45.minutes,
+            remainingTime = 42.minutes.plus(13.seconds),
+            status = TimerStatus.RUNNING,
+        ),
+    )
+    DjAppNavScaffold(
+        currentRoute = DjTab,
+        onRouteSelected = {},
+        isLandscape = false,
+        pulsarFeature = PulsarViewModel.previewFeature(),
+        timerFeature = runningTimer,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("(preview)", color = Color.White)
+        }
+    }
+}
+
+@Preview(widthDp = 360, heightDp = 780, name = "DJ Nav — Timer Paused")
+@Composable
+private fun DjAppNavTimerPausedPreview() {
+    val pausedTimer = TimerViewModel.previewFeature(
+        TimerUiState(
+            initialTime = 45.minutes,
+            remainingTime = 12.minutes,
+            status = TimerStatus.PAUSED,
+        ),
+    )
+    DjAppNavScaffold(
+        currentRoute = DjTab,
+        onRouteSelected = {},
+        isLandscape = false,
+        pulsarFeature = PulsarViewModel.previewFeature(),
+        timerFeature = pausedTimer,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("(preview)", color = Color.White)
+        }
     }
 }
 
