@@ -137,12 +137,13 @@ bool run_viz_tests() {
     printf("\n══════════════════════════════════════\n");
     printf("  SIGNAL VISUALIZATION TESTS\n");
     printf("══════════════════════════════════════\n");
-    bool pass = true;
-    pass &= test_viz_ring_basic();
-    pass &= test_viz_ring_wraparound();
-    pass &= test_viz_get_api();
-    pass &= test_viz_get_api_lapping();
-    pass &= test_viz_lfo_integration();
-    printf("\nViz tests: %s\n", pass ? "ALL PASS" : "SOME FAILED");
-    return pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_viz_ring_basic());
+    tally(test_viz_ring_wraparound());
+    tally(test_viz_get_api());
+    tally(test_viz_get_api_lapping());
+    tally(test_viz_lfo_integration());
+    printf("\nViz tests: %s\n", suite_fail == 0 ? "ALL PASS" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

@@ -261,21 +261,22 @@ static bool test_random_spurt_fires() {
 
 bool run_pulsar_tension_tests() {
     printf("\n========== PULSAR TENSION TESTS ==========\n");
-    bool all_pass = true;
-    all_pass &= test_tension_inner_phase();
-    all_pass &= test_tension_outer_modulation();
-    all_pass &= test_tension_volume_scaling();
-    all_pass &= test_tension_timing_scaling();
-    all_pass &= test_tension_evolution_attack_point();
-    all_pass &= test_tension_struct_defaults();
-    all_pass &= test_tension_chromatic_passing_math();
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_tension_inner_phase());
+    tally(test_tension_outer_modulation());
+    tally(test_tension_volume_scaling());
+    tally(test_tension_timing_scaling());
+    tally(test_tension_evolution_attack_point());
+    tally(test_tension_struct_defaults());
+    tally(test_tension_chromatic_passing_math());
     // Lick evolution spurt tests
-    all_pass &= test_spurt_triggers_at_tension_peak();
-    all_pass &= test_spurt_duration_from_inner_bars();
-    all_pass &= test_effective_mutation_during_spurt();
-    all_pass &= test_bounded_drift_clamp();
-    all_pass &= test_original_lick_immutable();
-    all_pass &= test_random_spurt_fires();
-    printf("\nPulsar tension tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
-    return all_pass;
+    tally(test_spurt_triggers_at_tension_peak());
+    tally(test_spurt_duration_from_inner_bars());
+    tally(test_effective_mutation_during_spurt());
+    tally(test_bounded_drift_clamp());
+    tally(test_original_lick_immutable());
+    tally(test_random_spurt_fires());
+    printf("\nPulsar tension tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

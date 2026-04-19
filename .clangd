@@ -1,0 +1,9 @@
+# The editor's built-in clang routinely reports false positives in this
+# repo because it lacks the CMake include graph used by liborpheus_dsp
+# (spurious "redefinition", "not found", "undeclared identifier", etc.).
+# CLAUDE.md documents this. The cmake build is authoritative for correctness;
+# do not rely on IDE diagnostics here.
+Diagnostics:
+  Suppress: '*'
+  UnusedIncludes: None
+  MissingIncludes: None

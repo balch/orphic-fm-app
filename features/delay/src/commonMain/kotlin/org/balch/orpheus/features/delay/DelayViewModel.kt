@@ -2,7 +2,6 @@ package org.balch.orpheus.features.delay
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -14,16 +13,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
-
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.boolSetter
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
-import org.balch.orpheus.core.plugin.symbols.DelaySymbol
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.plugin.symbols.DelaySymbol
 
 @Immutable
 data class DelayUiState(
@@ -114,7 +113,7 @@ interface DelayFeature : SynthFeature<DelayUiState, DelayPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ClassKey(DelayViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DelayViewModel(
     synthController: SynthController,

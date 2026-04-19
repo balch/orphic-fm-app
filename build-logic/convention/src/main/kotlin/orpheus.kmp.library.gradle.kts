@@ -19,6 +19,13 @@ plugins {
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 kotlin {
+    // Silences the "expect/actual classes are in Beta" warning project-wide.
+    // See https://youtrack.jetbrains.com/issue/KT-61573 — the feature is stable in
+    // practice; we accept it explicitly so builds aren't polluted with the warning.
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     android {
         compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
         minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()

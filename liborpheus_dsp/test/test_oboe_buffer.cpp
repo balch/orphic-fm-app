@@ -242,5 +242,5 @@ bool run_oboe_buffer_tests() {
     }
 
     printf("\n  Oboe Buffer: %d passed, %d failed\n", pass, fail);
-    return fail == 0;
+    TEST_SUITE_RETURN(pass, fail);
 }

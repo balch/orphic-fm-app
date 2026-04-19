@@ -20,7 +20,7 @@ import kotlin.reflect.KClass
  * (they live in [FeatureScope][org.balch.orpheus.core.di.FeatureScope]).
  */
 @Inject
-@ViewModelKey(SynthFeatureRegistry::class)
+@ViewModelKey
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class SynthFeatureRegistry(
     featureGraphFactory: FeatureGraph.Factory,

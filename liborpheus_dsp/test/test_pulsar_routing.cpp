@@ -167,5 +167,5 @@ bool run_pulsar_routing_tests() {
     run(test_pulsar_genre_port_routing);
 
     printf("\n  Pulsar Routing: %d passed, %d failed\n", passed, failed);
-    return failed == 0;
+    TEST_SUITE_RETURN(passed, failed);
 }

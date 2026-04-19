@@ -623,15 +623,16 @@ static bool test_delay_ports() {
 // Test runner
 // ═══════════════════════════════════════════════════════════════════
 bool run_control_routing_tests() {
-    bool all_pass = true;
-    all_pass &= test_mod_source_port_routing();
-    all_pass &= test_distortion_mix_port();
-    all_pass &= test_master_pan_port();
-    all_pass &= test_voice_timbre_morph();
-    all_pass &= test_mod_source_depth_integration();
-    all_pass &= test_kotlin_port_compatibility();
-    all_pass &= test_mod_source_enum_mapping();
-    all_pass &= test_vibrato_port();
-    all_pass &= test_delay_ports();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_mod_source_port_routing());
+    tally(test_distortion_mix_port());
+    tally(test_master_pan_port());
+    tally(test_voice_timbre_morph());
+    tally(test_mod_source_depth_integration());
+    tally(test_kotlin_port_compatibility());
+    tally(test_mod_source_enum_mapping());
+    tally(test_vibrato_port());
+    tally(test_delay_ports());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

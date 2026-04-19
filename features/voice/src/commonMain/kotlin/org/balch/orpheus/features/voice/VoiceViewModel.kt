@@ -167,7 +167,7 @@ interface VoicesFeature: SynthFeature<VoiceUiState, VoicePanelActions> {
  * Keeps SynthEngine dependency for non-port operations (gate, hold, wobble, bend, slide, peak).
  */
 @Inject
-@ClassKey(VoiceViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class VoiceViewModel(
     private val engine: SynthEngine,

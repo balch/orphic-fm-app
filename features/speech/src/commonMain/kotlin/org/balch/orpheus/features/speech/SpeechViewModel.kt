@@ -2,8 +2,8 @@ package org.balch.orpheus.features.speech
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.input.key.Key
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -19,16 +19,17 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import androidx.compose.ui.input.key.Key
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.PanelId
-import org.balch.orpheus.core.features.SynthFeature
-import org.balch.orpheus.core.input.KeyAction
-import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.controller.floatSetter
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.PanelId
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
+import org.balch.orpheus.core.input.KeyAction
+import org.balch.orpheus.core.input.KeyBinding
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.symbols.TTS_URI
 import org.balch.orpheus.core.plugin.symbols.TtsSymbol
@@ -36,7 +37,6 @@ import org.balch.orpheus.core.presets.PresetLoader
 import org.balch.orpheus.core.tts.SpeechEvent
 import org.balch.orpheus.core.tts.SpeechEventBus
 import org.balch.orpheus.core.tts.TtsGenerator
-import org.balch.orpheus.core.features.synthFeature
 
 @Immutable
 data class SpeechUiState(
@@ -134,7 +134,7 @@ interface SpeechFeature : SynthFeature<SpeechUiState, SpeechPanelActions> {
 }
 
 @Inject
-@ClassKey(SpeechViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class SpeechViewModel(
     synthController: SynthController,

@@ -2,6 +2,7 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -36,8 +37,8 @@ class VoiceTriggerTool(
 
     override val tool by lazy {
         object : Tool<VoiceTriggerArgs, VoiceTriggerResult>(
-            argsSerializer = VoiceTriggerArgs.serializer(),
-            resultSerializer = VoiceTriggerResult.serializer(),
+            argsType = typeToken<VoiceTriggerArgs>(),
+            resultType = typeToken<VoiceTriggerResult>(),
             name = "voice_trigger",
             description = """
         Trigger a voice to play a note. Voice indices are 0-7 (corresponding to voices 1-8).

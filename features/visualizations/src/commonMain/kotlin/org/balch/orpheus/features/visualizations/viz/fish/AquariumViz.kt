@@ -15,10 +15,11 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.ui.infrastructure.CenterPanelStyle
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidEffects
 import org.balch.orpheus.ui.infrastructure.VisualizationLiquidScope
@@ -49,7 +50,7 @@ data class Bubble(
 )
 
 @Inject
-@ContributesIntoSet(AppScope::class)
+@ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
 class AquariumViz(
     private val engine: SynthEngine,
 ) : Visualization {

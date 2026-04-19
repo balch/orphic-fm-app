@@ -1,15 +1,21 @@
 package org.balch.orpheus.features.dj
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,17 +38,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.balch.orpheus.core.plugin.symbols.DjDrop
 import org.balch.orpheus.core.plugin.symbols.DjSource
 import org.balch.orpheus.ui.panels.CollapsibleColumnPanel
 import org.balch.orpheus.ui.theme.OrpheusColors
@@ -54,6 +67,16 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+
+// Strip visibility tuning.
+private const val kStripRevealDelayMs = 300L       // sustained drag required before strip appears
+private const val kStripAudibleWet = 0.5f          // deck must be this wet for strip to arm
+private val kStripReservedHeight = 48.dp           // reserved space; strip fades in inside
+
+// Shared zero-beat-phase fallback for @Preview composables and any call-site that
+// hasn't wired the engine's real beatPhaseFlow. Hoisted so the default doesn't
+// allocate a new MutableStateFlow on every composition.
+private val kConstantZeroBeatPhase: StateFlow<Float> = MutableStateFlow(0f)
 
 // Cleveland Guardians palette for DJ panel
 private data class DjColors(
@@ -73,6 +96,7 @@ fun DjPanel(
     vizFlowA: StateFlow<FloatArray>,
     vizFlowB: StateFlow<FloatArray>,
     outVizFlow: StateFlow<FloatArray>,
+    beatPhaseFlow: StateFlow<Float> = kConstantZeroBeatPhase,
     modifier: Modifier = Modifier,
     isExpanded: Boolean? = null,
     onExpandedChange: ((Boolean) -> Unit)? = null,
@@ -85,7 +109,139 @@ fun DjPanel(
     val vizA by vizFlowA.collectAsState()
     val vizB by vizFlowB.collectAsState()
     val outViz by outVizFlow.collectAsState()
+    val beatPhase by beatPhaseFlow.collectAsState()
 
+    var platterABounds by remember { mutableStateOf<Rect?>(null) }
+    var platterBBounds by remember { mutableStateOf<Rect?>(null) }
+    var stripBounds by remember { mutableStateOf<Rect?>(null) }
+    var armingDeck by remember { mutableStateOf<Int?>(null) }
+    var armingZoneIdx by remember { mutableStateOf(0) }
+    var armingProgress by remember { mutableStateOf(0f) }
+    // Outer-box origin in window coords. We hit-test using window-space rects
+    // (captured via boundsInWindow) and must convert local pointer positions
+    // into window space by adding this offset.
+    var outerOrigin by remember { mutableStateOf(Offset.Zero) }
+
+    val currentActions by rememberUpdatedState(actions)
+    val currentZoneOrder by rememberUpdatedState(state.zoneOrder)
+
+    // Strip visibility — gated on an audible deck being actively dragged for
+    // at least kStripRevealDelayMs. Fast flings (hold < delay) don't trigger
+    // the strip. Decks with wet <= kStripAudibleWet are inaudible, so there's
+    // no point offering a drop.
+    val audibleDragged = (state.decks.getOrNull(0)?.dragActive == true && state.wetA > kStripAudibleWet) ||
+                         (state.decks.getOrNull(1)?.dragActive == true && state.wetB > kStripAudibleWet)
+    var stripRevealed by remember { mutableStateOf(false) }
+    LaunchedEffect(audibleDragged) {
+        if (audibleDragged) {
+            delay(kStripRevealDelayMs)
+            stripRevealed = true
+        } else {
+            stripRevealed = false
+        }
+    }
+    val currentStripRevealed by rememberUpdatedState(stripRevealed)
+
+    LaunchedEffect(armingDeck, armingZoneIdx) {
+        armingProgress = 0f
+        val deck = armingDeck ?: return@LaunchedEffect
+        val zoneIdx = armingZoneIdx
+        var startNanos = -1L
+        while (armingDeck == deck && armingZoneIdx == zoneIdx) {
+            var shouldBreak = false
+            withFrameNanos { nowNanos ->
+                if (startNanos < 0L) startNanos = nowNanos
+                val elapsedMs = (nowNanos - startNanos) / 1_000_000f
+                armingProgress = (elapsedMs / 120f).coerceIn(0f, 1f)
+                if (elapsedMs >= 120f) {
+                    val drop = currentZoneOrder.getOrNull(zoneIdx) ?: DjDrop.NONE
+                    if (drop != DjDrop.NONE) {
+                        currentActions.setDrop(deck, drop)
+                    }
+                    armingDeck = null
+                    armingProgress = 0f
+                    shouldBreak = true
+                }
+            }
+            if (shouldBreak) break
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .onGloballyPositioned { outerOrigin = it.positionInWindow() }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val startPosWin = Offset(down.position.x + outerOrigin.x,
+                                             down.position.y + outerOrigin.y)
+                    val deck = when {
+                        platterABounds?.contains(startPosWin) == true -> 0
+                        platterBBounds?.contains(startPosWin) == true -> 1
+                        else -> -1
+                    }
+                    if (deck < 0) return@awaitEachGesture
+
+                    currentActions.setDragActive(deck, true)
+                    currentActions.setPlatterDrag(deck, 0f)
+                    var lastY = down.position.y
+
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            val posWin = Offset(change.position.x + outerOrigin.x,
+                                                change.position.y + outerOrigin.y)
+
+                            val isLocked = state.decks.getOrNull(deck)?.drop != null &&
+                                    state.decks.getOrNull(deck)?.drop != DjDrop.NONE
+                            val strip = stripBounds
+                            // Only treat pointer-in-strip as arming territory once the strip
+                            // is actually visible — during the 300ms reveal delay (or when
+                            // the deck is inaudible) the strip is chrome, not interactive.
+                            val inStrip = currentStripRevealed && strip != null && strip.contains(posWin)
+
+                            if (inStrip) {
+                                // Inside strip. Arm a new zone only if no drop is locked yet;
+                                // once locked the zone is permanent for this gesture, so further
+                                // in-strip motion is a no-op (don't re-arm, don't scratch).
+                                if (!isLocked) {
+                                    // strip is non-null: inStrip implies it.
+                                    val xInStrip = ((posWin.x - strip.left) / strip.width).coerceIn(0f, 0.9999f)
+                                    val idx = (xInStrip * 4f).toInt().coerceIn(0, 3)
+                                    armingDeck = deck
+                                    armingZoneIdx = idx
+                                }
+                                // Keep lastY fresh so the first scratch sample after the pointer
+                                // leaves the strip computes delta from the exit point, not from
+                                // some stale pre-strip position (which would produce a click).
+                                lastY = change.position.y
+                            } else {
+                                // Outside strip: full scratch control, whether locked or not.
+                                // After lock-in this is the path back to platter control — the
+                                // drop effect keeps processing whatever scratch velocity produces.
+                                if (!isLocked) {
+                                    armingDeck = null
+                                    armingProgress = 0f
+                                }
+                                val deltaY = change.position.y - lastY
+                                val v = (deltaY * -0.1f).coerceIn(-5f, 5f)
+                                currentActions.setPlatterDrag(deck, v)
+                                lastY = change.position.y
+                            }
+                            change.consume()
+                        }
+                    } finally {
+                        currentActions.setPlatterRelease(deck)
+                        currentActions.setDrop(deck, DjDrop.NONE)
+                        currentActions.setDragActive(deck, false)
+                        armingDeck = null
+                        armingProgress = 0f
+                    }
+                }
+            }
+    ) {
     CollapsibleColumnPanel(
         title = "DJ",
         color = djColors.panelColor,
@@ -99,6 +255,7 @@ fun DjPanel(
             SignalTrace(data = outViz, color = djColors.deckAColor, alpha = 0.25f)
         },
     ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
         // ── Deck A | Fader A | knobs | Fader B | Deck B ──────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -125,8 +282,7 @@ fun DjPanel(
                     deckColor = djColors.deckAColor,
                     frozenColor = djColors.frozenColor,
                     deckLabel = "A",
-                    onDrag = { velocity -> actions.setPlatterDrag(0, velocity) },
-                    onRelease = { actions.setPlatterRelease(0) },
+                    onBounds = { platterABounds = it },
                     onToggleLock = { actions.toggleLock(0) },
                     modifier = Modifier.size(100.dp),
                 )
@@ -219,15 +375,49 @@ fun DjPanel(
                     deckColor = djColors.deckBColor,
                     frozenColor = djColors.frozenColor,
                     deckLabel = "B",
-                    onDrag = { velocity -> actions.setPlatterDrag(1, velocity) },
-                    onRelease = { actions.setPlatterRelease(1) },
+                    onBounds = { platterBBounds = it },
                     onToggleLock = { actions.toggleLock(1) },
                     modifier = Modifier.size(100.dp),
                 )
             }
         }
 
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Strip always occupies kStripReservedHeight so the turntables never
+        // shift when drops become available. Alpha + translationY animation
+        // gives the slide-in-from-below look without collapsing layout.
+        val stripAlpha by animateFloatAsState(
+            targetValue = if (stripRevealed) 1f else 0f,
+            animationSpec = tween(durationMillis = 180),
+            label = "stripAlpha",
+        )
+        val stripOffset by animateDpAsState(
+            targetValue = if (stripRevealed) 0.dp else 16.dp,
+            animationSpec = tween(durationMillis = 180),
+            label = "stripOffset",
+        )
+        DropZoneStrip(
+            zoneOrder = state.zoneOrder,
+            decks = state.decks,
+            beatPhase = beatPhase,
+            armingDeck = armingDeck,
+            armingZoneIdx = armingZoneIdx,
+            armingProgress = armingProgress,
+            deckAColor = djColors.deckAColor,
+            deckBColor = djColors.deckBColor,
+            onStripBounds = { stripBounds = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(kStripReservedHeight)
+                .graphicsLayer {
+                    alpha = stripAlpha
+                    translationY = stripOffset.toPx()
+                },
+        )
+        } // Column
     }
+    } // outer Box
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -250,13 +440,10 @@ private fun TurntablePlatter(
     deckColor: Color,
     frozenColor: Color,
     deckLabel: String,
-    onDrag: (Float) -> Unit,
-    onRelease: () -> Unit,
+    onBounds: (Rect) -> Unit,
     onToggleLock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val currentOnDrag by rememberUpdatedState(onDrag)
-    val currentOnRelease by rememberUpdatedState(onRelease)
     val currentOnToggleLock by rememberUpdatedState(onToggleLock)
     val currentVelocity by rememberUpdatedState(velocity)
     val currentWet by rememberUpdatedState(wet)
@@ -281,7 +468,7 @@ private fun TurntablePlatter(
     val borderColor = if (isFrozen) frozenColor else deckColor
 
     Box(
-        modifier = modifier,
+        modifier = modifier.onGloballyPositioned { coords -> onBounds(coords.boundsInWindow()) },
         contentAlignment = Alignment.Center,
     ) {
         Canvas(
@@ -301,29 +488,6 @@ private fun TurntablePlatter(
                                 currentOnToggleLock()
                             }
                         }
-                    )
-                }
-                .pointerInput(Unit) {
-                    var lastY = 0f
-                    // Vertical drag: up = forward (positive), down = backward (negative).
-                    // High sensitivity so small wiggles produce audible scratch.
-                    // A 10px mouse move should yield ~1.0 velocity.
-                    val pxToVelocity = -0.1f
-
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            lastY = offset.y
-                            currentOnDrag(0f) // touching, stopped
-                        },
-                        onDrag = { change, _ ->
-                            change.consume()
-                            val deltaY = change.position.y - lastY
-                            val scratchVelocity = (deltaY * pxToVelocity).coerceIn(-5f, 5f)
-                            currentOnDrag(scratchVelocity)
-                            lastY = change.position.y
-                        },
-                        onDragEnd = { currentOnRelease() },
-                        onDragCancel = { currentOnRelease() },
                     )
                 },
         ) {
@@ -519,6 +683,129 @@ private fun SourceDropdown(
     }
 }
 
+@Composable
+private fun DropZoneStrip(
+    zoneOrder: List<DjDrop>,
+    decks: List<DeckDropState>,
+    beatPhase: Float,
+    armingDeck: Int?,
+    armingZoneIdx: Int,
+    armingProgress: Float,
+    deckAColor: Color,
+    deckBColor: Color,
+    onStripBounds: (Rect) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val anyLocked = decks.any { it.drop != DjDrop.NONE }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp)
+            .onGloballyPositioned { onStripBounds(it.boundsInWindow()) },
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        zoneOrder.forEachIndexed { idx, drop ->
+            val accent = OrpheusColors.accentFor(drop)
+            val lockedBy = buildList {
+                if (decks.getOrNull(0)?.drop == drop) add("A" to deckAColor)
+                if (decks.getOrNull(1)?.drop == drop) add("B" to deckBColor)
+            }
+            val dimmed = anyLocked && lockedBy.isEmpty()
+            val arming = armingDeck != null && armingZoneIdx == idx && lockedBy.isEmpty()
+            DropZoneCell(
+                label = drop.label,
+                accent = accent,
+                beatPhase = beatPhase,
+                lockedBy = lockedBy,
+                dimmed = dimmed,
+                arming = arming,
+                armingProgress = if (arming) armingProgress else 0f,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DropZoneCell(
+    label: String,
+    accent: Color,
+    beatPhase: Float,
+    lockedBy: List<Pair<String, Color>>,
+    dimmed: Boolean,
+    arming: Boolean,
+    armingProgress: Float,
+    modifier: Modifier = Modifier,
+) {
+    val pulse = (1f - kotlin.math.cos(beatPhase * 2f * PI.toFloat())) / 2f
+    val baseAlpha = when {
+        lockedBy.isNotEmpty() -> 1f
+        dimmed               -> 0.2f + 0.15f * pulse
+        else                 -> 0.35f + 0.45f * pulse
+    }
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(accent.copy(alpha = baseAlpha)),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Locked: outer stroke glow
+        if (lockedBy.isNotEmpty()) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                drawRoundRect(
+                    color = accent.copy(alpha = 0.6f),
+                    style = Stroke(width = 6f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(6.dp.toPx()),
+                )
+            }
+        }
+        // Arming progress arc
+        if (arming) {
+            Canvas(modifier = Modifier.matchParentSize()) {
+                drawArc(
+                    color = accent,
+                    startAngle = -90f,
+                    sweepAngle = 360f * armingProgress,
+                    useCenter = false,
+                    style = Stroke(width = 2.dp.toPx()),
+                )
+            }
+        }
+        // Name reveal when locked
+        if (lockedBy.isNotEmpty()) {
+            Text(
+                text = label,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        // Deck-letter markers top-right
+        if (lockedBy.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                lockedBy.forEach { (letter, color) ->
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.4f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(letter, color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Previews
 // ─────────────────────────────────────────────────────────────────────────────
@@ -600,6 +887,100 @@ private fun DjPanelBothDecksHotPreview() {
             vizFlowA = MutableStateFlow(previewVizData()),
             vizFlowB = MutableStateFlow(previewVizData()),
             outVizFlow = MutableStateFlow(previewVizData()),
+            isExpanded = true,
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Drag Armed (no lock)", widthDp = 500, heightDp = 340)
+@Composable
+private fun DjPanelDragArmedPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 0.8f, velocityA = -0.2f,
+                    decks = listOf(
+                        DeckDropState(dragActive = true, drop = DjDrop.NONE),
+                        DeckDropState(),
+                    ),
+                ),
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            beatPhaseFlow = MutableStateFlow(0f),
+            isExpanded = true,
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Deck A Locked (STUTTER)", widthDp = 500, heightDp = 340)
+@Composable
+private fun DjPanelDeckALockedPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 0.8f, wetB = 0.6f,
+                    velocityA = -0.3f, velocityB = 1.0f,
+                    decks = listOf(
+                        DeckDropState(dragActive = true, drop = DjDrop.STUTTER),
+                        DeckDropState(dragActive = false, drop = DjDrop.NONE),
+                    ),
+                ),
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            beatPhaseFlow = MutableStateFlow(0.4f),
+            isExpanded = true,
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Both Decks Locked", widthDp = 500, heightDp = 340)
+@Composable
+private fun DjPanelBothLockedPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 0.8f, wetB = 0.7f,
+                    decks = listOf(
+                        DeckDropState(dragActive = true, drop = DjDrop.FILTER),
+                        DeckDropState(dragActive = true, drop = DjDrop.BRAKE),
+                    ),
+                ),
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            beatPhaseFlow = MutableStateFlow(0.2f),
+            isExpanded = true,
+        )
+    }
+}
+
+@Preview(name = "DJ Panel — Shuffled Zone Order", widthDp = 500, heightDp = 340)
+@Composable
+private fun DjPanelShuffledPreview() {
+    OrpheusTheme {
+        DjPanel(
+            feature = DjViewModel.previewFeature(
+                DjUiState(
+                    wetA = 0.8f, velocityA = 1.0f,
+                    decks = listOf(
+                        DeckDropState(dragActive = true, drop = DjDrop.NONE),
+                        DeckDropState(),
+                    ),
+                    zoneOrder = listOf(DjDrop.FREEZE, DjDrop.FILTER, DjDrop.STUTTER, DjDrop.BRAKE),
+                ),
+            ),
+            vizFlowA = MutableStateFlow(previewVizData()),
+            vizFlowB = MutableStateFlow(previewVizData()),
+            outVizFlow = MutableStateFlow(previewVizData()),
+            beatPhaseFlow = MutableStateFlow(0f),
             isExpanded = true,
         )
     }

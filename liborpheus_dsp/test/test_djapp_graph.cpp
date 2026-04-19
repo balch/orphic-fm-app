@@ -1104,24 +1104,25 @@ static bool test_djapp_pulsar_delay_vs_reverb() {
 
 bool run_djapp_graph_tests() {
     printf("\n========== DJ APP GRAPH TESTS ==========\n");
-    bool all_pass = true;
-    all_pass &= test_djapp_graph_loads();
-    all_pass &= test_djapp_pulsar_through_graph();
-    all_pass &= test_djapp_horn_active();
-    all_pass &= test_djapp_distortion_active();
-    all_pass &= test_djapp_reverb_active();
-    all_pass &= test_djapp_delay_active();
-    all_pass &= test_djapp_turntable_sends();
-    all_pass &= test_djapp_horn_doppler_lr();
-    all_pass &= test_djapp_full_chain();
-    all_pass &= test_djapp_drive_sweep();
-    all_pass &= test_djapp_distortion_mix();
-    all_pass &= test_djapp_turntable_bt_chunking();
-    all_pass &= test_djapp_pulsar_dedicated_delay();
-    all_pass &= test_djapp_pulsar_dedicated_reverb();
-    all_pass &= test_djapp_pulsar_effects_independent();
-    all_pass &= test_djapp_pulsar_zero_sends();
-    all_pass &= test_djapp_pulsar_delay_vs_reverb();
-    printf("\nDJ App graph tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_djapp_graph_loads());
+    tally(test_djapp_pulsar_through_graph());
+    tally(test_djapp_horn_active());
+    tally(test_djapp_distortion_active());
+    tally(test_djapp_reverb_active());
+    tally(test_djapp_delay_active());
+    tally(test_djapp_turntable_sends());
+    tally(test_djapp_horn_doppler_lr());
+    tally(test_djapp_full_chain());
+    tally(test_djapp_drive_sweep());
+    tally(test_djapp_distortion_mix());
+    tally(test_djapp_turntable_bt_chunking());
+    tally(test_djapp_pulsar_dedicated_delay());
+    tally(test_djapp_pulsar_dedicated_reverb());
+    tally(test_djapp_pulsar_effects_independent());
+    tally(test_djapp_pulsar_zero_sends());
+    tally(test_djapp_pulsar_delay_vs_reverb());
+    printf("\nDJ App graph tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

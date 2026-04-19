@@ -1154,22 +1154,23 @@ static bool test_poly_lfo_rate_knob_production_graph() {
 // Test runner
 // ═══════════════════════════════════════════════════════════════════
 bool run_lfo_tests() {
-    bool all_pass = true;
-    all_pass &= test_lfo_triangle_waveform();
-    all_pass &= test_lfo_square_waveform();
-    all_pass &= test_lfo_shape_morph();
-    all_pass &= test_lfo_and_mode();
-    all_pass &= test_lfo_or_mode();
-    all_pass &= test_lfo_frequency_range();
-    all_pass &= test_lfo_timbre_modulation();
-    all_pass &= test_lfo_fm_modulation();
-    all_pass &= test_lfo_vibrato();
-    all_pass &= test_lfo_graph_integration();
-    all_pass &= test_lfo_warps_routing();
-    all_pass &= test_lfo_mode_comparison();
-    all_pass &= test_lfo_mod_depth_sweep();
-    all_pass &= test_lfo_4channel_output();
-    all_pass &= test_poly_lfo_rate_knob_unit();
-    all_pass &= test_poly_lfo_rate_knob_production_graph();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_lfo_triangle_waveform());
+    tally(test_lfo_square_waveform());
+    tally(test_lfo_shape_morph());
+    tally(test_lfo_and_mode());
+    tally(test_lfo_or_mode());
+    tally(test_lfo_frequency_range());
+    tally(test_lfo_timbre_modulation());
+    tally(test_lfo_fm_modulation());
+    tally(test_lfo_vibrato());
+    tally(test_lfo_graph_integration());
+    tally(test_lfo_warps_routing());
+    tally(test_lfo_mode_comparison());
+    tally(test_lfo_mod_depth_sweep());
+    tally(test_lfo_4channel_output());
+    tally(test_poly_lfo_rate_knob_unit());
+    tally(test_poly_lfo_rate_knob_production_graph());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

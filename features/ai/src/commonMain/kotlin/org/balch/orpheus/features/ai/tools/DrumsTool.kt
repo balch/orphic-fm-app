@@ -2,6 +2,7 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
@@ -162,8 +163,8 @@ class DrumsTool(
 
     override val tool by lazy {
         object : Tool<DrumsControlArgs, DrumsControlResult>(
-            argsSerializer = DrumsControlArgs.serializer(),
-            resultSerializer = DrumsControlResult.serializer(),
+            argsType = typeToken<DrumsControlArgs>(),
+            resultType = typeToken<DrumsControlResult>(),
             name = "drums_control",
             description = """
         Control drum synthesis and drum beat patterns.

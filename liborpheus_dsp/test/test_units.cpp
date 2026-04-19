@@ -488,16 +488,17 @@ static bool test_duo_voice_fm() {
 }
 
 bool run_unit_tests() {
-    bool all_pass = true;
-    all_pass &= test_voice_coupling();
-    all_pass &= test_fm_modulation();
-    all_pass &= test_clock();
-    all_pass &= test_grids();
-    all_pass &= test_marbles();
-    all_pass &= test_marbles_y_output();
-    all_pass &= test_looper();
-    all_pass &= test_bender();
-    all_pass &= test_per_string_bender();
-    all_pass &= test_duo_voice_fm();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_voice_coupling());
+    tally(test_fm_modulation());
+    tally(test_clock());
+    tally(test_grids());
+    tally(test_marbles());
+    tally(test_marbles_y_output());
+    tally(test_looper());
+    tally(test_bender());
+    tally(test_per_string_bender());
+    tally(test_duo_voice_fm());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

@@ -5,6 +5,9 @@
 #include <cstring>
 #include <cmath>
 
+static constexpr float kPi    = 3.14159265358979f;
+static constexpr float kTwoPi = 2.0f * kPi;
+
 // Cubic Hermite interpolation for smooth variable-speed playback
 static inline float cubic_interp(const float* buf, int buf_size, float pos) {
     int i0 = static_cast<int>(pos);
@@ -33,134 +36,6 @@ static inline float wrap_pos(float pos, int buf_size) {
     pos = std::fmod(pos, s);
     if (pos < 0.0f) pos += s;
     return pos;
-}
-
-// ── Drop buildup state machine ──────────────────────────────────────
-// Ticks once per sample inside playback_deck.
-static inline void drop_tick(TurntableDeck* deck, float velocity, float sample_rate) {
-    float abs_vel = std::fabs(velocity);
-    // Dead zone: treat near-zero velocity as "stopped" so the asymptotic
-    // one-pole smoother can actually trigger the release transition.
-    bool stopped = (abs_vel < 0.01f);
-    bool slow_backward = !stopped && (velocity < 0.0f) && (abs_vel < kDropSlowThreshold);
-    bool fast_backward = !stopped && (velocity < 0.0f) && (abs_vel >= kDropSlowThreshold);
-    bool forward_or_stopped = stopped || (velocity >= 0.0f);
-
-    switch (deck->drop_state) {
-        case DROP_IDLE:
-            if (slow_backward) {
-                deck->drop_state = DROP_BUILDING;
-                deck->drop_lfo_phase = 0.0f;
-                deck->drop_rising = true;
-                deck->drop_first_sweep = true;
-            }
-            break;
-
-        case DROP_BUILDING:
-            if (forward_or_stopped) {
-                // Snap to IDLE — let the natural forward speedup sound through
-                deck->drop_state = DROP_IDLE;
-                deck->drop_amount = 0.0f;
-                deck->drop_rising = true;
-                deck->drop_first_sweep = true;
-                deck->drop_bq_s1 = 0.0f;
-                deck->drop_bq_s2 = 0.0f;
-            } else if (fast_backward) {
-                deck->drop_state = DROP_IDLE;
-                deck->drop_amount = 0.0f;
-                deck->drop_rising = true;
-                deck->drop_bq_s1 = 0.0f;
-                deck->drop_bq_s2 = 0.0f;
-            } else {
-                // First sweep: slow ramp 0→1 (~6s). After that: faster
-                // ping-pong between floor (0.3) and ceiling (0.75) at ~3s/leg.
-                if (deck->drop_rising) {
-                    float rate = deck->drop_first_sweep
-                        ? kDropBuildUpRate : kDropCycleRate;
-                    float ceil = deck->drop_first_sweep
-                        ? 1.0f : kDropPingPongCeil;
-                    deck->drop_amount += rate;
-                    if (deck->drop_amount >= ceil) {
-                        deck->drop_amount = ceil;
-                        deck->drop_rising = false;
-                        deck->drop_first_sweep = false;
-                    }
-                } else {
-                    deck->drop_amount -= kDropCycleRate;
-                    if (deck->drop_amount <= kDropPingPongFloor) {
-                        deck->drop_amount = kDropPingPongFloor;
-                        deck->drop_rising = true;
-                    }
-                }
-            }
-            break;
-
-        case DROP_RELEASING:
-            // Currently unused — release snaps to IDLE for clean forward sound.
-            // Kept for future use (gradual release sweep option).
-            deck->drop_state = DROP_IDLE;
-            deck->drop_amount = 0.0f;
-            deck->drop_bq_s1 = 0.0f;
-            deck->drop_bq_s2 = 0.0f;
-            break;
-    }
-
-    if (deck->drop_state != DROP_IDLE) {
-        float lfo_hz = kDropLfoMinHz + deck->drop_amount * (kDropLfoMaxHz - kDropLfoMinHz);
-        deck->drop_lfo_phase += lfo_hz / sample_rate;
-        if (deck->drop_lfo_phase >= 1.0f) deck->drop_lfo_phase -= 1.0f;
-    }
-}
-
-// Triangle LFO: phase 0→1 maps to output -1→+1→-1
-static inline float drop_lfo_value(float phase) {
-    return (phase < 0.5f)
-        ? (phase * 4.0f - 1.0f)
-        : (3.0f - phase * 4.0f);
-}
-
-// Recompute biquad LPF coefficients from current drop state.
-// LPF sweeps DOWN — removes highs during buildup.
-static void drop_update_coefficients(TurntableDeck* deck, float sample_rate) {
-    if (deck->drop_state == DROP_IDLE) return;
-
-    float base_cutoff = kDropFilterMaxHz *
-        std::pow(kDropFilterMinHz / kDropFilterMaxHz, deck->drop_amount);
-
-    float lfo = drop_lfo_value(deck->drop_lfo_phase);
-    float cutoff_hz = base_cutoff * std::pow(2.0f, lfo * deck->drop_amount);
-
-    if (cutoff_hz < kDropFilterMinHz) cutoff_hz = kDropFilterMinHz;
-    if (cutoff_hz > kDropFilterMaxHz) cutoff_hz = kDropFilterMaxHz;
-
-    // Q ramps from mild to aggressive with buildup amount
-    float q = kDropFilterQMin + deck->drop_amount * (kDropFilterQMax - kDropFilterQMin);
-
-    float omega = 2.0f * 3.14159265f * cutoff_hz / sample_rate;
-    float sin_w = std::sin(omega);
-    float cos_w = std::cos(omega);
-    float alpha = sin_w / (2.0f * q);
-
-    // RBJ cookbook LPF coefficients
-    float a0 = 1.0f + alpha;
-    deck->drop_b0 = ((1.0f - cos_w) / 2.0f) / a0;
-    deck->drop_b1 = (1.0f - cos_w) / a0;
-    deck->drop_b2 = deck->drop_b0;
-    deck->drop_a1 = (-2.0f * cos_w) / a0;
-    deck->drop_a2 = (1.0f - alpha) / a0;
-}
-
-// Apply cached biquad coefficients to a single sample (DF2T).
-static inline float drop_filter_sample(TurntableDeck* deck, float input) {
-    if (deck->drop_state == DROP_IDLE) return input;
-
-    float y = deck->drop_b0 * input + deck->drop_bq_s1;
-    deck->drop_bq_s1 = deck->drop_b1 * input - deck->drop_a1 * y + deck->drop_bq_s2;
-    deck->drop_bq_s2 = deck->drop_b2 * input - deck->drop_a2 * y;
-
-    // Gain boost ramps with buildup: 1x at start, kDropGainBoost at full
-    float gain = 1.0f + deck->drop_amount * (kDropGainBoost - 1.0f);
-    return y * gain;
 }
 
 // Silence threshold: ~-60dB. Blocks of silence before auto-freeze triggers.
@@ -197,44 +72,25 @@ static void capture_source(TurntableDeck* deck, const float* source, int num_fra
 
 void playback_deck(TurntableDeck* deck, float target_velocity,
                    float* out, int num_frames, float sample_rate) {
-    // Anti-alias filter state persists across blocks to avoid clicks at
-    // block boundaries during high-speed scratch playback.
     float lpf_state = deck->aa_lpf_state;
 
     for (int i = 0; i < num_frames; i++) {
-        // State machine uses raw target velocity for gesture detection —
-        // NOT smoothed, so the override speed doesn't trigger fast-backward abort.
-        drop_tick(deck, target_velocity, sample_rate);
-
-        // During BUILDING, override playback speed: accelerates backward
-        // regardless of how slowly the user is dragging.
-        float effective_velocity = target_velocity;
-        if (deck->drop_state == DROP_BUILDING) {
-            effective_velocity = kDropPlaySpeedMin +
-                deck->drop_amount * (kDropPlaySpeedMax - kDropPlaySpeedMin);
-        }
-
-        // One-pole velocity smoothing (per-sample for smooth transitions)
+        // One-pole velocity smoothing
         deck->smoothed_velocity += kTurntableVelSmoothCoeff *
-            (effective_velocity - deck->smoothed_velocity);
+            (target_velocity - deck->smoothed_velocity);
 
         float raw = cubic_interp(deck->buffer, kTurntableBufSize, deck->read_pos);
 
         // Anti-alias: stronger filtering at higher speeds.
         float abs_vel = std::fabs(deck->smoothed_velocity);
-        float sample;
         if (abs_vel > 1.0f) {
             float alpha = 1.0f / abs_vel;
             lpf_state += alpha * (raw - lpf_state);
-            sample = lpf_state;
+            out[i] = lpf_state;
         } else {
             lpf_state += 0.5f * (raw - lpf_state);
-            sample = raw;
+            out[i] = raw;
         }
-
-        // Recompute filter coefficients + apply biquad
-        drop_update_coefficients(deck, sample_rate);
-        out[i] = drop_filter_sample(deck, sample);
 
         deck->read_pos = wrap_pos(
             deck->read_pos + deck->smoothed_velocity,
@@ -292,6 +148,265 @@ void turntable_get_viz(TurntableDeck* deck, float* out_buffer) {
                 (kTurntableVizSize + 1) * sizeof(float));
 }
 
+// ── Drop: FILTER ────────────────────────────────────────────────────
+// Resonant LPF that sweeps from open to closed with a wobble LFO.
+
+static inline float drop_filter_lfo_value(float phase) {
+    return (phase < 0.5f) ? (phase * 4.0f - 1.0f) : (3.0f - phase * 4.0f);
+}
+
+static void drop_filter_update_coefficients(TurntableDeck::DropContext* d, float sample_rate) {
+    float base_cutoff = kDropFilterMaxHz *
+        std::pow(kDropFilterMinHz / kDropFilterMaxHz, d->phase);
+    float lfo = drop_filter_lfo_value(d->lfo_phase);
+    float cutoff_hz = base_cutoff * std::pow(2.0f, lfo * d->phase);
+    if (cutoff_hz < kDropFilterMinHz) cutoff_hz = kDropFilterMinHz;
+    if (cutoff_hz > kDropFilterMaxHz) cutoff_hz = kDropFilterMaxHz;
+
+    float q = kDropFilterQMin + d->phase * (kDropFilterQMax - kDropFilterQMin);
+    float omega = kTwoPi * cutoff_hz / sample_rate;
+    float sin_w = std::sin(omega);
+    float cos_w = std::cos(omega);
+    float alpha = sin_w / (2.0f * q);
+    float a0 = 1.0f + alpha;
+
+    d->b0 = ((1.0f - cos_w) / 2.0f) / a0;
+    d->b1 = (1.0f - cos_w) / a0;
+    d->b2 = d->b0;
+    d->a1 = (-2.0f * cos_w) / a0;
+    d->a2 = (1.0f - alpha) / a0;
+}
+
+static inline float drop_filter_tick(TurntableDeck::DropContext* d, float input) {
+    float y = d->b0 * input + d->bq_s1;
+    d->bq_s1 = d->b1 * input - d->a1 * y + d->bq_s2;
+    d->bq_s2 = d->b2 * input - d->a2 * y;
+    float gain = 1.0f + d->phase * (kDropGainBoost - 1.0f);
+    return y * gain;
+}
+
+// FILTER coefficient update interval. Recomputing pow/sin/cos every sample is
+// wasteful — the 6s build-up and 6-16 Hz LFO drift far slower than 48 kHz, so
+// updating every 16 samples is imperceptible (phase delta < 6e-5, LFO delta
+// < 0.006 cycles) while cutting the trig workload by 16×.
+static constexpr int kFilterCoeffUpdateInterval = 16;
+
+static void drop_process_filter(TurntableDeck* deck, float* buf, int n, float sr) {
+    auto& d = deck->drop;
+    // Seed coefficients if they haven't been computed yet (first block after
+    // the NONE→FILTER transition, where maybe_transition zeros them).
+    if (d.b0 == 0.0f && d.b1 == 0.0f && d.a1 == 0.0f) {
+        drop_filter_update_coefficients(&d, sr);
+    }
+    const float lfo_inc_base = 1.0f / sr;
+    int until_update = 0;  // forces an update on sample 0 of the block
+    for (int i = 0; i < n; i++) {
+        d.phase += kDropFilterBuildUpRate;
+        if (d.phase > 1.0f) d.phase = 1.0f;
+
+        float lfo_hz = kDropLfoMinHz + d.phase * (kDropLfoMaxHz - kDropLfoMinHz);
+        d.lfo_phase += lfo_hz * lfo_inc_base;
+        if (d.lfo_phase >= 1.0f) d.lfo_phase -= 1.0f;
+
+        if (until_update == 0) {
+            drop_filter_update_coefficients(&d, sr);
+            until_update = kFilterCoeffUpdateInterval;
+        }
+        --until_update;
+        buf[i] = drop_filter_tick(&d, buf[i]);
+    }
+}
+
+// ── Drop: STUTTER ────────────────────────────────────────────────────
+// Beat-synced gate. Division ramps 1/8 → 1/16 → 1/32 over kStutterRampSeconds.
+static void drop_process_stutter(TurntableDeck* deck, float* buf, int n, float sr,
+                                 float beat_phase) {
+    auto& d = deck->drop;
+    float ramp_per_sample = 1.0f / (kStutterRampSeconds * sr);
+    for (int i = 0; i < n; i++) {
+        d.phase += ramp_per_sample;
+        if (d.phase > 1.0f) d.phase = 1.0f;
+
+        int div_idx = static_cast<int>(d.phase * 3.0f);  // 0, 1, or 2
+        if (div_idx > 2) div_idx = 2;
+        d.stutter_div_idx = div_idx;
+
+        // Division multiplier: 1/8 = 8 pulses per beat, 1/16 = 16, 1/32 = 32
+        float div_mult = static_cast<float>(8 << div_idx);
+        float gated_phase = beat_phase * div_mult;
+        gated_phase -= std::floor(gated_phase);
+        float target_gate = (gated_phase < 0.5f) ? 1.0f : 0.0f;
+
+        // Gate smoothing α = 0.5 is intentionally aggressive (reaches 99% in ~4
+        // samples). The "chopped" gate attack is part of the stutter aesthetic —
+        // a softer smoother blurs the beat-synced feel into a tremolo. Clicks
+        // at the gate edges are acceptable for this effect.
+        d.stutter_smoothed_gate += 0.5f * (target_gate - d.stutter_smoothed_gate);
+        buf[i] *= d.stutter_smoothed_gate;
+    }
+}
+
+// ── Drop: FREEZE ─────────────────────────────────────────────────────
+// Snapshots a fixed slice and loops it with slow pitch modulation.
+static void drop_process_freeze(TurntableDeck* deck, float* buf, int n, float sr) {
+    auto& d = deck->drop;
+    if (d.freeze_len <= 0) {
+        for (int i = 0; i < n; i++) buf[i] = 0.0f;
+        return;
+    }
+    for (int i = 0; i < n; i++) {
+        float pitch = 1.0f + kFreezePitchDepth *
+            std::sin(kTwoPi * d.freeze_lfo);
+        d.freeze_lfo += kFreezeLfoHz / sr;
+        if (d.freeze_lfo >= 1.0f) d.freeze_lfo -= 1.0f;
+
+        float read = d.freeze_read;
+        int idx = static_cast<int>(d.freeze_start + read) % kTurntableBufSize;
+        int nxt = (idx + 1) % kTurntableBufSize;
+        float frac = read - std::floor(read);
+        buf[i] = deck->buffer[idx] * (1.0f - frac) + deck->buffer[nxt] * frac;
+
+        d.freeze_read += pitch;
+        while (d.freeze_read >= d.freeze_len) d.freeze_read -= d.freeze_len;
+        while (d.freeze_read < 0.0f)          d.freeze_read += d.freeze_len;
+    }
+}
+
+// ── Drop: BRAKE ──────────────────────────────────────────────────────
+// On kind transition NONE→BRAKE, maybe_transition() seeds brake_read with
+// the deck's current read_pos and brake_speed = 1.0. Here we just advance
+// the cursor at a decaying speed and read from deck->buffer directly,
+// overwriting whatever playback_deck produced.
+static void drop_process_brake(TurntableDeck* deck, float* buf, int n, float /*sr*/) {
+    auto& d = deck->drop;
+    for (int i = 0; i < n; i++) {
+        d.brake_speed *= kBrakeDecayPerSample;
+        if (d.brake_speed < 1e-4f) {
+            buf[i] = 0.0f;
+            continue;
+        }
+        // Scale output by brake_speed so amplitude also decays (vinyl motor losing power)
+        buf[i] = cubic_interp(deck->buffer, kTurntableBufSize, d.brake_read) * d.brake_speed;
+        d.brake_read = wrap_pos(d.brake_read + d.brake_speed, kTurntableBufSize);
+    }
+}
+
+// ── Drop: OCTAVE ─────────────────────────────────────────────────────
+// Blend-first subharmonic: adds a half-rate-read layer UNDER the normal
+// playback, giving an instant sub-bass doubling without replacing the source.
+// Note: when the deck's smoothed_velocity is 0 (platter stopped), octave_read
+// also freezes — the subharmonic layer naturally stops with the dry playback,
+// which is the desired behaviour (no phantom octave while the deck is held).
+static void drop_process_octave(TurntableDeck* deck, float* buf, int n, float /*sr*/) {
+    auto& d = deck->drop;
+    for (int i = 0; i < n; i++) {
+        float sub = cubic_interp(deck->buffer, kTurntableBufSize, d.octave_read);
+        buf[i] = buf[i] * kOctaveDryMix + sub * kOctaveSubMix;
+        // Advance at half the deck's smoothed velocity → plays an octave down.
+        d.octave_read = wrap_pos(d.octave_read + deck->smoothed_velocity * 0.5f,
+                                 kTurntableBufSize);
+    }
+}
+
+// ── Drop: PHASER ─────────────────────────────────────────────────────
+// 4-stage first-order allpass cascade with an LFO-modulated coefficient.
+// Canonical Direct-Form II allpass per stage:
+//   w[n] = x[n] - a * w[n-1]
+//   y[n] = a * w[n] + w[n-1]
+// Coefficient `a` is derived from cutoff: a = (tan(ω/2) - 1) / (tan(ω/2) + 1),
+// clamped away from ±1 to keep the feedback loop stable during the sweep.
+// Dry + wet mix preserves the original signal; small feedback gives depth.
+static void drop_process_phaser(TurntableDeck* deck, float* buf, int n, float sr) {
+    auto& d = deck->drop;
+    const float pi_over_sr = kPi / sr;
+    for (int i = 0; i < n; i++) {
+        // LFO phase in [0,1)
+        d.phaser_lfo_phase += kPhaserLfoHz / sr;
+        if (d.phaser_lfo_phase >= 1.0f) d.phaser_lfo_phase -= 1.0f;
+        float lfo = 0.5f * (1.0f + std::sin(kTwoPi * d.phaser_lfo_phase));
+        float cutoff = kPhaserMinHz * std::pow(kPhaserMaxHz / kPhaserMinHz, lfo);
+        float t = std::tan(pi_over_sr * cutoff);
+        float a = (t - 1.0f) / (t + 1.0f);
+        if (a >  0.99f) a =  0.99f;
+        if (a < -0.99f) a = -0.99f;
+
+        // Input + scaled previous feedback
+        float x = buf[i] + d.phaser_feedback * kPhaserFeedback;
+        float y = x;
+        for (int s = 0; s < kPhaserStages; s++) {
+            float w_new = y - a * d.phaser_stage[s];
+            float out   = a * w_new + d.phaser_stage[s];
+            d.phaser_stage[s] = w_new;
+            y = out;
+        }
+        // Flush denormals to zero so the feedback loop can't accumulate tiny
+        // drifting values into Inf/NaN during long sweeps.
+        if (std::fabs(y) < 1e-20f) y = 0.0f;
+        d.phaser_feedback = y;
+        buf[i] = buf[i] * (1.0f - kPhaserWetMix) + y * kPhaserWetMix;
+    }
+}
+
+// ── Drop: ECHO ───────────────────────────────────────────────────────
+// Dub-style delay. Reads kEchoDelaySamples behind the write head with feedback,
+// mixes wet into the output while the dry passes through.
+static void drop_process_echo(TurntableDeck* deck, float* buf, int n, float /*sr*/) {
+    auto& d = deck->drop;
+    const int delay = kEchoDelaySamples;
+    for (int i = 0; i < n; i++) {
+        int read_idx = d.echo_write - delay;
+        if (read_idx < 0) read_idx += kEchoBufSize;
+        float echoed = d.echo_buffer[read_idx];
+        float dry = buf[i];
+        // Write dry + feedback into the delay line
+        d.echo_buffer[d.echo_write] = dry + echoed * kEchoFeedback;
+        d.echo_write = (d.echo_write + 1) % kEchoBufSize;
+        buf[i] = dry + echoed * kEchoWetMix;
+    }
+}
+
+// ── Drop: RING ───────────────────────────────────────────────────────
+// Ring modulation with a sine carrier that sweeps kRingMinHz↔kRingMaxHz.
+// Mix 35% dry + 65% modulated so the source remains recognisable.
+static void drop_process_ring(TurntableDeck* deck, float* buf, int n, float sr) {
+    auto& d = deck->drop;
+    for (int i = 0; i < n; i++) {
+        // Sweep carrier across [min, max] via triangle so the sweep reverses.
+        d.ring_sweep_phase += kRingSweepHz / sr;
+        if (d.ring_sweep_phase >= 1.0f) d.ring_sweep_phase -= 1.0f;
+        float tri = (d.ring_sweep_phase < 0.5f)
+            ? (d.ring_sweep_phase * 2.0f)
+            : (2.0f - d.ring_sweep_phase * 2.0f);
+        float carrier_hz = kRingMinHz + (kRingMaxHz - kRingMinHz) * tri;
+
+        d.ring_phase += kTwoPi * carrier_hz / sr;
+        if (d.ring_phase >= kTwoPi) d.ring_phase -= kTwoPi;
+
+        float mod = std::sin(d.ring_phase);
+        buf[i] = buf[i] * kRingDryMix + buf[i] * mod * kRingWetMix;
+    }
+}
+
+// Dispatch
+void drop_process(TurntableDeck* deck, float* buf, int n, float sr, float beat_phase) {
+    switch (deck->drop.kind) {
+        case DROP_NONE:    return;
+        case DROP_FILTER:  drop_process_filter(deck, buf, n, sr); break;
+        case DROP_BRAKE:   drop_process_brake(deck, buf, n, sr); break;
+        case DROP_STUTTER: drop_process_stutter(deck, buf, n, sr, beat_phase); break;
+        case DROP_FREEZE:  drop_process_freeze(deck, buf, n, sr); break;
+        case DROP_OCTAVE:  drop_process_octave(deck, buf, n, sr); break;
+        case DROP_PHASER:  drop_process_phaser(deck, buf, n, sr); break;
+        case DROP_ECHO:    drop_process_echo(deck, buf, n, sr); break;
+        case DROP_RING:    drop_process_ring(deck, buf, n, sr); break;
+        default:           return;
+    }
+    // Global output boost so drops cut through the mix. Applied after the
+    // per-kind processor so BRAKE's amplitude taper and STUTTER's gate scale
+    // proportionally rather than distorting the kind-specific dynamics.
+    for (int i = 0; i < n; i++) buf[i] *= kDropOutputGain;
+}
+
 void unit_process_turntable(GraphUnit* u, OrpheusEngine* engine,
                             int num_frames, float sample_rate) {
     // Load control atomics
@@ -311,6 +426,93 @@ void unit_process_turntable(GraphUnit* u, OrpheusEngine* engine,
     deck_b.frozen = frozen_b;
     deck_a.source = src_a;
     deck_b.source = src_b;
+
+    // Beat phase: advance per block at a tempo sourced from Pulsar (if playing)
+    // or the free-run fallback (if idle). Always produces a usable 0..1 value.
+    {
+        float phase = engine->beat_phase.load(std::memory_order_relaxed);
+        float hz;
+        if (engine->pulsar_playing.load(std::memory_order_relaxed) != 0) {
+            float bpm_override = engine->pulsar_bpm_override.load(std::memory_order_relaxed);
+            float bpm = (bpm_override > 0.0f)
+                ? bpm_override
+                : engine->clock_bpm.load(std::memory_order_relaxed);
+            if (bpm < 20.0f) bpm = 120.0f;
+            hz = bpm / 60.0f;  // beats per second
+        } else {
+            hz = kFreeRunBeatPhaseHz;
+        }
+        phase += static_cast<float>(num_frames) * hz / sample_rate;
+        if (phase >= 1.0f) phase -= std::floor(phase);
+        engine->beat_phase.store(phase, std::memory_order_relaxed);
+        engine->viz_rings[VIZ_BEAT_PHASE].write(phase);
+    }
+
+    // Detect NONE→X (and X→NONE and X→Y) drop kind transitions and seed
+    // kind-specific state before processing. Callers (port routing) set
+    // the target via `turntable_drop_a/b`; on change we reset ONLY the
+    // fields the incoming kind will read, keeping the audio-thread cost
+    // proportional to the kind (ECHO zeroes its 96 KB buffer, all others
+    // touch only a handful of floats). This avoids memsetting the full
+    // DropContext (~94 KB) on every transition.
+    int target_drop_a = engine->turntable_drop_a.load(std::memory_order_relaxed);
+    int target_drop_b = engine->turntable_drop_b.load(std::memory_order_relaxed);
+    auto maybe_transition = [](TurntableDeck& dk, int target) {
+        DropKind k = static_cast<DropKind>(target);
+        if (dk.drop.kind == k) return;
+        dk.drop.kind  = k;
+        dk.drop.phase = 0.0f;  // used by FILTER build-up and STUTTER ramp
+        switch (k) {
+            case DROP_NONE:
+                break;
+            case DROP_FILTER:
+                dk.drop.lfo_phase = 0.0f;
+                dk.drop.bq_s1 = dk.drop.bq_s2 = 0.0f;
+                dk.drop.b0 = dk.drop.b1 = dk.drop.b2 = 0.0f;
+                dk.drop.a1 = dk.drop.a2 = 0.0f;
+                break;
+            case DROP_BRAKE:
+                dk.drop.brake_read  = dk.read_pos;
+                dk.drop.brake_speed = 1.0f;
+                break;
+            case DROP_STUTTER:
+                dk.drop.stutter_div_idx       = 0;
+                dk.drop.stutter_smoothed_gate = 1.0f;
+                break;
+            case DROP_FREEZE: {
+                int start = dk.write_pos - kFreezeSliceSamples;
+                if (start < 0) start += kTurntableBufSize;
+                dk.drop.freeze_start = start;
+                dk.drop.freeze_len   = kFreezeSliceSamples;
+                dk.drop.freeze_read  = 0.0f;
+                dk.drop.freeze_lfo   = 0.0f;
+                break;
+            }
+            case DROP_OCTAVE:
+                // Sub cursor starts alongside the deck's read head.
+                dk.drop.octave_read = dk.read_pos;
+                break;
+            case DROP_PHASER:
+                for (int s = 0; s < kPhaserStages; s++) dk.drop.phaser_stage[s] = 0.0f;
+                dk.drop.phaser_lfo_phase = 0.0f;
+                dk.drop.phaser_feedback  = 0.0f;
+                break;
+            case DROP_ECHO:
+                // Flush the 24000-float delay buffer so a re-entry to ECHO doesn't
+                // replay a stale echo tail from a prior session. This is the one
+                // transition that incurs a large memset (~96 KB) by design.
+                std::memset(dk.drop.echo_buffer, 0, sizeof(dk.drop.echo_buffer));
+                dk.drop.echo_write = 0;
+                break;
+            case DROP_RING:
+                dk.drop.ring_phase       = 0.0f;
+                dk.drop.ring_sweep_phase = 0.0f;
+                break;
+            default: break;
+        }
+    };
+    maybe_transition(engine->turntable_decks[0], target_drop_a);
+    maybe_transition(engine->turntable_decks[1], target_drop_b);
 
     // Sum Pulsar stereo to mono for TT_SOURCE_SUM
     float pulsar_sum[kMaxFrames];
@@ -370,6 +572,10 @@ void unit_process_turntable(GraphUnit* u, OrpheusEngine* engine,
     float play_b[kMaxFrames];
     playback_deck(&deck_a, vel_a, play_a, num_frames, sample_rate);
     playback_deck(&deck_b, vel_b, play_b, num_frames, sample_rate);
+
+    float beat_phase_now = engine->beat_phase.load(std::memory_order_relaxed);
+    drop_process(&deck_a, play_a, num_frames, sample_rate, beat_phase_now);
+    drop_process(&deck_b, play_b, num_frames, sample_rate, beat_phase_now);
 
     float boost_a = turntable_source_gain(src_a);
     float boost_b = turntable_source_gain(src_b);

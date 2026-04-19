@@ -430,5 +430,5 @@ bool run_pulsar_signal_tests() {
     }
 
     printf("\n  Pulsar Signal Quality: %d passed, %d failed\n", pass, fail);
-    return fail == 0;
+    TEST_SUITE_RETURN(pass, fail);
 }

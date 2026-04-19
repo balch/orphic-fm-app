@@ -8,7 +8,6 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.datetime.Clock
 import org.balch.orpheus.core.audio.dsp.AudioEngine
 import org.balch.orpheus.core.audio.dsp.DspPlugin
 import org.balch.orpheus.core.plugin.PluginInfo
@@ -17,6 +16,7 @@ import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.plugins.resonator.ResonatorPlugin
 import kotlin.math.absoluteValue
 import kotlin.math.pow
+import kotlin.time.Clock
 
 /**
  * DSP Plugin for per-string pitch bending.

@@ -2,6 +2,7 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -66,8 +67,8 @@ class AppCommandTool(
 
     override val tool by lazy {
         object : Tool<AppCommand, AppCommandResult>(
-            argsSerializer = AppCommand.serializer(),
-            resultSerializer = AppCommandResult.serializer(),
+            argsType = typeToken<AppCommand>(),
+            resultType = typeToken<AppCommandResult>(),
             name = "app_control",
             description = """
         Tool to allow the user to control the app or query about app specific settings (ex: llm model).

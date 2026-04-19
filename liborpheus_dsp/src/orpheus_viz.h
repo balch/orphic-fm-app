@@ -59,5 +59,6 @@ enum VizChannel {
     VIZ_PULSAR_TRACK_5 = 34,
     VIZ_PULSAR_TRACK_6 = 35,
     VIZ_PULSAR_TRACK_7 = 36,
+    VIZ_BEAT_PHASE = 37,
     VIZ_CHANNEL_COUNT
 };

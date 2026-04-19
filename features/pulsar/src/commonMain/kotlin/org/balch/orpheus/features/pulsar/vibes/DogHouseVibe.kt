@@ -1,9 +1,9 @@
 package org.balch.orpheus.features.pulsar.vibes
 
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.ArpDirection
 import org.balch.orpheus.features.pulsar.ArpMode
 import org.balch.orpheus.features.pulsar.Arrangement
@@ -43,7 +43,7 @@ import org.balch.orpheus.features.pulsar.bandMatrix
 import org.balch.orpheus.features.pulsar.row
 
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class DogHouseVibe : VibeProvider {
     override val vibe = Vibe(
         name = "Dog House",

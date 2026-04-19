@@ -155,12 +155,13 @@ bool run_pulsar_lick_techniques_tests() {
     printf("║   Pulsar Lick Techniques Tests               ║\n");
     printf("╚══════════════════════════════════════════════╝\n");
 
-    bool all_pass = true;
-    all_pass &= test_lick_rhythm_produces_hits();
-    all_pass &= test_lick_melody_preserves_backbone();
-    all_pass &= test_lick_contour_produces_sweeps();
-    all_pass &= test_fill_builder_progressive();
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_lick_rhythm_produces_hits());
+    tally(test_lick_melody_preserves_backbone());
+    tally(test_lick_contour_produces_sweeps());
+    tally(test_fill_builder_progressive());
 
-    printf("\n  Lick techniques suite: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
-    return all_pass;
+    printf("\n  Lick techniques suite: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

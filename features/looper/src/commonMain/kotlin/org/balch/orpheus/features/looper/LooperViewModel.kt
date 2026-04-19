@@ -69,7 +69,7 @@ interface LooperFeature : SynthFeature<LooperUiState, LooperActions> {
 }
 
 @Inject
-@ClassKey(LooperViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class LooperViewModel(
     private val synth: SynthEngine,

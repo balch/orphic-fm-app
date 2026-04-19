@@ -934,16 +934,17 @@ static bool test_drum_bypass_toggle() {
 }
 
 bool run_drums_graph_tests() {
-    bool all_pass = true;
-    all_pass &= test_drum_trigger();
-    all_pass &= test_drum_isolation();
-    all_pass &= test_drum_one_shot();
-    all_pass &= test_graph_drum_voice();
-    all_pass &= test_graph_multi_source_sum();
-    all_pass &= test_graph_effects_bypass_parity();
-    all_pass &= test_warps_source_routing();
-    all_pass &= test_grids_drum_integration();
-    all_pass &= test_drum_slot_gains();
-    all_pass &= test_drum_bypass_toggle();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_drum_trigger());
+    tally(test_drum_isolation());
+    tally(test_drum_one_shot());
+    tally(test_graph_drum_voice());
+    tally(test_graph_multi_source_sum());
+    tally(test_graph_effects_bypass_parity());
+    tally(test_warps_source_routing());
+    tally(test_grids_drum_integration());
+    tally(test_drum_slot_gains());
+    tally(test_drum_bypass_toggle());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

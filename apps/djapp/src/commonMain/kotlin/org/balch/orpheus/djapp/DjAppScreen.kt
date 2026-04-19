@@ -119,6 +119,7 @@ fun DjAppScreen(
                                     vizFlowA = synthEngine.djVizFlowA,
                                     vizFlowB = synthEngine.djVizFlowB,
                                     outVizFlow = synthEngine.djOutVizFlow,
+                                    beatPhaseFlow = synthEngine.beatPhaseFlow,
                                     modifier = Modifier.fillMaxSize(),
                                     isExpanded = true,
                                     onExpandedChange = {},

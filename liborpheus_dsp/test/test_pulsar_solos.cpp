@@ -351,17 +351,18 @@ static bool test_drone_interval_preset() {
 
 bool run_pulsar_solos_tests() {
     printf("\n========== PULSAR SOLOS TESTS ==========\n");
-    bool all_pass = true;
-    all_pass &= test_default_solo_behavior_profiles();
-    all_pass &= test_default_ducking_profiles();
-    all_pass &= test_solo_modifier_application();
-    all_pass &= test_clear_solo_modifiers();
-    all_pass &= test_markov_note_generation();
-    all_pass &= test_markov_density_curve();
-    all_pass &= test_improvisers_handoff_biases_weights();
-    all_pass &= test_record_solo_note();
-    all_pass &= test_density_curve_shape();
-    all_pass &= test_drone_interval_preset();
-    printf("\nPulsar solos tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_default_solo_behavior_profiles());
+    tally(test_default_ducking_profiles());
+    tally(test_solo_modifier_application());
+    tally(test_clear_solo_modifiers());
+    tally(test_markov_note_generation());
+    tally(test_markov_density_curve());
+    tally(test_improvisers_handoff_biases_weights());
+    tally(test_record_solo_note());
+    tally(test_density_curve_shape());
+    tally(test_drone_interval_preset());
+    printf("\nPulsar solos tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

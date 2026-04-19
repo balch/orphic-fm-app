@@ -104,6 +104,7 @@ class DspSynthEngine(
     override val djVizFlowA: StateFlow<FloatArray> get() = monitor.djVizFlowA
     override val djVizFlowB: StateFlow<FloatArray> get() = monitor.djVizFlowB
     override val djOutVizFlow: StateFlow<FloatArray> get() = monitor.djOutVizFlow
+    override val beatPhaseFlow: StateFlow<Float> get() = monitor.beatPhaseFlow
     override val masterOutVizFlow: StateFlow<FloatArray> get() = monitor.masterOutVizFlow
     override val hornInVizFlow: StateFlow<FloatArray> get() = monitor.hornInVizFlow
     override val hornOutVizFlow: StateFlow<FloatArray> get() = monitor.hornOutVizFlow

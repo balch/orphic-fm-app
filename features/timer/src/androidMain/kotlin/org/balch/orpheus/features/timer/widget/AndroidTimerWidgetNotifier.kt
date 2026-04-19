@@ -8,6 +8,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.features.timer.TimerWidgetNotifier
+import kotlin.time.Duration
 
 /**
  * Sends a broadcast to [TimerWidgetProvider] on each timer state transition,
@@ -20,10 +21,10 @@ class AndroidTimerWidgetNotifier(
     private val context: Context,
 ) : TimerWidgetNotifier {
 
-    override fun notifyStateChanged(remainingSeconds: Long, running: Boolean, statusText: String) {
+    override fun notifyStateChanged(remainingTime: Duration, running: Boolean, statusText: String) {
         val intent = Intent(context, TimerWidgetProvider::class.java).apply {
             action = TimerWidgetProvider.ACTION_STATE_UPDATE
-            putExtra(TimerWidgetProvider.EXTRA_REMAINING_SECONDS, remainingSeconds)
+            putExtra(TimerWidgetProvider.EXTRA_REMAINING_SECONDS, remainingTime.inWholeSeconds)
             putExtra(TimerWidgetProvider.EXTRA_RUNNING, running)
             putExtra(TimerWidgetProvider.EXTRA_STATUS, statusText)
         }

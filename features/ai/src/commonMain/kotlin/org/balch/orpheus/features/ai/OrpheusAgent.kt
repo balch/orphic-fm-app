@@ -10,7 +10,7 @@ import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.google.GoogleLLMClient
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
-import ai.koog.prompt.executor.llms.SingleLLMPromptExecutor
+import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -329,7 +329,7 @@ class OrpheusAgent(
             AiProvider.OpenAI -> OpenAILLMClient(apiKey)
             else -> throw IllegalStateException("Unsupported AI provider: $aiProvider")
         }
-        val executor = SingleLLMPromptExecutor(llmClient)
+        val executor = MultiLLMPromptExecutor(llmClient)
 
         val agentConfig = AIAgentConfig(
             prompt = prompt("OrpheusAgent") {

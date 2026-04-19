@@ -2,6 +2,7 @@
 #include "orpheus_units.h"
 #include "orpheus_engine.h"
 #include "orpheus_turntable.h"
+#include <cstdlib>
 #include <cstring>
 #include <cmath>
 #include <algorithm>
@@ -298,6 +299,12 @@ static void orpheus_graph_sort(OrpheusGraph* graph) {
 
 // -- Dump execution order for debugging ----
 void orpheus_graph_dump_exec_order(OrpheusGraph* graph) {
+    // Silent by default. Set ORPHEUS_DUMP_GRAPH=1 to enable diagnostic output.
+    // Only the exact string "1" is accepted; "true", "yes", "on", "10", etc.
+    // are ignored so the flag state is unambiguous.
+    const char* v = std::getenv("ORPHEUS_DUMP_GRAPH");
+    if (!v || v[0] != '1' || v[1] != '\0') return;
+
     static const char* type_names[] = {
         "TRI_OSC", "SQ_OSC", "MULTIPLY", "ADD", "MUL_ADD",
         "ENV", "LIN_RAMP", "PASS", "PEAK_FOLLOW", "HARD_CLIP",

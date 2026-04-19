@@ -10,12 +10,12 @@ package org.balch.orpheus.features.evo.strategy
  * DEPTH (Knob 2): Controls modulation amplitude (how much parameters change)
  */
 import com.diamondedge.logging.logging
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
@@ -27,7 +27,7 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 @Inject
-@ContributesIntoSet(AppScope::class)
+@ContributesIntoSet(FeatureScope::class)
 class BreatheStrategy(
     private val synthController: SynthController
 ) : AudioEvolutionStrategy {

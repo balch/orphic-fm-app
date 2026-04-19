@@ -105,7 +105,7 @@ interface DistortionFeature : SynthFeature<DistortionUiState, DistortionPanelAct
  * Keeps SynthEngine dependency for peakFlow monitoring and StereoMode (non-port state).
  */
 @Inject
-@ClassKey(DistortionViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DistortionViewModel(
     private val engine: SynthEngine,

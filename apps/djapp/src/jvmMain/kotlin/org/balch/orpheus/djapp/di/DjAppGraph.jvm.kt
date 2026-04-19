@@ -10,6 +10,15 @@ import org.balch.orpheus.core.tempo.GlobalTempo
 /**
  * JVM implementation of DjAppGraph.
  * Actual @DependencyGraph defined here so Metro can see jvmMain modules.
+ *
+ * Known benign warning at build time:
+ *   [Metro/SuspiciousUnusedMultibinding] Set<FeaturePanel> has N source bindings
+ *   but no consumer at AppScope.
+ * The Set is consumed by HeaderViewModel inside the child ViewModelGraph
+ * (FeatureScope); Metro 1.0.0-RC2's analyzer aggregates at AppScope and
+ * doesn't trace into the child graph's consumers. Behavior is correct —
+ * `@Suppress` can't silence this particular diagnostic (it's emitted via
+ * the K2 compiler's diagnosticReporter, not a standard Kotlin warning).
  */
 @DependencyGraph(AppScope::class)
 actual interface DjAppGraph : ViewModelGraph {

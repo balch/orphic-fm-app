@@ -245,14 +245,15 @@ static bool test_section_macro_interpolation() {
 
 bool run_pulsar_sections_tests() {
     printf("\n========== PULSAR SECTIONS TESTS ==========\n");
-    bool all_pass = true;
-    all_pass &= test_section_init();
-    all_pass &= test_section_init_with_intro();
-    all_pass &= test_section_advance_countdown();
-    all_pass &= test_section_transitions_eventually();
-    all_pass &= test_section_recency_prevents_immediate_repeat();
-    all_pass &= test_section_transition_ramp();
-    all_pass &= test_section_macro_interpolation();
-    printf("\nPulsar sections tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_section_init());
+    tally(test_section_init_with_intro());
+    tally(test_section_advance_countdown());
+    tally(test_section_transitions_eventually());
+    tally(test_section_recency_prevents_immediate_repeat());
+    tally(test_section_transition_ramp());
+    tally(test_section_macro_interpolation());
+    printf("\nPulsar sections tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

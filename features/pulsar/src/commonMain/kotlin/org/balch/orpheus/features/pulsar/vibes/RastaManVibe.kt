@@ -1,9 +1,9 @@
 package org.balch.orpheus.features.pulsar.vibes
 
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
@@ -45,6 +45,9 @@ import org.balch.orpheus.features.pulsar.row
 /**
  * Rasta Man — roots reggae at 78 BPM in A minor.
  *
+ * "Never send to know for whom the bell tolls; it tolls for thee (this time),"
+ *    written by John Donne in 1624
+ *
  * The classic arrangement: one-drop drums (sparse kick, backbeat snare,
  * steady hats), a big round dub bass locked to root, guitar skank on
  * beats 2+4, organ bubble filling the gaps with syncopated 16ths, and
@@ -54,10 +57,10 @@ import org.balch.orpheus.features.pulsar.row
  * classic reggae dub treatment for breakdowns.
  */
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<VibeProvider>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class RastaManVibe : VibeProvider {
     override val vibe = Vibe(
-        name = "Rasta Man",
+        name = "Bell Tolls",
         bpm = 78f,  // classic roots reggae tempo
         envelopeType = EnvelopeType.BLEND,
         rootNote = RootNote.A,

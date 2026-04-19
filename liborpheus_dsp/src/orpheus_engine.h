@@ -622,6 +622,9 @@ struct OrpheusEngine {
     std::atomic<float> turntable_crossfader{0.5f};
     std::atomic<float> turntable_delay_send{0.0f};
     std::atomic<float> turntable_reverb_send{0.0f};
+    std::atomic<int>   turntable_drop_a{DROP_NONE};
+    std::atomic<int>   turntable_drop_b{DROP_NONE};
+    std::atomic<float> beat_phase{0.0f};  // 0..1 from Pulsar or free-run fallback
     float turntable_smooth_wet_a = 0.0f;
     float turntable_smooth_wet_b = 0.0f;
 

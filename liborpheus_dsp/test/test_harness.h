@@ -12,6 +12,27 @@
 #include <chrono>
 #include <sys/stat.h>
 
+// ── Per-suite test counting (populated by TEST_SUITE_RETURN) ────────
+// test_main.cpp resets these to 0 before each suite is invoked. Migrated
+// suites overwrite them via TEST_SUITE_RETURN, so the summary shows real
+// X/Y counts. Unmigrated suites leave the globals at 0/0 and the summary
+// prints "-" for their counts column — signalling "count not exposed"
+// rather than "zero assertions ran" (which would be misleading, since
+// unmigrated suites typically run dozens of internal checks). Migration
+// is one line per suite: replace `return fail == 0;` with
+// `TEST_SUITE_RETURN(pass, fail);`.
+extern int g_suite_passes;
+extern int g_suite_fails;
+
+// do-while(0) makes the macro a single statement so it can be used inside
+// an unbraced `if`/`else`. The inner `return` ends function expansion before
+// the loop condition is evaluated, so the while(0) is harmless.
+#define TEST_SUITE_RETURN(passes_var, fails_var) do { \
+    ::g_suite_passes = (passes_var);                  \
+    ::g_suite_fails  = (fails_var);                   \
+    return (fails_var) == 0;                          \
+} while (0)
+
 // ── WAV I/O ─────────────────────────────────────────────────────────
 
 inline void write_wav(const char* path, const float* data, int num_frames, int sample_rate) {

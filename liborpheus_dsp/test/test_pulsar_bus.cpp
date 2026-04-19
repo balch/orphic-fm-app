@@ -50,11 +50,12 @@ static bool test_all_engines_have_valid_bus() {
 
 bool run_pulsar_bus_tests() {
     printf("\n========== PULSAR BUS TESTS ==========\n");
-    bool all_pass = true;
-    all_pass &= test_drum_engines_classified_as_drums();
-    all_pass &= test_bass_engines_classified_as_bass();
-    all_pass &= test_melodic_engines_classified_as_keys();
-    all_pass &= test_all_engines_have_valid_bus();
-    printf("\nPulsar bus tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_drum_engines_classified_as_drums());
+    tally(test_bass_engines_classified_as_bass());
+    tally(test_melodic_engines_classified_as_keys());
+    tally(test_all_engines_have_valid_bus());
+    printf("\nPulsar bus tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

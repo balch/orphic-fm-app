@@ -144,7 +144,7 @@ fun CompactStringPanel(
             val coroutineScope = rememberCoroutineScope()
             
             // PERSISTENT STRING POSITIONS
-            val stringCentersState = rememberSaveable(key = "string_centers", saver = Saver(
+            val stringCentersState = rememberSaveable(saver = Saver(
                 save = { it.value },
                 restore = { mutableStateOf(it) }
             )) {

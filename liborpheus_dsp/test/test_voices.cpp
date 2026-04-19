@@ -507,17 +507,18 @@ static bool test_swarm_particle_knob_remapping() {
 }
 
 bool run_voice_tests() {
-    bool all_pass = true;
-    all_pass &= test_single_voice_engine0();
-    all_pass &= test_single_voice_plaits_engines();
-    all_pass &= test_polyphonic_voices();
-    all_pass &= test_polyphonic_plaits_voices();
-    all_pass &= test_voice_gate_retrigger();
-    all_pass &= test_voice_hold_without_gate();
-    all_pass &= test_voice_activation_lifecycle();
-    all_pass &= test_engine_switch_while_playing();
-    all_pass &= test_idle_detection_recovery();
-    all_pass &= test_engine0_harmonics_morph();
-    all_pass &= test_swarm_particle_knob_remapping();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_single_voice_engine0());
+    tally(test_single_voice_plaits_engines());
+    tally(test_polyphonic_voices());
+    tally(test_polyphonic_plaits_voices());
+    tally(test_voice_gate_retrigger());
+    tally(test_voice_hold_without_gate());
+    tally(test_voice_activation_lifecycle());
+    tally(test_engine_switch_while_playing());
+    tally(test_idle_detection_recovery());
+    tally(test_engine0_harmonics_morph());
+    tally(test_swarm_particle_knob_remapping());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

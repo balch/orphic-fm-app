@@ -437,5 +437,5 @@ bool run_pulsar_texture_tests() {
 
     // ── Summary ──
     printf("\n  Pulsar Texture: %d passed, %d failed\n", pass, fail);
-    return fail == 0;
+    TEST_SUITE_RETURN(pass, fail);
 }

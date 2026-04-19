@@ -135,9 +135,10 @@ static bool test_mod_source_routing() {
 }
 
 bool run_engine_render_tests() {
-    bool all_pass = true;
-    all_pass &= test_full_engine_render();
-    all_pass &= test_polyphonic_engine_render();
-    all_pass &= test_mod_source_routing();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_full_engine_render());
+    tally(test_polyphonic_engine_render());
+    tally(test_mod_source_routing());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

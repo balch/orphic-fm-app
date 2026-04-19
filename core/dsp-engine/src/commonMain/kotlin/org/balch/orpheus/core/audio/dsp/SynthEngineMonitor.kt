@@ -92,6 +92,8 @@ class SynthEngineMonitor(
     val djVizFlowB: StateFlow<FloatArray> = _djVizFlowB.asStateFlow()
     private val _djOutVizFlow = MutableStateFlow(FloatArray(0))
     val djOutVizFlow: StateFlow<FloatArray> = _djOutVizFlow.asStateFlow()
+    private val _beatPhaseFlow = MutableStateFlow(0f)
+    val beatPhaseFlow: StateFlow<Float> = _beatPhaseFlow.asStateFlow()
     private val _masterOutVizFlow = MutableStateFlow(FloatArray(0))
     val masterOutVizFlow: StateFlow<FloatArray> = _masterOutVizFlow.asStateFlow()
     private val _hornInVizFlow = MutableStateFlow(FloatArray(0))
@@ -258,6 +260,13 @@ class SynthEngineMonitor(
                 pollTurntableViz(0, ttBuf, _djVizFlowA)
                 pollTurntableViz(1, ttBuf, _djVizFlowB)
                 pollVizChannel(VIZ_DJ_OUT, readPositions, vizBuf, _djOutVizFlow)
+                // Poll latest beat_phase for zone-strip pulse animation
+                vizReadPosBuf[0] = readPositions[VIZ_BEAT_PHASE]
+                val beatCount = nativeBridge.nativeGetViz(VIZ_BEAT_PHASE, vizBuf, vizReadPosBuf)
+                readPositions[VIZ_BEAT_PHASE] = vizReadPosBuf[0]
+                if (beatCount > 0) {
+                    _beatPhaseFlow.value = vizBuf[beatCount - 1].coerceIn(0f, 1f)
+                }
                 delay(VIZ_POLL_INTERVAL_MS)
             }
         }
@@ -388,7 +397,8 @@ class SynthEngineMonitor(
         private const val VIZ_TIDES_CH2 = 27
         private const val VIZ_TIDES_CH3 = 28
         private const val VIZ_PULSAR_TRACK_0 = 29
-        private const val VIZ_CHANNEL_COUNT = 37  // 29 + 8 pulsar tracks
+        private const val VIZ_BEAT_PHASE = 37
+        private const val VIZ_CHANNEL_COUNT = 38  // 29 + 8 pulsar tracks + beat_phase
         private const val TURNTABLE_VIZ_SIZE = 129  // 128 waveform + 1 playhead
     }
 }

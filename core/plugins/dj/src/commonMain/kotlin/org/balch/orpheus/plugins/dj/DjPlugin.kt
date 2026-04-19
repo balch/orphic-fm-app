@@ -13,6 +13,7 @@ import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.Symbol
 import org.balch.orpheus.core.plugin.ports
 import org.balch.orpheus.core.plugin.symbols.DJ_URI
+import org.balch.orpheus.core.plugin.symbols.DjDrop
 import org.balch.orpheus.core.plugin.symbols.DjSource
 import org.balch.orpheus.core.plugin.symbols.DjSymbol
 
@@ -44,6 +45,8 @@ class DjPlugin(
     private var _crossfader = 0.5f
     private var _delaySend = 0f
     private var _reverbSend = 0f
+    private var _dropA = DjDrop.NONE.id
+    private var _dropB = DjDrop.NONE.id
 
     private val portDefs = ports(startIndex = 2) {
         controlPort(DjSymbol.WET_A) {
@@ -130,6 +133,22 @@ class DjPlugin(
                 default = 0f
                 get { _reverbSend }
                 set { _reverbSend = it }
+            }
+        }
+        controlPort(DjSymbol.DROP_A) {
+            intType {
+                options = DjDrop.entries.map { it.label }
+                default = DjDrop.NONE.id
+                get { _dropA }
+                set { _dropA = it }
+            }
+        }
+        controlPort(DjSymbol.DROP_B) {
+            intType {
+                options = DjDrop.entries.map { it.label }
+                default = DjDrop.NONE.id
+                get { _dropB }
+                set { _dropB = it }
             }
         }
     }

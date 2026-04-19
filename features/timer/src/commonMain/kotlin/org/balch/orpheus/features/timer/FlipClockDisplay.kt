@@ -23,37 +23,55 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.balch.orpheus.ui.theme.OrpheusColors
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
- * HH:MM flip clock display using four [FlipDigit]s with a pulsing colon separator.
+ * Flip clock display using [FlipDigit]s. Normally renders HH:MM, but when
+ * [remainingTime] is below 60 it switches to a single 2-digit SS countdown
+ * (no colon) so the final minute reads as a clear seconds-only timer.
  *
- * When [isScrollable] is true and [onDurationChange] is provided, the hours and minutes digit
  * pairs respond to vertical drag gestures: drag up to increase, drag down to decrease.
  * Hours change by 60-minute steps; minutes change by 1-minute steps. Clamped to 0–260 minutes.
+ * (Scroll has no effect in the SS mode — users don't edit the final-60s display.)
  *
- * @param remainingSeconds Countdown value to display (converted to HH:MM internally).
+ * @param remainingTime Countdown value to display (converted to HH:MM or SS internally).
  * @param isRunning        Whether the timer is running — controls colon pulse animation.
- * @param isScrollable     Whether drag-to-scroll is active (typically when timer is idle).
  * @param digitHeight      Height of each FlipDigit card; width is derived at 0.7× height.
  * @param glowColor        Amber glow applied to all digit cards and the colon dots.
  * @param onDurationChange Callback fired with new duration in minutes when user scrolls.
- * @param currentDurationMinutes Current total duration, needed to compute delta on drag.
+ * @param initialTime Current total duration, needed to compute delta on drag.
  */
 @Composable
 fun FlipClockDisplay(
-    remainingSeconds: Long,
+    remainingTime: Duration,
     isRunning: Boolean,
-    isScrollable: Boolean,
     digitHeight: Dp = 108.dp,
     glowColor: Color = OrpheusColors.sleepMoonlight,
-    onDurationChange: ((Int) -> Unit)? = null,
-    currentDurationMinutes: Int = 0,
+    onDurationChange: ((Duration) -> Unit)? = null,
+    initialTime: Duration = 0.seconds,
     modifier: Modifier = Modifier,
 ) {
-    val totalMinutes = remainingSeconds / 60
+    val remainingSeconds = remainingTime.inWholeSeconds
+    // Final-minute mode: two big digits counting down 59 → 00, no colon, no scroll.
+    if (remainingSeconds in 0 until 60) {
+        SecondsCountdown(
+            seconds = remainingSeconds.toInt(),
+            digitHeight = digitHeight,
+            glowColor = glowColor,
+            animate = isRunning,
+            modifier = modifier,
+        )
+        return
+    }
+
+    val totalMinutes = remainingTime.inWholeMinutes
     val hours = (totalMinutes / 60).coerceIn(0, 99)
     val minutes = (totalMinutes % 60).coerceIn(0, 59)
 
@@ -86,7 +104,7 @@ fun FlipClockDisplay(
 
     // Use rememberUpdatedState so pointerInput gestures always read the latest
     // values without restarting (which would cancel in-progress drags).
-    val currentDuration by rememberUpdatedState(currentDurationMinutes)
+    val currentDuration by rememberUpdatedState(initialTime)
     val durationCallback by rememberUpdatedState(onDurationChange)
 
     // Drag accumulators for hours and minutes groups
@@ -103,7 +121,7 @@ fun FlipClockDisplay(
         if (steps != 0 && durationCallback != null) {
             // Positive delta = drag down = decrease; negative delta = drag up = increase
             val minutesDelta = -steps * stepMinutes
-            val newDuration = (currentDuration + minutesDelta).coerceIn(0, 260)
+            val newDuration = (currentDuration + minutesDelta.minutes).clampToTimerLimits()
             durationCallback?.invoke(newDuration)
             return newAccum - steps * dragThresholdPx
         }
@@ -116,8 +134,8 @@ fun FlipClockDisplay(
         horizontalArrangement = Arrangement.Center,
     ) {
         // Hours digit pair
-        val hoursPairModifier = if (isScrollable && durationCallback != null) {
-            Modifier.pointerInput(isScrollable) {
+        val hoursPairModifier = if (!isRunning && durationCallback != null) {
+            Modifier.pointerInput(!isRunning) {
                 detectVerticalDragGestures(
                     onDragEnd = { hourDragAccum = 0f },
                     onDragCancel = { hourDragAccum = 0f },
@@ -148,8 +166,8 @@ fun FlipClockDisplay(
         Spacer(modifier = Modifier.width(colonGap))
 
         // Minutes digit pair
-        val minutesPairModifier = if (isScrollable && durationCallback != null) {
-            Modifier.pointerInput(isScrollable) {
+        val minutesPairModifier = if (!isRunning && durationCallback != null) {
+            Modifier.pointerInput(!isRunning) {
                 detectVerticalDragGestures(
                     onDragEnd = { minuteDragAccum = 0f },
                     onDragCancel = { minuteDragAccum = 0f },
@@ -171,6 +189,47 @@ fun FlipClockDisplay(
         }
     }
 }
+
+/**
+ * Final-minute countdown: two big flip digits showing seconds (00–59). No colon,
+ * no scroll handles — this is pure display for the last 60s of the timer.
+ *
+ * Digit height is scaled up by [kSecondsScaleFactor] from [digitHeight] so the
+ * two digits dominate the space the way the 4-digit HH:MM layout did. The
+ * outer width is pinned to the 4-digit layout width so switching modes doesn't
+ * reflow the surrounding panel.
+ */
+@Composable
+private fun SecondsCountdown(
+    seconds: Int,
+    digitHeight: Dp,
+    glowColor: Color,
+    animate: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val clamped = seconds.coerceIn(0, 59)
+    val tens = clamped / 10
+    val ones = clamped % 10
+
+    // Scale up the seconds digits for "final countdown" prominence.
+    // The pair is centered in the 3.34h HH:MM envelope (see Row width below).
+    val bigDigitHeight = digitHeight * kSecondsScaleFactor
+    val digitGap = bigDigitHeight * 0.05f
+
+    Row(
+        // Match the 4-digit HH:MM layout width so mode-switching is layout-stable.
+        //   4 × (h × 0.7) + 2 × (h × 0.05) + 2 × (h × 0.14) + 2 × (h × 0.08) ≈ h × 3.34
+        modifier = modifier.width(digitHeight * 3.34f),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        FlipDigit(digit = tens, height = bigDigitHeight, glowColor = glowColor, animate = animate)
+        Spacer(modifier = Modifier.width(digitGap))
+        FlipDigit(digit = ones, height = bigDigitHeight, glowColor = glowColor, animate = animate)
+    }
+}
+
+private const val kSecondsScaleFactor = 1.2f
 
 /**
  * Two vertically-stacked round dots that form the colon separator between hours and minutes.
@@ -220,6 +279,72 @@ private fun ColonDots(
             color = glowColor,
             radius = dotR,
             center = Offset(centerX, bottomDotY),
+        )
+    }
+}
+
+// ── Previews ────────────────────────────────────────────────────────
+
+@Preview(name = "FlipClock — 1:23 Running", widthDp = 320, heightDp = 140)
+@Composable
+private fun FlipClockPreviewRunning() {
+    org.balch.orpheus.ui.theme.OrpheusTheme {
+        FlipClockDisplay(
+            remainingTime = 1.hours.plus(23.minutes).plus(17.seconds),
+            isRunning = true,
+            digitHeight = 72.dp,
+        )
+    }
+}
+
+@Preview(name = "FlipClock — 45s Final Minute", widthDp = 320, heightDp = 140)
+@Composable
+private fun FlipClockPreviewFinalMinute() {
+    org.balch.orpheus.ui.theme.OrpheusTheme {
+        FlipClockDisplay(
+            remainingTime = 45.seconds,
+            isRunning = true,
+            digitHeight = 72.dp,
+            glowColor = OrpheusColors.sleepEmber,
+        )
+    }
+}
+
+@Preview(name = "FlipClock — Idle 0:30", widthDp = 320, heightDp = 140)
+@Composable
+private fun FlipClockPreviewIdle() {
+    org.balch.orpheus.ui.theme.OrpheusTheme {
+        FlipClockDisplay(
+            remainingTime = 30.minutes,
+            isRunning = false,
+            digitHeight = 72.dp,
+            initialTime = 30.minutes,
+        )
+    }
+}
+
+@Preview(name = "FlipClock — Idle 0:00", widthDp = 320, heightDp = 140)
+@Composable
+private fun FlipClockPreviewIdleTime0() {
+    org.balch.orpheus.ui.theme.OrpheusTheme {
+        FlipClockDisplay(
+            remainingTime = 0.minutes,
+            isRunning = false,
+            digitHeight = 72.dp,
+            initialTime = 0.minutes,
+        )
+    }
+}
+
+@Preview(name = "FlipClock — Running 0:00", widthDp = 320, heightDp = 140)
+@Composable
+private fun FlipClockPreviewRunningTime0() {
+    org.balch.orpheus.ui.theme.OrpheusTheme {
+        FlipClockDisplay(
+            remainingTime = 0.minutes,
+            isRunning = true,
+            digitHeight = 72.dp,
+            initialTime = 0.minutes,
         )
     }
 }

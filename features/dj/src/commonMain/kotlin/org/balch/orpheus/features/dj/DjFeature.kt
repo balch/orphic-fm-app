@@ -16,16 +16,27 @@ interface DjFeature : SynthFeature<DjUiState, DjPanelActions> {
             override val markdown = """
         Dual-deck DJ turntable that captures live audio from synth, drums, bass,
         or master mix into circular buffers and plays them back with variable-speed
-        scratch control. Touch/drag the platters to scratch, use the crossfader to
-        blend between decks.
+        scratch control. While either platter is actively dragged, a four-zone Drop
+        strip appears. Dwell 120 ms on a zone to lock in that drop; the four visible
+        zones are drawn (weighted) from an 8-drop pool and reshuffle after every drag.
+
+        Drop pool:
+        - **FILTER** — resonant LPF sweep.
+        - **BRAKE** — vinyl-style slowdown to silence.
+        - **STUTTER** — beat-synced gate chops.
+        - **FREEZE** — looped slice on the capture buffer.
+        - **OCTAVE** — subharmonic bass layer.
+        - **PHASER** — swirly phase sweep.
+        - **ECHO** — dub-style delay with feedback.
+        - **RING** — ring-mod metallic color.
 
         ## Controls
-        - **WET A** (dj_wet_a): Deck A dry/wet (0=dry source, 1=turntable only). Default 0 (bypass).
-        - **WET B** (dj_wet_b): Deck B dry/wet (0=dry source, 1=turntable only). Default 0 (bypass).
-        - **SOURCE A/B** (dj_source_a/b): Capture source per deck — Synth, Drums, Bass, or Master.
-        - **CROSSFADER** (dj_crossfader): Blend between Deck A (left) and Deck B (right).
-        - **DELAY SEND** (dj_delay_send): Post-crossfader send to delay effect.
-        - **REVERB SEND** (dj_reverb_send): Post-crossfader send to reverb effect.
+        - **WET A/B**: Deck dry/wet (0=dry source, 1=turntable only).
+        - **SOURCE A/B**: Capture source per deck.
+        - **CROSSFADER**: Blend between decks.
+        - **DELAY/REVERB SEND**: Post-crossfader effect sends.
+        - **DROP A/B**: Per-deck active drop kind (int IDs: 0=none, 1=FILTER, 2=BRAKE,
+          3=STUTTER, 4=FREEZE, 5=OCTAVE, 6=PHASER, 7=ECHO, 8=RING).
             """.trimIndent()
 
             override val portControlKeys = mapOf(
@@ -36,6 +47,8 @@ interface DjFeature : SynthFeature<DjUiState, DjPanelActions> {
                 DjSymbol.CROSSFADER.controlId.key to "Crossfader (0=all A, 0.5=center, 1=all B)",
                 DjSymbol.DELAY_SEND.controlId.key to "Post-crossfader send to delay (0-1)",
                 DjSymbol.REVERB_SEND.controlId.key to "Post-crossfader send to reverb (0-1)",
+                DjSymbol.DROP_A.controlId.key to "Deck A active drop (0=none, 1=FILTER, 2=BRAKE, 3=STUTTER, 4=FREEZE, 5=OCTAVE, 6=PHASER, 7=ECHO, 8=RING)",
+                DjSymbol.DROP_B.controlId.key to "Deck B active drop (0=none, 1=FILTER, 2=BRAKE, 3=STUTTER, 4=FREEZE, 5=OCTAVE, 6=PHASER, 7=ECHO, 8=RING)",
             )
         }
     }

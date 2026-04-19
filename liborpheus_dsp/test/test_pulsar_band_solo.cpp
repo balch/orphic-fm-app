@@ -325,13 +325,14 @@ static bool test_personality_modifiers() {
 
 bool run_pulsar_band_solo_tests() {
     printf("\n========== PULSAR BAND SOLO TESTS ==========\n");
-    bool all_pass = true;
-    all_pass &= test_band_lead_selection();
-    all_pass &= test_always_active_not_ducked();
-    all_pass &= test_pull_in_mechanic();
-    all_pass &= test_pull_in_duration_and_dropout();
-    all_pass &= test_long_fill_no_handoff();
-    all_pass &= test_personality_modifiers();
-    printf("\nPulsar band solo tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_band_lead_selection());
+    tally(test_always_active_not_ducked());
+    tally(test_pull_in_mechanic());
+    tally(test_pull_in_duration_and_dropout());
+    tally(test_long_fill_no_handoff());
+    tally(test_personality_modifiers());
+    printf("\nPulsar band solo tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

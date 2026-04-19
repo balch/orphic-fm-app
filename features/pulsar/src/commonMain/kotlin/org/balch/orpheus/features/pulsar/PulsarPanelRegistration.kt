@@ -2,18 +2,18 @@ package org.balch.orpheus.features.pulsar
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<FeaturePanel>())
 class PulsarPanelRegistration(
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {

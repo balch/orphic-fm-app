@@ -107,7 +107,7 @@ sealed class LiveCodeIntent {
  * Delegates to TidalRepl for REPL evaluation lifecycle.
  */
 @Inject
-@ClassKey(LiveCodeViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class LiveCodeViewModel(
     private val scheduler: TidalScheduler,

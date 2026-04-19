@@ -89,7 +89,7 @@ private sealed class HeaderIntent {
  */
 @OptIn(FlowPreview::class)
 @Inject
-@ClassKey(HeaderViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class HeaderViewModel(
     panelExpansionEventBus: PanelExpansionEventBus,

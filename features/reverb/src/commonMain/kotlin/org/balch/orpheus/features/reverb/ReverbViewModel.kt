@@ -95,7 +95,7 @@ interface ReverbFeature : SynthFeature<ReverbUiState, ReverbPanelActions> {
 }
 
 @Inject
-@ClassKey(ReverbViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class ReverbViewModel(
     synthController: SynthController,

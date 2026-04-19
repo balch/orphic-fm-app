@@ -11,9 +11,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.SynthFeature
-import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.features.ai.AgentState
 import org.balch.orpheus.features.ai.OrpheusAgent
@@ -46,7 +46,7 @@ interface ChatFeature : SynthFeature<ChatUiState, ChatPanelActions> {
  * ViewModel for the AI chat panel.
  */
 @Inject
-@ClassKey(ChatViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class ChatViewModel(
     private val agent: OrpheusAgent,

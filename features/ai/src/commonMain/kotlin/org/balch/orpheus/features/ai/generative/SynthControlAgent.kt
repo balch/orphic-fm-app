@@ -4,13 +4,12 @@ import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.agent.config.AIAgentConfig
 import ai.koog.agents.core.dsl.builder.node
 import ai.koog.agents.core.dsl.builder.strategy
-import ai.koog.agents.core.dsl.extension.leaveLastNMessages
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
 import ai.koog.prompt.executor.clients.anthropic.AnthropicLLMClient
 import ai.koog.prompt.executor.clients.google.GoogleLLMClient
-import ai.koog.prompt.executor.llms.SingleLLMPromptExecutor
+import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import ai.koog.prompt.streaming.StreamFrame
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.Inject
@@ -475,7 +474,7 @@ class SynthControlAgent(
                     AiProvider.Anthropic -> AnthropicLLMClient(apiKey)
                     else -> throw IllegalStateException("Unsupported AI provider: $aiProvider")
                 }
-                val executor = SingleLLMPromptExecutor(llmClient)
+                val executor = MultiLLMPromptExecutor(llmClient)
                 // Tools are manually invoked, so registry can be empty or contain them for metadata (optional)
                 val toolRegistry = ToolRegistry {
                     tool(synthControlTool.tool)

@@ -141,7 +141,6 @@ fun ChatMessageBubble(
                                                 color = message.type.textColor().copy(alpha = 0.8f)
                                             )
                                         }
-                                        else -> {}
                                     }
                                 }
                             }

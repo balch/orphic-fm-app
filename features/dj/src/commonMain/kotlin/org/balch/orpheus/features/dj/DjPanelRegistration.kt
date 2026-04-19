@@ -3,19 +3,19 @@ package org.balch.orpheus.features.dj
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeaturePanel
 import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.featurePanelPreview
 import org.balch.orpheus.ui.theme.OrpheusColors
 
 @Inject
-@ContributesIntoSet(AppScope::class, binding = binding<FeaturePanel>())
+@ContributesIntoSet(FeatureScope::class, binding = binding<FeaturePanel>())
 class DjPanelRegistration(
     private val synthEngine: SynthEngine,
 ) : FeaturePanel {
@@ -42,6 +42,7 @@ class DjPanelRegistration(
             vizFlowA = synthEngine.djVizFlowA,
             vizFlowB = synthEngine.djVizFlowB,
             outVizFlow = synthEngine.djOutVizFlow,
+            beatPhaseFlow = synthEngine.beatPhaseFlow,
             modifier = modifier,
             isExpanded = isExpanded,
             onExpandedChange = onExpandedChange,
@@ -59,6 +60,7 @@ class DjPanelRegistration(
                 vizFlowA = MutableStateFlow(FloatArray(0)),
                 vizFlowB = MutableStateFlow(FloatArray(0)),
                 outVizFlow = MutableStateFlow(FloatArray(0)),
+                beatPhaseFlow = MutableStateFlow(0f),
                 modifier = modifier,
                 isExpanded = isExpanded,
                 onExpandedChange = onExpandedChange,

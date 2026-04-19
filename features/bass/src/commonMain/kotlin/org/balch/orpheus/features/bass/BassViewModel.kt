@@ -155,7 +155,7 @@ interface BassFeature : SynthFeature<BassUiState, BassPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ClassKey(BassViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class BassViewModel(
     synthController: SynthController,

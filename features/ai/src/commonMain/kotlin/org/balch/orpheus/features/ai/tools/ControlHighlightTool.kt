@@ -2,6 +2,7 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -46,8 +47,8 @@ class ControlHighlightTool(
 
     override val tool by lazy {
         object : Tool<ControlHighlightArgs, ControlHighlightResult>(
-            argsSerializer = ControlHighlightArgs.serializer(),
-            resultSerializer = ControlHighlightResult.serializer(),
+            argsType = typeToken<ControlHighlightArgs>(),
+            resultType = typeToken<ControlHighlightResult>(),
             name = "control_highlight",
             description = """
         Highlight specific controls in the UI with a pulsing gold glow.

@@ -168,7 +168,7 @@ class DattorroReverb(sampleRate: Float = 44100f) {
     }
 
     /** Single allpass section: read tail, feedforward/feedback, write head. */
-    private inline fun allpass(base: Int, len: Int, input: Float, coeff: Float): Float {
+    private fun allpass(base: Int, len: Int, input: Float, coeff: Float): Float {
         val tail = readBuffer(base + len - 1)
         val v = input + tail * coeff
         writeBuffer(base, v)

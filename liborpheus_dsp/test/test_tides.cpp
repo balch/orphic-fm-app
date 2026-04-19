@@ -562,16 +562,17 @@ static bool test_tides_rate_knob_production_graph() {
 // ── Test runner ─────────────────────────────────────────────────────────────
 bool run_tides_tests() {
     printf("\n========== TIDES2 TESTS ==========\n");
-    bool all_pass = true;
-    all_pass &= test_tides_init();
-    all_pass &= test_tides_bypass();
-    all_pass &= test_tides_tight_output_bounds();
-    all_pass &= test_tides_modulation_impact();
-    all_pass &= test_bass_tides_routing_requires_selection();
-    all_pass &= test_tides_amplitude_mode_with_shift();
-    all_pass &= test_tides_dc_offset_on_pitch_channel();
-    all_pass &= test_tides_rate_knob_unit();
-    all_pass &= test_tides_rate_knob_production_graph();
-    printf("\nTides2 tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_tides_init());
+    tally(test_tides_bypass());
+    tally(test_tides_tight_output_bounds());
+    tally(test_tides_modulation_impact());
+    tally(test_bass_tides_routing_requires_selection());
+    tally(test_tides_amplitude_mode_with_shift());
+    tally(test_tides_dc_offset_on_pitch_channel());
+    tally(test_tides_rate_knob_unit());
+    tally(test_tides_rate_knob_production_graph());
+    printf("\nTides2 tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

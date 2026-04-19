@@ -128,7 +128,7 @@ interface AiOptionsFeature : SynthFeature<AiOptionsUiState, AiOptionsPanelAction
  * - Chat: Open chat dialog
  */
 @Inject
-@ClassKey(AiOptionsViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class AiOptionsViewModel(
     private val agent: OrpheusAgent,

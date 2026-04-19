@@ -697,18 +697,19 @@ static bool test_bass_vcf_click_detection() {
 }
 
 bool run_bass_voice_tests() {
-    bool all_pass = true;
-    all_pass &= test_overdrive_passthrough();
-    all_pass &= test_overdrive_distorts();
-    all_pass &= test_compressor_passthrough();
-    all_pass &= test_compressor_reduces_dynamics();
-    all_pass &= test_bass_voice_produces_audio();
-    all_pass &= test_bass_voice_silent_when_bypassed();
-    all_pass &= test_bass_voice_full_graph();
-    all_pass &= test_bass_writes_to_warps_source_buffer();
-    all_pass &= test_bass_fx_send_mixes_into_clouds();
-    all_pass &= test_bass_flux_t_gating();
-    all_pass &= test_bass_slide_portamento();
-    all_pass &= test_bass_vcf_click_detection();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_overdrive_passthrough());
+    tally(test_overdrive_distorts());
+    tally(test_compressor_passthrough());
+    tally(test_compressor_reduces_dynamics());
+    tally(test_bass_voice_produces_audio());
+    tally(test_bass_voice_silent_when_bypassed());
+    tally(test_bass_voice_full_graph());
+    tally(test_bass_writes_to_warps_source_buffer());
+    tally(test_bass_fx_send_mixes_into_clouds());
+    tally(test_bass_flux_t_gating());
+    tally(test_bass_slide_portamento());
+    tally(test_bass_vcf_click_detection());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

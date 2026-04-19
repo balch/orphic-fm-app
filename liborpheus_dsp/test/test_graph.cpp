@@ -711,14 +711,15 @@ static bool test_engine0_release_timing() {
 }
 
 bool run_graph_tests() {
-    bool all_pass = true;
-    all_pass &= test_graph_single_voice();
-    all_pass &= test_graph_polyphonic();
-    all_pass &= test_graph_effects_chain();
-    all_pass &= test_voice_mix_cv_defaults();
-    all_pass &= test_per_voice_signal_parity();
-    all_pass &= test_bender_voice_volume_parity();
-    all_pass &= test_plaits_envspeed_varies_output();
-    all_pass &= test_engine0_release_timing();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_graph_single_voice());
+    tally(test_graph_polyphonic());
+    tally(test_graph_effects_chain());
+    tally(test_voice_mix_cv_defaults());
+    tally(test_per_voice_signal_parity());
+    tally(test_bender_voice_volume_parity());
+    tally(test_plaits_envspeed_varies_output());
+    tally(test_engine0_release_timing());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

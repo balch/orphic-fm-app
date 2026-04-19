@@ -132,7 +132,7 @@ interface ResonatorFeature : SynthFeature<ResonatorUiState, ResonatorPanelAction
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ClassKey(ResonatorViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class ResonatorViewModel(
     synthController: SynthController,

@@ -141,7 +141,7 @@ interface TidesFeature : SynthFeature<TidesUiState, TidesPanelActions> {
  * clock/gate routing.
  */
 @Inject
-@ClassKey(TidesViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class TidesViewModel(
     synthController: SynthController,

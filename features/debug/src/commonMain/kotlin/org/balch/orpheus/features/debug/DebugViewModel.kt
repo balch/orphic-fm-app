@@ -1,7 +1,6 @@
 package org.balch.orpheus.features.debug
 
 import androidx.compose.runtime.Composable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -10,9 +9,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.audio.SynthEngine
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.util.ConsoleLogger
 import org.balch.orpheus.util.LogEntry
@@ -46,7 +46,7 @@ interface DebugFeature : SynthFeature<DebugUiState, DebugPanelActions> {
  * Combines engine monitoring flows with console logs into a unified UI state.
  */
 @Inject
-@ClassKey(DebugViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DebugViewModel(
     private val engine: SynthEngine,

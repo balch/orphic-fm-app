@@ -378,11 +378,12 @@ static bool test_quad_hold() {
 }
 
 bool run_headroom_tests() {
-    bool all_pass = true;
-    all_pass &= test_engine_level_parity();
-    all_pass &= test_fullchain_headroom();
-    all_pass &= test_master_volume_linearity();
-    all_pass &= test_quad_volume();
-    all_pass &= test_quad_hold();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_engine_level_parity());
+    tally(test_fullchain_headroom());
+    tally(test_master_volume_linearity());
+    tally(test_quad_volume());
+    tally(test_quad_hold());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

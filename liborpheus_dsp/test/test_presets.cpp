@@ -135,10 +135,11 @@ bool run_preset_tests() {
     printf("  PRESET RENDERING TESTS\n");
     printf("══════════════════════════════════════\n");
 
-    bool all_pass = true;
-    all_pass &= test_preset_warps("pink", preset_pink_ports, preset_pink_bpm);
-    all_pass &= test_preset_warps("clean", preset_clean_ports, preset_clean_bpm);
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_preset_warps("pink", preset_pink_ports, preset_pink_bpm));
+    tally(test_preset_warps("clean", preset_clean_ports, preset_clean_bpm));
 
-    printf("\nPreset tests: %s\n", all_pass ? "ALL PASS" : "SOME FAILED");
-    return all_pass;
+    printf("\nPreset tests: %s\n", suite_fail == 0 ? "ALL PASS" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

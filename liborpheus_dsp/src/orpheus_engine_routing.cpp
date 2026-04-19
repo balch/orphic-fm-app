@@ -578,6 +578,10 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->turntable_delay_send.store(value, std::memory_order_relaxed);
         } else if (std::strcmp(symbol, "reverb_send") == 0) {
             engine->turntable_reverb_send.store(value, std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "drop_a") == 0) {
+            engine->turntable_drop_a.store(static_cast<int>(value), std::memory_order_relaxed);
+        } else if (std::strcmp(symbol, "drop_b") == 0) {
+            engine->turntable_drop_b.store(static_cast<int>(value), std::memory_order_relaxed);
         }
     }
     else if (std::strcmp(plugin_uri, "org.balch.orpheus.plugins.app") == 0) {

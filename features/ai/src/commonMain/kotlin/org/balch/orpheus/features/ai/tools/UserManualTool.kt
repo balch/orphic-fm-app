@@ -2,6 +2,7 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -46,8 +47,8 @@ class UserManualTool(
 
     override val tool by lazy {
         object : Tool<UserManualArgs, UserManualResult>(
-            argsSerializer = UserManualArgs.serializer(),
-            resultSerializer = UserManualResult.serializer(),
+            argsType = typeToken<UserManualArgs>(),
+            resultType = typeToken<UserManualResult>(),
             name = "user_manual",
             description = """
         Look up documentation for synthesizer features and controls.

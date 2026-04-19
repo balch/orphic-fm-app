@@ -181,7 +181,7 @@ interface FluxFeature : SynthFeature<FluxUiState, FluxPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ClassKey(FluxViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class FluxViewModel(
     synthController: SynthController,

@@ -370,5 +370,5 @@ bool run_bar_strategy_tests() {
     }
 
     printf("\n  Bar Strategy: %d passed, %d failed\n", pass, fail);
-    return fail == 0;
+    TEST_SUITE_RETURN(pass, fail);
 }

@@ -64,7 +64,7 @@ interface VizFeature : SynthFeature<VizUiState, VizPanelActions> {
  * Injects all available Visualization implementations.
  */
 @Inject
-@ClassKey(VizViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class VizViewModel(
     visualizations: Set<Visualization>,

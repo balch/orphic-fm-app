@@ -826,14 +826,15 @@ bool run_warps_tests() {
     printf("  WARPS SIGNAL PATH ANALYSIS\n");
     printf("══════════════════════════════════════\n");
 
-    bool all_pass = true;
-    all_pass &= test_warps_source_levels();
-    all_pass &= test_warps_algorithms();
-    all_pass &= test_warps_mix();
-    all_pass &= test_warps_synth_drums();
-    all_pass &= test_warps_clean_patch();
-    all_pass &= test_warps_callback_boundaries();
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_warps_source_levels());
+    tally(test_warps_algorithms());
+    tally(test_warps_mix());
+    tally(test_warps_synth_drums());
+    tally(test_warps_clean_patch());
+    tally(test_warps_callback_boundaries());
 
-    printf("\nWarps tests: %s\n", all_pass ? "ALL PASS" : "SOME FAILED");
-    return all_pass;
+    printf("\nWarps tests: %s\n", suite_fail == 0 ? "ALL PASS" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

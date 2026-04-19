@@ -130,7 +130,7 @@ interface GrainsFeature : SynthFeature<GrainsUiState, GrainsPanelActions> {
  * Uses MVI pattern with SynthController.controlFlow() for all engine interactions.
  */
 @Inject
-@ClassKey(GrainsViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class GrainsViewModel(
     synthController: SynthController,

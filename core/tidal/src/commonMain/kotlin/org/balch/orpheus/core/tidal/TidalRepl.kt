@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import kotlin.time.Clock
 
 /**
  * Console entry for REPL output.

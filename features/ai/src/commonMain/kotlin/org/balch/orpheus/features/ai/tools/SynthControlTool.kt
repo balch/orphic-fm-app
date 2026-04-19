@@ -2,17 +2,18 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
-import org.balch.orpheus.core.di.FeatureScope
+import ai.koog.serialization.typeToken
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.balch.orpheus.core.ai.ToolProvider
-import org.balch.orpheus.core.features.SynthFeature
-import org.balch.orpheus.core.features.FeatureCollection
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCollection
+import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue
 
@@ -60,8 +61,8 @@ class SynthControlTool(
 ) : ToolProvider {
     override val tool by lazy {
         object : Tool<SynthControlArgs, SynthControlResult>(
-            argsSerializer = SynthControlArgs.serializer(),
-            resultSerializer = SynthControlResult.serializer(),
+            argsType = typeToken<SynthControlArgs>(),
+            resultType = typeToken<SynthControlResult>(),
             name = "synth_control",
             description = buildToolDescription(featureCollection.allFeatures)
         ) {

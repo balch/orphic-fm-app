@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import io.github.fletchmckee.liquid.LiquidState
 import org.balch.orpheus.ui.theme.OrpheusColors
 import org.balch.orpheus.ui.widgets.dialogs.DraggableDialog
+import kotlin.time.Duration.Companion.seconds
 
 // Compact threshold mirrors SynthScreen.determineLayoutMode
 private fun isCompact(widthDp: Float, heightDp: Float) = widthDp < 600f || heightDp < 400f
@@ -93,8 +94,8 @@ private fun TimerDraggableDialog(
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
 
-    val glowColor = resolveGlowColor(state.status, state.remainingSeconds)
-    val totalSeconds = state.durationMinutes * 60L
+    val glowColor = resolveGlowColor(state.status, state.remainingTime)
+    val totalSeconds = state.initialTime.inWholeSeconds
     val elapsedProgress = calcElapsedProgress(state, totalSeconds)
 
     DraggableDialog(
@@ -121,9 +122,8 @@ private fun TimerDraggableDialog(
         ) {
             // Large flip clock
             FlipClockDisplay(
-                remainingSeconds = state.remainingSeconds,
+                remainingTime = state.remainingTime,
                 isRunning = state.status == TimerStatus.RUNNING,
-                isScrollable = false,
                 digitHeight = 108.dp,
                 glowColor = glowColor,
             )
@@ -175,7 +175,7 @@ private fun TimerDraggableDialog(
                     color = OrpheusColors.sleepMoonlight.copy(alpha = 0.5f),
                 )
                 Text(
-                    text = formatTime(totalSeconds),
+                    text = formatTime(totalSeconds.seconds),
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
                     color = OrpheusColors.sleepMoonlight.copy(alpha = 0.5f),
@@ -204,8 +204,8 @@ fun TimerFullscreen(
     val state by feature.stateFlow.collectAsState()
     val actions = feature.actions
 
-    val glowColor = resolveGlowColor(state.status, state.remainingSeconds)
-    val totalSeconds = state.durationMinutes * 60L
+    val glowColor = resolveGlowColor(state.status, state.remainingTime)
+    val totalSeconds = state.initialTime.inWholeSeconds
     val elapsedProgress = calcElapsedProgress(state, totalSeconds)
 
     // Tap on background dismisses fullscreen; inner controls don't propagate
@@ -235,9 +235,8 @@ fun TimerFullscreen(
                 ),
         ) {
             FlipClockDisplay(
-                remainingSeconds = state.remainingSeconds,
+                remainingTime = state.remainingTime,
                 isRunning = state.status == TimerStatus.RUNNING,
-                isScrollable = false,
                 digitHeight = 140.dp,
                 glowColor = glowColor,
             )
@@ -270,7 +269,7 @@ fun TimerFullscreen(
                     color = OrpheusColors.sleepMoonlight.copy(alpha = 0.5f),
                 )
                 Text(
-                    text = formatTime(totalSeconds),
+                    text = formatTime(totalSeconds.seconds),
                     fontFamily = FontFamily.Monospace,
                     fontSize = 10.sp,
                     color = OrpheusColors.sleepMoonlight.copy(alpha = 0.5f),
@@ -286,7 +285,7 @@ fun TimerFullscreen(
 private fun TimerTransportRow(
     state: TimerUiState,
     actions: TimerActions,
-    glowColor: androidx.compose.ui.graphics.Color,
+    glowColor: Color,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -339,7 +338,7 @@ private fun TimerTransportRow(
 
 private fun calcElapsedProgress(state: TimerUiState, totalSeconds: Long): Float =
     if (totalSeconds > 0L) {
-        1f - (state.remainingSeconds.toFloat() / totalSeconds.toFloat())
+        1f - (state.remainingTime.inWholeSeconds.toFloat() / totalSeconds.toFloat())
     } else {
         0f
     }

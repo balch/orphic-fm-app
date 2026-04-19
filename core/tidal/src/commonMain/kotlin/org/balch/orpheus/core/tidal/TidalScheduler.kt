@@ -320,7 +320,7 @@ class TidalScheduler(
 
                 // Add Freq Step with hold point
                 if (event.value is TidalEvent.Note) {
-                    val note = event.value as TidalEvent.Note
+                    val note = event.value
                     // Standard MIDI to frequency: 440Hz = A4 = MIDI 69
                     val freq = 440.0 * 2.0.pow((note.midiNote - 69) / 12.0)
                     

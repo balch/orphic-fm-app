@@ -331,6 +331,12 @@ bool run_pulsar_chords_tests() {
         init_chord_progression(cs, PROG_POP, 2, 16, 42);
         // progression = [0,4,5,3], length=4
 
+        // init_chord_progression zeroes drift_range (no drift by default). Set it to 1.0
+        // so the drift clamp in maybe_mutate_progression allows the custom matrix to
+        // actually change chord degrees. Without this, max_drift=0 and every mutation
+        // is immediately clamped back to the original value — custom matrix is a no-op.
+        cs.drift_range = 1.0f;
+
         // Run many full cycles at max complexity. After enough mutations,
         // every mutable slot (1,2,3) should converge to degree 4 (V).
         // Mutation probability per cycle is ~28%, and each mutation picks one
@@ -451,5 +457,5 @@ bool run_pulsar_chords_tests() {
 
     // ── Summary ──────────────────────────────────────────────────────────
     printf("\n  Pulsar Chords: %d passed, %d failed\n", pass, fail);
-    return fail == 0;
+    TEST_SUITE_RETURN(pass, fail);
 }

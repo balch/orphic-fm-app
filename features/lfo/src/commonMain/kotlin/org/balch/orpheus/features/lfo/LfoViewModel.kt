@@ -165,7 +165,7 @@ interface LfoFeature : SynthFeature<LfoUiState, LfoPanelActions> {
  * Knob values (0..1) map exponentially to frequency (0..10 Hz) for DuoLFO.
  */
 @Inject
-@ClassKey(LfoViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class LfoViewModel(
     private val synthController: SynthController,

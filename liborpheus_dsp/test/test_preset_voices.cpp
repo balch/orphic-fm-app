@@ -195,38 +195,39 @@ bool run_preset_voice_tests() {
 
     mkdir("test", 0755);
     mkdir("test/output", 0755);
-    bool all_pass = true;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
 
     // ── 6-7 preset: the primary regression target ──
     // Duo pair 1 (voices 2, 3) uses engine 17 (noise) with VOICE_FM mod source
     // This is the "speech" pair the user reported as broken.
-    all_pass &= test_preset_duo_pair("six_seven", preset_six_seven_ports,
-                                      1, 60.0f, 67.0f);  // duo 1: C4, G4
+    tally(test_preset_duo_pair("six_seven", preset_six_seven_ports,
+                                      1, 60.0f, 67.0f));  // duo 1: C4, G4
 
     // Also test duo pair 0 (engine 0 with FLUX mod) and pair 2 (engine 0 with LFO mod)
-    all_pass &= test_preset_duo_pair("six_seven", preset_six_seven_ports,
-                                      0, 55.0f, 62.0f);  // duo 0: G3, D4
-    all_pass &= test_preset_duo_pair("six_seven", preset_six_seven_ports,
-                                      2, 48.0f, 52.0f);  // duo 2: C3, E3
+    tally(test_preset_duo_pair("six_seven", preset_six_seven_ports,
+                                      0, 55.0f, 62.0f));  // duo 0: G3, D4
+    tally(test_preset_duo_pair("six_seven", preset_six_seven_ports,
+                                      2, 48.0f, 52.0f));  // duo 2: C3, E3
 
     // Full mix with all voices
-    all_pass &= test_preset_full_mix("six_seven", preset_six_seven_ports,
-                                      preset_six_seven_bpm);
+    tally(test_preset_full_mix("six_seven", preset_six_seven_ports,
+                                      preset_six_seven_bpm));
 
     // ── Other presets: baseline coverage ──
     // Pink and Funk491 use non-deterministic engines (speech, particle, etc.)
     // that drift between runs — use a wider tolerance for snapshot comparison.
-    all_pass &= test_preset_duo_pair("pink", preset_pink_ports,
-                                      0, 60.0f, 67.0f, 0.10f);
-    all_pass &= test_preset_duo_pair("clean", preset_clean_ports,
-                                      0, 60.0f, 64.0f);
-    all_pass &= test_preset_duo_pair("orpheus", preset_orpheus_ports,
-                                      0, 60.0f, 67.0f);
-    all_pass &= test_preset_duo_pair("funk491", preset_funk491_ports,
-                                      0, 60.0f, 64.0f, 0.10f);
-    all_pass &= test_preset_duo_pair("swirly_dreams", preset_swirly_dreams_ports,
-                                      0, 60.0f, 67.0f);
+    tally(test_preset_duo_pair("pink", preset_pink_ports,
+                                      0, 60.0f, 67.0f, 0.10f));
+    tally(test_preset_duo_pair("clean", preset_clean_ports,
+                                      0, 60.0f, 64.0f));
+    tally(test_preset_duo_pair("orpheus", preset_orpheus_ports,
+                                      0, 60.0f, 67.0f));
+    tally(test_preset_duo_pair("funk491", preset_funk491_ports,
+                                      0, 60.0f, 64.0f, 0.10f));
+    tally(test_preset_duo_pair("swirly_dreams", preset_swirly_dreams_ports,
+                                      0, 60.0f, 67.0f));
 
-    printf("\nPreset voice tests: %s\n", all_pass ? "ALL PASS" : "SOME FAILED");
-    return all_pass;
+    printf("\nPreset voice tests: %s\n", suite_fail == 0 ? "ALL PASS" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

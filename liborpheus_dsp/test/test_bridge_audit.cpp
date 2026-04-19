@@ -302,11 +302,12 @@ bool run_bridge_audit() {
     printf("  DSP BRIDGE AUDIT (self-evolving)\n");
     printf("══════════════════════════════════════\n");
 
-    bool all_pass = true;
-    all_pass &= audit_warps_sources();
-    all_pass &= audit_carrier_levels();
-    all_pass &= audit_double_buffer();
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(audit_warps_sources());
+    tally(audit_carrier_levels());
+    tally(audit_double_buffer());
 
-    printf("\nBridge audit: %s\n", all_pass ? "ALL PASS" : "SOME FAILED");
-    return all_pass;
+    printf("\nBridge audit: %s\n", suite_fail == 0 ? "ALL PASS" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

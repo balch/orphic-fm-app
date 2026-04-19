@@ -184,7 +184,7 @@ interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
  */
 @OptIn(FlowPreview::class)
 @Inject
-@ClassKey(PulsarViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class PulsarViewModel(
     private val synthController: SynthController,

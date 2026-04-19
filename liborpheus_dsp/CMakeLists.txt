@@ -4,6 +4,17 @@ project(orpheus_dsp CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ── Default build type: Release ─────────────────────────────────────
+# Single-config generators (Make, Ninja) use CMAKE_BUILD_TYPE.
+# Multi-config generators (Xcode, MSVC) use CMAKE_CONFIGURATION_TYPES
+# at build time, so this guard leaves them alone.
+# Respects any explicit -DCMAKE_BUILD_TYPE=... on the command line.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING
+        "Build type (Release, Debug, RelWithDebInfo, MinSizeRel)" FORCE)
+    message(STATUS "orpheus_dsp: defaulting CMAKE_BUILD_TYPE to Release")
+endif()
+
 # ── Eurorack source location ──────────────────────
 # Set EURORACK_DIR to the path of the eurorack repo.
 # Default: sibling directory or environment variable.

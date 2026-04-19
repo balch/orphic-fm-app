@@ -15,6 +15,11 @@ plugins {
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 kotlin {
+    // See orpheus.kmp.library.gradle.kts — accepts expect/actual classes Beta feature.
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     android {
         compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
         minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()

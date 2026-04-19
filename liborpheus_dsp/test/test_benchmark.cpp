@@ -77,7 +77,9 @@ bool run_benchmark_tests() {
     double r6 = benchmark("8 voices (graph)", 8, true);
 
     double lowest = std::min({r1, r2, r3, r4, r5, r6});
-    bool pass = lowest > 2.0;
-    printf("CPU benchmark: lowest=%.1fx — %s\n", lowest, pass ? "PASS" : "FAIL");
-    return pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(lowest > 2.0);
+    printf("CPU benchmark: lowest=%.1fx — %s\n", lowest, suite_fail == 0 ? "PASS" : "FAIL");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

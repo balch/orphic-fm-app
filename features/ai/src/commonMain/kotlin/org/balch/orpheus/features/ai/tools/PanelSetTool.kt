@@ -2,6 +2,7 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -52,8 +53,8 @@ class PanelSetTool(
 
     override val tool by lazy {
         object : Tool<PanelSetArgs, PanelSetResult>(
-            argsSerializer = PanelSetArgs.serializer(),
-            resultSerializer = PanelSetResult.serializer(),
+            argsType = typeToken<PanelSetArgs>(),
+            resultType = typeToken<PanelSetResult>(),
             name = "panel_set",
             description = """
         Manage panel set layouts in the synthesizer UI.

@@ -221,8 +221,9 @@ static bool test_effects_active() {
 }
 
 bool run_effects_tests() {
-    bool all_pass = true;
-    all_pass &= test_effects_bypass_passthrough();
-    all_pass &= test_effects_active();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_effects_bypass_passthrough());
+    tally(test_effects_active());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

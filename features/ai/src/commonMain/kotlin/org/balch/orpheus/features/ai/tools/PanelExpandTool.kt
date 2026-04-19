@@ -2,6 +2,7 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -45,8 +46,8 @@ class PanelExpandTool(
 
     override val tool by lazy {
         object : Tool<PanelExpandArgs, PanelExpandResult>(
-            argsSerializer = PanelExpandArgs.serializer(),
-            resultSerializer = PanelExpandResult.serializer(),
+            argsType = typeToken<PanelExpandArgs>(),
+            resultType = typeToken<PanelExpandResult>(),
             name = "panel_expand",
             description = """
         Expand or collapse UI panels in the synthesizer interface.

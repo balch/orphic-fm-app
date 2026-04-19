@@ -62,7 +62,7 @@ fun DesktopBenderStringsSection(
     val slideBarAnim = remember { Animatable(0f) }
 
     // Persistent string positions
-    val stringCentersState = rememberSaveable(key = "desktop_string_centers", saver = Saver(
+    val stringCentersState = rememberSaveable(saver = Saver(
         save = { it.value },
         restore = { mutableStateOf(it) }
     )) {

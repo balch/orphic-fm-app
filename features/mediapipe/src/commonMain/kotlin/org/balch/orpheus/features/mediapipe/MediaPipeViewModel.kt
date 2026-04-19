@@ -140,7 +140,7 @@ interface MediaPipeFeature : SynthFeature<MediaPipeUiState, MediaPipePanelAction
  * via AslInteractionEngine and SynthController.
  */
 @Inject
-@ClassKey(MediaPipeViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class MediaPipeViewModel(
     private val handTracker: HandTracker,

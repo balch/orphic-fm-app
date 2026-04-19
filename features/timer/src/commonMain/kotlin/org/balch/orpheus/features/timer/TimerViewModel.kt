@@ -24,14 +24,16 @@ import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 enum class TimerStatus { IDLE, RUNNING, PAUSED, FADING, FINISHED }
 
 @Immutable
 @Serializable
 data class TimerUiState(
-    val durationMinutes: Int = 30,
-    @Transient val remainingSeconds: Long = 1800,
+    val initialTime: Duration = TimerLimits.DefaultDuration,
+    @Transient val remainingTime: Duration = TimerLimits.DefaultDuration,
     @Transient val status: TimerStatus = TimerStatus.IDLE,
     @Transient val fadeProgress: Float = 1.0f,
     @Transient val showOverlay: Boolean = false,
@@ -41,7 +43,7 @@ data class TimerUiState(
 
 @Immutable
 data class TimerActions(
-    val onSetDuration: (Int) -> Unit,
+    val onSetDuration: (Duration) -> Unit,
     val onStart: () -> Unit,
     val onPause: () -> Unit,
     val onStop: () -> Unit,
@@ -68,7 +70,8 @@ interface TimerFeature : SynthFeature<TimerUiState, TimerActions> {
                 Sleep timer that fades audio out after a set duration.
 
                 ## Controls
-                - **Duration**: Set timer duration in minutes (0–260).
+                - **HR knob**: Hours (0–4).
+                - **M knob**: Minutes (0–59; capped at 20 when HR is 4).
                 - **Start**: Begin countdown.
                 - **Pause**: Pause the countdown.
                 - **Stop**: Stop the timer (audio continues).
@@ -81,7 +84,7 @@ interface TimerFeature : SynthFeature<TimerUiState, TimerActions> {
 }
 
 @Inject
-@ClassKey(TimerViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class TimerViewModel(
     private val synthEngine: SynthEngine,
@@ -104,7 +107,7 @@ class TimerViewModel(
             reader = { it.lastTimerJson },
             writer = { prefs, json -> prefs.copy(lastTimerJson = json) },
             restoreStrategy = RestoreStrategy.USER_PREFERENCES,
-            onRestore = { saved -> setDuration(saved.durationMinutes) },
+            onRestore = { saved -> setDuration(saved.initialTime) },
         )
     }
 
@@ -139,16 +142,16 @@ class TimerViewModel(
         onOverlaySizeChange = ::updateOverlaySize,
     )
 
-    private fun setDuration(minutes: Int) {
-        val clamped = minutes.coerceIn(0, 260)
-        _state.update { it.copy(durationMinutes = clamped, remainingSeconds = clamped * 60L) }
+    private fun setDuration(duration: Duration) {
+        val clamped = duration.clampToTimerLimits()
+        _state.update { it.copy(initialTime = clamped, remainingTime = clamped) }
     }
 
     private fun start() {
         val currentStatus = _state.value.status
         if (currentStatus == TimerStatus.RUNNING) return
 
-        if (_state.value.remainingSeconds <= 0 && currentStatus != TimerStatus.PAUSED) return
+        if (_state.value.remainingTime <= 0.seconds && currentStatus != TimerStatus.PAUSED) return
 
         // Resume from pause: just restart the countdown job, don't re-capture volume or wake lock
         if (currentStatus == TimerStatus.PAUSED) {
@@ -163,7 +166,7 @@ class TimerViewModel(
         metadataNotifier.setTimerActive(true)
 
         _state.update { it.copy(status = TimerStatus.RUNNING, showOverlay = true) }
-        updateTimerMetadata(_state.value.remainingSeconds)
+        updateTimerMetadata(_state.value.remainingTime)
         notifyWidget(TimerStatus.RUNNING)
 
         launchCountdownJob()
@@ -173,17 +176,17 @@ class TimerViewModel(
         countdownJob = coroutineScope.launch {
             while (true) {
                 delay(1_000L)
-                val remaining = _state.value.remainingSeconds - 1
-                if (remaining <= 0) {
-                    _state.update { it.copy(remainingSeconds = 0, status = TimerStatus.FADING) }
+                val remaining = _state.value.remainingTime.minus(1.seconds)
+                if (remaining <= 0.seconds) {
+                    _state.update { it.copy(remainingTime = 0.seconds, status = TimerStatus.FADING) }
                     notifyWidget(TimerStatus.FADING)
                     countdownJob = null
                     startFade()
                     break
                 } else {
-                    val prevMinute = _state.value.remainingSeconds / 60
-                    _state.update { it.copy(remainingSeconds = remaining) }
-                    if (remaining / 60 != prevMinute) {
+                    val prevMinute = _state.value.remainingTime.inWholeMinutes
+                    _state.update { it.copy(remainingTime = remaining) }
+                    if (remaining.inWholeMinutes != prevMinute) {
                         updateTimerMetadata(remaining)
                     }
                 }
@@ -191,15 +194,15 @@ class TimerViewModel(
         }
     }
 
-    private fun updateTimerMetadata(remainingSeconds: Long) {
-        val timeStr = formatTime(remainingSeconds)
+    private fun updateTimerMetadata(remainingTime: Duration) {
+        val timeStr = formatTime(remainingTime)
         metadataNotifier.updateTimerTitle("Sleep Timer: $timeStr remaining")
     }
 
     private fun notifyWidget(status: TimerStatus) {
         val state = _state.value
         widgetNotifier.notifyStateChanged(
-            remainingSeconds = state.remainingSeconds,
+            remainingTime = state.remainingTime,
             running = status == TimerStatus.RUNNING,
             statusText = status.name,
         )
@@ -223,12 +226,12 @@ class TimerViewModel(
             metadataNotifier.setTimerActive(false)
             delay(100) // allow agents to stop producing audio
             synthEngine.setMasterVolume(savedVolume)
-            val durationMinutes = _state.value.durationMinutes
+            val duration = _state.value.initialTime
             _state.update {
                 it.copy(
                     status = TimerStatus.FINISHED,
                     fadeProgress = 1.0f,
-                    remainingSeconds = durationMinutes * 60L,
+                    remainingTime = duration,
                     showOverlay = false,
                 )
             }
@@ -259,11 +262,11 @@ class TimerViewModel(
     private fun reset() {
         cancelAllJobs()
         restoreVolumeIfFading()
-        val durationMinutes = _state.value.durationMinutes
+        val duration = _state.value.initialTime
         _state.update {
             it.copy(
                 status = TimerStatus.IDLE,
-                remainingSeconds = durationMinutes * 60L,
+                remainingTime = duration,
                 fadeProgress = 1.0f,
             )
         }

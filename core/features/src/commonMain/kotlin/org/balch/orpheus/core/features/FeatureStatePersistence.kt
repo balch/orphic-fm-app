@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.FlowPreview::class)
+
 package org.balch.orpheus.core.features
 
 import com.diamondedge.logging.logging

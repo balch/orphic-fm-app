@@ -294,5 +294,5 @@ bool run_pulsar_comping_tests() {
     }
 
     printf("\n  Pulsar Comping: %d passed, %d failed\n", pass, fail);
-    return fail == 0;
+    TEST_SUITE_RETURN(pass, fail);
 }

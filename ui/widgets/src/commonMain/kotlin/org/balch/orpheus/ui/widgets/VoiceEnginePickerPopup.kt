@@ -307,7 +307,7 @@ fun EnginePickerButton(
                             (nowMs - lastDownTimeMs) < DOUBLE_CLICK_THRESHOLD_MS
                         lastDownTimeMs = nowMs
 
-                        activeConfig = if (isDoubleClick) v2Config!! else config
+                        activeConfig = if (isDoubleClick) v2Config else config
                         showEnginePicker = true
                         onExpandedChange?.invoke(true)
                         hoveredSegment = null

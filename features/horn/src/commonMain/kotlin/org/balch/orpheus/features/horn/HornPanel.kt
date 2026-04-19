@@ -203,6 +203,7 @@ fun HornPanel(
                 progressColor = CrimsonHorn,
                 knobColor = CrimsonKnob,
                 labelColor = CrimsonHorn,
+                valueFormatter = null,
             )
             RotaryKnob(
                 value = uiState.ratio,
@@ -214,6 +215,7 @@ fun HornPanel(
                 progressColor = CrimsonHorn,
                 knobColor = CrimsonKnob,
                 labelColor = CrimsonHorn,
+                valueFormatter = null,
             )
             RotaryKnob(
                 value = uiState.depth,
@@ -225,6 +227,7 @@ fun HornPanel(
                 progressColor = CrimsonHorn,
                 knobColor = CrimsonKnob,
                 labelColor = CrimsonHorn,
+                valueFormatter = null,
             )
             RotaryKnob(
                 value = uiState.mix,
@@ -236,6 +239,7 @@ fun HornPanel(
                 progressColor = CrimsonHorn,
                 knobColor = CrimsonKnob,
                 labelColor = CrimsonHorn,
+                valueFormatter = null,
             )
 
             BrakeToggle(
@@ -582,6 +586,7 @@ private fun BrakeToggle(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
         modifier = modifier,
     ) {
         Text(

@@ -268,6 +268,16 @@ object OrpheusColors {
     val djCream = Color(0xFFF5F0E1)                  // Cream (labels)
     val djIceBlue = Color(0xFF4FC3F7)                // Ice blue (frozen indicator)
 
+    // Drop zone accents (DJ Drops feature)
+    val dropFilter  = djIceBlue                 // FILTER — ice blue
+    val dropBrake   = Color(0xFFFF2530)         // BRAKE — vivid red (stop signal)
+    val dropStutter = Color(0xFF38E03A)         // STUTTER — acid green
+    val dropFreeze  = Color(0xFFE34CC9)         // FREEZE — magenta
+    val dropOctave  = Color(0xFF7D5CFF)         // OCTAVE — deep violet sub-bass
+    val dropPhaser  = Color(0xFF2FE0D5)         // PHASER — teal swirl
+    val dropEcho    = Color(0xFFFFC14D)         // ECHO — warm amber repeats
+    val dropRing    = Color(0xFFB8F52A)         // RING — toxic yellow-green metallic
+
     // Timer (Sleep) Palette — legacy amber
     val timerAmber = Color(0xFFFFB050)
     val timerDarkAmber = Color(0xFF3A2510)
@@ -349,4 +359,16 @@ object OrpheusColors {
 
     // Pulsar Beat Machine
     val cosmicPurple = Color(0xFF7C4DFF)
+
+    fun accentFor(drop: org.balch.orpheus.core.plugin.symbols.DjDrop): Color = when (drop) {
+        org.balch.orpheus.core.plugin.symbols.DjDrop.NONE    -> Color.Transparent
+        org.balch.orpheus.core.plugin.symbols.DjDrop.FILTER  -> dropFilter
+        org.balch.orpheus.core.plugin.symbols.DjDrop.BRAKE   -> dropBrake
+        org.balch.orpheus.core.plugin.symbols.DjDrop.STUTTER -> dropStutter
+        org.balch.orpheus.core.plugin.symbols.DjDrop.FREEZE  -> dropFreeze
+        org.balch.orpheus.core.plugin.symbols.DjDrop.OCTAVE  -> dropOctave
+        org.balch.orpheus.core.plugin.symbols.DjDrop.PHASER  -> dropPhaser
+        org.balch.orpheus.core.plugin.symbols.DjDrop.ECHO    -> dropEcho
+        org.balch.orpheus.core.plugin.symbols.DjDrop.RING    -> dropRing
+    }
 }

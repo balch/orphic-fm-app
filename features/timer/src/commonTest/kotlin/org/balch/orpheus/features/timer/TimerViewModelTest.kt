@@ -22,6 +22,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 // ─── Fake SynthEngine ─────────────────────────────────────────────────────────
 
@@ -146,6 +148,23 @@ private class FakeSynthEngine : SynthEngine {
 
 // ─── Test Helpers ─────────────────────────────────────────────────────────────
 
+private object FakeDispatcherProvider : org.balch.orpheus.core.coroutines.DispatcherProvider {
+    override val main = kotlinx.coroutines.Dispatchers.Unconfined
+    override val io = kotlinx.coroutines.Dispatchers.Unconfined
+    override val default = kotlinx.coroutines.Dispatchers.Unconfined
+    override val unconfined = kotlinx.coroutines.Dispatchers.Unconfined
+}
+
+private class FakeAppPreferencesRepository(
+    private var prefs: org.balch.orpheus.core.preferences.AppPreferences =
+        org.balch.orpheus.core.preferences.AppPreferences(),
+) : org.balch.orpheus.core.preferences.BaseAppPreferencesRepository() {
+    override suspend fun load() = prefs
+    override suspend fun save(preferences: org.balch.orpheus.core.preferences.AppPreferences) {
+        prefs = preferences
+    }
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 private fun makeVm(
     engine: FakeSynthEngine = FakeSynthEngine(),
@@ -160,7 +179,12 @@ private fun makeVm(
         override fun updateTimerTitle(title: String) { metadataUpdates.add(title) }
         override fun setTimerActive(active: Boolean) {}
     }
-    return TimerViewModel(engine, manager, notifier, NoOpTimerWidgetNotifier(), scope)
+    val persistence = org.balch.orpheus.core.features.FeatureStatePersistence(
+        appPreferencesRepository = FakeAppPreferencesRepository(),
+        dispatcherProvider = FakeDispatcherProvider,
+        scope = scope,
+    )
+    return TimerViewModel(engine, manager, notifier, NoOpTimerWidgetNotifier(), scope, persistence)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -182,12 +206,12 @@ class TimerViewModelTest {
     fun `countdown ticks every second`() = runTest {
         val vm = makeVm()
 
-        vm.actions.onSetDuration(2) // 120 seconds
+        vm.actions.onSetDuration(2.minutes) // 120 seconds
         vm.actions.onStart()
 
         advanceTimeBy(5_001L)
 
-        assertEquals(115L, vm.stateFlow.value.remainingSeconds)
+        assertEquals(115.seconds, vm.stateFlow.value.remainingTime)
         assertEquals(TimerStatus.RUNNING, vm.stateFlow.value.status)
     }
 
@@ -203,7 +227,7 @@ class TimerViewModelTest {
             }
         }
 
-        vm.actions.onSetDuration(5) // 300 seconds
+        vm.actions.onSetDuration(5.minutes) // 300 seconds
         vm.actions.onStart()
         advanceTimeBy(3_001L)
         vm.actions.onStop()
@@ -219,33 +243,33 @@ class TimerViewModelTest {
     fun `pause freezes countdown`() = runTest {
         val vm = makeVm()
 
-        vm.actions.onSetDuration(5) // 300 seconds
+        vm.actions.onSetDuration(5.minutes) // 300 seconds
         vm.actions.onStart()
         advanceTimeBy(3_001L)
 
-        val remainingBeforePause = vm.stateFlow.value.remainingSeconds
+        val remainingBeforePause = vm.stateFlow.value.remainingTime
         vm.actions.onPause()
 
         assertEquals(TimerStatus.PAUSED, vm.stateFlow.value.status)
 
         advanceTimeBy(10_000L) // time passes but countdown is paused
 
-        assertEquals(remainingBeforePause, vm.stateFlow.value.remainingSeconds)
+        assertEquals(remainingBeforePause, vm.stateFlow.value.remainingTime)
     }
 
     @Test
     fun `reset restores original duration`() = runTest {
         val vm = makeVm()
 
-        vm.actions.onSetDuration(3) // 180 seconds
+        vm.actions.onSetDuration(3.minutes) // 180 seconds
         vm.actions.onStart()
         advanceTimeBy(30_001L)
 
-        assertTrue(vm.stateFlow.value.remainingSeconds < 180L)
+        assertTrue(vm.stateFlow.value.remainingTime < 180.seconds)
 
         vm.actions.onReset()
 
-        assertEquals(180L, vm.stateFlow.value.remainingSeconds)
+        assertEquals(180.seconds, vm.stateFlow.value.remainingTime)
         assertEquals(TimerStatus.IDLE, vm.stateFlow.value.status)
     }
 
@@ -262,7 +286,7 @@ class TimerViewModelTest {
             }
         }
 
-        vm.actions.onSetDuration(1) // 60 seconds
+        vm.actions.onSetDuration(1.minutes) // 60 seconds
         vm.actions.onStart()
 
         // Advance past the countdown
@@ -280,8 +304,8 @@ class TimerViewModelTest {
 
         assertEquals(TimerStatus.FINISHED, vm.stateFlow.value.status)
         assertEquals(1.0f, vm.stateFlow.value.fadeProgress)
-        // Auto-reset remaining seconds back to 1 min
-        assertEquals(60L, vm.stateFlow.value.remainingSeconds)
+        // Auto-reset remaining back to 1 min
+        assertEquals(1.minutes, vm.stateFlow.value.remainingTime)
         assertTrue(stopAllEmitted, "StopAll should have been emitted after fade completes")
 
         collectJob.cancel()
@@ -299,7 +323,7 @@ class TimerViewModelTest {
             }
         }
 
-        vm.actions.onSetDuration(5)
+        vm.actions.onSetDuration(5.minutes)
         vm.actions.onStart()
         advanceTimeBy(2_001L)
         vm.actions.onStopAll()
@@ -312,16 +336,18 @@ class TimerViewModelTest {
     }
 
     @Test
-    fun `setDuration clamps to 0-260 range`() = runTest {
+    fun `setDuration clamps to TimerLimits range`() = runTest {
         val vm = makeVm()
 
-        vm.actions.onSetDuration(300)
-        assertEquals(260, vm.stateFlow.value.durationMinutes)
-        assertEquals(260L * 60L, vm.stateFlow.value.remainingSeconds)
+        // 300 min → clamps down to MaxDuration (4h 20m = 260 min).
+        vm.actions.onSetDuration(300.minutes)
+        assertEquals(TimerLimits.MaxDuration, vm.stateFlow.value.initialTime)
+        assertEquals(TimerLimits.MaxDuration, vm.stateFlow.value.remainingTime)
 
-        vm.actions.onSetDuration(-5)
-        assertEquals(0, vm.stateFlow.value.durationMinutes)
-        assertEquals(0L, vm.stateFlow.value.remainingSeconds)
+        // Negative → clamps up to MinDuration (zero).
+        vm.actions.onSetDuration((-5).minutes)
+        assertEquals(TimerLimits.MinDuration, vm.stateFlow.value.initialTime)
+        assertEquals(TimerLimits.MinDuration, vm.stateFlow.value.remainingTime)
     }
 
     // ─── Lifecycle: status transitions ────────────────────────────────────────
@@ -333,7 +359,7 @@ class TimerViewModelTest {
         assertEquals(TimerStatus.IDLE, vm.stateFlow.value.status)
         assertEquals(false, vm.stateFlow.value.showOverlay)
 
-        vm.actions.onSetDuration(5)
+        vm.actions.onSetDuration(5.minutes)
         vm.actions.onStart()
 
         assertEquals(TimerStatus.RUNNING, vm.stateFlow.value.status)
@@ -344,30 +370,30 @@ class TimerViewModelTest {
     fun `start while already RUNNING is a no-op`() = runTest {
         val vm = makeVm()
 
-        vm.actions.onSetDuration(5)
+        vm.actions.onSetDuration(5.minutes)
         vm.actions.onStart()
         advanceTimeBy(2_001L)
 
-        val remainingAfterFirstStart = vm.stateFlow.value.remainingSeconds
+        val remainingAfterFirstStart = vm.stateFlow.value.remainingTime
         vm.actions.onStart() // should be ignored
         advanceTimeBy(1L)
 
         assertEquals(TimerStatus.RUNNING, vm.stateFlow.value.status)
-        assertEquals(remainingAfterFirstStart, vm.stateFlow.value.remainingSeconds)
+        assertEquals(remainingAfterFirstStart, vm.stateFlow.value.remainingTime)
     }
 
     @Test
     fun `pause then resume resumes countdown from where it was paused`() = runTest {
         val vm = makeVm()
 
-        vm.actions.onSetDuration(5) // 300 seconds
+        vm.actions.onSetDuration(5.minutes) // 300 seconds
         vm.actions.onStart()
         advanceTimeBy(3_001L) // tick 3 seconds
 
         vm.actions.onPause()
         assertEquals(TimerStatus.PAUSED, vm.stateFlow.value.status)
 
-        val remainingAtPause = vm.stateFlow.value.remainingSeconds
+        val remainingAtPause = vm.stateFlow.value.remainingTime
 
         // Resume via onStart (resume action)
         vm.actions.onStart()
@@ -375,7 +401,7 @@ class TimerViewModelTest {
 
         // Countdown should continue from where it was paused
         advanceTimeBy(2_001L)
-        assertEquals(remainingAtPause - 2, vm.stateFlow.value.remainingSeconds)
+        assertEquals(remainingAtPause - 2.seconds, vm.stateFlow.value.remainingTime)
     }
 
     // ─── Media session metadata ────────────────────────────────────────────────
@@ -385,7 +411,7 @@ class TimerViewModelTest {
         val updates = mutableListOf<String>()
         val vm = makeVm(metadataUpdates = updates)
 
-        vm.actions.onSetDuration(2) // 120 seconds
+        vm.actions.onSetDuration(2.minutes) // 120 seconds
         vm.actions.onStart()
 
         assertNotNull(updates.firstOrNull()) { "Metadata should be emitted on start" }
@@ -398,7 +424,7 @@ class TimerViewModelTest {
         val engine = FakeSynthEngine().also { it.setInitialVolume(0.8f) }
         val vm = makeVm(engine = engine)
 
-        vm.actions.onSetDuration(1) // 60 seconds
+        vm.actions.onSetDuration(1.minutes) // 60 seconds
         vm.actions.onStart()
 
         // Advance past the countdown to reach FADING
@@ -423,7 +449,7 @@ class TimerViewModelTest {
         val vm = makeVm()
         advanceTimeBy(1L) // let the init collector coroutine start
 
-        vm.actions.onSetDuration(5)
+        vm.actions.onSetDuration(5.minutes)
         TimerWidgetCommandBus.send(TimerWidgetCommand.PLAY_PAUSE)
         advanceTimeBy(1L)
 
@@ -434,7 +460,7 @@ class TimerViewModelTest {
     fun `widget PLAY_PAUSE command pauses running timer`() = runTest {
         val vm = makeVm()
 
-        vm.actions.onSetDuration(5)
+        vm.actions.onSetDuration(5.minutes)
         vm.actions.onStart()
         advanceTimeBy(2_001L)
 
@@ -448,7 +474,7 @@ class TimerViewModelTest {
     fun `widget STOP command stops running timer`() = runTest {
         val vm = makeVm()
 
-        vm.actions.onSetDuration(5)
+        vm.actions.onSetDuration(5.minutes)
         vm.actions.onStart()
         advanceTimeBy(2_001L)
 
@@ -461,17 +487,19 @@ class TimerViewModelTest {
     // ─── Media session metadata ────────────────────────────────────────────────
 
     @Test
-    fun `metadata updates every second during countdown`() = runTest {
+    fun `metadata updates on minute boundary during countdown`() = runTest {
         val updates = mutableListOf<String>()
         val vm = makeVm(metadataUpdates = updates)
 
-        vm.actions.onSetDuration(2) // 120 seconds
+        vm.actions.onSetDuration(2.minutes) // 120 seconds
         vm.actions.onStart()
+        val countAfterStart = updates.size   // 1 (emitted on start)
 
-        val countAfterStart = updates.size
-        advanceTimeBy(3_001L) // 3 ticks
+        // Advance past the 61s mark → two minute-boundary crossings since start:
+        //   t = 1s : remaining = 119s → minutes 2 → 1 (fire)
+        //   t = 61s: remaining = 59s  → minutes 1 → 0 (fire)
+        advanceTimeBy(61_500L)
 
-        // Should have received 3 additional metadata updates (one per second)
-        assertEquals(countAfterStart + 3, updates.size)
+        assertEquals(countAfterStart + 2, updates.size)
     }
 }

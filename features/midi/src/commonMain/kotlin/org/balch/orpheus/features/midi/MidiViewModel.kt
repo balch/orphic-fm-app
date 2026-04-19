@@ -3,7 +3,6 @@ package org.balch.orpheus.features.midi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import com.diamondedge.logging.logging
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -16,15 +15,16 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.coroutines.DispatcherProvider
+import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
+import org.balch.orpheus.core.features.SynthFeature
+import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.midi.MidiController
 import org.balch.orpheus.core.midi.MidiInputHandler
 import org.balch.orpheus.core.midi.MidiMappingRepository
 import org.balch.orpheus.core.midi.MidiMappingState
 import org.balch.orpheus.core.midi.MidiMappingStateHolder
-import org.balch.orpheus.core.features.FeatureCoroutineScope
-import org.balch.orpheus.core.features.synthFeature
 
 /** UI state for the MIDI panel. */
 @Immutable
@@ -47,7 +47,7 @@ interface MidiFeature : SynthFeature<MidiUiState, MidiPanelActions> {
  * SynthController and all MidiViewModel instances share the same state.
  */
 @Inject
-@ClassKey(MidiViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class MidiViewModel(
     val midiController: MidiController,

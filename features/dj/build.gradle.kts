@@ -21,5 +21,8 @@ kotlin {
             implementation(projects.ui.widgets)
             implementation(projects.ui.theme)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
 }

@@ -2,6 +2,7 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -73,8 +74,8 @@ class ReplExecuteTool(
 
     override val tool by lazy {
         object : Tool<ReplExecuteArgs, ReplExecuteResult>(
-            argsSerializer = ReplExecuteArgs.serializer(),
-            resultSerializer = ReplExecuteResult.serializer(),
+            argsType = typeToken<ReplExecuteArgs>(),
+            resultType = typeToken<ReplExecuteResult>(),
             name = "repl_execute",
             description = """
         Execute Tidal-style REPL code for musical patterns.

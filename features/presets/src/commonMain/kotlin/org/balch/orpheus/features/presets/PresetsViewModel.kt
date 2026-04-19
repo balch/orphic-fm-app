@@ -82,7 +82,7 @@ interface PresetsFeature : SynthFeature<PresetUiState, PresetPanelActions> {
  * Uses MVI pattern: intents flow through a reducer (scan) to produce state.
  */
 @Inject
-@ClassKey(PresetsViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class PresetsViewModel(
     private val presetsRepository: PresetsRepository,

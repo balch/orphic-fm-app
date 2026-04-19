@@ -214,7 +214,7 @@ interface DrumFeature : SynthFeature<DrumUiState, DrumPanelActions> {
  * Keeps SynthEngine for triggerDrum() (imperative operation).
  */
 @Inject
-@ClassKey(DrumViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DrumViewModel(
     private val synthEngine: SynthEngine,

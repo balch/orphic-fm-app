@@ -329,13 +329,14 @@ static bool test_gain_staging_report() {
 }
 
 bool run_output_chain_tests() {
-    bool all_pass = true;
-    all_pass &= test_master_volume_scaling();
-    all_pass &= test_output_headroom();
-    all_pass &= test_drive_distortion();
-    all_pass &= test_master_pan();
-    all_pass &= test_voice_pan();
-    all_pass &= test_multi_voice_gain_staging();
-    all_pass &= test_gain_staging_report();
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_master_volume_scaling());
+    tally(test_output_headroom());
+    tally(test_drive_distortion());
+    tally(test_master_pan());
+    tally(test_voice_pan());
+    tally(test_multi_voice_gain_staging());
+    tally(test_gain_staging_report());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

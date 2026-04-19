@@ -168,10 +168,11 @@ static bool test_horn_phase_export() {
 }
 
 bool run_horn_tests() {
-    bool all_pass = true;
-    all_pass &= test_horn_self_bypass();
-    all_pass &= test_horn_active_processing();
-    all_pass &= test_horn_phase_export();
-    printf("\nHorn tests: %s\n", all_pass ? "PASS" : "FAIL");
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_horn_self_bypass());
+    tally(test_horn_active_processing());
+    tally(test_horn_phase_export());
+    printf("\nHorn tests: %s\n", suite_fail == 0 ? "PASS" : "FAIL");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

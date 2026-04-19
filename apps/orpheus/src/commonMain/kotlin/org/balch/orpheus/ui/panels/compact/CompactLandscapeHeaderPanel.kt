@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
@@ -88,7 +89,7 @@ fun CompactLandscapeHeaderPanel(
             ) {
                 Box(
                     modifier = Modifier
-                        .menuAnchor()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                         .width(140.dp)
                         .height(36.dp)
                         .clip(RoundedCornerShape(8.dp))
@@ -155,7 +156,7 @@ fun CompactLandscapeHeaderPanel(
             ) {
                 Box(
                     modifier = Modifier
-                        .menuAnchor()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                         .width(140.dp)
                         .height(36.dp)
                         .clip(RoundedCornerShape(8.dp))

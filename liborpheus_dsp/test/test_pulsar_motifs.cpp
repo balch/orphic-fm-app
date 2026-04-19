@@ -186,12 +186,13 @@ static bool test_motif_switch_probability_gate() {
 
 bool run_pulsar_motifs_tests() {
     printf("\n========== PULSAR MOTIFS TESTS ==========\n");
-    bool all_pass = true;
-    all_pass &= test_motif_init();
-    all_pass &= test_motif_countdown();
-    all_pass &= test_motif_eventually_switches();
-    all_pass &= test_motif_partial_overlay();
-    all_pass &= test_motif_switch_probability_gate();
-    printf("\nPulsar motifs tests: %s\n", all_pass ? "ALL PASSED" : "SOME FAILED");
-    return all_pass;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_motif_init());
+    tally(test_motif_countdown());
+    tally(test_motif_eventually_switches());
+    tally(test_motif_partial_overlay());
+    tally(test_motif_switch_probability_gate());
+    printf("\nPulsar motifs tests: %s\n", suite_fail == 0 ? "ALL PASSED" : "SOME FAILED");
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

@@ -10,6 +10,7 @@ private val emptyVizFlow: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0)
 private val emptyPulsarTrackVizFlows: List<StateFlow<FloatArray>> = List(8) { emptyVizFlow }
 private val emptyPulsarVizFlow: StateFlow<PulsarVizData> = MutableStateFlow(PulsarVizData())
 private val emptyPulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> = MutableStateFlow(null)
+private val emptyBeatPhaseFlow: StateFlow<Float> = MutableStateFlow(0f)
 
 interface SynthEngine {
     fun start()
@@ -187,6 +188,7 @@ interface SynthEngine {
     val djVizFlowA: StateFlow<FloatArray> get() = emptyVizFlow
     val djVizFlowB: StateFlow<FloatArray> get() = emptyVizFlow
     val djOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
+    val beatPhaseFlow: StateFlow<Float> get() = emptyBeatPhaseFlow
     val masterOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val hornInVizFlow: StateFlow<FloatArray> get() = emptyVizFlow
     val hornOutVizFlow: StateFlow<FloatArray> get() = emptyVizFlow

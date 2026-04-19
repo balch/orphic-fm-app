@@ -77,7 +77,8 @@ fun DistortionPanel(
                     label = "DISTORTION",
                     controlId = DistortionSymbol.DRIVE.controlId.key,
                     size = 56.dp,
-                    progressColor = OrpheusColors.neonMagenta
+                    progressColor = OrpheusColors.neonMagenta,
+                    valueFormatter = null,
                 )
                 RotaryKnob(
                     value = uiState.mix,
@@ -85,7 +86,8 @@ fun DistortionPanel(
                     label = "MIX",
                     controlId = DistortionSymbol.MIX.controlId.key,
                     size = 56.dp,
-                    progressColor = OrpheusColors.neonMagenta
+                    progressColor = OrpheusColors.neonMagenta,
+                    valueFormatter = null,
                 )
             }
 
@@ -100,7 +102,8 @@ fun DistortionPanel(
                     label = "VOL",
                     controlId = StereoSymbol.MASTER_VOL.controlId.key,
                     size = 56.dp,
-                    progressColor = OrpheusColors.neonMagenta
+                    progressColor = OrpheusColors.neonMagenta,
+                    valueFormatter = null,
                 )
                 RotaryKnob(
                     value = (uiState.masterPan + 1f) / 2f,
@@ -110,7 +113,8 @@ fun DistortionPanel(
                     label = "PAN",
                     controlId = StereoSymbol.MASTER_PAN.controlId.key,
                     size = 56.dp,
-                    progressColor = OrpheusColors.neonMagenta
+                    progressColor = OrpheusColors.neonMagenta,
+                    valueFormatter = null,
                 )
             }
 

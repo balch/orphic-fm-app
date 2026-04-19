@@ -326,5 +326,5 @@ bool run_pulsar_pattern_gen_tests() {
     test_dust_groove_scenario()             ? pass++ : fail++;
 
     printf("\n  Results: %d passed, %d failed\n", pass, fail);
-    return fail == 0;
+    TEST_SUITE_RETURN(pass, fail);
 }

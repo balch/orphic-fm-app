@@ -1,7 +1,6 @@
 package org.balch.orpheus.features.draw
 
 import androidx.compose.runtime.Composable
-import org.balch.orpheus.core.di.FeatureScope
 import dev.zacsweers.metro.ClassKey
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -9,6 +8,7 @@ import dev.zacsweers.metro.binding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.balch.orpheus.core.di.FeatureScope
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
 
@@ -18,7 +18,7 @@ interface DrawSequencerFeature: SynthFeature<DrawSequencerUiState, DrawSequencer
 }
 
 @Inject
-@ClassKey(DrawSequencerViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DrawSequencerViewModel : DrawSequencerFeature {
     private val _state = MutableStateFlow(DrawSequencerUiState())

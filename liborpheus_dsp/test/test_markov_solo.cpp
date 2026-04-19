@@ -172,11 +172,12 @@ static bool test_blend_normalization() {
 
 bool run_markov_solo_tests() {
     printf("\n── Markov Solo Tests ──\n");
-    bool ok = true;
-    ok &= test_matrix_normalization();
-    ok &= test_melodic_gap_fill();
-    ok &= test_rhythmic_unison();
-    ok &= test_last_interval_tracking();
-    ok &= test_blend_normalization();
-    return ok;
+    int suite_pass = 0, suite_fail = 0;
+    auto tally = [&](bool ok) { if (ok) ++suite_pass; else ++suite_fail; };
+    tally(test_matrix_normalization());
+    tally(test_melodic_gap_fill());
+    tally(test_rhythmic_unison());
+    tally(test_last_interval_tracking());
+    tally(test_blend_normalization());
+    TEST_SUITE_RETURN(suite_pass, suite_fail);
 }

@@ -130,7 +130,7 @@ interface DrumBeatsFeature: SynthFeature<BeatsUiState, DrumBeatsPanelActions> {
  * PatternGenerator state is updated as a side effect alongside controlFlow-driven state changes.
  */
 @Inject
-@ClassKey(DrumBeatsViewModel::class)
+@ClassKey
 @ContributesIntoMap(FeatureScope::class, binding = binding<SynthFeature<*, *>>())
 class DrumBeatsViewModel(
     private val synthEngine: SynthEngine,

@@ -2,6 +2,7 @@ package org.balch.orpheus.features.ai.tools
 
 import ai.koog.agents.core.tools.Tool
 import ai.koog.agents.core.tools.annotations.LLMDescription
+import ai.koog.serialization.typeToken
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -76,8 +77,8 @@ class SpeechTool(
 
     override val tool by lazy {
         object : Tool<SpeechArgs, SpeechResult>(
-            argsSerializer = SpeechArgs.serializer(),
-            resultSerializer = SpeechResult.serializer(),
+            argsType = typeToken<SpeechArgs>(),
+            resultType = typeToken<SpeechResult>(),
             name = "speech",
             description = buildDescription(ttsGenerator.isAvailable)
         ) {
