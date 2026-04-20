@@ -122,10 +122,10 @@ class SunkenPlaceVibe : VibeProvider {
         ),
         // Brooding baseline — moderate energy, low complexity (rigid),
         // moderate space (reverb tails but not washy), low mood (dark).
-        energy = 0.6f,
+        energy = 0.78f,
         complexity = 0.3f,
-        space = 0.55f,
-        mood = 0.25f,
+        space = 0.35f,
+        mood = 0.55f,
         deep = 0.6f,
         genre = GenreProfile(
             swingAmount = 0.0f,          // dead straight — mechanical
@@ -191,7 +191,7 @@ class SunkenPlaceVibe : VibeProvider {
             // lick is a full-bar statement, not a sub-bar stab.
             TrackVoice(
                 engineEdm = Engine.WSH,
-                engineSpace = Engine.VA,
+                engineSpace = Engine.SPK,
                 role = TrackRole.Melodic(
                     chordFollow = ChordFollow.ROOT_ONLY,
                     lickMode = LickMode.Fill,
@@ -199,7 +199,7 @@ class SunkenPlaceVibe : VibeProvider {
                 volume = 0.85f,
                 pan = 0.00f,
                 density = 0.55f,
-                harmonics = 0.70f,   // heavier waveshaping — grittier
+                harmonics = 0.42f,
                 timbre = 0.55f,
                 morph = 0.35f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
