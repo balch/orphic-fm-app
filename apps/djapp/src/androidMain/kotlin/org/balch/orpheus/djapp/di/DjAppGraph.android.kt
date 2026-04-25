@@ -7,7 +7,7 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metrox.viewmodel.ViewModelGraph
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.SynthOrchestrator
-import org.balch.orpheus.core.features.FeatureGraph
+import org.balch.orpheus.core.features.FeatureGraphHolder
 import org.balch.orpheus.core.media.ForegroundServiceController
 import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.tempo.GlobalTempo
@@ -18,7 +18,7 @@ actual interface DjAppGraph : ViewModelGraph {
     actual val synthOrchestrator: SynthOrchestrator
     actual val synthEngine: SynthEngine
     actual val globalTempo: GlobalTempo
-    val featureGraphFactory: FeatureGraph.Factory
+    val featureGraphHolder: FeatureGraphHolder
     val mediaSessionStateManager: MediaSessionStateManager
 
     /** Eagerly initialized to register lifecycle callbacks. */

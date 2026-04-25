@@ -59,8 +59,13 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
         get() {
             cachedFeature?.let { return it }
             return try {
+                // Read the *shared* FeatureGraph from the AppScope holder.
+                // Calling factory.create() here would build a second graph
+                // with a second PulsarViewModel that silently overwrites the
+                // Activity-side VM's MediaSessionManager handlers — leading
+                // to the UI/notification de-sync this service used to cause.
                 val graph = DjAppApplication.getGraph(this)
-                val featureGraph = graph.featureGraphFactory.create()
+                val featureGraph = graph.featureGraphHolder.featureGraph
                 val feature = featureGraph.featureCollection
                     .getFeature<PulsarFeature>(PulsarViewModel::class)
                 cachedFeature = feature

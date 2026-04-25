@@ -11,34 +11,34 @@ import org.balch.orpheus.core.input.KeyBinding
 import kotlin.reflect.KClass
 
 /**
- * ViewModel wrapper that owns the [FeatureGraph] child scope.
+ * Thin `ViewModel`-shaped accessor for the app-scoped [FeatureGraph].
  *
- * Lives in the ViewModelStore — `onCleared()` cancels the [FeatureCoroutineScope]
- * and closes [AutoCloseable] features.
+ * Lives in the `ViewModelStore` so Compose can look it up via
+ * [LocalSynthFeatures]. The actual graph and feature instances are owned
+ * by [FeatureGraphHolder] (`@SingleIn(AppScope::class)`) so multiple
+ * consumers — the Activity's UI tree *and* any Android background service
+ * (`MediaBrowserService`) — share the exact same `FeatureGraph` and the
+ * exact same feature ViewModels.
  *
- * Panels access this via [LocalSynthFeatures]. AI tools inject [FeatureCollection] directly
- * (they live in [FeatureScope][org.balch.orpheus.core.di.FeatureScope]).
+ * Lifecycle note: this class deliberately does **not** override
+ * `onCleared()`. The graph it exposes outlives the Activity (it's
+ * AppScope-scoped) and tearing down its `featureCoroutineScope` or closing
+ * its `AutoCloseable` features here would yank state out from under any
+ * background service still using them. Process death is the cleanup point.
  */
 @Inject
 @ViewModelKey
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 class SynthFeatureRegistry(
-    featureGraphFactory: FeatureGraph.Factory,
+    holder: FeatureGraphHolder,
 ) : ViewModel() {
-    private val featureGraph: FeatureGraph = featureGraphFactory.create()
-    private val collection: FeatureCollection = featureGraph.featureCollection
+    private val collection: FeatureCollection = holder.featureGraph.featureCollection
 
     fun <T> getFeature(key: KClass<*>): T = collection.getFeature(key)
 
     val allFeatures: Collection<SynthFeature<*, *>> get() = collection.allFeatures
 
     val keyActions: Map<Key, List<KeyBinding>> get() = collection.keyActions
-
-    override fun onCleared() {
-        super.onCleared()
-        featureGraph.featureCoroutineScope.cancel()
-        collection.close()
-    }
 }
 
 /** Typed convenience — usage: `registry.feature<VoiceViewModel, VoicesFeature>()` */
