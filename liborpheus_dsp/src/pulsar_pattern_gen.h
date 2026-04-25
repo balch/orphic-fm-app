@@ -50,6 +50,7 @@ inline int chord_degree_to_semitones(int degree, const PulsarScale& scale) {
 inline PulsarStep make_step(uint8_t note, float velocity, bool gate, float duration) {
     PulsarStep s = {note, note, velocity, gate, duration};
     s.hold = false;
+    s.glide_rate = -1.0f;  // sentinel: use track default unless lick overrides
     return s;
 }
 
@@ -680,13 +681,16 @@ inline void generate_lick_pattern(
 
         // Gate fires on the first step with full duration for AR envelope sustain.
         // Remaining slots are hold steps so the gate stays high across the full note.
+        // Per-step glide override flows from the lick step onto the gating sequencer
+        // step only — hold-tail steps inherit nothing extra (no retrigger anyway).
         if (step_pos < step_count) {
             steps[step_pos] = make_step(midi_note, vel, true, 1.0f);
-            steps[step_pos].hold = (slots > 1);  // start hold chain if multi-step
+            steps[step_pos].hold = (slots > 1);
+            steps[step_pos].glide_rate = ls.glide_rate;
         }
         for (int h = 1; h < slots && (step_pos + h) < step_count; h++) {
             steps[step_pos + h] = make_step(midi_note, vel, true, 1.0f);
-            steps[step_pos + h].hold = (h < slots - 1);  // last step ends the hold
+            steps[step_pos + h].hold = (h < slots - 1);
         }
         step_pos += slots;
     }

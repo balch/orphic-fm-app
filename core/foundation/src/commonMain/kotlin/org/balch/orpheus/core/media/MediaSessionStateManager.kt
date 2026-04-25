@@ -17,12 +17,13 @@ import kotlinx.coroutines.launch
  * Source of audio activity that can require MediaSession to be active.
  */
 enum class AudioActivitySource {
-    EVO,      // Audio Evolution is enabled
-    REPL,     // REPL is playing patterns
-    DRONE,    // AI Drone mode is active
-    SOLO,     // AI Solo mode is active
-    TIMER,    // Sleep timer countdown is active
-    PULSAR    // Pulsar beat machine is active
+    EVO,           // Audio Evolution is enabled
+    REPL,          // REPL is playing patterns
+    DRONE,         // AI Drone mode is active
+    SOLO,          // AI Solo mode is active
+    TIMER,         // Sleep timer countdown is active
+    PULSAR,        // Pulsar beat machine is active
+    AUTO_BROWSER   // Android Auto (or other MediaBrowser client) is bound
 }
 
 /**
@@ -51,6 +52,7 @@ class MediaSessionStateManager {
     private val _isSoloActive = MutableStateFlow(false)
     private val _isTimerActive = MutableStateFlow(false)
     private val _isPulsarActive = MutableStateFlow(false)
+    private val _isAutoBrowserActive = MutableStateFlow(false)
 
     /**
      * Combined flow indicating whether MediaSession should be active.
@@ -76,6 +78,7 @@ class MediaSessionStateManager {
                 _isSoloActive,
                 _isTimerActive,
                 _isPulsarActive,
+                _isAutoBrowserActive,
             ) { states ->
                 val evo = states[0]
                 val repl = states[1]
@@ -83,7 +86,8 @@ class MediaSessionStateManager {
                 val solo = states[3]
                 val timer = states[4]
                 val pulsar = states[5]
-                val needed = evo || repl || drone || solo || timer || pulsar
+                val autoBrowser = states[6]
+                val needed = evo || repl || drone || solo || timer || pulsar || autoBrowser
                 val source = when {
                     timer -> AudioActivitySource.TIMER
                     pulsar -> AudioActivitySource.PULSAR
@@ -91,6 +95,7 @@ class MediaSessionStateManager {
                     repl -> AudioActivitySource.REPL
                     drone -> AudioActivitySource.DRONE
                     solo -> AudioActivitySource.SOLO
+                    autoBrowser -> AudioActivitySource.AUTO_BROWSER
                     else -> null
                 }
                 needed to source
@@ -167,6 +172,20 @@ class MediaSessionStateManager {
     }
 
     /**
+     * Update the Auto-browser bound state.
+     *
+     * Set to true while a MediaBrowser client (Android Auto, Google Assistant)
+     * has the browser service bound. Keeps the MediaSession active so that
+     * action handlers are wired up before the first playback command arrives.
+     */
+    fun setAutoBrowserActive(active: Boolean) {
+        if (_isAutoBrowserActive.value != active) {
+            log.debug { "Auto-browser active: $active" }
+            _isAutoBrowserActive.value = active
+        }
+    }
+
+    /**
      * Clear all activity states (e.g., when stopping everything).
      */
     fun clearAll() {
@@ -177,5 +196,6 @@ class MediaSessionStateManager {
         _isSoloActive.value = false
         _isTimerActive.value = false
         _isPulsarActive.value = false
+        _isAutoBrowserActive.value = false
     }
 }

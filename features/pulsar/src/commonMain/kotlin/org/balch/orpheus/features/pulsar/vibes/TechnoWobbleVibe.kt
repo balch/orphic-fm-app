@@ -42,6 +42,7 @@ import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
 import org.balch.orpheus.features.pulsar.VibeProvider
 import org.balch.orpheus.features.pulsar.bandMatrix
+import org.balch.orpheus.features.pulsar.chords
 import org.balch.orpheus.features.pulsar.row
 
 /**
@@ -59,7 +60,34 @@ import org.balch.orpheus.features.pulsar.row
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
-class SunkenPlaceVibe : VibeProvider {
+class TechnoWobbleVibe : VibeProvider {
+
+    private val mainProgression = chords(0, 0, 0, 0, 6, 5, 0, 3)
+    private val chordsPerBar = 1
+
+    private val chorusProgression = chords(3, 3, 5, 6, 0)
+    private val chorusChordsPerBar = 2
+
+    private val cleanHumanization = CompingHumanization(
+        dropProbability = 0.05f,        // mostly hold each stab
+        ghostProbability = 0.10f,
+        octaveJumpProbability = 0.0f,   // PROTECT the 5th-in-bass voicing
+        extensionProbability = 0.10f,   // sparse color
+    )
+
+    // Per-edge transitionBars precedent: name the *musical role* the ramp serves,
+    // not the bar count. Lets future tuning happen in one place.
+    //
+    //   chorusLiftBars  — smooth macro climb INTO higher-energy sections
+    //                     (intro -> groove, grind -> stab, fall -> grind, etc.)
+    //   chorusDropBars  — long fade INTO low-energy / atmospheric sections
+    //                     (grind -> fall, stab -> fall — the dramatic descent)
+    //
+    // 0-bar (the SectionTransition default) is a hard cut and is reserved for
+    // moments that *want* to be jarring (e.g., entering the outro `drift`).
+    private val chorusLiftBars = 2
+    private val chorusDropBars = 4
+
     override val vibe = Vibe(
         name = "Techno Wobble",
         bpm = 84f,
@@ -134,12 +162,8 @@ class SunkenPlaceVibe : VibeProvider {
             noteRangeHigh = 60,
             rhythmDensity = RhythmPattern.FOUR_ON_FLOOR.density,
             progressionStyle = ProgressionStyle.DARK,
-            chordsPerBar = 1,            // slow harmonic motion — hang on chords
-            // Static-leaning custom progression: i-i-VI-VII-i-i-iv-VII.
-            // Holds the tonic for two bars, slides down a semitone (VI=E for G#m),
-            // walks up chromatically (VII=F# for G#m) back to tonic. Classic
-            // industrial "stuck in one place" feel that still breathes.
-            customProgression = listOf(0, 0, 0, 0, 6, 5, 0, 3),
+            chordsPerBar = chordsPerBar,
+            customProgression = mainProgression,
         ),
         progressionAnchor = ProgressionAnchor.EVERY_8,   // 8-bar hypnotic loop
         progressionDriftRange = 0.08f,                    // very tight — stays locked
@@ -191,7 +215,7 @@ class SunkenPlaceVibe : VibeProvider {
             // lick is a full-bar statement, not a sub-bar stab.
             TrackVoice(
                 engineEdm = Engine.WSH,
-                engineSpace = Engine.SPK,
+                engineSpace = Engine.STR,
                 role = TrackRole.Melodic(
                     chordFollow = ChordFollow.ROOT_ONLY,
                     lickMode = LickMode.Fill,
@@ -371,36 +395,47 @@ class SunkenPlaceVibe : VibeProvider {
         ),
         arrangement = Arrangement(
             introIndex = 0,
-            outroIndex = 4,
             sections = listOf(
                 // 0: pulse — opens with kick + pad only. Dread builds.
+                // pulse -> grind: chorusLift (smooth climb into the verse).
                 Section(
                     name = "pulse",
-                    barsMin = 8, barsMax = 12,
-                    transitions = listOf(SectionTransition(targetIndex = 1, weight = 1.0f)),
+                    barsMin = 6, barsMax = 6,
+                    transitions = listOf(
+                        SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = chorusLiftBars),
+                    ),
                     macroOverrides = MacroOverrides(
                         energy = 0.45f, complexity = 0.3f, space = 1.3f, mood = 0.7f,
                     ),
                 ),
                 // 1: grind — the main groove. All 8 tracks in, full weight.
+                // grind -> stab: chorusLift (the chorus rises in).
+                // grind -> fall: chorusDrop (long fade into the breakdown).
+                // grind -> drift: hard cut (sudden end of the song).
                 Section(
                     name = "grind",
                     barsMin = 8, barsMax = 16,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 2, weight = 0.5f),  // into the stab
-                        SectionTransition(targetIndex = 3, weight = 0.3f),  // into the fall
-                        SectionTransition(targetIndex = 4, weight = 0.2f),  // or outro
+                        SectionTransition(targetIndex = 2, weight = 0.5f, transitionBars = chorusLiftBars),
+                        SectionTransition(targetIndex = 3, weight = 0.3f, transitionBars = chorusDropBars),
+                        SectionTransition(targetIndex = 4, weight = 0.2f),  // 0-bar = hard outro entry
                     ),
                     recencyDecay = 0.6f,
                     macroOverrides = null,  // grind IS the baseline
                 ),
                 // 2: stab — lead gets aggressive, pads push forward, lick mutates.
+                // compingHumanization suppresses octave jumps so SECOND_INVERSION
+                // pedal voicing reads cleanly — track-level humanization
+                // (octaveJump=0.20) would scramble it.
+                // stab -> grind: chorusLift (gentle return to verse).
+                // stab -> fall:  chorusDrop (dramatic glide down into the breakdown).
+                // stab -> drift: hard cut (sudden ending after the chorus).
                 Section(
                     name = "stab",
                     barsMin = 6, barsMax = 10,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 1, weight = 0.5f),
-                        SectionTransition(targetIndex = 3, weight = 0.3f),
+                        SectionTransition(targetIndex = 1, weight = 0.5f, transitionBars = chorusLiftBars),
+                        SectionTransition(targetIndex = 3, weight = 0.3f, transitionBars = chorusDropBars),
                         SectionTransition(targetIndex = 4, weight = 0.2f),
                     ),
                     recencyDecay = 0.5f,
@@ -408,16 +443,22 @@ class SunkenPlaceVibe : VibeProvider {
                         energy = 1.3f, complexity = 1.4f, space = 0.7f, mood = 1.2f,
                     ),
                     soloMode = SoloMode.LickBuilder(probability = 0.75f, mutationRate = 0.5f),
-                    compingStyle = CompingStyle.BLUES_SHUFFLE
+                    compingStyle = CompingStyle.BLUES_SHUFFLE,
+                    customProgression = chorusProgression,
+                    chordsPerBar = chorusChordsPerBar,
+                    compingInversion = SectionInversion.SECOND_INVERSION,
+                    compingHumanization = cleanHumanization,
                 ),
                 // 3: fall — stripped to bass+kick+pad drone. Dangerous space.
                 // Lead gone, hats gone, grain whispers. Only the heart beats.
+                // fall -> grind / fall -> stab: chorusLift (re-emerging from the dread).
+                // fall -> drift: hard cut.
                 Section(
                     name = "fall",
                     barsMin = 6, barsMax = 10,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 1, weight = 0.6f),  // back to grind
-                        SectionTransition(targetIndex = 2, weight = 0.3f),
+                        SectionTransition(targetIndex = 1, weight = 0.6f, transitionBars = chorusLiftBars),
+                        SectionTransition(targetIndex = 2, weight = 0.3f, transitionBars = chorusLiftBars),
                         SectionTransition(targetIndex = 4, weight = 0.1f),
                     ),
                     recencyDecay = 0.5f,
@@ -426,17 +467,22 @@ class SunkenPlaceVibe : VibeProvider {
                     ),
                     chordFollow = ChordFollow.FIXED,  // bass drones on G#, no motion
                     compingStyle = CompingStyle.BLUES_SHUFFLE,
+                    compingHumanization = cleanHumanization,
                 ),
                 // 4: drift — the ending. Everything decays, pad holds, kick fades.
                 // True outro: empty transitions terminate the arrangement.
+                // drift -> grind: chorusLift (loop re-entry rises smoothly).
                 Section(
                     name = "drift",
                     barsMin = 3, barsMax = 4,
-                    transitions = emptyList(),
                     macroOverrides = MacroOverrides(
                         energy = 0.25f, space = 1.7f, mood = 0.9f,
                     ),
-                    chordFollow = ChordFollow.ROOT_ONLY
+                    chordFollow = ChordFollow.ROOT_ONLY,
+                    transitions = listOf(
+                            SectionTransition(targetIndex = 1, weight = 1f, transitionBars = chorusLiftBars),
+                    ),
+                    compingHumanization = cleanHumanization,
                 ),
             ),
         ),

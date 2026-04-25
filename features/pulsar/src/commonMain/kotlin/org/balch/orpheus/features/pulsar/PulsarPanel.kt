@@ -185,6 +185,7 @@ fun PulsarPanel(
         ) {
             val vibeList = remember { pulsar.vibeList }
             EnumDropdown(
+                modifier = Modifier.widthIn(max = 120.dp),
                 label = "VIBE",
                 selectedDisplay = state.vibe.name,
                 entries = vibeList,

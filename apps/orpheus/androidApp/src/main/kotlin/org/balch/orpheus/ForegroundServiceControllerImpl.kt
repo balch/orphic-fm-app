@@ -23,7 +23,10 @@ class ForegroundServiceControllerImpl(
         set(value) {
             AudioForegroundService.actionHandler = value
         }
-    
+
+    // Orpheus app has no browsable media tree — Android Auto is DJ-app only.
+    override var playFromMediaIdHandler: ((String) -> Unit)? = null
+
     override fun start() {
         val intent = Intent(context, AudioForegroundService::class.java)
         ContextCompat.startForegroundService(context, intent)

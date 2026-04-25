@@ -21,6 +21,7 @@ struct PulsarStep {
     bool gate;         // step active
     float duration;    // gate length as fraction of step (0.0-1.0)
     bool hold;         // if true, extend gate into next step (no retrigger)
+    float glide_rate;  // -1 = use track default; >= 0 = per-step override (set by lick)
 };
 
 struct PulsarMacroTarget {
@@ -227,6 +228,7 @@ struct PulsarTrackState {
     float target_pitch;      // target from current step
     float glide_rate;        // per-sample pitch change (MIDI notes/sample)
     bool prev_step_gated;    // was the previous step also gated
+    int last_chord_index = -1;   // track chord-change edges for per-chord glide
     BarStrategy bar_strategy;
 
     // Solo/ducking state (applied per-frame)
@@ -310,6 +312,7 @@ struct PulsarLickStep {
     int8_t scale_degree;
     float duration;
     float velocity;
+    float glide_rate;  // -1 = use track default; >= 0 = per-step override
 };
 
 struct PulsarChordState {
@@ -327,6 +330,9 @@ struct PulsarChordState {
     int     anchor_bars = 0;                              // 0 = disabled
     float   drift_range = 0.5f;                           // 0-1
     int     bars_since_anchor = 0;                        // counter
+    // Per-chord glide override applied when transitioning *into* each chord.
+    // 0 = no glide; >0 maps onto the same 0..1 portamento curve as track glide.
+    float   progression_glides[kMaxProgressionLength] = {};
 };
 
 // ── Tension system parameters (loaded from engine atomics on vibe reload) ──
@@ -354,6 +360,10 @@ struct TensionParams {
 struct SectionTransitionParam {
     int target_index;
     float weight;
+    // Pre-roll ramp into the destination section, in bars. 0 = hard cut at the
+    // boundary; >0 = macro overrides crossfade over the LAST N bars of the source
+    // section toward the destination's overrides, then snap to destination at boundary.
+    int transition_bars;
 };
 
 struct MacroOverridesParam {
@@ -423,9 +433,12 @@ enum class SoloModeId : uint8_t {
 
 struct SectionParam {
     int bars_min = 4, bars_max = 8;
+    // Step within [bars_min, bars_max] when picking a random length. 1 = any
+    // value; 2 = only odd or only even (determined by bars_min's parity); 4 =
+    // 4-bar increments; etc. Useful for keeping phrase lengths musical.
+    int bar_step = 1;
     SectionTransitionParam transitions[kMaxSectionTransitions];
     int transition_count = 0;
-    int transition_bars = 1;
     float recency_decay = 0.5f;
     MacroOverridesParam macro_overrides;
     bool has_tension_override = false;
@@ -442,6 +455,17 @@ struct SectionParam {
     int comping_style_override = -1;
     int comping_inversion_override = -1;
     int chord_follow_override = -1;
+    // Per-section chord progression override (0 = no override; see pulsar_chord_progression.h for kMaxProgressionLength = 8)
+    int custom_progression_length = 0;
+    int8_t custom_progression[kMaxProgressionLength] = {};
+    // Per-section chord-change rate override (0 = no override, 1..4 = override value)
+    int chords_per_bar_override = 0;
+    // Per-section CompingHumanization override (applies to ALL CHORDAL tracks).
+    bool has_comping_humanization_override = false;
+    float comping_humanization_drop = 0.0f;
+    float comping_humanization_ghost = 0.0f;
+    float comping_humanization_octave = 0.0f;
+    float comping_humanization_extension = 0.0f;
 };
 
 struct ArrangementParams {
@@ -465,6 +489,15 @@ struct SectionState {
     bool outro_triggered = false;
     float target_energy = -1.0f, target_complexity = -1.0f;
     float target_space = -1.0f, target_mood = -1.0f;
+    // Destination overrides during a transition crossfade. Populated when a
+    // transition stages, reset back to -1 when the transition completes.
+    float next_energy = -1.0f, next_complexity = -1.0f;
+    float next_space = -1.0f, next_mood = -1.0f;
+    // Pre-roll model: the next section is selected the moment the current
+    // section becomes active, and its incoming edge's transition_bars determines
+    // how many of the LAST bars of the current section are the ramp zone.
+    int next_section_planned = -1;
+    int next_section_trans_bars = 0;
 };
 
 // ── Band-based solo system ──────────────────────────────────────────

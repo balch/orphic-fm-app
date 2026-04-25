@@ -39,6 +39,13 @@ expect class MediaSessionManager {
     var onSkipPrevious: (() -> Unit)?
     var onPlay: (() -> Unit)?
     var onPause: (() -> Unit)?
+
+    /**
+     * Invoked when a browsable media client (e.g., Android Auto) asks to play
+     * a specific media item. The string is the media id selected in the
+     * browsable tree. Only wired on Android; no-op on other platforms.
+     */
+    var onPlayFromMediaId: ((String) -> Unit)?
 }
 
 /**

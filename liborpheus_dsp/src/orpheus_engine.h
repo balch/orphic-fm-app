@@ -774,6 +774,8 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_custom_progression_active{0};
     std::atomic<int>   pulsar_custom_progression_length{0};
     std::atomic<int>   pulsar_custom_progression[8]{};   // chord degrees 0-6
+    // Per-chord glide override applied on transition into each chord. 0 = no glide.
+    std::atomic<float> pulsar_custom_progression_glide[8]{};
 
     // Lick transfer buffer (written by Kotlin before setting lick_length)
     static constexpr int kMaxLickSteps = 32;
@@ -781,6 +783,7 @@ struct OrpheusEngine {
         int8_t scale_degree;
         float duration;
         float velocity;
+        float glide_rate;  // -1 = use track default; >= 0 = per-step override
     };
     std::atomic<int> pulsar_lick_length{0};        // 0 = no lick (pure generative)
     std::atomic<int> pulsar_lick_loop_length{0};   // beats; 0 = no rest padding
@@ -821,7 +824,38 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_arrangement_intro_index{-1};
     std::atomic<int>   pulsar_arrangement_outro_index{-1};
     std::atomic<float> pulsar_section_data[8 * 21] = {};
-    std::atomic<float> pulsar_section_transitions[8 * 8 * 2] = {};
+    // Per-section outgoing edges. Stride: 8 sections × 8 edges × 3 floats per edge.
+    // Field layout per edge: 0=target_index, 1=weight, 2=transition_bars (pre-roll
+    // ramp into the destination, in bars; 0 = hard cut at the boundary).
+    std::atomic<float> pulsar_section_transitions[8 * 8 * 3] = {};
+    // --- Per-section progression override ---
+    // 0 = no override, 1..8 = override length.
+    std::atomic<int>   pulsar_section_progression_length[8] = {};
+    // Degree values 0..6 (I..VII). Only slots [0..length) are meaningful.
+    std::atomic<int>   pulsar_section_progression_degrees[8 * 8] = {};
+    // Per-chord glide override applied on transition into each chord. 0 = no glide.
+    std::atomic<float> pulsar_section_progression_glides[8 * 8] = {};
+    // 0 = no override, 1..4 = override value.
+    std::atomic<int>   pulsar_section_chords_per_bar[8] = {};
+
+    // --- Per-section tension override ---
+    // 0 = no override, 1 = read from pulsar_section_tension_data[s*21..].
+    std::atomic<int>   pulsar_section_tension_active[8] = {};
+    // Field layout mirrors the vibe-level pulsar_tension_* scalars:
+    //   0=inner_bars, 1=outer_bars, 2=outer_depth, 3=volume, 4=timing,
+    //   5=octave_shift, 6=key_shift, 7=half_lick, 8=chromatic_passing,
+    //   9=evo_timbre_low, 10=evo_timbre_high, 11=evo_timbre_prob,
+    //   12=evo_morph_low, 13=evo_morph_high, 14=evo_morph_prob,
+    //   15=evo_harm_low, 16=evo_harm_high, 17=evo_harm_prob,
+    //   18=evo_attack_point, 19=evo_release_speed, 20=spurt_chance
+    std::atomic<float> pulsar_section_tension_data[8 * 21] = {};
+
+    // --- Per-section comping humanization override (for ALL CHORDAL tracks) ---
+    // 0 = no override, 1 = read from pulsar_section_comping_humanization_data[s*4..].
+    std::atomic<int>   pulsar_section_comping_humanization_active[8] = {};
+    // Field layout: 0=drop_prob, 1=ghost_prob, 2=octave_jump_prob, 3=extension_prob.
+    std::atomic<float> pulsar_section_comping_humanization_data[8 * 4] = {};
+
     std::atomic<float> pulsar_track_solo_behavior[8 * 15] = {};
     std::atomic<float> pulsar_track_ducking[8 * 6] = {};
     std::atomic<float> pulsar_track_solo_markov[8 * 15] = {};

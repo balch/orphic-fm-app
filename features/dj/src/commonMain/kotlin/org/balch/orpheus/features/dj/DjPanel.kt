@@ -98,6 +98,22 @@ internal fun faderVelocity(fx: Float): Float {
 }
 
 /**
+ * Picks a readable text color for a label drawn on top of [accent].
+ * The drop palette spans very light (RING yellow-green, ECHO amber, STUTTER
+ * acid green, FILTER ice blue) to medium-dark (OCTAVE deep violet, BRAKE red,
+ * FREEZE magenta, PHASER teal), so a single fixed color can't read well
+ * against all of them. Return a dark color for bright accents and a light
+ * color for dark accents.
+ *
+ * sRGB relative luminance weights: 0.2126·R + 0.7152·G + 0.0722·B.
+ * Suggested return values: [OrpheusColors.darkVoid] and [Color.White].
+ */
+internal fun contrastTextColor(accent: Color): Color {
+    val luminance = 0.2126f * accent.red + 0.7152f * accent.green + 0.0722f * accent.blue
+    return if (luminance > 0.5f) OrpheusColors.darkVoid else Color.White
+}
+
+/**
  * Preview-only override for local fader state in [DjPanel]. Lets @Preview
  * composables render mid-drive fader states that would otherwise require a
  * live pointer gesture. Production call sites pass null.
@@ -987,7 +1003,7 @@ private fun DropZoneCell(
         if (lockedBy.isNotEmpty()) {
             Text(
                 text = label,
-                color = Color.White,
+                color = contrastTextColor(accent),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
             )

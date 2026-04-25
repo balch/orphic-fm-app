@@ -35,6 +35,7 @@ import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
 import org.balch.orpheus.features.pulsar.VibeProvider
 import org.balch.orpheus.features.pulsar.bandMatrix
+import org.balch.orpheus.features.pulsar.chords
 import org.balch.orpheus.features.pulsar.row
 
 /**
@@ -125,7 +126,7 @@ class VoltageStrutVibe : VibeProvider {
             // i–VI–VII–i — classic EDM minor loop; MODAL matrix keeps it cyclic.
             progressionStyle = ProgressionStyle.MODAL,
             chordsPerBar = 2,
-            customProgression = listOf(3, 3, 3, 0, 6, 5),
+            customProgression = chords(3, 3, 3, 0, 6, 5),
         ),
         progressionAnchor = ProgressionAnchor.EVERY_2,
         progressionDriftRange = 0.52f,

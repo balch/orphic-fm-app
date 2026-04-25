@@ -223,6 +223,7 @@ if(BUILD_TESTS)
         test/test_pulsar_pattern_gen.cpp
         test/test_pulsar_band_solo.cpp
         test/test_pulsar_lick_techniques.cpp
+        test/test_pulsar_glide.cpp
         test/test_markov_solo.cpp
         test/test_pulsar_analysis.cpp
     )

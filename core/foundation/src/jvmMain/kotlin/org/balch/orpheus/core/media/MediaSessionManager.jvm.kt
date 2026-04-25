@@ -16,6 +16,7 @@ actual class MediaSessionManager {
     actual var onSkipPrevious: (() -> Unit)? = null
     actual var onPlay: (() -> Unit)? = null
     actual var onPause: (() -> Unit)? = null
+    actual var onPlayFromMediaId: ((String) -> Unit)? = null
 
     actual fun activate() {
         if (isActive) return

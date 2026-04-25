@@ -1,16 +1,57 @@
 package org.balch.djapp
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaDescriptionCompat
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.media.MediaBrowserServiceCompat
+import androidx.media.app.NotificationCompat.MediaStyle
 import com.diamondedge.logging.logging
+import org.balch.orpheus.core.media.ForegroundServiceController
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 
+/**
+ * Single combined service for the DJ app that:
+ *   - Serves the browsable media tree to Android Auto
+ *   - Owns the MediaSession (used by notification, lock screen, and Auto)
+ *   - Promotes itself to a foreground service with media-style notification
+ *     once playback is active
+ *
+ * Merging browser + foreground responsibilities into one service avoids the
+ * session-token-race that breaks Android Auto when the browser and the
+ * playback service live in separate processes.
+ */
 class DjMediaBrowserService : MediaBrowserServiceCompat() {
 
     private val log = logging("DjMediaBrowser")
+
+    private var mediaSession: MediaSessionCompat? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private var hasAudioFocus = false
+    private var albumArtBitmap: Bitmap? = null
+    private var sectionArtRenderer: SectionArtRenderer? = null
+    private var isPlaying = true
+    private var currentTitle = "Orphic-DJ"
+    private var currentSubtitle = ""
+    private var isForegroundStarted = false
 
     private var cachedFeature: PulsarFeature? = null
 
@@ -30,27 +71,124 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
             }
         }
 
+    companion object {
+        const val NOTIFICATION_ID = 1
+        const val CHANNEL_ID = "djapp_audio_playback"
+        private const val ROOT_ID = "djapp_root"
+
+        private val ACTION_PLAY = ForegroundServiceController.ACTION_PLAY
+        private val ACTION_PAUSE = ForegroundServiceController.ACTION_PAUSE
+        private val ACTION_STOP = ForegroundServiceController.ACTION_STOP
+        private val ACTION_SKIP_NEXT = ForegroundServiceController.ACTION_SKIP_NEXT
+        private val ACTION_SKIP_PREVIOUS = ForegroundServiceController.ACTION_SKIP_PREVIOUS
+        private val ACTION_UPDATE_STATE_PLAYING = ForegroundServiceController.ACTION_UPDATE_STATE_PLAYING
+        private val ACTION_UPDATE_STATE_PAUSED = ForegroundServiceController.ACTION_UPDATE_STATE_PAUSED
+        private val ACTION_UPDATE_METADATA = ForegroundServiceController.ACTION_UPDATE_METADATA
+        private val EXTRA_TITLE = ForegroundServiceController.EXTRA_TITLE
+        private val EXTRA_SUBTITLE = ForegroundServiceController.EXTRA_SUBTITLE
+        private val EXTRA_IS_PLAYING = ForegroundServiceController.EXTRA_IS_PLAYING
+
+        @Volatile var actionHandler: ((String) -> Unit)? = null
+        @Volatile var playFromMediaIdHandler: ((String) -> Unit)? = null
+
+        private val NOTIFICATION_COLOR = Color.parseColor("#7B68EE")
+    }
+
     override fun onCreate() {
         super.onCreate()
-        log.info { "DjMediaBrowserService created" }
-        DjAudioForegroundService.sessionToken?.let { token ->
-            setSessionToken(token)
+        val base = BitmapFactory.decodeResource(resources, R.drawable.album_art)
+        albumArtBitmap = base
+        sectionArtRenderer = SectionArtRenderer(base)
+        createNotificationChannel()
+        setupMediaSession()
+
+        // Warm the Pulsar stack so by the time Auto/Assistant sends a
+        // playback command, action handlers are wired through
+        // MediaSessionManager. AUTO_BROWSER keeps the session alive
+        // independent of the mute/playing state.
+        // Logged at error level: if this fails, Auto play commands silently
+        // do nothing, so the failure needs to be loud in logcat.
+        try {
+            val graph = DjAppApplication.getGraph(this)
+            graph.mediaSessionStateManager.setAutoBrowserActive(true)
+            pulsarFeature // trigger ViewModel init (registers onPlay/onPlayFromMediaId)
+        } catch (e: Exception) {
+            log.error(e) { "Failed to warm up Pulsar stack — Auto play commands will be no-ops" }
         }
+
+        log.info { "DjMediaBrowserService created" }
     }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        log.info { "DjMediaBrowserService onStartCommand: action=${intent?.action}" }
+
+        when (intent?.action) {
+            ACTION_PLAY -> {
+                acquireAudioFocus()
+                isPlaying = true
+                updatePlaybackState(true)
+                actionHandler?.invoke("play")
+            }
+            ACTION_PAUSE -> {
+                isPlaying = false
+                updatePlaybackState(false)
+                actionHandler?.invoke("pause")
+            }
+            ACTION_STOP -> {
+                actionHandler?.invoke("stop")
+                abandonAudioFocus()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                isForegroundStarted = false
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_SKIP_NEXT -> actionHandler?.invoke("skipNext")
+            ACTION_SKIP_PREVIOUS -> actionHandler?.invoke("skipPrevious")
+            ACTION_UPDATE_STATE_PLAYING -> {
+                isPlaying = true
+                updatePlaybackState(true)
+            }
+            ACTION_UPDATE_STATE_PAUSED -> {
+                isPlaying = false
+                updatePlaybackState(false)
+            }
+            ACTION_UPDATE_METADATA -> {
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: "DJ App"
+                val subtitle = intent.getStringExtra(EXTRA_SUBTITLE) ?: ""
+                val intentIsPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, true)
+
+                currentTitle = title
+                currentSubtitle = subtitle
+                isPlaying = intentIsPlaying
+
+                updateMediaSessionMetadata()
+                updateNotification()
+            }
+            else -> log.info { "Initial service start" }
+        }
+
+        ensureForeground()
+        return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        log.info { "DjMediaBrowserService destroyed" }
+        abandonAudioFocus()
+        try {
+            DjAppApplication.getGraph(this).mediaSessionStateManager.setAutoBrowserActive(false)
+        } catch (_: Exception) { /* shutting down anyway */ }
+        mediaSession?.release()
+        mediaSession = null
+        super.onDestroy()
+    }
+
+    // ─── MediaBrowserServiceCompat ─────────────────────────────────────
 
     override fun onGetRoot(
         clientPackageName: String,
         clientUid: Int,
         rootHints: Bundle?
-    ): BrowserRoot {
-        // Lazily set session token if foreground service started after us
-        if (sessionToken == null) {
-            DjAudioForegroundService.sessionToken?.let { token ->
-                setSessionToken(token)
-            }
-        }
-        return BrowserRoot(ROOT_ID, null)
-    }
+    ): BrowserRoot = BrowserRoot(ROOT_ID, null)
 
     override fun onLoadChildren(
         parentId: String,
@@ -84,7 +222,232 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
         }
     }
 
-    companion object {
-        private const val ROOT_ID = "djapp_root"
+    // ─── MediaSession / notification / focus ───────────────────────────
+
+    private fun setupMediaSession() {
+        mediaSession = MediaSessionCompat(this, "DjAppMediaSession").apply {
+            setCallback(object : MediaSessionCompat.Callback() {
+                override fun onPlay() {
+                    acquireAudioFocus()
+                    actionHandler?.invoke("play")
+                    updatePlaybackState(true)
+                }
+
+                override fun onPause() {
+                    actionHandler?.invoke("pause")
+                    updatePlaybackState(false)
+                }
+
+                override fun onStop() {
+                    actionHandler?.invoke("stop")
+                    abandonAudioFocus()
+                    stopSelf()
+                }
+
+                override fun onSkipToNext() {
+                    actionHandler?.invoke("skipNext")
+                }
+
+                override fun onSkipToPrevious() {
+                    actionHandler?.invoke("skipPrevious")
+                }
+
+                override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+                    mediaId ?: return
+                    log.info { "onPlayFromMediaId: $mediaId" }
+                    acquireAudioFocus()
+                    playFromMediaIdHandler?.invoke(mediaId)
+                    // Promote to foreground so the notification & background
+                    // playback stay alive past the initial bind from Auto.
+                    ContextCompat.startForegroundService(
+                        this@DjMediaBrowserService,
+                        Intent(this@DjMediaBrowserService, DjMediaBrowserService::class.java)
+                    )
+                }
+            })
+
+            isActive = true
+        }
+        sessionToken = mediaSession?.sessionToken
+
+        updateMediaSessionMetadata()
+        updatePlaybackState(true)
+    }
+
+    /**
+     * Acquire audio focus. Other audio apps (Apple Music, Spotify, etc.) should
+     * pause when this is granted. We do NOT auto-pause on focus loss — if a
+     * phone call or navigation prompt ducks us, Android handles that
+     * transparently; a permanent loss will be surfaced via the listener log
+     * only.
+     */
+    private fun acquireAudioFocus() {
+        if (hasAudioFocus) return
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val request = audioFocusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            .setAcceptsDelayedFocusGain(true)
+            .setOnAudioFocusChangeListener { change ->
+                // Intentionally non-destructive: we log but don't pause.
+                log.debug { "Audio focus change: $change" }
+            }
+            .build()
+            .also { audioFocusRequest = it }
+
+        val result = audioManager.requestAudioFocus(request)
+        hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        log.info { "requestAudioFocus result=$result granted=$hasAudioFocus" }
+    }
+
+    private fun abandonAudioFocus() {
+        if (!hasAudioFocus) return
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        hasAudioFocus = false
+    }
+
+    private fun ensureForeground() {
+        val notification = createNotification(isPlaying)
+        if (!isForegroundStarted) {
+            startForeground(NOTIFICATION_ID, notification)
+            isForegroundStarted = true
+        } else {
+            updateNotification()
+        }
+    }
+
+    private fun currentArt(): Bitmap? =
+        sectionArtRenderer?.render(currentTitle) ?: albumArtBitmap
+
+    private fun updateMediaSessionMetadata() {
+        val art = currentArt()
+        mediaSession?.setMetadata(
+            MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentSubtitle)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, art)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, art)
+                .build()
+        )
+    }
+
+    fun updatePlaybackState(isPlaying: Boolean) {
+        this.isPlaying = isPlaying
+
+        val state = if (isPlaying) {
+            PlaybackStateCompat.STATE_PLAYING
+        } else {
+            PlaybackStateCompat.STATE_PAUSED
+        }
+
+        mediaSession?.setPlaybackState(
+            PlaybackStateCompat.Builder()
+                .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1f)
+                .setActions(
+                    PlaybackStateCompat.ACTION_PLAY or
+                    PlaybackStateCompat.ACTION_PAUSE or
+                    PlaybackStateCompat.ACTION_STOP or
+                    PlaybackStateCompat.ACTION_PLAY_PAUSE or
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                    PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
+                )
+                .build()
+        )
+
+        updateMediaSessionMetadata()
+        if (isForegroundStarted) updateNotification()
+    }
+
+    private fun updateNotification() {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NOTIFICATION_ID, createNotification(isPlaying))
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Audio Playback",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows when DJ App is playing audio"
+                setShowBadge(false)
+                enableLights(true)
+                lightColor = NOTIFICATION_COLOR
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun createNotification(isPlaying: Boolean): Notification {
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            0,
+            packageManager.getLaunchIntentForPackage(packageName),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val skipPrevAction = NotificationCompat.Action(
+            android.R.drawable.ic_media_previous,
+            "Previous",
+            createActionIntent(ACTION_SKIP_PREVIOUS)
+        )
+        val playPauseAction = if (isPlaying) {
+            NotificationCompat.Action(
+                android.R.drawable.ic_media_pause,
+                "Pause",
+                createActionIntent(ACTION_PAUSE)
+            )
+        } else {
+            NotificationCompat.Action(
+                android.R.drawable.ic_media_play,
+                "Play",
+                createActionIntent(ACTION_PLAY)
+            )
+        }
+        val skipNextAction = NotificationCompat.Action(
+            android.R.drawable.ic_media_next,
+            "Next",
+            createActionIntent(ACTION_SKIP_NEXT)
+        )
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(currentTitle)
+            .setContentText(currentSubtitle)
+            .setSmallIcon(R.mipmap.ic_launcher_foreground)
+            .setLargeIcon(currentArt())
+            .setContentIntent(contentIntent)
+            .addAction(skipPrevAction)
+            .addAction(playPauseAction)
+            .addAction(skipNextAction)
+            .setStyle(
+                MediaStyle()
+                    .setMediaSession(mediaSession?.sessionToken)
+                    .setShowActionsInCompactView(0, 1, 2)
+            )
+            .setColor(NOTIFICATION_COLOR)
+            .setColorized(true)
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+    }
+
+    private fun createActionIntent(action: String): PendingIntent {
+        val intent = Intent(this, DjMediaBrowserService::class.java).apply {
+            this.action = action
+        }
+        return PendingIntent.getService(
+            this,
+            action.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 }

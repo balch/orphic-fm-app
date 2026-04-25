@@ -2,21 +2,64 @@ package org.balch.orpheus.features.pulsar
 
 import kotlinx.serialization.Serializable
 
+private fun validateProgression(steps: List<ChordStep>, where: String) {
+    require(steps.size in 1..8) {
+        "$where size must be 1..8, got ${steps.size}"
+    }
+    require(steps.all { it.degree in 0..6 }) {
+        "$where degrees must be 0..6 (I-VII), got ${steps.map { it.degree }}"
+    }
+    require(steps.all { it.glideRate in 0f..1f }) {
+        "$where glideRate must be 0..1, got ${steps.map { it.glideRate }}"
+    }
+}
+
 interface VibeProvider {
     val vibe: Vibe
 }
+
+/**
+ * One chord in a progression.
+ * @param degree Scale degree 0..6 (I-VII).
+ * @param glideRate Portamento applied when transitioning *into* this chord, 0..1.
+ *   0 = instant change (default), 0.3 = smooth, 0.6+ = very slow slide.
+ *   Only takes effect on tracks whose role honors the chord progression.
+ */
+@Serializable
+data class ChordStep(
+    val degree: Int,
+    val glideRate: Float = 0f,
+)
+
+/**
+ * Convenience builder: convert a series of scale degrees into [ChordStep]s
+ * with no glide. Use this for the common `progression` form:
+ *
+ *   `customProgression = chords(0, 3, 5, 6)`
+ *
+ * For per-chord glides, build the list explicitly:
+ *
+ *   `customProgression = listOf(ChordStep(0), ChordStep(3, glideRate = 0.4f), ...)`
+ */
+fun chords(vararg degrees: Int): List<ChordStep> = degrees.map { ChordStep(it) }
 
 /**
  * One note in a bass lick pattern.
  * @param scaleDegree Index into the current scale (0 = root, 1 = 2nd degree, etc.)
  * @param duration Note length in beats (0.25 = 16th, 0.5 = 8th, 1.0 = quarter)
  * @param velocity Hit strength 0-1 (lower = ghost note feel)
+ * @param glideRate Optional per-note portamento. `-1f` (default) = use the track's
+ *   own [TrackVoice.glideRate]. A value in `0f..1f` overrides for this step only:
+ *   0 = instant pitch jump; 0.3 = smooth; 0.6+ = very slow slide. The sentinel
+ *   matches the C++ engine's `glide_rate` convention exactly (no boxing, no
+ *   marshalling translation).
  */
 @Serializable
 data class LickStep(
     val scaleDegree: Int,
     val duration: Float,
     val velocity: Float = 0.8f,
+    val glideRate: Float = -1f,
 )
 
 /**
@@ -36,6 +79,10 @@ data class Lick(
     init {
         require(steps.size <= MAX_LICK_STEPS) {
             "Lick steps size ${steps.size} exceeds MAX_LICK_STEPS=$MAX_LICK_STEPS"
+        }
+        require(steps.all { it.glideRate == -1f || it.glideRate in 0f..1f }) {
+            "LickStep.glideRate must be -1 (use track default) or in 0..1, got " +
+                steps.map { it.glideRate }
         }
     }
 
@@ -552,7 +599,7 @@ data class TrackVoice(
     val density: Float = 0.5f,
     val harmonics: Float = 0.5f,
     val timbre: Float = 0.5f,
-    val morph: Float = 0.3f,
+    val morph: Float = 0.5f,
     val envelopeProfile: EnvelopeProfile = EnvelopeProfile.RHYTHM,
     val macroMap: TrackMacroMap = TrackMacroMap.RHYTHM,
     val barStrategy: BarStrategy = BarStrategy.REPEAT,
@@ -658,13 +705,16 @@ enum class ProgressionAnchor(val barsBetweenResets: Int) {
  * @param chordsPerBar How many chord changes per bar. 1 = static, 2 = standard, 4 = busy.
  * @param chordTransitionMatrix Optional 7x7 Markov matrix for chord transitions (I-VII).
  *   Build with [chordMatrix]. Null = use [progressionStyle]'s default matrix.
- * @param customProgression Optional explicit chord sequence. Each entry is a scale
- *   degree 0-6 (I-VII). Overrides the [progressionStyle]'s template sequence but
- *   still uses its matrix unless [chordTransitionMatrix] is also supplied. Size
- *   1..8. Useful for "hang-on-tonic" feels and other vibe-specific forms:
+ * @param customProgression Optional explicit chord sequence. Each entry is a [ChordStep]
+ *   carrying a scale degree 0-6 (I-VII) and an optional per-chord glide. Overrides
+ *   the [progressionStyle]'s template sequence but still uses its matrix unless
+ *   [chordTransitionMatrix] is also supplied. Size 1..8. Useful for "hang-on-tonic"
+ *   feels and other vibe-specific forms:
  *   ```
- *   customProgression = listOf(0, 0, 0, 6)  // i-i-i-VII roots reggae
- *   customProgression = listOf(0, 5, 3, 4)  // I-vi-IV-V doo-wop
+ *   customProgression = chords(0, 0, 0, 6)  // i-i-i-VII roots reggae (no glide)
+ *   customProgression = listOf(                 // pedal-steel slide on the V
+ *       ChordStep(0), ChordStep(5), ChordStep(3, glideRate = 0.45f), ChordStep(4)
+ *   )
  *   ```
  */
 @Serializable
@@ -677,17 +727,10 @@ data class GenreProfile(
     val progressionStyle: ProgressionStyle = ProgressionStyle.POP,
     val chordsPerBar: Int = 2,
     val chordTransitionMatrix: List<Float>? = null,
-    val customProgression: List<Int>? = null,
+    val customProgression: List<ChordStep>? = null,
 ) {
     init {
-        customProgression?.let { p ->
-            require(p.size in 1..8) {
-                "customProgression size must be 1..8, got ${p.size}"
-            }
-            require(p.all { it in 0..6 }) {
-                "customProgression degrees must be 0..6 (I-VII), got $p"
-            }
-        }
+        customProgression?.let { validateProgression(it, "GenreProfile.customProgression") }
     }
 }
 
@@ -878,11 +921,21 @@ data class MacroOverrides(
  * A weighted edge in the section graph.
  * @param targetIndex Index into [Arrangement.sections] for the destination section.
  * @param weight Relative probability of this transition (weights are normalized per section).
+ * @param transitionBars If > 0, the macro overrides crossfade smoothly toward the
+ *   destination section's overrides over the LAST [transitionBars] bars of the
+ *   source section ("pre-roll" model). At the boundary, the destination section
+ *   takes over with full character. Default 0 = hard cut at the boundary.
+ *
+ *   Per-edge so each route can have its own personality:
+ *   - chorus lift:    `SectionTransition(STAB, 0.5f, transitionBars = 2)`
+ *   - hard verse cut: `SectionTransition(VERSE, 0.5f)` (no ramp)
+ *   - long fade-out:  `SectionTransition(DRIFT, 0.2f, transitionBars = 4)`
  */
 @Serializable
 data class SectionTransition(
     val targetIndex: Int,
     val weight: Float,
+    val transitionBars: Int = 0,
 )
 
 
@@ -1222,9 +1275,14 @@ data class TrackSectionOverride(
  * @param name Display name (e.g., "groove", "verse", "chorus", "solo", "breakdown").
  * @param barsMin Minimum bars in this section before transition.
  * @param barsMax Maximum bars in this section.
- * @param transitions Where this section can go next. List of (targetIndex, weight) pairs.
- *   Empty = terminal section (arrangement ends here).
- * @param transitionBars Crossfade bars when transitioning to the next section.
+ * @param barStep Increment within `[barsMin, barsMax]` when randomizing the section
+ *   length. Default 1 = any value in the range. Set to 2 for "even bars only"
+ *   (with `barsMin` even) or "odd bars only" (with `barsMin` odd) — useful for
+ *   keeping phrase lengths musical (4-bar / 8-bar phrases). Set to e.g. 4 for
+ *   4-bar increments only.
+ * @param transitions Where this section can go next. List of (targetIndex, weight,
+ *   transitionBars) edges. Empty = terminal section (arrangement ends here).
+ *   Per-edge `transitionBars` controls macro pre-roll crossfade — see [SectionTransition].
  * @param recencyDecay Penalty for recently-visited sections in transition selection, 0-1.
  * @param macroOverrides Multiply macro values during this section.
  *   e.g., `MacroOverrides(energy = 1.4f)` boosts energy 40% during this section.
@@ -1238,8 +1296,8 @@ data class Section(
     val name: String,
     val barsMin: Int = 4,
     val barsMax: Int = 8,
+    val barStep: Int = 1,
     val transitions: List<SectionTransition> = emptyList(),
-    val transitionBars: Int = 1,
     val recencyDecay: Float = 0.5f,
     val macroOverrides: MacroOverrides? = null,
     val tensionOverride: TensionProfile? = null,
@@ -1250,9 +1308,35 @@ data class Section(
     val compingStyle: CompingStyle? = null,
     /** Override all CHORDAL tracks' section inversion for this section. null = keep defaults. */
     val compingInversion: SectionInversion? = null,
+    /** Override CompingHumanization for ALL CHORDAL tracks in this section. null = keep track defaults. */
+    val compingHumanization: CompingHumanization? = null,
     /** Override all melodic+chordal tracks' chord-follow mode. null = keep defaults. */
     val chordFollow: ChordFollow? = null,
-)
+    /** Per-section chord sequence. Null = inherit vibe's progression.
+     *  When set, this section restarts the progression at its degree 0 on entry.
+     *  Same constraints as [GenreProfile.customProgression]: size 1..8, degrees 0..6.
+     *  Per-chord glide is honored when supplied. */
+    val customProgression: List<ChordStep>? = null,
+    /** Per-section chord-change rate override. Null = inherit vibe's chordsPerBar.
+     *  Valid range 1..4; common values are 1 (static), 2 (standard), 4 (busy). */
+    val chordsPerBar: Int? = null,
+    /** Per-section tempo multiplier applied on top of the vibe's [Vibe.bpm].
+     *  1.0 = no change (default), 0.5 = half-time breakdown, 2.0 = double-time burst.
+     *  Useful range ~0.25..2.0. On each section transition the live BPM is
+     *  scaled by (newMultiplier / previousMultiplier), so live tempo edits the
+     *  user makes during a section carry through into subsequent sections at
+     *  their relative multiplier. */
+    val bpmMultiplier: Float = 1.0f,
+) {
+    init {
+        customProgression?.let { validateProgression(it, "Section.customProgression") }
+        chordsPerBar?.let {
+            require(it in 1..4) { "Section.chordsPerBar must be 1..4, got $it" }
+        }
+        require(barStep in 1..16) { "Section.barStep must be 1..16, got $barStep" }
+        require(bpmMultiplier > 0f) { "Section.bpmMultiplier must be > 0, got $bpmMultiplier" }
+    }
+}
 
 /**
  * Section-based song structure. Sections transition between each other using

@@ -46,8 +46,37 @@ inline int select_next_section(
 
 inline int randomize_section_bars(const SectionParam& sec, uint32_t& seed) {
     if (sec.bars_min >= sec.bars_max) return sec.bars_min;
-    int range = sec.bars_max - sec.bars_min + 1;
-    return sec.bars_min + static_cast<int>(pattern_rand01(seed) * range) % range;
+    int step = (sec.bar_step >= 1) ? sec.bar_step : 1;
+    // Number of valid stops in [bars_min, bars_max] at given step:
+    //   stop_count = floor((bars_max - bars_min) / step) + 1
+    int stop_count = (sec.bars_max - sec.bars_min) / step + 1;
+    if (stop_count <= 1) return sec.bars_min;
+    // pattern_rand01 returns [0, 1), so the cast lands in [0, stop_count - 1].
+    int idx = static_cast<int>(pattern_rand01(seed) * stop_count);
+    return sec.bars_min + idx * step;
+}
+
+// Look up the per-edge transition_bars for the edge from src to target_index.
+// Returns 0 (hard cut) when no matching outgoing edge exists.
+inline int find_edge_transition_bars(const SectionParam& src, int target_index) {
+    for (int i = 0; i < src.transition_count; i++) {
+        if (src.transitions[i].target_index == target_index) {
+            return src.transitions[i].transition_bars;
+        }
+    }
+    return 0;
+}
+
+// Pick the next section the moment the current one becomes active, and stash
+// the chosen edge's transition_bars. The pre-roll ramp zone occupies the LAST
+// `next_section_trans_bars` bars of the current section.
+inline void plan_next_section(SectionState& state, const ArrangementParams& arr, uint32_t& seed) {
+    int next = select_next_section(arr, state, state.current_section, seed);
+    state.next_section_planned = next;
+    state.next_section_trans_bars =
+        (next >= 0 && next < arr.section_count)
+            ? find_edge_transition_bars(arr.sections[state.current_section], next)
+            : 0;
 }
 
 inline void init_section_state(SectionState& state, const ArrangementParams& arr, uint32_t& seed) {
@@ -57,6 +86,12 @@ inline void init_section_state(SectionState& state, const ArrangementParams& arr
     state.target_complexity = -1.0f;
     state.target_space = -1.0f;
     state.target_mood = -1.0f;
+    state.next_energy = -1.0f;
+    state.next_complexity = -1.0f;
+    state.next_space = -1.0f;
+    state.next_mood = -1.0f;
+    state.next_section_planned = -1;
+    state.next_section_trans_bars = 0;
 
     if (!arr.active || arr.section_count == 0) return;
 
@@ -69,9 +104,15 @@ inline void init_section_state(SectionState& state, const ArrangementParams& arr
     }
 
     state.bars_remaining = randomize_section_bars(arr.sections[state.current_section], seed);
+    plan_next_section(state, arr, seed);
 }
 
-// Returns true if a section change occurred
+// Returns true if a section change occurred this bar.
+//
+// Pre-roll model: each bar, decrement bars_remaining. While bars_remaining is
+// less than the planned next edge's transition_bars, blend macros toward the
+// destination via section_macro_value(). At bars_remaining == 0, hard-flip to
+// the planned next section and pre-select the section after that.
 inline bool advance_section(
     SectionState& state,
     const ArrangementParams& arr,
@@ -84,50 +125,65 @@ inline bool advance_section(
     }
     state.bars_since_visit[state.current_section] = 0;
 
-    // Handle transition ramp in progress
-    if (state.transition_target >= 0) {
-        int trans_bars = arr.sections[state.current_section].transition_bars;
-        if (trans_bars > 0) {
-            state.transition_progress += 1.0f / static_cast<float>(trans_bars);
-        } else {
-            state.transition_progress = 1.0f;
-        }
+    state.bars_remaining--;
 
-        if (state.transition_progress >= 1.0f) {
-            state.current_section = state.transition_target;
-            state.transition_target = -1;
-            state.transition_progress = 0.0f;
-            state.bars_remaining = randomize_section_bars(arr.sections[state.current_section], seed);
-            if (!state.intro_done && state.current_section != arr.intro_index) {
-                state.intro_done = true;
-            }
-            return true;
+    // Pre-roll ramp zone: the last N bars of the current section, where
+    // N = the planned outgoing edge's transition_bars (0 = no ramp).
+    int N = state.next_section_trans_bars;
+    int planned = state.next_section_planned;
+    if (N > 0 && planned >= 0 && planned < arr.section_count
+        && state.bars_remaining < N) {
+        // First bar of ramp: stage destination overrides into next_*.
+        if (state.transition_target < 0) {
+            state.transition_target = planned;
+            const MacroOverridesParam& dst = arr.sections[planned].macro_overrides;
+            state.next_energy     = dst.energy;
+            state.next_complexity = dst.complexity;
+            state.next_space      = dst.space;
+            state.next_mood       = dst.mood;
         }
-        return false;
+        // Linear progress 0 -> 1 across N bars: when bars_remaining == N-1 the
+        // first bar of the ramp has just elapsed so progress = 1/N; at
+        // bars_remaining == 0 progress = N/N = 1.0 (boundary about to flip).
+        int into_ramp = N - state.bars_remaining;
+        if (into_ramp > N) into_ramp = N;
+        state.transition_progress = static_cast<float>(into_ramp) / static_cast<float>(N);
     }
 
-    state.bars_remaining--;
     if (state.bars_remaining > 0) return false;
 
-    int next = select_next_section(arr, state, state.current_section, seed);
+    // Section content has fully elapsed -> hard flip to the planned next section.
+    int next = (planned >= 0 && planned < arr.section_count)
+        ? planned
+        : select_next_section(arr, state, state.current_section, seed);
 
+    // outro_triggered may have been set mid-section, after we already planned
+    // toward a different target. Re-route at the boundary; the ramp may have
+    // morphed toward the wrong destination, but the outro takes precedence.
     if (state.outro_triggered && arr.outro_index >= 0) {
         next = arr.outro_index;
     }
 
-    int trans_bars = arr.sections[state.current_section].transition_bars;
-    if (trans_bars > 0) {
-        state.transition_target = next;
-        state.transition_progress = 0.0f;
-        return false;
-    } else {
-        state.current_section = next;
-        state.bars_remaining = randomize_section_bars(arr.sections[next], seed);
-        if (!state.intro_done && next != arr.intro_index) {
-            state.intro_done = true;
-        }
-        return true;
+    state.current_section     = next;
+    state.transition_target   = -1;
+    state.transition_progress = 0.0f;
+    // Don't propagate next_* here; the audio path's section_changed handler
+    // re-reads target_* from arr.sections[next].macro_overrides directly.
+    // Just clear the staging slots so future macro reads don't blend stale values.
+    state.next_energy       = -1.0f;
+    state.next_complexity   = -1.0f;
+    state.next_space        = -1.0f;
+    state.next_mood         = -1.0f;
+    state.bars_remaining = randomize_section_bars(arr.sections[next], seed);
+
+    if (!state.intro_done && next != arr.intro_index) {
+        state.intro_done = true;
     }
+
+    // Pre-plan the section that will follow the one we just entered.
+    plan_next_section(state, arr, seed);
+
+    return true;
 }
 
 inline float section_macro_value(

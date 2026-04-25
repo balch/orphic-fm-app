@@ -71,6 +71,7 @@ static TestSuite suites[] = {
     {"pattern_gen",     run_pulsar_pattern_gen_tests, true},
     {"band_solo",       run_pulsar_band_solo_tests, true},
     {"lick_techniques", run_pulsar_lick_techniques_tests, true},
+    {"pulsar_glide",    run_pulsar_glide_tests,    true},
     {"markov_solo",     run_markov_solo_tests,     true},
     {"analysis",        run_pulsar_analysis_tests, false},  // manual: writes WAV files
 };

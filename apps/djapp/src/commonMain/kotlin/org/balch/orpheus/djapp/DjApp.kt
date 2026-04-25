@@ -79,26 +79,29 @@ fun DjApp(graph: DjAppGraph) {
                     LocalSignalVizGlow provides (1f - vizState.knob2Value),
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
+                        // Outer liquefiable: source for the dialog lens — must
+                        // include both the viz AND the panels so dialogs see
+                        // through everything.
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .liquefiable(dialogLiquidState)
                         ) {
-                            Box(
+                            // VizBackground is the source for the panel lenses
+                            // (liquidState). It's a SIBLING of DjAppScreen, not
+                            // a parent — otherwise the panels would be inside
+                            // their own source and the glass effect collapses.
+                            VizBackground(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .liquefiable(liquidState)
-                            ) {
-                                VizBackground(
-                                    modifier = Modifier.fillMaxSize(),
-                                    selectedViz = vizState.selectedViz,
-                                )
-                                DjAppScreen(
-                                    synthEngine = graph.synthEngine,
-                                    vizFeature = vizFeature,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            }
+                                    .liquefiable(liquidState),
+                                selectedViz = vizState.selectedViz,
+                            )
+                            DjAppScreen(
+                                synthEngine = graph.synthEngine,
+                                vizFeature = vizFeature,
+                                modifier = Modifier.fillMaxSize(),
+                            )
                         }
                     }
                 }

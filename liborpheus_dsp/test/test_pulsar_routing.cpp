@@ -154,6 +154,60 @@ static bool test_pulsar_genre_port_routing() {
     return pass;
 }
 
+// Regression: the routing parser checks the more-specific
+// "custom_progression_glide_" prefix BEFORE the broader "custom_progression_"
+// prefix. If that ordering is ever flipped, atoi("glide_3") would silently
+// route the glide value into pulsar_custom_progression[0]. Same shape applies
+// to "section_progression_glide_" vs "section_progression_degree_".
+static bool test_pulsar_progression_glide_routing() {
+    printf("\n  Test: Pulsar progression glide ports route to glide arrays (not progression arrays)\n");
+    bool pass = true;
+
+    OrpheusEngine* engine = orpheus_engine_create(48000);
+
+    // Distinct sentinel values so a misroute is obvious from the failure message.
+    for (int i = 0; i < 8; i++) {
+        char sym[64];
+        snprintf(sym, sizeof(sym), "custom_progression_glide_%d", i);
+        check_float_port(engine, sym, 0.10f + 0.05f * i,
+                         engine->pulsar_custom_progression_glide[i], pass);
+
+        snprintf(sym, sizeof(sym), "custom_progression_%d", i);
+        check_int_port(engine, sym, i + 1, engine->pulsar_custom_progression[i], pass);
+    }
+    // Confirm the glide route did not corrupt pulsar_custom_progression[0].
+    if (engine->pulsar_custom_progression[0].load(std::memory_order_relaxed) != 1) {
+        printf("    FAIL: custom_progression[0] corrupted by glide-routing collision (got %d)\n",
+               engine->pulsar_custom_progression[0].load(std::memory_order_relaxed));
+        pass = false;
+    }
+
+    for (int s = 0; s < 8; s++) {
+        for (int i = 0; i < 8; i++) {
+            char sym[64];
+            int idx = s * 8 + i;
+            snprintf(sym, sizeof(sym), "section_progression_glide_%d", idx);
+            check_float_port(engine, sym, 0.20f + 0.001f * idx,
+                             engine->pulsar_section_progression_glides[idx], pass);
+
+            snprintf(sym, sizeof(sym), "section_progression_degree_%d", idx);
+            check_int_port(engine, sym, (idx % 7),
+                           engine->pulsar_section_progression_degrees[idx], pass);
+        }
+    }
+    if (engine->pulsar_section_progression_degrees[0].load(std::memory_order_relaxed) != 0) {
+        printf("    FAIL: section_progression_degrees[0] corrupted by glide-routing collision (got %d)\n",
+               engine->pulsar_section_progression_degrees[0].load(std::memory_order_relaxed));
+        pass = false;
+    }
+
+    printf("    %s: progression glide routing isolated from degree/index routing\n",
+           pass ? "PASS" : "FAIL");
+
+    orpheus_engine_destroy(engine);
+    return pass;
+}
+
 bool run_pulsar_routing_tests() {
     printf("\n═══ Pulsar Port Routing Coverage ═══\n");
     int passed = 0, failed = 0;
@@ -165,6 +219,7 @@ bool run_pulsar_routing_tests() {
     run(test_pulsar_global_port_routing);
     run(test_pulsar_per_track_port_routing);
     run(test_pulsar_genre_port_routing);
+    run(test_pulsar_progression_glide_routing);
 
     printf("\n  Pulsar Routing: %d passed, %d failed\n", passed, failed);
     TEST_SUITE_RETURN(passed, failed);

@@ -31,6 +31,7 @@ import org.balch.orpheus.features.pulsar.ScaleType
 import org.balch.orpheus.features.pulsar.Section
 import org.balch.orpheus.features.pulsar.SectionInversion
 import org.balch.orpheus.features.pulsar.SectionTransition
+import org.balch.orpheus.features.pulsar.SoloMode
 import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TonalTension
 import org.balch.orpheus.features.pulsar.TrackMacroMap
@@ -40,6 +41,7 @@ import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
 import org.balch.orpheus.features.pulsar.VibeProvider
 import org.balch.orpheus.features.pulsar.bandMatrix
+import org.balch.orpheus.features.pulsar.chords
 import org.balch.orpheus.features.pulsar.row
 
 /**
@@ -59,6 +61,26 @@ import org.balch.orpheus.features.pulsar.row
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class RastaManVibe : VibeProvider {
+
+    // Roots reggae: hang on tonic for 3 bars, VII turnaround on bar 4.
+    // Am-Am-Am-G — the signature "one drop" phrase shape.
+    private val mainProgression = chords(0, 0, 0, 6)
+    private val chordsPerBar = 1
+
+    private val chorusProgression = chords(0, 5, 6, 0)
+    private val chorusChordsPerBar = 2
+
+    // Per-edge transitionBars precedent: name the *musical role* the ramp serves,
+    // not the bar count. Reggae lives on smooth transitions — use these for
+    // every edge, not just the obvious ones.
+    //
+    //   skankLiftBars — gentle ramp UP into a busier section (chorus, solo) or
+    //                   re-emergence from a breakdown (dub -> groove).
+    //   dubFadeBars   — long dreamy fade INTO the dub breakdown — reverb tails
+    //                   bloom as the band drops out.
+    private val skankLiftBars = 2
+    private val dubFadeBars = 4
+
     override val vibe = Vibe(
         name = "Bell Tolls",
         bpm = 78f,  // classic roots reggae tempo
@@ -116,10 +138,8 @@ class RastaManVibe : VibeProvider {
             noteRangeHigh = 72,
             rhythmDensity = RhythmPattern.BACKBEAT.density,
             progressionStyle = ProgressionStyle.MODAL,  // matrix still modal for drift flavor
-            chordsPerBar = 1,  // 1 chord per bar → 4-bar roots phrase
-            // Roots reggae: hang on tonic for 3 bars, VII turnaround on bar 4.
-            // Am-Am-Am-G — the signature "one drop" phrase shape.
-            customProgression = listOf(0, 0, 0, 6),
+            chordsPerBar = chordsPerBar,
+            customProgression = mainProgression,
         ),
         progressionAnchor = ProgressionAnchor.EVERY_4,   // reset every phrase
         progressionDriftRange = 0.08f,                    // minimal drift — keep the phrase shape
@@ -276,7 +296,7 @@ class RastaManVibe : VibeProvider {
                 morphLow = 0.25f, morphHigh = 0.55f, morphProbability = 0.5f,
                 attackPoint = 0.5f, releaseSpeed = 0.4f,
             ),
-            spurtChance = 0.12f,
+            spurtChance = 0.22f,
         ),
         effects = VibeEffects(
             // Classic reggae delay — dotted 8th feel, long feedback for that dub tail
@@ -293,38 +313,45 @@ class RastaManVibe : VibeProvider {
         arrangement = Arrangement(
             introIndex = 0,
             sections = listOf(
-                // 0 INTRO: Just drums + bass locking in — classic reggae opening
+                // 0 INTRO: Just drums + bass locking in — classic reggae opening.
+                // intro -> groove: skankLift (the band rises into the pocket).
                 Section(
                     name = "intro",
-                    barsMin = 2, barsMax = 4,
+                    barsMin = 2, barsMax = 2,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 1, weight = 1.0f),
+                        SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = skankLiftBars),
                     ),
                     macroOverrides = MacroOverrides(
                         energy = 0.45f, complexity = 0.25f, space = 0.8f, mood = 0.9f,
                     ),
+                    chordsPerBar = 3,
+                    customProgression = chords(0, 0, 6)
                 ),
-                // 1 GROOVE: Full band roots feel — the main pocket
+                // 1 GROOVE: Full band roots feel — the main pocket.
+                // groove -> chorus / solo: skankLift (gentle energy climb).
+                // groove -> dub: dubFade (long dreamy descent into the breakdown).
                 Section(
                     name = "groove",
                     barsMin = 8, barsMax = 12,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 2, weight = 0.5f),  // chorus
-                        SectionTransition(targetIndex = 3, weight = 0.3f),  // dub
-                        SectionTransition(targetIndex = 4, weight = 0.2f),  // solo
+                        SectionTransition(targetIndex = 2, weight = 0.5f, transitionBars = skankLiftBars),  // chorus
+                        SectionTransition(targetIndex = 3, weight = 0.3f, transitionBars = dubFadeBars),    // dub
+                        SectionTransition(targetIndex = 4, weight = 0.2f, transitionBars = skankLiftBars),  // solo
                     ),
                     recencyDecay = 0.5f,
                     // groove is baseline — no macro overrides
                 ),
                 // 2 CHORUS: Bumped energy, horns prominent, skank shifts to
                 // SKA_UPSTROKES for a busier off-beat feel. Classic reggae lift.
+                // chorus -> groove / solo: skankLift (gentle return / lead-in).
+                // chorus -> dub: dubFade (long descent into the breakdown).
                 Section(
                     name = "chorus",
-                    barsMin = 6, barsMax = 8,
+                    barsMin = 4, barsMax =4,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 1, weight = 0.5f),
-                        SectionTransition(targetIndex = 3, weight = 0.3f),
-                        SectionTransition(targetIndex = 4, weight = 0.2f),
+                        SectionTransition(targetIndex = 1, weight = 0.5f, transitionBars = skankLiftBars),
+                        SectionTransition(targetIndex = 3, weight = 0.3f, transitionBars = dubFadeBars),
+                        SectionTransition(targetIndex = 4, weight = 0.2f, transitionBars = skankLiftBars),
                     ),
                     recencyDecay = 0.5f,
                     macroOverrides = MacroOverrides(
@@ -332,16 +359,18 @@ class RastaManVibe : VibeProvider {
                     ),
                     compingStyle = CompingStyle.SKA_UPSTROKES,   // busier off-beats
                     compingInversion = SectionInversion.FIRST_INVERSION,
+                    chordsPerBar = chorusChordsPerBar,
+                    customProgression = chorusProgression
                 ),
                 // 3 DUB: The reggae breakdown — bass drones, everything bathed in
                 // reverb and delay. Drummer keeps time but everyone else floats.
+                // dub -> groove / chorus: skankLift (re-emerging from the haze).
                 Section(
                     name = "dub",
                     barsMin = 4, barsMax = 8,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 1, weight = 0.6f),
-                        SectionTransition(targetIndex = 2, weight = 0.25f),
-                        SectionTransition(targetIndex = 0, weight = 0.15f),
+                        SectionTransition(targetIndex = 1, weight = 0.6f, transitionBars = skankLiftBars),
+                        SectionTransition(targetIndex = 2, weight = 0.4f, transitionBars = skankLiftBars),
                     ),
                     recencyDecay = 0.5f,
                     macroOverrides = MacroOverrides(
@@ -351,15 +380,18 @@ class RastaManVibe : VibeProvider {
                 ),
                 // 4 SOLO: Melodica takes the spotlight, LickBuilder evolves the
                 // phrase aggressively while the band holds the pocket.
+                // solo -> groove / chorus: skankLift.
+                // solo -> dub: dubFade (long fade into the breakdown).
                 Section(
                     name = "solo",
                     barsMin = 8, barsMax = 12,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 1, weight = 0.5f),
-                        SectionTransition(targetIndex = 2, weight = 0.3f),
-                        SectionTransition(targetIndex = 3, weight = 0.2f),
+                        SectionTransition(targetIndex = 1, weight = 0.5f, transitionBars = skankLiftBars),
+                        SectionTransition(targetIndex = 2, weight = 0.3f, transitionBars = skankLiftBars),
+                        SectionTransition(targetIndex = 3, weight = 0.2f, transitionBars = dubFadeBars),
                     ),
                     recencyDecay = 0.4f,
+                    soloMode = SoloMode.LickBuilder(),
                     macroOverrides = MacroOverrides(
                         energy = 0.9f, complexity = 1.4f, space = 1.2f, mood = 1.3f,
                     ),

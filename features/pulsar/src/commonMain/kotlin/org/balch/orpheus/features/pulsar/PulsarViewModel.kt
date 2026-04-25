@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -290,7 +292,8 @@ class PulsarViewModel(
     private val progressionDriftRangeId = synthController.controlFlow(PulsarSymbol.PROGRESSION_DRIFT_RANGE.controlId)
     private val lickLengthId = synthController.controlFlow(PulsarSymbol.LICK_LENGTH.controlId)
     private val lickLoopLengthId = synthController.controlFlow(PulsarSymbol.LICK_LOOP_LENGTH.controlId)
-    private val lickDataIds = (0..95).map { i ->
+    // 32 lick steps × 4 floats per step (degree, duration, velocity, glide_rate).
+    private val lickDataIds = (0..127).map { i ->
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.LICK_DATA_0.ordinal + i].controlId)
     }
 
@@ -408,6 +411,11 @@ class PulsarViewModel(
     private val vibeFlow = MutableStateFlow(vibeList.first())
     private val restoreComplete = CompletableDeferred<Unit>()
     private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+
+    // Tracks the bpmMultiplier of the section we're currently in. Read/written
+    // by the section-BPM collector and reset to 1.0f at every applyVibe (since
+    // applyVibe resets globalTempo to vibe.bpm — the 1.0× baseline).
+    @Volatile private var lastSectionMult: Float = 1.0f
 
     // Seed BPM from GlobalTempo before controlIntents/stateFlow subscribe,
     // so the first emission matches the system tempo, not the plugin default.
@@ -528,33 +536,6 @@ class PulsarViewModel(
         },
     )
 
-    private fun buildArrangementSubtitle(
-        state: PulsarArrangementState,
-        vibe: Vibe,
-    ): String {
-        if (state.sectionIndex < 0) return "Pulsar"
-
-        val section = vibe.arrangement?.sections?.getOrNull(state.sectionIndex)
-        val sectionName = section?.name ?: "Section ${state.sectionIndex + 1}"
-        val currentBar = state.barsElapsed + 1
-
-        return buildString {
-            append(sectionName)
-            if (state.soloActive && state.soloTrack >= 0) {
-                val bandMembers = vibe.band?.members
-                val soloistName = if (state.bandSolo && bandMembers != null) {
-                    bandMembers.getOrElse(state.soloTrack) { null }?.name
-                } else {
-                    PULSAR_TRACK_NAMES.getOrElse(state.soloTrack) { null }
-                }
-                if (soloistName != null) {
-                    append(" \u00b7 $soloistName Solo")
-                }
-            }
-            append(" \u00b7 Bar $currentBar/${state.barsTotal}")
-        }
-    }
-
     // ═══════════════════════════════════════════════════════════
     // State flow
     // ═══════════════════════════════════════════════════════════
@@ -635,6 +616,31 @@ class PulsarViewModel(
                 bpmId.value = FloatValue(bpm.toFloat())
             }
         }
+        // Per-section BPM: on each section transition, scale the live BPM by
+        // (newMult / oldMult). This composes with user-dialed tempo edits —
+        // a half-time breakdown stays half-time even if the user dialed BPM
+        // during the previous section. lastSectionMult resets to 1.0 on each
+        // vibe load (see applyVibe), so the first section's mult applies on
+        // top of vibe.bpm.
+        scope.launch(dispatcherProvider.io) {
+            arrangementStateFlow
+                .map { it.sectionIndex }
+                .filter { it >= 0 }
+                .distinctUntilChanged()
+                .collect { sectionIndex ->
+                    val vibe = vibeFlow.value
+                    val newMult = vibe.arrangement?.sections
+                        ?.getOrNull(sectionIndex)?.bpmMultiplier ?: 1.0f
+                    val oldMult = lastSectionMult
+                    lastSectionMult = newMult
+                    if (newMult == oldMult) return@collect
+                    val currentBpm = globalTempo.getBpm().toFloat()
+                    val effective = currentBpm * (newMult / oldMult)
+                    if (kotlin.math.abs(effective - currentBpm) > 0.01f) {
+                        globalTempo.setBpm(effective.toDouble())
+                    }
+                }
+        }
         // Debounced save: waits for restore to complete first to avoid saving stale defaults.
         // Timeout ensures saving isn't blocked forever if presetFlow never emits.
         scope.launch(dispatcherProvider.io) {
@@ -657,27 +663,28 @@ class PulsarViewModel(
             }
         }
 
-        // Update notification metadata when arrangement state, vibe, or mute changes
+        // Update notification metadata when the vibe or play-state changes.
+        // Deliberately NOT keyed on arrangement (section/bar) — that updates
+        // every beat which is unsafe to surface on a car display and causes
+        // Android Auto to re-render the now-playing card too often.
         scope.launch(dispatcherProvider.io) {
             combine(
-                arrangementStateFlow,
                 vibeFlow,
                 mutedId.map { it.asInt() == 0 },
-            ) { arrState, vibe, playing ->
-                Triple(arrState, vibe, playing)
-            }.collect { (arrState, vibe, playing) ->
-                if (playing || mediaPaused) {
-                    val subtitle = buildArrangementSubtitle(arrState, vibe)
-                    mediaSessionManager.updateMetadata(
-                        PlaybackMetadata(
-                            title = vibe.name,
-                            mode = PlaybackMode.PULSAR,
-                            isPlaying = playing,
-                            subtitle = subtitle,
+            ) { vibe, playing -> vibe to playing }
+                .distinctUntilChanged()
+                .collect { (vibe, playing) ->
+                    if (playing || mediaPaused) {
+                        mediaSessionManager.updateMetadata(
+                            PlaybackMetadata(
+                                title = vibe.name,
+                                mode = PlaybackMode.PULSAR,
+                                isPlaying = playing,
+                                subtitle = "",
+                            )
                         )
-                    )
+                    }
                 }
-            }
         }
 
         // Wire skip actions to vibe cycling
@@ -706,6 +713,20 @@ class PulsarViewModel(
             mediaPaused = true
             mutedId.value = IntValue(1)
             playingId.value = IntValue(0)
+        }
+
+        // Android Auto browseable tree item selected.
+        // mediaId == vibe.name (see DjMediaBrowserService.onLoadChildren).
+        // Unknown ids are ignored — Auto can send stale entries.
+        mediaSessionManager.onPlayFromMediaId = { mediaId ->
+            vibeList.firstOrNull { it.name == mediaId }?.let { vibe ->
+                applyVibe(vibe)
+                mediaPaused = false
+                mutedId.value = IntValue(0)
+                if (playingId.value.asInt() == 0) {
+                    playingId.value = IntValue(1)
+                }
+            }
         }
 
         // Subscribe to PlaybackLifecycleEvent.StopAll (e.g., timer expiry)
@@ -776,6 +797,9 @@ class PulsarViewModel(
     private fun applyVibe(vibe: Vibe) {
         // Set vibeFlow first so pushEffectiveSends reads the new vibe's per-track sends
         vibeFlow.value = vibe
+        // globalTempo will be set to vibe.bpm below — that is the 1.0× baseline
+        // for the section-BPM collector to compose multipliers against.
+        lastSectionMult = 1.0f
 
         // Reset all track mutes on vibe load
         _trackMutedFlow.value = List(8) { false }
@@ -879,14 +903,19 @@ class PulsarViewModel(
         }
 
         // Custom progression (optional chord sequence override, max 8 slots).
-        // Write degrees first, then length (acts as a release fence on the C++ side).
+        // Write degrees + glides first, then length (acts as a release fence on
+        // the C++ side). Per-chord glide is applied on transition into each chord.
         val customProg = vibe.genre.customProgression
         if (customProg != null) {
-            customProg.forEachIndexed { i, degree ->
+            customProg.forEachIndexed { i, step ->
                 if (i < 8) {
                     synthController.setPluginControl(
                         PluginControlId(PULSAR_URI, "custom_progression_$i"),
-                        IntValue(degree)
+                        IntValue(step.degree)
+                    )
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "custom_progression_glide_$i"),
+                        FloatValue(step.glideRate)
                     )
                 }
             }
@@ -909,9 +938,11 @@ class PulsarViewModel(
         val lick = vibe.lick
         if (lick != null) {
             lick.steps.forEachIndexed { i, step ->
-                lickDataIds[i * 3].value = FloatValue(step.scaleDegree.toFloat())
-                lickDataIds[i * 3 + 1].value = FloatValue(step.duration)
-                lickDataIds[i * 3 + 2].value = FloatValue(step.velocity)
+                lickDataIds[i * 4].value = FloatValue(step.scaleDegree.toFloat())
+                lickDataIds[i * 4 + 1].value = FloatValue(step.duration)
+                lickDataIds[i * 4 + 2].value = FloatValue(step.velocity)
+                // -1 = "use the track's TrackVoice.glideRate"; explicit value overrides.
+                lickDataIds[i * 4 + 3].value = FloatValue(step.glideRate)
             }
             lickMutationId.value = FloatValue(vibe.lickMutation)
             lickOctaveId.value = IntValue(vibe.lickOctave)
@@ -1021,15 +1052,16 @@ class PulsarViewModel(
      * Layout for C++ engine arrays (must match orpheus_engine_routing.cpp and load_vibe()):
      *
      * section_data[s * 21 + field]:
-     *   0=bars_min, 1=bars_max, 2=transition_bars, 3=recency_decay,
+     *   0=bars_min, 1=bars_max, 2=bar_step (1 = any; 2 = odd/even only; etc.),
+     *   3=recency_decay,
      *   4=macro_energy, 5=macro_complexity, 6=macro_space, 7=macro_mood,
      *   8=has_solo/solo_mode_id, 9..17=solo params (format depends on new vs legacy),
      *   12=bars_per_soloist_max, 13=solo_transition_bars, 14=improv_carryover,
      *   15=transition_count, 16=reserved, 17=reserved,
      *   18=comping_style_override (-1=no override), 19=comping_inversion_override, 20=chord_follow_override
      *
-     * section_transitions[s * 8 * 2 + t * 2 + field]:
-     *   0=targetIndex, 1=weight (up to 8 transitions per section)
+     * section_transitions[s * 8 * 3 + t * 3 + field]:
+     *   0=targetIndex, 1=weight, 2=transitionBars (up to 8 transitions per section)
      *
      * track_solo_behavior[t * 15 + field]:
      *   0=volume_boost, 1=density_boost, 2=timbre_min, 3=timbre_max,
@@ -1080,12 +1112,13 @@ class PulsarViewModel(
                     PluginControlId(PULSAR_URI, "section_data_${base + field}"), FloatValue(v)
                 )
             // Must match C++ load_vibe() unpack order exactly:
-            // [0]=bars_min, [1]=bars_max, [2]=transition_bars, [3]=recency_decay,
+            // [0]=bars_min, [1]=bars_max, [2]=bar_step (1 = any value in
+            //   [bars_min, bars_max]; 2 = odd-or-even-only stride), [3]=recency_decay,
             // [4]=transition_count, [5]=energy, [6]=complexity, [7]=space, [8]=mood,
             // [9..17]=solo data (format depends on new vs legacy system)
             setSection(0, section.barsMin.toFloat())
             setSection(1, section.barsMax.toFloat())
-            setSection(2, section.transitionBars.toFloat())
+            setSection(2, section.barStep.toFloat())
             setSection(3, section.recencyDecay)
             setSection(4, section.transitions.size.toFloat())
             setSection(5, mo?.energy ?: -1f)
@@ -1125,17 +1158,102 @@ class PulsarViewModel(
             setSection(19, compingInversionOrSentinel(section.compingInversion))
             setSection(20, chordFollowOrSentinel(section.chordFollow))
 
-            // Transitions for this section (up to 8 × 2 floats)
-            val transBase = s * 8 * 2
+            // Transitions for this section (up to 8 edges × 3 floats per edge:
+            // [target_index, weight, transition_bars]).
+            val transBase = s * 8 * 3
             section.transitions.forEachIndexed { t, tr ->
                 synthController.setPluginControl(
-                    PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 2}"),
+                    PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 3}"),
                     FloatValue(tr.targetIndex.toFloat())
                 )
                 synthController.setPluginControl(
-                    PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 2 + 1}"),
+                    PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 3 + 1}"),
                     FloatValue(tr.weight)
                 )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_transitions_${transBase + t * 3 + 2}"),
+                    FloatValue(tr.transitionBars.toFloat())
+                )
+            }
+
+            // --- Per-section progression override ---
+            // Per-chord glide is applied on transition into each chord by the
+            // pulsar progression runner; 0 = no glide.
+            val cp = section.customProgression
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "section_progression_active_$s"),
+                IntValue(cp?.size ?: 0)
+            )
+            if (cp != null) {
+                for (i in cp.indices) {
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "section_progression_degree_${s * 8 + i}"),
+                        IntValue(cp[i].degree)
+                    )
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "section_progression_glide_${s * 8 + i}"),
+                        FloatValue(cp[i].glideRate)
+                    )
+                }
+            }
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "section_chords_per_bar_$s"),
+                IntValue(section.chordsPerBar ?: 0)
+            )
+
+            // --- Per-section tension override ---
+            val to = section.tensionOverride
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "section_tension_active_$s"),
+                IntValue(if (to != null) 1 else 0)
+            )
+            if (to != null) {
+                val tBase = s * 21
+                fun setTension(field: Int, v: Float) =
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "section_tension_data_${tBase + field}"),
+                        FloatValue(v)
+                    )
+                setTension(0,  to.innerBars.toFloat())
+                setTension(1,  to.outerBars.toFloat())
+                setTension(2,  to.outerDepth)
+                setTension(3,  to.volume)
+                setTension(4,  to.timing)
+                setTension(5,  if (to.tonal.octaveShift) 1f else 0f)
+                setTension(6,  to.tonal.keyShift.toFloat())
+                setTension(7,  if (to.tonal.halfLick) 1f else 0f)
+                setTension(8,  to.tonal.chromaticPassing)
+                setTension(9,  to.evolution.timbreLow)
+                setTension(10, to.evolution.timbreHigh)
+                setTension(11, to.evolution.timbreProbability)
+                setTension(12, to.evolution.morphLow)
+                setTension(13, to.evolution.morphHigh)
+                setTension(14, to.evolution.morphProbability)
+                setTension(15, to.evolution.harmonicsLow)
+                setTension(16, to.evolution.harmonicsHigh)
+                setTension(17, to.evolution.harmonicsProbability)
+                setTension(18, to.evolution.attackPoint)
+                setTension(19, to.evolution.releaseSpeed)
+                setTension(20, to.spurtChance)
+            }
+
+            // --- Per-section comping humanization override ---
+            val ch = section.compingHumanization
+            synthController.setPluginControl(
+                PluginControlId(PULSAR_URI, "section_comping_humanization_active_$s"),
+                IntValue(if (ch != null) 1 else 0)
+            )
+            if (ch != null) {
+                val chBase = s * 4
+                fun setCh(field: Int, v: Float) =
+                    synthController.setPluginControl(
+                        PluginControlId(PULSAR_URI, "section_comping_humanization_data_${chBase + field}"),
+                        FloatValue(v)
+                    )
+                setCh(0, ch.dropProbability)
+                setCh(1, ch.ghostProbability)
+                setCh(2, ch.octaveJumpProbability)
+                setCh(3, ch.extensionProbability)
             }
         }
 

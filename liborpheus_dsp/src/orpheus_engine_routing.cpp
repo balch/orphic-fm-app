@@ -879,6 +879,13 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->pulsar_custom_progression_active.store(static_cast<int>(value), std::memory_order_relaxed);
         else if (std::strcmp(symbol, "custom_progression_length") == 0)
             engine->pulsar_custom_progression_length.store(static_cast<int>(value), std::memory_order_relaxed);
+        // Match the more-specific "custom_progression_glide_" prefix BEFORE the
+        // broader "custom_progression_" so atoi("glide_0") does not collide.
+        else if (std::strncmp(symbol, "custom_progression_glide_", 25) == 0) {
+            int idx = std::atoi(symbol + 25);
+            if (idx >= 0 && idx < 8)
+                engine->pulsar_custom_progression_glide[idx].store(value, std::memory_order_relaxed);
+        }
         else if (std::strncmp(symbol, "custom_progression_", 19) == 0) {
             int idx = std::atoi(symbol + 19);
             if (idx >= 0 && idx < 8)
@@ -935,13 +942,14 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
         else if (std::strncmp(symbol, "lick_data_", 10) == 0) {
             int idx = std::atoi(symbol + 10);
-            int step = idx / 3;
-            int field = idx % 3;
+            int step = idx / 4;
+            int field = idx % 4;
             if (step >= 0 && step < OrpheusEngine::kMaxLickSteps) {
                 switch (field) {
                     case 0: engine->pulsar_lick[step].scale_degree = static_cast<int8_t>(value); break;
                     case 1: engine->pulsar_lick[step].duration = value; break;
                     case 2: engine->pulsar_lick[step].velocity = value; break;
+                    case 3: engine->pulsar_lick[step].glide_rate = value; break;  // -1 = use track default
                 }
             }
         }
@@ -961,8 +969,56 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
         }
         else if (std::strncmp(symbol, "section_transitions_", 20) == 0) {
             int idx = std::atoi(symbol + 20);
-            if (idx >= 0 && idx < 8 * 8 * 2)
+            if (idx >= 0 && idx < 8 * 8 * 3)
                 engine->pulsar_section_transitions[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_progression_active_", 27) == 0) {
+            int idx = std::atoi(symbol + 27);
+            if (idx >= 0 && idx < 8)
+                engine->pulsar_section_progression_length[idx].store(
+                    static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_progression_degree_", 27) == 0) {
+            int idx = std::atoi(symbol + 27);
+            if (idx >= 0 && idx < 8 * 8)
+                engine->pulsar_section_progression_degrees[idx].store(
+                    static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_progression_glide_", 26) == 0) {
+            int idx = std::atoi(symbol + 26);
+            if (idx >= 0 && idx < 8 * 8)
+                engine->pulsar_section_progression_glides[idx].store(
+                    value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_chords_per_bar_", 23) == 0) {
+            int idx = std::atoi(symbol + 23);
+            if (idx >= 0 && idx < 8)
+                engine->pulsar_section_chords_per_bar[idx].store(
+                    static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_tension_active_", 23) == 0) {
+            int idx = std::atoi(symbol + 23);
+            if (idx >= 0 && idx < 8)
+                engine->pulsar_section_tension_active[idx].store(
+                    static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_tension_data_", 21) == 0) {
+            int idx = std::atoi(symbol + 21);
+            if (idx >= 0 && idx < 8 * 21)
+                engine->pulsar_section_tension_data[idx].store(
+                    value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_comping_humanization_active_", 36) == 0) {
+            int idx = std::atoi(symbol + 36);
+            if (idx >= 0 && idx < 8)
+                engine->pulsar_section_comping_humanization_active[idx].store(
+                    static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_comping_humanization_data_", 34) == 0) {
+            int idx = std::atoi(symbol + 34);
+            if (idx >= 0 && idx < 8 * 4)
+                engine->pulsar_section_comping_humanization_data[idx].store(
+                    value, std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "track_solo_behavior_", 20) == 0) {
             int idx = std::atoi(symbol + 20);

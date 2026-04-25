@@ -265,7 +265,7 @@ static void setup_jam_arrangement(OrpheusEngine* engine) {
     // Section 0
     section_data[0] = 4;    // bars_min
     section_data[1] = 8;    // bars_max
-    section_data[2] = 0;    // transition_bars
+    section_data[2] = 1;    // bar_step = 1 (any value in range)
     section_data[3] = 0.8f; // recency_decay
     section_data[4] = 2;    // transition_count
     section_data[5] = -1;   // macro energy (no override)
@@ -294,13 +294,16 @@ static void setup_jam_arrangement(OrpheusEngine* engine) {
     for (int i = 0; i < 8 * kSectionStride; i++)
         engine->pulsar_section_data[i].store(section_data[i], std::memory_order_relaxed);
 
-    // Transitions: s0->{0:0.6, 1:0.4}, s1->{0:0.6, 1:0.4}
-    float trans[8 * 8 * 2] = {};
-    trans[0] = 0; trans[1] = 0.6f;
-    trans[2] = 1; trans[3] = 0.4f;
-    trans[16] = 0; trans[17] = 0.6f;
-    trans[18] = 1; trans[19] = 0.4f;
-    for (int i = 0; i < 8 * 8 * 2; i++)
+    // Transitions: s0->{0:0.6, 1:0.4}, s1->{0:0.6, 1:0.4}.
+    // Per-edge stride: 3 floats (target, weight, transition_bars). All hard-cut.
+    float trans[8 * 8 * 3] = {};
+    // s0 edges (base index 0)
+    trans[0] = 0; trans[1] = 0.6f; trans[2] = 0;
+    trans[3] = 1; trans[4] = 0.4f; trans[5] = 0;
+    // s1 edges (base index 8 * 3 = 24)
+    trans[24] = 0; trans[25] = 0.6f; trans[26] = 0;
+    trans[27] = 1; trans[28] = 0.4f; trans[29] = 0;
+    for (int i = 0; i < 8 * 8 * 3; i++)
         engine->pulsar_section_transitions[i].store(trans[i], std::memory_order_relaxed);
 
     // Default solo behavior/ducking/markov (zeros — C++ applies defaults)

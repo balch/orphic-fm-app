@@ -13,6 +13,12 @@ interface ForegroundServiceController {
      * Action handler callback for media button actions.
      */
     var actionHandler: ((String) -> Unit)?
+
+    /**
+     * Callback invoked when a media browser client (e.g., Android Auto) asks
+     * to play a specific media item by id.
+     */
+    var playFromMediaIdHandler: ((String) -> Unit)?
     
     /**
      * Start the foreground service.
@@ -48,6 +54,8 @@ interface ForegroundServiceController {
         const val EXTRA_IS_PLAYING = "extra_is_playing"
         const val ACTION_SKIP_NEXT = "org.balch.orpheus.SKIP_NEXT"
         const val ACTION_SKIP_PREVIOUS = "org.balch.orpheus.SKIP_PREVIOUS"
+        const val ACTION_PLAY_FROM_MEDIA_ID = "org.balch.orpheus.PLAY_FROM_MEDIA_ID"
         const val EXTRA_SUBTITLE = "extra_subtitle"
+        const val EXTRA_MEDIA_ID = "extra_media_id"
     }
 }

@@ -375,9 +375,25 @@ static void mutate_patterns(PulsarState* state, float complexity, OrpheusEngine*
 
         // ── Humanization (only if no fill this bar) ──
         if (!fill_fired && any_human) {
+            // Section-level override wins when active (snap, no crossfade).
+            float h_drop  = ts.human_drop_prob;
+            float h_ghost = ts.human_ghost_prob;
+            float h_oct   = ts.human_octave_prob;
+            float h_ext   = ts.human_ext_prob;
+            if (state->arrangement.active && state->arrangement.section_count > 0) {
+                int cur = state->section_state.current_section;
+                if (cur >= 0 && cur < state->arrangement.section_count) {
+                    const SectionParam& sec = state->arrangement.sections[cur];
+                    if (sec.has_comping_humanization_override) {
+                        h_drop  = sec.comping_humanization_drop;
+                        h_ghost = sec.comping_humanization_ghost;
+                        h_oct   = sec.comping_humanization_octave;
+                        h_ext   = sec.comping_humanization_extension;
+                    }
+                }
+            }
             apply_humanization(ts.steps, ts.step_count,
-                               ts.human_drop_prob, ts.human_ghost_prob,
-                               ts.human_octave_prob, ts.human_ext_prob,
+                               h_drop, h_ghost, h_oct, h_ext,
                                complexity, seed);
         }
     }
@@ -448,6 +464,104 @@ static float compute_fx_probability(float energy, float complexity) {
     return std::max(low_prob, high_prob);
 }
 
+// ── Section entry: restart chord progression ────────────────────────
+//
+// Re-initializes state->chord_state so it starts at the beginning of the
+// section's effective progression. Used both on initial vibe load (for the
+// first section) and whenever advance_section() reports a section change.
+// Uses the section's custom progression / chords-per-bar when set, else the
+// vibe's own custom progression, else the genre default. init_chord_progression
+// resets chord_index to 0.
+static void restart_progression_for_section(PulsarState* state,
+                                            const SectionParam& sec,
+                                            OrpheusEngine* engine) {
+    int style = static_cast<int>(
+        engine->pulsar_genre_progression_style.load(std::memory_order_relaxed));
+    int step_count = static_cast<int>(
+        engine->pulsar_step_count.load(std::memory_order_relaxed));
+    int cpb = (sec.chords_per_bar_override > 0)
+        ? sec.chords_per_bar_override
+        : static_cast<int>(
+            engine->pulsar_genre_chords_per_bar.load(std::memory_order_relaxed));
+
+    int section_idx = state->section_state.current_section;  // for section-progression glide lookup
+    if (sec.custom_progression_length > 0) {
+        int degrees[kMaxProgressionLength];
+        for (int i = 0; i < sec.custom_progression_length; i++) {
+            degrees[i] = sec.custom_progression[i];
+        }
+        init_chord_progression(state->chord_state, style, cpb, step_count,
+                               state->mutation_seed,
+                               degrees, sec.custom_progression_length);
+        // Per-chord glides for the section progression. Section-indexed.
+        if (section_idx >= 0 && section_idx < 8) {
+            for (int i = 0; i < sec.custom_progression_length; i++) {
+                state->chord_state.progression_glides[i] =
+                    engine->pulsar_section_progression_glides[section_idx * 8 + i].load(
+                        std::memory_order_relaxed);
+            }
+        } else {
+            for (int i = 0; i < kMaxProgressionLength; i++)
+                state->chord_state.progression_glides[i] = 0.0f;
+        }
+    } else {
+        int vibe_len = 0;
+        int vibe_degrees[kMaxProgressionLength];
+        if (engine->pulsar_custom_progression_active.load(std::memory_order_relaxed) > 0) {
+            vibe_len = engine->pulsar_custom_progression_length.load(std::memory_order_relaxed);
+            for (int i = 0; i < vibe_len && i < kMaxProgressionLength; i++) {
+                vibe_degrees[i] = engine->pulsar_custom_progression[i].load(
+                    std::memory_order_relaxed);
+            }
+        }
+        init_chord_progression(state->chord_state, style, cpb, step_count,
+                               state->mutation_seed,
+                               vibe_len > 0 ? vibe_degrees : nullptr,
+                               vibe_len);
+        // Per-chord glides for the vibe-level progression.
+        for (int i = 0; i < kMaxProgressionLength; i++) {
+            state->chord_state.progression_glides[i] = (vibe_len > 0)
+                ? engine->pulsar_custom_progression_glide[i].load(std::memory_order_relaxed)
+                : 0.0f;
+        }
+    }
+    // Reset per-track chord-edge tracker. Re-entering chord 0 in a new section
+    // should be treated as the first edge (no glide), same as the initial vibe
+    // load — we have no previous chord to slide from across the section boundary.
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        state->tracks[t].last_chord_index = -1;
+    }
+}
+
+// Copy the vibe-level tension atomics into state->tension. Used on initial
+// vibe load and on section entry when the current section has no tension
+// override (so prior overrides do not leak forward).
+static void reload_vibe_tension(OrpheusEngine* engine, PulsarState* state) {
+    state->tension.inner_bars        = engine->pulsar_tension_inner_bars.load(std::memory_order_relaxed);
+    state->tension.outer_bars        = engine->pulsar_tension_outer_bars.load(std::memory_order_relaxed);
+    state->tension.outer_depth       = engine->pulsar_tension_outer_depth.load(std::memory_order_relaxed);
+    state->tension.volume            = engine->pulsar_tension_volume.load(std::memory_order_relaxed);
+    state->tension.timing            = engine->pulsar_tension_timing.load(std::memory_order_relaxed);
+    state->tension.octave_shift      = engine->pulsar_tension_octave_shift.load(std::memory_order_relaxed) != 0;
+    state->tension.key_shift         = engine->pulsar_tension_key_shift.load(std::memory_order_relaxed);
+    state->tension.half_lick         = engine->pulsar_tension_half_lick.load(std::memory_order_relaxed) != 0;
+    state->tension.chromatic_passing = engine->pulsar_tension_chromatic_passing.load(std::memory_order_relaxed);
+    state->tension.evo_timbre_low    = engine->pulsar_tension_evo_timbre_low.load(std::memory_order_relaxed);
+    state->tension.evo_timbre_high   = engine->pulsar_tension_evo_timbre_high.load(std::memory_order_relaxed);
+    state->tension.evo_timbre_prob   = engine->pulsar_tension_evo_timbre_prob.load(std::memory_order_relaxed);
+    state->tension.evo_morph_low     = engine->pulsar_tension_evo_morph_low.load(std::memory_order_relaxed);
+    state->tension.evo_morph_high    = engine->pulsar_tension_evo_morph_high.load(std::memory_order_relaxed);
+    state->tension.evo_morph_prob    = engine->pulsar_tension_evo_morph_prob.load(std::memory_order_relaxed);
+    state->tension.evo_harm_low      = engine->pulsar_tension_evo_harm_low.load(std::memory_order_relaxed);
+    state->tension.evo_harm_high     = engine->pulsar_tension_evo_harm_high.load(std::memory_order_relaxed);
+    state->tension.evo_harm_prob     = engine->pulsar_tension_evo_harm_prob.load(std::memory_order_relaxed);
+    state->tension.evo_attack_point  = engine->pulsar_tension_evo_attack_point.load(std::memory_order_relaxed);
+    state->tension.evo_release_speed = engine->pulsar_tension_evo_release_speed.load(std::memory_order_relaxed);
+    state->tension.spurt_chance      = engine->pulsar_tension_spurt_chance.load(std::memory_order_relaxed);
+    for (int i = 0; i < 8; i++)
+        state->tension.track_evo_weight[i] = engine->pulsar_track_evo_weight[i].load(std::memory_order_relaxed);
+}
+
 // ── Vibe loading (reads recipe from engine atomics) ─────────────────
 
 static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine) {
@@ -489,6 +603,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             state->lick[i].scale_degree = engine->pulsar_lick[i].scale_degree;
             state->lick[i].duration = engine->pulsar_lick[i].duration;
             state->lick[i].velocity = engine->pulsar_lick[i].velocity;
+            state->lick[i].glide_rate = engine->pulsar_lick[i].glide_rate;
         }
     }
     state->lick_mutation = engine->pulsar_lick_mutation.load(std::memory_order_relaxed);
@@ -697,6 +812,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.target_pitch = 60.0f;
         ts.glide_rate = 0.0f;
         ts.prev_step_gated = false;
+        ts.last_chord_index = -1;
         ts.mod_poly_lfo.Init();
         ts.mod_slope.Init();
         ts.drone_lfo.Init();
@@ -736,6 +852,13 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                            genre.chords_per_bar, step_count_for_chords, base_seed,
                            custom_prog_len > 0 ? custom_prog : nullptr,
                            custom_prog_len);
+    // Per-chord glides for the vibe-level progression. Only meaningful when
+    // a custom progression is active; otherwise zero (no glide).
+    for (int i = 0; i < kMaxProgressionLength; i++) {
+        state->chord_state.progression_glides[i] = (custom_prog_len > 0)
+            ? engine->pulsar_custom_progression_glide[i].load(std::memory_order_relaxed)
+            : 0.0f;
+    }
     state->chord_state.anchor_bars =
         engine->pulsar_progression_anchor.load(std::memory_order_relaxed);
     state->chord_state.drift_range =
@@ -743,29 +866,7 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
     state->chord_state.bars_since_anchor = 0;
 
     // ── Load tension params from engine atomics ──
-    state->tension.inner_bars = engine->pulsar_tension_inner_bars.load(std::memory_order_relaxed);
-    state->tension.outer_bars = engine->pulsar_tension_outer_bars.load(std::memory_order_relaxed);
-    state->tension.outer_depth = engine->pulsar_tension_outer_depth.load(std::memory_order_relaxed);
-    state->tension.volume = engine->pulsar_tension_volume.load(std::memory_order_relaxed);
-    state->tension.timing = engine->pulsar_tension_timing.load(std::memory_order_relaxed);
-    state->tension.octave_shift = engine->pulsar_tension_octave_shift.load(std::memory_order_relaxed) != 0;
-    state->tension.key_shift = engine->pulsar_tension_key_shift.load(std::memory_order_relaxed);
-    state->tension.half_lick = engine->pulsar_tension_half_lick.load(std::memory_order_relaxed) != 0;
-    state->tension.chromatic_passing = engine->pulsar_tension_chromatic_passing.load(std::memory_order_relaxed);
-    state->tension.evo_timbre_low = engine->pulsar_tension_evo_timbre_low.load(std::memory_order_relaxed);
-    state->tension.evo_timbre_high = engine->pulsar_tension_evo_timbre_high.load(std::memory_order_relaxed);
-    state->tension.evo_timbre_prob = engine->pulsar_tension_evo_timbre_prob.load(std::memory_order_relaxed);
-    state->tension.evo_morph_low = engine->pulsar_tension_evo_morph_low.load(std::memory_order_relaxed);
-    state->tension.evo_morph_high = engine->pulsar_tension_evo_morph_high.load(std::memory_order_relaxed);
-    state->tension.evo_morph_prob = engine->pulsar_tension_evo_morph_prob.load(std::memory_order_relaxed);
-    state->tension.evo_harm_low = engine->pulsar_tension_evo_harm_low.load(std::memory_order_relaxed);
-    state->tension.evo_harm_high = engine->pulsar_tension_evo_harm_high.load(std::memory_order_relaxed);
-    state->tension.evo_harm_prob = engine->pulsar_tension_evo_harm_prob.load(std::memory_order_relaxed);
-    state->tension.evo_attack_point = engine->pulsar_tension_evo_attack_point.load(std::memory_order_relaxed);
-    state->tension.evo_release_speed = engine->pulsar_tension_evo_release_speed.load(std::memory_order_relaxed);
-    state->tension.spurt_chance = engine->pulsar_tension_spurt_chance.load(std::memory_order_relaxed);
-    for (int i = 0; i < 8; i++)
-        state->tension.track_evo_weight[i] = engine->pulsar_track_evo_weight[i].load(std::memory_order_relaxed);
+    reload_vibe_tension(engine, state);
     state->tension_intensity = 0.0f;
     state->tension_evo_smooth = 0.0f;
 
@@ -787,7 +888,8 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             int base = s * 21;
             sec.bars_min              = static_cast<int>(engine->pulsar_section_data[base + 0].load(std::memory_order_relaxed));
             sec.bars_max              = static_cast<int>(engine->pulsar_section_data[base + 1].load(std::memory_order_relaxed));
-            sec.transition_bars       = static_cast<int>(engine->pulsar_section_data[base + 2].load(std::memory_order_relaxed));
+            int loaded_bar_step       = static_cast<int>(engine->pulsar_section_data[base + 2].load(std::memory_order_relaxed));
+            sec.bar_step              = (loaded_bar_step >= 1) ? loaded_bar_step : 1;
             sec.recency_decay         = engine->pulsar_section_data[base + 3].load(std::memory_order_relaxed);
             sec.transition_count      = static_cast<int>(engine->pulsar_section_data[base + 4].load(std::memory_order_relaxed));
             if (sec.transition_count > kMaxSectionTransitions) sec.transition_count = kMaxSectionTransitions;
@@ -813,11 +915,84 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 sec.chord_follow_override = (cf < 0.0f) ? -1 : static_cast<int>(cf);
             }
 
-            // Unpack transitions for this section (2 floats per edge: target, weight)
-            int trans_base = (s * kMaxSections) * 2;
+            // --- Per-section progression override ---
+            sec.custom_progression_length = std::clamp(
+                engine->pulsar_section_progression_length[s].load(std::memory_order_relaxed),
+                0, kMaxProgressionLength);
+            for (int i = 0; i < kMaxProgressionLength; i++) {
+                int d = engine->pulsar_section_progression_degrees[s * 8 + i].load(
+                    std::memory_order_relaxed);
+                if (d < 0) d = 0;
+                if (d > 6) d = 6;
+                sec.custom_progression[i] = static_cast<int8_t>(d);
+            }
+            sec.chords_per_bar_override = engine->pulsar_section_chords_per_bar[s].load(
+                std::memory_order_relaxed);
+            if (sec.chords_per_bar_override < 0) sec.chords_per_bar_override = 0;
+            if (sec.chords_per_bar_override > 4) sec.chords_per_bar_override = 4;
+
+            // --- Per-section tension override ---
+            // SectionParam already has has_tension_override / tension_override fields;
+            // the section_changed block at orpheus_unit_pulsar.cpp:1351 already reads them.
+            // This path wires the atomics that were previously never populated.
+            {
+                int tension_active = engine->pulsar_section_tension_active[s].load(
+                    std::memory_order_relaxed);
+                sec.has_tension_override = (tension_active == 1);
+                if (sec.has_tension_override) {
+                    int tb = s * 21;
+                    auto L = [&](int f) {
+                        return engine->pulsar_section_tension_data[tb + f].load(
+                            std::memory_order_relaxed);
+                    };
+                    sec.tension_override.inner_bars         = static_cast<int>(L(0));
+                    sec.tension_override.outer_bars         = static_cast<int>(L(1));
+                    sec.tension_override.outer_depth        = L(2);
+                    sec.tension_override.volume             = L(3);
+                    sec.tension_override.timing             = L(4);
+                    sec.tension_override.octave_shift       = (L(5) != 0.0f);
+                    sec.tension_override.key_shift          = static_cast<int>(L(6));
+                    sec.tension_override.half_lick          = (L(7) != 0.0f);
+                    sec.tension_override.chromatic_passing  = L(8);
+                    sec.tension_override.evo_timbre_low     = L(9);
+                    sec.tension_override.evo_timbre_high    = L(10);
+                    sec.tension_override.evo_timbre_prob    = L(11);
+                    sec.tension_override.evo_morph_low      = L(12);
+                    sec.tension_override.evo_morph_high     = L(13);
+                    sec.tension_override.evo_morph_prob     = L(14);
+                    sec.tension_override.evo_harm_low       = L(15);
+                    sec.tension_override.evo_harm_high      = L(16);
+                    sec.tension_override.evo_harm_prob      = L(17);
+                    sec.tension_override.evo_attack_point   = L(18);
+                    sec.tension_override.evo_release_speed  = L(19);
+                    sec.tension_override.spurt_chance       = L(20);
+                }
+            }
+
+            // --- Per-section CompingHumanization override ---
+            // When active, replaces the per-track humanization probabilities for
+            // ALL CHORDAL tracks during this section. See apply_humanization call
+            // site in mutate_patterns().
+            {
+                int ch_active = engine->pulsar_section_comping_humanization_active[s].load(
+                    std::memory_order_relaxed);
+                sec.has_comping_humanization_override = (ch_active != 0);
+                if (sec.has_comping_humanization_override) {
+                    int chBase = s * 4;
+                    sec.comping_humanization_drop      = engine->pulsar_section_comping_humanization_data[chBase + 0].load(std::memory_order_relaxed);
+                    sec.comping_humanization_ghost     = engine->pulsar_section_comping_humanization_data[chBase + 1].load(std::memory_order_relaxed);
+                    sec.comping_humanization_octave    = engine->pulsar_section_comping_humanization_data[chBase + 2].load(std::memory_order_relaxed);
+                    sec.comping_humanization_extension = engine->pulsar_section_comping_humanization_data[chBase + 3].load(std::memory_order_relaxed);
+                }
+            }
+
+            // Unpack transitions for this section (3 floats per edge: target, weight, transition_bars)
+            int trans_base = (s * kMaxSections) * 3;
             for (int e = 0; e < sec.transition_count; e++) {
-                sec.transitions[e].target_index = static_cast<int>(engine->pulsar_section_transitions[trans_base + e * 2 + 0].load(std::memory_order_relaxed));
-                sec.transitions[e].weight        = engine->pulsar_section_transitions[trans_base + e * 2 + 1].load(std::memory_order_relaxed);
+                sec.transitions[e].target_index = static_cast<int>(engine->pulsar_section_transitions[trans_base + e * 3 + 0].load(std::memory_order_relaxed));
+                sec.transitions[e].weight        = engine->pulsar_section_transitions[trans_base + e * 3 + 1].load(std::memory_order_relaxed);
+                int tb = static_cast<int>(engine->pulsar_section_transitions[trans_base + e * 3 + 2].load(std::memory_order_relaxed));
+                sec.transitions[e].transition_bars = (tb < 0) ? 0 : tb;
             }
         }
 
@@ -873,6 +1048,19 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         // Initialize section state machine
         init_section_state(state->section_state, arr, state->mutation_seed);
 
+        // If the initial section has a progression or chords_per_bar override,
+        // re-init chord_state so it lands in the section's sequence before playback.
+        // init_chord_progression resets chord_index to 0.
+        if (arr.active && arr.section_count > 0) {
+            int init_sec = state->section_state.current_section;
+            if (init_sec >= 0 && init_sec < arr.section_count) {
+                const SectionParam& sec = arr.sections[init_sec];
+                if (sec.custom_progression_length > 0 || sec.chords_per_bar_override > 0) {
+                    restart_progression_for_section(state, sec, engine);
+                }
+            }
+        }
+
         // Zero out solo and motif state
         std::memset(&state->motif_state, 0, sizeof(MotifState));
         std::memset(&state->band_solo_state, 0, sizeof(BandSoloState));
@@ -917,12 +1105,12 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             init_motif_state(state->motif_state, arr.sections[cur].motif_set, state->mutation_seed);
         }
 
-        // Set initial arrangement viz read-back
+        // Set initial arrangement viz read-back. Pre-roll model: section total
+        // is just bars_remaining — the ramp zone (if any) lives INSIDE that count.
         int init_sec = state->section_state.current_section;
-        int init_trans = state->arrangement.sections[init_sec].transition_bars;
         state->arr_viz_section_index.store(init_sec, std::memory_order_relaxed);
         state->arr_viz_bars_elapsed.store(0, std::memory_order_relaxed);
-        state->arr_viz_bars_total.store(state->section_state.bars_remaining + init_trans, std::memory_order_relaxed);
+        state->arr_viz_bars_total.store(state->section_state.bars_remaining, std::memory_order_relaxed);
         state->arr_viz_solo_active.store(false, std::memory_order_relaxed);
         state->arr_viz_solo_track.store(-1, std::memory_order_relaxed);
         state->arr_viz_solo_mode.store(0, std::memory_order_relaxed);
@@ -1126,21 +1314,53 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
     float space      = clamp01(state->smooth_space);
     float mood       = clamp01(state->smooth_mood);
 
-    // Section macro overrides (multipliers: 1.0=no change, >1=boost, <1=cut; -1=inactive)
+    // Section macro overrides (multipliers: 1.0=no change, >1=boost, <1=cut; -1=inactive).
+    // When a transition is in flight, blend the multiplier from the current
+    // section's override toward the staged destination's override via
+    // section_macro_value(). Passing base=1.0 to the helper means an absent
+    // override (-1) on either side collapses to "no change" — so e.g. blending
+    // from an unset override toward energy=2.0 ramps the multiplier 1.0 → 2.0.
+    //
+    // Sub-bar smoothing: ss.transition_progress only updates on bar boundaries
+    // (in advance_section), which makes an N-bar ramp jump in N coarse steps
+    // and sounds abrupt. Compute a continuous progress here using track 0's
+    // playhead within the current bar — gives one update per step (typically
+    // 1/16 of a bar) which is effectively continuous.
     if (state->arrangement.active) {
-        float sec_energy = state->section_state.target_energy;
-        float sec_complexity = state->section_state.target_complexity;
-        float sec_space = state->section_state.target_space;
-        float sec_mood = state->section_state.target_mood;
+        const SectionState& ss = state->section_state;
+        bool in_transition = ss.transition_target >= 0;
+        float progress = ss.transition_progress;
+        if (in_transition && ss.next_section_trans_bars > 0) {
+            int N = ss.next_section_trans_bars;
+            const PulsarTrackState& t0 = state->tracks[0];
+            float bar_phase = (t0.step_count > 0)
+                ? static_cast<float>(t0.playhead) / static_cast<float>(t0.step_count)
+                : 0.0f;
+            // bars_remaining counts whole bars LEFT in the source section. As
+            // we move through the current bar, the continuous remainder shrinks
+            // from bars_remaining toward bars_remaining - 1.
+            float bars_remaining_continuous =
+                static_cast<float>(ss.bars_remaining) - bar_phase;
+            if (bars_remaining_continuous < 0.0f) bars_remaining_continuous = 0.0f;
+            progress = (static_cast<float>(N) - bars_remaining_continuous)
+                       / static_cast<float>(N);
+            if (progress < 0.0f) progress = 0.0f;
+            if (progress > 1.0f) progress = 1.0f;
+        }
 
-        if (sec_energy >= 0.0f)
-            energy = clamp01(energy * sec_energy);
-        if (sec_complexity >= 0.0f)
-            complexity = clamp01(complexity * sec_complexity);
-        if (sec_space >= 0.0f)
-            space = clamp01(space * sec_space);
-        if (sec_mood >= 0.0f)
-            mood = clamp01(mood * sec_mood);
+        auto apply = [&](float base, float cur_ov, float nxt_ov) -> float {
+            if (in_transition) {
+                if (cur_ov < 0.0f && nxt_ov < 0.0f) return base;
+                float mult = section_macro_value(1.0f, cur_ov, nxt_ov, progress);
+                return clamp01(base * mult);
+            }
+            return (cur_ov >= 0.0f) ? clamp01(base * cur_ov) : base;
+        };
+
+        energy     = apply(energy,     ss.target_energy,     ss.next_energy);
+        complexity = apply(complexity, ss.target_complexity, ss.next_complexity);
+        space      = apply(space,      ss.target_space,      ss.next_space);
+        mood       = apply(mood,       ss.target_mood,       ss.next_mood);
     }
 
     // Complexity and space are used below for swing, variation, morph, etc.
@@ -1348,11 +1568,27 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         state->section_state.target_space = sec.macro_overrides.space;
                         state->section_state.target_mood = sec.macro_overrides.mood;
 
-                        // Apply section tension override if present
+                        // Always restart the chord progression at section entry.
+                        // Uses the section's override when set, else the vibe's
+                        // progression. init_chord_progression resets chord_index to 0.
+                        restart_progression_for_section(state, sec, engine);
+
+                        // --- Apply section tension override, else revert to vibe-level ---
                         if (sec.has_tension_override) {
                             state->tension = sec.tension_override;
-                            state->tension_intensity = 0.0f;
+                        } else {
+                            // Reload vibe tension so a prior section's override does not
+                            // leak forward into a section with no override of its own.
+                            reload_vibe_tension(engine, state);
                         }
+
+                        // --- Always reset the tension phase at section entry ---
+                        // Cosmetic: tension_intensity is recomputed every bar from loop_count
+                        // in mutate_patterns(), so this zero is observable only on the
+                        // entry bar. tension_evo_smooth is actually smoothed across bars,
+                        // so zeroing it here DOES reset the timbre-evolution arc.
+                        state->tension_intensity  = 0.0f;
+                        state->tension_evo_smooth = 0.0f;
 
                         // Start solo: new SoloMode system > band system > legacy
                         if (sec.solo_mode != SoloModeId::NONE && state->has_band_solo) {
@@ -1460,13 +1696,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                         }
                     }
 
-                    // Update arrangement viz read-back
+                    // Update arrangement viz read-back. Pre-roll model: section
+                    // total is just bars_remaining — the ramp zone (if any) is
+                    // inside that count, not appended after.
                     state->arr_viz_section_index.store(state->section_state.current_section, std::memory_order_relaxed);
                     if (section_changed) {
-                        int cur = state->section_state.current_section;
                         int content_bars = state->section_state.bars_remaining;
-                        int trans_bars = state->arrangement.sections[cur].transition_bars;
-                        state->arr_viz_bars_total.store(content_bars + trans_bars, std::memory_order_relaxed);
+                        state->arr_viz_bars_total.store(content_bars, std::memory_order_relaxed);
                         state->arr_viz_bars_elapsed.store(0, std::memory_order_relaxed);
                     } else {
                         state->arr_viz_bars_elapsed.store(
@@ -1821,8 +2057,30 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             }
 
                             // Arp suppresses glide — each note fires at exact pitch.
+                            // Glide priority (most-specific wins):
+                            //   1) Per-lick-step glide (step.glide_rate >= 0)
+                            //   2) Per-chord glide on chord-transition edge (one-shot)
+                            //   3) Per-track default
+                            float track_glide = engine->pulsar_track_glide_rate[t].load(std::memory_order_relaxed);
+                            float step_glide = step.glide_rate;
+                            float chord_glide = -1.0f;
+                            const PulsarChordState& cs = state->chord_state;
+                            int new_ci = cs.chord_index;
+                            if (new_ci != ts.last_chord_index
+                                && new_ci >= 0 && new_ci < cs.progression_length) {
+                                // last_chord_index == -1 means "no previous chord" (initial
+                                // load or section transition). Skip the glide on that first
+                                // edge — there's nothing to slide *from*. Only fire when
+                                // moving between two known chord positions.
+                                if (ts.last_chord_index >= 0) {
+                                    float g = cs.progression_glides[new_ci];
+                                    if (g > 0.0f) chord_glide = g;
+                                }
+                                ts.last_chord_index = new_ci;
+                            }
                             float glide_param = (ts.arp_note_count > 0) ? 0.0f
-                                : engine->pulsar_track_glide_rate[t].load(std::memory_order_relaxed);
+                                : (step_glide >= 0.0f ? step_glide
+                                    : (chord_glide >= 0.0f ? chord_glide : track_glide));
                             if (glide_param > 0.001f && ts.prev_step_gated) {
                                 // Map 0-1 to glide rate: 0.001 (fast ~20ms) to 0.00002 (very slow ~2s)
                                 ts.glide_rate = 0.001f * std::pow(0.02f, glide_param);

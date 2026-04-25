@@ -40,11 +40,36 @@ import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
 import org.balch.orpheus.features.pulsar.VibeProvider
 import org.balch.orpheus.features.pulsar.bandMatrix
+import org.balch.orpheus.features.pulsar.chords
 import org.balch.orpheus.features.pulsar.row
 
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<VibeProvider>())
 class DogHouseVibe : VibeProvider {
+    // Slow blues: hang on tonic for 4 bars, touch IV for 2, resolve through V.
+    // I-I-I-I-IV-IV-I-V — the 8-bar "hold your ground then move" form.
+    private val mainProgression = chords(0, 0, 0, 0, 3, 3, 0, 4)
+    private val chordsPerBar = 1
+
+    private val chorusProgression = chords(3, 3, 0, 0)
+    private val chorusChordsPerBar = 2
+
+    // Per-edge transitionBars precedent: name the *musical role* the ramp serves,
+    // not the bar count. Slow blues lives on dynamic swings — every edge gets a
+    // ramp, sized to the size of the energy change.
+    //
+    //   bluesLiftBars     — standard climb between adjacent-energy sections
+    //                       (intro -> verse, verse -> chorus, solo -> chorus).
+    //   bluesyDropBars    — slow blues exhale out of high-energy sections
+    //                       (chorus -> solo / breakdown, verse -> breakdown).
+    //   bigBluesLiftBars  — THE iconic moment: breakdown -> chorus. Since
+    //                       `breakdown` is locked to 4 bars (barsMin == barsMax),
+    //                       the entire breakdown becomes one long anticipation
+    //                       buildup — energy crawls 0.4 -> 1.4 across all 4 bars.
+    private val bluesLiftBars = 2
+    private val bluesyDropBars = 3
+    private val bigBluesLiftBars = 4
+
     override val vibe = Vibe(
         name = "Dog House",
         bpm = 85f,
@@ -98,10 +123,8 @@ class DogHouseVibe : VibeProvider {
             noteRangeHigh = 60,
             rhythmDensity = RhythmPattern.BACKBEAT.density,
             progressionStyle = ProgressionStyle.BLUES,   // matrix stays bluesy
-            chordsPerBar = 1,
-            // Slow blues: hang on tonic for 4 bars, touch IV for 2, resolve through V.
-            // I-I-I-I-IV-IV-I-V — the 8-bar "hold your ground then move" form.
-            customProgression = listOf(0, 0, 0, 0, 3, 3, 0, 4),
+            chordsPerBar = chordsPerBar,
+            customProgression = mainProgression
         ),
         progressionAnchor = ProgressionAnchor.EVERY_8,   // reset each 8-bar phrase
         progressionDriftRange = 0.12f,                    // subtle drift — preserve the blues shape
@@ -291,49 +314,62 @@ class DogHouseVibe : VibeProvider {
         ),
         arrangement = Arrangement(
             introIndex = 0,
-            outroIndex = 5,
             sections = listOf(
-                // 0: intro — drums only, building energy
+                // 0: intro — drums only, building energy.
+                // intro -> verse: bluesLift (the band joins in).
                 Section(
                     name = "intro",
-                    barsMin = 4, barsMax = 8,
-                    transitions = listOf(SectionTransition(targetIndex = 1, weight = 1.0f)),
+                    barsMin = 2, barsMax = 4,
+                    transitions = listOf(
+                        SectionTransition(targetIndex = 1, weight = 1.0f, transitionBars = bluesLiftBars),
+                    ),
                     macroOverrides = MacroOverrides(energy = 0.5f, complexity = 0.4f, space = 0.5f),
+                    customProgression = chorusProgression,
+                    chordsPerBar = chorusChordsPerBar,
                 ),
-                // 1: verse — full band, moderate energy, bluesy swing
+                // 1: verse — full band, moderate energy, bluesy swing.
+                // verse -> chorus / solo: bluesLift (climb or sideways).
+                // verse -> breakdown:     bluesyDrop (slow exhale into the breakdown).
                 Section(
                     name = "verse",
-                    barsMin = 8, barsMax = 16,
+                    barsMin = 6, barsMax = 10,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 2, weight = 0.6f),
-                        SectionTransition(targetIndex = 3, weight = 0.25f),
-                        SectionTransition(targetIndex = 4, weight = 0.15f),
+                        SectionTransition(targetIndex = 2, weight = 0.6f, transitionBars = bluesLiftBars),
+                        SectionTransition(targetIndex = 3, weight = 0.25f, transitionBars = bluesLiftBars),
+                        SectionTransition(targetIndex = 4, weight = 0.15f, transitionBars = bluesyDropBars),
                     ),
                     recencyDecay = 0.5f,
                     macroOverrides = null,  // verse IS the baseline
                 ),
-                // 2: chorus — high energy, tight, driving
+                // 2: chorus — high energy, tight, driving.
+                // chorus -> verse:      bluesLift (small step down).
+                // chorus -> solo:       bluesyDrop (chorus exhales into the solo).
+                // chorus -> breakdown:  bluesyDrop (big drop into the stripped-back section).
                 Section(
                     name = "chorus",
-                    barsMin = 8, barsMax = 12,
+                    barsMin = 4, barsMax = 6,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 1, weight = 0.4f),
-                        SectionTransition(targetIndex = 3, weight = 0.35f),
-                        SectionTransition(targetIndex = 4, weight = 0.25f),
+                        SectionTransition(targetIndex = 1, weight = 0.4f, transitionBars = bluesLiftBars),
+                        SectionTransition(targetIndex = 3, weight = 0.35f, transitionBars = bluesyDropBars),
+                        SectionTransition(targetIndex = 4, weight = 0.25f, transitionBars = bluesyDropBars),
                     ),
                     recencyDecay = 0.5f,
                     macroOverrides = MacroOverrides(
                         energy = 1.4f, complexity = 1.3f, space = 0.7f, mood = 1.2f,
                     ),
+                    customProgression = chorusProgression,
+                    chordsPerBar = chorusChordsPerBar,
                 ),
-                // 3: solo — band jams together, combos lock in
+                // 3: solo — band jams together, combos lock in.
+                // solo -> chorus / verse: bluesLift (solo climaxes back up).
+                // solo -> breakdown:      bluesyDrop (solo dissolves into the breakdown).
                 Section(
                     name = "solo",
                     barsMin = 8, barsMax = 16,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 2, weight = 0.5f),
-                        SectionTransition(targetIndex = 1, weight = 0.3f),
-                        SectionTransition(targetIndex = 4, weight = 0.2f),
+                        SectionTransition(targetIndex = 2, weight = 0.5f, transitionBars = bluesLiftBars),
+                        SectionTransition(targetIndex = 1, weight = 0.3f, transitionBars = bluesLiftBars),
+                        SectionTransition(targetIndex = 4, weight = 0.2f, transitionBars = bluesyDropBars),
                     ),
                     recencyDecay = 0.4f,
                     macroOverrides = MacroOverrides(
@@ -341,25 +377,24 @@ class DogHouseVibe : VibeProvider {
                     ),
                     soloMode = SoloMode.Jam(probability = 0.85f),
                 ),
-                // 4: breakdown — stripped back, just bass and percussion
+                // 4: breakdown — stripped back, just bass and percussion.
+                // breakdown -> chorus: bigBluesLift — THE moment. Locked to 4 bars,
+                //   so the entire breakdown is one long anticipation buildup as
+                //   energy 0.4 climbs to 1.4 across all 4 bars before chorus hits.
+                // breakdown -> verse:  bluesLift (gentler return to baseline).
                 Section(
                     name = "breakdown",
-                    barsMin = 4, barsMax = 8,
+                    barsMin = 4, barsMax = 4,
                     transitions = listOf(
-                        SectionTransition(targetIndex = 2, weight = 0.7f),
-                        SectionTransition(targetIndex = 1, weight = 0.3f),
+                        SectionTransition(targetIndex = 2, weight = 0.7f, transitionBars = bigBluesLiftBars),
+                        SectionTransition(targetIndex = 1, weight = 0.3f, transitionBars = bluesLiftBars),
                     ),
                     recencyDecay = 0.5f,
                     macroOverrides = MacroOverrides(
                         energy = 0.4f, complexity = 0.5f, space = 1.5f, mood = 0.8f,
                     ),
-                ),
-                // 5: outro — fade out, sparse
-                Section(
-                    name = "outro",
-                    barsMin = 4, barsMax = 8,
-                    transitions = emptyList(),
-                    macroOverrides = MacroOverrides(energy = 0.3f, space = 1.5f),
+                    customProgression = chorusProgression,
+                    chordsPerBar = chorusChordsPerBar,
                 ),
             ),
         ),

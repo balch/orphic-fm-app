@@ -23,12 +23,13 @@ actual class MediaSessionManager(
     actual var onSkipPrevious: (() -> Unit)? = null
     actual var onPlay: (() -> Unit)? = null
     actual var onPause: (() -> Unit)? = null
-    
+    actual var onPlayFromMediaId: ((String) -> Unit)? = null
+
     actual fun activate() {
         if (isActive) return
-        
+
         log.info { "Activating media session" }
-        
+
         // Set up the action handler bridge before starting the service
         foregroundServiceController.actionHandler = { action ->
             log.debug { "Received action from service: $action" }
@@ -46,11 +47,15 @@ actual class MediaSessionManager(
                 "skipPrevious" -> onSkipPrevious?.invoke() ?: handler?.onSkipPrevious()
             }
         }
-        
+        foregroundServiceController.playFromMediaIdHandler = { mediaId ->
+            log.debug { "Received playFromMediaId: $mediaId" }
+            onPlayFromMediaId?.invoke(mediaId)
+        }
+
         foregroundServiceController.start()
         isActive = true
     }
-    
+
     actual fun deactivate() {
         if (!isActive) return
 
@@ -59,6 +64,7 @@ actual class MediaSessionManager(
         // callbacks during teardown (e.g. MediaSession.Callback.onStop
         // firing during service destruction)
         foregroundServiceController.actionHandler = null
+        foregroundServiceController.playFromMediaIdHandler = null
         foregroundServiceController.stop()
         isActive = false
     }
