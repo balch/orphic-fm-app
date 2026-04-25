@@ -231,8 +231,13 @@ class HeartbeatViz(
             h.y += gravity * h.vy * dt
             h.age += dt
 
-            // Advance break sequence after the per-heart delay elapses.
-            if (h.willBreak && h.age >= h.breakAt) {
+            // Advance break sequence after the per-heart delay elapses AND the
+            // heart has drifted to at least the 40%-up-the-screen mark. This
+            // keeps the dramatic action (tension flush, tear, separation) in
+            // the upper half of the screen rather than at the bottom edge,
+            // and lets fallers spawn from the bottom like every other heart
+            // and accumulate altitude before they break + fall.
+            if (h.willBreak && h.age >= h.breakAt && h.y <= BREAK_TRIGGER_Y) {
                 h.breakAge = (if (h.breakAge < 0f) 0f else h.breakAge) + dt
             }
 
@@ -299,23 +304,22 @@ class HeartbeatViz(
         // hinge open in place and fade.
         val willFall = willBreak && Random.nextFloat() < BREAK_FALL_FRACTION
 
-        // Spawn near bottom; slight x bias toward the duo's "lane".
-        // Falling-broken hearts spawn near the top of the screen so the fall
-        // animation has somewhere to go before the heart fades out.
+        // Spawn near bottom for ALL hearts — fallers included. Fallers used
+        // to spawn near the top so the fall had somewhere to go, but that
+        // looked unmotivated ("hearts appearing from the ceiling"). Now they
+        // drift up like every other heart and don't begin breaking until
+        // they pass BREAK_TRIGGER_Y (see updateSimulation), so the break
+        // and the subsequent fall both happen from a position the user just
+        // watched the heart travel to.
         val laneX = (duo + 0.5f) / numDuos
         val xJitter = (Random.nextFloat() - 0.5f) * 0.4f
         val spawnX = (laneX + xJitter).coerceIn(0.05f, 0.95f)
-        val spawnY = if (willFall) {
-            FALLER_SPAWN_Y_MIN + Random.nextFloat() * (FALLER_SPAWN_Y_MAX - FALLER_SPAWN_Y_MIN)
-        } else {
-            1.05f + Random.nextFloat() * 0.08f
-        }
+        val spawnY = 1.05f + Random.nextFloat() * 0.08f
 
-        // Drift speed — variation keeps the field alive.
-        // Fallers don't drift naturally (they spawn near the top and need to
-        // stay there until the break; the fall comes from the break animation).
-        val vy = if (willFall) 0f
-            else DRIFT_VY_MIN + Random.nextFloat() * (DRIFT_VY_MAX - DRIFT_VY_MIN)
+        // Drift speed — variation keeps the field alive. Fallers get the
+        // same drift as regular hearts; the break + fall are now position-
+        // gated rather than relying on a static spawn near the top.
+        val vy = DRIFT_VY_MIN + Random.nextFloat() * (DRIFT_VY_MAX - DRIFT_VY_MIN)
 
         // Pulse rate — random spread around 80 BPM (~1.33 Hz) so hearts don't sync uniformly
         val pulseRate = (1.0f + Random.nextFloat() * 0.8f) * (PI.toFloat() * 2f) // 1.0..1.8 Hz
@@ -467,12 +471,17 @@ class HeartbeatViz(
         // moves it sideways), so the tilt looks anchored to the half's base
         // rather than swinging from a shared hinge.
         val pivot = Offset(0f, pixelSize)
-        // Only fallers actually translate downward, and only AFTER the drift
-        // has reached its max. Fall is scaled by canvas height (not heart
-        // size) so the descent crosses the screen regardless of heart size.
+        // Only fallers actually translate downward. Fall begins shortly
+        // after separation (BREAK_FALL_START_DELAY) — *not* after the
+        // outward drift completes, which used to delay the fall by ~0.5s
+        // and felt sluggish given the new model where the break already
+        // happens later in the heart's life. Fall is scaled by canvas
+        // height (not heart size) so the descent crosses the screen
+        // regardless of heart size, and adds on top of the heart's
+        // existing cy translate, so the descent starts from wherever the
+        // heart was when it broke.
         val fall = if (willFall) {
-            val driftDuration = BREAK_HALF_DRIFT_MAX / BREAK_HALF_DRIFT_RATE
-            val fallElapsed = (sepElapsed - driftDuration).coerceAtLeast(0f)
+            val fallElapsed = (sepElapsed - BREAK_FALL_START_DELAY).coerceAtLeast(0f)
             fallElapsed * fallElapsed * size.height * BREAK_FALL_GRAVITY
         } else 0f
         val outline = Color.White.copy(alpha = finalAlpha * 0.35f * _glow)
@@ -647,13 +656,19 @@ class HeartbeatViz(
         // Fraction of broken hearts that ALSO fall after the hinge fully opens.
         // The other (1 - this) hinge open in place and just fade.
         private const val BREAK_FALL_FRACTION = 0.30f
-        // Spawn-Y range for the falling subset — placed near the top so the
-        // fall has somewhere visible to go before the heart fades.
-        private const val FALLER_SPAWN_Y_MIN = 0.05f
-        private const val FALLER_SPAWN_Y_MAX = 0.22f
         // Faller gravity: fraction of canvas height per second^2. Tuned so the
         // heart traverses ~half the canvas in ~1s of fall.
         private const val BREAK_FALL_GRAVITY = 0.55f
+        // Seconds after separation begins before a faller starts dropping.
+        // Small but non-zero so the eye registers the tear as the trigger
+        // for the fall, rather than the two events colliding visually.
+        private const val BREAK_FALL_START_DELAY = 0.15f
+        // Hearts must drift up to at least this normalized y position before
+        // they're allowed to begin their break sequence. y=0 is the top of
+        // the screen, y=1 is the bottom — so 0.60 means the heart has to
+        // climb at least 40% of the screen height first. Hearts that die
+        // (life decays to 0) before reaching this point simply never break.
+        private const val BREAK_TRIGGER_Y = 0.60f
 
         // Red flush overlay tint applied during the tension phase.
         private val BREAK_FLUSH_COLOR = Color(0xFFFF1F3A)

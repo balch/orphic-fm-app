@@ -400,6 +400,28 @@ class TremoloTideVibe : VibeProvider {
                     ),
                     customProgression = chorusProgression,
                     chordsPerBar = chordsPerBar,
+                    // The lift arc: late-peaking shimmer that rides the held bVII.
+                    // Higher evolution probabilities push timbre/morph/harmonics
+                    // to wander wider during the chorus than the verse baseline.
+                    // octaveShift + chromaticPassing inject upward melodic motion;
+                    // a touch of spurtChance lets the lead accent the hang on bVII.
+                    // Faster releaseSpeed snaps tension back as we exit toward verse.
+                    tensionOverride = TensionProfile(
+                        spurtChance = 0.18f,
+                        innerBars = 8, outerBars = 24, outerDepth = 0.5f,
+                        volume = 0.40f,
+                        tonal = TonalTension(
+                            octaveShift = true,
+                            chromaticPassing = 0.15f,
+                            halfLick = true,
+                        ),
+                        timing = 0.10f,
+                        evolution = EvolutionTension(
+                            timbreLow = 0.40f, timbreHigh = 0.75f, timbreProbability = 0.75f,
+                            attackPoint = 0.70f,    // peak late — earned, not handed
+                            releaseSpeed = 0.50f,   // snap back home for verse handoff
+                        ),
+                    ),
                 ),
                 // 3: solo — lead-and-pads jam. Bass + sparse drums hold pocket.
                 Section(
@@ -427,6 +449,27 @@ class TremoloTideVibe : VibeProvider {
                     recencyDecay = 0.5f,
                     macroOverrides = MacroOverrides(
                         energy = 0.30f, complexity = 0.50f, space = 1.60f, mood = 0.85f,
+                    ),
+                    chordFollow = ChordFollow.FIXED,
+                    // Held-breath arc: nothing sparks, nothing develops. Tension
+                    // sits flat for almost the entire section, then a slow late
+                    // attack signals the rise out. Steady timing + minimal
+                    // evolution keep the section perfectly still.
+                    tensionOverride = TensionProfile(
+                        spurtChance = 0.02f,            // almost never accent
+                        innerBars = 16, outerBars = 32, outerDepth = 0.3f,
+                        volume = 0.20f,
+                        tonal = TonalTension(
+                            octaveShift = false,
+                            chromaticPassing = 0.02f,
+                            halfLick = true,
+                        ),
+                        timing = 0.05f,                 // steady, almost frozen
+                        evolution = EvolutionTension(
+                            timbreLow = 0.30f, timbreHigh = 0.45f, timbreProbability = 0.30f,
+                            attackPoint = 0.85f,        // peak right at the exit edge
+                            releaseSpeed = 0.15f,       // slow exhale
+                        ),
                     ),
                 ),
             ),

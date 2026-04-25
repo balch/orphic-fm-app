@@ -11,6 +11,7 @@ import org.balch.orpheus.features.pulsar.BarStrategy
 import org.balch.orpheus.features.pulsar.ChordComping
 import org.balch.orpheus.features.pulsar.ChordFollow
 import org.balch.orpheus.features.pulsar.CompingFills
+import org.balch.orpheus.features.pulsar.CompingHumanization
 import org.balch.orpheus.features.pulsar.CompingStyle
 import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
@@ -433,7 +434,6 @@ class ArmyStompVibe : VibeProvider {
                 //                          spacious sections — short ramp is enough).
                 Section(
                     name = "drift",
-                    bpmMultiplier = .82f,
                     barsMin = 6, barsMax = 10,
                     transitions = listOf(
                         SectionTransition(
@@ -453,11 +453,43 @@ class ArmyStompVibe : VibeProvider {
                     macroOverrides = MacroOverrides(
                         energy = 0.2f, complexity = 1.8f, space = 1.6f, mood = 1.4f,
                     ),
-                    // chordFollow = FOLLOW so the bass breaks out of ROOT_ONLY
+                    // FOLLOW (not ROOT_ONLY) lets the bass walk with the i-iv cycle
+                    // instead of pedaling on E — that's the "army wandering" sound.
                     chordFollow = ChordFollow.FOLLOW,
                     compingStyle = CompingStyle.ROCK_DOWNBEATS,
+                    // Loosen the keyboard's stabs: drop ~a third of them, let some
+                    // jump octaves, occasionally add an extension. The march keys
+                    // are tight and disciplined; drift keys should feel like a
+                    // tired pianist noodling at dawn.
+                    compingHumanization = CompingHumanization(
+                        dropProbability = 0.35f,
+                        ghostProbability = 0.20f,
+                        octaveJumpProbability = 0.30f,
+                        extensionProbability = 0.40f,
+                    ),
                     customProgression = chords(0, 3, 0, 3),
                     chordsPerBar = 1,
+                    // Long languid arc — slow attack into a late peak, slow release.
+                    // octaveShift + halfLick + heavier chromaticPassing make the
+                    // melodic figure wander instead of marching. Evolution probs
+                    // crank to keep the timbre/morph drifting through the section.
+                    tensionOverride = TensionProfile(
+                        spurtChance = 0.05f,
+                        innerBars = 8, outerBars = 24, outerDepth = 0.5f,
+                        volume = 0.30f,
+                        tonal = TonalTension(
+                            octaveShift = true,
+                            halfLick = true,
+                            chromaticPassing = 0.30f,
+                        ),
+                        timing = 0.35f,
+                        evolution = EvolutionTension(
+                            timbreLow = 0.30f, timbreHigh = 0.70f, timbreProbability = 0.70f,
+                            morphLow = 0.40f, morphHigh = 0.70f, morphProbability = 0.50f,
+                            harmonicsLow = 0.35f, harmonicsHigh = 0.55f, harmonicsProbability = 0.30f,
+                            attackPoint = 0.60f, releaseSpeed = 0.30f,
+                        ),
+                    ),
                 ),
             ),
         ),
