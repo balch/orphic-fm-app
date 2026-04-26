@@ -565,6 +565,21 @@ static void reload_vibe_tension(OrpheusEngine* engine, PulsarState* state) {
 // ── Vibe loading (reads recipe from engine atomics) ─────────────────
 
 static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine) {
+    // ── Clear generative runtime state from the previous vibe ───────────
+    // Solo modifiers, live-lick caches, and anchor indices all carry musical
+    // state that must not bleed across vibe boundaries. (Pattern data, effect
+    // buffers, tempo drift, etc. are reset further down in this function.)
+    clear_solo_modifiers(state->tracks, kNumPulsarTracks);
+    std::memset(state->live_lick_degrees,    0, sizeof(state->live_lick_degrees));
+    std::memset(state->live_lick_durations,  0, sizeof(state->live_lick_durations));
+    std::memset(state->live_lick_velocities, 0, sizeof(state->live_lick_velocities));
+    state->live_lick_length = 0;
+    state->live_lick_active = false;
+    for (int t = 0; t < kNumPulsarTracks; t++) {
+        state->tracks[t].anchor_indices[0] = -1;
+        state->tracks[t].anchor_indices[1] = -1;
+    }
+
     // Read seed — 0 means random
     int64_t seed_val = engine->pulsar_seed.load(std::memory_order_relaxed);
     uint32_t base_seed;
@@ -1119,13 +1134,13 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         state->arr_viz_solo_mode.store(0, std::memory_order_relaxed);
     } else {
         // No arrangement active: clear all state machines
+        // (solo modifiers were already cleared at the top of load_vibe)
         state->arrangement.active = false;
         state->arrangement.section_count = 0;
         std::memset(&state->section_state, 0, sizeof(SectionState));
         std::memset(&state->motif_state, 0, sizeof(MotifState));
         std::memset(&state->band_solo_state, 0, sizeof(BandSoloState));
         state->has_band_solo = false;
-        clear_solo_modifiers(state->tracks, kNumPulsarTracks);
         state->arr_viz_section_index.store(-1, std::memory_order_relaxed);
     }
 
