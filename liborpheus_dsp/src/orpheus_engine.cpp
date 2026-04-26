@@ -47,7 +47,9 @@ OrpheusEngine* orpheus_engine_create(float sample_rate) {
     // Initialize Warps modulator
     engine->warps_modulator.Init(engine->sample_rate);
 
-    // Initialize Marbles random sequencer
+    // Initialize Marbles random sequencer with a placeholder state; the real
+    // seed is applied by unit_process_marbles on the first audio block (driven
+    // by the marbles_seed atomic). 0xDEADBEEF is just a safe non-zero state.
     engine->marbles_rng.Init(0xDEADBEEF);
     engine->marbles_random_stream.Init(&engine->marbles_rng);
     engine->marbles_t_generator.Init(&engine->marbles_random_stream, sample_rate);

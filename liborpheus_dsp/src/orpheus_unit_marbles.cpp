@@ -1,6 +1,7 @@
 #include "orpheus_units.h"
 #include "orpheus_units_common.h"
 #include "orpheus_engine.h"
+#include <chrono>
 #include <cmath>
 #include <cstring>
 
@@ -17,6 +18,24 @@ void unit_process_marbles(GraphUnit* u, OrpheusEngine* engine, int num_frames, f
     float* out_gate = u->output_buffers[OPORT_OUT];
     float* out_cv1  = u->output_buffers[OPORT_OUT_RIGHT];
     float* out_cv2  = u->output_buffers[OPORT_AUX];
+
+    // Re-seed the RNG when the seed parameter changes. seed=0 stirs in
+    // microsecond-precision clock entropy (so toggling back to 0 produces
+    // a fresh sequence); non-zero is mixed through the Knuth multiplicative
+    // hash so adjacent integer seeds map to distant 32-bit states.
+    int64_t seed_val = engine->marbles_seed.load(std::memory_order_relaxed);
+    if (seed_val != engine->marbles_last_applied_seed) {
+        uint32_t base_seed;
+        if (seed_val == 0) {
+            auto now = std::chrono::steady_clock::now().time_since_epoch();
+            base_seed = static_cast<uint32_t>(
+                std::chrono::duration_cast<std::chrono::microseconds>(now).count());
+        } else {
+            base_seed = static_cast<uint32_t>(seed_val) * 2654435761u;
+        }
+        engine->marbles_rng.Init(base_seed);
+        engine->marbles_last_applied_seed = seed_val;
+    }
 
     // Self-bypass: output silence when mix is zero
     float mix = engine->marbles_mix.load(std::memory_order_relaxed);

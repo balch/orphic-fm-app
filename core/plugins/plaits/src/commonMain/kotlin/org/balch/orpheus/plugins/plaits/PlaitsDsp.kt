@@ -93,8 +93,10 @@ object PlaitsDsp {
 
     // --- Random (LCG from stmlib/utils/random.h) ---
 
-    class Random {
-        private var state: Int = 0x12345678
+    class Random(seed: Int = 0) {
+        // seed=0 (default) → fresh state per launch from platform entropy; non-zero is deterministic.
+        private var state: Int =
+            if (seed != 0) seed else kotlin.random.Random.Default.nextInt()
 
         fun getWord(): Int {
             state = state * 1664525 + 1013904223

@@ -314,6 +314,8 @@ struct OrpheusEngine {
     std::atomic<float> marbles_pulse_width{0.5f};    // 0..1 pulse width mean
     std::atomic<float> marbles_pulse_width_std{0.0f};// 0..1 pulse width randomization
     std::atomic<int>   marbles_clock_source{0};      // 0=global clock, 1=LFO
+    std::atomic<int64_t> marbles_seed{0};            // 0 = re-seed from clock; non-zero = deterministic
+    int64_t marbles_last_applied_seed{-1};           // sentinel forces re-seed on first audio block
 
     // ── Marbles Deinterleaved Output Buffers ─────────
     // Written by unit_process_marbles, read by unit_process_plaits for trigger routing.

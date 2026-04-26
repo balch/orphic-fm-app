@@ -404,6 +404,8 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             engine->marbles_pulse_width_std.store(value, std::memory_order_relaxed);
         else if (std::strcmp(symbol, "clock_source") == 0)
             engine->marbles_clock_source.store(static_cast<int>(value), std::memory_order_relaxed);
+        else if (std::strcmp(symbol, "seed") == 0)
+            engine->marbles_seed.store(static_cast<int64_t>(value), std::memory_order_relaxed);
         // Trigger router: drum source selectors
         else if (std::strcmp(symbol, "drum_trigger_source_0") == 0)
             engine->drum_trigger_source[0].store(static_cast<int>(value), std::memory_order_relaxed);
