@@ -466,18 +466,18 @@ enum class ArpMode {
 enum class ArpDirection { UP, DOWN, UP_DOWN, RANDOM }
 
 /**
- * Type of fill played at phrase boundaries. Phase 2e ships ASCENDING_ARP;
- * others are stubs that fall through to NONE behavior.
+ * Type of fill played at phrase boundaries. All variants are wired through to
+ * the C++ comping engine (`pulsar_comping.h`).
  */
 @Serializable
 enum class FillType {
     NONE,
     ASCENDING_ARP,   // chord tones walk up through the bar with rising velocity
-    DESCENDING_ARP,  // deferred
-    TURNAROUND,      // deferred
-    DOUBLE_TIME,     // deferred
-    STAB_FLURRY,     // deferred
-    DROP_OUT,        // deferred
+    DESCENDING_ARP,  // chord tones walk down with fading velocity (root↑ → 5 → 3 → root)
+    TURNAROUND,      // bluesy 4-beat landing (root → 3 → ♭7 → root) building into the next bar
+    DOUBLE_TIME,     // every step plays a chord tone (root/3/root/5), accented downbeats
+    STAB_FLURRY,     // empty first half, dense rising stabs in the second — build-up feel
+    DROP_OUT,        // silence except a single accented downbeat — dramatic space
 }
 
 /**

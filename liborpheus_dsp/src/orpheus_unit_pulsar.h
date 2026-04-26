@@ -97,11 +97,11 @@ enum class ArpDirectionId : uint8_t { UP = 0, DOWN = 1, UP_DOWN = 2, RANDOM = 3 
 enum class FillTypeId : uint8_t {
     NONE = 0,
     ASCENDING_ARP = 1,
-    DESCENDING_ARP = 2,  // deferred
-    TURNAROUND = 3,      // deferred
-    DOUBLE_TIME = 4,     // deferred
-    STAB_FLURRY = 5,     // deferred
-    DROP_OUT = 6,        // deferred
+    DESCENDING_ARP = 2,
+    TURNAROUND = 3,
+    DOUBLE_TIME = 4,
+    STAB_FLURRY = 5,
+    DROP_OUT = 6,
 };
 
 enum class ChordFollowMode : uint8_t {

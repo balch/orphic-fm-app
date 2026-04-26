@@ -8,12 +8,17 @@ import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
 import org.balch.orpheus.features.pulsar.BarStrategy
+import org.balch.orpheus.features.pulsar.ChordComping
 import org.balch.orpheus.features.pulsar.ChordFollow
+import org.balch.orpheus.features.pulsar.CompingFills
+import org.balch.orpheus.features.pulsar.CompingHumanization
+import org.balch.orpheus.features.pulsar.CompingStyle
 import org.balch.orpheus.features.pulsar.Engine
 import org.balch.orpheus.features.pulsar.EnvelopeProfile
 import org.balch.orpheus.features.pulsar.EnvelopeType
 import org.balch.orpheus.features.pulsar.Evolution
 import org.balch.orpheus.features.pulsar.EvolutionTension
+import org.balch.orpheus.features.pulsar.FillType
 import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickMode
@@ -27,6 +32,7 @@ import org.balch.orpheus.features.pulsar.RhythmicEvolution
 import org.balch.orpheus.features.pulsar.RootNote
 import org.balch.orpheus.features.pulsar.ScaleType
 import org.balch.orpheus.features.pulsar.Section
+import org.balch.orpheus.features.pulsar.SectionInversion
 import org.balch.orpheus.features.pulsar.SectionTransition
 import org.balch.orpheus.features.pulsar.SoloMode
 import org.balch.orpheus.features.pulsar.TensionProfile
@@ -261,7 +267,18 @@ class TremoloTideVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.ENS,
                 engineSpace = Engine.ENS,
-                role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
+                role = TrackRole.Chordal(
+                    chordFollow = ChordFollow.FOLLOW,
+                    comping = ChordComping(
+                        style = CompingStyle.PAD,
+                        arpSpeed = 1.0f,
+                        fills = CompingFills(
+                            everyNBars = 16,
+                            skipProbability = 0.5f,
+                            fillType = FillType.STAB_FLURRY,
+                        ),
+                    ),
+                ),
                 volume = 0.30f,
                 pan = -0.25f,
                 density = 0.10f,
@@ -311,16 +328,30 @@ class TremoloTideVibe : VibeProvider {
             TrackVoice(
                 engineEdm = Engine.MOD,
                 engineSpace = Engine.MOD,
-                role = TrackRole.Melodic(chordFollow = ChordFollow.FIXED),
+                role = TrackRole.Chordal(
+                    chordFollow = ChordFollow.ROOT_ONLY,
+                    comping = ChordComping(
+                        style = CompingStyle.REGGAE_SKANK,
+                        fills = CompingFills(
+                            everyNBars = 8,
+                            skipProbability = .25f,
+                            fillType = FillType.TURNAROUND
+                        ),
+                        humanization = CompingHumanization(
+                            dropProbability = .1f,
+                            ghostProbability = .1f,
+                            octaveJumpProbability = .1f,
+                            extensionProbability = .1f,
+                        )
+                    )
+                ),
                 volume = 0.25f,
                 pan = 0.00f,
-                density = 0.06f,
                 harmonics = 0.55f,
                 timbre = 0.40f,
                 morph = 0.50f,
-                envelopeProfile = EnvelopeProfile.WILD,
+                envelopeProfile = EnvelopeProfile.DRONE,
                 macroMap = TrackMacroMap.WILD,
-                barStrategy = BarStrategy.INDEPENDENT,
                 modLfoRate = 0.04f,
                 modLfoDepth = 0.4f,
                 modLfoShape = 0.3f,
@@ -330,9 +361,9 @@ class TremoloTideVibe : VibeProvider {
                 holdLengthMax = 10,
                 noteRangeLow = 60,
                 noteRangeHigh = 84,
-                reverbSend = 0.70f,
-                delaySend = 0.55f,
-                reverbBrightness = 0.85f,    // shimmer-ping
+                reverbSend = 0.50f,
+                delaySend = 0.25f,
+                reverbBrightness = 0.45f,
             ),
         ),
         stepCount = 32,
@@ -400,6 +431,9 @@ class TremoloTideVibe : VibeProvider {
                     ),
                     customProgression = chorusProgression,
                     chordsPerBar = chordsPerBar,
+                    // No compingStyle override — let track 5 keep PAD wash and track 7
+                    // keep its REGGAE_SKANK accent, so the bed stays under the lift.
+                    compingInversion = SectionInversion.OPEN_VOICING,
                     // The lift arc: late-peaking shimmer that rides the held bVII.
                     // Higher evolution probabilities push timbre/morph/harmonics
                     // to wander wider during the chorus than the verse baseline.
