@@ -194,13 +194,18 @@ class RastaManVibe : VibeProvider {
                 glideRate = 0.55f,  // slidey dub bass — notes smear into each other
                 reverbBrightness = 0.25f,
             ),
-            // 4 MELODICA: Roots horn line — bright PD tone, lick-driven.
+            // 4 LEAD: Roots horn-stand-in — lick-driven plucks crossfading to a slow pad.
+            // At Energy=1: DX2 patch idx 14 = "Harpsich" (harpsichord pluck) — works as a
+            // bright plucky lead in place of a real melodica. At Energy=0: DX3 patch idx 14
+            // = "*Planets" (PPG-style synth pad) for the more dub/spaced-out feel.
             // Fills across the full pattern; lick mutation gives it melodic life.
+            // (See references/fm_patches.md — harmonics=0.45 lands at index 14 in both
+            // banks; this voice is harpsichord-pluck, not a true reedy melodica.)
             TrackVoice(
                 engineEdm = Engine.DX2, engineSpace = Engine.DX3,
                 role = TrackRole.Melodic(lickMode = LickMode.Fill),
                 volume = 0.30f, pan = 0.20f, density = 0.30f,
-                harmonics = 0.45f, timbre = 0.52f, morph = 0.24f,  // bright reedy melodica tone
+                harmonics = 0.45f, timbre = 0.52f, morph = 0.24f,  // bright plucky lead → spacey pad
                 envelopeProfile = EnvelopeProfile.MELODIC,
                 macroMap = TrackMacroMap.MELODIC,
                 barStrategy = BarStrategy.REPEAT,

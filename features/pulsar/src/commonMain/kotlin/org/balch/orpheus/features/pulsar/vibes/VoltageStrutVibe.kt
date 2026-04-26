@@ -195,7 +195,14 @@ class VoltageStrutVibe : VibeProvider {
                 reverbSend = 0.10f,
                 glideRate = 0.05f,
             ),
-            // 4: lead — FM stabs, moderate density, energy-driven.
+            // 4: lead — glassy FM stabs, moderate density, energy-driven.
+            // Engine.DX2 + harmonics=0.50 lands on patch idx 16 = "Xylophone". At this
+            // track's C4–G6 register with reverb=0.60, delay=0.30 and MUTATE strategy,
+            // the mallet attack reads as glassy/bell-tone FM stabs — NOT a literal
+            // xylophone. (Tried Engine.DX idx 17 "Insert 1 BRASSY" — actual brass
+            // stabs — but the strut character wanted the percussive top-end clarity
+            // that the mallet patch provides at high register.) Crossfades to VA
+            // (clean analog poly) when Energy drops for a softer space-side voice.
             TrackVoice(
                 engineEdm = Engine.DX2,
                 engineSpace = Engine.VA,
@@ -203,7 +210,7 @@ class VoltageStrutVibe : VibeProvider {
                 volume = 0.55f,
                 pan = 0.05f,
                 density = 0.40f,
-                harmonics = 0.50f,
+                harmonics = 0.50f,  // DX2 idx 16 = "Xylophone" — glassy mallet at C4-G6
                 timbre = 0.55f,
                 morph = 0.45f,
                 envelopeProfile = EnvelopeProfile.MELODIC,

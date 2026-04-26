@@ -189,9 +189,11 @@ class ArmyStompVibe : VibeProvider {
                 macroMap = TrackMacroMap.RHYTHM,
                 barStrategy = BarStrategy.REPEAT
             ),
-            // Bass: disciplined march — ROOT_ONLY chord follow + REPEAT rhythm so the bass
-            // locks to the chord root every stab. noteRangeLow raised from E1 to E2 to
-            // avoid sub-bass mud; the octave pin will keep it in E2-D#3 territory.
+            // Bass: disciplined march — ROOT_ONLY chord follow + REPEAT rhythm so
+            // the bass locks to the chord root every stab. Range pinned to E2-B2
+            // (40-47): noteRangeLow raised from E1 keeps it out of sub-bass mud,
+            // noteRangeHigh dropped to B2 keeps it from climbing into the lead's
+            // E3 floor (see Path B note on the squash lead below).
             TrackVoice(
                 engineEdm = Engine.VCF,
                 engineSpace = Engine.VA,
@@ -203,22 +205,32 @@ class ArmyStompVibe : VibeProvider {
                 macroMap = TrackMacroMap.MELODIC,
                 barStrategy = BarStrategy.REPEAT,
                 noteRangeLow = 40,
-                noteRangeHigh = 52,
+                noteRangeHigh = 47,  // B2 ceiling — pure bass register
                 reverbBrightness = 0.5f
             ),
+            // Squash lead: dual-VCF aesthetic, separated from the bass by SPACE
+            // not SPECTRUM. The bass and lead share filter-sweep character but
+            // live in different positions in the field:
+            //   * pan = 0.20         — pushed right (bass holds center)
+            //   * floor = E3 (52)    — never overlaps the bass's B2 ceiling
+            //   * reverbBrightness   — 0.7 (brighter tail pushes it back in depth)
+            // The space-side stays Engine.STR so at low energy you get a lush
+            // string crossfade. (A/B winner over the brass approach: tried DX3
+            // idx 31 "Br trumpet" — clean spectral separation but lost the
+            // unified filter-sweep palette that defines the vibe's character.)
             TrackVoice(
                 engineEdm = Engine.VCF,
                 engineSpace = Engine.STR,
                 role = TrackRole.Melodic(lickMode = LickMode.Squash),
                 volume = 0.60f,
-                pan = 0.00f,
+                pan = 0.20f,
                 density = 0.20f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
                 macroMap = TrackMacroMap.MELODIC,
                 barStrategy = BarStrategy.CALL_RESPONSE,
-                noteRangeLow = 45,
+                noteRangeLow = 52,
                 noteRangeHigh = 67,
-                reverbBrightness = 0.5f,
+                reverbBrightness = 0.7f,
                 glideRate = 0.05f
             ), // Squash: CALL_RESPONSE owns bar 2
             // Track 5: Texture pad — density bumped so it can pulse under the breakdown.
@@ -268,9 +280,16 @@ class ArmyStompVibe : VibeProvider {
                 noteRangeHigh = 60,
                 reverbBrightness = 0.5f
             ),
-            // Track 7: CHORDAL keys — subtle PAD during march sections, becomes
+            // Track 7: CHORDAL mallet — subtle PAD during march sections, becomes
             // off-beat SKA_UPSTROKES stabs in the breakdown via section override.
-            // CHD engine handles the chord voicing natively.
+            // Engine.DX2 with harmonics=0.54 selects patch idx 17 = "Marimba" — same
+            // FM mallet family as Xylophone but inherently woodier and lower-register,
+            // so the ring stays without the bell-y top end. Range dropped to F2-C4 to
+            // keep the marimba in its idiomatic register and let chords sit just above
+            // the bass without floating into the trumpet's territory.
+            // (Iteration history: DX2/0.50 = "Xylophone" → too high and mallet-y for
+            // ska. DX3/0.05 = "Hammond" → too organ-y, lost the ring. Marimba threads
+            // both: ring + lower register + percussive chord stab.)
             TrackVoice(
                 engineEdm = Engine.DX2, engineSpace = Engine.DX2,
                 role = TrackRole.Chordal(
@@ -284,12 +303,12 @@ class ArmyStompVibe : VibeProvider {
                     ),
                 ),  // subtle in march
                 timbre = .5f,
-                harmonics = .5f,
+                harmonics = 0.54f,  // DX2 idx 17 = "Marimba" — wooden ring, lower than xylo
                 morph = .5f,
                 volume = 0.20f, pan = 0.15f, density = 0.18f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
                 macroMap = TrackMacroMap.MELODIC,
-                noteRangeLow = 48, noteRangeHigh = 67,
+                noteRangeLow = 41, noteRangeHigh = 60,  // F2-C4 — deeper mallet register
                 reverbBrightness = 0.5f,
             ),
         ),

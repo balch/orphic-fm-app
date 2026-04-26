@@ -85,14 +85,16 @@ Convention (not enforced): 0=kick, 1=snare, 2=hat, 3=bass, 4=keys/lead, 5-6=text
 
 - **`engineEdm` / `engineSpace`**: Two Plaits engines. The mix crossfades between them based on the Energy macro. Use the same engine in both slots if you do not want crossfade. Common picks:
   - Drums: `BD`, `SD`, `HH`, `NSE`, `PAR`.
-  - Bass: `WSH` (gritty), `VCF` (filter-sweep bass), `PD` (warm round), `VA` (analog poly).
-  - Lead: `DX` / `DX2` / `DX3` (FM), `WSH` (distorted), `FM`, `WTB` (wavetable).
-  - Pad: `ENS` (string ensemble), `STR` (string model), `GRN` (granular), `CHD` (chord engine), `ADD` (additive).
+  - Bass: `WSH` (gritty), `VCF` (filter-sweep bass), `PD` (warm round), `VA` (analog poly), `DX` (FM bass — see below).
+  - Keys / E.piano / chroma percussion: `DX2` (see below — NOT a generic FM lead).
+  - Lead: `DX3` (FM brass/strings/pads — see below), `WSH` (distorted), `FM` (2-op), `WTB` (wavetable).
+  - Pad: `ENS` (string ensemble), `STR` (string model), `GRN` (granular), `CHD` (chord engine), `ADD` (additive), `DX3` (FM cinematic pads).
   - Texture/FX: `MOD` (modal/metallic), `PAR` (particles), `SPK` (speech), `SWM` (swarm), `NES` (chiptune), `TRN` (wave terrain).
+  - **Important**: `DX` / `DX2` / `DX3` are *not* three flavors of one FM engine. They share a 6-op FM voice but each loads a different 32-patch sysex bank. `harmonics` is a **patch selector** (quantized to 32 zones), not a tone control. Picking the wrong bank lands on the wrong family of patches (e.g. xylophone instead of brass). **See `references/fm_patches.md` for the full bank tables and harmonics math** before using a DX engine.
 - **`role`**: `TrackRole.Percussive`, `TrackRole.Melodic(chordFollow, lickMode)`, or `TrackRole.Chordal(comping, chordFollow)`. Wrong role = wrong pattern generator (e.g. chord-following on drums makes no sense).
 - **`volume` / `pan` / `density`**: mix-level basics.
-- **`harmonics` / `timbre` / `morph`**: Plaits engine knobs, meaning varies per engine. Default 0.3-0.5 works; sweep to taste.
-- **`envelopeProfile`**: `RHYTHM` (drums), `MELODIC` (bass/lead), `EFFECT` (pad/texture), `WILD` (wildcard), `DRONE` (infinite sustain ambient).
+- **`harmonics` / `timbre` / `morph`**: Plaits engine knobs, meaning varies per engine. Default 0.3-0.5 works for most engines. **For SixOp FM (`DX`/`DX2`/`DX3`), `harmonics` is a 32-step patch selector — see `references/fm_patches.md` for the bank tables.** Always set `harmonics` explicitly on these engines; default 0.0 always picks patch index 0, which is rarely what you want.
+- **`envelopeProfile`**: Per-track envelope shape that also drives solo/ducking behavior. `RHYTHM` (drums), `MELODIC` (bass/lead/keys), `EFFECT` (pad/texture — gains reverb during others' solos), `WILD` (wildcard — boosts when soloing, ducks when others do), `DRONE` (infinite sustain ambient — never ducks). See `references/envelopes.md` for solo/ducking specifics.
 - **`macroMap`**: `TrackMacroMap.RHYTHM`/`MELODIC`/`EFFECT`/`WILD`. Controls how the 4 macros move this track's parameters. Match to `envelopeProfile` unless you have a reason not to.
 - **`barStrategy`**: `REPEAT` (same every bar — driving elements, anchoring bass), `MUTATE` (slight variation), `FILL` (adds fills at phrase boundaries), `CALL_RESPONSE` (alternates), `INDEPENDENT` (regenerated — textures, pads).
 - **`modLfo*`**: Slow-modulation parameters for pad/texture tracks. `rate` 0.03-0.1 is glacial; `depth` 0.3-0.7 audible.
@@ -289,6 +291,8 @@ Existing vibes in the `vibes/` directory use the full list of explicit imports (
 - Ambient / chordMatrix example: `DeepSpaceVibe.kt`.
 - CHORDAL-comping family helper: `CompLabVibe.kt` (uses `generateCompLabVibe(...)`).
 - ViewModel that consumes vibes (for reference — no edits needed): `PulsarViewModel.kt` — takes `Set<VibeProvider>` via DI.
+- **`references/fm_patches.md`** — full SixOp FM patch banks for `DX`/`DX2`/`DX3`. Read before setting `harmonics` on any of these engines. Includes a per-bank index→patch-name table and the harmonics-zone math.
+- **`references/envelopes.md`** — `EnvelopeType` (vibe-global) and `EnvelopeProfile` (per-track) reference. Includes solo and ducking behavior per profile and the AD/TIDES/BLEND crossover math.
 
 ## See also
 

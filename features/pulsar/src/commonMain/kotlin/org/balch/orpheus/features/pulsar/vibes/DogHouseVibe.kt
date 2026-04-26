@@ -179,10 +179,14 @@ class DogHouseVibe : VibeProvider {
             ),
             // Keys: reduced volume + density + REPEAT strategy so chord progression motion
             // sits behind the drums/bass instead of dominating (restores pre-progression-wiring feel).
+            // Engine.DX with harmonics=0.33 lands on patch index 10 = "Syn-bass 2" (DX bank
+            // is the bass+analog-synth bank, not E.piano — see references/fm_patches.md).
+            // At volume=0.28 played as Chordal/BLUES_SHUFFLE comping, this synth-bass tone
+            // voices chords with a thick analog-FM character that sits well under the bass.
             TrackVoice(
                 engineEdm = Engine.DX,
                 engineSpace = Engine.GRN,
-                harmonics = 0.33f,  // lower bank — often EP / soft bass patches
+                harmonics = 0.33f,  // DX bank idx 10 = "Syn-bass 2" — synth-bass voicing chords
                 timbre = 0.32f,     // modulator index — not too bright for blues
                 morph = 0.31f,       // less feedback, cleaner attack
                 volume = 0.28f,
