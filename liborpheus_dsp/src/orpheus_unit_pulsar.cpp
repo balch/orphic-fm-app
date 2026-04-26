@@ -725,7 +725,10 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             ts.fill_type = static_cast<FillTypeId>(
                 engine->pulsar_track_fill_type[t].load(std::memory_order_relaxed));
             ts.fill_skip_prob = engine->pulsar_track_fill_skip_prob[t].load(std::memory_order_relaxed);
-            ts.bars_since_fill = 0;  // counter reset on vibe load
+            // Seed at 1 so the first fill lands on bar N (not bar N+1). Bar 1
+            // plays BASE without going through mutate_patterns(), so we lose
+            // one increment up front and need to compensate.
+            ts.bars_since_fill = 1;
         } else if (lick_len > 0 && lick_mode != LickMode::NONE && role == TrackRole::MELODIC) {
             if (lick_mode == LickMode::FILL) {
                 // FILL: lick spans full step count, bypass bar strategy

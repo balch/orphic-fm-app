@@ -165,7 +165,13 @@ inline void init_chord_progression(PulsarChordState& cs, int style,
     if (cs.steps_per_chord < 1) cs.steps_per_chord = 1;
 
     std::memcpy(cs.original_progression, cs.progression, sizeof(cs.progression));
-    cs.bars_since_anchor = 0;
+    // Seed at 1 so the first anchor reset lands on cycle N (not cycle N+1).
+    // bars_since_anchor only increments when the progression wraps back to
+    // chord_index 0, which happens at the START of cycle 2; cycle 1 plays
+    // without ever entering that branch, so we lose one increment up front
+    // and need to compensate. Mirrors the fix in orpheus_unit_pulsar.cpp for
+    // ts.bars_since_fill.
+    cs.bars_since_anchor = 1;
     // Clear anchor/drift to sane defaults so init is a true reset. The host
     // load_vibe() path immediately overwrites these from the vibe config;
     // other callers (tests, hot-swapped progressions) get a stable baseline.

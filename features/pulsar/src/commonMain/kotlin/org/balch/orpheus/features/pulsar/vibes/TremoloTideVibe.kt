@@ -274,7 +274,6 @@ class TremoloTideVibe : VibeProvider {
                         arpSpeed = 1.0f,
                         fills = CompingFills(
                             everyNBars = 16,
-                            skipProbability = 0.5f,
                             fillType = FillType.STAB_FLURRY,
                         ),
                     ),
@@ -338,10 +337,10 @@ class TremoloTideVibe : VibeProvider {
                             fillType = FillType.TURNAROUND
                         ),
                         humanization = CompingHumanization(
-                            dropProbability = .1f,
-                            ghostProbability = .1f,
-                            octaveJumpProbability = .1f,
-                            extensionProbability = .1f,
+                            dropProbability = .05f,
+                            ghostProbability = .2f,
+                            octaveJumpProbability = .05f,
+                            extensionProbability = .05f,
                         )
                     )
                 ),
