@@ -158,7 +158,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                 updatePlaybackState(false)
             }
             ACTION_UPDATE_METADATA -> {
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "DJ App"
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Orphic-DJ"
                 val subtitle = intent.getStringExtra(EXTRA_SUBTITLE) ?: ""
                 val intentIsPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, true)
 
@@ -381,7 +381,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                 "Audio Playback",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows when DJ App is playing audio"
+                description = "Shows when Orphic-DJ is playing audio"
                 setShowBadge(false)
                 enableLights(true)
                 lightColor = NOTIFICATION_COLOR

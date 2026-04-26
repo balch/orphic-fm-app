@@ -17,9 +17,24 @@ val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 android {
     compileSdk = libs.findVersion("android-compileSdk").get().requiredVersion.toInt()
 
+    fun execGit(vararg args: String): String? = try {
+        providers.exec {
+            commandLine("git", *args)
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim().takeIf { it.isNotBlank() }
+    } catch (_: Exception) {
+        null
+    }
+
+    val gitVersionCode = execGit("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
+    val gitVersionName = execGit("describe", "--tags", "--always", "--dirty") ?: "1.0"
+
     defaultConfig {
         minSdk = libs.findVersion("android-minSdk").get().requiredVersion.toInt()
         targetSdk = libs.findVersion("android-targetSdk").get().requiredVersion.toInt()
+
+        versionCode = gitVersionCode
+        versionName = gitVersionName
 
         ndk {
             abiFilters += setOf("arm64-v8a", "x86_64")
@@ -46,6 +61,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = if (hasKeystoreProps) {
                 signingConfigs.getByName("release")
             } else {

@@ -7,8 +7,6 @@ android {
 
     defaultConfig {
         applicationId = "org.balch.orpheus"
-        versionCode = 1
-        versionName = "1.0"
 
         externalNativeBuild {
             cmake {

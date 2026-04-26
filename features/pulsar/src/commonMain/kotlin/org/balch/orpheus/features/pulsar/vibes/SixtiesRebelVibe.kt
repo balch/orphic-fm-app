@@ -48,11 +48,11 @@ import org.balch.orpheus.features.pulsar.row
 class SixtiesRebelVibe : VibeProvider {
     // I — IV (E — A in E Mixolydian). Simple back-and-forth.
     private val verseProgression = chords(0, 3, 0, 3)
+    private val chordsPerBar = 1
 
     // Chorus pushes to the V before resolving back.
     private val chorusProgression = chords(0, 4, 0, 3)
-
-    private val chordsPerBar = 1
+    private val chorusChordsPerBar = 2
 
     override val vibe = Vibe(
         name = "Sixties Rebel",
@@ -76,25 +76,25 @@ class SixtiesRebelVibe : VibeProvider {
             ),
             loopLength = 8, // 2 bars
         ),
-        lickMutation = 0.25f, // Keep it tight
+        lickMutation = 0.45f, // Higher base mutation allows section overrides to "dissolve" the riff
         band = Band(
             members = listOf(
-                BandMember("Drummer", listOf(0, 1, 2, 7), alwaysActive = true, creativity = 0.15f),
-                BandMember("Bassist", listOf(3), creativity = 0.20f),
-                BandMember("Guitarist", listOf(4, 5), creativity = 0.45f),
-                BandMember("Keyboardist", listOf(6), creativity = 0.35f),
+                BandMember("Drums", listOf(0, 1, 2, 7), alwaysActive = true, creativity = 0.15f),
+                BandMember("Bass", listOf(3), creativity = 0.20f),
+                BandMember("Guitar", listOf(4, 5), creativity = 0.45f),
+                BandMember("Keys", listOf(6), creativity = 0.35f),
             ),
             handoffMatrix = bandMatrix(
-                "Drummer"    to row(0.00f, 0.20f, 0.60f, 0.20f),
-                "Bassist"    to row(0.10f, 0.00f, 0.70f, 0.20f),
-                "Guitarist"  to row(0.05f, 0.25f, 0.00f, 0.70f),
-                "Keyboardist" to row(0.10f, 0.20f, 0.70f, 0.00f),
+                "Drums"    to row(0.00f, 0.20f, 0.60f, 0.20f),
+                "Bass"    to row(0.10f, 0.00f, 0.70f, 0.20f),
+                "Guitar"  to row(0.05f, 0.25f, 0.00f, 0.70f),
+                "Keys" to row(0.10f, 0.20f, 0.70f, 0.00f),
             ),
             pullInMatrix = bandMatrix(
-                "Drummer"    to row(0.00f, 0.40f, 0.30f, 0.30f),
-                "Bassist"    to row(0.30f, 0.00f, 0.50f, 0.20f),
-                "Guitarist"  to row(0.20f, 0.40f, 0.00f, 0.40f),
-                "Keyboardist" to row(0.20f, 0.30f, 0.50f, 0.00f),
+                "Drums"    to row(0.00f, 0.40f, 0.30f, 0.30f),
+                "Bass"    to row(0.30f, 0.00f, 0.50f, 0.20f),
+                "Guitar"  to row(0.20f, 0.40f, 0.00f, 0.40f),
+                "Keys" to row(0.20f, 0.30f, 0.50f, 0.00f),
             ),
         ),
         energy = 0.65f,
@@ -204,7 +204,7 @@ class SixtiesRebelVibe : VibeProvider {
                 volume = 0.45f,
                 pan = 0.25f,
                 density = 0.15f,
-                barStrategy = BarStrategy.MUTATE,
+                barStrategy = BarStrategy.FILL,
                 reverbSend = 0.30f,
             ),
             // 7: Tambourine / Percussion
@@ -234,29 +234,31 @@ class SixtiesRebelVibe : VibeProvider {
             reverbBrightness = 0.60f,
         ),
         arrangement = Arrangement(
+            introIndex = 0,
             sections = listOf(
                 Section(
                     name = "intro",
-                    barsMin = 4, barsMax = 4,
+                    barsMin = 2, barsMax = 2,
                     transitions = listOf(SectionTransition(1, 1f)),
-                    macroOverrides = MacroOverrides(energy = 0.8f, complexity = 0.7f),
+                    macroOverrides = MacroOverrides(energy = 1.3f, complexity = 0.7f, mood = 1.3f),
+                    chordsPerBar = 2,
                     // Just fuzz + drums
                 ),
                 Section(
                     name = "verse",
-                    barsMin = 8, barsMax = 12,
+                    barsMin = 8, barsMax = 8,
                     transitions = listOf(
                         SectionTransition(2, 0.6f),
                         SectionTransition(3, 0.4f)
                     ),
-                    recencyDecay = 0.5f,
                 ),
                 Section(
                     name = "chorus",
-                    barsMin = 8, barsMax = 8,
+                    barsMin = 4, barsMax = 4,
                     transitions = listOf(SectionTransition(1, 1f)),
-                    macroOverrides = MacroOverrides(energy = 1.3f, complexity = 1.2f, mood = 1.2f),
+                    macroOverrides = MacroOverrides(energy = .5f, complexity = 2.0f, mood = .4f),
                     customProgression = chorusProgression,
+                    chordsPerBar = chorusChordsPerBar,
                 ),
                 Section(
                     name = "solo",

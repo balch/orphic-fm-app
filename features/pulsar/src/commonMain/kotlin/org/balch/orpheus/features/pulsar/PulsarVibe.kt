@@ -1349,14 +1349,14 @@ data class Section(
  * - `Arrangement.JAM` — groove ↔ improv with IMPROVISERS solos (2 sections, open-ended)
  *
  * @param sections Up to 8 sections.
- * @param introIndex Which section to start with (null = random weighted choice).
+ * @param introIndex Which section to start with (default 0; pass null for random weighted choice).
  * @param outroIndex Which section ends the arrangement (null = loops forever).
  * @param defaultSectionBars Default bar count if a section doesn't specify.
  */
 @Serializable
 data class Arrangement(
     val sections: List<Section>,
-    val introIndex: Int? = null,
+    val introIndex: Int? = 0,
     val outroIndex: Int? = null,
     val defaultSectionBars: Int = 8,
 ) {

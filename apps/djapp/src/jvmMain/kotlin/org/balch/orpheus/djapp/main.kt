@@ -24,7 +24,7 @@ fun main() {
                 graph.synthOrchestrator.stop()
                 exitApplication()
             },
-            title = "DJ App",
+            title = "Orphic-DJ",
             state = rememberWindowState(width = 360.dp, height = 780.dp),
         ) {
             DjApp(graph)
