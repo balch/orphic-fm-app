@@ -1,45 +1,15 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <group
-        android:translateX="18"
-        android:translateY="18">
-        <!-- Turntable Platter -->
-        <path
-            android:fillColor="#E0E0E0"
-            android:pathData="M36,36m-32,0a32,32 0,1 1,64 0a32,32 0,1 1,-64 0" />
-        <path
-            android:fillColor="#212121"
-            android:pathData="M36,36m-30,0a30,30 0,1 1,60 0a30,30 0,1 1,-60 0" />
-        <!-- Grooves -->
-        <path
-            android:strokeColor="#424242"
-            android:strokeWidth="0.5"
-            android:pathData="M36,36m-25,0a25,25 0,1 1,50 0a25,25 0,1 1,-50 0" />
-        <path
-            android:strokeColor="#424242"
-            android:strokeWidth="0.5"
-            android:pathData="M36,36m-20,0a20,20 0,1 1,40 0a20,20 0,1 1,-40 0" />
-        <path
-            android:strokeColor="#424242"
-            android:strokeWidth="0.5"
-            android:pathData="M36,36m-15,0a15,15 0,1 1,30 0a15,15 0,1 1,-30 0" />
-        <!-- Label -->
-        <path
-            android:fillColor="#FF4081"
-            android:pathData="M36,36m-8,0a8,8 0,1 1,16 0a8,8 0,1 1,-16 0" />
-        <!-- Center -->
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M36,36m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
-        <!-- Tonearm -->
-        <path
-            android:fillColor="#BDBDBD"
-            android:pathData="M64,10 L68,10 L68,40 L60,50 L58,48 L64,38 Z" />
-        <path
-            android:fillColor="#9E9E9E"
-            android:pathData="M56,46 L60,52 L54,58 L50,52 Z" />
-    </group>
-</vector>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Vinyl turntable base (vector) -->
+    <item android:drawable="@drawable/ic_launcher_turntable" />
+    <!-- Orpheus emblem fills the label well, flush against the red accent ring. -->
+    <item
+        android:width="26dp"
+        android:height="26dp"
+        android:gravity="center">
+        <bitmap
+            android:src="@mipmap/orpheus_emblem"
+            android:gravity="center" />
+    </item>
+    <!-- Concentric grooves painted over the emblem so the label looks pressed into the vinyl. -->
+    <item android:drawable="@drawable/ic_launcher_grooves" />
+</layer-list>

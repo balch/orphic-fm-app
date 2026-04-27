@@ -1,0 +1,22 @@
+<!-- Concentric groove rings painted OVER the orpheus emblem so the label looks
+     pressed into the vinyl. Semi-transparent so the character stays legible. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="18"
+        android:translateY="18">
+        <path android:strokeColor="#66000000" android:strokeWidth="0.35"
+              android:pathData="M36,36 m-11,0 a11,11 0,1 1,22 0 a11,11 0,1 1,-22 0" />
+        <path android:strokeColor="#66000000" android:strokeWidth="0.35"
+              android:pathData="M36,36 m-9,0 a9,9 0,1 1,18 0 a9,9 0,1 1,-18 0" />
+        <path android:strokeColor="#66000000" android:strokeWidth="0.35"
+              android:pathData="M36,36 m-7,0 a7,7 0,1 1,14 0 a7,7 0,1 1,-14 0" />
+        <path android:strokeColor="#66000000" android:strokeWidth="0.35"
+              android:pathData="M36,36 m-5,0 a5,5 0,1 1,10 0 a5,5 0,1 1,-10 0" />
+        <path android:strokeColor="#66000000" android:strokeWidth="0.35"
+              android:pathData="M36,36 m-3,0 a3,3 0,1 1,6 0 a3,3 0,1 1,-6 0" />
+    </group>
+</vector>
