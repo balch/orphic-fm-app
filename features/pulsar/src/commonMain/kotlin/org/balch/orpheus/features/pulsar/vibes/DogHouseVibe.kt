@@ -4,6 +4,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.ArpDirection
 import org.balch.orpheus.features.pulsar.ArpMode
 import org.balch.orpheus.features.pulsar.Arrangement
@@ -72,6 +73,7 @@ class DogHouseVibe : VibeProvider {
 
     override val vibe = Vibe(
         name = "Dog House",
+        album = Album.ZERO_TO_ONE,
         bpm = 85f,
         envelopeType = EnvelopeType.BLEND,
         rootNote = RootNote.E,

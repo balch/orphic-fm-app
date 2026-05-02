@@ -62,6 +62,7 @@ if(APPLE)
         "-framework CoreFoundation"
         "-framework Foundation"
         "-framework MediaPlayer"
+        "-framework AppKit"
     )
 elseif(UNIX)
     target_link_libraries(orpheus_desktop PRIVATE pthread m dl)

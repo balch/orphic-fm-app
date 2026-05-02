@@ -4,92 +4,51 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
-import org.balch.orpheus.core.media.MediaSessionActionHandler
-import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
-import org.balch.orpheus.core.media.PlaybackMetadata
-import org.balch.orpheus.core.media.PlaybackMode
+import org.balch.orpheus.core.playback.PlaybackController
 import kotlin.concurrent.Volatile
 
 /**
- * Orchestrates the lifecycle of the synthesizer engine.
+ * Engine lifecycle wrapper. Owns:
+ * - Engine start/stop (process boot, shutdown).
+ * - Restoring master volume after engine restart.
+ * - Routing PlaybackLifecycleEvent.RequestResume to PlaybackController.
+ * - Clearing activity sources on StopAll.
  *
- * Manages engine start/stop to ensure proper audio lifecycle management
- * independent of UI composition. Also manages the MediaSession for
- * background audio and system media controls.
- *
- * MediaSession is automatically managed based on [org.balch.orpheus.core.media.MediaSessionStateManager]:
- * - ACTIVATED when any audio source is active (Evo, REPL, Drone, Solo)
- * - DEACTIVATED when all audio sources become inactive
- *
- * Supports three states:
- * - Playing: Audio is audible, engine is running
- * - Paused: Audio is muted, but engine and agents keep running
- * - Stopped: Engine stopped, agents stopped, service deactivated
- *
- * When stopped (including from the foreground service notification),
- * broadcasts a stop event via [org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager] so all
- * audio-producing components (AI agents, schedulers) can shut down.
+ * Does NOT own play/pause state, MediaSession activation, mute mechanism,
+ * or playback mode display — those are PlaybackController's responsibility
+ * (see core/playback/PlaybackController.kt).
  */
 @SingleIn(AppScope::class)
 @Inject
 class SynthOrchestrator(
     private val engine: SynthEngine,
-    private val mediaSessionManager: MediaSessionManager,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
-    private val mediaSessionStateManager: MediaSessionStateManager
-) : MediaSessionActionHandler {
+    private val mediaSessionStateManager: MediaSessionStateManager,
+    private val playbackController: PlaybackController,
+    private val scope: AppCoroutineScope,
+) {
     private val log = logging("SynthOrchestrator")
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile private var isStarted = false
-    @Volatile private var isPaused = false
-    @Volatile private var isMediaSessionActive = false
     @Volatile private var savedMasterVolume = 0.7f
-    private var currentPlaybackMode = PlaybackMode.USER
 
     init {
-        mediaSessionManager.setActionHandler(this)
-
-        // Subscribe to MediaSessionStateManager to auto-activate/deactivate MediaSession
-        scope.launch {
-            mediaSessionStateManager.isMediaSessionNeeded.collect { needed ->
-                if (needed && !isMediaSessionActive) {
-                    if (!isStarted) {
-                        // Engine was stopped (e.g., via notification Stop button).
-                        // Restart it so the user can resume from the UI.
-                        log.debug { "MediaSession needed but engine stopped - restarting" }
-                        start()
-                    } else {
-                        log.debug { "MediaSession needed - activating (source: ${mediaSessionStateManager.activeSource.value})" }
-                        activateMediaSession()
-                    }
-                } else if (!needed && isMediaSessionActive) {
-                    log.debug { "MediaSession no longer needed - deactivating" }
-                    deactivateMediaSession()
-                }
-            }
-        }
-
-        // Subscribe to lifecycle events (e.g., resume requests from scheduler)
+        // Route lifecycle events through PlaybackController so all state
+        // transitions go through the single source of truth.
         scope.launch {
             playbackLifecycleManager.events.collect { event ->
                 when (event) {
                     is PlaybackLifecycleEvent.RequestResume -> {
                         log.debug { "Received RequestResume event" }
-                        // Update metadata when playback resumes
-                        updateMediaSessionMetadata()
-                        if (isPaused) {
-                            resume()
-                        }
+                        playbackController.play()
                     }
                     is PlaybackLifecycleEvent.StopAll -> {
-                        // Clear all activity states when stopping
+                        // Clear activity sources so the MediaSession can fully
+                        // deactivate (PlaybackController observes this).
                         mediaSessionStateManager.clearAll()
                     }
                 }
@@ -98,164 +57,35 @@ class SynthOrchestrator(
     }
 
     /**
-     * Activate the MediaSession (internal).
-     */
-    private fun activateMediaSession() {
-        if (!isMediaSessionActive && isStarted) {
-            mediaSessionManager.activate()
-            mediaSessionManager.updatePlaybackState(!isPaused)
-            isMediaSessionActive = true
-            updateMediaSessionMetadata()
-            log.debug { "SynthOrchestrator: Media session activated" }
-        }
-    }
-
-    /**
-     * Deactivate the MediaSession (internal).
-     */
-    private fun deactivateMediaSession() {
-        if (isMediaSessionActive) {
-            // Deactivate directly — no need to update playback state first.
-            // Sending updatePlaybackState via startService could restart
-            // the service after stopService is called in deactivate().
-            mediaSessionManager.deactivate()
-            isMediaSessionActive = false
-            currentPlaybackMode = PlaybackMode.USER
-            log.debug { "SynthOrchestrator: Media session deactivated" }
-        }
-    }
-
-    /**
-     * Start the synth engine. This does NOT activate the media session.
-     * The media session is only activated when actual playback begins
-     * (REPL, Drone, Solo mode) to avoid showing a "Playing" notification
-     * when nothing is actually playing.
+     * Start the synth engine. Called once at app boot.
      */
     fun start() {
         if (!isStarted) {
             engine.start()
-            // Restore master volume after starting (engine may reset to 0 on restart)
+            // Restore master volume after starting (engine may reset to 0 on restart).
             engine.setMasterVolume(savedMasterVolume)
             log.debug { "Restored master volume to $savedMasterVolume after start" }
-
-            // Don't activate media session here - wait for actual playback
             isStarted = true
-            isPaused = false
-            log.debug { "SynthOrchestrator: Engine started (media session not yet active)" }
-
-            // Re-check: if isMediaSessionNeeded became true before isStarted,
-            // the collector already skipped activation. Activate now.
-            if (mediaSessionStateManager.isMediaSessionNeeded.value && !isMediaSessionActive) {
-                log.debug { "MediaSession was needed before engine started - activating now" }
-                activateMediaSession()
-            }
-        }
-    }
-
-
-    /**
-     * Pause audio playback by muting output.
-     * The engine and all agents continue running, just silenced.
-     */
-    fun pause() {
-        if (isStarted && !isPaused) {
-            // Save current master volume (guard against saving 0 if already
-            // muted by AndroidAppLifecycleManager or sleep timer fade)
-            val vol = engine.getMasterVolume()
-            if (vol > 0f) savedMasterVolume = vol
-            engine.setMasterVolume(0f)
-            mediaSessionManager.updatePlaybackState(false)
-            isPaused = true
-            updateMediaSessionMetadata()
-            log.debug { "SynthOrchestrator: Paused (muted, savedVolume=$savedMasterVolume)" }
+            log.debug { "SynthOrchestrator: Engine started" }
         }
     }
 
     /**
-     * Resume audio playback by restoring volume.
+     * Stop the engine. Called on app shutdown (JVM main).
      */
-    fun resume() {
-        if (isStarted && isPaused) {
-            // Restore master volume
-            engine.setMasterVolume(savedMasterVolume)
-            mediaSessionManager.updatePlaybackState(true)
-            isPaused = false
-            updateMediaSessionMetadata()
-            log.debug { "SynthOrchestrator: Resumed (restored volume=$savedMasterVolume)" }
-        }
-    }
-
     fun stop() {
         if (isStarted) {
             log.debug { "SynthOrchestrator: Stopping - broadcasting stop event" }
-            // Broadcast stop event to all listeners (agents, schedulers, etc.)
+            // Broadcast stop event to all listeners (agents, schedulers, etc.).
             playbackLifecycleManager.tryRequestStopAll()
-
-            // Save the current master volume before stopping
-            // If paused, we already have the pre-pause volume saved
-            // If not paused, save the current volume for next restart
-            if (!isPaused) {
-                savedMasterVolume = engine.getMasterVolume()
-            }
+            // Save current master volume for next restart.
+            savedMasterVolume = engine.getMasterVolume()
             log.debug { "Saved master volume: $savedMasterVolume for next start" }
-
-            // Deactivate media session using the centralized method
-            deactivateMediaSession()
             engine.stop()
             isStarted = false
-            isPaused = false
             log.debug { "SynthOrchestrator: Engine stopped" }
         }
     }
 
     val peakFlow get() = engine.peakFlow
-
-    // MediaSessionActionHandler implementation
-    override fun onPlay() {
-        log.debug { "MediaSession: Play requested" }
-        if (!isStarted) {
-            start()
-        } else if (isPaused) {
-            resume()
-        }
-    }
-
-    override fun onPause() {
-        log.debug { "MediaSession: Pause requested" }
-        pause()
-    }
-
-    override fun onStop() {
-        log.debug { "MediaSession: Stop requested" }
-        stop()
-    }
-
-    /**
-     * Set the current playback mode for display in notifications and lock screen.
-     * Call this when AI modes are activated/deactivated.
-     *
-     * Note: MediaSession activation is now handled by MediaSessionStateManager.
-     * This method only updates the mode for metadata display.
-     */
-    fun setPlaybackMode(mode: PlaybackMode) {
-        if (currentPlaybackMode != mode) {
-            currentPlaybackMode = mode
-            log.debug { "Playback mode changed to: ${mode.displayName}" }
-            updateMediaSessionMetadata()
-        }
-    }
-
-    /**
-     * Update MediaSession metadata with current mode and state.
-     */
-    private fun updateMediaSessionMetadata() {
-        if (!isMediaSessionActive) return
-
-        val metadata = PlaybackMetadata(
-            title = "Orpheus Synthesizer",
-            mode = currentPlaybackMode,
-            isPlaying = !isPaused
-        )
-        mediaSessionManager.updateMetadata(metadata)
-    }
 }

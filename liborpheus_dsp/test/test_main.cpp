@@ -33,6 +33,7 @@ struct TestSuite {
 static TestSuite suites[] = {
     {"unit",            run_unit_tests,            true},
     {"voice",           run_voice_tests,           true},
+    {"lpg",             run_lpg_tests,             true},
     {"engine",          run_engine_render_tests,   true},
     {"effects",         run_effects_tests,         true},
     {"graph",           run_graph_tests,           true},
@@ -63,7 +64,6 @@ static TestSuite suites[] = {
     {"comping",         run_pulsar_comping_tests,  true},
     {"pulsar_signal",   run_pulsar_signal_tests,   true},
     {"tension",         run_pulsar_tension_tests,  true},
-    {"pulsar_motifs",   run_pulsar_motifs_tests,   true},
     {"pulsar_solos",    run_pulsar_solos_tests,    true},
     {"pulsar_sections", run_pulsar_sections_tests, true},
     {"oboe_buffer",     run_oboe_buffer_tests,     true},

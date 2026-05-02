@@ -15,8 +15,8 @@ private fun jsSetPlaybackState(isPlaying: Boolean): Unit = js(
     "{ if ('mediaSession' in navigator) { navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'; } }"
 )
 
-private fun jsUpdateMetadata(title: String, artist: String, album: String): Unit = js(
-    "{ if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: title, artist: artist, album: album }); } }"
+private fun jsUpdateMetadata(title: String, artist: String): Unit = js(
+    "{ if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: title, artist: artist }); } }"
 )
 
 private fun jsSetupInitialMetadata(): Unit = js(
@@ -45,11 +45,6 @@ actual class MediaSessionManager {
     private val log = logging("MediaSessionManager")
     private var handler: MediaSessionActionHandler? = null
     private var isActive = false
-    actual var onSkipNext: (() -> Unit)? = null
-    actual var onSkipPrevious: (() -> Unit)? = null
-    actual var onPlay: (() -> Unit)? = null
-    actual var onPause: (() -> Unit)? = null
-    actual var onPlayFromMediaId: ((String) -> Unit)? = null
     
     actual fun activate() {
         if (isActive) return
@@ -90,12 +85,12 @@ actual class MediaSessionManager {
     
     actual fun updateMetadata(metadata: PlaybackMetadata) {
         try {
-            jsUpdateMetadata(metadata.title, metadata.displaySubtitle, metadata.mode.displayName)
+            jsUpdateMetadata(metadata.title, metadata.subtitle)
         } catch (e: Exception) {
             // MediaSession may not be available
         }
     }
-    
+
     private fun setupMediaSession() {
         // Set initial metadata
         jsSetupInitialMetadata()

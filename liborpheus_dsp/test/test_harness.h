@@ -489,6 +489,7 @@ inline std::vector<float> render_voice_with_envelope(
 
 bool run_unit_tests();
 bool run_voice_tests();
+bool run_lpg_tests();
 bool run_engine_render_tests();
 bool run_effects_tests();
 bool run_graph_tests();
@@ -519,7 +520,6 @@ bool run_pulsar_chords_tests();
 bool run_pulsar_comping_tests();
 bool run_pulsar_signal_tests();
 bool run_pulsar_tension_tests();
-bool run_pulsar_motifs_tests();
 bool run_pulsar_solos_tests();
 bool run_pulsar_sections_tests();
 bool run_oboe_buffer_tests();

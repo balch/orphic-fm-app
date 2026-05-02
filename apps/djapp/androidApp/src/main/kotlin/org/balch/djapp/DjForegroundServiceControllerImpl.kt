@@ -47,13 +47,14 @@ class DjForegroundServiceControllerImpl(
         context.startService(intent)
     }
 
-    override fun updateMetadata(title: String, mode: String, modeDisplayName: String, isPlaying: Boolean) {
+    override fun updateMetadata(title: String, subtitle: String, isPlaying: Boolean) {
         val intent = Intent(context, DjMediaBrowserService::class.java).apply {
             action = ForegroundServiceController.ACTION_UPDATE_METADATA
             putExtra(ForegroundServiceController.EXTRA_TITLE, title)
-            putExtra(ForegroundServiceController.EXTRA_SUBTITLE, modeDisplayName)
+            putExtra(ForegroundServiceController.EXTRA_SUBTITLE, subtitle)
             putExtra(ForegroundServiceController.EXTRA_IS_PLAYING, isPlaying)
         }
         context.startService(intent)
     }
+
 }

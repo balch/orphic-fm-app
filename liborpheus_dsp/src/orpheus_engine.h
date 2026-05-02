@@ -826,6 +826,14 @@ struct OrpheusEngine {
     std::atomic<int>   pulsar_arrangement_intro_index{-1};
     std::atomic<int>   pulsar_arrangement_outro_index{-1};
     std::atomic<float> pulsar_section_data[8 * 21] = {};
+    // Per-track section overrides. Stride: 8 sections × 8 tracks. -1 sentinel
+    // means "no override — use the track's base value". Read at vibe load and
+    // consulted at section transitions for chordal pattern regeneration and
+    // per-voice rendering (inversion / arp_mode / chord_follow).
+    std::atomic<int>   pulsar_section_track_comping_style[8 * 8] = {};
+    std::atomic<int>   pulsar_section_track_inversion[8 * 8] = {};
+    std::atomic<int>   pulsar_section_track_arp_mode[8 * 8] = {};
+    std::atomic<int>   pulsar_section_track_chord_follow[8 * 8] = {};
     // Per-section outgoing edges. Stride: 8 sections × 8 edges × 3 floats per edge.
     // Field layout per edge: 0=target_index, 1=weight, 2=transition_bars (pre-roll
     // ramp into the destination, in bars; 0 = hard cut at the boundary).
@@ -926,6 +934,20 @@ struct OrpheusEngine {
 
     // Per-track chord follow mode (0=FOLLOW, 1=ROOT_ONLY, 2=FIXED)
     std::atomic<int> pulsar_track_chord_follow[8] = {};
+
+    // Per-track LPG (low-pass gate) config — see LpgMode in orpheus_voice.h.
+    // Zero-init here matches LPG_BYPASS (regression-safe). Kotlin's PulsarPlugin
+    // declares defaults of LPG_ENGINE_DEFAULT (3) and 0.5f for decay/colour
+    // and pushes them on vibe load before the track plays.
+    //
+    // lpg_mode applies when engineEdm is active; lpg_mode_space applies when
+    // engineSpace is active. The space slot is "fall through to lpg_mode" via
+    // a sentinel of LPG_ENGINE_DEFAULT (3) — Kotlin pushes the per-slot
+    // mode if a vibe sets `lpgModeSpace` explicitly.
+    std::atomic<int>   pulsar_track_lpg_mode[8]       = {};
+    std::atomic<int>   pulsar_track_lpg_mode_space[8] = {};
+    std::atomic<float> pulsar_track_lpg_decay[8]      = {};
+    std::atomic<float> pulsar_track_lpg_colour[8]     = {};
 
     // Per-track evolution parameters
     // Note: tension_resp and voicing_tension zero-init here; Kotlin defaults are 1.0f.

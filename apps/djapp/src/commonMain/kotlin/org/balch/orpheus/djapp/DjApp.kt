@@ -31,7 +31,7 @@ import org.balch.orpheus.ui.viz.LocalSignalVizGlow
 import org.balch.orpheus.ui.widgets.VizBackground
 
 @Composable
-fun DjApp(graph: DjAppGraph) {
+fun DjApp(graph: DjAppGraph, onTogglePlayback: () -> Unit = {}) {
     CompositionLocalProvider(
         LocalMetroViewModelFactory provides graph.metroViewModelFactory,
     ) {
@@ -100,6 +100,7 @@ fun DjApp(graph: DjAppGraph) {
                             DjAppScreen(
                                 synthEngine = graph.synthEngine,
                                 vizFeature = vizFeature,
+                                onTogglePlayback = onTogglePlayback,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }

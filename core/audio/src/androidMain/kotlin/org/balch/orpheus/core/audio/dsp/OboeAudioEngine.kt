@@ -106,6 +106,10 @@ class OboeAudioEngine() : AudioEngine, NativeDspBridge {
     ) = bridge.nativeGetPulsarViz(gatesOut, velocitiesOut, playheadsOut, stepCountsOut)
     override fun nativeGetPulsarArrangement(out: IntArray) = bridge.nativeGetPulsarArrangement(out)
 
+    override fun setOnEngineRecreatedCallback(callback: (() -> Unit)?) {
+        bridge.nativeSetEngineRecreatedCallback(callback?.let { Runnable(it) })
+    }
+
     companion object {
         private val log = logging("OboeAudioEngine")
     }

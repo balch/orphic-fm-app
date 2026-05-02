@@ -1,10 +1,11 @@
 package org.balch.orpheus.core.tidal
 
 import org.balch.orpheus.core.audio.TestSynthEngine
+import org.balch.orpheus.core.audio.dsp.TestAudioEngine
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.TestDispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
-import org.balch.orpheus.core.audio.dsp.TestAudioEngine
 import org.balch.orpheus.core.tempo.GlobalTempo
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -21,6 +22,7 @@ class TidalReplParsingTest {
 
     private lateinit var repl: TidalRepl
     private val dispatcherProvider = TestDispatcherProvider()
+    private val scope = AppCoroutineScope(dispatcherProvider)
 
 
     @BeforeTest
@@ -35,8 +37,9 @@ class TidalReplParsingTest {
             playbackLifecycleManager,
             dispatcherProvider,
             globalTempo,
+            scope,
         )
-        repl = TidalRepl(scheduler, dispatcherProvider)
+        repl = TidalRepl(scheduler, dispatcherProvider, scope)
     }
 
     // =========================================================================

@@ -12,7 +12,6 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -38,12 +37,6 @@ import org.balch.orpheus.core.features.PanelId
 import org.balch.orpheus.core.features.PulsarPlaybackMode
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
-import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
-import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
-import org.balch.orpheus.core.media.MediaSessionManager
-import org.balch.orpheus.core.media.MediaSessionStateManager
-import org.balch.orpheus.core.media.PlaybackMetadata
-import org.balch.orpheus.core.media.PlaybackMode
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.PortValue.IntValue
@@ -83,8 +76,6 @@ data class PulsarUiState(
 
 @Immutable
 data class PulsarPanelActions(
-    val togglePlaying: () -> Unit = {},
-    val toggleGlobalPause: () -> Unit = {},
     val setVibe: (Vibe) -> Unit = {},
     val setEnergy: (Float) -> Unit = {},
     val setComplexity: (Float) -> Unit = {},
@@ -132,6 +123,10 @@ private sealed interface PulsarIntent {
 interface PulsarFeature : SynthFeature<PulsarUiState, PulsarPanelActions> {
     val vibeList: List<Vibe>
         get() = emptyList()  // default for previews
+
+    val vibeFlow: kotlinx.coroutines.flow.StateFlow<Vibe>
+
+    fun applyVibe(vibe: Vibe)
 
     val arrangementStateFlow: StateFlow<PulsarArrangementState>
 
@@ -197,16 +192,10 @@ class PulsarViewModel(
     dispatcherProvider: DispatcherProvider,
     private val scope: FeatureCoroutineScope,
     vibeProviders: Set<VibeProvider>,
-    private val mediaSessionStateManager: MediaSessionStateManager,
-    private val mediaSessionManager: MediaSessionManager,
-    private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val playbackMode: PulsarPlaybackMode,
 ) : PulsarFeature {
 
     override val vibeList: List<Vibe> = vibeProviders.map { it.vibe }.sortedBy { it.name }
-
-    @Volatile
-    private var mediaPaused = false
 
     private val log = logging("PulsarVM")
 
@@ -394,6 +383,18 @@ class PulsarViewModel(
     private val trackChordFollowIds = (0..7).map {
         synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_CHORD_FOLLOW.ordinal + it].controlId)
     }
+    private val trackLpgModeIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_MODE.ordinal + it].controlId)
+    }
+    private val trackLpgModeSpaceIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_MODE_SPACE.ordinal + it].controlId)
+    }
+    private val trackLpgDecayIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_DECAY.ordinal + it].controlId)
+    }
+    private val trackLpgColourIds = (0..7).map {
+        synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_COLOUR.ordinal + it].controlId)
+    }
     private val trackEvoTensionRespIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_TENSION_RESP.ordinal + it].controlId) }
     private val trackEvoNoteFollowIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_NOTE_FOLLOW.ordinal + it].controlId) }
     private val trackEvoPitchModeIds = (0..7).map { synthController.controlFlow(PulsarSymbol.entries[PulsarSymbol.TRACK_0_EVO_PITCH_MODE.ordinal + it].controlId) }
@@ -408,7 +409,7 @@ class PulsarViewModel(
 
     private val selectedTrackFlow = MutableStateFlow<Int?>(null)
     private val _trackMutedFlow = MutableStateFlow(List(8) { false })
-    private val vibeFlow = MutableStateFlow(vibeList.first())
+    override val vibeFlow = MutableStateFlow(vibeList.first())
     private val restoreComplete = CompletableDeferred<Unit>()
     private val persistJson = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
@@ -416,6 +417,12 @@ class PulsarViewModel(
     // by the section-BPM collector and reset to 1.0f at every applyVibe (since
     // applyVibe resets globalTempo to vibe.bpm — the 1.0× baseline).
     @Volatile private var lastSectionMult: Float = 1.0f
+
+    // Per-track effective send base values. Section overrides may swap these
+    // between vibe load and the next vibe load — pushEffectiveSends reads from
+    // here so per-section reverb/delay sends survive DEEP/SPACE knob updates.
+    private val sendBaseDelay = FloatArray(8)
+    private val sendBaseReverb = FloatArray(8)
 
     // Seed BPM from GlobalTempo before controlIntents/stateFlow subscribe,
     // so the first emission matches the system tempo, not the plugin default.
@@ -438,6 +445,18 @@ class PulsarViewModel(
             synthEngine.graphReady.await()
             if (vibeFlow.value.arrangement != null) {
                 log.debug { "Re-applying vibe after engine init" }
+                applyVibe(vibeFlow.value)
+            }
+        }
+        // If the underlying C++ engine is recreated mid-session (Android: Oboe
+        // rebuilds on audio route changes that shift sample rate), re-push the
+        // current vibe recipe. DspSynthEngine handles graph + port-map sync;
+        // the per-vibe track engines / harmonics / lick steps are NOT in the
+        // port map, so without this re-push Pulsar would stay silent until
+        // the user manually picks a vibe again.
+        scope.launch(dispatcherProvider.io) {
+            synthEngine.engineRecreatedFlow.collect {
+                log.info { "Engine recreated — re-applying vibe ${vibeFlow.value.name}" }
                 applyVibe(vibeFlow.value)
             }
         }
@@ -482,21 +501,6 @@ class PulsarViewModel(
     // Actions
     // ═══════════════════════════════════════════════════════════
     override val actions = PulsarPanelActions(
-        togglePlaying = {
-            val current = playingId.value.asInt()
-            playingId.value = IntValue(if (current != 0) 0 else 1)
-        },
-        toggleGlobalPause = {
-            val currentlyMuted = mutedId.value.asInt() != 0
-            mutedId.value = IntValue(if (currentlyMuted) 0 else 1)
-            if (currentlyMuted) {
-                // Unmuting: start Pulsar
-                playingId.value = IntValue(1)
-            } else {
-                // Muting: stop Pulsar to save CPU
-                playingId.value = IntValue(0)
-            }
-        },
         setVibe = { vibe -> applyVibe(vibe) },
         setEnergy = energyId.floatSetter(),
         setComplexity = complexityId.floatSetter(),
@@ -641,102 +645,25 @@ class PulsarViewModel(
                     }
                 }
         }
+        // Per-section per-track overrides: on each section change, apply the
+        // section's TrackSectionOverride to each track (or restore the vibe's
+        // base value when no override is present). Static atomics flip
+        // immediately; sends update via pushEffectiveSends.
+        scope.launch(dispatcherProvider.io) {
+            arrangementStateFlow
+                .map { it.sectionIndex }
+                .filter { it >= 0 }
+                .distinctUntilChanged()
+                .collect { sectionIndex ->
+                    applyTrackOverridesForSection(sectionIndex)
+                }
+        }
         // Debounced save: waits for restore to complete first to avoid saving stale defaults.
         // Timeout ensures saving isn't blocked forever if presetFlow never emits.
         scope.launch(dispatcherProvider.io) {
             withTimeoutOrNull(5_000L) { restoreComplete.await() }
             stateFlow.drop(1).debounce(2_000L).collect { state ->
                 saveState(state)
-            }
-        }
-    }
-
-    init {
-        // Activate/deactivate MediaSession based on global mute state.
-        // When paused via notification (mediaPaused=true), keep session active
-        // so the Play button can re-activate.
-        scope.launch(dispatcherProvider.io) {
-            mutedId.collect { value ->
-                val muted = value.asInt() != 0
-                val active = !muted || mediaPaused
-                mediaSessionStateManager.setPulsarActive(active)
-            }
-        }
-
-        // Update notification metadata when the vibe or play-state changes.
-        // Deliberately NOT keyed on arrangement (section/bar) — that updates
-        // every beat which is unsafe to surface on a car display and causes
-        // Android Auto to re-render the now-playing card too often.
-        scope.launch(dispatcherProvider.io) {
-            combine(
-                vibeFlow,
-                mutedId.map { it.asInt() == 0 },
-            ) { vibe, playing -> vibe to playing }
-                .distinctUntilChanged()
-                .collect { (vibe, playing) ->
-                    if (playing || mediaPaused) {
-                        mediaSessionManager.updateMetadata(
-                            PlaybackMetadata(
-                                title = vibe.name,
-                                mode = PlaybackMode.PULSAR,
-                                isPlaying = playing,
-                                subtitle = "",
-                            )
-                        )
-                    }
-                }
-        }
-
-        // Wire skip actions to vibe cycling
-        mediaSessionManager.onSkipNext = {
-            val currentIndex = vibeList.indexOfFirst { it.name == vibeFlow.value.name }
-            val nextIndex = (currentIndex + 1) % vibeList.size
-            applyVibe(vibeList[nextIndex])
-        }
-        mediaSessionManager.onSkipPrevious = {
-            val currentIndex = vibeList.indexOfFirst { it.name == vibeFlow.value.name }
-            val prevIndex = if (currentIndex <= 0) vibeList.size - 1 else currentIndex - 1
-            applyVibe(vibeList[prevIndex])
-        }
-
-        // Wire play/pause to global mute.
-        // mediaPaused flag keeps the MediaSession alive during notification pause
-        // so the Play button remains functional.
-        mediaSessionManager.onPlay = {
-            mediaPaused = false
-            mutedId.value = IntValue(0)
-            if (playingId.value.asInt() == 0) {
-                playingId.value = IntValue(1)
-            }
-        }
-        mediaSessionManager.onPause = {
-            mediaPaused = true
-            mutedId.value = IntValue(1)
-            playingId.value = IntValue(0)
-        }
-
-        // Android Auto browseable tree item selected.
-        // mediaId == vibe.name (see DjMediaBrowserService.onLoadChildren).
-        // Unknown ids are ignored — Auto can send stale entries.
-        mediaSessionManager.onPlayFromMediaId = { mediaId ->
-            vibeList.firstOrNull { it.name == mediaId }?.let { vibe ->
-                applyVibe(vibe)
-                mediaPaused = false
-                mutedId.value = IntValue(0)
-                if (playingId.value.asInt() == 0) {
-                    playingId.value = IntValue(1)
-                }
-            }
-        }
-
-        // Subscribe to PlaybackLifecycleEvent.StopAll (e.g., timer expiry)
-        scope.launch(dispatcherProvider.io) {
-            playbackLifecycleManager.events.collect { event ->
-                if (event is PlaybackLifecycleEvent.StopAll) {
-                    log.debug { "Received StopAll — pausing" }
-                    mutedId.value = IntValue(1)
-                    playingId.value = IntValue(0)
-                }
             }
         }
     }
@@ -794,7 +721,7 @@ class PulsarViewModel(
     /**
      * Push the entire vibe recipe to C++. Called from setVibe action and restoreSavedState.
      */
-    private fun applyVibe(vibe: Vibe) {
+    override fun applyVibe(vibe: Vibe) {
         // Set vibeFlow first so pushEffectiveSends reads the new vibe's per-track sends
         vibeFlow.value = vibe
         // globalTempo will be set to vibe.bpm below — that is the 1.0× baseline
@@ -862,6 +789,21 @@ class PulsarViewModel(
             trackFillTypeIds[i].value = IntValue(tv.chordComping?.fills?.fillType?.ordinal ?: 0)
             trackFillSkipProbIds[i].value = FloatValue(tv.chordComping?.fills?.skipProbability ?: 0f)
             trackChordFollowIds[i].value = IntValue(tv.chordFollow.ordinal)
+            // LPG: null mode → ENGINE_DEFAULT (3); explicit override → that mode's id.
+            // SPACE slot inherits from EDM slot when lpgModeSpace is null, so a vibe
+            // that sets `lpgMode = PLUCK` covers both engine slots without extra config.
+            val effectiveLpgMode = tv.lpgMode ?: LpgMode.ENGINE_DEFAULT
+            val effectiveLpgModeSpace = tv.lpgModeSpace ?: effectiveLpgMode
+            trackLpgModeIds[i].value = IntValue(effectiveLpgMode.id)
+            trackLpgModeSpaceIds[i].value = IntValue(effectiveLpgModeSpace.id)
+            trackLpgDecayIds[i].value = FloatValue(tv.lpgDecay)
+            trackLpgColourIds[i].value = FloatValue(tv.lpgColour)
+        }
+        // Seed per-track send bases from vibe; section overrides may swap these later.
+        for (i in 0 until 8) {
+            val tv = vibe.tracks.getOrNull(i)
+            sendBaseDelay[i] = tv?.delaySend ?: 0f
+            sendBaseReverb[i] = tv?.reverbSend ?: 0f
         }
         stepCountId.value = IntValue(vibe.stepCount)
         pushEffectiveSends(deepId.value.asFloat())
@@ -1000,7 +942,7 @@ class PulsarViewModel(
         pushArrangement(vibe)
 
         // In MIX_GATED mode (Orpheus), auto-start on vibe load — mix knob controls audibility.
-        // In EXPLICIT mode (DJ app), playing is controlled by toggleGlobalPause, mix stays at 1.
+        // In EXPLICIT mode (DJ app), playing is controlled by PulsarPlaybackBridge, mix stays at 1.
         if (playbackMode == PulsarPlaybackMode.MIX_GATED) {
             playingId.value = IntValue(1)
             mixId.value = FloatValue(0f)
@@ -1033,6 +975,30 @@ class PulsarViewModel(
         ids[13].value = FloatValue(map.moodTimbre.max)
     }
 
+    /**
+     * Apply per-track overrides defined on the given section. For each track,
+     * the effective value is `override?.field ?: tv.field`. Restores base
+     * values automatically when the section has no override for that track.
+     */
+    private fun applyTrackOverridesForSection(sectionIndex: Int) {
+        val vibe = vibeFlow.value
+        val section = vibe.arrangement?.sections?.getOrNull(sectionIndex) ?: return
+        val overrides = section.trackOverrides
+        for (i in 0 until 8) {
+            val tv = vibe.tracks.getOrNull(i) ?: continue
+            val o = overrides?.get(i)
+            trackHoldProbabilityIds[i].value = FloatValue(o?.holdProbability ?: tv.holdProbability)
+            trackHoldLengthMinIds[i].value = IntValue(o?.holdLengthMin ?: tv.holdLengthMin)
+            trackHoldLengthMaxIds[i].value = IntValue(o?.holdLengthMax ?: tv.holdLengthMax)
+            trackVolumeIds[i].value = FloatValue(o?.volume ?: tv.volume)
+            genreDensityIds[i].value = FloatValue(o?.density ?: tv.density)
+            trackEnvelopeIds[i].value = IntValue((o?.envelopeProfile ?: tv.envelopeProfile).id)
+            sendBaseDelay[i] = o?.delaySend ?: tv.delaySend
+            sendBaseReverb[i] = o?.reverbSend ?: tv.reverbSend
+        }
+        pushEffectiveSends(deepId.value.asFloat())
+    }
+
     private fun pushEffectiveSends(deep: Float) {
         val vibe = vibeFlow.value
         val space = spaceId.value.asFloat()
@@ -1040,9 +1006,8 @@ class PulsarViewModel(
         // SPACE boosts DEEP with a per-vibe floor: effectiveDeep = deep * (floor + space * (1 - floor))
         val effectiveDeep = deep * (floor + space * (1.0f - floor))
         for (i in 0 until 8) {
-            val tv = vibe.tracks.getOrNull(i) ?: continue
-            trackDelaySendIds[i].value = FloatValue(tv.delaySend * effectiveDeep)
-            trackReverbSendIds[i].value = FloatValue(tv.reverbSend * effectiveDeep)
+            trackDelaySendIds[i].value = FloatValue(sendBaseDelay[i] * effectiveDeep)
+            trackReverbSendIds[i].value = FloatValue(sendBaseReverb[i] * effectiveDeep)
         }
     }
 
@@ -1157,6 +1122,31 @@ class PulsarViewModel(
             setSection(18, compingStyleOrSentinel(section.compingStyle))
             setSection(19, compingInversionOrSentinel(section.compingInversion))
             setSection(20, chordFollowOrSentinel(section.chordFollow))
+
+            // Per-track section overrides. Always write all 8 slots so a vibe
+            // reload doesn't carry stale overrides from a previous vibe.
+            // -1 = no override (track falls back to its base value or to the
+            // section-level override if present).
+            for (t in 0 until 8) {
+                val o = section.trackOverrides?.get(t)
+                val baseIdx = s * 8 + t
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_comping_$baseIdx"),
+                    IntValue(o?.compingStyle?.engineId ?: -1)
+                )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_inversion_$baseIdx"),
+                    IntValue(o?.sectionInversion?.ordinal ?: -1)
+                )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_arp_mode_$baseIdx"),
+                    IntValue(o?.arpMode?.ordinal ?: -1)
+                )
+                synthController.setPluginControl(
+                    PluginControlId(PULSAR_URI, "section_track_chord_follow_$baseIdx"),
+                    IntValue(o?.chordFollow?.ordinal ?: -1)
+                )
+            }
 
             // Transitions for this section (up to 8 edges × 3 floats per edge:
             // [target_index, weight, transition_bars]).
@@ -1440,6 +1430,8 @@ class PulsarViewModel(
         )): PulsarFeature =
             object : PulsarFeature {
                 override val vibeList: List<Vibe> = listOf(previewVibe)
+                override val vibeFlow: StateFlow<Vibe> = MutableStateFlow(previewVibe)
+                override fun applyVibe(vibe: Vibe) {}
                 override val arrangementStateFlow: StateFlow<PulsarArrangementState> = MutableStateFlow(ARRANGEMENT_STATE_UNKNOWN)
                 override val stateFlow: StateFlow<PulsarUiState> = MutableStateFlow(state)
                 override val actions: PulsarPanelActions = PulsarPanelActions.EMPTY

@@ -33,6 +33,10 @@
 #include "plaits/dsp/engine2/virtual_analog_vcf_engine.h"
 #include "plaits/dsp/engine2/wave_terrain_engine.h"
 
+#include "plaits/dsp/dsp.h"
+#include "plaits/dsp/envelope.h"
+#include "plaits/dsp/fx/low_pass_gate.h"
+
 #include <cmath>
 #include <cstring>
 
@@ -75,6 +79,63 @@ static const float kOrpheusOutGain[kOrpheusMaxEngines] = {
     1.00f,  // 21: BassDrum  (matches Kotlin AnalogBassDrumEngine)
     1.00f,  // 22: SnareDrum (matches Kotlin AnalogSnareDrumEngine)
     1.00f,  // 23: HiHat     (matches Kotlin MetallicHiHatEngine)
+};
+
+// Per-voice low-pass gate mode. Models the vactrol-based LPG that Plaits' own
+// voice.cc applies after engine rendering. We bypass plaits::Voice entirely,
+// so the LPG is opt-in per call: the mode determines whether (and how) the
+// LPG envelope is driven from the gate signal.
+//
+//   LPG_BYPASS         — skip the LPG entirely (raw engine output)
+//   LPG_SUSTAINED      — vactrol follows gate (high while held, decays on release)
+//   LPG_PLUCK          — fast vactrol bloom on note-on, asymmetric decay (the
+//                        "pluck" character — what makes a low-tom out of a sine)
+//   LPG_ENGINE_DEFAULT — sentinel: resolve to kOrpheusLpgDefault[engine_index]
+//
+// The default of LPG_BYPASS in Render() means existing call sites that don't
+// pass a mode get exactly the prior behavior.
+enum LpgMode : int {
+    LPG_BYPASS = 0,
+    LPG_SUSTAINED = 1,
+    LPG_PLUCK = 2,
+    LPG_ENGINE_DEFAULT = 3,
+};
+
+// Per-engine LPG default. When a caller passes LPG_ENGINE_DEFAULT, this table
+// is consulted. Choices are tuned for Pulsar usage where the engine is asked
+// to play "naked" notes (no external ADSR wrap). Engines with built-in
+// envelopes (drums, struck/plucked physical models, internally-enveloped DX
+// patches) should BYPASS so the LPG doesn't double-envelope them.
+//
+// CURRENT BASELINE: all entries set to LPG_BYPASS. This makes DJApp sound
+// bit-identical to the pre-LPG behavior. Vibes that explicitly set
+// `lpgMode = LpgMode.PLUCK/SUSTAINED` on a TrackVoice override the table.
+// To A/B an engine, flip its row to LPG_PLUCK or LPG_SUSTAINED and listen.
+static const LpgMode kOrpheusLpgDefault[kOrpheusMaxEngines] = {
+    LPG_BYPASS,    //  0: VirtualAnalogVCF
+    LPG_BYPASS,    //  1: PhaseDistortion
+    LPG_BYPASS,    //  2: SixOp FM (DX)
+    LPG_BYPASS,    //  3: SixOp FM (DX2)
+    LPG_BYPASS,    //  4: SixOp FM (DX3)
+    LPG_BYPASS,    //  5: WaveTerrain
+    LPG_BYPASS,    //  6: StringMachine
+    LPG_BYPASS,    //  7: Chiptune
+    LPG_BYPASS,    //  8: VirtualAnalog
+    LPG_BYPASS,    //  9: Waveshaping
+    LPG_BYPASS,    // 10: FM (2-op)
+    LPG_BYPASS,    // 11: Grain
+    LPG_BYPASS,    // 12: Additive
+    LPG_BYPASS,    // 13: Wavetable
+    LPG_BYPASS,    // 14: Chord
+    LPG_BYPASS,    // 15: Speech
+    LPG_BYPASS,    // 16: Swarm
+    LPG_BYPASS,    // 17: Noise
+    LPG_BYPASS,    // 18: Particle
+    LPG_BYPASS,    // 19: String
+    LPG_BYPASS,    // 20: Modal
+    LPG_BYPASS,    // 21: BassDrum
+    LPG_BYPASS,    // 22: SnareDrum
+    LPG_BYPASS,    // 23: HiHat
 };
 
 // Soft saturation matching Kotlin DspPlaitsUnit.softLimit():
@@ -131,6 +192,12 @@ struct OrpheusVoice {
     // Anti-click: last output sample for retrigger crossfade.
     float last_sample_;
 
+    // Per-voice LPG state — mirrors Plaits' lpg_envelope_ + filter pair.
+    // Driven by the LpgMode passed to Render(). Persists across blocks so the
+    // vactrol decay continues smoothly between calls.
+    plaits::LPGEnvelope lpg_envelope_;
+    plaits::LowPassGate lpg_filter_;
+
     // Initialize all engines. Must be called once before Render().
     // The allocator is freed between each engine Init() so all engines
     // share the same RAM space (same pattern as plaits::Voice::Init).
@@ -176,6 +243,9 @@ struct OrpheusVoice {
         trigger_state_ = false;
         remainder_count_ = 0;
         last_sample_ = 0.0f;
+
+        lpg_envelope_.Init();
+        lpg_filter_.Init();
     }
 
     // Render audio using the specified engine.
@@ -190,8 +260,13 @@ struct OrpheusVoice {
     //   accent        - 0..1
     //   out           - output buffer (num_frames floats)
     //   num_frames    - number of frames to render
+    //   lpg_mode      - LpgMode (default LPG_BYPASS for back-compat with
+    //                   existing main-synth/bass call sites; Pulsar passes
+    //                   LPG_ENGINE_DEFAULT or an explicit per-track override)
+    //   lpg_decay     - 0..1, longer = slower vactrol decay tail
+    //   lpg_colour    - 0..1, HF bleed (0 = dark/closed, 1 = bright/open)
     //
-    // Output has per-engine outGain and soft_limit() applied.
+    // Output has per-engine outGain and soft_limit() applied (LPG runs first).
     void Render(
             int engine_index,
             int gate,
@@ -201,11 +276,19 @@ struct OrpheusVoice {
             float morph,
             float accent,
             float* out,
-            int num_frames) {
+            int num_frames,
+            LpgMode lpg_mode = LPG_BYPASS,
+            float lpg_decay = 0.5f,
+            float lpg_colour = 0.5f) {
 
         // Clamp engine index to valid range.
         if (engine_index < 0) engine_index = 0;
         if (engine_index >= engines_.size()) engine_index = engines_.size() - 1;
+
+        // Resolve engine-default sentinel via the per-engine table.
+        if (lpg_mode == LPG_ENGINE_DEFAULT) {
+            lpg_mode = kOrpheusLpgDefault[engine_index];
+        }
 
         plaits::Engine* e = engines_.get(engine_index);
 
@@ -220,6 +303,9 @@ struct OrpheusVoice {
             e->Reset();
             previous_engine_index_ = engine_index;
             remainder_count_ = 0;  // discard stale remainder on engine switch
+            // Reset LPG so a previous engine's vactrol state doesn't leak in.
+            lpg_envelope_.Init();
+            lpg_filter_.Init();
         }
 
         float gain = kOrpheusOutGain[engine_index];
@@ -279,6 +365,42 @@ struct OrpheusVoice {
 
             bool already_enveloped = false;
             e->Render(p, out_buffer_, aux_buffer_, kOrpheusBlockSize, &already_enveloped);
+
+            // ── LPG (vactrol-style low-pass gate) ──
+            // Modulates out_buffer_ in place BEFORE per-sample gain + soft_limit.
+            // Plaits' formulas (voice.cc:236-243) — kept identical so the
+            // perceived decay matches a hardware Plaits with the same patch.
+            if (lpg_mode != LPG_BYPASS) {
+                const float kBs = static_cast<float>(kOrpheusBlockSize);
+                const float kSr = plaits::kSampleRate;  // 48000
+                const float short_decay =
+                    (200.0f * kBs) / kSr * stmlib::SemitonesToRatio(-96.0f * lpg_decay);
+                const float decay_tail =
+                    (20.0f * kBs) / kSr *
+                    stmlib::SemitonesToRatio(-72.0f * lpg_decay + 12.0f * lpg_colour) -
+                    short_decay;
+
+                if (lpg_mode == LPG_PLUCK) {
+                    // PING: trigger a vactrol bloom on rising edge, then let
+                    // the asymmetric decay carry it down regardless of gate.
+                    if (rising_edge) lpg_envelope_.Trigger();
+                    const float attack =
+                        plaits::NoteToFrequency(note) * kBs * 2.0f;
+                    lpg_envelope_.ProcessPing(attack, short_decay, decay_tail, lpg_colour);
+                } else {
+                    // SUSTAINED: vactrol follows the gate level. Held = open,
+                    // released = natural vactrol decay (NOT a hard cut).
+                    const float level = (gate != 0) ? 1.0f : 0.0f;
+                    lpg_envelope_.ProcessLP(level, short_decay, decay_tail, lpg_colour);
+                }
+
+                lpg_filter_.Process(
+                    lpg_envelope_.gain(),
+                    lpg_envelope_.frequency(),
+                    lpg_envelope_.hf_bleed(),
+                    out_buffer_,
+                    kOrpheusBlockSize);
+            }
 
             // Anti-click: on rising edge, crossfade the first 12 samples
             // from the last output level to the new engine output.

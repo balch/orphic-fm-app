@@ -25,6 +25,7 @@ import androidx.media.MediaBrowserServiceCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import com.diamondedge.logging.logging
 import org.balch.orpheus.core.media.ForegroundServiceController
+import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.PulsarFeature
 import org.balch.orpheus.features.pulsar.PulsarViewModel
 
@@ -46,12 +47,17 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
     private var mediaSession: MediaSessionCompat? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var hasAudioFocus = false
-    private var albumArtBitmap: Bitmap? = null
-    private var sectionArtRenderer: SectionArtRenderer? = null
+    private var zeroToOneArt: Bitmap? = null
+    private var rifArt: Bitmap? = null
+    private var stealthRenderer: ProceduralArtRenderer? = null
     private var isPlaying = true
     private var currentTitle = "Orphic-DJ"
-    private var currentSubtitle = ""
+    private var primarySubtitle = ""
     private var isForegroundStarted = false
+    // Set true once ACTION_STOP is processed. Defends against late intents
+    // (queued startService calls from updateMetadata/updatePlaybackState
+    // ricochets) re-promoting us back to foreground after teardown.
+    private var isShuttingDown = false
 
     private var cachedFeature: PulsarFeature? = null
 
@@ -101,9 +107,9 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
 
     override fun onCreate() {
         super.onCreate()
-        val base = BitmapFactory.decodeResource(resources, R.drawable.album_art)
-        albumArtBitmap = base
-        sectionArtRenderer = SectionArtRenderer(base)
+        zeroToOneArt = BitmapFactory.decodeResource(resources, R.drawable.album_art_021)
+        rifArt = BitmapFactory.decodeResource(resources, R.drawable.album_art_rif)
+        stealthRenderer = ProceduralArtRenderer()
         createNotificationChannel()
         setupMediaSession()
 
@@ -116,7 +122,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
         try {
             val graph = DjAppApplication.getGraph(this)
             graph.mediaSessionStateManager.setAutoBrowserActive(true)
-            pulsarFeature // trigger ViewModel init (registers onPlay/onPlayFromMediaId)
+            pulsarFeature // trigger ViewModel init (wires MediaSessionActionHandler)
         } catch (e: Exception) {
             log.error(e) { "Failed to warm up Pulsar stack — Auto play commands will be no-ops" }
         }
@@ -125,7 +131,14 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        log.info { "DjMediaBrowserService onStartCommand: action=${intent?.action}" }
+        log.info { "DjMediaBrowserService onStartCommand: action=${intent?.action} shuttingDown=$isShuttingDown" }
+
+        if (isShuttingDown) {
+            // We've already accepted ACTION_STOP. Drop any late-arriving
+            // updates so we don't re-promote to foreground via ensureForeground().
+            log.debug { "Ignoring ${intent?.action} while shutting down" }
+            return START_NOT_STICKY
+        }
 
         when (intent?.action) {
             ACTION_PLAY -> {
@@ -140,6 +153,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                 actionHandler?.invoke("pause")
             }
             ACTION_STOP -> {
+                isShuttingDown = true
                 actionHandler?.invoke("stop")
                 abandonAudioFocus()
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -163,7 +177,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
                 val intentIsPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, true)
 
                 currentTitle = title
-                currentSubtitle = subtitle
+                primarySubtitle = subtitle
                 isPlaying = intentIsPlaying
 
                 updateMediaSessionMetadata()
@@ -326,15 +340,31 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
         }
     }
 
-    private fun currentArt(): Bitmap? =
-        sectionArtRenderer?.render(currentTitle) ?: albumArtBitmap
+    /**
+     * Album art is selected per [Album]:
+     *  - ZERO_TO_ONE → fixed photographic poster.
+     *  - RIF → fixed photographic poster.
+     *  - STEALTH (default for un-tagged vibes) → procedural per-title art.
+     * Album is resolved by looking up the current vibe in PulsarFeature; if
+     * the vibe isn't found yet, fall back to the ZERO_TO_ONE art so we never
+     * push a notification with no large icon. Title is shown by Android's
+     * notification UI separately, so the artwork doesn't bake the song name in.
+     */
+    private fun currentArt(): Bitmap? {
+        val album = pulsarFeature?.vibeList?.firstOrNull { it.name == currentTitle }?.album
+        return when (album) {
+            Album.RIF -> rifArt
+            Album.STEALTH -> stealthRenderer?.render(currentTitle)
+            Album.ZERO_TO_ONE, null -> zeroToOneArt
+        }
+    }
 
     private fun updateMediaSessionMetadata() {
         val art = currentArt()
         mediaSession?.setMetadata(
             MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
-                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentSubtitle)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, primarySubtitle)
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, art)
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, art)
                 .build()
@@ -425,7 +455,7 @@ class DjMediaBrowserService : MediaBrowserServiceCompat() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(currentTitle)
-            .setContentText(currentSubtitle)
+            .setContentText(primarySubtitle)
             .setSmallIcon(R.mipmap.ic_launcher_foreground)
             .setLargeIcon(currentArt())
             .setContentIntent(contentIntent)

@@ -17,12 +17,14 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -35,6 +37,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -265,7 +268,7 @@ fun DjPanel(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .onGloballyPositioned { outerOrigin = it.positionInWindow() }
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -403,7 +406,7 @@ fun DjPanel(
         isExpanded = isExpanded,
         onExpandedChange = onExpandedChange,
         initialExpanded = false,
-        modifier = modifier,
+        modifier = Modifier.fillMaxSize(),
         showCollapsedHeader = showCollapsedHeader,
         backgroundContent = {
             SignalTrace(data = outViz, color = djColors.deckAColor, alpha = 0.25f)
@@ -606,23 +609,30 @@ private fun TurntablePlatter(
     val currentVelocity by rememberUpdatedState(velocity)
     val currentWet by rememberUpdatedState(wet)
 
-    // Continuous rotation animation — only spins when this deck's wet > 0
-    var rotationAngle by remember { mutableStateOf(0f) }
-    // Pulsing alpha for frozen overlay / locked spindle
-    var pulseAlpha by remember { mutableStateOf(1f) }
+    // Held as FloatState (no `by` delegate) so reads happen *inside* the
+    // Canvas drawScope below — 60Hz writes only invalidate the draw pass
+    // instead of recomposing this composable.
+    val rotationAngle = remember { mutableFloatStateOf(0f) }
+    // Pulsing alpha for frozen overlay / locked spindle.
+    val pulseAlpha = remember { mutableFloatStateOf(1f) }
+    val isFrozen = frozen || locked
     LaunchedEffect(Unit) {
         while (true) {
             withFrameNanos { frameNanos ->
+                // At-rest early-out: if the deck is silent and not frozen,
+                // there's no rotation and no pulse to compute.
+                if (!isFrozen && currentWet <= 0.001f) return@withFrameNanos
                 if (currentWet > 0.001f) {
-                    rotationAngle += currentVelocity * 0.05f
+                    rotationAngle.floatValue += currentVelocity * 0.05f
                 }
-                val pulse = kotlin.math.abs(sin(frameNanos / 166_000_000f))
-                pulseAlpha = 0.4f + 0.6f * pulse
+                if (isFrozen) {
+                    val pulse = kotlin.math.abs(sin(frameNanos / 166_000_000f))
+                    pulseAlpha.floatValue = 0.4f + 0.6f * pulse
+                }
             }
         }
     }
 
-    val isFrozen = frozen || locked
     val borderColor = if (isFrozen) frozenColor else deckColor
 
     Box(
@@ -649,6 +659,11 @@ private fun TurntablePlatter(
                     )
                 },
         ) {
+            // Snapshot animation state inside drawScope: writes to these
+            // FloatStates only invalidate this draw, not recompose the parent.
+            val rot = rotationAngle.floatValue
+            val pulse = pulseAlpha.floatValue
+
             val cx = size.width / 2f
             val cy = size.height / 2f
             val outerRadius = (size.minDimension / 2f) - 4f
@@ -658,7 +673,7 @@ private fun TurntablePlatter(
             // Frozen: filled ice overlay that pulses
             if (isFrozen) {
                 drawCircle(
-                    color = frozenColor.copy(alpha = pulseAlpha * 0.15f),
+                    color = frozenColor.copy(alpha = pulse * 0.15f),
                     radius = outerRadius,
                     center = Offset(cx, cy),
                 )
@@ -688,7 +703,7 @@ private fun TurntablePlatter(
             val grooveColor = deckColor.copy(alpha = 0.5f)
             if (sampleCount > 0) {
                 for (i in 0 until sampleCount) {
-                    val baseAngle = (i.toFloat() / sampleCount) * 2f * PI.toFloat() - (PI.toFloat() / 2f) + rotationAngle
+                    val baseAngle = (i.toFloat() / sampleCount) * 2f * PI.toFloat() - (PI.toFloat() / 2f) + rot
                     val sample = vizData[i].coerceIn(-1f, 1f)
                     val r0 = waveRadius
                     val r1 = waveRadius + sample * (outerRadius - waveRadius) * 0.8f
@@ -721,7 +736,7 @@ private fun TurntablePlatter(
 
             // Playhead line — vizData[128] if available
             val playheadPos = if (vizData.size > 128) vizData[128] else 0f
-            val playheadAngle = playheadPos * 2f * PI.toFloat() - (PI.toFloat() / 2f) + rotationAngle
+            val playheadAngle = playheadPos * 2f * PI.toFloat() - (PI.toFloat() / 2f) + rot
             drawLine(
                 color = borderColor,
                 start = Offset(
@@ -737,7 +752,7 @@ private fun TurntablePlatter(
 
             // Center spindle — pulses when frozen/locked
             drawCircle(
-                color = borderColor.copy(alpha = if (isFrozen) pulseAlpha else 1f),
+                color = borderColor.copy(alpha = if (isFrozen) pulse else 1f),
                 radius = innerRadius * 0.4f,
                 center = Offset(cx, cy),
             )
@@ -1329,5 +1344,192 @@ private fun DjPanelFaderDeckBActivePreview() {
             isExpanded = true,
             previewFaderOverride = FaderPreviewOverride(deck = 1, pressed = true, thumbX = 0.3f),
         )
+    }
+}
+
+// Mimics Orpheus HeaderPanel: DJ takes weight(1f).widthIn(min = 320.dp) inside a Row
+// alongside collapsed sibling strips. Regression-tests that the panel modifier
+// (weight) reaches the outer Box and isn't dropped on a wrapper.
+@Preview(name = "DJ Panel — HeaderPanel Context", widthDp = 700, heightDp = 280)
+@Composable
+private fun DjPanelInHeaderPanelContextPreview() {
+    OrpheusTheme {
+        Row(modifier = Modifier.fillMaxSize()) {
+            // Stand-in for collapsed sibling panels that flank the DJ panel.
+            listOf("LFO", "DLY", "VOL").forEach { label ->
+                Box(
+                    modifier = Modifier
+                        .width(28.dp)
+                        .fillMaxSize()
+                        .background(OrpheusColors.panelSurface),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label, color = Color.White.copy(alpha = 0.4f), fontSize = 9.sp)
+                }
+            }
+            DjPanel(
+                feature = DjViewModel.previewFeature(
+                    DjUiState(wetA = 0.7f, wetB = 0.5f, velocityA = 1.0f, velocityB = 1.0f),
+                ),
+                vizFlowA = MutableStateFlow(previewVizData()),
+                vizFlowB = MutableStateFlow(previewVizData()),
+                outVizFlow = MutableStateFlow(previewVizData()),
+                modifier = Modifier
+                    .widthIn(min = 320.dp)
+                    .weight(1f)
+                    .fillMaxSize(),
+                isExpanded = true,
+            )
+        }
+    }
+}
+
+// ── TurntablePlatter sub-component states ──
+// Direct calls to the private composable so visual iteration on the platter
+// alone doesn't require routing through the full panel.
+@Preview(name = "TurntablePlatter — Idle", widthDp = 140, heightDp = 140)
+@Composable
+private fun TurntablePlatterIdlePreview() {
+    OrpheusTheme {
+        Box(
+            modifier = Modifier.size(140.dp).background(OrpheusColors.darkVoid),
+            contentAlignment = Alignment.Center,
+        ) {
+            TurntablePlatter(
+                vizData = FloatArray(0),
+                frozen = false, locked = false,
+                velocity = 0f, wet = 0f,
+                deckColor = OrpheusColors.djRedLight,
+                frozenColor = OrpheusColors.djIceBlue,
+                deckLabel = "A",
+                onBounds = {}, onToggleLock = {},
+                modifier = Modifier.size(100.dp),
+            )
+        }
+    }
+}
+
+@Preview(name = "TurntablePlatter — Playing", widthDp = 140, heightDp = 140)
+@Composable
+private fun TurntablePlatterPlayingPreview() {
+    OrpheusTheme {
+        Box(
+            modifier = Modifier.size(140.dp).background(OrpheusColors.darkVoid),
+            contentAlignment = Alignment.Center,
+        ) {
+            TurntablePlatter(
+                vizData = previewVizData(),
+                frozen = false, locked = false,
+                velocity = 1.0f, wet = 0.8f,
+                deckColor = OrpheusColors.djRedLight,
+                frozenColor = OrpheusColors.djIceBlue,
+                deckLabel = "A",
+                onBounds = {}, onToggleLock = {},
+                modifier = Modifier.size(100.dp),
+            )
+        }
+    }
+}
+
+@Preview(name = "TurntablePlatter — Frozen", widthDp = 140, heightDp = 140)
+@Composable
+private fun TurntablePlatterFrozenPreview() {
+    OrpheusTheme {
+        Box(
+            modifier = Modifier.size(140.dp).background(OrpheusColors.darkVoid),
+            contentAlignment = Alignment.Center,
+        ) {
+            TurntablePlatter(
+                vizData = previewVizData(),
+                frozen = true, locked = false,
+                velocity = 0f, wet = 0.8f,
+                deckColor = OrpheusColors.djRedLight,
+                frozenColor = OrpheusColors.djIceBlue,
+                deckLabel = "A",
+                onBounds = {}, onToggleLock = {},
+                modifier = Modifier.size(100.dp),
+            )
+        }
+    }
+}
+
+@Preview(name = "TurntablePlatter — Locked", widthDp = 140, heightDp = 140)
+@Composable
+private fun TurntablePlatterLockedPreview() {
+    OrpheusTheme {
+        Box(
+            modifier = Modifier.size(140.dp).background(OrpheusColors.darkVoid),
+            contentAlignment = Alignment.Center,
+        ) {
+            TurntablePlatter(
+                vizData = previewVizData(),
+                frozen = false, locked = true,
+                velocity = 3.5f, wet = 1.0f,
+                deckColor = OrpheusColors.djCream,
+                frozenColor = OrpheusColors.djIceBlue,
+                deckLabel = "B",
+                onBounds = {}, onToggleLock = {},
+                modifier = Modifier.size(100.dp),
+            )
+        }
+    }
+}
+
+// ── DropZoneCell states row ──
+// Renders the four canonical cell states side-by-side: dimmed (other deck has
+// a lock), arming (dwell-progress arc), locked-by-A, and locked-by-both decks.
+@Preview(name = "DropZoneCell — States Row", widthDp = 480, heightDp = 80)
+@Composable
+private fun DropZoneCellStatesPreview() {
+    OrpheusTheme {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .background(OrpheusColors.darkVoid)
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DropZoneCell(
+                label = "FILTER",
+                accent = OrpheusColors.accentFor(DjDrop.FILTER),
+                beatPhase = 0.5f,
+                lockedBy = emptyList(),
+                dimmed = true,
+                arming = false, armingProgress = 0f,
+                modifier = Modifier.width(96.dp).height(44.dp),
+            )
+            DropZoneCell(
+                label = "STUTTER",
+                accent = OrpheusColors.accentFor(DjDrop.STUTTER),
+                beatPhase = 0.5f,
+                lockedBy = emptyList(),
+                dimmed = false,
+                arming = true, armingProgress = 0.6f,
+                modifier = Modifier.width(96.dp).height(44.dp),
+            )
+            DropZoneCell(
+                label = "ECHO",
+                accent = OrpheusColors.accentFor(DjDrop.ECHO),
+                beatPhase = 0f,
+                lockedBy = listOf("A" to OrpheusColors.djRedLight),
+                dimmed = false,
+                arming = false, armingProgress = 0f,
+                modifier = Modifier.width(96.dp).height(44.dp),
+            )
+            DropZoneCell(
+                label = "FREEZE",
+                accent = OrpheusColors.accentFor(DjDrop.FREEZE),
+                beatPhase = 0f,
+                lockedBy = listOf(
+                    "A" to OrpheusColors.djRedLight,
+                    "B" to OrpheusColors.djCream,
+                ),
+                dimmed = false,
+                arming = false, armingProgress = 0f,
+                modifier = Modifier.width(96.dp).height(44.dp),
+            )
+        }
     }
 }

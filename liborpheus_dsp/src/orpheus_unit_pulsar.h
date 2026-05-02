@@ -10,7 +10,6 @@ static constexpr int kNumPulsarTracks = 8;
 static constexpr int kMaxPulsarSteps = 32;
 static constexpr int kMaxSections = 8;
 static constexpr int kMaxSectionTransitions = 8;
-static constexpr int kMaxMotifs = 4;
 static constexpr int kMarkovIntervals = 15;
 static constexpr int kMaxSoloPhrase = 8;
 
@@ -260,6 +259,14 @@ struct PulsarTrackState {
     // Chord follow mode (persists from load_vibe)
     ChordFollowMode chord_follow = ChordFollowMode::FOLLOW;
 
+    // LPG (low-pass gate) config (persists from load_vibe)
+    // mode = LpgMode int from orpheus_voice.h. Default 3 = LPG_ENGINE_DEFAULT.
+    // lpg_mode applies on the EDM engine slot; lpg_mode_space on the SPACE slot.
+    int lpg_mode = 3;          // LPG_ENGINE_DEFAULT
+    int lpg_mode_space = 3;    // LPG_ENGINE_DEFAULT (Kotlin pushes lpgModeSpace ?: lpgMode)
+    float lpg_decay = 0.5f;
+    float lpg_colour = 0.5f;
+
     // Comping config (only meaningful when role == CHORDAL)
     CompingStyleId comping_style = CompingStyleId::PAD;
 
@@ -274,6 +281,7 @@ struct PulsarTrackState {
     ChordFollowMode default_chord_follow = ChordFollowMode::FOLLOW;
     CompingStyleId default_comping_style = CompingStyleId::PAD;
     SectionInversionId default_section_inversion = SectionInversionId::FOLLOW_STYLE;
+    ArpModeId default_arp_mode = ArpModeId::AUTO;
     // Runtime state (managed during playback — sub-task 2b.4)
     uint8_t arp_notes[4] = {};
     int arp_note_count = 0;
@@ -407,23 +415,6 @@ struct DuckingParam {
     float reverb_boost = 0.1f;
 };
 
-struct MotifParam {
-    float track_densities[kNumPulsarTracks] = {};
-    bool track_density_active[kNumPulsarTracks] = {};
-    float swing_override = -1.0f;
-    float ghost_probability = -1.0f;
-    float rhythm_density = -1.0f;
-};
-
-struct MotifSetParam {
-    MotifParam motifs[kMaxMotifs];
-    int motif_count = 0;
-    float transition_weights[kMaxMotifs][kMaxMotifs] = {};
-    float recency_decay = 0.5f;
-    int bars_per_motif_min = 4, bars_per_motif_max = 8;
-    float switch_probability = 0.6f;
-};
-
 enum class SoloModeId : uint8_t {
     NONE         = 0,
     LONG_FILL    = 1,
@@ -449,12 +440,18 @@ struct SectionParam {
     float solo_lick_influence = 0.5f;   // Jam only
     int solo_bars_min = 2;              // LongFill only
     int solo_bars_max = 4;              // LongFill only
-    bool has_motif_set = false;
-    MotifSetParam motif_set;
     // Section-level overrides (-1 = no override, keep track defaults)
     int comping_style_override = -1;
     int comping_inversion_override = -1;
     int chord_follow_override = -1;
+    // Per-track section overrides (-1 = no override). Per-track wins over the
+    // section-level override above. Defaulted to -1 so an un-loaded SectionParam
+    // (e.g. constructed in a future test fixture) is safe to read — load_vibe
+    // overwrites all 8 slots before any audio block consults them.
+    int track_comping_style_override[kNumPulsarTracks] = {-1, -1, -1, -1, -1, -1, -1, -1};
+    int track_inversion_override[kNumPulsarTracks]     = {-1, -1, -1, -1, -1, -1, -1, -1};
+    int track_arp_mode_override[kNumPulsarTracks]      = {-1, -1, -1, -1, -1, -1, -1, -1};
+    int track_chord_follow_override[kNumPulsarTracks]  = {-1, -1, -1, -1, -1, -1, -1, -1};
     // Per-section chord progression override (0 = no override; see pulsar_chord_progression.h for kMaxProgressionLength = 8)
     int custom_progression_length = 0;
     int8_t custom_progression[kMaxProgressionLength] = {};
@@ -541,12 +538,6 @@ struct BandSoloState {
     uint32_t solo_seed = 0;
 };
 
-struct MotifState {
-    int current_motif = 0;
-    int bars_remaining = 0;
-    int bars_since_motif[kMaxMotifs] = {};
-};
-
 // ── Persistent state (heap-allocated on first process call) ──────────────
 static constexpr int kVoiceAllocBytes_Pulsar = 32768;
 
@@ -599,10 +590,9 @@ struct PulsarState {
     float tension_intensity = 0.0f;
     float tension_evo_smooth = 0.0f;
 
-    // Section / Solo / Motif system
+    // Section / Solo system
     ArrangementParams arrangement;
     SectionState section_state;
-    MotifState motif_state;
     SoloBehaviorParam track_solo_behavior[kNumPulsarTracks];
     DuckingParam track_ducking[kNumPulsarTracks];
 

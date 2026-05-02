@@ -7,14 +7,12 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.preferences.AppPreferencesRepository
@@ -53,9 +51,9 @@ enum class AiModel(
 class AiModelProvider(
     private val preferencesRepository: AppPreferencesRepository,
     private val dispatcherProvider: DispatcherProvider,
+    private val scope: AppCoroutineScope,
 ) {
     private val log = logging("AiModelProvider")
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** Reactive state for the current model */
     private val _selectedModel = MutableStateFlow(AiModel.DEFAULT)

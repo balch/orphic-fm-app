@@ -1,5 +1,5 @@
 @file:Suppress("EXPECT_ACTUAL_CLASSIFIERS_ARE_IN_BETA_WARNING")
-@file:OptIn(ExperimentalForeignApi::class)
+@file:OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 
 package org.balch.orpheus.core.media
 
@@ -7,8 +7,19 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.allocArrayOf
+import kotlinx.cinterop.cValue
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.useContents
+import platform.CoreGraphics.CGSize
+import platform.Foundation.NSData
+import platform.Foundation.NSNumber
+import platform.Foundation.create
+import platform.MediaPlayer.MPMediaItemArtwork
 import platform.MediaPlayer.MPMediaItemPropertyArtist
+import platform.MediaPlayer.MPMediaItemPropertyArtwork
 import platform.MediaPlayer.MPMediaItemPropertyTitle
 import platform.MediaPlayer.MPNowPlayingInfoCenter
 import platform.MediaPlayer.MPNowPlayingInfoPropertyPlaybackRate
@@ -16,6 +27,7 @@ import platform.MediaPlayer.MPNowPlayingPlaybackStatePaused
 import platform.MediaPlayer.MPNowPlayingPlaybackStatePlaying
 import platform.MediaPlayer.MPRemoteCommandCenter
 import platform.MediaPlayer.MPRemoteCommandHandlerStatusSuccess
+import platform.UIKit.UIImage
 
 /**
  * iOS implementation of MediaSessionManager.
@@ -30,11 +42,11 @@ actual class MediaSessionManager {
     private var handler: MediaSessionActionHandler? = null
     private var isActive = false
     private var isPlaying = false
-    actual var onSkipNext: (() -> Unit)? = null
-    actual var onSkipPrevious: (() -> Unit)? = null
-    actual var onPlay: (() -> Unit)? = null
-    actual var onPause: (() -> Unit)? = null
-    actual var onPlayFromMediaId: ((String) -> Unit)? = null
+
+    // Cache the latest metadata so `activate()` can replay it. Without this,
+    // metadata that arrives before activation gets silently dropped and the
+    // Now Playing widget stays blank until the next user-driven update.
+    private var latestMetadata: PlaybackMetadata? = null
 
     actual fun activate() {
         if (isActive) return
@@ -43,25 +55,17 @@ actual class MediaSessionManager {
         val cc = MPRemoteCommandCenter.sharedCommandCenter()
 
         cc.playCommand.addTargetWithHandler { _ ->
-            val custom = onPlay
-            if (custom != null) custom() else handler?.onPlay()
+            handler?.onPlay()
             MPRemoteCommandHandlerStatusSuccess
         }
 
         cc.pauseCommand.addTargetWithHandler { _ ->
-            val custom = onPause
-            if (custom != null) custom() else handler?.onPause()
+            handler?.onPause()
             MPRemoteCommandHandlerStatusSuccess
         }
 
         cc.togglePlayPauseCommand.addTargetWithHandler { _ ->
-            if (isPlaying) {
-                val custom = onPause
-                if (custom != null) custom() else handler?.onPause()
-            } else {
-                val custom = onPlay
-                if (custom != null) custom() else handler?.onPlay()
-            }
+            if (isPlaying) handler?.onPause() else handler?.onPlay()
             MPRemoteCommandHandlerStatusSuccess
         }
 
@@ -70,15 +74,35 @@ actual class MediaSessionManager {
             MPRemoteCommandHandlerStatusSuccess
         }
 
+        // Wire next/prev track AND skipForward/skipBackward to the same
+        // handler. Empirically, iOS only renders the artwork-rich Now Playing
+        // layout when the skip commands are also enabled with a
+        // preferredIntervals — without them, the widget falls back to a
+        // compact layout and the album art doesn't display. The skip pair
+        // ends up rendered as ⏩15 / ⏪15 icons; the buttons themselves
+        // still cycle vibes correctly, and the alternative (track-only) trades
+        // away the artwork. TODO: revisit when we figure out the layout
+        // heuristic — there may be another property that triggers the rich
+        // layout without forcing the seek-by-N icon style.
         cc.nextTrackCommand.addTargetWithHandler { _ ->
-            onSkipNext?.invoke()
+            handler?.onSkipNext()
+            MPRemoteCommandHandlerStatusSuccess
+        }
+        cc.skipForwardCommand.addTargetWithHandler { _ ->
+            handler?.onSkipNext()
+            MPRemoteCommandHandlerStatusSuccess
+        }
+        cc.previousTrackCommand.addTargetWithHandler { _ ->
+            handler?.onSkipPrevious()
+            MPRemoteCommandHandlerStatusSuccess
+        }
+        cc.skipBackwardCommand.addTargetWithHandler { _ ->
+            handler?.onSkipPrevious()
             MPRemoteCommandHandlerStatusSuccess
         }
 
-        cc.previousTrackCommand.addTargetWithHandler { _ ->
-            onSkipPrevious?.invoke()
-            MPRemoteCommandHandlerStatusSuccess
-        }
+        cc.skipForwardCommand.preferredIntervals = listOf<Any?>(15.0)
+        cc.skipBackwardCommand.preferredIntervals = listOf<Any?>(15.0)
 
         cc.playCommand.setEnabled(true)
         cc.pauseCommand.setEnabled(true)
@@ -86,8 +110,13 @@ actual class MediaSessionManager {
         cc.stopCommand.setEnabled(true)
         cc.nextTrackCommand.setEnabled(true)
         cc.previousTrackCommand.setEnabled(true)
+        cc.skipForwardCommand.setEnabled(true)
+        cc.skipBackwardCommand.setEnabled(true)
 
         isActive = true
+        // Replay any metadata that arrived before activation so the Now
+        // Playing widget shows the current title/art immediately.
+        latestMetadata?.let { pushToNative(it) }
     }
 
     actual fun deactivate() {
@@ -101,6 +130,8 @@ actual class MediaSessionManager {
         cc.stopCommand.removeTarget(null)
         cc.nextTrackCommand.removeTarget(null)
         cc.previousTrackCommand.removeTarget(null)
+        cc.skipForwardCommand.removeTarget(null)
+        cc.skipBackwardCommand.removeTarget(null)
 
         MPNowPlayingInfoCenter.defaultCenter().nowPlayingInfo = null
 
@@ -109,25 +140,62 @@ actual class MediaSessionManager {
 
     actual fun updatePlaybackState(isPlaying: Boolean) {
         this.isPlaying = isPlaying
-        MPNowPlayingInfoCenter.defaultCenter().playbackState =
-            if (isPlaying) MPNowPlayingPlaybackStatePlaying
-            else MPNowPlayingPlaybackStatePaused
-
-        // Also update the playback rate in nowPlayingInfo
-        val info = MPNowPlayingInfoCenter.defaultCenter().nowPlayingInfo?.toMutableMap()
-            ?: mutableMapOf<Any?, Any?>()
-        info[MPNowPlayingInfoPropertyPlaybackRate] = if (isPlaying) 1.0 else 0.0
-        MPNowPlayingInfoCenter.defaultCenter().nowPlayingInfo = info
+        if (!isActive) return
+        // Re-push the full metadata so artwork + title + rate stay in sync.
+        // Partial updates to nowPlayingInfo can cause iOS to drop fields we
+        // didn't explicitly include — the play/pause icon stops refreshing
+        // and (sometimes) artwork disappears. Always send the whole thing.
+        val current = latestMetadata
+        if (current != null) {
+            val updated = current.copy(isPlaying = isPlaying)
+            latestMetadata = updated
+            pushToNative(updated)
+        } else {
+            // No metadata yet — fall back to setting just the playback state.
+            MPNowPlayingInfoCenter.defaultCenter().playbackState =
+                if (isPlaying) MPNowPlayingPlaybackStatePlaying
+                else MPNowPlayingPlaybackStatePaused
+        }
     }
 
     actual fun updateMetadata(metadata: PlaybackMetadata) {
+        latestMetadata = metadata
         if (!isActive) return
+        pushToNative(metadata)
+    }
 
-        val info = mutableMapOf<Any?, Any?>(
-            MPMediaItemPropertyTitle to metadata.title,
-            MPMediaItemPropertyArtist to metadata.displaySubtitle,
-            MPNowPlayingInfoPropertyPlaybackRate to if (metadata.isPlaying) 1.0 else 0.0,
-        )
+    actual fun setActionHandler(handler: MediaSessionActionHandler) {
+        this.handler = handler
+    }
+
+    @OptIn(BetaInteropApi::class)
+    private fun pushToNative(metadata: PlaybackMetadata) {
+        // Merge into the existing dict so updates to title/subtitle don't
+        // wipe out artwork (and vice versa).
+        val info = MPNowPlayingInfoCenter.defaultCenter().nowPlayingInfo?.toMutableMap()
+            ?: mutableMapOf<Any?, Any?>()
+        info[MPMediaItemPropertyTitle] = metadata.title
+        info[MPMediaItemPropertyArtist] = metadata.subtitle
+        // Wrap rate as NSNumber explicitly. Some Kotlin/Native bridge paths
+        // can leave a raw Kotlin Double in the dict; iOS's MPNowPlayingInfo
+        // expects an NSNumber here and can silently ignore the entry otherwise.
+        info[MPNowPlayingInfoPropertyPlaybackRate] =
+            NSNumber(double = if (metadata.isPlaying) 1.0 else 0.0)
+
+        val artworkBytes = metadata.artworkPng
+        if (artworkBytes != null) {
+            val image = decodeImage(artworkBytes)
+            if (image != null) {
+                val size = image.size.useContents { CGSizeValue(width, height) }
+                val artwork = MPMediaItemArtwork(boundsSize = size) { _ -> image }
+                info[MPMediaItemPropertyArtwork] = artwork
+            } else {
+                info.remove(MPMediaItemPropertyArtwork)
+            }
+        } else {
+            info.remove(MPMediaItemPropertyArtwork)
+        }
+
         MPNowPlayingInfoCenter.defaultCenter().nowPlayingInfo = info
 
         isPlaying = metadata.isPlaying
@@ -136,7 +204,33 @@ actual class MediaSessionManager {
             else MPNowPlayingPlaybackStatePaused
     }
 
-    actual fun setActionHandler(handler: MediaSessionActionHandler) {
-        this.handler = handler
+    /** Decode raw PNG/JPEG/WebP bytes into a UIImage via NSData. */
+    @OptIn(BetaInteropApi::class)
+    private fun decodeImage(bytes: ByteArray): UIImage? {
+        val nsData: NSData = bytes.toNSData() ?: return null
+        return UIImage.imageWithData(nsData)
+    }
+}
+
+/**
+ * Holder for a CGSize value to keep the cinterop boundary tight — the raw
+ * `image.size.useContents { ... }` block can't return a CValue<CGSize>
+ * directly without a wrapper construction.
+ */
+@OptIn(ExperimentalForeignApi::class)
+private fun CGSizeValue(width: Double, height: Double): kotlinx.cinterop.CValue<CGSize> =
+    cValue<CGSize> {
+        this.width = width
+        this.height = height
+    }
+
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
+private fun ByteArray.toNSData(): NSData? {
+    if (isEmpty()) return null
+    return memScoped {
+        NSData.create(
+            bytes = allocArrayOf(this@toNSData),
+            length = this@toNSData.size.toULong(),
+        )
     }
 }

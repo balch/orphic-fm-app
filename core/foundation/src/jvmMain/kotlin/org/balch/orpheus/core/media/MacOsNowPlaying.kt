@@ -51,6 +51,19 @@ object MacOsNowPlaying {
         }
     }
 
+    /**
+     * Push artwork to MPNowPlayingInfoCenter. Pass null to clear.
+     * The bytes should encode a PNG/JPEG that NSImage can decode.
+     */
+    fun updateArtwork(pngBytes: ByteArray?) {
+        if (!isAvailable) return
+        try {
+            nativeUpdateArtwork(pngBytes)
+        } catch (_: UnsatisfiedLinkError) {
+            // Silently ignore if native not loaded
+        }
+    }
+
     fun teardown() {
         if (!isAvailable) return
         try {
@@ -64,5 +77,6 @@ object MacOsNowPlaying {
     @JvmStatic private external fun nativeSetup(callback: Callback)
     @JvmStatic private external fun nativeUpdateMetadata(title: String, artist: String)
     @JvmStatic private external fun nativeUpdatePlaybackState(isPlaying: Boolean)
+    @JvmStatic private external fun nativeUpdateArtwork(pngBytes: ByteArray?)
     @JvmStatic private external fun nativeTeardown()
 }

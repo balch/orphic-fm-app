@@ -42,4 +42,18 @@ interface NativeDspBridge {
         stepCountsOut: IntArray,
     )
     fun nativeGetPulsarArrangement(out: IntArray)
+
+    /**
+     * Register a callback fired when the underlying C++ engine is recreated
+     * (e.g. on Android, an audio output route change with a different sample
+     * rate causes Oboe to destroy/recreate the engine — the new engine has
+     * NO graph and audio is silent until reloaded).
+     *
+     * The callback runs on whatever thread native code chooses; consumers
+     * should marshal to a safe coroutine scope before doing real work.
+     *
+     * Default: no-op. Platforms whose audio engine never recreates itself
+     * (current desktop/iOS/wasm) don't need to override.
+     */
+    fun setOnEngineRecreatedCallback(callback: (() -> Unit)?) {}
 }

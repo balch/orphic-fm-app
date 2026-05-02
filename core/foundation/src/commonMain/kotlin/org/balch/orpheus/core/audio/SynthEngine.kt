@@ -1,7 +1,10 @@
 package org.balch.orpheus.core.audio
 
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
 import org.balch.orpheus.core.plugin.viz.PulsarVizData
@@ -11,6 +14,7 @@ private val emptyPulsarTrackVizFlows: List<StateFlow<FloatArray>> = List(8) { em
 private val emptyPulsarVizFlow: StateFlow<PulsarVizData> = MutableStateFlow(PulsarVizData())
 private val emptyPulsarArrangementStateFlow: StateFlow<PulsarArrangementState?> = MutableStateFlow(null)
 private val emptyBeatPhaseFlow: StateFlow<Float> = MutableStateFlow(0f)
+private val emptyEngineRecreatedFlow: SharedFlow<Unit> = MutableSharedFlow<Unit>().asSharedFlow()
 
 interface SynthEngine {
     fun start()
@@ -22,6 +26,19 @@ interface SynthEngine {
 
     /** True when a native C++ DSP engine is available (WASM, Android, desktop-native). */
     val hasNativeEngine: Boolean get() = false
+
+    /**
+     * Emits whenever the underlying native engine is recreated (e.g. on
+     * Android when an audio output route change forces Oboe to rebuild the
+     * stream and DSP engine). Subscribers should re-push any state that
+     * isn't part of the wiring graph or port map — most importantly,
+     * Pulsar's per-vibe recipe (track engines, harmonics, lick steps)
+     * which lives in port writes from `applyVibe` rather than in the
+     * graph definition itself.
+     *
+     * Default no-op for engines that never recreate themselves.
+     */
+    val engineRecreatedFlow: SharedFlow<Unit> get() = emptyEngineRecreatedFlow
 
     // Voice Control
     fun setVoiceTune(index: Int, tune: Float)

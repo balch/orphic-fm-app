@@ -184,8 +184,7 @@ class AquariumViz(
             }
         }
 
-        val state = _uiState.value
-        AquariumCanvas(modifier = modifier, state = state)
+        AquariumCanvas(modifier = modifier)
     }
 
     private fun manageFishPopulation() {
@@ -397,8 +396,11 @@ class AquariumViz(
     }
 
     @Composable
-    private fun AquariumCanvas(modifier: Modifier, state: AquariumUiState) {
+    private fun AquariumCanvas(modifier: Modifier) {
         Canvas(modifier = modifier.fillMaxSize()) {
+            // Read inside drawScope so per-frame _uiState writes only invalidate
+            // the draw pass, not recompose this @Composable.
+            val state = _uiState.value
             val w = size.width
             val h = size.height
 

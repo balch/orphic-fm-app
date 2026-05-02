@@ -4,6 +4,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.ArpMode
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
@@ -23,6 +24,7 @@ import org.balch.orpheus.features.pulsar.GenreProfile
 import org.balch.orpheus.features.pulsar.Lick
 import org.balch.orpheus.features.pulsar.LickMode
 import org.balch.orpheus.features.pulsar.LickStep
+import org.balch.orpheus.features.pulsar.LpgMode
 import org.balch.orpheus.features.pulsar.MacroOverrides
 import org.balch.orpheus.features.pulsar.ProgressionAnchor
 import org.balch.orpheus.features.pulsar.ProgressionStyle
@@ -37,6 +39,7 @@ import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TonalTension
 import org.balch.orpheus.features.pulsar.TrackMacroMap
 import org.balch.orpheus.features.pulsar.TrackRole
+import org.balch.orpheus.features.pulsar.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.TrackVoice
 import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
@@ -90,6 +93,7 @@ class TechnoWobbleVibe : VibeProvider {
 
     override val vibe = Vibe(
         name = "Techno Wobble",
+        album = Album.RIF,
         bpm = 84f,
         envelopeType = EnvelopeType.BLEND,  // punchy drums, breathing pads
         rootNote = RootNote.G_SHARP,         // G# minor = Ab minor enharmonic
@@ -200,7 +204,7 @@ class TechnoWobbleVibe : VibeProvider {
             // are an accent color, not a driving force.
             TrackVoice(
                 engineEdm = Engine.HH,
-                engineSpace = Engine.NSE,  // lo-fi noise hats in low-energy mode
+                engineSpace = Engine.HH,
                 role = TrackRole.Percussive,
                 volume = 0.40f,
                 pan = 0.15f,
@@ -220,6 +224,12 @@ class TechnoWobbleVibe : VibeProvider {
                     chordFollow = ChordFollow.ROOT_ONLY,
                     lickMode = LickMode.Fill,
                 ),
+                // WSH (EDM slot) needs the LPG vactrol pluck so its raw oscillator
+                // gets an articulate attack. STR (SPACE slot) already has its own
+                // physical-model decay envelope — BYPASS lets it ride at full volume
+                // instead of being doubly attenuated.
+                lpgMode = LpgMode.PLUCK,
+                lpgModeSpace = LpgMode.BYPASS,
                 volume = 0.85f,
                 pan = 0.00f,
                 density = 0.55f,
@@ -448,6 +458,22 @@ class TechnoWobbleVibe : VibeProvider {
                     chordsPerBar = chorusChordsPerBar,
                     compingInversion = SectionInversion.SECOND_INVERSION,
                     compingHumanization = cleanHumanization,
+                    // Stab adds melodic motion via arpeggiated lead stabs and lifts
+                    // the MOD clang into a chorus signature rather than a rare accent.
+                    trackOverrides = mapOf(
+                        4 to TrackSectionOverride(
+                            delaySend = .6f,
+                            reverbSend = .6f,
+                            holdProbability = .6f,
+                            holdLengthMin = 2,
+                            holdLengthMax = 8,
+                            chordFollow = ChordFollow.FOLLOW
+                        ),
+                        7 to TrackSectionOverride(
+                            volume = 0.45f,              // ringing clang foregrounded
+                            delaySend = 0.50f,
+                        ),
+                    ),
                 ),
                 // 3: fall — stripped to bass+kick+pad drone. Dangerous space.
                 // Lead gone, hats gone, grain whispers. Only the heart beats.
@@ -468,6 +494,28 @@ class TechnoWobbleVibe : VibeProvider {
                     chordFollow = ChordFollow.FIXED,  // bass drones on G#, no motion
                     compingStyle = CompingStyle.BLUES_SHUFFLE,
                     compingHumanization = cleanHumanization,
+                    // The breakdown trades aggression for atmosphere. The lead
+                    // (track 4) transforms from sharp stabs into a quiet held
+                    // drone — same instrument, opposite role. Pad relentlessly
+                    // sustains; grain texture recedes into ambient whisper.
+                    trackOverrides = mapOf(
+                        4 to TrackSectionOverride(
+                            compingStyle = CompingStyle.PAD,        // continuous chord — held drone
+                            arpMode = ArpMode.NEVER,
+                            envelopeProfile = EnvelopeProfile.EFFECT,
+                            volume = 0.20f,
+                        ),
+                        5 to TrackSectionOverride(
+                            holdProbability = 0.95f,
+                            holdLengthMin = 16,
+                            holdLengthMax = 28,
+                            volume = 0.55f,
+                        ),
+                        6 to TrackSectionOverride(
+                            volume = 0.15f,
+                            reverbSend = 0.75f,
+                        ),
+                    ),
                 ),
                 // 4: drift — the ending. Everything decays, pad holds, kick fades.
                 // True outro: empty transitions terminate the arrangement.
@@ -483,6 +531,29 @@ class TechnoWobbleVibe : VibeProvider {
                             SectionTransition(targetIndex = 1, weight = 1f, transitionBars = chorusLiftBars),
                     ),
                     compingHumanization = cleanHumanization,
+                    // Drift is the deliberate decay. Kick fades, lead becomes
+                    // sparse held decays, pad holds nearly forever, MOD wildcard
+                    // becomes a distant ghost-ring. Each instrument hands off
+                    // its character to the reverb.
+                    trackOverrides = mapOf(
+                        0 to TrackSectionOverride(volume = 0.40f),  // kick fades
+                        4 to TrackSectionOverride(
+                            compingStyle = CompingStyle.PAD,
+                            arpMode = ArpMode.NEVER,
+                            envelopeProfile = EnvelopeProfile.EFFECT,
+                            volume = 0.15f,
+                        ),
+                        5 to TrackSectionOverride(
+                            holdProbability = 0.95f,
+                            holdLengthMin = 24,
+                            holdLengthMax = 28,
+                        ),
+                        7 to TrackSectionOverride(
+                            volume = 0.10f,
+                            reverbSend = 0.85f,
+                            delaySend = 0.65f,
+                        ),
+                    ),
                 ),
             ),
         ),

@@ -3,12 +3,8 @@ package org.balch.orpheus.features.evo.strategy
 import com.diamondedge.logging.logging
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
@@ -16,6 +12,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.plugin.PluginControlId
 import org.balch.orpheus.core.plugin.PortValue.FloatValue
 import org.balch.orpheus.core.plugin.symbols.DelaySymbol
@@ -43,7 +40,8 @@ import kotlin.time.ExperimentalTime
 @ContributesIntoSet(FeatureScope::class)
 class ReactStrategy(
     private val synthController: SynthController,
-    private val synthEngine: SynthEngine
+    private val synthEngine: SynthEngine,
+    private val featureScope: FeatureCoroutineScope,
 ) : AudioEvolutionStrategy {
 
     private val log = logging("ReactStrategy")
@@ -67,8 +65,8 @@ class ReactStrategy(
     private var lastUserChange: UserChange? = null
     private var userChangeDecay = 0f
 
-    // Coroutine scope for monitoring flows
-    private var monitorScope: CoroutineScope? = null
+    // Job for monitoring flows; parented to the feature scope so it dies with
+    // the feature graph if not explicitly cancelled in onDeactivate.
     private var monitorJob: Job? = null
 
     // PluginControlId keys for matching incoming control events
@@ -111,8 +109,7 @@ class ReactStrategy(
         userChangeDecay = 0f
 
         // Start monitoring user input
-        monitorScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        monitorJob = monitorScope?.launch {
+        monitorJob = featureScope.launch {
             synthController.onControlChange
                 .filter { it.origin == ControlEventOrigin.UI || it.origin == ControlEventOrigin.MIDI }
                 .debounce(100.milliseconds)
@@ -142,8 +139,6 @@ class ReactStrategy(
     override fun onDeactivate() {
         log.debug { "Deactivated" }
         monitorJob?.cancel()
-        monitorScope?.cancel()
-        monitorScope = null
         monitorJob = null
     }
 

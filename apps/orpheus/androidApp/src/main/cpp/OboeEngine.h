@@ -5,6 +5,7 @@
 #include "orpheus_dsp.h"
 #include <atomic>
 #include <chrono>
+#include <functional>
 
 class OboeEngine : public oboe::AudioStreamDataCallback,
                    public oboe::AudioStreamErrorCallback {
@@ -63,12 +64,21 @@ public:
     void onErrorAfterClose(
         oboe::AudioStream* stream, oboe::Result error) override;
 
+    // Register a callback that fires after the C++ DSP engine is recreated
+    // (e.g. on a route-change with a different sample rate). Pass nullptr to
+    // clear. Called from Oboe's error thread; the implementation must marshal
+    // off-thread before doing real work.
+    void setEngineRecreatedCallback(std::function<void()> cb) {
+        mEngineRecreatedCallback = std::move(cb);
+    }
+
 private:
     std::shared_ptr<oboe::AudioStream> mStream;
     std::atomic<OrpheusEngine*> dsp_engine_{nullptr};
     int32_t mCreatedSampleRate = 0;
     std::atomic<bool> mIsRunning{false};
     std::atomic<double> mCpuLoad{0.0};
+    std::function<void()> mEngineRecreatedCallback;
 };
 
 #endif

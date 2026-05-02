@@ -4,6 +4,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
@@ -83,6 +84,7 @@ class RastaManVibe : VibeProvider {
 
     override val vibe = Vibe(
         name = "Bell Tolls",
+        album = Album.RIF,
         bpm = 78f,  // classic roots reggae tempo
         envelopeType = EnvelopeType.BLEND,
         rootNote = RootNote.A,

@@ -11,8 +11,10 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.lifecycle.AndroidAppLifecycleManager
 import org.balch.orpheus.core.media.ForegroundServiceController
 import org.balch.orpheus.core.media.MediaSessionStateManager
+import org.balch.orpheus.core.playback.PlaybackController
 import org.balch.orpheus.core.tempo.GlobalTempo
 import org.balch.orpheus.features.ai.ControlHighlightEventBus
+import org.balch.orpheus.features.pulsar.playback.PulsarPlaybackBridge
 import org.balch.orpheus.util.ConsoleLogger
 
 /**
@@ -34,6 +36,12 @@ actual interface OrpheusGraph : ViewModelGraph {
      * Accessing this property ensures it gets initialized.
      */
     val androidAppLifecycleManager: AndroidAppLifecycleManager
+
+    /** Eagerly initialized so init {} block subscribes to flows at startup. */
+    val playbackController: PlaybackController
+
+    /** Eagerly initialized to observe PlaybackController state and drive Pulsar effects. */
+    val pulsarPlaybackBridge: PulsarPlaybackBridge
 
     @DependencyGraph.Factory
     fun interface Factory {

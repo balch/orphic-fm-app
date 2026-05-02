@@ -61,4 +61,13 @@ class OboeAudioBridge {
         stepCountsOut: IntArray,
     )
     external fun nativeGetPulsarArrangement(out: IntArray)
+
+    /**
+     * Register a Runnable that the C++ side invokes after recreating the DSP
+     * engine (e.g. when Oboe rebuilds the audio stream on a route change with
+     * a different sample rate). The Runnable runs on whatever thread native
+     * code chooses — Kotlin must marshal to a safe scope before doing real
+     * work. Pass null to clear.
+     */
+    external fun nativeSetEngineRecreatedCallback(callback: Runnable?)
 }

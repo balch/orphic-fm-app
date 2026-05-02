@@ -24,6 +24,7 @@ import org.balch.orpheus.core.features.RestoreStrategy
 import org.balch.orpheus.core.features.SynthFeature
 import org.balch.orpheus.core.features.synthFeature
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.media.MediaSessionStateManager
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -89,7 +90,7 @@ interface TimerFeature : SynthFeature<TimerUiState, TimerActions> {
 class TimerViewModel(
     private val synthEngine: SynthEngine,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
-    private val metadataNotifier: TimerMetadataNotifier,
+    private val mediaSessionStateManager: MediaSessionStateManager,
     private val widgetNotifier: TimerWidgetNotifier,
     scope: FeatureCoroutineScope,
     persistence: FeatureStatePersistence,
@@ -163,10 +164,9 @@ class TimerViewModel(
 
         savedVolume = synthEngine.getMasterVolume()
         wakeLockManager.acquire()
-        metadataNotifier.setTimerActive(true)
+        mediaSessionStateManager.setTimerActive(true)
 
         _state.update { it.copy(status = TimerStatus.RUNNING, showOverlay = true) }
-        updateTimerMetadata(_state.value.remainingTime)
         notifyWidget(TimerStatus.RUNNING)
 
         launchCountdownJob()
@@ -184,19 +184,12 @@ class TimerViewModel(
                     startFade()
                     break
                 } else {
-                    val prevMinute = _state.value.remainingTime.inWholeMinutes
                     _state.update { it.copy(remainingTime = remaining) }
-                    if (remaining.inWholeMinutes != prevMinute) {
-                        updateTimerMetadata(remaining)
-                    }
+                    // Subtitle is now produced by TimerOverlayProducer reading
+                    // stateFlow directly; no per-minute push needed here.
                 }
             }
         }
-    }
-
-    private fun updateTimerMetadata(remainingTime: Duration) {
-        val timeStr = formatTime(remainingTime)
-        metadataNotifier.updateTimerTitle("Sleep Timer: $timeStr remaining")
     }
 
     private fun notifyWidget(status: TimerStatus) {
@@ -223,7 +216,7 @@ class TimerViewModel(
             // an audible pop (volume briefly at full while agents still produce audio)
             wakeLockManager.release()
             playbackLifecycleManager.tryRequestStopAll()
-            metadataNotifier.setTimerActive(false)
+            mediaSessionStateManager.setTimerActive(false)
             delay(100) // allow agents to stop producing audio
             synthEngine.setMasterVolume(savedVolume)
             val duration = _state.value.initialTime
@@ -291,7 +284,7 @@ class TimerViewModel(
         fadeJob?.cancel()
         fadeJob = null
         wakeLockManager.release()
-        metadataNotifier.setTimerActive(false)
+        mediaSessionStateManager.setTimerActive(false)
     }
 
     private fun restoreVolumeIfFading() {

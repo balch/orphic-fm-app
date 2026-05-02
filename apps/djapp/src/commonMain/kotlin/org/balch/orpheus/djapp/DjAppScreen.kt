@@ -73,6 +73,7 @@ import kotlin.time.Duration.Companion.seconds
 fun DjAppScreen(
     synthEngine: SynthEngine,
     vizFeature: VizFeature,
+    onTogglePlayback: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val djFeature = DjViewModel.feature()
@@ -106,6 +107,7 @@ fun DjAppScreen(
             isLandscape = isLandscape,
             pulsarFeature = pulsarFeature,
             timerFeature = timerFeature,
+            onTogglePlayback = onTogglePlayback,
             modifier = Modifier.fillMaxSize(),
         ) {
             // Shared nav content composable used in both orientations
@@ -480,6 +482,7 @@ private fun DjAppNavTimerRunningPreview() {
         isLandscape = false,
         pulsarFeature = PulsarViewModel.previewFeature(),
         timerFeature = runningTimer,
+        onTogglePlayback = {},
     ) {
         Box(
             modifier = Modifier
@@ -508,6 +511,7 @@ private fun DjAppNavTimerPausedPreview() {
         isLandscape = false,
         pulsarFeature = PulsarViewModel.previewFeature(),
         timerFeature = pausedTimer,
+        onTogglePlayback = {},
     ) {
         Box(
             modifier = Modifier

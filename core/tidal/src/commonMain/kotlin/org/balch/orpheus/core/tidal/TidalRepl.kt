@@ -4,13 +4,12 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import kotlin.time.Clock
 
@@ -75,11 +74,9 @@ enum class EvalMode {
 class TidalRepl(
     private val scheduler: TidalScheduler,
     private val dispatcherProvider: DispatcherProvider,
+    private val scope: AppCoroutineScope,
 ) {
     private val log = logging("TidalRepl")
-    
-    // Use injected dispatcher for parsng work (allows testing)
-    private val scope = CoroutineScope(SupervisorJob() + dispatcherProvider.default)
     
     // Pattern slots (d0-d15)
     private val slots = mutableMapOf<String, Pattern<TidalEvent>>()

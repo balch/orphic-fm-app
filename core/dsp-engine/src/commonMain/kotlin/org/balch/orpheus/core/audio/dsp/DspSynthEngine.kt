@@ -5,12 +5,17 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.StereoMode
 import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.audio.dsp.DspSynthEngine.Companion.OSC_ENGINE_CPP_INDEX
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.ControlPort
 import org.balch.orpheus.core.plugin.PortSymbol
@@ -48,7 +53,8 @@ class DspSynthEngine(
     private val globalTempo: GlobalTempo,
     private val voiceManager: DspVoiceManager,
     private val synthController: SynthController,
-    private val wiringGraphProvider: WiringGraphProvider
+    private val wiringGraphProvider: WiringGraphProvider,
+    private val appCoroutineScope: AppCoroutineScope,
 ) : SynthEngine {
 
     private val log = logging("DspSynthEngine")
@@ -61,6 +67,11 @@ class DspSynthEngine(
     private var _graphReady = kotlinx.coroutines.CompletableDeferred<Unit>()
     override val graphReady: kotlinx.coroutines.Deferred<Unit> get() = _graphReady
 
+    // extraBufferCapacity=1 so emit() never suspends on the audio recreation
+    // path; subscribers (e.g. PulsarPlaybackBridge) re-push their state on tick.
+    private val _engineRecreatedFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val engineRecreatedFlow: SharedFlow<Unit> = _engineRecreatedFlow.asSharedFlow()
+
     private fun setPort(ps: PortSymbol, value: PortValue): Boolean =
         setPluginPort(ps.uri, ps.symbol, value)
     private fun getPort(ps: PortSymbol): PortValue? =
@@ -70,7 +81,7 @@ class DspSynthEngine(
     private var _stereoMode = StereoMode.VOICE_PAN
 
     // Composed delegates
-    val monitor = SynthEngineMonitor(nativeBridge, dispatcherProvider)
+    val monitor = SynthEngineMonitor(nativeBridge, dispatcherProvider, appCoroutineScope)
     val routing = SynthEngineRouting(audioEngine, nativeBridge, pluginProvider)
 
     // Delegate SynthEngine interface StateFlow properties to monitor
@@ -407,15 +418,27 @@ class DspSynthEngine(
         monitor.startRequested = true
         log.debug { "Starting Shared Audio Engine..." }
         audioEngine.start()
-        syncNativeBridgeState() // Re-sync after C++ engine is created
+        loadGraphAndSync()
 
-        // Load the default wiring graph into the C++ engine
-        nativeBridge.nativeLoadGraph(wiringGraphProvider.buildGraph()).also { result ->
-            log.info { "nativeLoadGraph result: $result" }
+        // Subscribe to the audio engine's "C++ engine recreated" event.
+        // On Android (Oboe), an audio output route change with a different
+        // sample rate destroys+recreates the DSP engine — the new engine has
+        // NO graph until we reload it. Without this, audio stays silent
+        // (still hear mute clicks because the master gain path is alive,
+        // but no Pulsar beats / no instrument output).
+        nativeBridge.setOnEngineRecreatedCallback {
+            // Callback runs on Oboe's error thread; hop to a coroutine so we
+            // don't block error handling and so the JNI calls happen on a
+            // sane scope.
+            appCoroutineScope.launch {
+                log.info { "C++ engine recreated — reloading graph + syncing port state" }
+                loadGraphAndSync()
+                // Notify subscribers (PulsarPlaybackBridge etc.) so they can
+                // re-push state that lives outside the wiring graph + port
+                // map — most importantly the per-vibe Pulsar recipe.
+                _engineRecreatedFlow.tryEmit(Unit)
+            }
         }
-
-        // Re-sync port map values after graph load (graph load resets node defaults)
-        syncNativeBridgeState()
 
         // Poll monitor data from C++ via native bridge
         monitor.startMonitoring()
@@ -425,6 +448,20 @@ class DspSynthEngine(
         }
         log.debug { "Audio Engine Started" }
         _graphReady.complete(Unit)
+    }
+
+    /**
+     * Push wiring graph + cached port state into the (possibly fresh) native
+     * engine. Called on initial start AND any time the C++ engine is
+     * recreated under us.
+     */
+    private fun loadGraphAndSync() {
+        syncNativeBridgeState() // Re-sync after C++ engine is (re)created
+        nativeBridge.nativeLoadGraph(wiringGraphProvider.buildGraph()).also { result ->
+            log.info { "nativeLoadGraph result: $result" }
+        }
+        // Re-sync port map values after graph load (graph load resets node defaults)
+        syncNativeBridgeState()
     }
 
     override fun setVizEnabled(enabled: Boolean) {

@@ -7,7 +7,6 @@
 #include "pulsar_solo.h"
 #include "pulsar_band_solo.h"
 #include "pulsar_lick_techniques.h"
-#include "pulsar_motif.h"
 #include "pulsar_mod_ranges.h"
 #include "pulsar_comping.h"
 #include <cmath>
@@ -702,10 +701,17 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         ts.chord_follow = static_cast<ChordFollowMode>(
             engine->pulsar_track_chord_follow[t].load(std::memory_order_relaxed));
 
+        // LPG (low-pass gate) config
+        ts.lpg_mode = engine->pulsar_track_lpg_mode[t].load(std::memory_order_relaxed);
+        ts.lpg_mode_space = engine->pulsar_track_lpg_mode_space[t].load(std::memory_order_relaxed);
+        ts.lpg_decay = engine->pulsar_track_lpg_decay[t].load(std::memory_order_relaxed);
+        ts.lpg_colour = engine->pulsar_track_lpg_colour[t].load(std::memory_order_relaxed);
+
         // Snapshot defaults so section overrides can revert to them on -1 (no override)
         ts.default_chord_follow = ts.chord_follow;
         ts.default_comping_style = ts.comping_style;
         ts.default_section_inversion = ts.section_inversion;
+        ts.default_arp_mode = ts.arp_mode;
 
         // Evolution parameters
         ts.evo_rhythmic = engine->pulsar_track_evo_rhythmic[t].load(std::memory_order_relaxed) != 0;
@@ -933,6 +939,17 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 sec.chord_follow_override = (cf < 0.0f) ? -1 : static_cast<int>(cf);
             }
 
+            // Per-track section overrides; -1 = no override (per-track wins over section-level)
+            {
+                int tbase = s * kNumPulsarTracks;
+                for (int t = 0; t < kNumPulsarTracks; t++) {
+                    sec.track_comping_style_override[t] = engine->pulsar_section_track_comping_style[tbase + t].load(std::memory_order_relaxed);
+                    sec.track_inversion_override[t]     = engine->pulsar_section_track_inversion[tbase + t].load(std::memory_order_relaxed);
+                    sec.track_arp_mode_override[t]      = engine->pulsar_section_track_arp_mode[tbase + t].load(std::memory_order_relaxed);
+                    sec.track_chord_follow_override[t]  = engine->pulsar_section_track_chord_follow[tbase + t].load(std::memory_order_relaxed);
+                }
+            }
+
             // --- Per-section progression override ---
             sec.custom_progression_length = std::clamp(
                 engine->pulsar_section_progression_length[s].load(std::memory_order_relaxed),
@@ -1076,11 +1093,45 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
                 if (sec.custom_progression_length > 0 || sec.chords_per_bar_override > 0) {
                     restart_progression_for_section(state, sec, engine);
                 }
+
+                // Apply per-track section overrides for the initial section so
+                // chordal patterns generated above match the active section's
+                // overrides on first play.
+                int cd0 = state->chord_state.progression[state->chord_state.chord_index];
+                for (int t = 0; t < kNumPulsarTracks; t++) {
+                    PulsarTrackState& ts = state->tracks[t];
+                    if (ts.role == TrackRole::CHORDAL) {
+                        int cs_ovr = sec.track_comping_style_override[t];
+                        if (cs_ovr >= 0) {
+                            CompingStyleId target = static_cast<CompingStyleId>(cs_ovr);
+                            if (target != ts.comping_style) {
+                                ts.comping_style = target;
+                                if (ts.chordal_base_valid) {
+                                    generate_chordal_pattern(
+                                        ts.chordal_base, ts.chordal_base_count,
+                                        ts.comping_style, cd0,
+                                        static_cast<uint8_t>(root), scale,
+                                        static_cast<uint8_t>(engine->pulsar_genre_note_range_low.load(std::memory_order_relaxed)),
+                                        static_cast<uint8_t>(engine->pulsar_genre_note_range_high.load(std::memory_order_relaxed)));
+                                    std::memcpy(ts.steps, ts.chordal_base,
+                                                sizeof(PulsarStep) * ts.step_count);
+                                }
+                            }
+                        }
+                        int inv_ovr = sec.track_inversion_override[t];
+                        if (inv_ovr >= 0) ts.section_inversion = static_cast<SectionInversionId>(inv_ovr);
+                        int arp_ovr = sec.track_arp_mode_override[t];
+                        if (arp_ovr >= 0) ts.arp_mode = static_cast<ArpModeId>(arp_ovr);
+                    }
+                    if (ts.role == TrackRole::MELODIC || ts.role == TrackRole::CHORDAL) {
+                        int cf_ovr = sec.track_chord_follow_override[t];
+                        if (cf_ovr >= 0) ts.chord_follow = static_cast<ChordFollowMode>(cf_ovr);
+                    }
+                }
             }
         }
 
-        // Zero out solo and motif state
-        std::memset(&state->motif_state, 0, sizeof(MotifState));
+        // Zero out solo state
         std::memset(&state->band_solo_state, 0, sizeof(BandSoloState));
 
         // Load band solo config
@@ -1117,12 +1168,6 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
             bc.bars_per_lead_max = engine->pulsar_band_bars_per_lead_max.load(std::memory_order_relaxed);
         }
 
-        // If the starting section has a motif set, initialize motif state
-        int cur = state->section_state.current_section;
-        if (cur >= 0 && cur < arr.section_count && arr.sections[cur].has_motif_set) {
-            init_motif_state(state->motif_state, arr.sections[cur].motif_set, state->mutation_seed);
-        }
-
         // Set initial arrangement viz read-back. Pre-roll model: section total
         // is just bars_remaining — the ramp zone (if any) lives INSIDE that count.
         int init_sec = state->section_state.current_section;
@@ -1138,7 +1183,6 @@ static void load_vibe(PulsarState* state, int generation, OrpheusEngine* engine)
         state->arrangement.active = false;
         state->arrangement.section_count = 0;
         std::memset(&state->section_state, 0, sizeof(SectionState));
-        std::memset(&state->motif_state, 0, sizeof(MotifState));
         std::memset(&state->band_solo_state, 0, sizeof(BandSoloState));
         state->has_band_solo = false;
         state->arr_viz_section_index.store(-1, std::memory_order_relaxed);
@@ -1464,6 +1508,12 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         PulsarTrackState& ts = state->tracks[t];
         const PulsarTrackMacroMap& mm = ts.macro_map;
 
+        // Per-block refresh of fields that section transitions can override.
+        // Atomic-cheap; lets Kotlin push per-section overrides without a vibe reload.
+        ts.volume = engine->pulsar_track_volume[t].load(std::memory_order_relaxed);
+        ts.envelope_profile = static_cast<PulsarEnvelopeProfile>(
+            engine->pulsar_track_envelope[t].load(std::memory_order_relaxed));
+
         // ── Apply engine selection from atomics (immediate UI response) ──
         {
             int edm = engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
@@ -1571,7 +1621,7 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             if (ts.playhead == 0 && prev_playhead > 0 && t == 0) {
                 mutate_patterns(state, complexity, engine);
 
-                // ── Section / Solo / Motif advancement ──
+                // ── Section / Solo advancement ──
                 if (state->arrangement.active) {
                     bool section_changed = advance_section(
                         state->section_state, state->arrangement, state->mutation_seed);
@@ -1630,12 +1680,6 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             }
                         }
 
-                        // Initialize motif state for new section
-                        if (sec.has_motif_set) {
-                            init_motif_state(state->motif_state, sec.motif_set,
-                                             state->mutation_seed);
-                        }
-
                         // Apply section-level comping overrides to all CHORDAL tracks
                         // (-1 = restore default snapshotted at load_vibe)
                         {
@@ -1647,9 +1691,13 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             int cd = state->chord_state.progression[state->chord_state.chord_index];
                             for (int t = 0; t < kNumPulsarTracks; t++) {
                                 if (state->tracks[t].role != TrackRole::CHORDAL) continue;
-                                CompingStyleId target = (sec.comping_style_override >= 0)
-                                    ? static_cast<CompingStyleId>(sec.comping_style_override)
-                                    : state->tracks[t].default_comping_style;
+                                // Per-track override wins over section-level override.
+                                int per_track = sec.track_comping_style_override[t];
+                                CompingStyleId target = (per_track >= 0)
+                                    ? static_cast<CompingStyleId>(per_track)
+                                    : (sec.comping_style_override >= 0)
+                                        ? static_cast<CompingStyleId>(sec.comping_style_override)
+                                        : state->tracks[t].default_comping_style;
                                 if (target != state->tracks[t].comping_style) {
                                     state->tracks[t].comping_style = target;
                                     if (state->tracks[t].chordal_base_valid) {
@@ -1666,23 +1714,39 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                             }
                         }
 
-                        // Inversion override (-1 = restore default)
+                        // Inversion override (per-track wins over section-level; -1 = restore default)
                         for (int t = 0; t < kNumPulsarTracks; t++) {
                             if (state->tracks[t].role != TrackRole::CHORDAL) continue;
-                            SectionInversionId target = (sec.comping_inversion_override >= 0)
-                                ? static_cast<SectionInversionId>(sec.comping_inversion_override)
-                                : state->tracks[t].default_section_inversion;
+                            int per_track = sec.track_inversion_override[t];
+                            SectionInversionId target = (per_track >= 0)
+                                ? static_cast<SectionInversionId>(per_track)
+                                : (sec.comping_inversion_override >= 0)
+                                    ? static_cast<SectionInversionId>(sec.comping_inversion_override)
+                                    : state->tracks[t].default_section_inversion;
                             state->tracks[t].section_inversion = target;
                         }
 
-                        // Chord-follow override (-1 = restore default)
+                        // Chord-follow override (per-track wins over section-level; -1 = restore default)
                         for (int t = 0; t < kNumPulsarTracks; t++) {
                             TrackRole r = state->tracks[t].role;
                             if (r != TrackRole::MELODIC && r != TrackRole::CHORDAL) continue;
-                            ChordFollowMode target = (sec.chord_follow_override >= 0)
-                                ? static_cast<ChordFollowMode>(sec.chord_follow_override)
-                                : state->tracks[t].default_chord_follow;
+                            int per_track = sec.track_chord_follow_override[t];
+                            ChordFollowMode target = (per_track >= 0)
+                                ? static_cast<ChordFollowMode>(per_track)
+                                : (sec.chord_follow_override >= 0)
+                                    ? static_cast<ChordFollowMode>(sec.chord_follow_override)
+                                    : state->tracks[t].default_chord_follow;
                             state->tracks[t].chord_follow = target;
+                        }
+
+                        // Arp-mode override (per-track only — no section-level equivalent; -1 = restore default)
+                        for (int t = 0; t < kNumPulsarTracks; t++) {
+                            if (state->tracks[t].role != TrackRole::CHORDAL) continue;
+                            int per_track = sec.track_arp_mode_override[t];
+                            ArpModeId target = (per_track >= 0)
+                                ? static_cast<ArpModeId>(per_track)
+                                : state->tracks[t].default_arp_mode;
+                            state->tracks[t].arp_mode = target;
                         }
                     }
 
@@ -1702,15 +1766,6 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
                                 creativity * sec_adv.solo_mutation_rate,
                                 state->mutation_seed
                             );
-                        }
-                    }
-
-                    // Advance motif within current section
-                    {
-                        int cur_sec = state->section_state.current_section;
-                        const SectionParam& sec = state->arrangement.sections[cur_sec];
-                        if (sec.has_motif_set) {
-                            advance_motif(state->motif_state, sec.motif_set, state->mutation_seed);
                         }
                     }
 
@@ -2384,6 +2439,17 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
         }
 
         // ── Render voice ──
+        // Pick lpg_mode based on which engine slot is currently active.
+        // ts.engine_index is set per-block by the energy threshold above —
+        // EDM slot above 0.6, SPACE slot below 0.4. The compare-against-edm
+        // here means SPACE slot's mode applies whenever engine_index isn't
+        // the EDM engine (covers both SPACE-active and the "edm == spa"
+        // single-engine case, which still uses lpg_mode since they match).
+        const int active_edm_engine =
+            engine->pulsar_track_engine_edm[t].load(std::memory_order_relaxed);
+        const int active_lpg_mode = (ts.engine_index == active_edm_engine)
+            ? ts.lpg_mode
+            : ts.lpg_mode_space;
         ts.voice.Render(
             ts.engine_index,
             gate_for_render,
@@ -2393,7 +2459,10 @@ void unit_process_pulsar(GraphUnit* u, OrpheusEngine* engine, int num_frames, fl
             clamp01(mod_morph),
             accent_for_render,
             track_buffer,
-            num_frames
+            num_frames,
+            static_cast<LpgMode>(active_lpg_mode),
+            ts.lpg_decay,
+            ts.lpg_colour
         );
 
         // ── Apply Tides envelope ──

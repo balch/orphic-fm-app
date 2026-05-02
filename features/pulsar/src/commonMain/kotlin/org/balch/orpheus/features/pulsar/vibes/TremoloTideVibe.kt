@@ -39,6 +39,7 @@ import org.balch.orpheus.features.pulsar.TensionProfile
 import org.balch.orpheus.features.pulsar.TonalTension
 import org.balch.orpheus.features.pulsar.TrackMacroMap
 import org.balch.orpheus.features.pulsar.TrackRole
+import org.balch.orpheus.features.pulsar.TrackSectionOverride
 import org.balch.orpheus.features.pulsar.TrackVoice
 import org.balch.orpheus.features.pulsar.Vibe
 import org.balch.orpheus.features.pulsar.VibeEffects
@@ -232,15 +233,15 @@ class TremoloTideVibe : VibeProvider {
             //    DX2 in EDM slot for plaintive bell-like attack;
             //    WTB in space slot for darker shimmer when energy is low.
             TrackVoice(
-                engineEdm = Engine.DX2,
-                engineSpace = Engine.WTB,
+                engineEdm = Engine.DX,
+                engineSpace = Engine.DX2,
                 role = TrackRole.Melodic(lickMode = LickMode.Fill),
                 volume = 0.25f,
                 pan = 0.15f,
                 density = 0.20f,
+                morph = .74f,
+                timbre = .67f,
                 harmonics = 0.35f,
-                timbre = 0.45f,
-                morph = 0.35f,
                 envelopeProfile = EnvelopeProfile.MELODIC,
                 macroMap = TrackMacroMap.MELODIC,
                 barStrategy = BarStrategy.MUTATE,
@@ -263,14 +264,19 @@ class TremoloTideVibe : VibeProvider {
                 ),
                 evolutionWeight = 0.8f,
             ),
-            // 5: ensemble pad — long swells, key bed.
+            // 5: chordal pad — syncopated stabs by default; the verse promotes
+            //    this to a sustained drone via TrackSectionOverride below.
+            //    The chord engine picks up the progression; ENS in the space
+            //    slot keeps a string-ensemble shimmer when energy is low.
+            //    JAZZ_COMP keeps the bed quiet outside the verse — verse
+            //    flips it to PAD for held bedrock.
             TrackVoice(
-                engineEdm = Engine.ENS,
+                engineEdm = Engine.CHD,
                 engineSpace = Engine.ENS,
                 role = TrackRole.Chordal(
                     chordFollow = ChordFollow.FOLLOW,
                     comping = ChordComping(
-                        style = CompingStyle.PAD,
+                        style = CompingStyle.GOSPEL_STABS,
                         arpSpeed = 1.0f,
                         fills = CompingFills(
                             everyNBars = 16,
@@ -278,19 +284,19 @@ class TremoloTideVibe : VibeProvider {
                         ),
                     ),
                 ),
-                volume = 0.30f,
+                volume = 0.40f,
                 pan = -0.25f,
-                density = 0.10f,
-                envelopeProfile = EnvelopeProfile.DRONE,
+                density = 0.40f,
+                envelopeProfile = EnvelopeProfile.EFFECT,  // ducks under solos; verse swaps to DRONE
                 macroMap = TrackMacroMap.MELODIC,
                 barStrategy = BarStrategy.REPEAT,
                 modLfoRate = 0.05f,
-                modLfoDepth = 0.6f,
+                modLfoDepth = 0.35f,
                 modLfoShape = 0.4f,
                 modLfoCoupling = 0.3f,
-                holdProbability = 0.92f,
-                holdLengthMin = 8,
-                holdLengthMax = 24,
+                holdProbability = 0.25f,
+                holdLengthMin = 2,
+                holdLengthMax = 12,
                 noteRangeLow = 48,
                 noteRangeHigh = 67,
                 reverbSend = 0.75f,
@@ -404,6 +410,10 @@ class TremoloTideVibe : VibeProvider {
                     ),
                 ),
                 // 1: verse — full band, subdued. The pocket.
+                //    Track 5 (chordal pad) gets promoted to a sustained DRONE
+                //    here — held bedrock under the lead. Other sections leave
+                //    the override off, so the pad reverts to its light comping
+                //    base.
                 Section(
                     name = "verse",
                     barsMin = 8, barsMax = 16,
@@ -414,6 +424,12 @@ class TremoloTideVibe : VibeProvider {
                     ),
                     recencyDecay = 0.5f,
                     macroOverrides = null,  // verse is the baseline
+                    // Track 5 is Chordal, so its rhythm comes from compingStyle —
+                    trackOverrides = mapOf(
+                        5 to TrackSectionOverride(
+                            envelopeProfile = EnvelopeProfile.DRONE,
+                        ),
+                    ),
                 ),
                 // 2: chorus — the swell. Lift on bVII; everything wider/wetter.
                 Section(
@@ -502,6 +518,14 @@ class TremoloTideVibe : VibeProvider {
                             timbreLow = 0.30f, timbreHigh = 0.45f, timbreProbability = 0.30f,
                             attackPoint = 0.85f,        // peak right at the exit edge
                             releaseSpeed = 0.15f,       // slow exhale
+                        ),
+                    ),
+                    trackOverrides = mapOf(
+                        5 to TrackSectionOverride(
+                            compingStyle = CompingStyle.ROCK_DOWNBEATS,
+                            envelopeProfile = EnvelopeProfile.RHYTHM,
+                            volume = .5f,
+                            holdProbability = 0f
                         ),
                     ),
                 ),

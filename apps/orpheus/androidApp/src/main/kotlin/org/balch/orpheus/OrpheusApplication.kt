@@ -37,5 +37,15 @@ class OrpheusApplication : Application() {
         // Eagerly initialize AndroidAppLifecycleManager to register lifecycle callbacks
         // This enables muting audio when the app is backgrounded without MediaSession
         graph.androidAppLifecycleManager
+
+        // Eagerly initialize PlaybackController so its init {} subscribes
+        // to flows at startup. PlaybackController is the single source of
+        // truth for play/pause state across the app.
+        graph.playbackController
+
+        // Eagerly initialize PulsarPlaybackBridge so it observes PlaybackController
+        // state and StopAll events from app launch. Decoupled from PulsarViewModel
+        // to break the DI cycle that would otherwise stack-overflow Metro.
+        graph.pulsarPlaybackBridge
     }
 }

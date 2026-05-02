@@ -15,12 +15,12 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.plugin.PortValue
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
@@ -169,22 +169,20 @@ private class FakeAppPreferencesRepository(
 private fun makeVm(
     engine: FakeSynthEngine = FakeSynthEngine(),
     manager: PlaybackLifecycleManager = PlaybackLifecycleManager(),
-    metadataUpdates: MutableList<String> = mutableListOf(),
 ): TimerViewModel {
     // FeatureCoroutineScope uses Dispatchers.Main.immediate.
     // Tests set Main to a StandardTestDispatcher via @BeforeTest / setMain so that
     // virtual-time advancement via advanceTimeBy() controls the countdown.
     val scope = FeatureCoroutineScope()
-    val notifier = object : TimerMetadataNotifier {
-        override fun updateTimerTitle(title: String) { metadataUpdates.add(title) }
-        override fun setTimerActive(active: Boolean) {}
-    }
+    val mediaSessionStateManager = MediaSessionStateManager(
+        org.balch.orpheus.core.coroutines.AppCoroutineScope(FakeDispatcherProvider)
+    )
     val persistence = org.balch.orpheus.core.features.FeatureStatePersistence(
         appPreferencesRepository = FakeAppPreferencesRepository(),
         dispatcherProvider = FakeDispatcherProvider,
         scope = scope,
     )
-    return TimerViewModel(engine, manager, notifier, NoOpTimerWidgetNotifier(), scope, persistence)
+    return TimerViewModel(engine, manager, mediaSessionStateManager, NoOpTimerWidgetNotifier(), scope, persistence)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -404,21 +402,6 @@ class TimerViewModelTest {
         assertEquals(remainingAtPause - 2.seconds, vm.stateFlow.value.remainingTime)
     }
 
-    // ─── Media session metadata ────────────────────────────────────────────────
-
-    @Test
-    fun `start emits media session metadata with remaining time`() = runTest {
-        val updates = mutableListOf<String>()
-        val vm = makeVm(metadataUpdates = updates)
-
-        vm.actions.onSetDuration(2.minutes) // 120 seconds
-        vm.actions.onStart()
-
-        assertNotNull(updates.firstOrNull()) { "Metadata should be emitted on start" }
-        assertTrue(updates.first().startsWith("Sleep Timer:"), "Title should start with 'Sleep Timer:'")
-        assertTrue(updates.first().contains("remaining"), "Title should contain 'remaining'")
-    }
-
     @Test
     fun `stop during FADING restores volume and transitions to IDLE`() = runTest {
         val engine = FakeSynthEngine().also { it.setInitialVolume(0.8f) }
@@ -484,22 +467,4 @@ class TimerViewModelTest {
         assertEquals(TimerStatus.IDLE, vm.stateFlow.value.status)
     }
 
-    // ─── Media session metadata ────────────────────────────────────────────────
-
-    @Test
-    fun `metadata updates on minute boundary during countdown`() = runTest {
-        val updates = mutableListOf<String>()
-        val vm = makeVm(metadataUpdates = updates)
-
-        vm.actions.onSetDuration(2.minutes) // 120 seconds
-        vm.actions.onStart()
-        val countAfterStart = updates.size   // 1 (emitted on start)
-
-        // Advance past the 61s mark → two minute-boundary crossings since start:
-        //   t = 1s : remaining = 119s → minutes 2 → 1 (fire)
-        //   t = 61s: remaining = 59s  → minutes 1 → 0 (fire)
-        advanceTimeBy(61_500L)
-
-        assertEquals(countAfterStart + 2, updates.size)
-    }
 }

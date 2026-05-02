@@ -1,15 +1,13 @@
 package org.balch.orpheus.core.audio.dsp
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.plugin.viz.PULSAR_MAX_STEPS
 import org.balch.orpheus.core.plugin.viz.PULSAR_NUM_TRACKS
@@ -22,7 +20,8 @@ import org.balch.orpheus.core.plugin.viz.PulsarVizData
  */
 class SynthEngineMonitor(
     private val nativeBridge: NativeDspBridge,
-    private val dispatcherProvider: DispatcherProvider
+    private val dispatcherProvider: DispatcherProvider,
+    private val monitoringScope: AppCoroutineScope,
 ) {
     // Reactive monitoring flows
     private val _peakFlow = MutableStateFlow(0f)
@@ -127,9 +126,6 @@ class SynthEngineMonitor(
     private val pulsarPlayheads = IntArray(PULSAR_NUM_TRACKS)
     private val pulsarStepCounts = IntArray(PULSAR_NUM_TRACKS)
     private val arrangementBuf = IntArray(6)
-
-    // Monitoring
-    private val monitoringScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private var monitoringJob: Job? = null
     private var vizJob: Job? = null

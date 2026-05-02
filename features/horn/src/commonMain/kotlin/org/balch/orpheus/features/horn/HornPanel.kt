@@ -16,13 +16,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.FloatState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,60 +88,6 @@ fun HornPanel(
     val hornPhaseViz by hornPhaseVizFlow.collectAsState()
     val wooferPhaseViz by wooferPhaseVizFlow.collectAsState()
 
-    // ── Physics-based rotor animation ──────────────────────────────────────
-    // Each rotor has a current velocity (deg/sec) that accelerates/decelerates
-    // toward a target velocity with realistic inertia. Angle accumulates each
-    // frame based on current velocity × dt.
-
-    // Target velocities derived from knobs
-    val hornTargetDps = if (uiState.brake) 0f
-        else lerp(MIN_HORN_DEG_PER_SEC, MAX_HORN_DEG_PER_SEC, uiState.speed)
-    val ratioFactor = lerp(LESLIE_RATIO, 1f, uiState.ratio)
-    val wooferTargetDps = hornTargetDps / ratioFactor
-
-    // rememberUpdatedState so the LaunchedEffect always sees current targets
-    val currentHornTarget by rememberUpdatedState(hornTargetDps)
-    val currentWooferTarget by rememberUpdatedState(wooferTargetDps)
-
-    // Mutable state for physics simulation
-    var hornAngle by remember { mutableFloatStateOf(0f) }
-    var wooferAngle by remember { mutableFloatStateOf(0f) }
-    var hornVelocity by remember { mutableFloatStateOf(0f) }
-    var wooferVelocity by remember { mutableFloatStateOf(0f) }
-
-    // Frame-by-frame physics loop
-    LaunchedEffect(Unit) {
-        var lastNanos = 0L
-        while (true) {
-            withFrameNanos { frameNanos ->
-                if (lastNanos == 0L) { lastNanos = frameNanos; return@withFrameNanos }
-                val dt = (frameNanos - lastNanos) / 1_000_000_000f  // seconds
-                lastNanos = frameNanos
-
-                // Read current targets (updated via rememberUpdatedState)
-                val hornTarget = currentHornTarget
-                val wooferTarget = currentWooferTarget
-
-                // Exponential slew toward target velocity (different time constants for up/down)
-                val hornTau = if (hornTarget > hornVelocity) RAMP_UP_TAU else RAMP_DOWN_TAU
-                val wooferTau = if (wooferTarget > wooferVelocity) RAMP_UP_TAU else RAMP_DOWN_TAU
-                val hornAlpha = 1f - kotlin.math.exp(-dt / hornTau)
-                val wooferAlpha = 1f - kotlin.math.exp(-dt / wooferTau)
-
-                hornVelocity += hornAlpha * (hornTarget - hornVelocity)
-                wooferVelocity += wooferAlpha * (wooferTarget - wooferVelocity)
-
-                // Stop completely when velocity is negligible
-                if (hornVelocity < 0.5f && hornTarget == 0f) hornVelocity = 0f
-                if (wooferVelocity < 0.5f && wooferTarget == 0f) wooferVelocity = 0f
-
-                // Accumulate angle
-                hornAngle = (hornAngle + hornVelocity * dt) % 360f
-                wooferAngle = (wooferAngle + wooferVelocity * dt) % 360f
-            }
-        }
-    }
-
     CollapsibleColumnPanel(
         title = "HORN",
         expandedTitle = if (showExpandedTitle) "Leslie" else null,
@@ -158,6 +104,69 @@ fun HornPanel(
             SignalTrace(data = wooferPhaseViz, color = CrimsonWoofer)    // woofer rotor phase (slow sawtooth)
         }
     ) {
+        // ── Physics-based rotor animation ──────────────────────────────────
+        // Each rotor has a current velocity (deg/sec) that accelerates/decelerates
+        // toward a target velocity with realistic inertia. Angle accumulates each
+        // frame based on current velocity × dt.
+        //
+        // State + frame loop live INSIDE the content lambda so they only exist
+        // while the panel is expanded. Collapsed → loop stops → CPU saved.
+        // The state is held as MutableFloatState (not delegated `by`) so we
+        // pass the State *reference* into children — the Canvas reads
+        // .floatValue inside drawScope, which only invalidates the draw phase
+        // and never recomposes this composable.
+
+        val hornAngle = remember { mutableFloatStateOf(0f) }
+        val wooferAngle = remember { mutableFloatStateOf(0f) }
+        val hornVelocity = remember { mutableFloatStateOf(0f) }
+        val wooferVelocity = remember { mutableFloatStateOf(0f) }
+
+        val hornTargetDps = if (uiState.brake) 0f
+            else lerp(MIN_HORN_DEG_PER_SEC, MAX_HORN_DEG_PER_SEC, uiState.speed)
+        val ratioFactor = lerp(LESLIE_RATIO, 1f, uiState.ratio)
+        val wooferTargetDps = hornTargetDps / ratioFactor
+
+        // rememberUpdatedState so the long-running LaunchedEffect always sees
+        // the latest knob-derived targets without restarting the loop.
+        val currentHornTarget by rememberUpdatedState(hornTargetDps)
+        val currentWooferTarget by rememberUpdatedState(wooferTargetDps)
+
+        LaunchedEffect(Unit) {
+            var lastNanos = 0L
+            while (true) {
+                withFrameNanos { frameNanos ->
+                    if (lastNanos == 0L) { lastNanos = frameNanos; return@withFrameNanos }
+                    val dt = (frameNanos - lastNanos) / 1_000_000_000f
+                    lastNanos = frameNanos
+
+                    val hornTarget = currentHornTarget
+                    val wooferTarget = currentWooferTarget
+                    val hv = hornVelocity.floatValue
+                    val wv = wooferVelocity.floatValue
+
+                    // Fully at rest — nothing to compute, no state to update.
+                    if (hv == 0f && wv == 0f && hornTarget == 0f && wooferTarget == 0f) {
+                        return@withFrameNanos
+                    }
+
+                    val hornTau = if (hornTarget > hv) RAMP_UP_TAU else RAMP_DOWN_TAU
+                    val wooferTau = if (wooferTarget > wv) RAMP_UP_TAU else RAMP_DOWN_TAU
+                    val hornAlpha = 1f - kotlin.math.exp(-dt / hornTau)
+                    val wooferAlpha = 1f - kotlin.math.exp(-dt / wooferTau)
+
+                    var newHv = hv + hornAlpha * (hornTarget - hv)
+                    var newWv = wv + wooferAlpha * (wooferTarget - wv)
+                    if (newHv < 0.5f && hornTarget == 0f) newHv = 0f
+                    if (newWv < 0.5f && wooferTarget == 0f) newWv = 0f
+                    hornVelocity.floatValue = newHv
+                    wooferVelocity.floatValue = newWv
+
+                    hornAngle.floatValue = (hornAngle.floatValue + newHv * dt) % 360f
+                    wooferAngle.floatValue = (wooferAngle.floatValue + newWv * dt) % 360f
+                }
+            }
+        }
+
         // Dual rotor animation area — fixed width, centered
         Row(
             modifier = Modifier
@@ -170,8 +179,8 @@ fun HornPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ConcentricRingsAnimation(
-                hornAngle = hornAngle,
-                wooferAngle = wooferAngle,
+                hornAngleState = hornAngle,
+                wooferAngleState = wooferAngle,
                 speed = uiState.speed,
                 modifier = Modifier
                     .weight(1f)
@@ -179,8 +188,8 @@ fun HornPanel(
                     .padding(8.dp),
             )
             CabinetCrossSectionAnimation(
-                hornAngle = hornAngle,
-                wooferAngle = wooferAngle,
+                hornAngleState = hornAngle,
+                wooferAngleState = wooferAngle,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
@@ -258,15 +267,21 @@ fun HornPanel(
 
 @Composable
 private fun ConcentricRingsAnimation(
-    hornAngle: Float,
-    wooferAngle: Float,
+    hornAngleState: FloatState,
+    wooferAngleState: FloatState,
     speed: Float,
     modifier: Modifier = Modifier,
 ) {
-    // Trail length in degrees: 60° at slow, 150° at fast
+    // Trail length in degrees: 60° at slow, 150° at fast.
+    // Only changes when the user moves the SPEED knob — captured at composition.
     val trailDegrees = lerp(60f, 150f, speed)
 
     Canvas(modifier = modifier) {
+        // Read the angle States *inside* the draw scope so changes only
+        // invalidate the draw phase (not the composition).
+        val hornAngle = hornAngleState.floatValue
+        val wooferAngle = wooferAngleState.floatValue
+
         val cx = size.width / 2f
         val cy = size.height / 2f
         val minDim = minOf(size.width, size.height)
@@ -397,11 +412,15 @@ private fun DrawScope.drawRotorRing(
 
 @Composable
 private fun CabinetCrossSectionAnimation(
-    hornAngle: Float,
-    wooferAngle: Float,
+    hornAngleState: FloatState,
+    wooferAngleState: FloatState,
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier) {
+        // Reads inside the draw scope — see ConcentricRingsAnimation note.
+        val hornAngle = hornAngleState.floatValue
+        val wooferAngle = wooferAngleState.floatValue
+
         val w = size.width
         val h = size.height
 
@@ -452,11 +471,9 @@ private fun CabinetCrossSectionAnimation(
             strokeWidth = 1f,
         )
 
-        // Section label: HORN (top half)
-        val labelY = cabinetPadding + 10f
-        // We can't draw text on Canvas directly in common Compose; use the foreshortened rotor
-        // to visually identify the sections without text (text drawing requires platform APIs
-        // not available cross-platform in Canvas draw scope).
+        // No section labels — text drawing in Canvas needs platform APIs that
+        // aren't available cross-platform; the foreshortened rotor shapes
+        // alone visually distinguish the horn (top) from the woofer (bottom).
 
         // ─── Horn rotor (top half) ───
         // Foreshortening: rotor paddle appears to compress horizontally as it turns edge-on.

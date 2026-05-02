@@ -2,6 +2,7 @@ package org.balch.orpheus.features.visualizations.viz
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.withFrameNanos
@@ -24,16 +25,10 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * UI state for the lava lamp background.
- */
-data class LavaLampUiState(
-    val blobs: List<Blob> = emptyList(),
-    val lfoModulation: Float = 0f,    // -1 to 1, affects color hue shift
-    val masterEnergy: Float = 0f      // 0-1, overall brightness multiplier
-)
-
-/**
  * Lava Lamp visualization using Compose withFrameNanos for vsync-aligned animation.
+ * Holds three separate Compose States (blobs / lfo / master) so [VizBackground]
+ * can read them inside its drawScope — keeps animation ticks in the draw phase
+ * instead of recomposing this @Composable on every frame.
  */
 @Inject
 @ContributesIntoSet(FeatureScope::class, binding = binding<Visualization>())
@@ -90,8 +85,13 @@ class LavaLampViz(
     private val tearOffRadius: Float get() = tearOffRadiusBase * sizeMultiplier
     private val maxBlobRadius: Float get() = 0.18f * sizeMultiplier
 
-    // neverEqualPolicy: always recompose since blobs are mutated in-place
-    private val _uiState = mutableStateOf(LavaLampUiState(), neverEqualPolicy())
+    // Three separate States so VizBackground can read each one *inside* its
+    // drawScope — invalidating only the draw pass, not recomposing this
+    // @Composable on every animation tick. neverEqualPolicy on the blob list
+    // because it mutates in place; the float states change naturally.
+    private val _blobsState = mutableStateOf<List<Blob>>(emptyList(), neverEqualPolicy())
+    private val _lfoModulationState = mutableFloatStateOf(0f)
+    private val _masterEnergyState = mutableFloatStateOf(0f)
 
     override fun onActivate() {
         active = true
@@ -100,7 +100,9 @@ class LavaLampViz(
     override fun onDeactivate() {
         active = false
         blobs.clear()
-        _uiState.value = LavaLampUiState()
+        _blobsState.value = emptyList()
+        _lfoModulationState.floatValue = 0f
+        _masterEnergyState.floatValue = 0f
     }
 
     @Composable
@@ -123,21 +125,18 @@ class LavaLampViz(
 
                     updateBlobs(voiceLevels, masterLevel, lfoValue, dt)
 
-                    _uiState.value = LavaLampUiState(
-                        blobs = ArrayList(blobs),
-                        lfoModulation = lfoValue,
-                        masterEnergy = masterLevel
-                    )
+                    _blobsState.value = ArrayList(blobs)
+                    _lfoModulationState.floatValue = lfoValue
+                    _masterEnergyState.floatValue = masterLevel
                 }
             }
         }
 
-        val state = _uiState.value
         VizBackground(
             modifier = modifier,
-            blobs = state.blobs,
-            lfoModulation = state.lfoModulation,
-            masterEnergy = state.masterEnergy
+            blobsState = _blobsState,
+            lfoModulationState = _lfoModulationState,
+            masterEnergyState = _masterEnergyState,
         )
     }
 

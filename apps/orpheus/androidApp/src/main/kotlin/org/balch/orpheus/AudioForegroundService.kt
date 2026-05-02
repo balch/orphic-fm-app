@@ -28,18 +28,21 @@ import org.balch.orpheus.core.media.ForegroundServiceController
  * 
  * Features:
  * - App icon displayed in notifications and lock screen
- * - Mode-aware display (REPL/Drone/Solo/User)
- * - Cool color scheme with gradient-inspired theming
+ * - Subtitle reflects whatever the current MetadataProducer composes
+ *   (vibe name, AI mode, sleep timer countdown, etc.)
  */
 class AudioForegroundService : Service() {
-    
+
     private val log = logging("AudioForegroundService")
     private var mediaSession: MediaSessionCompat? = null
     private var albumArtBitmap: Bitmap? = null
     private var isPlaying = true
-    private var currentTitle = "Orpheus Synthesizer"
-    private var currentModeName = "Manual Play"
-    private var currentMode = "USER"
+    private var currentTitle = "Orpheus"
+    private var currentSubtitle = ""
+    // Set true once ACTION_STOP is processed. Defends against late
+    // startService intents (queued from updateMetadata/updatePlaybackState
+    // ricochets) re-promoting us back to foreground after teardown.
+    private var isShuttingDown = false
 
     companion object {
         const val NOTIFICATION_ID = 1
@@ -54,20 +57,12 @@ class AudioForegroundService : Service() {
         private val ACTION_UPDATE_STATE_PAUSED = ForegroundServiceController.ACTION_UPDATE_STATE_PAUSED
         private val ACTION_UPDATE_METADATA = ForegroundServiceController.ACTION_UPDATE_METADATA
         private val EXTRA_TITLE = ForegroundServiceController.EXTRA_TITLE
-        private val EXTRA_MODE = ForegroundServiceController.EXTRA_MODE
-        private val EXTRA_MODE_DISPLAY_NAME = ForegroundServiceController.EXTRA_MODE_DISPLAY_NAME
+        private val EXTRA_SUBTITLE = ForegroundServiceController.EXTRA_SUBTITLE
         private val EXTRA_IS_PLAYING = ForegroundServiceController.EXTRA_IS_PLAYING
 
         var actionHandler: ((String) -> Unit)? = null
 
-        private val MODE_COLORS = mapOf(
-            "USER" to Color.parseColor("#6B7FD7"),
-            "DRONE" to Color.parseColor("#7B68EE"),
-            "SOLO" to Color.parseColor("#9370DB"),
-            "REPL" to Color.parseColor("#00CED1")
-        )
-
-        private val DEFAULT_COLOR = Color.parseColor("#7B68EE")
+        private val ACCENT_COLOR = Color.parseColor("#7B68EE")
     }
     
     override fun onCreate() {
@@ -78,8 +73,13 @@ class AudioForegroundService : Service() {
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        log.info { "AudioForegroundService onStartCommand: action=${intent?.action}" }
-        
+        log.info { "AudioForegroundService onStartCommand: action=${intent?.action} shuttingDown=$isShuttingDown" }
+
+        if (isShuttingDown) {
+            log.debug { "Ignoring ${intent?.action} while shutting down" }
+            return START_NOT_STICKY
+        }
+
         // Handle media button actions
         when (intent?.action) {
             ACTION_PLAY -> {
@@ -96,6 +96,7 @@ class AudioForegroundService : Service() {
             }
             ACTION_STOP -> {
                 log.info { "Stop action received" }
+                isShuttingDown = true
                 actionHandler?.invoke("stop")
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
@@ -113,18 +114,16 @@ class AudioForegroundService : Service() {
             }
             ACTION_UPDATE_METADATA -> {
                 // Extract metadata from intent
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Orpheus Synthesizer"
-                val mode = intent.getStringExtra(EXTRA_MODE) ?: "USER"
-                val modeDisplayName = intent.getStringExtra(EXTRA_MODE_DISPLAY_NAME) ?: "Manual Play"
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Orpheus"
+                val subtitle = intent.getStringExtra(EXTRA_SUBTITLE) ?: ""
                 val intentIsPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, true)
 
-                log.debug { "Metadata update: title=$title, mode=$mode, displayName=$modeDisplayName, isPlaying=$intentIsPlaying" }
+                log.debug { "Metadata update: title=$title, subtitle=$subtitle, isPlaying=$intentIsPlaying" }
 
                 currentTitle = title
-                currentMode = mode
-                currentModeName = modeDisplayName
+                currentSubtitle = subtitle
                 isPlaying = intentIsPlaying
-                
+
                 updateMediaSessionMetadata()
                 updateNotification()
             }
@@ -160,7 +159,7 @@ class AudioForegroundService : Service() {
                 setShowBadge(false)
                 // Enable lights with our theme color
                 enableLights(true)
-                lightColor = DEFAULT_COLOR
+                lightColor = ACCENT_COLOR
             }
             
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -198,22 +197,13 @@ class AudioForegroundService : Service() {
         mediaSession?.setMetadata(
             MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentTitle)
-                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, getSubtitle())
-                .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, currentModeName)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentSubtitle)
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, albumArtBitmap)
                 .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, albumArtBitmap)
                 .build()
         )
     }
-    
-    private fun getSubtitle(): String {
-        return if (isPlaying) "Playing: $currentModeName" else "Paused: $currentModeName"
-    }
-    
-    private fun getModeColor(): Int {
-        return MODE_COLORS[currentMode] ?: DEFAULT_COLOR
-    }
-    
+
     fun updatePlaybackState(isPlaying: Boolean) {
         this.isPlaying = isPlaying
         
@@ -277,8 +267,7 @@ class AudioForegroundService : Service() {
         
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(currentTitle)
-            .setContentText(getSubtitle())
-            .setSubText(currentModeName)
+            .setContentText(currentSubtitle)
             .setSmallIcon(R.mipmap.ic_launcher_foreground)
             .setLargeIcon(albumArtBitmap)
             .setContentIntent(contentIntent)
@@ -289,7 +278,7 @@ class AudioForegroundService : Service() {
                     .setMediaSession(mediaSession?.sessionToken)
                     .setShowActionsInCompactView(0, 1)
             )
-            .setColor(getModeColor())  // Cool color scheme per mode
+            .setColor(ACCENT_COLOR)
             .setColorized(true)  // Enable colorized notification for media style
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

@@ -10,6 +10,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.djapp.DjApp
 
 class MainActivity : ComponentActivity() {
@@ -37,7 +38,11 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            DjApp(graph)
+            DjApp(graph) {
+                val controller = graph.playbackController
+                if (controller.state.value == PlaybackState.Playing) controller.pause()
+                else controller.play()
+            }
         }
     }
 }

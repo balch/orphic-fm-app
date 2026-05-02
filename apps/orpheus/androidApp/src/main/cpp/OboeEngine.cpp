@@ -113,6 +113,7 @@ void OboeEngine::onErrorAfterClose(oboe::AudioStream* stream, oboe::Result error
         oboe::Result result = openStream();
         if (result == oboe::Result::OK) {
             int32_t new_sr = mStream->getSampleRate();
+            bool engineRecreated = false;
             // Recreate DSP engine if sample rate changed (e.g. speaker → Bluetooth).
             // Atomically null the pointer BEFORE destroying to prevent use-after-free
             // from concurrent JNI calls (getMonitor, setPort, etc.).
@@ -123,13 +124,18 @@ void OboeEngine::onErrorAfterClose(oboe::AudioStream* stream, oboe::Result error
                 dsp_engine_.store(orpheus_engine_create(static_cast<float>(new_sr)),
                                   std::memory_order_release);
                 mCreatedSampleRate = new_sr;
-                // NOTE: graph must be reloaded from Kotlin side after engine recreation.
-                // The new engine has no graph — audio will be silent until nativeLoadGraph.
+                engineRecreated = true;
             }
             mIsRunning.store(true);
             mStream->requestStart();
             LOGI("Stream reopened: sampleRate=%d, framesPerBurst=%d",
                  new_sr, mStream->getFramesPerBurst());
+            // Notify Kotlin to reload the graph + re-push port state into the
+            // brand-new engine. Without this, audio stays silent: the new
+            // engine has no graph and no port writes have hit it yet.
+            if (engineRecreated && mEngineRecreatedCallback) {
+                mEngineRecreatedCallback();
+            }
         }
     }
 }

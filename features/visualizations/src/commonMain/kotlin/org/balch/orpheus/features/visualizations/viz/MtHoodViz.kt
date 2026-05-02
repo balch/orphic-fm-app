@@ -229,10 +229,12 @@ class MtHoodViz(
             }
         }
 
-        val state = _uiState.value
         val sunsetT = _sunsetKnob
 
         Canvas(modifier = modifier.fillMaxSize()) {
+            // Read inside drawScope so per-frame _uiState writes only invalidate
+            // the draw pass, not recompose this @Composable.
+            val state = _uiState.value
             drawSky(sunsetT, state.lfoModulation, state.time)
             drawSunGlow(sunsetT, state.eruptionLevel)
             drawBackRidge()

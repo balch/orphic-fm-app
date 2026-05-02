@@ -252,10 +252,10 @@ class BlackHoleSunViz(
             }
         }
 
-        val state = _uiState.value
-
         Canvas(modifier = modifier.fillMaxSize()) {
-            drawBlackholeSun(state)
+            // Read inside drawScope so per-frame _uiState writes only invalidate
+            // the draw pass, not recompose this @Composable.
+            drawBlackholeSun(_uiState.value)
         }
     }
 

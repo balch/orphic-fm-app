@@ -133,6 +133,11 @@ class PulsarPlugin : DspPlugin {
     private val _trackFillType = IntArray(8) { 1 }  // ASCENDING_ARP
     private val _trackFillSkipProb = FloatArray(8) { 0.0f }
     private val _trackChordFollow = IntArray(8) { 0 }  // default FOLLOW
+    // LPG: default 3 = LPG_ENGINE_DEFAULT (per-engine table). Decay/colour 0.5 mid.
+    private val _trackLpgMode      = IntArray(8) { 3 }
+    private val _trackLpgModeSpace = IntArray(8) { 3 }
+    private val _trackLpgDecay     = FloatArray(8) { 0.5f }
+    private val _trackLpgColour    = FloatArray(8) { 0.5f }
 
     private val portDefs = ports(startIndex = 0) {
         controlPort(PulsarSymbol.PLAYING) {
@@ -560,6 +565,28 @@ class PulsarPlugin : DspPlugin {
         for (t in 0..7) {
             controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_CHORD_FOLLOW.ordinal + t]) {
                 intType { default = 0; get { _trackChordFollow[t] }; set { _trackChordFollow[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_MODE.ordinal + t]) {
+                intType { default = 3; get { _trackLpgMode[t] }; set { _trackLpgMode[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_MODE_SPACE.ordinal + t]) {
+                intType { default = 3; get { _trackLpgModeSpace[t] }; set { _trackLpgModeSpace[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_DECAY.ordinal + t]) {
+                floatType { default = 0.5f; min = 0f; max = 1f
+                    get { _trackLpgDecay[t] }; set { _trackLpgDecay[t] = it } }
+            }
+        }
+        for (t in 0..7) {
+            controlPort(PulsarSymbol.entries[PulsarSymbol.TRACK_0_LPG_COLOUR.ordinal + t]) {
+                floatType { default = 0.5f; min = 0f; max = 1f
+                    get { _trackLpgColour[t] }; set { _trackLpgColour[t] = it } }
             }
         }
     }

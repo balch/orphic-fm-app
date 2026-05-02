@@ -18,9 +18,6 @@ import org.balch.orpheus.core.controller.SynthController
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.features.FeatureCoroutineScope
 import org.balch.orpheus.core.features.PulsarPlaybackMode
-import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
-import org.balch.orpheus.core.media.MediaSessionManager
-import org.balch.orpheus.core.media.MediaSessionStateManager
 import org.balch.orpheus.core.plugin.PortValue
 import org.balch.orpheus.core.plugin.viz.ARRANGEMENT_STATE_UNKNOWN
 import org.balch.orpheus.core.plugin.viz.PulsarArrangementState
@@ -91,9 +88,6 @@ class PulsarSectionBpmTest {
             dispatcherProvider = TestDispatchers(testDispatcher),
             scope = FeatureCoroutineScope(),
             vibeProviders = setOf(SectionedVibeProvider(vibe)),
-            mediaSessionStateManager = MediaSessionStateManager(),
-            mediaSessionManager = MediaSessionManager(),
-            playbackLifecycleManager = PlaybackLifecycleManager(),
             playbackMode = PulsarPlaybackMode.EXPLICIT,
         )
     }

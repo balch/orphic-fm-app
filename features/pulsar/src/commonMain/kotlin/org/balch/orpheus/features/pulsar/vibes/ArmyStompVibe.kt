@@ -195,8 +195,9 @@ class ArmyStompVibe : VibeProvider {
             // noteRangeHigh dropped to B2 keeps it from climbing into the lead's
             // E3 floor (see Path B note on the squash lead below).
             TrackVoice(
-                engineEdm = Engine.VCF,
-                engineSpace = Engine.VA,
+                engineEdm = Engine.PD,
+                engineSpace = Engine.DX,
+                harmonics = .05f, // Mooger Low
                 role = TrackRole.Melodic(chordFollow = ChordFollow.ROOT_ONLY),
                 volume = 0.85f,
                 pan = 0.00f,
@@ -219,8 +220,9 @@ class ArmyStompVibe : VibeProvider {
             // idx 31 "Br trumpet" — clean spectral separation but lost the
             // unified filter-sweep palette that defines the vibe's character.)
             TrackVoice(
-                engineEdm = Engine.VCF,
-                engineSpace = Engine.STR,
+                engineEdm = Engine.DX2, // Fender
+                engineSpace = Engine.DX3, // Hammond
+                harmonics = .05f,
                 role = TrackRole.Melodic(lickMode = LickMode.Squash),
                 volume = 0.60f,
                 pan = 0.20f,
@@ -261,7 +263,7 @@ class ArmyStompVibe : VibeProvider {
                 engineEdm = Engine.NSE,
                 engineSpace = Engine.PAR,
                 role = TrackRole.Percussive,
-                volume = 0.20f,
+                volume = 0.30f,
                 pan = -0.30f,
                 density = 0.10f,
                 envelopeProfile = EnvelopeProfile.EFFECT,

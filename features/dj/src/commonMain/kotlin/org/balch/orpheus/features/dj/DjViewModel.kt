@@ -8,9 +8,11 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -245,66 +247,62 @@ class DjViewModel(
     private var currentWetA = 0f
     private var currentWetB = 0f
 
-    init {
-        // Physics simulation at ~60Hz — drives velocity/frozen to C++ engine.
-        // Gated on mix > 0 or active touch to avoid unnecessary setPort calls when DJ is off.
-        scope.launch(dispatchers.default) {
-            while (true) {
-                delay(16)
+    private val physicsTickFlow: Flow<DjIntent.PhysicsTick> = flow {
+        while (true) {
+            delay(16)
 
-                val deckAActive = currentWetA > kMixBypassThreshold || touchingA
-                val deckBActive = currentWetB > kMixBypassThreshold || touchingB
+            val deckAActive = currentWetA > kMixBypassThreshold || touchingA
+            val deckBActive = currentWetB > kMixBypassThreshold || touchingB
 
-                // Skip physics when both decks are fully dry and nobody is touching
-                if (!deckAActive && !deckBActive) continue
+            // Skip physics when both decks are fully dry and nobody is touching
+            if (!deckAActive && !deckBActive) continue
 
-                // Deck A — only run physics when this deck is active.
-                // Motor target while the finger is lifted: DROP_MOTOR_SPEED when a drop
-                // is locked, MOTOR_SPEED (normal playback) otherwise. While the finger
-                // is down, the drag velocity wins — holding still at the fader deadspot
-                // (drag == 0) lerps the platter toward 0, so the deadspot feels like a
-                // brake rather than a phantom motor boost.
-                if (deckAActive) {
-                    val motorTargetA = if (lockedDropA) DROP_MOTOR_SPEED else MOTOR_SPEED
-                    val motorRampA = if (lockedDropA) LOCKED_MOTOR_RAMP else MOTOR_DECAY
-                    if (touchingA) {
-                        currentVelocityA = lerp(currentVelocityA, dragVelocityA, SCRATCH_RESPONSE)
-                    } else {
-                        currentVelocityA = lerp(currentVelocityA, motorTargetA, motorRampA)
-                    }
-                    setVelocityA(currentVelocityA)
-                    setFrozenA(touchingA || lockedA)
+            // Deck A — only run physics when this deck is active.
+            // Motor target while the finger is lifted: DROP_MOTOR_SPEED when a drop
+            // is locked, MOTOR_SPEED (normal playback) otherwise. While the finger
+            // is down, the drag velocity wins — holding still at the fader deadspot
+            // (drag == 0) lerps the platter toward 0, so the deadspot feels like a
+            // brake rather than a phantom motor boost.
+            if (deckAActive) {
+                val motorTargetA = if (lockedDropA) DROP_MOTOR_SPEED else MOTOR_SPEED
+                val motorRampA = if (lockedDropA) LOCKED_MOTOR_RAMP else MOTOR_DECAY
+                if (touchingA) {
+                    currentVelocityA = lerp(currentVelocityA, dragVelocityA, SCRATCH_RESPONSE)
+                } else {
+                    currentVelocityA = lerp(currentVelocityA, motorTargetA, motorRampA)
                 }
-
-                // Deck B — same rules as deck A.
-                if (deckBActive) {
-                    val motorTargetB = if (lockedDropB) DROP_MOTOR_SPEED else MOTOR_SPEED
-                    val motorRampB = if (lockedDropB) LOCKED_MOTOR_RAMP else MOTOR_DECAY
-                    if (touchingB) {
-                        currentVelocityB = lerp(currentVelocityB, dragVelocityB, SCRATCH_RESPONSE)
-                    } else {
-                        currentVelocityB = lerp(currentVelocityB, motorTargetB, motorRampB)
-                    }
-                    setVelocityB(currentVelocityB)
-                    setFrozenB(touchingB || lockedB)
-                }
-
-                // Emit to MVI so UiState reflects velocity/frozen for UI display
-                // Inactive decks report 0 velocity so platters don't spin
-                physicsIntentFlow.tryEmit(
-                    DjIntent.PhysicsTick(
-                        velocityA = if (deckAActive) currentVelocityA else 0f,
-                        velocityB = if (deckBActive) currentVelocityB else 0f,
-                        frozenA = touchingA || lockedA,
-                        frozenB = touchingB || lockedB,
-                    )
-                )
+                setVelocityA(currentVelocityA)
+                setFrozenA(touchingA || lockedA)
             }
+
+            // Deck B — same rules as deck A.
+            if (deckBActive) {
+                val motorTargetB = if (lockedDropB) DROP_MOTOR_SPEED else MOTOR_SPEED
+                val motorRampB = if (lockedDropB) LOCKED_MOTOR_RAMP else MOTOR_DECAY
+                if (touchingB) {
+                    currentVelocityB = lerp(currentVelocityB, dragVelocityB, SCRATCH_RESPONSE)
+                } else {
+                    currentVelocityB = lerp(currentVelocityB, motorTargetB, motorRampB)
+                }
+                setVelocityB(currentVelocityB)
+                setFrozenB(touchingB || lockedB)
+            }
+
+            emit(
+                DjIntent.PhysicsTick(
+                    velocityA = if (deckAActive) currentVelocityA else 0f,
+                    velocityB = if (deckBActive) currentVelocityB else 0f,
+                    frozenA = touchingA || lockedA,
+                    frozenB = touchingB || lockedB,
+                )
+            )
         }
     }
+    .flowOn(dispatchers.default)
 
     // Control changes + physics -> DjIntent
     private val controlIntents = merge(
+        physicsTickFlow,
         physicsIntentFlow,
         wetAId.map { DjIntent.SetWetA(it.asFloat()) },
         wetBId.map { DjIntent.SetWetB(it.asFloat()) },
@@ -326,7 +324,7 @@ class DjViewModel(
             .scan(DjUiState()) { state, intent ->
                 reduce(state, intent)
             }
-            .flowOn(dispatchers.io)
+            .flowOn(dispatchers.default)
             .stateIn(
                 scope = scope,
                 started = this.sharingStrategy,

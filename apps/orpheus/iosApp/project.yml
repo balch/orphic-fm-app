@@ -2,7 +2,7 @@ name: OrpheusApp
 options:
   bundleIdPrefix: org.balch.orpheus
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "15.0"
 settings:
   # Set your Apple team ID here, then run: xcodegen generate
   DEVELOPMENT_TEAM: ""

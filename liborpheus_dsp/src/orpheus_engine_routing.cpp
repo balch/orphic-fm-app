@@ -829,6 +829,14 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
                 engine->pulsar_track_evo_tension_resp[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "chord_follow") == 0)
                 engine->pulsar_track_chord_follow[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "lpg_mode") == 0)
+                engine->pulsar_track_lpg_mode[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "lpg_mode_space") == 0)
+                engine->pulsar_track_lpg_mode_space[t].store(static_cast<int>(value), std::memory_order_relaxed);
+            else if (std::strcmp(param, "lpg_decay") == 0)
+                engine->pulsar_track_lpg_decay[t].store(value, std::memory_order_relaxed);
+            else if (std::strcmp(param, "lpg_colour") == 0)
+                engine->pulsar_track_lpg_colour[t].store(value, std::memory_order_relaxed);
             else if (std::strcmp(param, "evo_note_follow") == 0)
                 engine->pulsar_track_evo_note_follow[t].store(static_cast<int>(value), std::memory_order_relaxed);
             else if (std::strcmp(param, "evo_pitch_mode") == 0)
@@ -968,6 +976,26 @@ void orpheus_engine_set_port(OrpheusEngine* engine,
             int idx = std::atoi(symbol + 13);
             if (idx >= 0 && idx < 8 * 21)
                 engine->pulsar_section_data[idx].store(value, std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_track_comping_", 22) == 0) {
+            int idx = std::atoi(symbol + 22);
+            if (idx >= 0 && idx < 8 * 8)
+                engine->pulsar_section_track_comping_style[idx].store(static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_track_inversion_", 24) == 0) {
+            int idx = std::atoi(symbol + 24);
+            if (idx >= 0 && idx < 8 * 8)
+                engine->pulsar_section_track_inversion[idx].store(static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_track_arp_mode_", 23) == 0) {
+            int idx = std::atoi(symbol + 23);
+            if (idx >= 0 && idx < 8 * 8)
+                engine->pulsar_section_track_arp_mode[idx].store(static_cast<int>(value), std::memory_order_relaxed);
+        }
+        else if (std::strncmp(symbol, "section_track_chord_follow_", 27) == 0) {
+            int idx = std::atoi(symbol + 27);
+            if (idx >= 0 && idx < 8 * 8)
+                engine->pulsar_section_track_chord_follow[idx].store(static_cast<int>(value), std::memory_order_relaxed);
         }
         else if (std::strncmp(symbol, "section_transitions_", 20) == 0) {
             int idx = std::atoi(symbol + 20);

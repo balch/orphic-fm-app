@@ -185,6 +185,7 @@ if(BUILD_TESTS)
         test/test_main.cpp
         test/test_units.cpp
         test/test_voices.cpp
+        test/test_lpg.cpp
         test/test_engine_render.cpp
         test/test_effects.cpp
         test/test_graph.cpp
@@ -215,7 +216,6 @@ if(BUILD_TESTS)
         test/test_pulsar_comping.cpp
         test/test_pulsar_signal_quality.cpp
         test/test_pulsar_tension.cpp
-        test/test_pulsar_motifs.cpp
         test/test_pulsar_solos.cpp
         test/test_pulsar_sections.cpp
         test/test_oboe_buffer.cpp

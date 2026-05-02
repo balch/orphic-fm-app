@@ -230,9 +230,10 @@ class GalaxyViz(
             }
         }
 
-        val state = _uiState.value
-
         Canvas(modifier = modifier.fillMaxSize()) {
+            // Read inside drawScope so per-frame _uiState writes only invalidate
+            // the draw pass, not recompose this @Composable.
+            val state = _uiState.value
             val w = size.width
             val h = size.height
             val cx = w / 2f

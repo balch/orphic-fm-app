@@ -4,6 +4,22 @@
 
 static OboeEngine sEngine;
 
+// JVM + global ref for the engine-recreated callback. Stored in C++ so the
+// callback survives the JNI call that registered it. The Runnable.run()
+// method is invoked from Oboe's error thread when the DSP engine is rebuilt.
+static JavaVM* sCallbackJvm = nullptr;
+static jobject sEngineRecreatedRunnable = nullptr;
+
+static JNIEnv* attachToJvm() {
+    if (!sCallbackJvm) return nullptr;
+    JNIEnv* env = nullptr;
+    int status = sCallbackJvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (status == JNI_EDETACHED) {
+        sCallbackJvm->AttachCurrentThread(&env, nullptr);
+    }
+    return env;
+}
+
 extern "C" {
 
 JNIEXPORT jint JNICALL
@@ -295,6 +311,28 @@ JNIEXPORT jint JNICALL
 Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeIsTtsPlaying(
         JNIEnv *env, jobject thiz) {
     return sEngine.isTtsPlaying();
+}
+
+JNIEXPORT void JNICALL
+Java_org_balch_orpheus_core_audio_dsp_OboeAudioBridge_nativeSetEngineRecreatedCallback(
+        JNIEnv *env, jobject thiz, jobject runnable) {
+    env->GetJavaVM(&sCallbackJvm);
+    if (sEngineRecreatedRunnable) {
+        env->DeleteGlobalRef(sEngineRecreatedRunnable);
+        sEngineRecreatedRunnable = nullptr;
+    }
+    if (runnable == nullptr) {
+        sEngine.setEngineRecreatedCallback(nullptr);
+        return;
+    }
+    sEngineRecreatedRunnable = env->NewGlobalRef(runnable);
+    sEngine.setEngineRecreatedCallback([]() {
+        JNIEnv* e = attachToJvm();
+        if (!e || !sEngineRecreatedRunnable) return;
+        jclass cls = e->GetObjectClass(sEngineRecreatedRunnable);
+        jmethodID run = e->GetMethodID(cls, "run", "()V");
+        if (run) e->CallVoidMethod(sEngineRecreatedRunnable, run);
+    });
 }
 
 } // extern "C"

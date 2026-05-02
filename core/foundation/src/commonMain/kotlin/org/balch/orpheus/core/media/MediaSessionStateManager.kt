@@ -4,14 +4,12 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import org.balch.orpheus.core.coroutines.AppCoroutineScope
 
 /**
  * Source of audio activity that can require MediaSession to be active.
@@ -41,12 +39,13 @@ enum class AudioActivitySource {
  */
 @SingleIn(AppScope::class)
 @Inject
-class MediaSessionStateManager {
+class MediaSessionStateManager(private val scope: AppCoroutineScope) {
     private val log = logging("MediaSessionStateManager")
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     
     // Individual activity states
     private val _isEvoActive = MutableStateFlow(false)
+    /** Evo activity, exposed for metadata producers that want a display chip. */
+    val isEvoActive: StateFlow<Boolean> = _isEvoActive.asStateFlow()
     private val _isReplPlaying = MutableStateFlow(false)
     private val _isDroneActive = MutableStateFlow(false)
     private val _isSoloActive = MutableStateFlow(false)

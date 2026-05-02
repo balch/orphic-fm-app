@@ -33,16 +33,26 @@ fun VizBackground(
     }
 }
 
-// Keeping this for LavaLampViz to use as a helper composable
+/**
+ * Helper composable for LavaLamp-style blob viz. Takes State references —
+ * not values — so 60Hz updates inside the State only invalidate this
+ * Canvas's draw phase, not the caller's composition. The previous overload
+ * that took bare values caused the entire LavaLampViz composable to
+ * recompose every frame.
+ */
 @Composable
 fun VizBackground(
     modifier: Modifier = Modifier,
-    blobs: List<Blob>,
-    lfoModulation: Float,
-    masterEnergy: Float
+    blobsState: androidx.compose.runtime.State<List<Blob>>,
+    lfoModulationState: androidx.compose.runtime.FloatState,
+    masterEnergyState: androidx.compose.runtime.FloatState,
 ) {
-    // Shared drawing logic for Lava Lamp style blobs
     Canvas(modifier = modifier.fillMaxSize()) {
+        // Reads happen inside drawScope: invalidates only the draw pass.
+        val blobs = blobsState.value
+        val lfoModulation = lfoModulationState.floatValue
+        val masterEnergy = masterEnergyState.floatValue
+
         // Subtle gradient background
         drawRect(
             brush = Brush.verticalGradient(
@@ -52,8 +62,7 @@ fun VizBackground(
                 )
             )
         )
-        
-        // Draw ambient glow based on master energy
+
         if (masterEnergy > 0.01f) {
             drawAmbientGlow(
                 width = size.width,
@@ -66,8 +75,7 @@ fun VizBackground(
         blobs.forEach { blob ->
             drawBlob(blob, size.width, size.height)
         }
-        
-        // Optional overlay based on master energy
+
         if (masterEnergy > 0.1f) {
             drawRect(
                 color = Color.White.copy(alpha = masterEnergy * 0.05f)

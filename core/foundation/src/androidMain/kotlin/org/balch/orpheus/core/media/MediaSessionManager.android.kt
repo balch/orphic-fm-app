@@ -19,11 +19,6 @@ actual class MediaSessionManager(
     private val log = logging("MediaSessionManager")
     private var handler: MediaSessionActionHandler? = null
     private var isActive = false
-    actual var onSkipNext: (() -> Unit)? = null
-    actual var onSkipPrevious: (() -> Unit)? = null
-    actual var onPlay: (() -> Unit)? = null
-    actual var onPause: (() -> Unit)? = null
-    actual var onPlayFromMediaId: ((String) -> Unit)? = null
 
     actual fun activate() {
         if (isActive) return
@@ -34,22 +29,16 @@ actual class MediaSessionManager(
         foregroundServiceController.actionHandler = { action ->
             log.debug { "Received action from service: $action" }
             when (action) {
-                "play" -> {
-                    val customHandler = onPlay
-                    if (customHandler != null) customHandler() else handler?.onPlay()
-                }
-                "pause" -> {
-                    val customHandler = onPause
-                    if (customHandler != null) customHandler() else handler?.onPause()
-                }
+                "play" -> handler?.onPlay()
+                "pause" -> handler?.onPause()
                 "stop" -> handler?.onStop()
-                "skipNext" -> onSkipNext?.invoke() ?: handler?.onSkipNext()
-                "skipPrevious" -> onSkipPrevious?.invoke() ?: handler?.onSkipPrevious()
+                "skipNext" -> handler?.onSkipNext()
+                "skipPrevious" -> handler?.onSkipPrevious()
             }
         }
         foregroundServiceController.playFromMediaIdHandler = { mediaId ->
             log.debug { "Received playFromMediaId: $mediaId" }
-            onPlayFromMediaId?.invoke(mediaId)
+            handler?.onPlayFromMediaId(mediaId)
         }
 
         foregroundServiceController.start()
@@ -82,13 +71,13 @@ actual class MediaSessionManager(
     
     actual fun updateMetadata(metadata: PlaybackMetadata) {
         if (!isActive) return
-        
-        log.debug { "Updating metadata: mode=${metadata.mode}, isPlaying=${metadata.isPlaying}" }
+
+        log.debug { "Updating metadata: title=${metadata.title}, isPlaying=${metadata.isPlaying}" }
         foregroundServiceController.updateMetadata(
             title = metadata.title,
-            mode = metadata.mode.name,
-            modeDisplayName = metadata.displaySubtitle,
+            subtitle = metadata.subtitle,
             isPlaying = metadata.isPlaying
         )
     }
+
 }

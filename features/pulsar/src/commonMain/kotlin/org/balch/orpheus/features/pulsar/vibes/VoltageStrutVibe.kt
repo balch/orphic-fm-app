@@ -4,6 +4,7 @@ import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import org.balch.orpheus.core.di.FeatureScope
+import org.balch.orpheus.features.pulsar.Album
 import org.balch.orpheus.features.pulsar.Arrangement
 import org.balch.orpheus.features.pulsar.Band
 import org.balch.orpheus.features.pulsar.BandMember
@@ -53,6 +54,7 @@ import org.balch.orpheus.features.pulsar.row
 class VoltageStrutVibe : VibeProvider {
     override val vibe = Vibe(
         name = "Voltage Strut",
+        album = Album.RIF,
         bpm = 126f,
         envelopeType = EnvelopeType.AD,
         rootNote = RootNote.A,

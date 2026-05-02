@@ -30,22 +30,11 @@ expect class MediaSessionManager {
      * This updates what is displayed in notifications and lock screen.
      */
     fun updateMetadata(metadata: PlaybackMetadata)
-    
+
     /**
      * Set the handler for media button actions (play/pause/stop).
      */
     fun setActionHandler(handler: MediaSessionActionHandler)
-    var onSkipNext: (() -> Unit)?
-    var onSkipPrevious: (() -> Unit)?
-    var onPlay: (() -> Unit)?
-    var onPause: (() -> Unit)?
-
-    /**
-     * Invoked when a browsable media client (e.g., Android Auto) asks to play
-     * a specific media item. The string is the media id selected in the
-     * browsable tree. Only wired on Android; no-op on other platforms.
-     */
-    var onPlayFromMediaId: ((String) -> Unit)?
 }
 
 /**
@@ -57,4 +46,5 @@ interface MediaSessionActionHandler {
     fun onStop()
     fun onSkipNext() {}
     fun onSkipPrevious() {}
+    fun onPlayFromMediaId(mediaId: String) {}
 }

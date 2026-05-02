@@ -224,9 +224,10 @@ class AntColonyViz(
             }
         }
 
-        val state = _uiState.value
-
         Canvas(modifier = modifier.fillMaxSize()) {
+            // Read inside drawScope so per-frame _uiState writes only invalidate
+            // the draw pass, not recompose this @Composable.
+            val state = _uiState.value
             drawBackground()
             drawGroundPlane()
             drawBlocks(grid, voiceColors, duoLevels, smoothedMaster, smoothedLfo)

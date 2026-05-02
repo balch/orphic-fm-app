@@ -122,16 +122,16 @@ fun PulsarStepGrid(
     val trackGap = 4f
 
     val particlePool = remember { GridParticlePool() }
-    var wavePhase by remember { mutableFloatStateOf(0f) }
     var beatPulse by remember { mutableFloatStateOf(1f) }
     val prevPlayheads = remember { IntArray(NUM_TRACKS) { -1 } }
     val smoothedLevels = remember { FloatArray(NUM_TRACKS) }
     // Running peak per track for stable waveform normalization (slow decay)
     val trackPeaks = remember { FloatArray(NUM_TRACKS) { 0.1f } }
-    // Collect per-track waveform data from viz flows
-    val trackWaveforms = Array(NUM_TRACKS) { t ->
-        trackVizFlows[t].collectAsState().value
-    }
+    // Per-track waveform State references. `.value` is intentionally NOT read
+    // in the composition phase — every flow emission would otherwise recompose
+    // the entire grid (8 audio-buffer-rate flows ≫ 60Hz). Reads happen inside
+    // the waveform Canvas's drawScope below, which invalidates only the draw.
+    val trackWaveformStates = trackVizFlows.map { it.collectAsState() }
 
     LaunchedEffect(Unit) {
         var lastNanos = 0L
@@ -141,7 +141,6 @@ fun PulsarStepGrid(
                 else ((nanos - lastNanos) / 1_000_000_000f).coerceIn(0.001f, 0.1f)
                 lastNanos = nanos
                 particlePool.update(dt)
-                wavePhase += dt * 2f
                 if (beatPulse > 1f) beatPulse = (beatPulse - dt * 15f).coerceAtLeast(1f)
 
                 // Smooth track levels: fast attack (~10ms), slow decay (~300ms)
@@ -421,7 +420,8 @@ fun PulsarStepGrid(
 
             for (track in 0 until NUM_TRACKS) {
                 if (vizData.stepCounts[track] < 2) continue
-                val data = trackWaveforms[track]
+                // Read inside drawScope so flow emissions only invalidate this draw.
+                val data = trackWaveformStates[track].value
                 if (data.isEmpty()) continue
 
                 val trackY = track * (trackHeight + trackGap)

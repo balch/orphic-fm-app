@@ -40,6 +40,7 @@ fun DjAppNavScaffold(
     isLandscape: Boolean,
     pulsarFeature: PulsarFeature,
     timerFeature: TimerFeature,
+    onTogglePlayback: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -63,7 +64,7 @@ fun DjAppNavScaffold(
 
             fun addPlayPause() = item(
                 selected = false,
-                onClick = pulsarFeature.actions.toggleGlobalPause,
+                onClick = onTogglePlayback,
                 icon = { Icon(playIcon, contentDescription = playLabel, tint = OrpheusColors.cosmicPurple) },
                 label = { Text(playLabel, style = MaterialTheme.typography.labelSmall, color = OrpheusColors.cosmicPurple) },
             )

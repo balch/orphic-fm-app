@@ -269,6 +269,28 @@ enum class ChordFollow {
 }
 
 /**
+ * Per-track low-pass gate mode. Models the vactrol-based LPG that hardware Plaits
+ * applies after engine rendering. Orpheus bypasses Plaits' built-in LPG and lets
+ * each [TrackVoice] opt in.
+ *
+ * The default ([null] in [TrackVoice.lpgMode]) consults the per-engine table
+ * `kOrpheusLpgDefault[]` in `orpheus_voice.h` — drums and self-enveloped engines
+ * (DX, String, Modal, BassDrum, etc.) bypass; raw oscillator engines
+ * (Waveshaping, VirtualAnalog, FM) default to [PLUCK] for an articulate attack.
+ */
+@Serializable
+enum class LpgMode(val id: Int) {
+    /** Skip the LPG. Raw engine output, no envelope/filter shaping. */
+    BYPASS(0),
+    /** Vactrol follows the gate — open while held, natural decay on release. */
+    SUSTAINED(1),
+    /** Vactrol bloom on note-on, asymmetric decay regardless of gate length. */
+    PLUCK(2),
+    /** Sentinel — resolved to per-engine default in C++. */
+    ENGINE_DEFAULT(3);
+}
+
+/**
  * Track behavior role — determines pattern generation, pitch handling, and which
  * evolution dimensions are available. Role-specific fields live on their subclass,
  * so invalid combinations (e.g. percussive tracks with comping) are unrepresentable.
@@ -620,6 +642,25 @@ data class TrackVoice(
     val reverbBrightness: Float = 0.5f,
     val delayFeedback: Float? = null,
     val glideRate: Float = 0.0f,
+    /**
+     * Per-track LPG mode applied when [engineEdm] is the active engine.
+     * `null` (default) consults the per-engine default table in
+     * `orpheus_voice.h`. Set explicitly to override — e.g. force `BYPASS`
+     * on a Modal-engine drone, or force `PLUCK` on a Modal-engine stab.
+     */
+    val lpgMode: LpgMode? = null,
+    /**
+     * LPG mode applied when [engineSpace] is the active engine. `null`
+     * (default) inherits from [lpgMode] — the common case is a single mode
+     * for both slots. Set explicitly when the two engines need different
+     * behavior (e.g. `lpgMode = PLUCK` for a raw `WSH` bass + `lpgModeSpace
+     * = BYPASS` for a `STR` drone that should ride its own physical envelope).
+     */
+    val lpgModeSpace: LpgMode? = null,
+    /** LPG decay length, 0..1. Longer = slower vactrol tail. Shared across slots. */
+    val lpgDecay: Float = 0.5f,
+    /** LPG colour (HF bleed), 0..1. 0 = dark/closed, 1 = bright/open. Shared across slots. */
+    val lpgColour: Float = 0.5f,
     val evolution: Evolution = Evolution(),
 )
 
@@ -804,6 +845,12 @@ data class TensionProfile(
     val spurtChance: Float = 0.0f,  // per-bar random spurt probability (0 = tension-only)
 )
 
+enum class Album(val title: String) {
+    STEALTH("Stealth"),
+    RIF("RIF"),
+    ZERO_TO_ONE("0-2-1"),
+}
+
 /**
  * A complete beat machine preset — the top-level unit of Pulsar.
  * Defines 8 tracks, a musical key, tempo, macro defaults, effects, and tension arc.
@@ -842,6 +889,7 @@ data class TensionProfile(
 @Serializable
 data class Vibe(
     val name: String,
+    val album: Album = Album.STEALTH,
     val tracks: List<TrackVoice>,
     val lick: Lick? = null,
     val lickMutation: Float = 0.5f,
@@ -1215,58 +1263,52 @@ sealed class SoloMode {
 
 
 /**
- * A named rhythmic pattern that can be swapped in during a section.
- * Used in [MotifSet] for pattern variation within a section.
+ * Per-track parameter overrides scoped to a single [Section].
  *
- * @param name Display name (e.g., "driving", "halftime", "breakdown").
- * @param trackPatterns Per-track step patterns: map of track index to step velocities.
- *   Each list has one float per step (0.0 = rest, 0.0-1.0 = velocity).
- * @param swingOverride Override the genre's swing amount for this motif.
- * @param ghostProbability Override ghost note probability for this motif.
- * @param rhythmPattern Override rhythm pattern index for this motif.
- */
-@Serializable
-data class BeatMotif(
-    val name: String,
-    val trackPatterns: Map<Int, List<Float>> = emptyMap(),
-    val swingOverride: Float? = null,
-    val ghostProbability: Float? = null,
-    val rhythmPattern: Int? = null,
-)
-
-/**
- * A collection of [BeatMotif]s that a section can switch between for variety.
+ * Each field is nullable; null means "keep the track's base value from [TrackVoice]".
+ * Applied at section transitions by `PulsarViewModel`. Restored to base values
+ * automatically when the section ends.
  *
- * @param motifs Available beat patterns.
- * @param transitionWeights Markov matrix: probability of switching from motif i to motif j.
- * @param recencyDecay Penalty for recently-used motifs, 0-1. Higher = more variety.
- * @param barsPerMotifMin Minimum bars before switching motifs.
- * @param barsPerMotifMax Maximum bars before switching motifs.
- * @param switchProbability Chance of switching at a bar boundary, 0-1.
- */
-@Serializable
-data class MotifSet(
-    val motifs: List<BeatMotif>,
-    val transitionWeights: List<List<Float>> = emptyList(),
-    val recencyDecay: Float = 0.5f,
-    val barsPerMotifMin: Int = 4,
-    val barsPerMotifMax: Int = 8,
-    val switchProbability: Float = 0.6f,
-)
-
-/**
- * Per-track overrides within a specific section.
- * @param mutationRate Override pattern mutation rate for this track in this section.
- * @param motifLock If true, lock this track to its current motif (don't switch).
- * @param densityEnvelopeMin Minimum density envelope for this track in this section.
- * @param densityEnvelopeMax Maximum density envelope for this track in this section.
+ * Use this to give a track a different character per section — e.g. a pad that
+ * holds as a drone during the verse but plays short comping stabs during the
+ * chorus.
+ *
+ * @param holdProbability Override pattern-generator hold-chain probability (0..1).
+ *   Only meaningful for tracks 5..7 (effect/pad slots) — tracks 0..4 ignore holds.
+ * @param holdLengthMin Override min hold-chain length in steps.
+ * @param holdLengthMax Override max hold-chain length in steps.
+ * @param density Override per-step density (0..1). Negative = no override.
+ * @param volume Override mix volume (0..1).
+ * @param reverbSend Override per-track reverb send (0..1).
+ * @param delaySend Override per-track delay send (0..1).
+ * @param envelopeProfile Override envelope profile for this section. Switch e.g.
+ *   from `DRONE` (long swelling sustain) to `EFFECT` (short stabs that wash out
+ *   under solos).
+ * @param compingStyle Override comping style for chordal tracks. e.g. set the
+ *   base style to short stabs (`FUNK_STABS` / `JAZZ_COMP`) and use `PAD` here
+ *   only for sections that should sustain. Hold params do **not** affect
+ *   chordal tracks — comping style is the rhythm source.
+ * @param sectionInversion Override voicing inversion for chordal tracks
+ *   (e.g. `OPEN_VOICING` in chorus, `ROOT_POSITION` in verse).
+ * @param arpMode Override arpeggiation mode for chordal tracks. `ALWAYS` to
+ *   force arpeggiation, `NEVER` for block stabs, `AUTO` for engine-default.
+ * @param chordFollow Override chord-follow mode for melodic and chordal tracks.
+ *   e.g. flip a bass from `ROOT_ONLY` (verse pedal) to `FOLLOW` (chorus walks).
  */
 @Serializable
 data class TrackSectionOverride(
-    val mutationRate: Float? = null,
-    val motifLock: Boolean = false,
-    val densityEnvelopeMin: Float? = null,
-    val densityEnvelopeMax: Float? = null,
+    val holdProbability: Float? = null,
+    val holdLengthMin: Int? = null,
+    val holdLengthMax: Int? = null,
+    val density: Float? = null,
+    val volume: Float? = null,
+    val reverbSend: Float? = null,
+    val delaySend: Float? = null,
+    val envelopeProfile: EnvelopeProfile? = null,
+    val compingStyle: CompingStyle? = null,
+    val sectionInversion: SectionInversion? = null,
+    val arpMode: ArpMode? = null,
+    val chordFollow: ChordFollow? = null,
 )
 
 /**
@@ -1288,8 +1330,9 @@ data class TrackSectionOverride(
  *   e.g., `MacroOverrides(energy = 1.4f)` boosts energy 40% during this section.
  * @param tensionOverride Replace the vibe's tension profile for this section.
  * @param soloMode Solo mode for this section (null = no solos).
- * @param motifSet Beat pattern variations for this section.
  * @param trackOverrides Per-track parameter overrides specific to this section.
+ *   Map of track index (0..7) to [TrackSectionOverride]. Applied at section
+ *   entry; restored to track base values at section exit.
  */
 @Serializable
 data class Section(
@@ -1302,7 +1345,6 @@ data class Section(
     val macroOverrides: MacroOverrides? = null,
     val tensionOverride: TensionProfile? = null,
     val soloMode: SoloMode? = null,
-    val motifSet: MotifSet? = null,
     val trackOverrides: Map<Int, TrackSectionOverride>? = null,
     /** Override all CHORDAL tracks' comping style for this section. null = keep defaults. */
     val compingStyle: CompingStyle? = null,

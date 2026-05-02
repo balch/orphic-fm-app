@@ -12,11 +12,13 @@ actual class MediaSessionManager {
     private var handler: MediaSessionActionHandler? = null
     private var isActive = false
     private var isPlaying = false
-    actual var onSkipNext: (() -> Unit)? = null
-    actual var onSkipPrevious: (() -> Unit)? = null
-    actual var onPlay: (() -> Unit)? = null
-    actual var onPause: (() -> Unit)? = null
-    actual var onPlayFromMediaId: ((String) -> Unit)? = null
+
+    // Cache the latest metadata so `activate()` can replay it. Without this
+    // the metadata combine collector in PlaybackController fires before the
+    // session is active (since both launch concurrently), the no-op silently
+    // discards it, and the now-playing widget stays blank until the user
+    // changes a vibe. Caching means activation = an immediate metadata push.
+    private var latestMetadata: PlaybackMetadata? = null
 
     actual fun activate() {
         if (isActive) return
@@ -24,25 +26,26 @@ actual class MediaSessionManager {
 
         MacOsNowPlaying.setup(object : MacOsNowPlaying.Callback {
             override fun onPlay() {
-                val customHandler = onPlay
-                if (customHandler != null) customHandler() else handler?.onPlay()
+                handler?.onPlay()
             }
             override fun onPause() {
-                val customHandler = onPause
-                if (customHandler != null) customHandler() else handler?.onPause()
+                handler?.onPause()
             }
             override fun onTogglePlayPause() {
                 if (isPlaying) handler?.onPause() else handler?.onPlay()
             }
             override fun onNext() {
-                onSkipNext?.invoke()
+                handler?.onSkipNext()
             }
             override fun onPrevious() {
-                onSkipPrevious?.invoke()
+                handler?.onSkipPrevious()
             }
         })
 
         isActive = true
+        // Replay any metadata that arrived before activation so the widget
+        // shows the current title/art immediately, not after the next vibe change.
+        latestMetadata?.let { pushToNative(it) }
     }
 
     actual fun deactivate() {
@@ -54,6 +57,7 @@ actual class MediaSessionManager {
 
     actual fun updatePlaybackState(isPlaying: Boolean) {
         this.isPlaying = isPlaying
+        if (!isActive) return
         MacOsNowPlaying.updatePlaybackState(isPlaying)
     }
 
@@ -62,8 +66,14 @@ actual class MediaSessionManager {
     }
 
     actual fun updateMetadata(metadata: PlaybackMetadata) {
+        latestMetadata = metadata
         if (!isActive) return
-        MacOsNowPlaying.updateMetadata(metadata.title, metadata.displaySubtitle)
+        pushToNative(metadata)
+    }
+
+    private fun pushToNative(metadata: PlaybackMetadata) {
+        MacOsNowPlaying.updateMetadata(metadata.title, metadata.subtitle)
+        MacOsNowPlaying.updateArtwork(metadata.artworkPng)
         MacOsNowPlaying.updatePlaybackState(metadata.isPlaying)
         isPlaying = metadata.isPlaying
     }

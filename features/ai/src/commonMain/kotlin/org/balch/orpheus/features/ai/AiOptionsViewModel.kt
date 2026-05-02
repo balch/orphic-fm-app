@@ -10,6 +10,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
@@ -28,7 +29,6 @@ import org.balch.orpheus.core.ai.AiProvider
 import org.balch.orpheus.core.audio.HyperLfoMode
 import org.balch.orpheus.core.audio.ModSource
 import org.balch.orpheus.core.audio.SynthEngine
-import org.balch.orpheus.core.audio.SynthOrchestrator
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.coroutines.runCatchingSuspend
 import org.balch.orpheus.core.di.FeatureScope
@@ -116,6 +116,8 @@ data class AiOptionsPanelActions(
 interface AiOptionsFeature : SynthFeature<AiOptionsUiState, AiOptionsPanelActions> {
     override val synthControl: SynthFeature.SynthControl
         get() = SynthFeature.SynthControl.Empty
+    /** Current AI mode (USER when none active; DRONE/SOLO when an AI feature is engaged). */
+    val currentMode: kotlinx.coroutines.flow.StateFlow<org.balch.orpheus.core.media.PlaybackMode>
 }
 
 /**
@@ -144,7 +146,6 @@ class AiOptionsViewModel(
     private val aiModelProvider: AiModelProvider,
     private val dispatcherProvider: DispatcherProvider,
     private val playbackLifecycleManager: PlaybackLifecycleManager,
-    private val synthOrchestrator: SynthOrchestrator,
     private val mediaSessionStateManager: MediaSessionStateManager,
     private val scope: FeatureCoroutineScope,
 ) : AiOptionsFeature, AutoCloseable {
@@ -240,8 +241,6 @@ class AiOptionsViewModel(
             }
         }
 
-        // Reset playback mode to USER since no AI is active
-        synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
     }
 
     /**
@@ -271,9 +270,6 @@ class AiOptionsViewModel(
         
         log.debug { "Starting Solo Agent with custom params - request: $event" }
 
-        // Update playback mode for notifications
-        synthOrchestrator.setPlaybackMode(PlaybackMode.SOLO)
-        
         // Clear old agent reference before incrementing session
         _soloAgent.value = null
         _sessionId.value++
@@ -400,9 +396,6 @@ class AiOptionsViewModel(
                 _showChatDialog.value = true // Ensure ChatDialog is visible
             }
             
-            // Update playback mode for notifications
-            synthOrchestrator.setPlaybackMode(PlaybackMode.DRONE)
-            
             // Clear old drone agent reference (if any) before incrementing session
             _droneAgent.value = null
             _sessionId.value++ // Signal UI to clear logs
@@ -435,8 +428,6 @@ class AiOptionsViewModel(
             _droneAgent.value?.stop()
             _droneAgent.value = null  // Clear the reference
             
-            // Reset playback mode to USER
-            synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
         }
     }
 
@@ -483,9 +474,6 @@ class AiOptionsViewModel(
             if (showDialog) {
                 _showChatDialog.value = true
             }
-            
-            // Update playback mode for notifications
-            synthOrchestrator.setPlaybackMode(PlaybackMode.SOLO)
             
             // Clear old solo agent reference (if any) before incrementing session
             _soloAgent.value = null
@@ -541,8 +529,6 @@ class AiOptionsViewModel(
             _soloAgent.value?.stop()
             _soloAgent.value = null  // Clear the reference
             
-            // Reset playback mode to USER
-            synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
         }
     }
 
@@ -633,7 +619,6 @@ class AiOptionsViewModel(
         // Update state
         _isSoloActive.value = false
         mediaSessionStateManager.setSoloActive(false)
-        synthOrchestrator.setPlaybackMode(PlaybackMode.USER)
     }
 
     // ============================================================
@@ -822,6 +807,16 @@ class AiOptionsViewModel(
     private val _isReplActive = MutableStateFlow(false)
     private val _showChatDialog = MutableStateFlow(false)
 
+    override val currentMode: StateFlow<PlaybackMode> =
+        combine(_isDroneActive, _isSoloActive, _isReplActive) { drone, solo, repl ->
+            when {
+                drone -> PlaybackMode.DRONE
+                solo -> PlaybackMode.SOLO
+                repl -> PlaybackMode.REPL
+                else -> PlaybackMode.USER
+            }
+        }.stateIn(scope, SharingStarted.Eagerly, PlaybackMode.USER)
+
     // ============================================================
     // API Key Management
     // ============================================================
@@ -910,6 +905,7 @@ class AiOptionsViewModel(
             object : AiOptionsFeature {
                 override val stateFlow: StateFlow<AiOptionsUiState> = MutableStateFlow(state)
                 override val actions: AiOptionsPanelActions = AiOptionsPanelActions.EMPTY
+                override val currentMode: StateFlow<PlaybackMode> = MutableStateFlow(PlaybackMode.USER)
             }
 
         @Composable

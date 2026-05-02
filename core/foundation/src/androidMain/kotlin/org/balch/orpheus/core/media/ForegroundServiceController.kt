@@ -36,9 +36,9 @@ interface ForegroundServiceController {
     fun updatePlaybackState(isPlaying: Boolean)
     
     /**
-     * Update the metadata (mode, display name, etc.).
+     * Update the metadata (title, subtitle, play state).
      */
-    fun updateMetadata(title: String, mode: String, modeDisplayName: String, isPlaying: Boolean)
+    fun updateMetadata(title: String, subtitle: String, isPlaying: Boolean)
 
     companion object {
         // Action constants that match AudioForegroundService
@@ -49,13 +49,11 @@ interface ForegroundServiceController {
         const val ACTION_UPDATE_STATE_PAUSED = "org.balch.orpheus.UPDATE_STATE_PAUSED"
         const val ACTION_UPDATE_METADATA = "org.balch.orpheus.UPDATE_METADATA"
         const val EXTRA_TITLE = "extra_title"
-        const val EXTRA_MODE = "extra_mode"
-        const val EXTRA_MODE_DISPLAY_NAME = "extra_mode_display_name"
+        const val EXTRA_SUBTITLE = "extra_subtitle"
         const val EXTRA_IS_PLAYING = "extra_is_playing"
         const val ACTION_SKIP_NEXT = "org.balch.orpheus.SKIP_NEXT"
         const val ACTION_SKIP_PREVIOUS = "org.balch.orpheus.SKIP_PREVIOUS"
         const val ACTION_PLAY_FROM_MEDIA_ID = "org.balch.orpheus.PLAY_FROM_MEDIA_ID"
-        const val EXTRA_SUBTITLE = "extra_subtitle"
         const val EXTRA_MEDIA_ID = "extra_media_id"
     }
 }

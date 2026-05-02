@@ -4,10 +4,7 @@ import com.diamondedge.logging.logging
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +18,7 @@ import org.balch.orpheus.core.audio.SynthEngine
 import org.balch.orpheus.core.controller.ControlEventOrigin
 import org.balch.orpheus.core.controller.ControlStateSnapshot
 import org.balch.orpheus.core.controller.SynthController
+import org.balch.orpheus.core.coroutines.AppCoroutineScope
 import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleEvent
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
@@ -61,9 +59,9 @@ class TidalScheduler(
     private val playbackLifecycleManager: PlaybackLifecycleManager,
     private val dispatchProvider: DispatcherProvider,
     private val globalTempo: GlobalTempo,
+    private val scope: AppCoroutineScope,
 ) {
     private val log = logging("TidalScheduler")
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     
     private val _state = MutableStateFlow(TidalSchedulerState())
     val state: StateFlow<TidalSchedulerState> = _state.asStateFlow()

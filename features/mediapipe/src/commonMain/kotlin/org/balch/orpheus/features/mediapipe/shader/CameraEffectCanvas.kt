@@ -4,17 +4,15 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.IntSize
-import kotlin.math.pow
 import kotlinx.coroutines.isActive
 import org.balch.orpheus.core.audio.SynthEngine
+import kotlin.math.pow
 
 /**
  * Draws the camera image through an audio-reactive SKSL shader.
@@ -41,14 +39,16 @@ fun CameraEffectCanvas(
         return
     }
 
-    // Animation time — advances every display frame
-    var elapsed by remember { mutableFloatStateOf(0f) }
+    // Animation time — advances every display frame. Held as FloatState (no
+    // `by` delegate) so the read happens *inside* the Canvas drawScope below;
+    // 60Hz writes only invalidate the draw pass instead of recomposing.
+    val elapsed = remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         var startNanos = 0L
         while (isActive) {
             withFrameNanos { frameNanos ->
                 if (startNanos == 0L) startNanos = frameNanos
-                elapsed = (frameNanos - startNanos) / 1_000_000_000f
+                elapsed.floatValue = (frameNanos - startNanos) / 1_000_000_000f
             }
         }
     }
@@ -65,7 +65,7 @@ fun CameraEffectCanvas(
             masterLevel = master,
             peakLevel = peak,
             lfoMod = lfo,
-            time = elapsed,
+            time = elapsed.floatValue,
         )
         if (brush != null) {
             drawRect(brush = brush)

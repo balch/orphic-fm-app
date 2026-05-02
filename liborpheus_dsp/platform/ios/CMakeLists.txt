@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ── iOS deployment target ────────────────────────
-set(CMAKE_OSX_DEPLOYMENT_TARGET "16.0")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
 
 # ── Eurorack source location ────────────────────
 if(NOT DEFINED EURORACK_DIR)

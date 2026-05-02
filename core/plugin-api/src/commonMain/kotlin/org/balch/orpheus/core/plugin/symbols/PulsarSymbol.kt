@@ -762,6 +762,45 @@ enum class PulsarSymbol(
     TRACK_6_CHORD_FOLLOW("track_6_chord_follow"),
     TRACK_7_CHORD_FOLLOW("track_7_chord_follow"),
 
+    // Per-track LPG mode (applies on the EDM engine slot):
+    //   int LpgMode (0=BYPASS, 1=SUSTAINED, 2=PLUCK, 3=ENGINE_DEFAULT)
+    TRACK_0_LPG_MODE("track_0_lpg_mode"),
+    TRACK_1_LPG_MODE("track_1_lpg_mode"),
+    TRACK_2_LPG_MODE("track_2_lpg_mode"),
+    TRACK_3_LPG_MODE("track_3_lpg_mode"),
+    TRACK_4_LPG_MODE("track_4_lpg_mode"),
+    TRACK_5_LPG_MODE("track_5_lpg_mode"),
+    TRACK_6_LPG_MODE("track_6_lpg_mode"),
+    TRACK_7_LPG_MODE("track_7_lpg_mode"),
+    // Per-track LPG mode for the SPACE engine slot (Kotlin pushes
+    // lpgModeSpace ?: lpgMode so a single explicit lpgMode covers both slots).
+    TRACK_0_LPG_MODE_SPACE("track_0_lpg_mode_space"),
+    TRACK_1_LPG_MODE_SPACE("track_1_lpg_mode_space"),
+    TRACK_2_LPG_MODE_SPACE("track_2_lpg_mode_space"),
+    TRACK_3_LPG_MODE_SPACE("track_3_lpg_mode_space"),
+    TRACK_4_LPG_MODE_SPACE("track_4_lpg_mode_space"),
+    TRACK_5_LPG_MODE_SPACE("track_5_lpg_mode_space"),
+    TRACK_6_LPG_MODE_SPACE("track_6_lpg_mode_space"),
+    TRACK_7_LPG_MODE_SPACE("track_7_lpg_mode_space"),
+    // Per-track LPG decay (vactrol tail length): float 0-1
+    TRACK_0_LPG_DECAY("track_0_lpg_decay"),
+    TRACK_1_LPG_DECAY("track_1_lpg_decay"),
+    TRACK_2_LPG_DECAY("track_2_lpg_decay"),
+    TRACK_3_LPG_DECAY("track_3_lpg_decay"),
+    TRACK_4_LPG_DECAY("track_4_lpg_decay"),
+    TRACK_5_LPG_DECAY("track_5_lpg_decay"),
+    TRACK_6_LPG_DECAY("track_6_lpg_decay"),
+    TRACK_7_LPG_DECAY("track_7_lpg_decay"),
+    // Per-track LPG colour (HF bleed): float 0-1
+    TRACK_0_LPG_COLOUR("track_0_lpg_colour"),
+    TRACK_1_LPG_COLOUR("track_1_lpg_colour"),
+    TRACK_2_LPG_COLOUR("track_2_lpg_colour"),
+    TRACK_3_LPG_COLOUR("track_3_lpg_colour"),
+    TRACK_4_LPG_COLOUR("track_4_lpg_colour"),
+    TRACK_5_LPG_COLOUR("track_5_lpg_colour"),
+    TRACK_6_LPG_COLOUR("track_6_lpg_colour"),
+    TRACK_7_LPG_COLOUR("track_7_lpg_colour"),
+
     // Pulsar dedicated effect parameters (pushed on vibe change)
     PULSAR_DELAY_TIME_A("pulsar_delay_time_a"),
     PULSAR_DELAY_TIME_B("pulsar_delay_time_b"),

@@ -6,6 +6,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.zacsweers.metro.createGraphFactory
+import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.djapp.di.DjAppGraph
 
 fun main() {
@@ -13,6 +14,10 @@ fun main() {
 
     application {
         val graph = remember { createGraphFactory<DjAppGraph.Factory>().create() }
+        // Eagerly initialize PulsarPlaybackBridge so its init {} subscribes to
+        // PlaybackController.state at startup. Without this touch the singleton
+        // is never created and the PULSAR_PLAYING port stays at 0.
+        remember { graph.pulsarPlaybackBridge }
 
         Window(
             onCloseRequest = {
@@ -27,7 +32,11 @@ fun main() {
             title = "Orphic-DJ",
             state = rememberWindowState(width = 360.dp, height = 780.dp),
         ) {
-            DjApp(graph)
+            DjApp(graph) {
+                val controller = graph.playbackController
+                if (controller.state.value == PlaybackState.Playing) controller.pause()
+                else controller.play()
+            }
         }
     }
 }

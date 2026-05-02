@@ -1,53 +1,71 @@
 package org.balch.orpheus.core.audio
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
+import org.balch.orpheus.core.coroutines.AppCoroutineScope
+import org.balch.orpheus.core.coroutines.DispatcherProvider
 import org.balch.orpheus.core.lifecycle.PlaybackLifecycleManager
+import org.balch.orpheus.core.media.MediaSessionManager
 import org.balch.orpheus.core.media.MediaSessionStateManager
+import org.balch.orpheus.core.playback.MetadataProducer
+import org.balch.orpheus.core.playback.MuteSink
+import org.balch.orpheus.core.playback.PlaybackController
+import org.balch.orpheus.core.playback.PlaybackState
 import org.balch.orpheus.core.plugin.PortValue
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Integration tests for SynthOrchestrator's engine lifecycle and media session
- * activation, focusing on the stop-then-play recovery path that occurs when
- * a user stops playback via the notification and later presses Play in the UI.
+ * Tests for SynthOrchestrator engine lifecycle.
  *
- * These tests use real MediaSessionManager (JVM) and MediaSessionStateManager
- * instances. The JVM MediaSessionManager's native macOS calls are no-ops in test.
+ * SynthOrchestrator now owns only:
+ *  - Engine start/stop.
+ *  - Routing RequestResume to PlaybackController.
+ *  - Routing StopAll to MediaSessionStateManager.clearAll().
+ *
+ * MediaSession activation, pause/resume, and mode tracking were moved to
+ * PlaybackController (tested in PlaybackControllerTest).
  */
 class SynthOrchestratorTest {
 
-    /** Real-time delay to let SynthOrchestrator's internal Dispatchers.Default collectors process.
-     *  Must use withContext(Default) because runTest uses virtual time for delay(). */
-    private suspend fun settle() = withContext(Dispatchers.Default) { delay(100) }
-
     private fun createOrchestrator(): TestHarness {
+        val scope = testScope()
         val engine = FakeSynthEngine()
-        val mediaSessionManager = org.balch.orpheus.core.media.MediaSessionManager()
         val playbackLifecycleManager = PlaybackLifecycleManager()
-        val mediaSessionStateManager = MediaSessionStateManager()
-
+        val mediaSessionStateManager = MediaSessionStateManager(scope)
+        val muteCalls = mutableListOf<PlaybackState>()
+        val controller = PlaybackController(
+            mediaSessionManager = MediaSessionManager(),
+            mediaSessionStateManager = mediaSessionStateManager,
+            playbackLifecycleManager = playbackLifecycleManager,
+            muteSink = MuteSink { state -> muteCalls.add(state) },
+            metadataProducer = FakeMetadata(),
+            scope = scope,
+        )
         val orchestrator = SynthOrchestrator(
             engine = engine,
-            mediaSessionManager = mediaSessionManager,
             playbackLifecycleManager = playbackLifecycleManager,
             mediaSessionStateManager = mediaSessionStateManager,
+            playbackController = controller,
+            scope = scope,
         )
-        return TestHarness(orchestrator, engine, mediaSessionStateManager)
+        return TestHarness(orchestrator, engine, mediaSessionStateManager, controller, muteCalls)
     }
 
     private data class TestHarness(
         val orchestrator: SynthOrchestrator,
         val engine: FakeSynthEngine,
         val mediaSessionStateManager: MediaSessionStateManager,
+        val playbackController: PlaybackController,
+        val muteCalls: MutableList<PlaybackState>,
     )
 
     // ═══════════════════════════════════════════════════════════
-    // Tests
+    // Engine lifecycle tests
     // ═══════════════════════════════════════════════════════════
 
     @Test
@@ -70,91 +88,70 @@ class SynthOrchestratorTest {
     }
 
     @Test
-    fun `setPulsarActive after start activates media session`() = runTest {
+    fun `stop broadcasts StopAll which clears MediaSessionStateManager`() = runTest {
         val h = createOrchestrator()
         h.orchestrator.start()
-
         h.mediaSessionStateManager.setPulsarActive(true)
-        settle()
+        assertTrue(h.mediaSessionStateManager.isMediaSessionNeeded.value, "Should be needed before stop")
 
-        // Verify via peakFlow — a proxy that the orchestrator is alive.
-        // The real assertion is that no exception was thrown and the flow completed.
-        assertTrue(h.engine.started, "Engine should still be running")
-    }
-
-    @Test
-    fun `stop then setPulsarActive restarts engine`() = runTest {
-        val h = createOrchestrator()
-
-        // 1. Normal startup + play
-        h.orchestrator.start()
-        h.mediaSessionStateManager.setPulsarActive(true)
-        settle()
-        assertTrue(h.engine.started, "Engine should be running after start")
-
-        // 2. Stop (simulates notification Stop button).
-        //    stop() emits StopAll which asynchronously calls clearAll().
         h.orchestrator.stop()
-        settle() // Let StopAll → clearAll() propagate
-        assertFalse(h.engine.started, "Engine should be stopped after stop()")
 
-        // 3. User presses Play in UI → sets Pulsar active
-        h.mediaSessionStateManager.setPulsarActive(true)
-        settle()
-
-        // 4. Engine should have been restarted by the orchestrator
-        assertTrue(h.engine.started, "Engine should restart when setPulsarActive(true) after stop")
-        assertTrue(h.engine.volume > 0f, "Master volume should be restored after restart")
+        assertFalse(h.mediaSessionStateManager.isMediaSessionNeeded.value, "clearAll should have cleared state")
     }
 
     @Test
-    fun `setPulsarActive before explicit start auto-starts engine`() = runTest {
-        val h = createOrchestrator()
+    fun `RequestResume via shared PlaybackLifecycleManager calls play`() = runTest {
+        val scope = testScope()
+        val engine = FakeSynthEngine()
+        val plm = PlaybackLifecycleManager()
+        val mediaSessionStateManager = MediaSessionStateManager(scope)
+        val muteCalls = mutableListOf<PlaybackState>()
+        val controller = PlaybackController(
+            mediaSessionManager = MediaSessionManager(),
+            mediaSessionStateManager = mediaSessionStateManager,
+            playbackLifecycleManager = plm,
+            muteSink = MuteSink { state -> muteCalls.add(state) },
+            metadataProducer = FakeMetadata(),
+            scope = scope,
+        )
+        SynthOrchestrator(
+            engine = engine,
+            playbackLifecycleManager = plm,
+            mediaSessionStateManager = mediaSessionStateManager,
+            playbackController = controller,
+            scope = scope,
+        )
 
-        // When isMediaSessionNeeded becomes true and the engine isn't started,
-        // the orchestrator should auto-start the engine.
-        h.mediaSessionStateManager.setPulsarActive(true)
-        settle()
+        controller.play()
+        controller.pause()
+        assertEquals(PlaybackState.Paused, controller.state.value)
 
-        assertTrue(h.engine.started, "Engine should auto-start when media session is needed")
-    }
+        plm.tryRequestResume()
 
-    @Test
-    fun `multiple stop-play cycles work`() = runTest {
-        val h = createOrchestrator()
-
-        repeat(3) { cycle ->
-            h.orchestrator.start()
-            h.mediaSessionStateManager.setPulsarActive(true)
-            settle()
-            assertTrue(h.engine.started, "Cycle $cycle: engine should be running")
-
-            h.orchestrator.stop()
-            settle() // Let StopAll → clearAll() propagate
-            assertFalse(h.engine.started, "Cycle $cycle: engine should be stopped")
-        }
-
-        // Final restart — setPulsarActive(true) should restart engine
-        h.mediaSessionStateManager.setPulsarActive(true)
-        settle()
-        assertTrue(h.engine.started, "Engine should restart on final cycle")
-    }
-
-    @Test
-    fun `pause and resume preserve volume`() = runTest {
-        val h = createOrchestrator()
-        h.orchestrator.start()
-        h.engine.setMasterVolume(0.6f)
-
-        h.orchestrator.pause()
-        assertTrue(h.engine.volume == 0f, "Volume should be 0 when paused")
-
-        h.orchestrator.resume()
-        assertTrue(h.engine.volume == 0.6f, "Volume should be restored on resume")
+        assertEquals(PlaybackState.Playing, controller.state.value, "RequestResume should have called play()")
     }
 }
 
-// ─── Minimal Fake ─────────────────────────────────────────────────────────────
+private fun assertEquals(expected: PlaybackState, actual: PlaybackState, message: String = "") {
+    if (expected != actual) throw AssertionError("Expected $expected but was $actual. $message")
+}
+
+// ─── Minimal Fakes ────────────────────────────────────────────────────────────
+
+private class FakeMetadata : MetadataProducer {
+    override val titleFlow = MutableStateFlow("T")
+    override val subtitleFlow = MutableStateFlow("S")
+}
+
+private class TestDispatchers(private val d: CoroutineDispatcher) : DispatcherProvider {
+    override val main get() = d
+    override val io get() = d
+    override val default get() = d
+    override val unconfined get() = d
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun testScope() = AppCoroutineScope(TestDispatchers(UnconfinedTestDispatcher()))
 
 private class FakeSynthEngine : SynthEngine {
     var started = false
