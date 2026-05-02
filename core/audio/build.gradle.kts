@@ -15,7 +15,7 @@ kotlin {
     val iosBuildDir = rootProject.file("liborpheus_dsp/platform/ios")
     // Device target gets device library path; simulator targets get simulator library path
     val deviceTargets = listOf(iosArm64())
-    val simTargets = listOf(iosSimulatorArm64(), iosX64())
+    val simTargets = listOf(iosSimulatorArm64())
     (deviceTargets + simTargets).forEach { target ->
         val isDevice = target in deviceTargets
         val libSubdir = if (isDevice) "build-device" else "build-sim"
